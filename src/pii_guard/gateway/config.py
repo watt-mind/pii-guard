@@ -9,6 +9,9 @@ These live here, not in ``pii_guard.config``, until the settings work (LAB-1095)
 | ``PII_GUARD_GATEWAY_UPSTREAM_TIMEOUT`` | ``upstream_timeout`` (s) | ``120`` |
 | ``PII_GUARD_GATEWAY_CACHE_SIZE`` | ``cache_size`` (entries) | ``4096`` |
 | ``PII_GUARD_GATEWAY_CONCURRENCY`` | ``concurrency`` (parallel detections) | ``4`` |
+| ``PII_GUARD_GATEWAY_MAX_IMAGES`` | ``max_images`` (inline images per request) | ``4`` |
+| ``PII_GUARD_GATEWAY_MAX_IMAGE_BYTES`` | ``max_image_bytes`` (per image, decoded) | ``10485760`` |
+| ``PII_GUARD_GATEWAY_IMAGE_TIMEOUT`` | ``image_timeout`` (s, all images of a request) | ``120`` |
 | ``PII_GUARD_GATEWAY_KEEP_TYPES`` | ``keep_types`` (deprecated) | unset |
 | ``PII_GUARD_LLM_DETECTOR_REASONING_EFFORT`` | ``llm_reasoning_effort`` | unset |
 
@@ -58,6 +61,13 @@ class GatewayConfig(BaseSettings):
     )
     cache_size: int = Field(default=4096, ge=0, validation_alias="PII_GUARD_GATEWAY_CACHE_SIZE")
     concurrency: int = Field(default=4, ge=1, validation_alias="PII_GUARD_GATEWAY_CONCURRENCY")
+    max_images: int = Field(default=4, ge=0, validation_alias="PII_GUARD_GATEWAY_MAX_IMAGES")
+    max_image_bytes: int = Field(
+        default=10 * 1024 * 1024, ge=1, validation_alias="PII_GUARD_GATEWAY_MAX_IMAGE_BYTES"
+    )
+    image_timeout: float = Field(
+        default=120.0, gt=0, validation_alias="PII_GUARD_GATEWAY_IMAGE_TIMEOUT"
+    )
     # Deprecated: use PII_GUARD_POLICY_OVERRIDES. None = not set (the policies decide).
     keep_types: Annotated[frozenset[EntityType] | None, NoDecode] = Field(
         default=None, validation_alias="PII_GUARD_GATEWAY_KEEP_TYPES"

@@ -10,19 +10,31 @@ can set ``app.state.gateway`` directly, or override pieces before the first requ
 from __future__ import annotations
 
 import json
+import math
 import threading
 
 from fastapi import Request
 from starlette.responses import Response
 
 from pii_guard.api.deps import get_max_text_chars, get_vault
-from pii_guard.api.routes._common import log_extra, v1_router
+from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
 from pii_guard.gateway import Gateway, InvalidChatRequestError
 
 __all__ = ["get_gateway", "router"]
 
-router = v1_router()
 _lock = threading.Lock()
+
+
+class GatewayRoute(LoggedRoute):
+    """Room for the configured number of inline images (base64) on top of the text limit."""
+
+    def max_body_bytes(self, request: Request) -> int:
+        config = get_gateway(request).config
+        images = math.ceil(config.max_images * config.max_image_bytes / 3) * 4
+        return text_body_limit(request) + images
+
+
+router = v1_router(GatewayRoute)
 
 
 def get_gateway(request: Request) -> Gateway:

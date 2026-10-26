@@ -2,11 +2,12 @@ import type { KeyboardEvent } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 
-export type Screen = "playground" | "roundtrip";
+export type Screen = "playground" | "roundtrip" | "images";
 
 const SCREENS: { id: Screen; step: string; label: string }[] = [
   { id: "playground", step: "1", label: "Playground" },
   { id: "roundtrip", step: "2", label: "Round trip" },
+  { id: "images", step: "3", label: "Images" },
 ];
 
 interface Props {

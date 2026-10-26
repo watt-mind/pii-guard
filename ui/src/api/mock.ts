@@ -7,6 +7,7 @@ import { utf16ToCodePoint } from "../lib/codepoints";
 import { ENTITY_META } from "../lib/entities";
 import { placeholderRegex } from "../lib/placeholders";
 import { ApiError } from "./http";
+import { createMockImageEngine } from "./imageMock";
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
@@ -294,6 +295,9 @@ export function createMockClient(options: MockClientOptions = {}): GuardClient {
         })),
       };
     },
+
+    // Images: replays recorded regions for the built-in samples (see imageMock.ts).
+    maskImage: createMockImageEngine({ latencyMs: latency * 3 }).maskImage,
 
     // No artificial latency here: streaming calls unmask once per chunk.
     async unmask(req: UnmaskRequest): Promise<UnmaskResponse> {

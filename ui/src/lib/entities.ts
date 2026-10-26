@@ -166,8 +166,54 @@ export function metaFor(type: EntityType | null | undefined): EntityMeta {
   return type ? ENTITY_META[type] : UNKNOWN_META;
 }
 
-export const DETECTOR_LABEL: Record<string, string> = {
-  rules: "Rules + checksum",
-  ner: "Multilingual NER",
-  llm: "Llama detector",
+/** Rule detections of these types are validated by a checksum; other rule hits are patterns. */
+export const CHECKSUM_TYPES: ReadonlySet<EntityType> = new Set<EntityType>([
+  "NATIONAL_ID_HU_TAX",
+  "NATIONAL_ID_HU_TAJ",
+  "BANK_ACCOUNT",
+  "COMPANY_ID_HU",
+]);
+
+const TEXT_TYPES = Object.keys(ENTITY_META).filter((t) => !["FACE", "SIGNATURE", "ID_PHOTO", "STAMP"].includes(t)) as EntityType[];
+
+/**
+ * Which text types each built-in detector looks for (src/pii_guard/detect). `partly`: only some
+ * forms (rules find postcodes and street patterns, not every address).
+ */
+export const DETECTOR_TYPES: Record<string, { types: readonly EntityType[]; partly?: readonly EntityType[] }> = {
+  rules: {
+    types: ["EMAIL", "PHONE", "NATIONAL_ID_HU_TAX", "NATIONAL_ID_HU_TAJ", "BANK_ACCOUNT", "COMPANY_ID_HU", "ID_DOCUMENT", "VEHICLE_PLATE"],
+    partly: ["ADDRESS"],
+  },
+  ner: { types: ["PERSON", "ORGANIZATION", "ADDRESS"] },
+  llm: { types: TEXT_TYPES },
 };
+
+const KNOWN_MODELS: { prefix: string; label: (version: string) => string }[] = [
+  { prefix: "muse-spark-", label: (v) => `Muse Spark ${v} (Meta API)` },
+];
+
+/** A model id as a person reads it: "muse-spark-1.3" -> "Muse Spark 1.3 (Meta API)". */
+export function modelLabel(model: string): string {
+  const id = model.split("/").pop() ?? model;
+  for (const known of KNOWN_MODELS) if (id.startsWith(known.prefix)) return known.label(id.slice(known.prefix.length));
+  return id;
+}
+
+export interface DetectorLabelOptions {
+  /** The types this detector found here: rules get "+ checksum" only for checksum-validated types. */
+  types?: Iterable<EntityType>;
+  /** The model behind a model-backed detector, when the API reports it. */
+  model?: string;
+}
+
+/** Label a detector by what actually ran, never by what it might be. */
+export function detectorLabel(detector: string, options: DetectorLabelOptions = {}): string {
+  if (detector === "rules") {
+    const types = [...(options.types ?? [])];
+    return types.some((t) => CHECKSUM_TYPES.has(t)) ? "Rules + checksum" : "Rules";
+  }
+  if (detector === "llm") return options.model ? modelLabel(options.model) : "LLM detector";
+  if (detector === "ner") return "Multilingual NER";
+  return detector;
+}

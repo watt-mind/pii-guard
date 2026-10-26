@@ -78,9 +78,55 @@ export interface ErrorBody {
   error: { code: string; message: string };
 }
 
+/** `POST /v1/mask/image`: the image is sent as the raw body (PNG or JPEG). */
+export interface ImageMaskRequest {
+  image: Blob;
+  /** Built-in sample id; lets the demo engine replay its recorded regions. Never sent. */
+  sampleId?: string | null;
+  language?: string;
+}
+
+export type RegionSource = "sam" | "ocr";
+export type RegionPolicy = "mask" | "keep" | "block";
+
+/** One region, as the API reports it: inclusive pixel corners, no value. */
+export interface ImageRegion {
+  entity_type: EntityType;
+  box: [number, number, number, number];
+  source: RegionSource;
+  detector: string;
+  score: number | null;
+  policy: RegionPolicy;
+}
+
+export interface TypeCount {
+  entity_type: EntityType;
+  count: number;
+}
+
+export interface ImageAnalysis {
+  sam: { model: string; entity_types: EntityType[] };
+  /** `models`: model id per model-backed detector (`{"llm": "muse-spark-1.3"}`). */
+  ocr: { ran: boolean; engine: string | null; detectors: string[]; models?: Record<string, string>; reason: string | null };
+}
+
+export interface ImageMaskResponse {
+  /** The masked image, base64 PNG. Empty from the demo engine, which only replays regions. */
+  image: string;
+  media_type: string;
+  width: number;
+  height: number;
+  regions: ImageRegion[];
+  masked: TypeCount[];
+  kept: TypeCount[];
+  analysis: ImageAnalysis;
+}
+
 /** What every engine (live API or the built-in demo engine) offers the screens. */
 export interface GuardClient {
   analyze(req: AnalyzeRequest): Promise<AnalyzeResponse>;
   mask(req: MaskRequest): Promise<MaskResponse>;
   unmask(req: UnmaskRequest): Promise<UnmaskResponse>;
+  /** Optional so text-only engines (and test doubles) still fit. */
+  maskImage?(req: ImageMaskRequest): Promise<ImageMaskResponse>;
 }

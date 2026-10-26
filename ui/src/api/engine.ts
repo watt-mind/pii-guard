@@ -10,7 +10,7 @@
 
 import { ApiError, UnreachableError } from "./http";
 import { MOCK_SESSION_PREFIX } from "./mock";
-import type { GuardClient, HealthResponse } from "./types";
+import type { GuardClient, HealthResponse, ImageMaskRequest, ImageMaskResponse } from "./types";
 
 export type ModePreference = "auto" | "api" | "mock";
 export type EngineKind = "api" | "mock";
@@ -61,6 +61,7 @@ export interface RoutingClient {
   analyze(...args: Parameters<GuardClient["analyze"]>): Promise<Routed<Awaited<ReturnType<GuardClient["analyze"]>>>>;
   mask(...args: Parameters<GuardClient["mask"]>): Promise<Routed<Awaited<ReturnType<GuardClient["mask"]>>>>;
   unmask(...args: Parameters<GuardClient["unmask"]>): Promise<Routed<Awaited<ReturnType<GuardClient["unmask"]>>>>;
+  maskImage(req: ImageMaskRequest): Promise<Routed<ImageMaskResponse>>;
 }
 
 export interface RoutingDeps {
@@ -74,13 +75,18 @@ export interface RoutingDeps {
 }
 
 export function createRoutingClient(deps: RoutingDeps): RoutingClient {
-  async function route<K extends "analyze" | "mask">(
+  async function route<K extends "analyze" | "mask" | "maskImage">(
     method: K,
-    req: Parameters<GuardClient[K]>[0],
-  ): Promise<Routed<Awaited<ReturnType<GuardClient[K]>>>> {
-    type Result = Awaited<ReturnType<GuardClient[K]>>;
+    req: Parameters<Required<GuardClient>[K]>[0],
+  ): Promise<Routed<Awaited<ReturnType<Required<GuardClient>[K]>>>> {
+    type Result = Awaited<ReturnType<Required<GuardClient>[K]>>;
     const state = deps.getState();
-    const call = (client: GuardClient) => (client[method] as (r: typeof req) => Promise<Result>)(req);
+    const call = (client: GuardClient) => {
+      const fn = client[method] as ((r: typeof req) => Promise<Result>) | undefined;
+      // An engine without this method (a text-only test double) counts as not reachable.
+      if (!fn) return Promise.reject(new UnreachableError(`${method} is not available`));
+      return fn(req);
+    };
     if (state.preference === "mock") return { data: await call(deps.mock), engine: "mock" };
     // In auto mode every call tries the API first, so a transient 404 or a missed health
     // check can't pin the session to the demo engine.
@@ -105,6 +111,7 @@ export function createRoutingClient(deps: RoutingDeps): RoutingClient {
   return {
     analyze: (req) => route("analyze", req),
     mask: (req) => route("mask", req),
+    maskImage: (req) => route("maskImage", req),
     // A session lives in the engine that created it.
     async unmask(req) {
       if (req.session_id.startsWith(MOCK_SESSION_PREFIX)) {

@@ -264,6 +264,75 @@ including `keep` and `block` ones: analyze never refuses on policy.
 mapping (invented or mangled by the model). They are left in `text` as is. Unknown or
 expired `session_id` → 404 `not_found`.
 
+### `POST /v1/mask/image`
+
+Cover faces, signatures, ID photos and text personal data in a PNG or JPEG image
+(`pii_guard.api.routes.image`, shared pipeline in `pii_guard.api.routes.image_masking`).
+
+Request, either form:
+
+- **raw upload**: the image bytes as the body with `Content-Type: image/png` or `image/jpeg`;
+  optional `?language=hu`. `curl --data-binary @card.png -H 'Content-Type: image/png' …`
+- **JSON**: `{"image": "<base64>" | "data:image/png;base64,…", "language": "hu"}`.
+
+The format is sniffed from the bytes; anything but PNG/JPEG is `415 unsupported_media_type`.
+Images up to 10 MiB decoded (`app.state.max_image_bytes`); larger is `413`. Multipart form
+uploads are not accepted (they would need an extra dependency).
+
+```json
+// response 200
+{
+  "image": "iVBORw0KGgo…",            // the masked image, base64 PNG, re-encoded from pixels
+  "media_type": "image/png",
+  "width": 720, "height": 450,
+  "regions": [
+    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "sam", "detector": "sam", "score": null, "policy": "mask"},
+    {"entity_type": "NATIONAL_ID_HU_TAJ", "box": [310, 184, 437, 206], "source": "ocr", "detector": "rules", "score": 1.0, "policy": "mask"},
+    {"entity_type": "STAMP", "box": [392, 572, 548, 728], "source": "sam", "detector": "sam", "score": null, "policy": "keep"}
+  ],
+  "masked": [{"entity_type": "FACE", "count": 1}, {"entity_type": "NATIONAL_ID_HU_TAJ", "count": 1}],
+  "kept": [{"entity_type": "STAMP", "count": 1}],
+  "analysis": {
+    "sam": {"model": "sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO", "STAMP"]},
+    "ocr": {"ran": true, "engine": "tesseract", "detectors": ["rules", "llm"], "models": {"llm": "muse-spark-1.3"}, "reason": null}
+  }
+}
+```
+
+- `box` is `[x1, y1, x2, y2]`, inclusive pixel corners in the image after EXIF orientation.
+  `source` is `sam` (SAM 3.1 segmentation) or `ocr` (OCR word boxes of a span a text detector
+  found); `detector` is `sam` or the text detector's registry name. SAM gives no scores.
+- `FACE` boxes are grown before masking (40% up, 10% on each side, 5% down, clamped to the
+  image) because SAM's face box leaves hair and ears visible; the reported box is the grown
+  one, i.e. the area covered.
+- `analysis.ocr.models` maps each model-backed text detector to its model id, so clients can
+  label regions by what actually ran.
+- Regions never carry the covered text or pixels. Overlapping regions of the same type and
+  source are merged into their union (SAM's `signature` and `squiggly line` prompts).
+- Policies apply per region: `mask` regions are filled solid black (plus 2 px), `keep` regions
+  (`STAMP` by default) are reported and left visible, any `block` region is
+  `422 blocked_entity` with no image.
+- SAM segments every visual type it has a prompt for (one Meta API request per prompt:
+  `face`, `signature`, `squiggly line`, `id photo`, `stamp`). It needs `META_API_KEY` (or
+  `PII_GUARD_SAM_API_KEY`); without one every call is `503 detection_failed`.
+- Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
+  binary with `hun`/`eng` data), OCR text goes through the API's detectors
+  (`PII_GUARD_DETECTORS`, so names need `llm`). Otherwise only SAM runs and `analysis.ocr` is
+  `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "tesseract_unavailable"}`: text in
+  the image was **not** checked.
+- Fail closed: any SAM, OCR or detector error is `503 detection_failed`, a masking error
+  `500 masking_failed`; an undecodable image or bad base64 is `422 invalid_image`. Error bodies
+  never contain the image.
+
+The gateway (`POST /v1/chat/completions`) runs the same pipeline on `image_url` content parts
+whose URL is an inline `data:image/png|jpeg;base64,…` URL, with the request mode's detectors
+for OCR text, and forwards a masked PNG data URL in its place (other part fields such as
+`detail` are kept). Remote `http(s)` and other URLs are `400 unsupported_content`: the guard
+never fetches URLs. Limits: `PII_GUARD_GATEWAY_MAX_IMAGES` (4) images of
+`PII_GUARD_GATEWAY_MAX_IMAGE_BYTES` (10 MiB) each, `PII_GUARD_GATEWAY_IMAGE_TIMEOUT` (120 s)
+for all of a request's images. Responses to requests with images carry `X-PII-Guard-Images`,
+`X-PII-Guard-Image-Regions-Masked` and `X-PII-Guard-Image-OCR: on|off`.
+
 ## Vault (planned)
 
 Package: `pii_guard.vault`. Implements [ADR 0007](decisions/0007-keyed-pseudonyms.md).

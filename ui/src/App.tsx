@@ -9,15 +9,18 @@ import { useEngine } from "./hooks/useEngine";
 import { useTheme } from "./hooks/useTheme";
 import { initialAnswer, runGuard, toRunError, type RunError, type RunResult } from "./lib/run";
 import { Playground } from "./screens/Playground";
+import { Images } from "./screens/Images";
 import { RoundTrip } from "./screens/RoundTrip";
 
 export interface AppProps {
   api?: HttpGuardClient;
   mock?: GuardClient;
   envMode?: string;
+  /** Loads a sample image's bytes (Images screen); injectable for tests. */
+  loadImage?: (src: string) => Promise<Blob>;
 }
 
-export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE }: AppProps) {
+export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage }: AppProps) {
   const apiClient = useMemo(() => api ?? createHttpClient(), [api]);
   const mockClient = useMemo(() => mock ?? createMockClient({ latencyMs: 220 }), [mock]);
   const engine = useEngine(apiClient, mockClient, envMode);
@@ -79,7 +82,10 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE }
       {engine.engine === "mock" && (
         <div role="status" className="border-b border-warn/30 bg-warn-soft">
           <p className="mx-auto max-w-[1440px] px-4 py-2 text-xs text-ink sm:px-6 sm:text-sm">
-            <strong className="font-semibold text-warn">Demo mode.</strong> {engineReason(engine.state)}. Detection runs in your browser with a small built-in rule set, so results are illustrative.{" "}
+            <strong className="font-semibold text-warn">Demo mode.</strong> {engineReason(engine.state)}.{" "}
+            {screen === "images"
+              ? "Images replay regions recorded from a real SAM 3.1 run on the built-in samples; uploads need the API."
+              : "Detection runs in your browser with a small built-in rule set, so results are illustrative."}{" "}
             {engine.state.status.state === "online" ? (
               engine.state.preference === "mock" ? (
                 <>Switch the engine to Auto or Live API for the real pipeline.</>
@@ -123,10 +129,13 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE }
             onRun={() => void run()}
           />
         </div>
+        <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={screen !== "images"}>
+          <Images client={engine.client} engineState={engine.state} loadImage={loadImage} />
+        </div>
       </main>
 
       <footer className="mx-auto max-w-[1440px] px-4 pb-10 text-xs text-faint sm:px-6">
-        All sample data is fictional. This page only talks to pii-guard and never calls a model provider; the model answers on the Round trip screen are simulated.
+        All sample data is fictional. This page only talks to pii-guard and never calls a model provider itself (SAM 3.1 is called by the pii-guard server); the model answers on the Round trip screen are simulated.
       </footer>
     </div>
   );
