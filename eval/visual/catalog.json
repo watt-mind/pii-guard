@@ -1,0 +1,500 @@
+{
+  "version": 1,
+  "description": "Bounded list of official specimen ID documents to fetch for the visual eval (LAB-1120). Images are downloaded into data/specimens/ and never committed (ADR 0005).",
+  "sources": [
+    {
+      "name": "prado",
+      "url": "https://www.consilium.europa.eu/prado/en/prado-latest-authentic.html",
+      "kind": "probe"
+    },
+    {
+      "name": "eszemelyi",
+      "url": "https://eszemelyi.hu/az-eszemelyi/",
+      "kind": "probe"
+    },
+    {
+      "name": "wikimedia-commons",
+      "url": "https://commons.wikimedia.org/",
+      "kind": "commons"
+    }
+  ],
+  "specimens": [
+    {
+      "country": "AT",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:New_Austrian_ID_Card_(2021).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "AT",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:New_Austrian_ID_Card_(Backside)_(2021).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "BE",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:New_Belgian_ID_(2021)_(front).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "BE",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:New_Belgian_ID_(2021)_(back).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "BG",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:New_Bulgarian_ID_card_(front).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "BG",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Bulgarian_Identity_card_-_back_(2024).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "HR",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Croatian_National_ID_2021_-_front.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "HR",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Croatian_National_ID_2021_-_back.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "CY",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Cypriot_identity_card_-_2020_-_Front.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "CY",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Cypriot_identity_card_-_2020_-_Back.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "CZ",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:2021_Czech_ID_card_front.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "CZ",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:2021_Czech_ID_card_back.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "EE",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:New_Estonian_ID_card_(2021)(front).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "EE",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:New_Estonian_ID_card_(2021)(back).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "FI",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:New_Finnish_ID_Card_(front).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "FI",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:New_Finnish_ID_Card_(back).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "FR",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Carte_identité_électronique_française_(2021,_recto).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "FR",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Carte_identité_électronique_française_(2021,_verso).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "DE",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Personalausweis_Vorderseite_(2024).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "DE",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Personalausweis_Rückseite_(2024).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "GR",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Το_νέο_Ελληνικό_Δελτίο_Ταυτότητας_Βιομετρικών_Στοιχείων_(εμπρόσθια_όψη).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "GR",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Νέα_Ελληνική_Ταυτότητα_Βιομετρικών_δεδομένων_(οπίσθια_όψη_με_τον_Προσωπικό_Αριθμό).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:The_renewed_hungarian_ID.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:HunIDback.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:HunIDfront.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Hungarian_identity_card.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Hungarian_identity_card_back.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "IT",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:CIE_(fronte).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "IT",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:CIE_(retro).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "LV",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Latvia-ID_(Front).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "LV",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Latvia-ID_(Back).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "LT",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:New_lithuanian_ID_card_(2021)_(front).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "LT",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:New_lithuanian_ID_card_(2021)_(back).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "LU",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Luxembourg_Identity_Card_2021.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "LU",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Luxembourg_Identity_Card_2021_verso.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "MT",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Maltese_ID_card_(2021)_(front).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "MT",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Maltese_ID_card_(back).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "NL",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Nederlandse_identiteitskaart_2021-II_(Voorkant).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "NL",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Nederlandse_identiteitskaart_2021-II_(Rug).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "PL",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Dowod-osobisty-wzorzec-2021-awers.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "PL",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Dowod-osobisty-wzorzec-2021-rewers.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "PT",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Portugal_Identity_Card_-_Cartão_de_Cidadão,_New_model_2024.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "PT",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Portugal_Identity_Card,_new_model_(Back).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "RO",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:New_Romanian_ID_Card_(2021).png",
+      "verified_specimen": true
+    },
+    {
+      "country": "SK",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Slovak_national_ID_card_(front).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "SK",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:SK_Biometric_ID_card_specimen.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "SI",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Slovenian_ID_Card_2022_-_Front.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "SI",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Slovenian_ID_Card_2022_-_Rear.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "ES",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Spanish_ID_card_(front_side).webp",
+      "verified_specimen": true
+    },
+    {
+      "country": "ES",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Spanish_ID_card_(back_side).webp",
+      "verified_specimen": true
+    },
+    {
+      "country": "SE",
+      "doc_type": "id_card",
+      "side": "front",
+      "commons_title": "File:Nya_svensk_ID.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "SE",
+      "doc_type": "id_card",
+      "side": "back",
+      "commons_title": "File:Nya_svensk_ID_backsidan.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "AT",
+      "doc_type": "passport",
+      "side": "data_page",
+      "commons_title": "File:Passport_of_Austria_(2024)_data_page.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "FR",
+      "doc_type": "passport",
+      "side": "data_page",
+      "commons_title": "File:French_passport_data_page_sample.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "DE",
+      "doc_type": "passport",
+      "side": "data_page",
+      "commons_title": "File:Deutscher_Reisepass_(2024)_-_Passkartendatenseite.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "HU",
+      "doc_type": "passport",
+      "side": "data_page",
+      "commons_title": "File:Hungarian_passport_biodata_page.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "ES",
+      "doc_type": "passport",
+      "side": "data_page",
+      "commons_title": "File:Spanish_passport_data_page_sample.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "PL",
+      "doc_type": "passport",
+      "side": "data_page",
+      "commons_title": "File:Polski_wzór_paszportu_2022.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "AT",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "commons_title": "File:A_Licence_2013_Front.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "AT",
+      "doc_type": "driving_licence",
+      "side": "back",
+      "commons_title": "File:A_Licence_2013_Back.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "DE",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "commons_title": "File:DE_Licence_2021_Front.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "DE",
+      "doc_type": "driving_licence",
+      "side": "back",
+      "commons_title": "File:DE_Licence_2021_Back.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "DE",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "commons_title": "File:DE_Licence_Desiré_Jeanette_Mustermann_Front.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "FR",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "commons_title": "File:Recto-du-nouveau-permis.jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "IT",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "commons_title": "File:IT_licence_(front).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "IT",
+      "doc_type": "driving_licence",
+      "side": "back",
+      "commons_title": "File:IT_licence_(back).jpg",
+      "verified_specimen": true
+    },
+    {
+      "country": "PL",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "commons_title": "File:Driving_licence_Poland_2013_recto.png",
+      "verified_specimen": true
+    },
+    {
+      "country": "PL",
+      "doc_type": "driving_licence",
+      "side": "back",
+      "commons_title": "File:Driving_licence_Poland_2013_verso.png",
+      "verified_specimen": true
+    }
+  ],
+  "review_note": "Every listed image was looked at before labelling (2026-10-27): each shows an official specimen (a SPECIMEN/MUSTER/WZÓR/FACSIMILE/VZOREC mark or a standard specimen holder such as Mustermann). Dropped after review: images whose values were already blanked out and a combined front+back duplicate."
+}

@@ -131,7 +131,7 @@ def test_segment_sends_store_false_and_one_request_per_prompt() -> None:
     assert [r.entity_type for r in regions] == [EntityType.FACE]
     assert all(isinstance(r, Region) for r in regions)
     prompts = [b["input"][0]["content"][0]["text"] for b in rec.bodies]
-    assert prompts == ["face", "signature", "squiggly line", "id photo"]
+    assert prompts == ["face", "signature", "squiggly line", "photo of a person"]
     for request, body in zip(rec.requests, rec.bodies, strict=True):
         assert body["store"] is False
         assert body["model"] == DEFAULT_MODEL

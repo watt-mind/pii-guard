@@ -60,11 +60,16 @@ API_KEY_ENV_VAR = "PII_GUARD_SAM_API_KEY"
 #: ``SIGNATURE``: on the Meta API (2026-10-26) ``"signature"`` and ``"handwriting"`` returned
 #: nothing for drawn or script-font signatures on synthetic documents, while
 #: ``"squiggly line"`` found the pen scribbles; it may also cover other squiggles (over-masking
-#: is the safe side).
+#: is the safe side). On 30 official specimen ID documents (``pii-guard eval visual
+#: --prompt-study``, 2026-10-27) ``"signature"`` found 90 % of real signatures and
+#: ``"squiggly line"`` none, so both stay: one for real documents, one for drawn ones.
+#: ``ID_PHOTO``: on the same specimens ``"id photo"`` and ``"passport photo"`` returned nothing
+#: (0/37 portraits), while ``"photo of a person"`` found 89 % at IoU >= 0.5 with 3 stray
+#: regions; see ``eval/results/visual/``.
 DEFAULT_PROMPTS: dict[EntityType, tuple[str, ...]] = {
     EntityType.FACE: ("face",),
     EntityType.SIGNATURE: ("signature", "squiggly line"),
-    EntityType.ID_PHOTO: ("id photo",),
+    EntityType.ID_PHOTO: ("photo of a person",),
     EntityType.STAMP: ("stamp",),
 }
 DEFAULT_ENTITY_TYPES: tuple[EntityType, ...] = (

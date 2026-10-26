@@ -4,6 +4,7 @@
 pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language hu[,en]]
                [--json OUT] [--markdown OUT] [--baselines presidio,llm-guard,privaite]
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
+pii-guard eval visual --specimens data/specimens  # visual recall on specimen ID documents
 ```
 
 ``--fixtures`` may be repeated and may name a directory (every ``*.jsonl`` in it); the
@@ -94,6 +95,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pii_guard.eval.generate import main as generate_main
 
         return generate_main(argv[1:])
+    if argv[:1] == ["visual"]:  # ``pii-guard eval visual``: image masking on specimens
+        from pii_guard.eval.visual import main as visual_main
+
+        return visual_main(argv[1:])
     args = build_parser().parse_args(argv)
     fixture_paths = _expand_fixture_paths(args.fixtures or [DEFAULT_FIXTURES])
     try:
