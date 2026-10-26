@@ -1,0 +1,133 @@
+"""Rule detector: regular expressions plus validation for structured identifiers.
+
+The first, deterministic detection layer (``docs/architecture.md`` → detect/Rules). Every rule
+finds candidates with a regular expression and keeps only those that pass validation
+(checksums, known prefixes and area codes, address context), so precision is high and the
+output is fully reproducible.
+
+Rules are organised by language pack (ADR 0008):
+
+- :mod:`.common`: language-independent rules (IBAN, email, international phone numbers,
+  payment cards), run for every text;
+- one module per language (:mod:`.hu`, :mod:`.en`), registered as a :class:`RulePack` with
+  ``everywhere`` rules (identifiers with a checksum or a distinctive validated format, run for
+  every language: a Hungarian tax ID in an English e-mail is still personal data) and
+  ``rules`` (formats that are only unambiguous in that language's texts, such as postcodes,
+  plates and national phone formats, run only when ``language`` matches).
+
+A language without a pack gets the language-independent rules and every pack's
+``everywhere`` rules. Register another pack with :func:`register_rule_pack`.
+
+Look-alikes are rejected on purpose: wrong check digits, digits that are part of a longer
+digit run (``12345678901`` contains no 10-digit tax ID), and dates.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from pii_guard.detect.rules import common, en, hu
+from pii_guard.detect.rules._base import Rule, _Hit
+from pii_guard.types import DetectionError, Span
+
+__all__ = [
+    "DETECTOR_CLASS",
+    "Rule",
+    "RuleDetector",
+    "RulePack",
+    "primary_language",
+    "register_rule_pack",
+    "rule_packs",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class RulePack:
+    """The rules one language contributes.
+
+    - ``language``: ISO 639-1 code (``"hu"``, ``"en"``).
+    - ``everywhere``: validated identifiers of that country, run for every language.
+    - ``rules``: run only when the analysed text is in ``language``.
+    """
+
+    language: str
+    everywhere: tuple[Rule, ...] = ()
+    rules: tuple[Rule, ...] = ()
+
+
+_PACKS: dict[str, RulePack] = {
+    "hu": RulePack("hu", everywhere=hu.EVERYWHERE, rules=hu.RULES),
+    "en": RulePack("en", everywhere=en.EVERYWHERE, rules=en.RULES),
+}
+
+
+def primary_language(language: str) -> str:
+    """``"en-GB"`` / ``"EN_us"`` → ``"en"``; blank → ``"und"``."""
+    return (language or "").strip().lower().replace("_", "-").split("-")[0] or "und"
+
+
+def register_rule_pack(pack: RulePack) -> None:
+    """Use ``pack`` for ``pack.language``, replacing any existing one.
+
+    Takes effect for :class:`RuleDetector` instances created afterwards.
+    """
+    _PACKS[primary_language(pack.language)] = pack
+
+
+def rule_packs() -> dict[str, RulePack]:
+    """The registered packs by language (a copy)."""
+    return dict(_PACKS)
+
+
+def _drop_contained(hits: list[_Hit]) -> list[_Hit]:
+    """Remove hits that lie entirely inside another hit (e.g. digits inside an IBAN).
+
+    Partial overlaps are kept: the resolver decides those.
+    """
+    ordered = sorted(set(hits), key=lambda h: (h.start, -(h.end - h.start), -h.score))
+    kept: list[_Hit] = []
+    for hit in ordered:
+        if any(k.start <= hit.start and hit.end <= k.end for k in kept):
+            continue
+        kept.append(hit)
+    return kept
+
+
+class RuleDetector:
+    """Deterministic, checksum-validated detector for structured identifiers.
+
+    Stateless and safe to share between threads. Any unexpected error is raised as
+    :class:`DetectionError` without the input text (ADR 0006: fail closed).
+    """
+
+    name = "rules"
+
+    def __init__(self) -> None:
+        packs = rule_packs()
+        #: Run for every language: language-independent rules + every pack's ``everywhere``.
+        self._rules: tuple[Rule, ...] = common.RULES + tuple(
+            rule for pack in packs.values() for rule in pack.everywhere
+        )
+        #: Run only for their language.
+        self._language_rules: dict[str, tuple[Rule, ...]] = {
+            code: pack.rules for code, pack in packs.items()
+        }
+
+    def rules_for(self, language: str) -> tuple[Rule, ...]:
+        """Every rule that runs for a text in ``language``."""
+        return self._rules + self._language_rules.get(primary_language(language), ())
+
+    def detect(self, text: str, language: str = "hu") -> list[Span]:
+        if not isinstance(text, str):
+            raise DetectionError(f"rules detector expects str, got {type(text).__name__}")
+        try:
+            hits = [hit for rule in self.rules_for(language) for hit in rule(text)]
+            return [
+                Span(h.start, h.end, h.entity_type, text[h.start : h.end], h.score, self.name)
+                for h in _drop_contained(hits)
+            ]
+        except Exception as exc:
+            raise DetectionError("rules detector failed") from exc
+
+
+DETECTOR_CLASS = RuleDetector
