@@ -64,6 +64,73 @@ curl http://127.0.0.1:8787/healthz      # {"status":"ok","version":"0.1.0"}
 Or with Docker: `docker compose up --build`. Configuration comes from environment variables;
 see [.env.example](.env.example).
 
+### Gateway quickstart
+
+Point any OpenAI-compatible client at pii-guard instead of the provider. Every message is
+masked when it arrives, the masked request is forwarded, and the answer (streamed or not) comes
+back with the real values restored. Example with the Meta Model API as upstream and Muse Spark
+as the LLM detector (**fictional data only** on hosted models, see
+[docs/models.md](docs/models.md)):
+
+```bash
+export PII_GUARD_TENANT_KEY=$(openssl rand -hex 32)
+export PII_GUARD_UPSTREAM_BASE_URL=https://api.meta.ai/v1
+export PII_GUARD_UPSTREAM_API_KEY=$META_API_KEY
+export PII_GUARD_LLM_DETECTOR_URL=https://api.meta.ai/v1      # strict mode's LLM detector
+export PII_GUARD_LLM_DETECTOR_API_KEY=$META_API_KEY
+export PII_GUARD_LLM_DETECTOR_MODEL=muse-spark-1.3
+export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=minimal
+uv run pii-guard serve                                        # http://127.0.0.1:8787
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:8787/v1", api_key="unused")
+messages = [
+    {
+        "role": "system",
+        "content": "Values like [[PERSON_1a2b3c]] are the user's real data, "
+        "masked for privacy. Use them verbatim.",
+    },
+    {
+        "role": "user",
+        "content": "I'm Jane Placeholder, jane.placeholder@example.net. "
+        "Write one sentence inviting Teszt Elek to lunch.",
+    },
+]
+raw = client.chat.completions.with_raw_response.create(model="muse-spark-1.3", messages=messages)
+print(raw.parse().choices[0].message.content)  # real names; the model only saw placeholders
+session = raw.headers["X-PII-Guard-Session"]  # send it back on the next turn
+
+stream = client.chat.completions.create(
+    model="muse-spark-1.3",
+    stream=True,
+    messages=[
+        *messages,
+        {"role": "assistant", "content": raw.parse().choices[0].message.content},
+        {"role": "user", "content": "Now mention Minta Mária too."},
+    ],
+    extra_headers={"X-PII-Guard-Session": session},
+)
+for chunk in stream:
+    if chunk.choices:
+        print(chunk.choices[0].delta.content or "", end="")
+```
+
+| Header | Direction | Meaning |
+|---|---|---|
+| `X-PII-Guard-Session` | both | The conversation. Omit it to start one; the response carries it. Same session = same placeholders, and history is not detected again. Unknown or expired → 404. |
+| `X-PII-Guard-Mode` | request | `strict` (rules + LLM detector, the default) or `fast` (rules only, no model call). |
+| `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
+| `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
+
+Fails closed: a detection error or timeout (`PII_GUARD_GATEWAY_DETECTION_TIMEOUT`, 30 s), image
+or audio parts, or a missing tenant key or upstream return an error and nothing is forwarded.
+Further settings (`PII_GUARD_GATEWAY_MODE`, `_UPSTREAM_TIMEOUT`, `_CACHE_SIZE`, `_CONCURRENCY`,
+`_KEEP_TYPES`) are documented in `src/pii_guard/gateway/config.py`. Without
+`PII_GUARD_UPSTREAM_API_KEY`, the client's own `Authorization` header is forwarded.
+
 ## Documentation
 
 Start at [docs/INDEX.md](docs/INDEX.md).
