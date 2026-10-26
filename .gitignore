@@ -1,0 +1,81 @@
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+
+# Virtual environments (uv creates .venv/)
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Notebooks
+.ipynb_checkpoints/
+
+# --- Node (demo UI, if added) -----------------------------------------------
+node_modules/
+.nuxt/
+.output/
+.next/
+
+# --- Secrets & local configuration ------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Models & weights (download or serve them, never commit) -----------------
+models/
+checkpoints/
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.onnx
+
+# --- Data -------------------------------------------------------------------
+# Only synthetic, generated data may ever be committed, and only under
+# eval/fixtures/. Everything below is local working data.
+data/
+eval/generated/
+eval/runs/
+# Real documents must never enter the repository, not even temporarily.
+real/
+private/
+**/real-data/
+
+# --- Logs & runtime ---------------------------------------------------------
+*.log
+logs/
+tmp/
+*.sqlite
+*.db
+
+# --- Editors & OS -----------------------------------------------------------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Agent worktrees --------------------------------------------------------
+.worktrees/
