@@ -3,6 +3,7 @@
 ```
 pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language hu[,en]]
                [--json OUT] [--markdown OUT]
+pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
 ```
 
 ``--fixtures`` may be repeated and may name a directory (every ``*.jsonl`` in it); the
@@ -80,7 +81,12 @@ def _expand_fixture_paths(raw: Sequence[str]) -> list[Path]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(list(argv) if argv is not None else None)
+    argv = list(argv) if argv is not None else sys.argv[1:]
+    if argv[:1] == ["generate"]:  # ``pii-guard eval generate``: the corpus generator
+        from pii_guard.eval.generate import main as generate_main
+
+        return generate_main(argv[1:])
+    args = build_parser().parse_args(argv)
     fixture_paths = _expand_fixture_paths(args.fixtures or [DEFAULT_FIXTURES])
     try:
         documents = load_fixtures(fixture_paths)

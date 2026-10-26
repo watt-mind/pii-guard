@@ -1,0 +1,152 @@
+# Hungarian document templates for the synthetic corpus (pii_guard.eval.generate).
+#
+# Each [[kinds]] entry is one document shape. `parties` lists the fictional identities the
+# model must write into it: `kind` is person | company | property | court | office, `fields`
+# are the values it must use (see pii_guard.eval.identities.FIELD_TYPES). `informal = true`
+# also offers the person's given name for informal address.
+
+language = "hu"
+language_name = "Hungarian"
+inflection_rule = """Hungarian case endings are welcome on names of people, companies, towns and \
+streets and after numbers (Kovács Annának, Kovács Annával, a Napfény Ingatlan Kft.-vel, \
+a 06 30 123 4567-es számon), but the value itself must stay intact in front of the ending. \
+Give the full name in its full form at least once; later you may refer to people by surname \
+or given name alone."""
+typos = " Make it feel real: a few typos, missing accents or casual abbreviations in the surrounding text (never inside the values)."
+
+[field_labels]
+name = "name"
+mother_name = "mother's name (anyja neve)"
+date_of_birth = "date of birth"
+address = "address"
+email = "e-mail"
+phone = "phone"
+tax_id = "tax ID (adóazonosító jel)"
+taj = "TAJ number"
+id_document = "ID card number (személyi igazolvány száma)"
+bank_account = "bank account"
+plate = "licence plate (rendszám)"
+org_name = "name"
+reg_number = "company registration number (cégjegyzékszám)"
+tax_number = "tax number (adószám)"
+parcel = "parcel number (helyrajzi szám)"
+given = "given name, for informal address"
+
+[[kinds]]
+id = "sale-contract"
+title = "Ingatlan adásvételi szerződés (real estate sale contract)"
+brief = "A real estate sale contract between a seller and a buyer for a flat: the parties' personal data block, the property with its parcel number and address, the purchase price in forints, payment by bank transfer to the seller's account, handover date, the usual clauses, and a place and date line with signature lines."
+register = "formal legal Hungarian"
+length = "300-450"
+weight = 2
+parties = [
+  { role = "seller", label = "Eladó (seller)", kind = "person", fields = ["name", "mother_name", "date_of_birth", "address", "tax_id", "id_document", "bank_account"] },
+  { role = "buyer", label = "Vevő (buyer)", kind = "person", fields = ["name", "date_of_birth", "address", "tax_id"] },
+  { role = "property", label = "Ingatlan (property)", kind = "property", fields = ["parcel", "address"] },
+]
+
+[[kinds]]
+id = "lease"
+title = "Lakásbérleti szerződés (residential lease)"
+brief = "A residential lease between a landlord company and a private tenant: the parties, the flat, monthly rent and deposit paid to the landlord's account, duration, utilities, termination clauses and signature lines."
+register = "formal legal Hungarian"
+length = "300-450"
+weight = 2
+parties = [
+  { role = "landlord", label = "Bérbeadó (landlord)", kind = "company", fields = ["org_name", "reg_number", "tax_number", "address", "bank_account"] },
+  { role = "representative", label = "a bérbeadó képviselője, ügyvezető (the landlord's managing director)", kind = "person", fields = ["name"] },
+  { role = "tenant", label = "Bérlő (tenant)", kind = "person", fields = ["name", "mother_name", "date_of_birth", "id_document", "taj", "phone", "email"] },
+  { role = "flat", label = "Bérlemény (the rented flat)", kind = "property", fields = ["address"] },
+]
+
+[[kinds]]
+id = "power-of-attorney"
+title = "Meghatalmazás (power of attorney)"
+brief = "A power of attorney in which a principal authorises an agent to act for them before the land registry office in a matter concerning a property, with both parties' personal data, the scope of the authorisation, place and date, and signature lines for two witnesses described only by role."
+register = "formal legal Hungarian"
+length = "180-300"
+weight = 1
+parties = [
+  { role = "principal", label = "Meghatalmazó (principal)", kind = "person", fields = ["name", "mother_name", "date_of_birth", "address", "id_document"] },
+  { role = "agent", label = "Meghatalmazott (agent)", kind = "person", fields = ["name", "date_of_birth", "address"] },
+  { role = "property", label = "Ingatlan (property)", kind = "property", fields = ["parcel", "address"] },
+  { role = "office", label = "the land registry office", kind = "office", fields = ["org_name"] },
+]
+
+[[kinds]]
+id = "land-registry"
+title = "Tulajdoni lap, nem hiteles másolat (land registry title sheet extract)"
+brief = "A land registry title sheet extract laid out like the real form: part I (property: settlement, parcel number, address, area, land use), part II (owners with share, acquisition title and date), part III (encumbrances: a mortgage in favour of the lender company). Short lines, form-like."
+register = "official, form-like"
+length = "150-260"
+weight = 1
+parties = [
+  { role = "property", label = "Ingatlan (property)", kind = "property", fields = ["parcel", "address"] },
+  { role = "owner", label = "Tulajdonos (owner)", kind = "person", fields = ["name", "mother_name", "date_of_birth", "address"] },
+  { role = "lender", label = "Jelzálogjogosult (mortgage lender)", kind = "company", fields = ["org_name", "reg_number"] },
+  { role = "office", label = "the land registry office issuing the extract", kind = "office", fields = ["org_name"] },
+]
+
+[[kinds]]
+id = "court-notice"
+title = "Idézés / bírósági értesítés (court summons)"
+brief = "A court summons to a hearing in a civil case (case number, date and time, room), addressed to the defendant, mentioning the plaintiff, what to bring, the consequences of absence, and the court's contact details. Signed by a court clerk described only by role."
+register = "formal official Hungarian"
+length = "180-300"
+weight = 1
+parties = [
+  { role = "court", label = "Bíróság (the court)", kind = "court", fields = ["org_name", "address", "phone"] },
+  { role = "defendant", label = "Alperes (defendant, the addressee)", kind = "person", fields = ["name", "address", "date_of_birth"] },
+  { role = "plaintiff", label = "Felperes (plaintiff)", kind = "person", fields = ["name"] },
+]
+
+[[kinds]]
+id = "invoice"
+title = "Számla (invoice)"
+brief = "An invoice from a small company to a private customer, as plain text: seller block, buyer block, invoice number, dates, three or four line items with net, VAT and gross amounts in forints, total, payment by transfer to the seller's account."
+register = "business, terse"
+length = "120-220"
+weight = 1
+parties = [
+  { role = "seller", label = "Eladó / szolgáltató (seller)", kind = "company", fields = ["org_name", "tax_number", "address", "bank_account", "email"] },
+  { role = "buyer", label = "Vevő (customer)", kind = "person", fields = ["name", "address"] },
+]
+
+[[kinds]]
+id = "letter"
+title = "Hivatalos levél (formal letter)"
+brief = "A formal letter from a company to a customer about a car they bought (a payment reminder or a warranty matter), quoting the customer's details, the car's licence plate and the company's bank account, with contact details and a signature by a named staff member."
+register = "polite formal Hungarian"
+length = "180-300"
+weight = 1
+parties = [
+  { role = "sender", label = "Feladó cég (sender company)", kind = "company", fields = ["org_name", "address", "phone", "bank_account"] },
+  { role = "staff", label = "a levelet aláíró munkatárs (staff member signing)", kind = "person", fields = ["name"] },
+  { role = "customer", label = "Címzett (customer)", kind = "person", fields = ["name", "address", "plate"] },
+]
+
+[[kinds]]
+id = "email"
+title = "Informális e-mail (informal e-mail)"
+brief = "An informal e-mail between two friends or relatives who are sorting out paperwork (an apartment, a car, a tax return): the sender passes on personal details and asks for help. Subject line first, then the message."
+register = "informal, chatty Hungarian (tegeződés)"
+length = "90-180"
+weight = 2
+typos = true
+parties = [
+  { role = "sender", label = "Feladó (sender)", kind = "person", fields = ["name", "taj", "tax_id", "phone", "email"], informal = true },
+  { role = "recipient", label = "Címzett (recipient)", kind = "person", fields = ["name"], informal = true },
+]
+
+[[kinds]]
+id = "chat"
+title = "Chat-üzenetváltás (chat conversation)"
+brief = "A short instant-messaging conversation between two people arranging something practical (buying a used car, renting a flat, transferring money). Each line starts with the time and the speaker's given name, like '18:42 Anna: ...'. Short messages, emoji-free. At some point both give their full name (for a contract or a bank transfer) and the other details."
+register = "very informal Hungarian chat"
+length = "80-160"
+weight = 2
+typos = true
+parties = [
+  { role = "a", label = "first speaker", kind = "person", fields = ["name", "phone", "bank_account"], informal = true },
+  { role = "b", label = "second speaker", kind = "person", fields = ["name", "address", "plate"], informal = true },
+]
