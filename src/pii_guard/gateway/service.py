@@ -269,7 +269,7 @@ class Gateway:
                     f"detection timed out after {self.config.detection_timeout:g}s "
                     f"({detector.mode.value} mode)"
                 ) from None
-            except DetectionError:
+            except PiiGuardError:  # DetectionError, BlockedEntityError: already safe to return
                 raise
             except Exception as exc:
                 raise DetectionError(f"detection failed ({type(exc).__name__})") from exc

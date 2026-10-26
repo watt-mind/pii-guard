@@ -5,7 +5,10 @@
 > language pack's rules find and which type they map to ([ADR 0008](decisions/0008-language-packs.md)).
 
 Each entity type has a default **policy**: `mask` (replace with a pseudonym), `keep` (leave as
-is) or `block` (refuse the request). Deployments can override policies.
+is) or `block` (refuse the request). Deployments override policies with
+`PII_GUARD_POLICY_OVERRIDES`, e.g. `ORGANIZATION=mask,EMAIL=block` (validated at startup).
+The defaults in the `Default` columns below are `pii_guard.policy.DEFAULT_POLICIES`; a test
+keeps the two in sync. See [contracts.md](contracts.md#entity-policies-implemented).
 
 ## Text entities
 

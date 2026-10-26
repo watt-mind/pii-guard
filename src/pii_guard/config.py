@@ -7,13 +7,18 @@ appear in ``repr()`` or logs. Empty values (``PII_GUARD_SAM_URL=``) count as uns
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic import AliasChoices, Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-__all__ = ["DEFAULT_PORT", "Settings", "get_settings"]
+from pii_guard.policy import Policy, parse_overrides
+from pii_guard.types import EntityType
+
+__all__ = ["DEFAULT_DETECTORS", "DEFAULT_PORT", "Settings", "get_settings"]
 
 DEFAULT_PORT = 8787
+DEFAULT_DETECTORS: tuple[str, ...] = ("rules",)
 
 
 class Settings(BaseSettings):
@@ -31,6 +36,12 @@ class Settings(BaseSettings):
     log_level: str = "info"
     default_language: str = "hu"
 
+    # Detection and policies for the REST API (/v1/analyze, /v1/mask).
+    # Comma-separated registry names, run through the DetectionPipeline: "rules,llm".
+    detectors: Annotated[tuple[str, ...], NoDecode] = DEFAULT_DETECTORS
+    # "TYPE=mask|keep|block,..." on top of the defaults in docs/entities.md.
+    policy_overrides: Annotated[dict[EntityType, Policy], NoDecode] = Field(default_factory=dict)
+
     # Upstream LLM the gateway forwards masked requests to (OpenAI-compatible).
     upstream_base_url: str | None = None
     upstream_api_key: SecretStr | None = None
@@ -47,6 +58,22 @@ class Settings(BaseSettings):
     meta_api_key: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("META_API_KEY", "meta_api_key")
     )
+
+    @field_validator("detectors", mode="before")
+    @classmethod
+    def _split_detectors(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = [part.strip() for part in value.split(",") if part.strip()]
+        if isinstance(value, list | tuple) and not value:
+            raise ValueError("PII_GUARD_DETECTORS needs at least one detector name")
+        return value
+
+    @field_validator("policy_overrides", mode="before")
+    @classmethod
+    def _parse_policies(cls, value: object) -> object:
+        if isinstance(value, str) or value is None:
+            return parse_overrides(value)
+        return value
 
     def tenant_key_bytes(self) -> bytes | None:
         """The tenant key decoded from hex, or ``None`` if unset.
