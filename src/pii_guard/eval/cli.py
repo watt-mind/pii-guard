@@ -2,14 +2,15 @@
 
 ```
 pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language hu[,en]]
-               [--json OUT] [--markdown OUT]
+               [--json OUT] [--markdown OUT] [--baselines presidio,llm-guard,privaite]
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
 ```
 
 ``--fixtures`` may be repeated and may name a directory (every ``*.jsonl`` in it); the
 default is ``eval/fixtures``. Detectors are looked up in the registry by name; one that
 can't be loaded is skipped with a warning. The Markdown scorecard goes to stdout (and to
-``--markdown``), the JSON scorecard to ``--json``.
+``--markdown``), the JSON scorecard to ``--json``. ``--baselines`` also runs open-source
+tools over the same documents (:mod:`pii_guard.eval.baselines`) and appends a comparison.
 
 Exit codes: 0 success, 1 a detector or the vault failed during the run, 2 bad arguments,
 unreadable fixtures or no loadable detector.
@@ -64,6 +65,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="extend",
         metavar="LANGS",
         help="only documents in these languages (comma-separated, repeatable)",
+    )
+    parser.add_argument(
+        "--baselines",
+        type=_csv,
+        default=[],
+        metavar="NAMES",
+        help="also score these open-source tools: presidio, llm-guard, privaite",
     )
     parser.add_argument("--json", type=Path, metavar="OUT", help="write the JSON scorecard here")
     parser.add_argument(
@@ -122,6 +130,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         languages=args.language,
     )
     markdown = render_markdown(scorecard)
+    if args.baselines:
+        from pii_guard.eval.baselines import render_comparison, run_baselines
+
+        try:
+            scorecard["baselines"], skipped = run_baselines(documents, args.baselines)
+        except PiiGuardError as exc:
+            print(f"pii-guard eval: baseline failed: {exc.code}: {exc.message}", file=sys.stderr)
+            return 1
+        scorecard["meta"]["skipped_baselines"] = [{"name": n, "reason": r} for n, r in skipped]
+        for name, reason in skipped:
+            print(f"pii-guard eval: warning: skipping baseline {name!r}: {reason}", file=sys.stderr)
+        markdown += "\n" + render_comparison([scorecard])
     sys.stdout.write(markdown)
     if args.markdown:
         args.markdown.parent.mkdir(parents=True, exist_ok=True)
