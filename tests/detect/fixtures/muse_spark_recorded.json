@@ -1,0 +1,108 @@
+{
+  "_comment": "All text is fictional (ADR 0005). Response bodies only (no headers or keys), recorded 2026-10-26 from the Meta Model API, model muse-spark-1.3, reasoning_effort minimal.",
+  "contract_hu": {
+    "language": "hu",
+    "text": "Alulírott Teszt Elek (született: Szeged, 1985. április 12., anyja neve: Minta Mária) 6720 Szeged, Kárász utca 7. szám alatti lakos, mint eladó, valamint Példa Ágnes vevő (e-mail: pelda.agnes@example.com, telefon: +36 30 123 4567) megállapodnak abban, hogy Teszt Elek a tulajdonát képező, Szeged belterület 12345/6 helyrajzi számú ingatlant eladja Példa Ágnesnek. Teszt Eleknek a vételárat a HU42 1177 3016 1111 1018 0000 0000 számú bankszámlára kell átutalni.",
+    "model": "muse-spark-1.3",
+    "reasoning_effort": "minimal",
+    "response": {
+      "id": "chatcmpl-recorded-contract_hu",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "{\"entities\": [{\"type\": \"PERSON\", \"text\": \"Teszt Elek\"}, {\"type\": \"PERSON\", \"text\": \"Minta Mária\"}, {\"type\": \"PERSON\", \"text\": \"Példa Ágnes\"}, {\"type\": \"PERSON\", \"text\": \"Példa Ágnesnek\"}, {\"type\": \"PERSON\", \"text\": \"Teszt Eleknek\"}, {\"type\": \"DATE_OF_BIRTH\", \"text\": \"1985. április 12.\"}, {\"type\": \"ADDRESS\", \"text\": \"6720 Szeged, Kárász utca 7. szám\"}, {\"type\": \"EMAIL\", \"text\": \"pelda.agnes@example.com\"}, {\"type\": \"PHONE\", \"text\": \"+36 30 123 4567\"}, {\"type\": \"PARCEL_NUMBER_HU\", \"text\": \"12345/6\"}, {\"type\": \"BANK_ACCOUNT\", \"text\": \"HU42 1177 3016 1111 1018 0000 0000\"}]}",
+            "refusal": null,
+            "role": "assistant"
+          },
+          "logprobs": null
+        }
+      ],
+      "created": 1793048571,
+      "model": "muse-spark-1.3",
+      "object": "chat.completion",
+      "usage": {
+        "completion_tokens": 727,
+        "prompt_tokens": 846,
+        "total_tokens": 1573,
+        "completion_tokens_details": {
+          "reasoning_tokens": 491
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      }
+    }
+  },
+  "letter_en": {
+    "language": "en",
+    "text": "Dear Ms Riley, I am writing on behalf of my tenant, Dr Jonathan Fakename, born 14 March 1979, who lives at Flat 3, 27 Example Road, Testington TE5 7XY. Jonathan's passport number is 123456789 and his phone number is +44 7700 900123. Please reply to j.fakename@example.org or to his employer, Placeholder Widgets Ltd.",
+    "model": "muse-spark-1.3",
+    "reasoning_effort": "minimal",
+    "response": {
+      "id": "chatcmpl-recorded-letter_en",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "{\"entities\": [{\"type\": \"PERSON\", \"text\": \"Riley\"}, {\"type\": \"PERSON\", \"text\": \"Jonathan Fakename\"}, {\"type\": \"DATE_OF_BIRTH\", \"text\": \"14 March 1979\"}, {\"type\": \"ADDRESS\", \"text\": \"Flat 3, 27 Example Road, Testington TE5 7XY\"}, {\"type\": \"PERSON\", \"text\": \"Jonathan\"}, {\"type\": \"ID_DOCUMENT\", \"text\": \"123456789\"}, {\"type\": \"PHONE\", \"text\": \"+44 7700 900123\"}, {\"type\": \"EMAIL\", \"text\": \"j.fakename@example.org\"}, {\"type\": \"ORGANIZATION\", \"text\": \"Placeholder Widgets Ltd\"}]}",
+            "refusal": null,
+            "role": "assistant"
+          },
+          "logprobs": null
+        }
+      ],
+      "created": 1793048575,
+      "model": "muse-spark-1.3",
+      "object": "chat.completion",
+      "usage": {
+        "completion_tokens": 451,
+        "prompt_tokens": 641,
+        "total_tokens": 1092,
+        "completion_tokens_details": {
+          "reasoning_tokens": 284
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      }
+    }
+  },
+  "prose_hu": {
+    "language": "hu",
+    "text": "Kedves Ügyfélszolgálat! Kovácsné Próba Zsuzsanna vagyok, a Budapest XIII. kerületében, a Váci út 199. második emeletén lakom. A személyi igazolványom száma 123456AB, az autóm rendszáma ABC-123. Kérem, a választ Próba Zsuzsannának címezzék, ne a cégnek (Próba Zsuzsanna e.v.).",
+    "model": "muse-spark-1.3",
+    "reasoning_effort": "minimal",
+    "response": {
+      "id": "chatcmpl-recorded-prose_hu",
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "{\"entities\": [{\"type\": \"PERSON\", \"text\": \"Kovácsné Próba Zsuzsanna\"}, {\"type\": \"ADDRESS\", \"text\": \"Budapest XIII. kerületében\"}, {\"type\": \"ADDRESS\", \"text\": \"Váci út 199.\"}, {\"type\": \"ID_DOCUMENT\", \"text\": \"123456AB\"}, {\"type\": \"VEHICLE_PLATE\", \"text\": \"ABC-123\"}, {\"type\": \"PERSON\", \"text\": \"Próba Zsuzsannának\"}, {\"type\": \"PERSON\", \"text\": \"Próba Zsuzsanna\"}, {\"type\": \"ORGANIZATION\", \"text\": \"Próba Zsuzsanna e.v.\"}]}",
+            "refusal": null,
+            "role": "assistant"
+          },
+          "logprobs": null
+        }
+      ],
+      "created": 1793048579,
+      "model": "muse-spark-1.3",
+      "object": "chat.completion",
+      "usage": {
+        "completion_tokens": 847,
+        "prompt_tokens": 767,
+        "total_tokens": 1614,
+        "completion_tokens_details": {
+          "reasoning_tokens": 684
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      }
+    }
+  }
+}

@@ -67,6 +67,7 @@ select = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-ra", "--strict-markers", "--cov=pii_guard", "--cov-report=term-missing"]
+markers = ["live: calls a real model endpoint; skipped unless its credentials are set"]
 filterwarnings = [
     "error",
     # Starlette's TestClient nudges towards httpx2; httpx is still supported.
