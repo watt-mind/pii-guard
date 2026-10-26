@@ -17,6 +17,7 @@ classifiers = [
 dependencies = [
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
+    "pillow>=13.0.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
     "uvicorn>=0.54.0",
@@ -27,6 +28,11 @@ Repository = "https://github.com/watt-mind/pii-guard"
 
 [project.scripts]
 pii-guard = "pii_guard.cli:main"
+
+[project.optional-dependencies]
+ocr = [
+    "pytesseract>=0.3.13",
+]
 
 [build-system]
 requires = ["hatchling"]
