@@ -20,6 +20,9 @@ describe("image regions", () => {
   it("labels regions without values", () => {
     expect(sourceLabel(face)).toBe("SAM 3.1");
     expect(sourceLabel(taj)).toBe("OCR + Rules + checksum");
+    expect(sourceLabel({ ...taj, entity_type: "EMAIL" })).toBe("OCR + Rules");
+    expect(sourceLabel({ ...taj, entity_type: "PERSON", detector: "llm" }, { llm: "muse-spark-1.3" })).toBe("OCR + Muse Spark 1.3 (Meta API)");
+    expect(sourceLabel({ ...taj, entity_type: "PERSON", detector: "llm" })).toBe("OCR + LLM detector");
     expect(regionLabel(stamp)).toBe("Stamp, found by SAM 3.1, kept by policy");
   });
 
@@ -33,9 +36,14 @@ describe("image regions", () => {
   });
 
   it("states what was not covered", () => {
-    expect(coverageGaps(analysis({ ran: false, engine: null, detectors: [], reason: "tesseract_unavailable" }))[0]).toMatch(/Text in this image was not checked/);
-    expect(coverageGaps(analysis({}))[0]).toMatch(/Names in the image were not looked for.*Rules \+ checksum only/);
-    expect(coverageGaps(analysis({ detectors: ["rules", "llm"] }))).toEqual([]);
+    expect(coverageGaps(analysis({ ran: false, engine: null, detectors: [], reason: "tesseract_unavailable" }))).toEqual([
+      expect.stringMatching(/Text in this image was not checked at all/),
+    ]);
+    const rulesOnly = coverageGaps(analysis({}));
+    expect(rulesOnly[0]).toMatch(/\(Rules \+ checksum\) do not look for names, dates of birth, organization names and parcel numbers/);
+    expect(rulesOnly[1]).toMatch(/^Addresses are found only by pattern/);
+    expect(coverageGaps(analysis({ detectors: ["rules", "llm"], models: { llm: "muse-spark-1.3" } }))).toEqual([]);
+    expect(coverageGaps(analysis({ detectors: ["rules", "ner"] }))[0]).toMatch(/do not look for dates of birth and parcel numbers/);
     expect(samTargets(analysis({}))).toBe("faces, signatures, ID photos and stamps");
   });
 });

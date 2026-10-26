@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { EngineKind, RoutingClient } from "../api/engine";
+import { effectiveEngine, type EngineKind, type EngineState, type RoutingClient } from "../api/engine";
 import { DemoImageUnavailableError, IMAGE_RECORDINGS } from "../api/imageMock";
 import type { ImageMaskResponse, ImageRegion } from "../api/types";
 import { Boundary } from "../components/Boundary";
@@ -36,6 +36,8 @@ type ImageError = RunError | { code: "demo_upload"; message: string };
 
 interface Props {
   client: RoutingClient;
+  /** For honest copy about uploads in demo mode. */
+  engineState?: EngineState;
   /** Fetches a sample's bytes. Injectable for tests (jsdom has no static server). */
   loadImage?: (src: string) => Promise<Blob>;
 }
@@ -46,9 +48,15 @@ async function fetchImage(src: string): Promise<Blob> {
   return res.blob();
 }
 
+async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }> {
+  const started = performance.now();
+  const value = await fn();
+  return { value, ms: Math.round(performance.now() - started) };
+}
+
 const sampleSelection = (sample: ImageSample): Selection => ({ kind: "sample", key: `sample:${sample.id}`, sample });
 
-export function Images({ client, loadImage = fetchImage }: Props) {
+export function Images({ client, engineState, loadImage = fetchImage }: Props) {
   const [selection, setSelection] = useState<Selection>(() => sampleSelection(DEFAULT_IMAGE_SAMPLE));
   const [result, setResult] = useState<ImageResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -67,6 +75,8 @@ export function Images({ client, loadImage = fetchImage }: Props) {
   }, [uploadUrl]);
 
   const fresh = result !== null && result.key === selection.key;
+  const demo = engineState ? effectiveEngine(engineState) === "mock" : false;
+  const manualDemoWithApiUp = engineState?.preference === "mock" && engineState.status.state === "online";
   const src = selection.kind === "sample" ? selection.sample.src : selection.url;
   const alt = selection.kind === "sample" ? selection.sample.alt : `Your upload: ${selection.name}`;
 
@@ -92,22 +102,22 @@ export function Images({ client, loadImage = fetchImage }: Props) {
     select({ kind: "upload", key: `upload:${++uploadSeq.current}`, name: file.name, blob: file, url: URL.createObjectURL(file) });
   };
 
-  const run = async () => {
+  const run = async (target: Selection = selection) => {
     const id = ++runId.current;
-    const target = selection;
     setRunning(true);
     setError(null);
     setActive(null);
     try {
-      const started = performance.now();
-      const blob = target.kind === "sample" ? await loadImage(target.sample.src) : target.blob;
-      const routed = await client.maskImage({
-        image: blob,
-        sampleId: target.kind === "sample" ? target.sample.id : null,
-        language: "hu",
+      const { value: routed, ms } = await timed(async () => {
+        const blob = target.kind === "sample" ? await loadImage(target.sample.src) : target.blob;
+        return client.maskImage({
+          image: blob,
+          sampleId: target.kind === "sample" ? target.sample.id : null,
+          language: "hu",
+        });
       });
       if (id !== runId.current) return;
-      setResult({ key: target.key, data: routed.data, engine: routed.engine, ms: Math.round(performance.now() - started) });
+      setResult({ key: target.key, data: routed.data, engine: routed.engine, ms });
     } catch (err) {
       if (id !== runId.current) return;
       setResult(null); // fail closed: never leave an older masked image on screen as current
@@ -131,7 +141,7 @@ export function Images({ client, loadImage = fetchImage }: Props) {
 
       <fieldset className="min-w-0">
         <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples, or your own image</legend>
-        <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 sm:pb-0">
+        <div className="relative -mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
           {IMAGE_SAMPLES.map((s) => {
             const on = selection.kind === "sample" && selection.sample.id === s.id;
             return (
@@ -139,7 +149,11 @@ export function Images({ client, loadImage = fetchImage }: Props) {
                 key={s.id}
                 type="button"
                 aria-pressed={on}
-                onClick={() => select(sampleSelection(s))}
+                onClick={() => {
+                  const next = sampleSelection(s);
+                  select(next);
+                  void run(next); // one click: pick and mask
+                }}
                 className={[
                   "flex w-[15rem] shrink-0 snap-start items-center gap-3 rounded-xl border p-2 pr-3 text-left transition-colors sm:w-auto",
                   on ? "border-ink bg-surface shadow-sm" : "border-line bg-surface/60 hover:border-line-strong hover:bg-surface",
@@ -147,8 +161,8 @@ export function Images({ client, loadImage = fetchImage }: Props) {
               >
                 <img src={s.src} alt="" aria-hidden="true" className="size-12 shrink-0 rounded-md border border-line bg-surface-2 object-cover" />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-ink">{s.title}</span>
-                  <span className="block truncate text-xs text-muted">{s.subtitle}</span>
+                  <span className="block text-sm font-semibold text-ink">{s.title}</span>
+                  <span className="block text-xs text-muted">{s.subtitle}</span>
                 </span>
               </button>
             );
@@ -175,7 +189,7 @@ export function Images({ client, loadImage = fetchImage }: Props) {
             >
               <span className="text-sm font-semibold">{selection.kind === "upload" ? "Upload another image" : "Upload an image"}</span>
               <span id="upload-hint" className="max-w-full truncate text-xs font-normal opacity-75">
-                {selection.kind === "upload" ? selection.name : "PNG or JPEG, up to 10 MB. Fictional only."}
+                {selection.kind === "upload" ? selection.name : demo ? "Needs the live API: SAM runs on the server." : "PNG or JPEG, up to 10 MB. Fictional only."}
               </span>
             </Button>
           </div>
@@ -220,7 +234,7 @@ export function Images({ client, loadImage = fetchImage }: Props) {
             {data &&
               showRegions &&
               data.regions.map((r, i) => (
-                <RegionBox key={i} region={r} index={i} width={data.width} height={data.height} active={active === i} onActive={setActive} />
+                <RegionBox key={i} region={r} models={data.analysis.ocr.models} index={i} width={data.width} height={data.height} active={active === i} onActive={setActive} />
               ))}
           </Figure>
         </Pane>
@@ -253,7 +267,9 @@ export function Images({ client, loadImage = fetchImage }: Props) {
         >
           {error ? (
             error.code === "demo_upload" ? (
-              <DemoUploadNotice />
+              <DemoUploadNotice switchEngine={manualDemoWithApiUp} />
+            ) : error.code === "invalid_image" || error.code === "unsupported_media_type" ? (
+              <UnreadableNotice code={error.code} />
             ) : (
               <BlockedNotice error={error} />
             )
@@ -261,7 +277,6 @@ export function Images({ client, loadImage = fetchImage }: Props) {
             <Running />
           ) : data && result ? (
             <div className="space-y-4">
-              <WhatRan data={data} engine={result.engine} />
               {result.engine === "api" && data.image ? (
                 <Figure src={`data:image/png;base64,${data.image}`} alt={`Masked image: ${summary?.masked ?? 0} regions covered.`} testId="masked-image">
                   {active !== null && data.regions[active] && <Highlight region={data.regions[active]} width={data.width} height={data.height} />}
@@ -276,12 +291,10 @@ export function Images({ client, loadImage = fetchImage }: Props) {
                   {active !== null && data.regions[active] && <Highlight region={data.regions[active]} width={data.width} height={data.height} />}
                 </Figure>
               )}
+              <WhatRan data={data} engine={result.engine} />
             </div>
           ) : (
-            <EmptyState
-              title={result ? "The image changed" : "Nothing has been sent yet"}
-              body={result ? "Mask it again to see what the model would get for this image." : "Mask the image to see exactly what would leave your network."}
-            />
+            <EmptyState title="Nothing has been sent yet" body="Mask the image to see exactly what would leave your network." />
           )}
         </Pane>
       </div>
@@ -313,7 +326,7 @@ export function Images({ client, loadImage = fetchImage }: Props) {
           </div>
           <div className="min-w-0">
             <h3 className="mb-2 text-sm font-semibold text-ink">Region list</h3>
-            <RegionTable regions={data.regions} active={active} onActive={setActive} />
+            <RegionTable regions={data.regions} models={data.analysis.ocr.models} active={active} onActive={setActive} />
           </div>
         </section>
       )}
@@ -334,6 +347,7 @@ function Figure({ src, alt, testId, children }: { src: string; alt: string; test
 
 function RegionBox({
   region,
+  models,
   index,
   width,
   height,
@@ -341,6 +355,7 @@ function RegionBox({
   onActive,
 }: {
   region: ImageRegion;
+  models?: Record<string, string>;
   index: number;
   width: number;
   height: number;
@@ -354,7 +369,7 @@ function RegionBox({
     <button
       type="button"
       data-testid="region-box"
-      aria-label={regionLabel(region)}
+      aria-label={regionLabel(region, models)}
       aria-pressed={active}
       onMouseEnter={() => onActive(index)}
       onMouseLeave={() => onActive(null)}
@@ -424,7 +439,17 @@ function ImageLegend({ regions, activeType }: { regions: ImageRegion[]; activeTy
   );
 }
 
-function RegionTable({ regions, active, onActive }: { regions: ImageRegion[]; active: number | null; onActive: (i: number | null) => void }) {
+function RegionTable({
+  regions,
+  models,
+  active,
+  onActive,
+}: {
+  regions: ImageRegion[];
+  models?: Record<string, string>;
+  active: number | null;
+  onActive: (i: number | null) => void;
+}) {
   if (regions.length === 0) {
     return <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing to list: the image went out re-encoded but otherwise unchanged.</p>;
   }
@@ -444,7 +469,7 @@ function RegionTable({ regions, active, onActive }: { regions: ImageRegion[]; ac
             <tr
               key={i}
               tabIndex={0}
-              aria-label={regionLabel(r)}
+              aria-label={regionLabel(r, models)}
               data-active={active === i || undefined}
               onMouseEnter={() => onActive(i)}
               onMouseLeave={() => onActive(null)}
@@ -458,7 +483,7 @@ function RegionTable({ regions, active, onActive }: { regions: ImageRegion[]; ac
                   {metaFor(r.entity_type).label}
                 </span>
               </td>
-              <td className="px-3 py-2 text-muted">{sourceLabel(r)}</td>
+              <td className="px-3 py-2 text-muted">{sourceLabel(r, models)}</td>
               <td className="px-3 py-2">
                 <span className={r.policy === "mask" ? "text-guard-ink dark:text-guard" : "text-muted"}>{policyLabel(r.policy)}</span>
               </td>
@@ -503,14 +528,30 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
   );
 }
 
-function DemoUploadNotice() {
+function DemoUploadNotice({ switchEngine }: { switchEngine: boolean }) {
   return (
     <div role="alert" className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
       <p className="font-semibold text-warn">Uploads need the live API.</p>
-      <p className="mt-1 text-ink">SAM 3.1 runs on the pii-guard server, not in your browser, and the API isn't in use right now. Your image was not sent anywhere.</p>
+      <p className="mt-1 text-ink">SAM 3.1 runs on the pii-guard server, not in your browser. Your image was not sent anywhere.</p>
       <p className="mt-2 text-muted">
-        Start it with <code className="rounded bg-surface px-1 font-mono text-xs">uv run pii-guard serve</code> (with <code className="font-mono text-xs">META_API_KEY</code> set), or try one of the samples, which replay a recorded run.
+        {switchEngine ? (
+          <>The API is up: switch <strong className="font-semibold text-ink">Engine</strong> in the header to <strong className="font-semibold text-ink">Live API</strong>, then mask the image again.</>
+        ) : (
+          <>
+            Start it with <code className="rounded bg-surface px-1 font-mono text-xs">uv run pii-guard serve</code> (with <code className="font-mono text-xs">META_API_KEY</code> set), or try one of the samples, which replay a recorded run.
+          </>
+        )}
       </p>
+    </div>
+  );
+}
+
+function UnreadableNotice({ code }: { code: string }) {
+  return (
+    <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft p-4 text-sm">
+      <p className="font-semibold text-danger">{code === "invalid_image" ? "This image couldn't be decoded." : "This file isn't a PNG or JPEG image."}</p>
+      <p className="mt-1 text-ink">The guard rejected it before any detection ran, so nothing was sent to the model.</p>
+      <p className="mt-2 text-muted">Try another PNG or JPEG file.</p>
     </div>
   );
 }

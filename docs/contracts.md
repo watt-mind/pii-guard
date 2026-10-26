@@ -294,7 +294,7 @@ uploads are not accepted (they would need an extra dependency).
   "kept": [{"entity_type": "STAMP", "count": 1}],
   "analysis": {
     "sam": {"model": "sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO", "STAMP"]},
-    "ocr": {"ran": true, "engine": "tesseract", "detectors": ["rules"], "reason": null}
+    "ocr": {"ran": true, "engine": "tesseract", "detectors": ["rules", "llm"], "models": {"llm": "muse-spark-1.3"}, "reason": null}
   }
 }
 ```
@@ -302,6 +302,11 @@ uploads are not accepted (they would need an extra dependency).
 - `box` is `[x1, y1, x2, y2]`, inclusive pixel corners in the image after EXIF orientation.
   `source` is `sam` (SAM 3.1 segmentation) or `ocr` (OCR word boxes of a span a text detector
   found); `detector` is `sam` or the text detector's registry name. SAM gives no scores.
+- `FACE` boxes are grown before masking (40% up, 10% on each side, 5% down, clamped to the
+  image) because SAM's face box leaves hair and ears visible; the reported box is the grown
+  one, i.e. the area covered.
+- `analysis.ocr.models` maps each model-backed text detector to its model id, so clients can
+  label regions by what actually ran.
 - Regions never carry the covered text or pixels. Overlapping regions of the same type and
   source are merged into their union (SAM's `signature` and `squiggly line` prompts).
 - Policies apply per region: `mask` regions are filled solid black (plus 2 px), `keep` regions
@@ -313,7 +318,7 @@ uploads are not accepted (they would need an extra dependency).
 - Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
   binary with `hun`/`eng` data), OCR text goes through the API's detectors
   (`PII_GUARD_DETECTORS`, so names need `llm`). Otherwise only SAM runs and `analysis.ocr` is
-  `{"ran": false, "engine": null, "detectors": [], "reason": "tesseract_unavailable"}`: text in
+  `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "tesseract_unavailable"}`: text in
   the image was **not** checked.
 - Fail closed: any SAM, OCR or detector error is `503 detection_failed`, a masking error
   `500 masking_failed`; an undecodable image or bad base64 is `422 invalid_image`. Error bodies

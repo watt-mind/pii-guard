@@ -21,7 +21,12 @@ from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from pii_guard.api.app import create_app
-from pii_guard.api.routes.image_masking import ImageMasker, decode_base64_image, sniff_media_type
+from pii_guard.api.routes.image_masking import (
+    ImageMasker,
+    _grow_face,
+    decode_base64_image,
+    sniff_media_type,
+)
 from pii_guard.config import Settings
 from pii_guard.policy import PolicySet
 from pii_guard.types import DetectionError, EntityType
@@ -46,6 +51,8 @@ TAJ_WORDS = [
     OcrWord("Elek", Box(220, 100, 259, 119), (1,)),
 ]
 TAJ_BOX = Box(205, 60, 319, 79)
+# SAM's face box is grown (hair, ears) before masking: (30, 40, 129, 169) -> this.
+FACE_COVERED = Box(20, 0, 139, 175)
 
 
 def card_image(fmt: str = "PNG") -> bytes:
@@ -181,9 +188,10 @@ def test_raw_png_upload_masks_sam_and_ocr_regions(client: TestClient) -> None:
     assert not is_filled(masked, STAMP)  # STAMP is keep by default: reported, left visible
 
     by_type = {r["entity_type"]: r for r in body["regions"]}
+    assert is_filled(masked, FACE_COVERED)
     assert by_type["FACE"] == {
         "entity_type": "FACE",
-        "box": FACE.to_list(),
+        "box": FACE_COVERED.to_list(),
         "source": "sam",
         "detector": "sam",
         "score": None,
@@ -206,7 +214,13 @@ def test_raw_png_upload_masks_sam_and_ocr_regions(client: TestClient) -> None:
     assert body["kept"] == [{"entity_type": "STAMP", "count": 1}]
     assert body["analysis"] == {
         "sam": {"model": "sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO", "STAMP"]},
-        "ocr": {"ran": True, "engine": "fake-ocr", "detectors": ["rules"], "reason": None},
+        "ocr": {
+            "ran": True,
+            "engine": "fake-ocr",
+            "detectors": ["rules"],
+            "models": {},
+            "reason": None,
+        },
     }
 
 
@@ -264,6 +278,7 @@ def test_without_ocr_only_sam_runs_and_the_response_says_so() -> None:
         "ran": False,
         "engine": None,
         "detectors": [],
+        "models": {},
         "reason": "tesseract_unavailable",
     }
     assert {r["source"] for r in body["regions"]} == {"sam"}
@@ -422,3 +437,31 @@ def test_image_masker_validates_its_configuration() -> None:
     outcome = masker.mask(card_image())
     assert [r.entity_type for r in outcome.regions] == [EntityType.FACE]
     assert "bytes" in repr(outcome) and TAJ_VALUE not in repr(outcome)
+
+
+def test_face_boxes_grow_to_cover_hair_and_ears_clamped_to_the_image() -> None:
+    from pii_guard.visual import Region
+
+    grown = _grow_face(Region(EntityType.FACE, Box(100, 100, 199, 199), None, "sam"), 400, 260)
+    assert grown.box == Box(90, 60, 209, 204)
+    edge = _grow_face(Region(EntityType.FACE, Box(0, 5, 99, 255), None, "sam"), 400, 260)
+    assert edge.box == Box(0, 0, 109, 259)
+    other = Region(EntityType.SIGNATURE, Box(1, 1, 5, 5), None, "sam")
+    assert _grow_face(other, 400, 260) is other
+
+
+def test_model_backed_detectors_are_reported_for_labels() -> None:
+    class Llm:
+        name = "llm"
+        model = "muse-spark-1.3"
+
+    class Analyzer:
+        def __init__(self) -> None:
+            self.detectors = [Llm()]
+
+        def analyze(self, text: str, language: str) -> list:
+            return []
+
+    with TestClient(make_app(analyzer=Analyzer())) as http:
+        body = post_png(http).json()
+    assert body["analysis"]["ocr"]["models"] == {"llm": "muse-spark-1.3"}

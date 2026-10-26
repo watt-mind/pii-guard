@@ -107,6 +107,7 @@ class OcrInfo(BaseModel):
     ran: bool
     engine: str | None
     detectors: list[str]
+    models: dict[str, str]
     reason: str | None
 
 
@@ -152,12 +153,19 @@ def get_image_masker(request: Request) -> ImageMasker:
     ocr = _ocr_engine(request)
     detector = AnalyzerDetector(get_analyzer(request)) if ocr is not None else None
     names = list(getattr(request.app.state, "detector_names", None) or [])
+    models: dict[str, str] = {}
+    if detector is not None:
+        for inner in getattr(detector.analyzer, "detectors", None) or []:
+            model = getattr(inner, "model", None)
+            if isinstance(model, str) and model:
+                models[getattr(inner, "name", type(inner).__name__)] = model
     return ImageMasker(
         sam=_sam_client(request),
         policies=get_policies(request),
         ocr=ocr,
         text_detector=detector,
         text_detector_names=names,
+        text_detector_models=models,
     )
 
 
@@ -213,6 +221,7 @@ def _response(outcome: ImageMaskOutcome) -> ImageMaskResponse:
                 ran=ocr_ran,
                 engine=outcome.ocr_engine,
                 detectors=outcome.text_detectors,
+                models=outcome.detector_models,
                 reason=None if ocr_ran else "tesseract_unavailable",
             ),
         ),

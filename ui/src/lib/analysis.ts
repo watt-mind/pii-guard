@@ -1,6 +1,6 @@
 import type { EntityType, MaskResponse, PublicSpan } from "../api/types";
 import { codePointIndex } from "./codepoints";
-import { DETECTOR_LABEL, metaFor } from "./entities";
+import { detectorLabel, metaFor } from "./entities";
 import { alignRestored, tokenize } from "./placeholders";
 
 /** A detected span in UTF-16 indices, ready to slice a JS string. */
@@ -150,7 +150,7 @@ export function spanKey(span: LocalSpan): string {
 
 export function describeSpan(span: LocalSpan): string {
   const meta = metaFor(span.entityType);
-  const detector = DETECTOR_LABEL[span.detector] ?? span.detector;
+  const detector = detectorLabel(span.detector, { types: [span.entityType] });
   const action = span.placeholder ? `masked as ${span.placeholder}` : "kept by policy";
   return `${meta.label}, ${action}, found by ${detector}, confidence ${Math.round(span.score * 100)}%`;
 }
@@ -158,7 +158,9 @@ export function describeSpan(span: LocalSpan): string {
 
 /** Human labels of the detectors that produced at least one span. */
 export function detectorsUsed(spans: readonly LocalSpan[]): string[] {
-  return [...new Set(spans.map((s) => DETECTOR_LABEL[s.detector] ?? s.detector))];
+  const byDetector = new Map<string, EntityType[]>();
+  for (const s of spans) byDetector.set(s.detector, [...(byDetector.get(s.detector) ?? []), s.entityType]);
+  return [...byDetector].map(([detector, types]) => detectorLabel(detector, { types }));
 }
 
 export function joinList(items: readonly string[]): string {

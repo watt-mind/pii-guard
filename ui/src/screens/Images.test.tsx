@@ -57,8 +57,8 @@ describe("Images screen", () => {
 
   it("in demo mode replays recorded regions for a sample and draws the masking in the browser", async () => {
     const { user, panel } = await openImages(offlineApi());
+    // One click: picking a sample masks it.
     await user.click(within(panel).getByRole("button", { name: /signed letter/i }));
-    await user.click(within(panel).getByRole("button", { name: "Mask image" }));
 
     expect(await within(panel).findByTestId("demo-masked-image")).toBeInTheDocument();
     const rec = IMAGE_RECORDINGS.samples["signed-letter"]!;
@@ -69,6 +69,33 @@ describe("Images screen", () => {
     expect(within(panel).getByTestId("image-scope-note")).toHaveTextContent(/Recorded .* Nothing was sent anywhere/);
     expect(within(panel).getByText(/black boxes are drawn in your browser/)).toBeInTheDocument();
     expect(within(panel).getByRole("table")).toHaveTextContent("Signature");
+    // Labels follow what ran: the recorded run used the Muse Spark LLM detector.
+    expect(within(panel).getByRole("table")).toHaveTextContent("OCR + Muse Spark 1.3 (Meta API)");
+    expect(within(panel).getByRole("table")).toHaveTextContent(/OCR \+ Rules(?! \+)/);
+  });
+
+  it("marks the upload tile as needing the live API in demo mode", async () => {
+    const { panel } = await openImages(offlineApi());
+    await waitFor(() => expect(within(panel).getByText("Needs the live API: SAM runs on the server.")).toBeInTheDocument());
+  });
+
+  it("tells a user who chose the demo engine with the API up to switch to Live API", async () => {
+    localStorage.setItem("pii-guard:mode", "mock");
+    const { user, panel } = await openImages(liveApi(vi.fn()));
+    await screen.findByText("API v0.1.0");
+    const input = panel.querySelector<HTMLInputElement>("#image-upload")!;
+    await user.upload(input, new File([new Uint8Array([0x89, 0x50])], "mine.png", { type: "image/png" }));
+    expect(within(panel).getByText("Nothing has been sent yet")).toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: "Mask image" }));
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(/switch Engine in the header to Live API/);
+  });
+
+  it("says an undecodable image could not be decoded", async () => {
+    const maskImage = vi.fn().mockRejectedValue(new ApiError(422, "invalid_image", "image could not be decoded"));
+    const { user, panel } = await openImages(liveApi(maskImage));
+    await screen.findByText("Live");
+    await user.click(within(panel).getByRole("button", { name: "Mask image" }));
+    expect(await within(panel).findByRole("alert")).toHaveTextContent("This image couldn't be decoded.");
   });
 
   it("refuses an upload in demo mode and says nothing was sent", async () => {
@@ -102,7 +129,7 @@ describe("Images screen", () => {
     expect(loadImage).toHaveBeenCalledWith("/samples/id-card.png");
     const note = within(panel).getByTestId("image-scope-note");
     expect(note).toHaveTextContent("SAM 3.1 looked for faces, signatures, ID photos and stamps");
-    expect(note).toHaveTextContent("Names in the image were not looked for");
+    expect(note).not.toHaveTextContent("Not covered"); // rules + llm ran: nothing to flag
     expect(within(panel).getByText(/exactly as the API returned it/)).toBeInTheDocument();
 
     // Hover a region box: the matching legend type lights up; the toggle hides the boxes.
@@ -121,7 +148,6 @@ describe("Images screen", () => {
     const { user, panel } = await openImages(liveApi(vi.fn().mockResolvedValue(data)));
     await screen.findByText("Live");
     await user.click(within(panel).getByRole("button", { name: /visitor badge/i }));
-    await user.click(within(panel).getByRole("button", { name: "Mask image" }));
     expect(await within(panel).findByText(/Text in this image was not checked/)).toBeInTheDocument();
   });
 
@@ -136,14 +162,16 @@ describe("Images screen", () => {
     expect(within(panel).queryByTestId("masked-image")).toBeNull();
   });
 
-  it("drops the result when another image is picked", async () => {
+  it("drops the result when an upload replaces the sample, and waits for a click", async () => {
     const maskImage = vi.fn().mockResolvedValue(recorded("id-card"));
     const { user, panel } = await openImages(liveApi(maskImage));
     await screen.findByText("Live");
     await user.click(within(panel).getByRole("button", { name: "Mask image" }));
     await within(panel).findByTestId("masked-image");
-    await user.click(within(panel).getByRole("button", { name: /visitor badge/i }));
+    const input = panel.querySelector<HTMLInputElement>("#image-upload")!;
+    await user.upload(input, new File([new Uint8Array([0x89, 0x50])], "mine.png", { type: "image/png" }));
     await waitFor(() => expect(within(panel).queryByTestId("masked-image")).toBeNull());
-    expect(within(panel).getByText("The image changed")).toBeInTheDocument();
+    expect(within(panel).getByText("Nothing has been sent yet")).toBeInTheDocument();
+    expect(maskImage).toHaveBeenCalledTimes(1);
   });
 });

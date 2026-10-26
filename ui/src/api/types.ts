@@ -106,7 +106,8 @@ export interface TypeCount {
 
 export interface ImageAnalysis {
   sam: { model: string; entity_types: EntityType[] };
-  ocr: { ran: boolean; engine: string | null; detectors: string[]; reason: string | null };
+  /** `models`: model id per model-backed detector (`{"llm": "muse-spark-1.3"}`). */
+  ocr: { ran: boolean; engine: string | null; detectors: string[]; models?: Record<string, string>; reason: string | null };
 }
 
 export interface ImageMaskResponse {

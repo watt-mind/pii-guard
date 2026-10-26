@@ -13,6 +13,10 @@ imports it but mounts nothing.
    regions (``STAMP`` by default) are reported but left visible, any ``block`` region refuses
    the image (:class:`~pii_guard.policy.BlockedEntityError`).
 
+``FACE`` boxes are grown before masking (:data:`FACE_PADDING`: up, sides, down, as fractions of
+the box, clamped to the image): SAM's face box runs from the brows to the chin, which leaves
+hair and ears visible. The reported box is the grown one, the area actually covered.
+
 Overlapping regions of the same type and source (SAM's ``signature`` and ``squiggly line``
 prompts can find the same scribble) are merged into their union, which is never smaller.
 
@@ -66,6 +70,9 @@ SUPPORTED_MEDIA_TYPES: dict[str, tuple[bytes, ...]] = {
 }
 
 Origin = Literal["sam", "ocr"]
+
+#: How far a ``FACE`` box is grown before masking: (up, sides, down), fractions of its size.
+FACE_PADDING: tuple[float, float, float] = (0.40, 0.10, 0.05)
 
 
 class UnsupportedImageError(PiiGuardError):
@@ -139,6 +146,8 @@ class ImageMaskOutcome:
     sam_types: list[EntityType]
     ocr_engine: str | None
     text_detectors: list[str] = field(default_factory=list)
+    #: Model id per model-backed text detector (``{"llm": "muse-spark-1.3"}``), for labels.
+    detector_models: dict[str, str] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         return (
@@ -189,6 +198,7 @@ class ImageMasker:
         ocr: OcrEngine | None = None,
         text_detector: Detector | None = None,
         text_detector_names: Sequence[str] = (),
+        text_detector_models: dict[str, str] | None = None,
         entity_types: Sequence[EntityType] | None = None,
     ) -> None:
         if (ocr is None) != (text_detector is None):
@@ -198,6 +208,7 @@ class ImageMasker:
         self.ocr = ocr
         self.text_detector = text_detector
         self.text_detector_names = list(text_detector_names)
+        self.text_detector_models = dict(text_detector_models or {})
         self.entity_types = list(entity_types) if entity_types is not None else list(sam.prompts)
         if not self.entity_types:
             raise ValueError("at least one visual entity type is needed")
@@ -222,6 +233,7 @@ class ImageMasker:
             detectors=[self.text_detector] if self.text_detector is not None else (),
             language=language,
         )
+        regions = [_grow_face(r, width, height) for r in regions]
         policed = _merge([self._police(r) for r in regions])
         blocked = Counter(r.entity_type for r in policed if r.policy is Policy.BLOCK)
         if blocked:
@@ -243,11 +255,27 @@ class ImageMasker:
             sam_types=list(self.entity_types),
             ocr_engine=getattr(self.ocr, "name", None) if self.ocr is not None else None,
             text_detectors=self.text_detector_names if self.ocr is not None else [],
+            detector_models=self.text_detector_models if self.ocr is not None else {},
         )
 
     def _police(self, region: Region) -> PolicedRegion:
         origin: Origin = "sam" if region.source == "sam" else "ocr"
         return PolicedRegion(region, origin, self.policies.of(region.entity_type))
+
+
+def _grow_face(region: Region, width: int, height: int) -> Region:
+    """A ``FACE`` region grown by :data:`FACE_PADDING` (clamped); other regions unchanged."""
+    if region.entity_type is not EntityType.FACE:
+        return region
+    up, sides, down = FACE_PADDING
+    box = region.box
+    grown = Box(
+        max(0, box.x1 - round(box.width * sides)),
+        max(0, box.y1 - round(box.height * up)),
+        min(width - 1, box.x2 + round(box.width * sides)),
+        min(height - 1, box.y2 + round(box.height * down)),
+    )
+    return Region(region.entity_type, grown, region.score, region.source, mask=region.mask)
 
 
 def _iou(a: Box, b: Box) -> float:

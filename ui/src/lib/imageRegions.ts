@@ -1,5 +1,5 @@
 import type { EntityType, ImageAnalysis, ImageRegion } from "../api/types";
-import { DETECTOR_LABEL, metaFor } from "./entities";
+import { DETECTOR_TYPES, detectorLabel, metaFor } from "./entities";
 
 /** Outline colour per type, matching the swatches in ENTITY_META (Tailwind 500/400). */
 export const REGION_COLOR: Record<EntityType, string> = {
@@ -47,9 +47,12 @@ export function percentBox(box: ImageRegion["box"], width: number, height: numbe
   };
 }
 
-export function sourceLabel(region: Pick<ImageRegion, "source" | "detector">): string {
+/** Model ids per detector, as `analysis.ocr.models` reports them. */
+export type DetectorModels = Readonly<Record<string, string>>;
+
+export function sourceLabel(region: Pick<ImageRegion, "source" | "detector" | "entity_type">, models: DetectorModels = {}): string {
   if (region.source === "sam") return "SAM 3.1";
-  return `OCR + ${DETECTOR_LABEL[region.detector] ?? region.detector}`;
+  return `OCR + ${detectorLabel(region.detector, { types: [region.entity_type], model: models[region.detector] })}`;
 }
 
 export function policyLabel(policy: ImageRegion["policy"]): string {
@@ -57,8 +60,8 @@ export function policyLabel(policy: ImageRegion["policy"]): string {
 }
 
 /** What a screen reader hears for one region; never a value (the API sends none). */
-export function regionLabel(region: ImageRegion): string {
-  return `${metaFor(region.entity_type).label}, found by ${sourceLabel(region)}, ${policyLabel(region.policy)}`;
+export function regionLabel(region: ImageRegion, models: DetectorModels = {}): string {
+  return `${metaFor(region.entity_type).label}, found by ${sourceLabel(region, models)}, ${policyLabel(region.policy)}`;
 }
 
 export interface RegionSummary {
@@ -99,21 +102,52 @@ export function legendRows(regions: readonly ImageRegion[]): LegendRow[] {
   return [...rows.values()];
 }
 
-const NAME_DETECTORS = ["llm", "ner"];
+/** Plural nouns for coverage notes. */
+export const TEXT_TYPE_NOUN: Partial<Record<EntityType, string>> = {
+  PERSON: "names",
+  ADDRESS: "addresses",
+  EMAIL: "email addresses",
+  PHONE: "phone numbers",
+  DATE_OF_BIRTH: "dates of birth",
+  NATIONAL_ID_HU_TAX: "tax IDs",
+  NATIONAL_ID_HU_TAJ: "TAJ numbers",
+  ID_DOCUMENT: "ID document numbers",
+  BANK_ACCOUNT: "bank accounts",
+  COMPANY_ID_HU: "company IDs",
+  ORGANIZATION: "organization names",
+  PARCEL_NUMBER_HU: "parcel numbers",
+  VEHICLE_PLATE: "vehicle plates",
+};
 
-/** Plain-language gaps in what ran, so a missing region reads as known scope, not a promise. */
+function joinNouns(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/**
+ * Plain-language gaps in what ran, derived from the detectors the API reports, so a missing
+ * region reads as known scope, not a promise.
+ */
 export function coverageGaps(analysis: ImageAnalysis): string[] {
-  const gaps: string[] = [];
   if (!analysis.ocr.ran) {
-    gaps.push(
-      "Text in this image was not checked: OCR (Tesseract) is not installed on the API host, so only SAM 3.1 ran.",
-    );
-  } else if (!analysis.ocr.detectors.some((d) => NAME_DETECTORS.includes(d))) {
-    gaps.push(
-      "Names in the image were not looked for: they need the Llama or NER detector, and this run used " +
-        `${analysis.ocr.detectors.map((d) => DETECTOR_LABEL[d] ?? d).join(", ") || "no text detector"} only.`,
-    );
+    return ["Text in this image was not checked at all: OCR (Tesseract) is not installed on the API host, so only SAM 3.1 ran."];
   }
+  const full = new Set<EntityType>();
+  const partly = new Set<EntityType>();
+  for (const d of analysis.ocr.detectors) {
+    DETECTOR_TYPES[d]?.types.forEach((t) => full.add(t));
+    DETECTOR_TYPES[d]?.partly?.forEach((t) => partly.add(t));
+  }
+  const nouns = Object.entries(TEXT_TYPE_NOUN) as [EntityType, string][];
+  const missing = nouns.filter(([t]) => !full.has(t) && !partly.has(t)).map(([, n]) => n);
+  const someOnly = nouns.filter(([t]) => !full.has(t) && partly.has(t)).map(([, n]) => n);
+  const models = analysis.ocr.models ?? {};
+  const ran = analysis.ocr.detectors.map((d) => detectorLabel(d, { types: DETECTOR_TYPES[d]?.types, model: models[d] }));
+  const gaps: string[] = [];
+  if (missing.length) {
+    gaps.push(`Text detectors on this run (${joinNouns(ran) || "none"}) do not look for ${joinNouns(missing)}, so any in the image were sent as they are.`);
+  }
+  if (someOnly.length) gaps.push(`${joinNouns(someOnly).replace(/^./, (c) => c.toUpperCase())} are found only by pattern (postcodes, street names).`);
   return gaps;
 }
 
