@@ -5,7 +5,7 @@ import { Placeholder } from "./Placeholder";
 interface Props {
   segments: readonly RestoredSegment[];
   activeKey?: string | null;
-  onActivate?: (key: string | null) => void;
+  onActivate?: (key: string | null, anchor?: HTMLElement | null) => void;
   /** Index from which segments are new (animated) in a streaming run. */
   freshFrom?: number;
 }
@@ -27,9 +27,9 @@ export function RestoredText({ segments, activeKey = null, onActivate, freshFrom
             tabIndex={onActivate ? 0 : undefined}
             data-restored={seg.placeholder}
             data-active={active || undefined}
-            onMouseEnter={onActivate ? () => onActivate(seg.placeholder) : undefined}
+            onMouseEnter={onActivate ? (e) => onActivate(seg.placeholder, e.currentTarget) : undefined}
             onMouseLeave={onActivate ? () => onActivate(null) : undefined}
-            onFocus={onActivate ? () => onActivate(seg.placeholder) : undefined}
+            onFocus={onActivate ? (e) => onActivate(seg.placeholder, e.currentTarget) : undefined}
             onBlur={onActivate ? () => onActivate(null) : undefined}
             className={[
               "rounded-[5px] px-0.5 -mx-0.5 ring-1 ring-inset underline decoration-2 underline-offset-[5px] decoration-current/35",

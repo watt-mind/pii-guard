@@ -7,9 +7,10 @@ import { Inspector, type InspectorInfo } from "../components/Inspector";
 import { Legend } from "../components/Legend";
 import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
+import { Popover } from "../components/Popover";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
 import { SAMPLES, type Sample } from "../data/samples";
-import { spanKey, summarize } from "../lib/analysis";
+import { detectorsUsed, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
 import type { RunError, RunResult } from "../lib/run";
 
 interface Props {
@@ -27,6 +28,11 @@ interface Props {
 export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue }: Props) {
   const [editing, setEditing] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const activate = (key: string | null, el?: HTMLElement | null) => {
+    setActiveKey(key);
+    setAnchor(key ? (el ?? null) : null);
+  };
 
   const fresh = result !== null && result.input === text;
   const showHighlighted = fresh && !editing;
@@ -38,6 +44,10 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
     result?.spans.forEach((s) => m.set(s.entityType, (m.get(s.entityType) ?? 0) + 1));
     return m;
   }, [result]);
+  const keptTypes = useMemo(
+    () => new Set<EntityType>(result?.spans.filter((s) => s.placeholder === null).map((s) => s.entityType) ?? []),
+    [result],
+  );
 
   const info: InspectorInfo | null = useMemo(() => {
     if (!result || !activeKey) return null;
@@ -79,6 +89,19 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                   Edit text
                 </Button>
               )}
+              {text !== "" && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setEditing(false);
+                    activate(null);
+                    onText("");
+                    requestAnimationFrame(() => document.getElementById("doc-input")?.focus());
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
               <Button variant="primary" onClick={run} disabled={running || text.trim() === ""} aria-describedby="run-hint">
                 {running ? "Masking…" : fresh ? "Run again" : "Mask document"}
                 <span aria-hidden="true">→</span>
@@ -87,7 +110,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           }
           footer={
             showHighlighted ? (
-              <Inspector info={info} hint="Hover or tab through a highlight to see its type, detector and confidence." />
+              <span>Hover, tap or tab to a highlight to see its type, detector and confidence.</span>
             ) : (
               <span id="run-hint">
                 Paste any text, or pick a sample. Only fictional data, please: this is a demo. <kbd className="rounded border border-line px-1 font-mono text-[10px]">⌘/Ctrl ↵</kbd> runs it.
@@ -96,7 +119,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           }
         >
           {showHighlighted && result ? (
-            <HighlightedText text={result.input} spans={result.spans} activeKey={activeKey} onActivate={setActiveKey} />
+            <HighlightedText text={result.input} spans={result.spans} activeKey={activeKey} onActivate={activate} />
           ) : (
             <>
               <label htmlFor="doc-input" className="sr-only">
@@ -143,8 +166,12 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
             ) : undefined
           }
           footer={
-            result && fresh ? (
-              <Inspector info={info} hint="Every value was swapped for a typed, keyed placeholder. The model never sees the originals." />
+            result && fresh && summary ? (
+              result.engine === "mock" ? (
+                <span>Every value was swapped for a typed, keyed placeholder. The model never sees the originals.</span>
+              ) : (
+                <span>{liveScope(summary, detectorsUsed(result.spans))}</span>
+              )
             ) : undefined
           }
         >
@@ -160,7 +187,8 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                   {sample.task}
                 </p>
               )}
-              <MaskedText text={result.mask.masked_text} activeKey={activeKey} onActivate={setActiveKey} />
+              {result.engine === "api" && summary && <ScopeNote summary={summary} detectors={detectorsUsed(result.spans)} />}
+              <MaskedText text={result.mask.masked_text} activeKey={activeKey} onActivate={activate} />
             </div>
           ) : (
             <EmptyState
@@ -183,10 +211,10 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                 Detected entities
               </h2>
               <p className="mt-1 text-sm text-muted">
-                Colour shows the type. Dashed outlines are kept by policy (organizations and company IDs are usually not personal data, and the model needs them).
+                Colour shows the type. A dashed outline means the value was detected but kept by policy (organizations, for example, are usually not personal data and the model needs them).
               </p>
             </div>
-            <Legend counts={counts} activeType={info?.entityType ?? null} />
+            <Legend counts={counts} kept={keptTypes} activeType={info?.entityType ?? null} />
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted">
               <dt>Session</dt>
               <dd className="truncate font-mono text-ink" title={result.mask.session_id}>
@@ -203,10 +231,38 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           </div>
           <div>
             <h3 className="mb-2 text-sm font-semibold text-ink">Placeholder map</h3>
-            <EntityTable entities={result.mask.entities} spans={result.spans} activeKey={activeKey} onActivate={setActiveKey} />
+            <EntityTable entities={result.mask.entities} spans={result.spans} activeKey={activeKey} onActivate={activate} />
           </div>
         </section>
       )}
+
+      <Popover anchor={info ? anchor : null}>
+        <Inspector info={info} hint="" />
+      </Popover>
+    </div>
+  );
+}
+
+function liveScope(summary: Summary, detectors: string[]): string {
+  const by = detectors.length ? ` by ${joinList(detectors)}` : "";
+  const kept = summary.kept ? ` ${summary.kept} kept by policy.` : "";
+  return `${summary.masked} ${summary.masked === 1 ? "value" : "values"} masked${by}.${kept} Text without a highlight was not detected and was sent as written.`;
+}
+
+/** Live mode: say exactly what this engine did, so gaps read as known scope rather than a promise. */
+function ScopeNote({ summary, detectors }: { summary: Summary; detectors: string[] }) {
+  return (
+    <div className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink" data-testid="scope-note">
+      <p>
+        <span className="font-semibold">
+          {summary.masked} {summary.masked === 1 ? "value" : "values"} masked
+        </span>
+        {detectors.length > 0 && <> by {joinList(detectors)}</>}
+        {summary.kept > 0 && <>, {summary.kept} kept by policy</>}.
+      </p>
+      <p className="mt-0.5 text-muted">
+        Only highlighted values were replaced. Anything without a highlight on the left was not detected by the detectors running on this API and reached the model as written.
+      </p>
     </div>
   );
 }

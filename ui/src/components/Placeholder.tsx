@@ -7,7 +7,7 @@ interface Props {
   active?: boolean;
   /** The token isn't in the session mapping (the model invented or mangled it). */
   unresolved?: boolean;
-  onActivate?: (key: string | null) => void;
+  onActivate?: (key: string | null, anchor?: HTMLElement | null) => void;
   description?: string;
   className?: string;
 }
@@ -28,9 +28,9 @@ export function Placeholder({ text, entityType, active, unresolved, onActivate, 
       tabIndex={onActivate ? 0 : undefined}
       data-placeholder={text}
       data-active={active || undefined}
-      onMouseEnter={onActivate ? () => onActivate(text) : undefined}
+      onMouseEnter={onActivate ? (e) => onActivate(text, e.currentTarget) : undefined}
       onMouseLeave={onActivate ? () => onActivate(null) : undefined}
-      onFocus={onActivate ? () => onActivate(text) : undefined}
+      onFocus={onActivate ? (e) => onActivate(text, e.currentTarget) : undefined}
       onBlur={onActivate ? () => onActivate(null) : undefined}
       className={[
         "inline rounded-md px-1 py-px ring-1 ring-inset font-mono font-medium whitespace-nowrap box-decoration-clone",

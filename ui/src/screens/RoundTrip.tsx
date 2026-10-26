@@ -4,6 +4,7 @@ import { Boundary } from "../components/Boundary";
 import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
 import { Placeholder } from "../components/Placeholder";
+import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
 import { SAMPLES } from "../data/samples";
@@ -41,6 +42,11 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
   const [view, setView] = useState<View>({ kind: "idle" });
   const [speed, setSpeed] = useState<SpeedId>("normal");
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const activate = (key: string | null, el?: HTMLElement | null) => {
+    setActiveKey(key);
+    setAnchor(key ? (el ?? null) : null);
+  };
   const abortRef = useRef<AbortController | null>(null);
 
   const values = useMemo(() => (result ? valuesByPlaceholder(result.input, result.links) : new Map<string, string>()), [result]);
@@ -131,7 +137,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
 
   return (
     <div className="space-y-6">
-      <RoundTripIntro />
+      <RoundTripIntro live={result.engine === "api"} />
 
       <details className="group rounded-2xl border border-model/25 bg-surface">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden">
@@ -153,7 +159,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
               {sample.task}
             </p>
           )}
-          <MaskedText text={result.mask.masked_text} activeKey={activeKey} onActivate={setActiveKey} />
+          <MaskedText text={result.mask.masked_text} activeKey={activeKey} onActivate={activate} />
         </div>
       </details>
 
@@ -162,7 +168,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
           id="answer"
           side="model"
           eyebrow="From the model"
-          title={chunksShown ? "Answer as it streams in" : "Model answer (simulated)"}
+          title={chunksShown ? "Streaming in" : "Model answer"}
           className="lg:flex-1"
           actions={
             !chunksShown ? (
@@ -197,7 +203,9 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
               </span>
             ) : (
               <span>
-                Edit freely: this stands in for the LLM. It can only refer to people through placeholders.
+                {result.engine === "api"
+                  ? "Simulated, edit freely. The model got placeholders only for what was masked; anything the detectors missed it saw as written."
+                  : "Edit freely: this stands in for the LLM. It can only refer to people through placeholders."}
               </span>
             )
           }
@@ -302,7 +310,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
             </div>
           ) : restoration ? (
             <div className="space-y-4">
-              <RestoredText segments={restoration.segments} activeKey={activeKey} onActivate={setActiveKey} freshFrom={freshFrom} />
+              <RestoredText segments={restoration.segments} activeKey={activeKey} onActivate={activate} freshFrom={freshFrom} />
               {streaming && <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 bg-ink motion-safe:animate-pulse" />}
               {unresolved.length > 0 && view.kind === "done" && (
                 <div role="note" className="rounded-xl border border-warn/40 bg-warn-soft p-3 text-sm text-ink">
@@ -324,14 +332,36 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
           )}
         </Pane>
       </div>
+
+      <Popover anchor={activeKey ? anchor : null}>
+        {activeKey && <PlaceholderDetails placeholder={activeKey} restored={values.has(activeKey)} />}
+      </Popover>
     </div>
   );
 }
 
-function RoundTripIntro() {
+function PlaceholderDetails({ placeholder, restored }: { placeholder: string; restored: boolean }) {
+  const type = tokenize(placeholder)[0];
+  const meta = metaFor(type?.kind === "placeholder" ? type.entityType : null);
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span className="inline-flex items-center gap-1.5 font-medium text-ink">
+        <span className={["size-2 rounded-full", meta.swatch].join(" ")} />
+        {meta.label}
+      </span>
+      <span>
+        {restored ? "restored from" : "placeholder"} <code className="font-mono text-ink">{placeholder}</code>
+      </span>
+    </div>
+  );
+}
+
+function RoundTripIntro({ live = false }: { live?: boolean }) {
   return (
     <div className="max-w-3xl">
-      <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">The answer comes back with the real names in it.</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">
+        {live ? "The answer comes back with the masked values restored." : "The answer comes back with the real names in it."}
+      </h1>
       <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
         The model writes about placeholders. On the way back, pii-guard swaps them for the original values, even mid-stream, when a placeholder is split across two chunks.
       </p>

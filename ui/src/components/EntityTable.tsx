@@ -7,7 +7,7 @@ interface Props {
   entities: readonly MaskedEntity[];
   spans: readonly LocalSpan[];
   activeKey: string | null;
-  onActivate: (key: string | null) => void;
+  onActivate: (key: string | null, anchor?: HTMLElement | null) => void;
 }
 
 /**

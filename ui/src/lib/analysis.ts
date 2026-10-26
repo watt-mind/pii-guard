@@ -88,23 +88,46 @@ export function summarize(spans: readonly LocalSpan[], mask: MaskResponse | null
 }
 
 /**
- * Fills a sample answer template: `{{value}}` becomes the placeholder that
- * replaced `value` in the input. Values that weren't masked stay as they are.
+ * What the model saw for input[start, end): masked stretches become their
+ * placeholders, everything else is the text that was sent as is.
  */
-export function fillAnswerTemplate(template: string, input: string, links: readonly PlaceholderLink[] | null): string {
-  const byValue = new Map<string, string>();
-  links?.forEach((l) => {
-    const value = input.slice(l.start, l.end);
-    if (!byValue.has(value)) byValue.set(value, l.placeholder);
+export function maskedSlice(input: string, start: number, end: number, links: readonly PlaceholderLink[]): string {
+  let out = "";
+  let cursor = start;
+  for (const l of links) {
+    if (l.end <= start || l.start >= end) continue;
+    if (l.start > cursor) out += input.slice(cursor, l.start);
+    out += l.placeholder;
+    cursor = Math.max(cursor, l.end);
+  }
+  if (cursor < end) out += input.slice(cursor, end);
+  return out;
+}
+
+/**
+ * Fills a sample answer template. `{{value}}` becomes exactly what the model
+ * saw for that value: its placeholder when the whole value was masked, the
+ * placeholders of any masked parts otherwise (a postcode inside an address),
+ * and plain text only for parts that reached the model unmasked anyway. The
+ * simulated model never "knows" a value it was not sent. Returns null when the
+ * masked text could not be lined up with the input (then nothing is safe to
+ * echo, and callers should fall back to the generic answer).
+ */
+export function fillAnswerTemplate(template: string, input: string, links: readonly PlaceholderLink[] | null): string | null {
+  if (!links) return null;
+  const sorted = [...links].sort((a, b) => a.start - b.start);
+  return template.replace(/\{\{([^}]+)\}\}/g, (_, value: string) => {
+    const at = input.indexOf(value);
+    if (at < 0) return "(not in the document)";
+    return maskedSlice(input, at, at + value.length, sorted);
   });
-  return template.replace(/\{\{([^}]+)\}\}/g, (_, value: string) => byValue.get(value) ?? value);
 }
 
 /** A generic answer for custom input, built from the placeholders only. */
 export function genericAnswer(mask: MaskResponse): string {
   if (mask.entities.length === 0) return "I could not find anyone to write about in this text.";
   const lines = mask.entities.map((e) => `• ${e.placeholder} (mentioned ${e.count}×)`);
-  return `Here is what the document refers to:\n\n${lines.join("\n")}\n\nLet me know which of these you want me to contact first.`;
+  return `Here is what the document refers to:\n\n${lines.join("\n")}\n\nWhich of these should I look into?`;
 }
 
 /** placeholder -> the input value it replaced, from the links. */
@@ -132,3 +155,13 @@ export function describeSpan(span: LocalSpan): string {
   return `${meta.label}, ${action}, found by ${detector}, confidence ${Math.round(span.score * 100)}%`;
 }
 
+
+/** Human labels of the detectors that produced at least one span. */
+export function detectorsUsed(spans: readonly LocalSpan[]): string[] {
+  return [...new Set(spans.map((s) => DETECTOR_LABEL[s.detector] ?? s.detector))];
+}
+
+export function joinList(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}

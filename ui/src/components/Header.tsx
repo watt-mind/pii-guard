@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from "react";
-import { engineReason, type EngineKind, type EngineState, type ModePreference } from "../api/engine";
+import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 
 export type Screen = "playground" | "roundtrip";
@@ -13,7 +13,7 @@ interface Props {
   screen: Screen;
   onScreen: (s: Screen) => void;
   engineState: EngineState;
-  engine: EngineKind;
+  engine: EngineDisplay;
   onPreference: (p: ModePreference) => void;
   onRecheck: () => void;
   theme: ThemePref;
@@ -100,7 +100,7 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
   );
 }
 
-function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine: EngineKind; onRecheck: () => void }) {
+function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine: EngineDisplay; onRecheck: () => void }) {
   const reason = engineReason(state);
   const status = state.status;
   const apiLabel =
@@ -109,7 +109,7 @@ function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine:
     status.state === "online" ? "bg-guard" : status.state === "checking" ? "bg-faint animate-pulse" : "bg-danger";
 
   return (
-    <div className="flex items-center gap-2" role="status" aria-label={`${engine === "mock" ? "Demo engine" : "Live API"}. ${reason}.`}>
+    <div className="flex items-center gap-2" role="status" aria-label={`${engine === "mock" ? "Demo engine" : engine === "pending" ? "Connecting" : "Live API"}. ${reason}.`}>
       <button
         type="button"
         onClick={onRecheck}
@@ -119,7 +119,15 @@ function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine:
         <span aria-hidden="true" className={["size-2 rounded-full", dot].join(" ")} />
         <span className="tabular-nums">{apiLabel}</span>
       </button>
-      {engine === "mock" ? (
+      {engine === "pending" ? (
+        <span
+          title={reason}
+          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-muted"
+        >
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-faint motion-safe:animate-pulse" />
+          Connecting…
+        </span>
+      ) : engine === "mock" ? (
         <span
           title={reason}
           className="inline-flex items-center gap-1.5 rounded-full border border-warn/40 bg-warn-soft px-2.5 py-1 text-xs font-semibold text-warn"

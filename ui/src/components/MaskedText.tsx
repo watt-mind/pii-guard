@@ -5,7 +5,7 @@ import { Placeholder } from "./Placeholder";
 interface Props {
   text: string;
   activeKey?: string | null;
-  onActivate?: (key: string | null) => void;
+  onActivate?: (key: string | null, anchor?: HTMLElement | null) => void;
   unresolved?: readonly string[];
 }
 

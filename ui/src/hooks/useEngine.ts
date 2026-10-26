@@ -4,7 +4,7 @@ import {
   createRoutingClient,
   effectiveEngine,
   parseModePreference,
-  type EngineKind,
+  type EngineDisplay,
   type EngineState,
   type ModePreference,
   type RoutingClient,
@@ -17,7 +17,7 @@ const HEALTH_INTERVAL_MS = 15_000;
 
 export interface EngineHandle {
   state: EngineState;
-  engine: EngineKind;
+  engine: EngineDisplay;
   client: RoutingClient;
   setPreference: (p: ModePreference) => void;
   recheck: () => void;
@@ -57,8 +57,8 @@ export function useEngine(api: HttpGuardClient, mock: GuardClient, envMode?: str
       store.update((s) => ({
         ...s,
         status,
-        // An API that just came (back) online may have gained its routes; try them again.
-        endpointsMissing: status.state === "online" && s.status.state !== "online" ? false : s.endpointsMissing,
+        // Display only: every call re-probes the API, and a success clears this flag.
+        endpointsMissing: status.state === "online" ? s.endpointsMissing : false,
       })),
     );
   }, [api, store]);
@@ -77,8 +77,13 @@ export function useEngine(api: HttpGuardClient, mock: GuardClient, envMode?: str
         getState: store.get,
         onEndpointsMissing: () => store.update((s) => ({ ...s, endpointsMissing: true })),
         onUnreachable: () => store.update((s) => ({ ...s, status: { state: "offline" } })),
+        onApiSuccess: () => {
+          const s = store.get();
+          if (s.endpointsMissing) store.update((x) => ({ ...x, endpointsMissing: false }));
+          if (s.status.state !== "online") recheck();
+        },
       }),
-    [api, mock, store],
+    [api, mock, store, recheck],
   );
 
   const setPreference = useCallback(

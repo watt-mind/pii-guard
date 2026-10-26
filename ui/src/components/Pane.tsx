@@ -32,7 +32,7 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
           side === "model" ? "border-model/20 bg-model-soft/60" : "border-line bg-surface-2",
         ].join(" ")}
       >
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[11rem] flex-1">
           <p
             className={[
               "flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase",
@@ -42,7 +42,7 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
             <SideIcon side={side} />
             {eyebrow}
           </p>
-          <h2 id={headingId} className="truncate text-base font-semibold tracking-tight text-ink">
+          <h2 id={headingId} className="text-base font-semibold tracking-tight text-balance text-ink">
             {title}
           </h2>
         </div>

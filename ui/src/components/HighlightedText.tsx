@@ -6,7 +6,7 @@ interface Props {
   text: string;
   spans: readonly LocalSpan[];
   activeKey: string | null;
-  onActivate: (key: string | null) => void;
+  onActivate: (key: string | null, anchor?: HTMLElement | null) => void;
 }
 
 /** The user's own document with every detected span marked. Values are shown only here. */
@@ -26,9 +26,9 @@ export function HighlightedText({ text, spans, activeKey, onActivate }: Props) {
         tabIndex={0}
         data-entity={span.entityType}
         data-active={active || undefined}
-        onMouseEnter={() => onActivate(key)}
+        onMouseEnter={(e) => onActivate(key, e.currentTarget)}
         onMouseLeave={() => onActivate(null)}
-        onFocus={() => onActivate(key)}
+        onFocus={(e) => onActivate(key, e.currentTarget)}
         onBlur={() => onActivate(null)}
         className={[
           "rounded-[5px] px-0.5 -mx-0.5 ring-1 ring-inset transition-shadow cursor-help",

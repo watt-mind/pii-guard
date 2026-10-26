@@ -35,9 +35,9 @@ describe("HighlightedText", () => {
     const { container } = render(<HighlightedText text={text} spans={spans} activeKey={null} onActivate={onActivate} />);
     const [person, , org] = container.querySelectorAll("mark");
     fireEvent.mouseEnter(person!);
-    expect(onActivate).toHaveBeenLastCalledWith("[[PERSON_7f3a]]");
+    expect(onActivate).toHaveBeenLastCalledWith("[[PERSON_7f3a]]", person);
     fireEvent.focus(org!);
-    expect(onActivate).toHaveBeenLastCalledWith("span:36:46");
+    expect(onActivate).toHaveBeenLastCalledWith("span:36:46", org);
     fireEvent.blur(org!);
     expect(onActivate).toHaveBeenLastCalledWith(null);
   });

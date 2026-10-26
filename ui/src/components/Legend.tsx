@@ -3,19 +3,21 @@ import { ENTITY_META } from "../lib/entities";
 
 interface Props {
   counts: ReadonlyMap<EntityType, number>;
+  /** Types that were detected but left in place by policy. */
+  kept?: ReadonlySet<EntityType>;
   /** Highlight a type (e.g. the one under the cursor). */
   activeType?: EntityType | null;
 }
 
 /** Entity types present in the current document, with their colour and policy. */
-export function Legend({ counts, activeType = null }: Props) {
+export function Legend({ counts, kept: keptTypes, activeType = null }: Props) {
   const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   if (entries.length === 0) return null;
   return (
     <ul aria-label="Entity legend" className="flex flex-wrap gap-1.5">
       {entries.map(([type, n]) => {
         const meta = ENTITY_META[type];
-        const kept = meta.policy === "keep";
+        const kept = keptTypes ? keptTypes.has(type) : meta.policy === "keep";
         return (
           <li
             key={type}

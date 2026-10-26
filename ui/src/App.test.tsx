@@ -81,4 +81,55 @@ describe("App in demo mode", () => {
     expect(alert).toHaveTextContent("detection_failed");
     expect(screen.queryByTestId("masked-text")).toBeNull();
   });
+
+  it("shows a neutral Connecting state, without the demo banner, while the health check is pending", () => {
+    const pending = () => new Promise<never>(() => {});
+    const api: HttpGuardClient = { health: pending, analyze: pending, mask: pending, unmask: pending };
+    render(<App api={api} mock={createMockClient()} />);
+    expect(screen.getByText("Connecting…")).toBeInTheDocument();
+    expect(screen.queryByText("Demo mode", { selector: "span" })).toBeNull();
+    expect(screen.queryByText("Demo mode.")).toBeNull();
+  });
+
+  it("clears the document", async () => {
+    const user = userEvent.setup();
+    render(<App api={offlineApi()} mock={createMockClient()} />);
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.getByLabelText("Document text")).toHaveValue("");
+    expect(screen.getByRole("button", { name: /mask document/i })).toBeDisabled();
+  });
+});
+
+describe("App against a live API", () => {
+  function liveApi(): HttpGuardClient {
+    // A live engine that, like a rules-only build, finds only some entities.
+    const backend = createMockClient();
+    return {
+      health: () => Promise.resolve({ status: "ok", version: "0.1.0" }),
+      analyze: backend.analyze,
+      mask: backend.mask,
+      unmask: backend.unmask,
+    };
+  }
+
+  it("states what the engine did instead of claiming everything was masked, and shows details on hover", async () => {
+    const user = userEvent.setup();
+    render(<App api={liveApi()} mock={createMockClient()} />);
+    expect(await screen.findByText("Live")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /mask document/i }));
+    const note = await screen.findByTestId("scope-note");
+    expect(note).toHaveTextContent(/\d+ values masked by .*Rules \+ checksum/);
+    expect(note).toHaveTextContent("Anything without a highlight on the left was not detected");
+    expect(screen.queryByText(/The model never sees the originals/)).toBeNull();
+
+    const playground = screen.getByRole("tabpanel", { name: /playground/i });
+    const firstMark = playground.querySelector("mark")!;
+    await user.hover(firstMark);
+    expect(await screen.findByTestId("entity-popover")).toHaveTextContent(/found by/);
+    await user.unhover(firstMark);
+    expect(screen.queryByTestId("entity-popover")).toBeNull();
+
+    await user.click(screen.getByRole("tab", { name: /round trip/i }));
+    expect(screen.getByRole("heading", { level: 1, name: /masked values restored/ })).toBeInTheDocument();
+  });
 });

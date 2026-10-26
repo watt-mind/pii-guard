@@ -14,6 +14,8 @@ import type { GuardClient, HealthResponse } from "./types";
 
 export type ModePreference = "auto" | "api" | "mock";
 export type EngineKind = "api" | "mock";
+/** What the header shows: "pending" while the first health check is still out. */
+export type EngineDisplay = EngineKind | "pending";
 
 export type ApiStatus =
   | { state: "checking" }
@@ -27,9 +29,10 @@ export interface EngineState {
   endpointsMissing: boolean;
 }
 
-export function effectiveEngine(s: EngineState): EngineKind {
+export function effectiveEngine(s: EngineState): EngineDisplay {
   if (s.preference === "mock") return "mock";
   if (s.preference === "api") return "api";
+  if (s.status.state === "checking") return "pending";
   return s.status.state === "online" && !s.endpointsMissing ? "api" : "mock";
 }
 
@@ -66,6 +69,8 @@ export interface RoutingDeps {
   getState: () => EngineState;
   onEndpointsMissing: () => void;
   onUnreachable: () => void;
+  /** A live call succeeded: clears any earlier "endpoints missing" / "offline" verdict. */
+  onApiSuccess?: () => void;
 }
 
 export function createRoutingClient(deps: RoutingDeps): RoutingClient {
@@ -76,9 +81,13 @@ export function createRoutingClient(deps: RoutingDeps): RoutingClient {
     type Result = Awaited<ReturnType<GuardClient[K]>>;
     const state = deps.getState();
     const call = (client: GuardClient) => (client[method] as (r: typeof req) => Promise<Result>)(req);
-    if (effectiveEngine(state) === "mock") return { data: await call(deps.mock), engine: "mock" };
+    if (state.preference === "mock") return { data: await call(deps.mock), engine: "mock" };
+    // In auto mode every call tries the API first, so a transient 404 or a missed health
+    // check can't pin the session to the demo engine.
     try {
-      return { data: await call(deps.api), engine: "api" };
+      const data = await call(deps.api);
+      deps.onApiSuccess?.();
+      return { data, engine: "api" };
     } catch (err) {
       if (state.preference !== "auto") throw err;
       if (err instanceof UnreachableError) {

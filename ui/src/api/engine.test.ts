@@ -32,7 +32,7 @@ describe("effectiveEngine", () => {
     expect(effectiveEngine(online)).toBe("api");
     expect(effectiveEngine({ ...online, preference: "mock" })).toBe("mock");
     expect(effectiveEngine({ ...online, status: { state: "offline" } })).toBe("mock");
-    expect(effectiveEngine({ ...online, status: { state: "checking" } })).toBe("mock");
+    expect(effectiveEngine({ ...online, status: { state: "checking" } })).toBe("pending");
     expect(effectiveEngine({ ...online, endpointsMissing: true })).toBe("mock");
     expect(effectiveEngine({ ...online, preference: "api", status: { state: "offline" } })).toBe("api");
   });
@@ -52,6 +52,35 @@ describe("routing client", () => {
     const res = await client.analyze({ text: "Teszt Elek" });
     expect(res.engine).toBe("mock");
     expect(onEndpointsMissing).toHaveBeenCalled();
+  });
+
+  it("re-probes the API on every call, so a transient 404 can't pin the demo engine", async () => {
+    const api: GuardClient = {
+      analyze: vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(404, "not_found", "starting"))
+        .mockResolvedValue({ spans: [] }),
+      mask: vi.fn(),
+      unmask: vi.fn(),
+    };
+    const onApiSuccess = vi.fn();
+    const client = createRoutingClient({
+      api,
+      mock: createMockClient(),
+      getState: () => ({ ...online, endpointsMissing: true }),
+      onEndpointsMissing: () => {},
+      onUnreachable: () => {},
+      onApiSuccess,
+    });
+    expect((await client.analyze({ text: "x" })).engine).toBe("mock");
+    expect(await client.analyze({ text: "x" })).toEqual({ engine: "api", data: { spans: [] } });
+    expect(onApiSuccess).toHaveBeenCalledOnce();
+  });
+
+  it("tries the API while the first health check is still pending", async () => {
+    const api: GuardClient = { analyze: vi.fn().mockResolvedValue({ spans: [] }), mask: vi.fn(), unmask: vi.fn() };
+    const { client } = setup(api, { ...online, status: { state: "checking" } });
+    expect((await client.analyze({ text: "x" })).engine).toBe("api");
   });
 
   it("fails closed on a contract error: no fallback, the error surfaces", async () => {

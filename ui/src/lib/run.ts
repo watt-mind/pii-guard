@@ -53,6 +53,9 @@ export async function runGuard(client: RoutingClient, text: string, sampleId: st
 }
 
 export function initialAnswer(result: RunResult, sample: Sample | undefined): string {
-  if (sample && sample.text === result.input) return fillAnswerTemplate(sample.answer, result.input, result.links);
+  if (sample && sample.text === result.input) {
+    const filled = fillAnswerTemplate(sample.answer, result.input, result.links);
+    if (filled !== null) return filled;
+  }
   return genericAnswer(result.mask);
 }
