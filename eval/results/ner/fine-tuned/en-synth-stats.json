@@ -1,0 +1,77 @@
+{
+  "language": "en",
+  "seed": 7,
+  "requested": 160,
+  "accepted": 160,
+  "discarded": 0,
+  "discard_rate": 0.0,
+  "discard_reasons": {},
+  "missing_value_types": {},
+  "unsupplied_value_types": {},
+  "by_kind": {
+    "chat": {
+      "accepted": 32,
+      "discarded": 0
+    },
+    "court-notice": {
+      "accepted": 16,
+      "discarded": 0
+    },
+    "email": {
+      "accepted": 22,
+      "discarded": 0
+    },
+    "invoice": {
+      "accepted": 13,
+      "discarded": 0
+    },
+    "lease": {
+      "accepted": 24,
+      "discarded": 0
+    },
+    "letter": {
+      "accepted": 12,
+      "discarded": 0
+    },
+    "power-of-attorney": {
+      "accepted": 11,
+      "discarded": 0
+    },
+    "sale-contract": {
+      "accepted": 30,
+      "discarded": 0
+    }
+  },
+  "splits": {
+    "train": 112,
+    "dev": 24,
+    "test": 24
+  },
+  "spans": 2007,
+  "spans_by_type": {
+    "ADDRESS": 259,
+    "BANK_ACCOUNT": 110,
+    "DATE_OF_BIRTH": 87,
+    "EMAIL": 111,
+    "ID_DOCUMENT": 52,
+    "ORGANIZATION": 125,
+    "PERSON": 1077,
+    "PHONE": 139,
+    "VEHICLE_PLATE": 47
+  },
+  "chars": 220754,
+  "model_calls": 160,
+  "cache_hits": 0,
+  "usage": {
+    "completion_tokens": 310211,
+    "prompt_tokens": 84889,
+    "reasoning_tokens": 255698,
+    "total_tokens": 395100
+  },
+  "latency_s": {
+    "total": 2522.96,
+    "mean": 15.77,
+    "median": 15.48,
+    "max": 26.82
+  }
+}
