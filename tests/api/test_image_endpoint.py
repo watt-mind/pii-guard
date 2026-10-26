@@ -234,7 +234,7 @@ def test_one_sam_request_per_prompt_with_store_false() -> None:
     sam = SamStub()
     with TestClient(make_app(sam=sam)) as http:
         assert post_png(http).status_code == 200
-    expected = ["face", "signature", "squiggly line", "id photo", "stamp"]
+    expected = ["face", "signature", "squiggly line", "photo of a person", "stamp"]
     assert sorted(sam.prompts) == sorted(expected)
     assert all(body["store"] is False for body in sam.bodies)
     assert all(body["model"] == "sam-3.1" for body in sam.bodies)
