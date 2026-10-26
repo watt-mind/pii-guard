@@ -9,7 +9,7 @@
 | Job | Model | Where it runs | Sees real data? |
 |---|---|---|---|
 | Structured identifiers | Rules (no model) | pii-guard container | yes (inside the boundary) |
-| Names, organizations, locations | Multilingual NER model (open) | pii-guard container | yes |
+| Names, organizations, addresses (dates of birth when fine-tuned) | Multilingual NER encoder (XLM-RoBERTa-base, open) | pii-guard container (CPU / MPS / CUDA) | yes |
 | Second-pass detection and adjudication | **Muse Spark Open** (open weights), optionally fine-tuned; **Muse Glimmer** as a smaller local candidate | Baseten (`meta-models/muse-spark-open-1026`), or your own hardware | yes |
 | Faces, signatures, ID photos | **SAM 3.1** | GPU endpoint | yes |
 | OCR | Open OCR engine | pii-guard container or GPU endpoint | yes |
@@ -18,6 +18,64 @@
 
 The rule behind this table: **anything that sees real personal data is an open-weights model
 you can host yourself.** Hosted Meta models only ever see fictional data or masked data.
+
+## NER detector
+
+`pii_guard.detect.ner.NerDetector` (registry name `ner`) runs a Hugging Face token-classification
+encoder in-process and reports `PERSON`, `ADDRESS`, `ORGANIZATION` and, with the fine-tuned
+model, `DATE_OF_BIRTH`. Rules stay authoritative for structured identifiers in
+`DetectionPipeline`. Install with `uv sync --extra ner` (torch, transformers, sentencepiece,
+protobuf). Without the extra the registry reports `ner` as unavailable, so the gateway's fast
+mode stays rules-only; with it, fast mode picks `ner` up automatically. A model that can't be
+loaded and any inference error raise `DetectionError` (fail closed).
+
+| Setting | Env var | Default |
+|---|---|---|
+| Model (hub id or directory) | `PII_GUARD_NER_MODEL` | `Davlan/xlm-roberta-base-ner-hrl` (pinned revision) |
+| Revision | `PII_GUARD_NER_REVISION` | pinned for the default model |
+| Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
+
+Constructor keywords: `thresholds` (`{language: {type: min_score}}`, default 0.5), `entity_types`,
+`label_map`, `max_length`/`stride` (token windows for long inputs), `aggregation`, `preload`.
+Offsets come from the fast tokenizer's offset mapping (code points), so they are exact for any
+Unicode input. Warm the cache with `uv run --extra ner python -m pii_guard.detect.ner download`.
+
+**Models and licences.**
+
+- Zero-shot default: [`Davlan/xlm-roberta-base-ner-hrl`](https://huggingface.co/Davlan/xlm-roberta-base-ner-hrl)
+  (AFL-3.0; XLM-RoBERTa-base trained on PER/ORG/LOC/DATE in ten languages, none of them
+  Hungarian). `LOC` maps to `ADDRESS`, so addresses come out as fragments. It doesn't find
+  dates of birth.
+- Fine-tuned: [`FacebookAI/xlm-roberta-base`](https://huggingface.co/FacebookAI/xlm-roberta-base)
+  (MIT) trained with `training/ner/train.py` (`training/ner/config.toml`) on 223 synthetic hu+en
+  documents (`pii-guard eval generate --n 160 --seed 7`, train split). Labels are the pii-guard
+  types (`B-PERSON`, …), with token-level aggregation so Hungarian case suffixes can stay
+  outside the span. About 18 minutes on an M1 Max (MPS); `--device cuda` for a GPU. Weights
+  are not committed or published yet: train locally and set `PII_GUARD_NER_MODEL`.
+- Also evaluated zero-shot: `urchade/gliner_multi_pii-v1` (GLiNER, Apache-2.0). It finds dates
+  of birth and whole addresses, but over-masked more (18–20 % on the synth samples), was 3–4×
+  slower and needs its own package, so it isn't wired in.
+
+**Results** (rules vs rules + NER, overlap F1 / leak rate, %; full scorecards in
+`eval/results/ner/`):
+
+| Fixture | rules | + NER zero-shot | + NER fine-tuned |
+|---|---|---|---|
+| hu-smoke | 62.1 / 52.6 | 89.7 / 17.5 | 94.3 / 12.4 |
+| en-smoke | 64.0 / 46.7 | 90.7 / 10.0 | 86.5 / 3.3 |
+| hu-synth-sample | 57.7 / 50.3 | 92.0 / 18.5 | 96.6 / 8.7 |
+| en-synth-sample | 54.5 / 46.2 | 96.8 / 7.5 | 100.0 / 0.0 |
+| hu-synth dev split (seed 7) | 60.7 / 50.0 | 91.5 / 18.0 | 96.9 / 8.6 |
+| en-synth dev split (seed 7) | 55.9 / 46.8 | 94.8 / 8.1 | 99.5 / 0.5 |
+
+What's left in the Hungarian leak is ID document and parcel numbers, which are out of scope for
+the NER detector. On the hand-written English smoke set the fine-tuned model over-masks more
+(16 % vs 11 %) and loses some person precision: the synthetic training data is narrow, so this
+is the set to watch.
+
+**Latency** per ~400-character message (`training/ner/bench_latency.py`, M1 Max, torch 2.14):
+CPU p50 46 ms / p95 53 ms; MPS p50 17 ms / p95 23 ms (same for both models). CUDA hasn't been
+measured.
 
 ## LLM detector
 

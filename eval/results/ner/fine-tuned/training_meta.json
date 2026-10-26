@@ -1,0 +1,107 @@
+{
+  "base_model": "FacebookAI/xlm-roberta-base",
+  "base_revision": null,
+  "teacher": "Davlan/xlm-roberta-base-ner-hrl",
+  "labels": [
+    "O",
+    "B-PERSON",
+    "I-PERSON",
+    "B-ADDRESS",
+    "I-ADDRESS",
+    "B-ORGANIZATION",
+    "I-ORGANIZATION",
+    "B-DATE_OF_BIRTH",
+    "I-DATE_OF_BIRTH"
+  ],
+  "settings": {
+    "epochs": 5,
+    "batch_size": 8,
+    "lr": 5e-05,
+    "weight_decay": 0.01,
+    "warmup": 0.1,
+    "max_length": 512,
+    "stride": 128,
+    "seed": 13,
+    "teacher_threshold": 0.6
+  },
+  "device": "mps",
+  "train": {
+    "eval/generated/ner-s7/hu-synth-train.jsonl": "5c142522756484de",
+    "eval/generated/ner-s7/en-synth-train.jsonl": "ac0a41dea229c4ea"
+  },
+  "dev": {
+    "eval/generated/ner-s7/hu-synth-dev.jsonl": "ed64235a130a0b5a",
+    "eval/generated/ner-s7/en-synth-dev.jsonl": "9f676d54f09da017"
+  },
+  "train_docs": 223,
+  "train_windows": 276,
+  "best": {
+    "pred": 417,
+    "gold": 416,
+    "f1_exact": 0.9964,
+    "p_overlap": 0.9976,
+    "r_overlap": 1.0,
+    "f1_overlap": 0.9988,
+    "epoch": 2,
+    "loss": 0.0399,
+    "minutes": 7.1
+  },
+  "history": [
+    {
+      "pred": 466,
+      "gold": 416,
+      "f1_exact": 0.7256,
+      "p_overlap": 0.7704,
+      "r_overlap": 0.8654,
+      "f1_overlap": 0.8151,
+      "epoch": 1,
+      "loss": 0.6851,
+      "minutes": 3.8
+    },
+    {
+      "pred": 417,
+      "gold": 416,
+      "f1_exact": 0.9964,
+      "p_overlap": 0.9976,
+      "r_overlap": 1.0,
+      "f1_overlap": 0.9988,
+      "epoch": 2,
+      "loss": 0.0399,
+      "minutes": 7.1
+    },
+    {
+      "pred": 425,
+      "gold": 416,
+      "f1_exact": 0.9845,
+      "p_overlap": 0.9835,
+      "r_overlap": 1.0,
+      "f1_overlap": 0.9917,
+      "epoch": 3,
+      "loss": 0.0041,
+      "minutes": 9.2
+    },
+    {
+      "pred": 431,
+      "gold": 416,
+      "f1_exact": 0.9728,
+      "p_overlap": 0.9629,
+      "r_overlap": 1.0,
+      "f1_overlap": 0.9811,
+      "epoch": 4,
+      "loss": 0.0022,
+      "minutes": 15.3
+    },
+    {
+      "pred": 420,
+      "gold": 416,
+      "f1_exact": 0.9952,
+      "p_overlap": 0.9905,
+      "r_overlap": 1.0,
+      "f1_overlap": 0.9952,
+      "epoch": 5,
+      "loss": 0.0017,
+      "minutes": 17.8
+    }
+  ],
+  "minutes": 17.8
+}
