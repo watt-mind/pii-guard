@@ -108,8 +108,9 @@ def test_unknown_route_uses_error_body(client: TestClient) -> None:
     assert response.json()["error"]["code"] == "not_found"
 
 
-def test_route_package_is_empty_for_now() -> None:
-    assert discover_routers() == []
+def test_v1_routers_are_mounted() -> None:
+    paths = {route.path for router in discover_routers() for route in router.routes}
+    assert {"/v1/analyze", "/v1/mask", "/v1/unmask"} <= paths
 
 
 class _Body(BaseModel):

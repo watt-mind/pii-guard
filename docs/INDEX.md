@@ -7,6 +7,7 @@
 | [privacy-model.md](privacy-model.md) | Threat model, what pii-guard guarantees and what it does not |
 | [entities.md](entities.md) | The entity taxonomy: what counts as personal data, per language |
 | [evaluation.md](evaluation.md) | Synthetic benchmark, metrics, baselines, how results are reported |
+| [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [roadmap.md](roadmap.md) | The 9-day hackathon plan, day-1 checks, what comes after |
 | [decisions/](decisions/) | Architecture decision records (ADRs) |
