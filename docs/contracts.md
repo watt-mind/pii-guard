@@ -146,7 +146,7 @@ unset. Secrets are `SecretStr`.
     `Settings` (port 8787);
   - `eval [...]` passes everything after `eval` untouched to
     `pii_guard.eval.cli:main(argv: Sequence[str] | None) -> int` and exits with its return
-    code. The stub prints "not implemented yet" and returns 1.
+    code (see "Evaluation fixtures and harness" below).
 
 ## REST API (planned)
 
@@ -270,22 +270,60 @@ class StreamUnmasker:
   whole text at once.
 - The mapping never leaves the process, is never logged, and has a TTL.
 
-## Evaluation fixtures (planned)
+## Evaluation fixtures and harness (implemented)
 
-Committed synthetic fixtures live under `eval/fixtures/` as JSON Lines, one document per line,
-UTF-8:
+Package: `pii_guard.eval`. Committed synthetic fixtures live under `eval/fixtures/` as JSON
+Lines, one document per line, UTF-8, **one file per language and set**:
+`eval/fixtures/<language>-<set>.jsonl` (`hu-smoke.jsonl`, `en-smoke.jsonl`). The record's
+`language` field is authoritative; the file name is a convention.
 
 ```json
-{"id": "hu-contract-0001", "language": "hu", "text": "Alulírott Teszt Elek …", "spans": [{"start": 10, "end": 20, "entity_type": "PERSON"}]}
+{"id": "hu-contract-0001", "language": "hu", "text": "Alulírott Teszt Elek …", "spans": [{"start": 10, "end": 20, "entity_type": "PERSON", "text": "Teszt Elek"}], "meta": {"kind": "contract"}}
 ```
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | string | Unique within the corpus, stable across regenerations with the same seed |
-| `language` | string | ISO 639-1, e.g. `hu` |
+| `id` | string | Unique across everything loaded together, stable across regenerations with the same seed |
+| `language` | string | BCP-47-style tag, e.g. `hu`, `en`, `en-GB`. Passed as is to detectors and the vault; selects the surface-form hook for the leak rate (`en-GB` falls back to `en`) |
 | `text` | string | The synthetic document |
-| `spans` | list | Gold labels: `start`, `end` (code-point offsets, end exclusive), `entity_type` (an `EntityType` value) |
+| `spans` | list | Gold labels: `start`, `end` (code-point offsets, end exclusive), `entity_type` (a text `EntityType` value), optional `text` (must equal `text[start:end]`) |
+| `meta` | object | Optional, free-form: `kind`, `tags` (e.g. `hard-negative`), generator seed, template |
 
-Gold spans don't overlap and satisfy `text[start:end]` == the inserted value. Every value is
-fictional ([ADR 0005](decisions/0005-synthetic-data-only.md)). The CLI entry point is
-`pii-guard eval`, which calls `pii_guard.eval.cli:main(argv)`.
+Gold spans don't overlap, aren't blank and don't start or end with whitespace. A Hungarian
+suffix that leaves the value intact stays outside the span (`Teszt Elek|nek`); a
+stem-changing form is labelled as the whole word (`Minta Annának`). Every value is fictional
+([ADR 0005](decisions/0005-synthetic-data-only.md)). `load_fixtures` rejects anything else with
+file, line and field, never the value.
+
+Python API (`from pii_guard.eval import …`), for the CLI, corpus generators and red-team
+scorers:
+
+```python
+load_fixtures(paths) -> list[Document]          # files or directories; validates
+write_fixtures(path, docs); dump_document(doc)  # JSONL out
+from_markup(id, "… {{PERSON|Teszt Elek}}nek …", language="hu") -> Document; label(type, value)
+find_surface_forms(text, value, entity_type, language) -> list[(start, end)]
+register_language_forms(LanguageForms(...))     # per-language surface-form hook
+DetectorAnalyzer(["rules", "llm"])              # registry names; unloadable ones -> .skipped
+run_documents(docs, analyzer) -> list[DocumentResult]   # detect, vault-mask, unmask
+summarize(results) -> dict; match_counts(gold, pred, "exact"|"overlap"); prf(counts)
+leak_report(doc, masked_text) -> list[ValueLeak]; over_masked(doc, masked_spans)
+build_scorecard(results, detectors=[...], fixture_paths=[...]) -> dict; render_markdown(card)
+```
+
+`run_documents` accepts any object with `analyze(text, language) -> list[Span]`, so a
+detection pipeline plugs in without changes here. Only `mask`-policy types are masked
+(`DEFAULT_POLICY`: everything except `ORGANIZATION` and `COMPANY_ID_HU`), each document in a
+fresh vault session under the public `EVAL_TENANT_KEY`.
+
+CLI: `pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language hu[,en]]
+[--json OUT] [--markdown OUT]` (`pii_guard.eval.cli:main(argv)`). `--fixtures` repeats and
+accepts directories (default `eval/fixtures`). Unloadable detectors are skipped with a
+warning. Markdown goes to stdout. Exit codes: 0 ok, 1 a detector or the vault failed during the
+run (fail closed, no scorecard), 2 bad arguments, fixtures or no loadable detector.
+
+The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag, version, detectors,
+skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
+(one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
+`leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
+contains document text or labelled values.

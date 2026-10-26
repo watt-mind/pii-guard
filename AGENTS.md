@@ -49,7 +49,7 @@ uv run pytest                    # tests + coverage
 uv run ruff check .              # lint
 uv run ruff format .             # format (CI runs --check)
 uv run pii-guard serve           # REST API on http://127.0.0.1:8787 (GET /healthz)
-uv run pii-guard eval            # evaluation scorecard (stub until the harness lands)
+uv run pii-guard eval            # evaluation scorecard (eval/fixtures, rules detector)
 make check                       # lint + format check + tests, same as CI
 docker compose up --build        # the API in a container on 127.0.0.1:8787
 ```

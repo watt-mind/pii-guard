@@ -1,0 +1,461 @@
+"""Scoring: span precision/recall/F1, leak rate, over-masking, round trip and latency.
+
+Pure functions on gold and predicted spans (:func:`match_counts`, :func:`prf`,
+:func:`leak_report`, :func:`over_masked`) plus :func:`run_documents`, which runs an analyzer
+and the vault over fixture documents, and :func:`summarize`, which turns the results into
+one score block (per entity type, micro and macro).
+
+Definitions (``docs/evaluation.md``):
+
+- **exact** match: same ``start``, ``end`` and ``entity_type``.
+- **overlap** match: same ``entity_type`` and at least one shared character. Precision
+  counts predictions that overlap some gold span, recall counts gold spans that overlap some
+  prediction (not one-to-one: one long prediction can cover two gold spans).
+- Undefined ratios (no predictions, no gold spans) are ``None``; F1 is 0 when either side
+  is 0. Macro averages run over every type with gold or predicted spans, undefined as 0.
+- **Leak rate**: distinct labelled values (per document, entity type and normalized value)
+  of a ``mask``-policy type for which any surface form
+  (:func:`pii_guard.eval.forms.find_surface_forms`) survives in the masked text.
+  **Partial leak**: not fully leaked, but an identifying token of the value survives (a
+  token of 3+ letters or 4+ digits that is not a language stopword and doesn't also occur in
+  the original text outside the gold spans).
+- **Over-masking rate**: masked predicted spans that overlap no gold span of any type.
+- **Round trip**: documents where ``unmask(mask(text)) == text``.
+"""
+
+from __future__ import annotations
+
+import math
+import re
+import statistics
+import time
+from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Literal, Protocol
+
+from pii_guard.eval.fixtures import Document, GoldSpan
+from pii_guard.eval.forms import find_surface_forms, language_forms
+from pii_guard.registry import create_detector
+from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, Detector, EntityType, Span
+from pii_guard.vault import PLACEHOLDER_RE, Vault, normalize_value
+
+__all__ = [
+    "DEFAULT_POLICY",
+    "EVAL_TENANT_KEY",
+    "Analyzer",
+    "DetectorAnalyzer",
+    "DocumentResult",
+    "MatchMode",
+    "TypeCounts",
+    "ValueLeak",
+    "leak_report",
+    "match_counts",
+    "over_masked",
+    "prf",
+    "run_documents",
+    "summarize",
+]
+
+MatchMode = Literal["exact", "overlap"]
+
+#: Default policies from ``docs/entities.md``: everything is masked except organisations
+#: and company identifiers, which the model needs to reason and which aren't personal data.
+DEFAULT_POLICY: Mapping[EntityType, str] = {
+    t: ("keep" if t in {EntityType.ORGANIZATION, EntityType.COMPANY_ID_HU} else "mask")
+    for t in TEXT_ENTITY_TYPES
+}
+
+#: Fixed, public key for evaluation runs only, so placeholders are reproducible.
+EVAL_TENANT_KEY = b"pii-guard-evaluation-only-key-v1"
+
+
+class _SpanLike(Protocol):
+    @property
+    def start(self) -> int: ...
+    @property
+    def end(self) -> int: ...
+    @property
+    def entity_type(self) -> EntityType: ...
+
+
+# --- Detection metrics -------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class TypeCounts:
+    """Counts for one entity type. ``tp_pred``/``tp_gold`` differ only in overlap mode."""
+
+    gold: int = 0
+    pred: int = 0
+    tp_pred: int = 0
+    tp_gold: int = 0
+
+    def __iadd__(self, other: TypeCounts) -> TypeCounts:
+        self.gold += other.gold
+        self.pred += other.pred
+        self.tp_pred += other.tp_pred
+        self.tp_gold += other.tp_gold
+        return self
+
+    @property
+    def precision(self) -> float | None:
+        return self.tp_pred / self.pred if self.pred else None
+
+    @property
+    def recall(self) -> float | None:
+        return self.tp_gold / self.gold if self.gold else None
+
+    @property
+    def f1(self) -> float | None:
+        p, r = self.precision, self.recall
+        if p is None and r is None:
+            return None
+        if not p or not r:
+            return 0.0
+        return 2 * p * r / (p + r)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "gold": self.gold,
+            "pred": self.pred,
+            "tp_pred": self.tp_pred,
+            "tp_gold": self.tp_gold,
+            "precision": self.precision,
+            "recall": self.recall,
+            "f1": self.f1,
+        }
+
+
+def _matches(gold: _SpanLike, pred: _SpanLike, mode: MatchMode) -> bool:
+    if gold.entity_type != pred.entity_type:
+        return False
+    if mode == "exact":
+        return gold.start == pred.start and gold.end == pred.end
+    return gold.start < pred.end and pred.start < gold.end
+
+
+def match_counts(
+    gold: Iterable[_SpanLike], pred: Iterable[_SpanLike], mode: MatchMode
+) -> dict[EntityType, TypeCounts]:
+    """Per-type counts for one document."""
+    gold, pred = list(gold), list(pred)
+    counts: dict[EntityType, TypeCounts] = defaultdict(TypeCounts)
+    for g in gold:
+        counts[g.entity_type].gold += 1
+        if any(_matches(g, p, mode) for p in pred):
+            counts[g.entity_type].tp_gold += 1
+    for p in pred:
+        counts[p.entity_type].pred += 1
+        if any(_matches(g, p, mode) for g in gold):
+            counts[p.entity_type].tp_pred += 1
+    return dict(counts)
+
+
+def prf(counts: Mapping[EntityType, TypeCounts]) -> dict[str, object]:
+    """Per-type, micro and macro precision/recall/F1 for accumulated counts."""
+    micro = TypeCounts()
+    for c in counts.values():
+        micro += c
+    present = [c for c in counts.values() if c.gold or c.pred]
+
+    def macro(attr: str) -> float | None:
+        if not present:
+            return None
+        return statistics.fmean(getattr(c, attr) or 0.0 for c in present)
+
+    return {
+        "per_type": {t.value: counts[t].to_dict() for t in sorted(counts, key=_type_order)},
+        "micro": micro.to_dict(),
+        "macro": {"precision": macro("precision"), "recall": macro("recall"), "f1": macro("f1")},
+    }
+
+
+_TYPE_ORDER = {t: i for i, t in enumerate(EntityType)}
+
+
+def _type_order(t: EntityType) -> int:
+    return _TYPE_ORDER[t]
+
+
+# --- Leak rate ---------------------------------------------------------------------------
+
+_TOKEN_RE = re.compile(r"[^\W_]+")
+_OBJECT = "￼"  # stands in for a placeholder: not a word character, so boundaries hold
+
+
+@dataclass(frozen=True, slots=True)
+class ValueLeak:
+    """Leak result for one distinct labelled value. Never repr'd with the value."""
+
+    entity_type: EntityType
+    occurrences: int
+    leaked: bool
+    partial: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "entity_type": self.entity_type.value,
+            "occurrences": self.occurrences,
+            "leaked": self.leaked,
+            "partial": self.partial,
+        }
+
+
+def _strip_placeholders(masked_text: str) -> str:
+    return PLACEHOLDER_RE.sub(_OBJECT, masked_text)
+
+
+def _identifying_tokens(value: str, entity_type: EntityType, stopwords: frozenset[str]) -> set[str]:
+    if entity_type is EntityType.EMAIL and "@" in value:
+        value = value.split("@", 1)[0]  # the domain is usually shared and not identifying
+    tokens: set[str] = set()
+    for token in _TOKEN_RE.findall(value):
+        folded = token.casefold()
+        if folded in stopwords:
+            continue
+        if (token.isdigit() and len(token) >= 4) or (not token.isdigit() and len(token) >= 3):
+            tokens.add(folded)
+    return tokens
+
+
+def leak_report(
+    doc: Document,
+    masked_text: str,
+    *,
+    policy: Mapping[EntityType, str] = DEFAULT_POLICY,
+) -> list[ValueLeak]:
+    """Which labelled values of ``doc`` survive in ``masked_text`` (the text sent upstream).
+
+    Only ``mask``-policy types are checked. Placeholders are removed before searching, so a
+    hex placeholder id never counts as a surviving value.
+    """
+    clean = _strip_placeholders(masked_text)
+    forms = language_forms(doc.language)
+    groups: dict[tuple[EntityType, str], list[GoldSpan]] = defaultdict(list)
+    for span in doc.spans:
+        if policy.get(span.entity_type, "mask") == "mask":
+            groups[(span.entity_type, normalize_value(span.text))].append(span)
+
+    # Tokens that also occur outside every gold span don't prove anything when they survive.
+    outside = list(doc.text)
+    for span in doc.spans:
+        outside[span.start : span.end] = " " * (span.end - span.start)
+    outside_text = "".join(outside)
+
+    report: list[ValueLeak] = []
+    for (entity_type, _), spans in groups.items():
+        value = spans[0].text
+        leaked = bool(find_surface_forms(clean, value, entity_type, doc.language))
+        partial = False
+        if not leaked:
+            for token in _identifying_tokens(value, entity_type, forms.stopwords):
+                if find_surface_forms(outside_text, token, EntityType.PERSON, doc.language):
+                    continue
+                if find_surface_forms(clean, token, EntityType.PERSON, doc.language):
+                    partial = True
+                    break
+        report.append(ValueLeak(entity_type, len(spans), leaked, partial))
+    return report
+
+
+def over_masked(doc: Document, masked_spans: Sequence[_SpanLike]) -> list[_SpanLike]:
+    """Masked spans that overlap no gold span of any type (not personal data)."""
+    return [
+        s for s in masked_spans if not any(s.start < g.end and g.start < s.end for g in doc.spans)
+    ]
+
+
+# --- Running detectors and the vault -----------------------------------------------------
+
+
+class Analyzer(Protocol):
+    """Detection as the gateway sees it: non-overlapping spans sorted by ``start``."""
+
+    def analyze(self, text: str, language: str) -> list[Span]: ...
+
+
+def _resolve_overlaps(spans: Sequence[Span]) -> list[Span]:
+    """Greedy, longest then highest score wins; same rule as the API's stand-in resolver."""
+    ranked = sorted(spans, key=lambda s: (-s.length, -s.score, s.start, s.detector))
+    kept: list[Span] = []
+    for span in ranked:
+        if not any(span.overlaps(other) for other in kept):
+            kept.append(span)
+    return sorted(kept, key=lambda s: (s.start, s.end))
+
+
+class DetectorAnalyzer:
+    """Runs registry detectors by name and merges their spans.
+
+    Names that can't be resolved or instantiated are skipped and listed in ``skipped``
+    (``(name, reason)``), so ``--detectors rules,llm`` still runs when the LLM detector
+    isn't installed yet. A detector that fails *during* detection fails the run.
+    """
+
+    def __init__(self, names: Sequence[str]) -> None:
+        self.detectors: list[Detector] = []
+        self.loaded: list[str] = []
+        self.skipped: list[tuple[str, str]] = []
+        for name in names:
+            try:
+                detector = create_detector(name)
+            except DetectionError as exc:
+                self.skipped.append((name, exc.message))
+                continue
+            except Exception as exc:
+                self.skipped.append((name, f"could not be created ({type(exc).__name__})"))
+                continue
+            self.detectors.append(detector)
+            self.loaded.append(name)
+
+    def analyze(self, text: str, language: str) -> list[Span]:
+        spans: list[Span] = []
+        for detector in self.detectors:
+            spans.extend(detector.detect(text, language=language))
+        return _resolve_overlaps(spans)
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentResult:
+    """Everything measured on one document."""
+
+    document: Document
+    predicted: tuple[Span, ...]
+    masked_spans: tuple[Span, ...]
+    masked_text: str
+    roundtrip: bool
+    detect_ms: float
+    mask_ms: float
+
+    def __repr__(self) -> str:
+        return (
+            f"DocumentResult(id={self.document.id!r}, predicted={len(self.predicted)}, "
+            f"roundtrip={self.roundtrip})"
+        )
+
+
+def run_documents(
+    documents: Iterable[Document],
+    analyzer: Analyzer,
+    *,
+    policy: Mapping[EntityType, str] = DEFAULT_POLICY,
+    tenant_key: bytes = EVAL_TENANT_KEY,
+) -> list[DocumentResult]:
+    """Detect, mask (``mask``-policy predictions only) and unmask every document.
+
+    Each document gets a fresh vault session, as one request would. Errors propagate
+    (fail closed): a run with a failing detector produces no scorecard.
+    """
+    vault = Vault(tenant_key)
+    results: list[DocumentResult] = []
+    for doc in documents:
+        started = time.perf_counter()
+        predicted = analyzer.analyze(doc.text, doc.language)
+        detected = time.perf_counter()
+        to_mask = [s for s in predicted if policy.get(s.entity_type, "mask") == "mask"]
+        session = vault.session()
+        masked_text = session.mask(doc.text, to_mask, language=doc.language)
+        masked = time.perf_counter()
+        roundtrip = session.unmask(masked_text) == doc.text
+        vault.drop(session.session_id)
+        results.append(
+            DocumentResult(
+                document=doc,
+                predicted=tuple(predicted),
+                masked_spans=tuple(to_mask),
+                masked_text=masked_text,
+                roundtrip=roundtrip,
+                detect_ms=(detected - started) * 1000,
+                mask_ms=(masked - detected) * 1000,
+            )
+        )
+    return results
+
+
+# --- Summaries ---------------------------------------------------------------------------
+
+
+def _ratio(num: int, den: int) -> float | None:
+    return num / den if den else None
+
+
+def _percentile(values: Sequence[float], q: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, math.ceil(q * len(ordered)) - 1))  # nearest rank
+    return ordered[index]
+
+
+def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
+    """One score block for ``results`` (all documents, or one language)."""
+    detection: dict[str, object] = {}
+    for mode in ("exact", "overlap"):
+        total: dict[EntityType, TypeCounts] = defaultdict(TypeCounts)
+        for r in results:
+            for t, c in match_counts(r.document.spans, r.predicted, mode).items():
+                total[t] += c
+        detection[mode] = prf(total)
+
+    leak_total: Counter[str] = Counter()
+    leak_by_type: dict[str, Counter[str]] = defaultdict(Counter)
+    over_total: Counter[str] = Counter()
+    over_by_type: dict[str, Counter[str]] = defaultdict(Counter)
+    for r in results:
+        for leak in leak_report(r.document, r.masked_text):
+            for bucket in (leak_total, leak_by_type[leak.entity_type.value]):
+                bucket["values"] += 1
+                bucket["leaked"] += leak.leaked
+                bucket["partial"] += leak.partial
+        over = {id(s) for s in over_masked(r.document, r.masked_spans)}
+        for span in r.masked_spans:
+            for bucket in (over_total, over_by_type[span.entity_type.value]):
+                bucket["masked"] += 1
+                bucket["over_masked"] += id(span) in over
+
+    def leak_block(c: Counter[str]) -> dict[str, object]:
+        return {
+            "values": c["values"],
+            "leaked": c["leaked"],
+            "partial": c["partial"],
+            "rate": _ratio(c["leaked"], c["values"]),
+            "partial_rate": _ratio(c["partial"], c["values"]),
+        }
+
+    def over_block(c: Counter[str]) -> dict[str, object]:
+        return {
+            "masked": c["masked"],
+            "over_masked": c["over_masked"],
+            "rate": _ratio(c["over_masked"], c["masked"]),
+        }
+
+    detect_ms = [r.detect_ms for r in results]
+    mask_ms = [r.mask_ms for r in results]
+    return {
+        "documents": len(results),
+        "gold_spans": sum(len(r.document.spans) for r in results),
+        "predicted_spans": sum(len(r.predicted) for r in results),
+        "detection": detection,
+        "leak": {
+            **leak_block(leak_total),
+            "per_type": {t: leak_block(leak_by_type[t]) for t in _ordered_names(leak_by_type)},
+        },
+        "over_masking": {
+            **over_block(over_total),
+            "per_type": {t: over_block(over_by_type[t]) for t in _ordered_names(over_by_type)},
+        },
+        "roundtrip": {
+            "documents": len(results),
+            "exact": sum(r.roundtrip for r in results),
+            "rate": _ratio(sum(r.roundtrip for r in results), len(results)),
+        },
+        "latency_ms": {
+            "detect": {"p50": _percentile(detect_ms, 0.5), "p95": _percentile(detect_ms, 0.95)},
+            "mask": {"p50": _percentile(mask_ms, 0.5), "p95": _percentile(mask_ms, 0.95)},
+        },
+    }
+
+
+def _ordered_names(names: Iterable[str]) -> list[str]:
+    return sorted(names, key=lambda n: _TYPE_ORDER[EntityType(n)])
