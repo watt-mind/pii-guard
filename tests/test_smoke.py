@@ -56,9 +56,10 @@ def test_cli_version(capsys: pytest.CaptureFixture[str]) -> None:
     assert __version__ in capsys.readouterr().out
 
 
-def test_cli_eval_stub(capsys: pytest.CaptureFixture[str]) -> None:
-    assert cli.main(["eval", "--split", "dev"]) == 1
-    assert "not implemented" in capsys.readouterr().err
+def test_cli_eval_delegates_to_the_eval_cli(capsys: pytest.CaptureFixture[str]) -> None:
+    # Everything after "eval" goes to pii_guard.eval.cli; its own errors exit with 2.
+    assert cli.main(["eval", "--fixtures", "missing.jsonl"]) == 2
+    assert "pii-guard eval:" in capsys.readouterr().err
 
 
 def test_cli_serve_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:

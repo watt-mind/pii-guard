@@ -54,8 +54,34 @@ Each detection change reports against these:
 
 The hackathon claim is the difference between 2 and 4, on the test split.
 
+## Languages
+
+Evaluation is multilingual from the start: every fixture record carries a `language`, which
+is passed to detectors and the vault, and fixtures are kept one file per language and set
+(`eval/fixtures/hu-smoke.jsonl`, `eval/fixtures/en-smoke.jsonl`). Leak-rate matching goes
+through a per-language surface-form hook (`pii_guard.eval.forms`): Hungarian case suffixes
+and stem changes (`Annának`, `Kováccsal`) for `hu`, exact matching as the default elsewhere.
+The scorecard reports every metric per language and per entity type, plus an overall row.
+
+## Leak rate in practice
+
+The harness masks each document with the vault (only `mask`-policy predictions, as the
+gateway would) and searches the masked text for each labelled value: case- and
+whitespace-insensitive, through the language's surface forms, and for structured identifiers
+on their letters and digits with any separators (a phone number also by its national number,
+a Hungarian IBAN also by the giro number inside it). A value is **leaked** if any form
+survives. It is **partially leaked** if not, but an identifying token of it survives (for
+example the street of an address whose postcode alone was masked). Tokens that also occur
+outside the labelled spans, and generic words such as `utca` or month names, don't count.
+
 ## Reporting
 
-`uv run pii-guard eval` writes a JSON scorecard and a Markdown table. Results for every
-release are committed under `eval/results/` with the model versions, corpus seed and commit
-hash, so anyone can reproduce them.
+`uv run pii-guard eval --fixtures eval/fixtures --detectors rules --json OUT` prints a
+Markdown scorecard and writes the JSON one (format in [contracts.md](contracts.md)), with the
+commit hash, detector names and the SHA-256 of every fixture file. `--language en` restricts
+the run to one language. Results for every release are committed under `eval/results/` with
+the model versions, corpus seed and commit hash, so anyone can reproduce them.
+
+The hand-written smoke sets are built by `eval/fixtures/build_smoke.py` (inline
+`{{TYPE|value}}` labels, checksum-valid fictional identifiers); a test fails if the committed
+JSONL is stale.
