@@ -9,6 +9,7 @@ from pii_guard.eval import (
     DetectorAnalyzer,
     GoldSpan,
     TypeCounts,
+    consistency_report,
     from_markup,
     label,
     leak_report,
@@ -268,3 +269,48 @@ def test_detector_analyzer_uses_the_pipeline_resolver() -> None:
     assert [s.entity_type for s in spans] == [EntityType.PERSON, EntityType.ORGANIZATION]
     assert DEFAULT_POLICY[EntityType.ORGANIZATION] == "keep"
     assert DEFAULT_POLICY[EntityType.PERSON] == "mask"
+
+
+# --- placeholder consistency (LAB-1115) -----------------------------------------------------
+
+
+def test_consistency_groups_surface_forms_and_needs_one_placeholder() -> None:
+    doc = _doc(
+        f"{label('PERSON', 'Minta Anna')} és {label('PERSON', 'Minta Annának')}, "
+        f"{label('PERSON', 'Teszt Elek')} és {label('PERSON', 'TESZT ELEK')}, "
+        f"{label('EMAIL', 'anna@example.com')}"
+    )
+    spans = sorted(doc.spans, key=lambda sp: sp.start)
+    anna, anna_dat, elek, elek_caps, _email = spans
+    replacements = [
+        (anna.start, anna.end, "[[PERSON_aaaa]]"),
+        (anna_dat.start, anna_dat.end - 3, "[[PERSON_aaaa]]"),  # suffix outside
+        (elek.start, elek.end, "[[PERSON_bbbb]]"),
+        (elek_caps.start, elek_caps.end, "[[PERSON_cccc]]"),  # a second placeholder
+    ]
+    report = consistency_report(doc, replacements)
+    by_occurrences = sorted((r.entity_type.value, r.occurrences, r.consistent) for r in report)
+    assert by_occurrences == [
+        ("EMAIL", 1, False),  # not masked at all
+        ("PERSON", 2, False),
+        ("PERSON", 2, True),
+    ]
+    assert "Anna" not in repr(report)
+
+
+def test_run_documents_reports_consistency() -> None:
+    docs = [
+        _doc(
+            f"{label('PERSON', 'Próba Zsuzsanna')} és {label('PERSON', 'Próba Zsuzsannának')}, "
+            f"{label('PERSON', 'Próba Zsuzsannát')}."
+        )
+    ]
+    (result,) = run_documents(docs, FakeAnalyzer("Próba Zsuzsannának"))
+    assert len({p for _, _, p in result.replacements}) == 1
+    assert result.roundtrip
+    block = summarize([result])
+    assert block["consistency"]["entities"] == 1
+    assert block["consistency"]["rate"] == 1.0
+    assert block["consistency"]["multi_rate"] == 1.0
+    assert block["consistency"]["per_type"]["PERSON"]["consistent"] == 1
+    assert summarize([])["consistency"]["rate"] is None

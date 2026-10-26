@@ -21,6 +21,11 @@ Definitions (``docs/evaluation.md``):
   the original text outside the gold spans).
 - **Over-masking rate**: masked predicted spans that overlap no gold span of any type.
 - **Round trip**: documents where ``unmask(mask(text)) == text``.
+- **Placeholder consistency**: gold entities (per document, of a ``mask``-policy type) whose
+  occurrences are all masked by one and the same placeholder. An entity groups the gold spans
+  of one type that are surface forms of each other (``Minta Anna``, ``Minta Annának``,
+  ``TESZT ELEK``; :func:`pii_guard.eval.forms.surface_pattern`). An occurrence left unmasked
+  makes its entity inconsistent. ``multi_rate`` counts only entities with 2+ occurrences.
 """
 
 from __future__ import annotations
@@ -36,7 +41,7 @@ from typing import Literal, Protocol
 
 from pii_guard.detect.pipeline import DetectionPipeline
 from pii_guard.eval.fixtures import Document, GoldSpan
-from pii_guard.eval.forms import find_surface_forms, language_forms
+from pii_guard.eval.forms import find_surface_forms, language_forms, surface_pattern
 from pii_guard.policy import DEFAULT_POLICIES, PolicySet
 from pii_guard.registry import create_detector
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, Detector, EntityType, Span
@@ -48,9 +53,11 @@ __all__ = [
     "Analyzer",
     "DetectorAnalyzer",
     "DocumentResult",
+    "EntityConsistency",
     "MatchMode",
     "TypeCounts",
     "ValueLeak",
+    "consistency_report",
     "leak_report",
     "match_counts",
     "over_masked",
@@ -260,6 +267,69 @@ def leak_report(
     return report
 
 
+# --- Placeholder consistency -------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class EntityConsistency:
+    """Consistency of one gold entity. Never repr'd with its value."""
+
+    entity_type: EntityType
+    occurrences: int
+    consistent: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "entity_type": self.entity_type.value,
+            "occurrences": self.occurrences,
+            "consistent": self.consistent,
+        }
+
+
+def _gold_entities(doc: Document, policy: Mapping[EntityType, str]) -> list[list[GoldSpan]]:
+    """Gold spans grouped into entities: same type, surface forms of the shortest value."""
+    groups: list[tuple[GoldSpan, list[GoldSpan]]] = []
+    candidates = [s for s in doc.spans if policy.get(s.entity_type, "mask") == "mask"]
+    for span in sorted(candidates, key=lambda s: (len(s.text), s.start)):
+        for head, members in groups:
+            if head.entity_type is span.entity_type and (
+                normalize_value(head.text) == normalize_value(span.text)
+                or surface_pattern(head.text, head.entity_type, doc.language).fullmatch(span.text)
+            ):
+                members.append(span)
+                break
+        else:
+            groups.append((span, [span]))
+    return [members for _, members in groups]
+
+
+def consistency_report(
+    doc: Document,
+    replacements: Sequence[tuple[int, int, str]],
+    *,
+    policy: Mapping[EntityType, str] = DEFAULT_POLICY,
+) -> list[EntityConsistency]:
+    """Per gold entity: are all its occurrences masked by a single placeholder?
+
+    ``replacements`` are the vault's ``(start, end, placeholder)`` in input offsets
+    (:meth:`pii_guard.vault.VaultSession.mask_with_report`).
+    """
+    report: list[EntityConsistency] = []
+    for members in _gold_entities(doc, policy):
+        placeholders: set[str] = set()
+        covered = True
+        for span in members:
+            hits = {p for start, end, p in replacements if start < span.end and span.start < end}
+            covered &= bool(hits)
+            placeholders |= hits
+        report.append(
+            EntityConsistency(
+                members[0].entity_type, len(members), covered and len(placeholders) == 1
+            )
+        )
+    return report
+
+
 def over_masked(doc: Document, masked_spans: Sequence[_SpanLike]) -> list[_SpanLike]:
     """Masked spans that overlap no gold span of any type (not personal data)."""
     return [
@@ -325,6 +395,7 @@ class DocumentResult:
     roundtrip: bool
     detect_ms: float
     mask_ms: float
+    replacements: tuple[tuple[int, int, str], ...] = ()
 
     def __repr__(self) -> str:
         return (
@@ -356,7 +427,8 @@ def run_documents(
         detected = time.perf_counter()
         to_mask = [s for s in predicted if policy.get(s.entity_type, "mask") != "keep"]
         session = vault.session()
-        masked_text = session.mask(doc.text, to_mask, language=doc.language)
+        mask_result = session.mask_with_report(doc.text, to_mask, language=doc.language)
+        masked_text = mask_result.text
         masked = time.perf_counter()
         roundtrip = session.unmask(masked_text) == doc.text
         vault.drop(session.session_id)
@@ -369,6 +441,7 @@ def run_documents(
                 roundtrip=roundtrip,
                 detect_ms=(detected - started) * 1000,
                 mask_ms=(masked - detected) * 1000,
+                replacements=mask_result.replacements,
             )
         )
     return results
@@ -403,7 +476,16 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
     leak_by_type: dict[str, Counter[str]] = defaultdict(Counter)
     over_total: Counter[str] = Counter()
     over_by_type: dict[str, Counter[str]] = defaultdict(Counter)
+    consistency_total: Counter[str] = Counter()
+    consistency_by_type: dict[str, Counter[str]] = defaultdict(Counter)
     for r in results:
+        for entity in consistency_report(r.document, r.replacements):
+            for bucket in (consistency_total, consistency_by_type[entity.entity_type.value]):
+                bucket["entities"] += 1
+                bucket["consistent"] += entity.consistent
+                if entity.occurrences > 1:
+                    bucket["multi_occurrence"] += 1
+                    bucket["multi_consistent"] += entity.consistent
         for leak in leak_report(r.document, r.masked_text):
             for bucket in (leak_total, leak_by_type[leak.entity_type.value]):
                 bucket["values"] += 1
@@ -431,6 +513,16 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
             "rate": _ratio(c["over_masked"], c["masked"]),
         }
 
+    def consistency_block(c: Counter[str]) -> dict[str, object]:
+        return {
+            "entities": c["entities"],
+            "consistent": c["consistent"],
+            "rate": _ratio(c["consistent"], c["entities"]),
+            "multi_occurrence": c["multi_occurrence"],
+            "multi_consistent": c["multi_consistent"],
+            "multi_rate": _ratio(c["multi_consistent"], c["multi_occurrence"]),
+        }
+
     detect_ms = [r.detect_ms for r in results]
     mask_ms = [r.mask_ms for r in results]
     return {
@@ -445,6 +537,13 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
         "over_masking": {
             **over_block(over_total),
             "per_type": {t: over_block(over_by_type[t]) for t in _ordered_names(over_by_type)},
+        },
+        "consistency": {
+            **consistency_block(consistency_total),
+            "per_type": {
+                t: consistency_block(consistency_by_type[t])
+                for t in _ordered_names(consistency_by_type)
+            },
         },
         "roundtrip": {
             "documents": len(results),

@@ -1,4 +1,5 @@
-"""Build the hand-written smoke fixtures: ``hu-smoke.jsonl`` and ``en-smoke.jsonl``.
+"""Build the hand-written smoke fixtures: ``hu-smoke.jsonl``, ``en-smoke.jsonl`` and
+``hu-inflection.jsonl`` (Hungarian stem-changing forms of names).
 
 Every person, address, number and organisation below is **fictional** (ADR 0005). Names use
 placeholder-style Hungarian and English surnames; e-mail domains are the reserved
@@ -462,7 +463,77 @@ def en_documents() -> list[Document]:
     return [from_markup(doc_id, text, language="en", meta=meta) for doc_id, text, meta in docs]
 
 
-OUTPUTS = {"hu-smoke.jsonl": hu_documents, "en-smoke.jsonl": en_documents}
+def hu_inflection_documents() -> list[Document]:
+    """Hungarian names whose stem changes before a suffix, each in several cases.
+
+    A final ``a``/``e`` lengthens (``Zsuzsanna`` -> ``Zsuzsannának``), a final digraph doubles
+    (``Szabolcs`` -> ``Szabolccsal``), a single final consonant doubles into ``-val``
+    (``Elek`` -> ``Elekkel``). Measures that every form is masked by one placeholder
+    (placeholder consistency) and that the suffix stays outside it.
+    """
+    docs = [
+        (
+            "hu-inflection-0001",
+            f"{P('Próba Zsuzsannának')} küldtük a levelet. {P('Próba Zsuzsanna')} holnap "
+            f"válaszol, {P('Próba Zsuzsannát')} hívjuk. E-mail: {E('zsuzsanna.proba@example.com')}",
+            {"kind": "email", "tags": ["inflected-stem", "vowel-lengthening"]},
+        ),
+        (
+            "hu-inflection-0002",
+            f"A szerződést {P('Minta Kende')} írta alá. {P('Minta Kendének')} megküldtük, "
+            f"{P('Minta Kendét')} a jövő héten keressük, {P('Minta Kendével')} egyeztetünk. "
+            f"Telefon: {PH('+36 30 555 0142')}.",
+            {"kind": "letter", "tags": ["inflected-stem", "vowel-lengthening"]},
+        ),
+        (
+            "hu-inflection-0003",
+            f"{P('Kovács Szabolcs')} meghatalmazta a cégét. A {P('Kovács Szabolccsal')} kötött "
+            f"megállapodás szerint {P('Kovács Szabolcs')}nak kell fizetni a(z) "
+            f"{BANK(giro('1177301', '61111018'))} számlára.",
+            {"kind": "contract", "tags": ["inflected-stem", "digraph-doubling"]},
+        ),
+        (
+            "hu-inflection-0004",
+            f"{P('Teszt Elek')} és {P('Teszt Elek')}kel együtt érkezett {P('Teszt Hajna')}. "
+            f"{P('Teszt Hajnának')} átadtuk a kulcsot, {P('Teszt Hajnáról')} és "
+            f"{P('Teszt Elek')}ről is készült feljegyzés.",
+            {"kind": "note", "tags": ["inflected-stem", "consonant-doubling"]},
+        ),
+        (
+            "hu-inflection-0005",
+            f"szia! {P('Példa Emese')} nem ér rá, {P('Példa Emesével')} majd jövő héten "
+            f"beszélünk, {P('Példa Emesének')} írj te is. a rendszám {PLATE('PRB-321')}, a "
+            f"{PLATE('PRB-321')}-nek lejár a vizsgája.",
+            {"kind": "chat", "tags": ["inflected-stem", "vowel-lengthening", "informal"]},
+        ),
+        (
+            "hu-inflection-0006",
+            f"Tisztelt {P('Minta Gergely')}! A {P('Minta Gergellyel')} folytatott egyeztetés "
+            f"alapján {P('Minta Gergely')}nek küldjük az iratokat a "
+            f"{A('6720 Szeged, Kitalált tér 3.')} címre.",
+            {"kind": "letter", "tags": ["inflected-stem", "digraph-doubling"]},
+        ),
+        (
+            "hu-inflection-0007",
+            f"{P('Próba Kornél')} kor szerint a legidősebb. {P('Próba Kornél')}nak és "
+            f"{P('Teszt Zoltán')}nak is szóltunk; {P('Teszt Zoltánt')} holnap hívjuk vissza.",
+            {"kind": "note", "tags": ["inflected-look-alike"]},
+        ),
+        (
+            "hu-inflection-0008",
+            f"{P('PRÓBA ZSUZSANNA')} (született {DOB('1988. 03. 14.')}) részére. Kérjük, "
+            f"{P('Próba Zsuzsannával')} és {P('Minta Kendével')} is közölje a döntést.",
+            {"kind": "form", "tags": ["inflected-stem", "upper-case"]},
+        ),
+    ]
+    return [from_markup(doc_id, text, language="hu", meta=meta) for doc_id, text, meta in docs]
+
+
+OUTPUTS = {
+    "hu-smoke.jsonl": hu_documents,
+    "en-smoke.jsonl": en_documents,
+    "hu-inflection.jsonl": hu_inflection_documents,
+}
 
 
 def main() -> None:
