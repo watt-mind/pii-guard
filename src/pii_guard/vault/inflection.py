@@ -9,6 +9,10 @@ the vault replaces only the value itself and keeps the suffix, so
 
 Forms that change the value itself (``Anna`` -> ``Annának``, ``Kovács`` -> ``Kováccsal``)
 are not matched by the simple Hungarian matcher here.
+
+English adds only the possessive (``Smith's`` -> ``[[PERSON_7f3a]]'s``, ``James'``); see
+:class:`EnglishPossessiveMatcher`. Matchers are part of a language pack (ADR 0008) and are
+looked up by primary language, so ``en-GB`` uses the ``en`` matcher.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from typing import Protocol, runtime_checkable
 from pii_guard.types import EntityType
 
 __all__ = [
+    "EnglishPossessiveMatcher",
     "ExactMatcher",
     "HungarianSuffixMatcher",
     "InflectionMatcher",
@@ -89,8 +94,28 @@ class HungarianSuffixMatcher:
         return f"(?:-(?:{after_hyphen})|(?:{plain}))"
 
 
-_INFLECTIONS: dict[str, InflectionMatcher] = {"hu": HungarianSuffixMatcher()}
+class EnglishPossessiveMatcher:
+    """English: the possessive ``'s`` (or a bare apostrophe), straight or typographic (U+2019).
+
+    ``Smith's``, ``James'`` and their typographic forms keep the apostrophe and ``s`` outside
+    the placeholder.
+    Plurals (``the Smiths``) are not matched: a trailing ``s`` turns too many names into other
+    words (``Will`` -> ``wills``).
+    """
+
+    def suffix_pattern(self, value: str, entity_type: EntityType) -> str:
+        return "(?:['\u2019]s|['\u2019])"
+
+
+_INFLECTIONS: dict[str, InflectionMatcher] = {
+    "hu": HungarianSuffixMatcher(),
+    "en": EnglishPossessiveMatcher(),
+}
 _EXACT = ExactMatcher()
+
+
+def _primary(language: str) -> str:
+    return (language or "").strip().lower().replace("_", "-").split("-")[0]
 
 
 def register_inflection(language: str, matcher: InflectionMatcher) -> None:
@@ -99,5 +124,9 @@ def register_inflection(language: str, matcher: InflectionMatcher) -> None:
 
 
 def inflection_for(language: str) -> InflectionMatcher:
-    """The matcher for ``language``; :class:`ExactMatcher` for languages without one."""
-    return _INFLECTIONS.get(language, _EXACT)
+    """The matcher for ``language`` (``"en-GB"`` falls back to ``"en"``).
+
+    :class:`ExactMatcher` for languages without one.
+    """
+    matcher = _INFLECTIONS.get(language) or _INFLECTIONS.get(_primary(language))
+    return matcher if matcher is not None else _EXACT

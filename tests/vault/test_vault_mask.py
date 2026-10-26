@@ -185,9 +185,9 @@ def test_digraph_final_values_do_not_take_doubled_suffix(vault: Vault) -> None:
 def test_language_without_matcher_requires_exact_word(vault: Vault) -> None:
     session = vault.session()
     text = f"{NAME} wrote to {NAME}nek"
-    masked = session.mask(text, [span_of(text, NAME, "PERSON")], language="en")
+    masked = session.mask(text, [span_of(text, NAME, "PERSON")], language="de")
     assert masked.endswith(f"{NAME}nek")
-    assert isinstance(inflection_for("en"), ExactMatcher)
+    assert isinstance(inflection_for("de"), ExactMatcher)
     assert isinstance(inflection_for("hu"), HungarianSuffixMatcher)
 
 
