@@ -1,6 +1,6 @@
 import type { MaskedEntity } from "../api/types";
 import type { LocalSpan } from "../lib/analysis";
-import { DETECTOR_LABEL, metaFor } from "../lib/entities";
+import { detectorLabel, metaFor } from "../lib/entities";
 import { Placeholder } from "./Placeholder";
 
 interface Props {
@@ -44,7 +44,7 @@ export function EntityTable({ entities, spans, activeKey, onActivate }: Props) {
         <tbody>
           {entities.map((e) => {
             const own = spans.filter((s) => s.placeholder === e.placeholder);
-            const detectors = [...new Set(own.map((s) => DETECTOR_LABEL[s.detector] ?? s.detector))];
+            const detectors = [...new Set(own.map((s) => detectorLabel(s.detector, { types: [s.entityType] })))];
             const best = own.length ? Math.max(...own.map((s) => s.score)) : null;
             const active = activeKey === e.placeholder;
             return (

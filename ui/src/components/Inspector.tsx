@@ -1,5 +1,5 @@
 import type { EntityType } from "../api/types";
-import { DETECTOR_LABEL, metaFor } from "../lib/entities";
+import { detectorLabel, metaFor } from "../lib/entities";
 
 export interface InspectorInfo {
   entityType: EntityType | null;
@@ -25,7 +25,7 @@ export function Inspector({ info, hint }: Props) {
             {metaFor(info.entityType).label}
           </span>
           <span>{info.placeholder ? <>masked as <code className="font-mono text-ink">{info.placeholder}</code></> : "kept (policy: keep)"}</span>
-          {info.detector && <span>found by {DETECTOR_LABEL[info.detector] ?? info.detector}</span>}
+          {info.detector && <span>found by {detectorLabel(info.detector, { types: info.entityType ? [info.entityType] : [] })}</span>}
           {info.score !== undefined && (
             <span className="inline-flex items-center gap-1.5">
               confidence

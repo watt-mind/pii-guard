@@ -1,0 +1,89 @@
+{
+  "language": "hu",
+  "seed": 7,
+  "requested": 160,
+  "accepted": 159,
+  "discarded": 1,
+  "discard_rate": 0.0063,
+  "discard_reasons": {
+    "missing_value": 1
+  },
+  "missing_value_types": {
+    "ADDRESS": 1
+  },
+  "unsupplied_value_types": {},
+  "by_kind": {
+    "chat": {
+      "accepted": 26,
+      "discarded": 0
+    },
+    "court-notice": {
+      "accepted": 16,
+      "discarded": 0
+    },
+    "email": {
+      "accepted": 21,
+      "discarded": 0
+    },
+    "invoice": {
+      "accepted": 12,
+      "discarded": 0
+    },
+    "land-registry": {
+      "accepted": 7,
+      "discarded": 0
+    },
+    "lease": {
+      "accepted": 17,
+      "discarded": 0
+    },
+    "letter": {
+      "accepted": 17,
+      "discarded": 0
+    },
+    "power-of-attorney": {
+      "accepted": 13,
+      "discarded": 0
+    },
+    "sale-contract": {
+      "accepted": 30,
+      "discarded": 1
+    }
+  },
+  "splits": {
+    "train": 111,
+    "dev": 24,
+    "test": 24
+  },
+  "spans": 2178,
+  "spans_by_type": {
+    "ADDRESS": 298,
+    "BANK_ACCOUNT": 131,
+    "COMPANY_ID_HU": 53,
+    "DATE_OF_BIRTH": 126,
+    "EMAIL": 55,
+    "ID_DOCUMENT": 60,
+    "NATIONAL_ID_HU_TAJ": 38,
+    "NATIONAL_ID_HU_TAX": 81,
+    "ORGANIZATION": 144,
+    "PARCEL_NUMBER_HU": 51,
+    "PERSON": 959,
+    "PHONE": 125,
+    "VEHICLE_PLATE": 57
+  },
+  "chars": 246159,
+  "model_calls": 160,
+  "cache_hits": 0,
+  "usage": {
+    "completion_tokens": 387113,
+    "prompt_tokens": 101134,
+    "reasoning_tokens": 297310,
+    "total_tokens": 488247
+  },
+  "latency_s": {
+    "total": 3324.18,
+    "mean": 20.78,
+    "median": 19.94,
+    "max": 35.19
+  }
+}
