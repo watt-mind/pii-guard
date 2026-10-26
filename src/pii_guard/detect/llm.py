@@ -32,6 +32,7 @@ from pydantic import SecretStr
 
 from pii_guard.config import Settings, get_settings
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, EntityType, Span
+from pii_guard.vault.inflection import inflection_for, variant_stems
 
 __all__ = [
     "DEFAULT_BASE_URL",
@@ -434,8 +435,15 @@ class LlmDetector:
         return self.align(text, entities, language)
 
     def align(self, text: str, entities: Iterable[LlmEntity], language: str = "hu") -> list[Span]:
-        """Map entities to spans over ``text``; values not found verbatim are dropped."""
+        """Map entities to spans over ``text``; values not found verbatim are dropped.
+
+        Where the language changes a value's stem before a suffix (Hungarian ``Zsuzsanna`` ->
+        ``Zsuzsannának``, ``Kovács`` -> ``Kováccsal``), the changed stem is found too, when an
+        allowed suffix follows it; the span covers the stem (``Próba Zsuzsanná|nak``) and the
+        vault keys it on the lemma.
+        """
         profile = language_profile(language)
+        matcher = inflection_for(language)
         spans: set[Span] = set()
         hallucinated = 0
         for entity in dict.fromkeys(entities):
@@ -445,6 +453,16 @@ class LlmDetector:
                 word_boundary=profile.word_boundary,
                 allow_suffix=profile.allow_suffix,
             )
+            if profile.allow_suffix:
+                for stem, suffix in variant_stems(matcher, entity.text.strip(), entity.entity_type):
+                    follows = re.compile(f"(?:{suffix})(?!\\w)", re.IGNORECASE)
+                    hits += [
+                        (start, end)
+                        for start, end in find_occurrences(
+                            text, stem, word_boundary=profile.word_boundary, allow_suffix=True
+                        )
+                        if follows.match(text, end)
+                    ]
             if not hits:
                 hallucinated += 1
                 continue

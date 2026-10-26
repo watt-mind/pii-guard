@@ -120,6 +120,7 @@ def _summary_row(name: str, block: dict[str, Any]) -> str:
         _pct(leak["partial_rate"]),
         _pct(over["rate"]),
         _pct(block["roundtrip"]["rate"]),
+        _pct(block.get("consistency", {}).get("rate")),
         _ms(block["latency_ms"]["detect"]["p50"]),
         _ms(block["latency_ms"]["detect"]["p95"]),
     ]
@@ -191,12 +192,13 @@ def render_markdown(scorecard: dict[str, Any]) -> str:
         "",
         "All ratios in %. P/R/F1 are span-level micro averages; macro F1 is over entity types "
         "(overlap match). Leak = labelled values of mask-policy types surviving the masked "
-        "text in any surface form; partial = an identifying token survives.",
+        "text in any surface form; partial = an identifying token survives. Consistency = "
+        "gold entities whose occurrences (all surface forms) are masked by one placeholder.",
         "",
         "| Language | Docs | Gold | Pred | P exact | R exact | F1 exact | P overlap "
         "| R overlap | F1 overlap | Macro F1 | Leak | Partial leak | Over-masking "
-        "| Round trip | Detect p50 ms | Detect p95 ms |",
-        "|---|" + "---:|" * 16,
+        "| Round trip | Consistency | Detect p50 ms | Detect p95 ms |",
+        "|---|" + "---:|" * 17,
     ]
     for lang, block in scorecard["languages"].items():
         lines.append(_summary_row(f"`{lang}`", block))

@@ -40,6 +40,7 @@ The test split is never used for training or prompt tuning.
 | **Leak rate (end to end)** | Share of labelled values that appear, in any surface form, in the request the gateway sends upstream. This is the number that matters most. |
 | **Over-masking rate** | Share of masked spans that weren't personal data (hurts answer quality) |
 | **Re-identification accuracy** | Share of placeholders in responses restored to the correct, correctly inflected value |
+| **Placeholder consistency** | Share of gold entities (per document; the gold spans of one type that are surface forms of each other, `Minta Anna` / `Minta Annának`) whose occurrences are all masked by one and the same placeholder. An unmasked occurrence counts as inconsistent. Also reported over entities with 2+ occurrences (`multi_rate`). |
 | **Visual recall** | Share of labelled image regions covered by a mask (IoU threshold) |
 | **Latency** | p50 / p95 per request, per pipeline stage |
 
@@ -58,7 +59,9 @@ The hackathon claim is the difference between 2 and 4, on the test split.
 
 Evaluation is multilingual from the start: every fixture record carries a `language`, which
 is passed to detectors and the vault, and fixtures are kept one file per language and set
-(`eval/fixtures/hu-smoke.jsonl`, `eval/fixtures/en-smoke.jsonl`). Leak-rate matching goes
+(`eval/fixtures/hu-smoke.jsonl`, `eval/fixtures/en-smoke.jsonl`;
+`eval/fixtures/hu-inflection.jsonl` holds names whose stem changes before a suffix, in several
+cases). Leak-rate matching goes
 through a per-language surface-form hook (`pii_guard.eval.forms`): Hungarian case suffixes
 and stem changes (`Annának`, `Kováccsal`) for `hu`, exact matching as the default elsewhere.
 The scorecard reports every metric per language and per entity type, plus an overall row.

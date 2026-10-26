@@ -64,7 +64,10 @@ Payment cards use `BANK_ACCOUNT` until the taxonomy has a card type of its own.
 | Vehicle plate (`ABC-123`, `AA BC-123`) | `VEHICLE_PLATE` | format | language |
 | Land registry parcel number | `PARCEL_NUMBER_HU` | LLM (context) | — |
 
-Vault inflection: case suffixes kept outside the placeholder (`[[PERSON_7f3a]]nek`).
+Vault inflection: case suffixes kept outside the placeholder (`[[PERSON_7f3a]]nek`), also
+when the stem changes: final-vowel lengthening (`Próba Zsuzsannának` → `[[PERSON_7f3a]]nak`)
+and consonant or digraph doubling (`Teszt Elekkel` → `[[PERSON_7f3a]]kel`, `Kováccsal` →
+`[[PERSON_9b2c]]al`). All forms of a name share one placeholder; unmask re-inflects it.
 
 ### English (`en`)
 

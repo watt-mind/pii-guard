@@ -64,8 +64,12 @@ inflection rules are not duplicated; what remains duplicated is the Hungarian st
 logic (`Anna` → `Annának`, digraph doubling), which lives only in `eval/forms.py`. Moving it
 into the vault matcher (an optional `stem_variants` method) is the next step, because it would
 also let the vault mask stem-changed forms it misses today; it is tracked as a follow-up rather
-than done here. We revisit a single pack object when a third language lands or when packs
-need to be installed from separate distributions (entry points).
+than done here. *(Update, LAB-1115: the vault matcher now has optional `variant_stems`,
+`splits` and `restore` methods, so the vault and `LlmDetector.align` mask stem-changed forms
+under the lemma's placeholder and unmask re-inflects them. `eval/forms.py` keeps its own copy of
+the stem-change rules on purpose, so the leak rate is not measured with the code it checks.)*
+We revisit a single pack object when a third language lands or when packs need to be
+installed from separate distributions (entry points).
 
 ## Consequences
 

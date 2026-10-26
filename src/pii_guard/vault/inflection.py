@@ -7,8 +7,22 @@ match would miss it. An :class:`InflectionMatcher` says which suffixes may follo
 the vault replaces only the value itself and keeps the suffix, so
 ``Teszt Eleknek`` becomes ``[[PERSON_7f3a]]nek`` and re-identification is exact.
 
-Forms that change the value itself (``Anna`` -> ``Annának``, ``Kovács`` -> ``Kováccsal``)
-are not matched by the simple Hungarian matcher here.
+Hungarian also changes the value itself before some suffixes: a final ``a``/``e`` lengthens
+(``Próba Zsuzsanna`` -> ``Próba Zsuzsannának``, ``Minta Kendét``) and a final digraph doubles
+before ``-val``/``-vel`` (``Kovács`` -> ``Kováccsal``). Three optional matcher methods cover
+these forms, so every form of one value maps to one vault entry keyed on its lemma:
+
+- :meth:`~HungarianSuffixMatcher.variant_stems`: the changed stems of a lemma and the suffixes
+  that must follow them (occurrence expansion in the vault and ``LlmDetector.align``);
+- :meth:`~HungarianSuffixMatcher.splits`: ways to split a detected surface form into
+  ``lemma + suffix`` (``Próba Zsuzsannának`` -> ``Próba Zsuzsanna`` + ``nak``), so the
+  placeholder covers the stem and the suffix stays outside: ``[[PERSON_7f3a]]nak``;
+- :meth:`~HungarianSuffixMatcher.restore`: re-inflection on unmask, also for suffixes the
+  upstream model attached itself (``[[PERSON_7f3a]]nak`` -> ``Próba Zsuzsannának``).
+
+Matchers without these methods (a custom :func:`register_inflection` hook that only has
+``suffix_pattern``) keep the exact-stem behaviour; use the module functions
+:func:`variant_stems`, :func:`splits` and :func:`restore`, which fall back for them.
 
 English adds only the possessive (``Smith's`` -> ``[[PERSON_7f3a]]'s``, ``James'``); see
 :class:`EnglishPossessiveMatcher`. Matchers are part of a language pack (ADR 0008) and are
@@ -18,18 +32,64 @@ looked up by primary language, so ``en-GB`` uses the ``en`` matcher.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from pii_guard.types import EntityType
 
 __all__ = [
+    "MAX_SUFFIX_LENGTH",
     "EnglishPossessiveMatcher",
     "ExactMatcher",
     "HungarianSuffixMatcher",
     "InflectionMatcher",
+    "Split",
+    "following_suffix",
     "inflection_for",
     "register_inflection",
+    "restore",
+    "splits",
+    "variant_stems",
 ]
+
+#: Longest run of word characters after a placeholder that can still be a suffix. A longer run
+#: is never treated as one, which bounds what a streaming unmasker has to hold back.
+MAX_SUFFIX_LENGTH = 12
+
+_FOLLOWING_RE = re.compile(r"(?:-(?=\w))?\w*")
+
+
+def following_suffix(text: str, pos: int) -> str:
+    """The suffix-like run at ``text[pos:]``: word characters, optionally after one hyphen.
+
+    ``""`` when nothing word-like follows or the run is longer than :data:`MAX_SUFFIX_LENGTH`.
+    """
+    match = _FOLLOWING_RE.match(text, pos)
+    run = match.group(0) if match else ""
+    return run if len(run) <= MAX_SUFFIX_LENGTH else ""
+
+
+@dataclass(frozen=True, slots=True)
+class Split:
+    """One way to read a surface form as ``stem + suffix`` of a lemma. Never logged.
+
+    ``stem + suffix`` is the surface form; ``lemma`` is the dictionary form as written
+    (``Próba Zsuzsannának`` -> lemma ``Próba Zsuzsanna``, stem ``Próba Zsuzsanná``, suffix
+    ``nak``). ``strong`` splits are unambiguous enough to apply on their own; the vault applies
+    a weak one only when the lemma is confirmed (it occurs on its own, another span or an
+    earlier request has it).
+    """
+
+    lemma: str
+    stem: str
+    suffix: str
+    strong: bool = False
+
+    def __repr__(self) -> str:
+        return f"Split(suffix_length={len(self.suffix)}, strong={self.strong})"
+
+    __str__ = __repr__
 
 
 @runtime_checkable
@@ -71,12 +131,73 @@ _HU_VOWELS = frozenset("aáeéiíoóöőuúüű")
 _HU_DIGRAPHS = ("cs", "dz", "gy", "ly", "ny", "sz", "ty", "zs")
 
 
-class HungarianSuffixMatcher:
-    """Common Hungarian case suffixes that leave the value intact.
+# Suffixes after a lengthened final vowel (``Zsuzsanná|nak``, ``Kendé|t``). ``-ként`` keeps
+# the short vowel (``Annaként``) and is matched by the unchanged stem.
+_HU_LENGTHENING: tuple[str, ...] = (
+    "nak", "nek", "ban", "ben", "ba", "be", "ból", "ből", "hoz", "hez", "höz", "nál", "nél",
+    "tól", "től", "ra", "re", "ról", "ről", "n", "ig", "ért", "t", "val", "vel", "vá", "vé",
+    "é", "ék", "éi", "éig", "k", "i",
+)  # fmt: skip
+# Lengthened suffixes that are safe to split on their own (no Hungarian name ends in
+# ``-ának``, ``-ével`` ...), by the vowel harmony of the lemma's final vowel.
+_HU_STRONG = {
+    "a": frozenset({"nak", "ban", "ból", "hoz", "nál", "tól", "ról", "val", "ért"}),
+    "e": frozenset({"nek", "ben", "ből", "hez", "höz", "nél", "től", "ről", "vel", "ért"}),
+}
+_HU_LONG = {"a": "á", "e": "é", "A": "Á", "E": "É"}
+_HU_SHORT = {v: k for k, v in _HU_LONG.items()}
+# Endings after a doubled final consonant or digraph (``Elek|kel``, ``Kováccs|al``).
+_HU_DOUBLED_ENDINGS = ("al", "el", "á", "é")
+_HU_HYPHENATED = ("val", "vel", "vá", "vé")
+_HU_LENGTHENING_RE = re.compile(
+    "|".join(re.escape(s) for s in sorted(_HU_LENGTHENING, key=len, reverse=True))
+)
+_MIN_LEMMA_LETTERS = 2
 
-    Also covers instrumental and translative forms with consonant doubling when the value
-    ends in a single consonant (``Elek`` -> ``Elekkel``, ``Elekké``), ``-val``/``-vel``
-    after a vowel, and hyphenated suffixes after codes and numbers (``ABC-123-nak``).
+
+def _alternation(suffixes: Iterable[str]) -> str:
+    return "|".join(re.escape(s) for s in sorted(set(suffixes), key=len, reverse=True))
+
+
+def _hu_digraph(value: str) -> str | None:
+    folded = value.casefold()
+    for digraph in _HU_DIGRAPHS:
+        if folded.endswith(digraph) and len(value) > len(digraph):
+            return digraph
+    return None
+
+
+def _is_consonant(char: str) -> bool:
+    return char.isalpha() and char.casefold() not in _HU_VOWELS and char.casefold() != "y"
+
+
+def _word_like(value: str) -> bool:
+    """A name-like last token: letters only (no digits, no e-mail address), 3+ of them."""
+    tokens = value.split()
+    last = tokens[-1] if tokens else ""
+    return (
+        "@" not in value
+        and not any(ch.isdigit() for ch in last)
+        and _last_token_letters(value) >= 3
+    )
+
+
+def _last_token_letters(value: str) -> int:
+    tokens = value.split()
+    return sum(ch.isalpha() for ch in tokens[-1]) if tokens else 0
+
+
+class HungarianSuffixMatcher:
+    """Hungarian case suffixes, with the stem changes they cause.
+
+    Suffixes that leave the value intact: the common case endings, instrumental and
+    translative forms with consonant doubling when the value ends in a single consonant
+    (``Elek`` -> ``Elekkel``, ``Elekké``), ``-val``/``-vel`` after a vowel, and hyphenated
+    suffixes after codes and numbers (``ABC-123-nak``).
+
+    Stem changes (:meth:`variant_stems`, :meth:`splits`, :meth:`restore`): a final ``a``/``e``
+    lengthens before most suffixes (``Zsuzsanna`` -> ``Zsuzsannának``, ``Zsuzsannát``) and a
+    final digraph doubles before ``-al``/``-el``/``-á``/``-é`` (``Kovács`` -> ``Kováccsal``).
     """
 
     def suffix_pattern(self, value: str, entity_type: EntityType) -> str:
@@ -92,6 +213,117 @@ class HungarianSuffixMatcher:
             re.escape(s) for s in sorted(suffixes | hyphenated, key=len, reverse=True)
         )
         return f"(?:-(?:{after_hyphen})|(?:{plain}))"
+
+    def variant_stems(self, value: str, entity_type: EntityType) -> list[tuple[str, str]]:
+        """``(changed stem as written, regex of the suffixes that must follow it)``."""
+        value = value.strip()
+        if not value or not value[-1].isalpha() or not _word_like(value):
+            return []
+        variants: list[tuple[str, str]] = []
+        long_vowel = _HU_LONG.get(value[-1])
+        if long_vowel is not None:
+            variants.append((value[:-1] + long_vowel, _alternation(_HU_LENGTHENING)))
+        digraph = _hu_digraph(value)
+        if digraph is not None:
+            stem = value[:-2] + value[-2] + value[-2:]  # Kovács -> Kováccs (case kept)
+            variants.append((stem, _alternation(_HU_DOUBLED_ENDINGS)))
+        return variants
+
+    def splits(self, surface: str, entity_type: EntityType) -> list[Split]:
+        """Readings of ``surface`` as an inflected form, most specific first.
+
+        Strong: a lengthened final vowel before a three-letter case ending in vowel harmony
+        (``Zsuzsannának``, ``Kendével``). Weak, applied only when the lemma is confirmed: other
+        lengthened forms (``Zsuzsannát``: ``Donát`` and ``Zoltán`` look the same), consonant and
+        digraph doubling (``Elekkel``, ``Kováccsal``), unchanged stems (``Eleknek``: ``Kornél``
+        looks the same) and hyphenated suffixes after codes (``ABC-123-nak``).
+        """
+        surface = surface.strip()
+        if not surface or not surface[-1].isalpha():
+            return []
+        found: list[Split] = []
+        folded = surface.casefold()
+        hyphen = surface.rfind("-")
+        if hyphen > 0 and surface[hyphen - 1].isalnum():
+            head, tail = surface[:hyphen], surface[hyphen:]
+            if tail[1:].casefold() in set(_HU_SUFFIXES) | set(_HU_HYPHENATED) and (
+                head[-1].isdigit() or head.split("-")[-1].isupper()
+            ):
+                found.append(Split(head, head, tail))
+        if not _word_like(surface):
+            return found
+        for suffix in sorted(set(_HU_LENGTHENING), key=len, reverse=True):
+            cut = len(surface) - len(suffix)
+            if cut < 1 or not folded.endswith(suffix):
+                continue
+            short = _HU_SHORT.get(surface[cut - 1])
+            if short is None:
+                continue
+            stem, lemma = surface[:cut], surface[: cut - 1] + short
+            if _last_token_letters(lemma) < _MIN_LEMMA_LETTERS + 1:
+                continue
+            strong = suffix in _HU_STRONG[short.casefold()]
+            found.append(Split(lemma, stem, surface[cut:], strong))
+        for ending in _HU_DOUBLED_ENDINGS:
+            if not folded.endswith(ending):
+                continue
+            stem = surface[: len(surface) - len(ending)]
+            digraph = _hu_digraph(stem)
+            # Kováccs|al -> Kovács: the digraph's first letter is doubled.
+            if digraph is not None and stem[-3:-2].casefold() == digraph[0]:
+                lemma = stem[:-3] + stem[-2:]
+                if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
+                    found.append(Split(lemma, stem, surface[len(stem) :]))
+                continue
+            # Elek|kel -> Elek: a single final consonant doubled into the suffix.
+            if (
+                len(stem) >= 2
+                and _is_consonant(stem[-1])
+                and stem[-1].casefold() == stem[-2].casefold()
+                and _is_consonant(stem[-2])
+            ):
+                lemma = stem[:-1]
+                if (
+                    lemma[-2:-1].casefold() != lemma[-1].casefold()
+                    and _hu_digraph(lemma) is None
+                    and _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1
+                ):
+                    found.append(Split(lemma, lemma, surface[len(lemma) :]))
+        for suffix in sorted(set(_HU_SUFFIXES) | set(_HU_HYPHENATED), key=len, reverse=True):
+            cut = len(surface) - len(suffix)
+            if cut < 1 or not folded.endswith(suffix) or not surface[cut - 1].isalpha():
+                continue
+            lemma = surface[:cut]
+            if suffix in _HU_HYPHENATED and lemma[-1].casefold() not in _HU_VOWELS:
+                continue
+            if _last_token_letters(lemma) < _MIN_LEMMA_LETTERS + 1:
+                continue
+            found.append(Split(lemma, lemma, surface[cut:]))
+        # Strong readings first; otherwise keep the order above (most specific first).
+        unique = list(dict.fromkeys(found))
+        return sorted(unique, key=lambda split: not split.strong)
+
+    def restore(self, lemma: str, suffix: str, entity_type: EntityType) -> str:
+        """``lemma`` inflected for ``suffix`` as it follows a placeholder: ``stem + suffix``.
+
+        ``Próba Zsuzsanna`` + ``nak`` -> ``Próba Zsuzsannának``; ``Kovács`` + ``al`` or ``val``
+        -> ``Kováccsal``; ``Elek`` + ``vel`` -> ``Elekkel``. Anything else is ``lemma + suffix``.
+        """
+        if not suffix or suffix.startswith("-") or not lemma or not lemma[-1].isalpha():
+            return lemma + suffix
+        folded = suffix.casefold()
+        long_vowel = _HU_LONG.get(lemma[-1])
+        if long_vowel is not None and _HU_LENGTHENING_RE.fullmatch(folded):
+            return lemma[:-1] + long_vowel + suffix
+        digraph = _hu_digraph(lemma)
+        if digraph is not None and folded in {"al", "el", "á", "val", "vel", "vá", "vé"}:
+            ending = suffix[1:] if folded.startswith("v") else suffix
+            return lemma[:-2] + lemma[-2] + lemma[-2:] + ending
+        if folded in {"val", "vel", "vá", "vé"} and _is_consonant(lemma[-1]):
+            if len(lemma) >= 2 and lemma[-2].casefold() == lemma[-1].casefold():
+                return lemma + suffix[1:]  # Kiss + vel -> Kissel
+            return lemma + lemma[-1] + suffix[1:]  # Elek + vel -> Elekkel
+        return lemma + suffix
 
 
 class EnglishPossessiveMatcher:
@@ -121,6 +353,26 @@ def _primary(language: str) -> str:
 def register_inflection(language: str, matcher: InflectionMatcher) -> None:
     """Use ``matcher`` for ``language`` (ISO 639-1), replacing any existing one."""
     _INFLECTIONS[language] = matcher
+
+
+def variant_stems(
+    matcher: InflectionMatcher, value: str, entity_type: EntityType
+) -> list[tuple[str, str]]:
+    """``matcher.variant_stems`` if it has one, else no changed stems."""
+    method = getattr(matcher, "variant_stems", None)
+    return list(method(value, entity_type)) if method is not None else []
+
+
+def splits(matcher: InflectionMatcher, surface: str, entity_type: EntityType) -> list[Split]:
+    """``matcher.splits`` if it has one, else no splits (the surface is its own lemma)."""
+    method = getattr(matcher, "splits", None)
+    return list(method(surface, entity_type)) if method is not None else []
+
+
+def restore(matcher: InflectionMatcher, lemma: str, suffix: str, entity_type: EntityType) -> str:
+    """``matcher.restore`` if it has one, else ``lemma + suffix``."""
+    method = getattr(matcher, "restore", None)
+    return method(lemma, suffix, entity_type) if method is not None else lemma + suffix
 
 
 def inflection_for(language: str) -> InflectionMatcher:

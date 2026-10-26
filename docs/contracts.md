@@ -349,7 +349,10 @@ class VaultSession:
     session_id: str
 
     # Replace each span with its placeholder and record the mapping.
-    def mask(self, text: str, spans: list[Span]) -> str: ...
+    def mask(self, text: str, spans: list[Span], *, language: str = "hu") -> str: ...
+
+    # Same, plus (start, end, placeholder) of every replacement in input offsets.
+    def mask_with_report(self, text, spans, *, language="hu") -> MaskResult: ...
 
     # Replace known placeholders with their original values.
     def unmask(self, text: str) -> str: ...
@@ -374,11 +377,23 @@ class StreamUnmasker:
   `\[\[([A-Z][A-Z0-9_]*)_([0-9a-f]{4,})\]\]`. Example: `[[PERSON_7f3a]]`. Collisions inside a
   session extend the id.
 - Same normalized value → same placeholder within a session; different tenants never share
-  placeholders.
+  placeholders. The key is the value's **lemma**: every inflected form of one value shares one
+  placeholder, with the suffix outside it. Hungarian: `Próba Zsuzsannának` →
+  `[[PERSON_x]]nak`, `Próba Zsuzsannát` → `[[PERSON_x]]t`, `Kováccsal` → `[[PERSON_y]]al`,
+  `Teszt Elekkel` → `[[PERSON_z]]kel`, `ABC-123-nak` → `[[VEHICLE_PLATE_w]]-nak`. A detector
+  span that includes a suffix is narrowed to the stem; an ambiguous split (`Zoltán` could be
+  `Zolta` + `n`) is applied only when the lemma is confirmed (it occurs on its own, another span
+  or an earlier request has it, or two different forms agree). Otherwise the whole word is masked
+  and the candidate lemmas' forms get the same placeholder (recall first). See
+  `vault/inflection.py` (`splits`, `variant_stems`, `restore`).
+- `unmask` re-inflects: a known placeholder followed by a suffix restores the stem as written in
+  the input for that suffix, or, for a suffix the model added itself, the language's inflected
+  stem (`[[PERSON_x]]nak` → `Próba Zsuzsannának`, `[[PERSON_y]]val` → `Kováccsal`).
 - `mask` raises `MaskingError` on overlapping or out-of-range spans rather than guessing.
 - `StreamUnmasker.feed("[[PERS") + feed("ON_7f3a]] ok") + flush()` equals
   `session.unmask("[[PERSON_7f3a]] ok")`: concatenated output is identical to unmasking the
-  whole text at once.
+  whole text at once. A complete placeholder followed only by word characters (a suffix that
+  may still grow, at most 12 characters) is held back until the next non-word character.
 - The mapping never leaves the process, is never logged, and has a TTL.
 
 ## Evaluation fixtures and harness (implemented)
