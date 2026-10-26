@@ -9,7 +9,7 @@ from api_helpers import FAKE_EMAIL, FAKE_PHONE, SAMPLE_TEXT, TEST_TENANT_KEY
 from fastapi.testclient import TestClient
 
 from pii_guard.api.app import create_app
-from pii_guard.api.deps import RegistryAnalyzer, resolve_overlaps
+from pii_guard.api.deps import RegistryAnalyzer
 from pii_guard.config import Settings
 from pii_guard.types import DetectionError, EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE
@@ -24,8 +24,9 @@ def test_analyze_returns_sorted_public_spans(api: TestClient) -> None:
     assert [s["entity_type"] for s in spans] == ["EMAIL", "PHONE", "EMAIL"]
     assert [s["start"] for s in spans] == sorted(s["start"] for s in spans)
     for span in spans:
-        assert set(span) == {"start", "end", "entity_type", "score", "detector"}
+        assert set(span) == {"start", "end", "entity_type", "score", "detector", "policy"}
         assert span["detector"] == "rules"
+        assert span["policy"] == "mask"
         assert SAMPLE_TEXT[span["start"] : span["end"]] in {FAKE_EMAIL, FAKE_PHONE}
     assert FAKE_EMAIL not in response.text
     assert FAKE_PHONE not in response.text
@@ -64,7 +65,8 @@ def test_mask_then_unmask_round_trip(api: TestClient) -> None:
     response = api.post("/v1/mask", json={"text": SAMPLE_TEXT, "session_id": None})
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"masked_text", "session_id", "entities"}
+    assert set(body) == {"masked_text", "session_id", "entities", "kept"}
+    assert body["kept"] == []
     masked = body["masked_text"]
     assert FAKE_EMAIL not in masked
     assert FAKE_PHONE not in masked
@@ -186,13 +188,28 @@ def test_registry_analyzer_requires_detectors() -> None:
         RegistryAnalyzer([])
 
 
-def test_resolve_overlaps_keeps_longest() -> None:
-    text = "Teszt Elek Kft."
-    long = Span(0, 15, EntityType.ORGANIZATION, text, 0.6, "a")
-    short = Span(0, 10, EntityType.PERSON, text[:10], 0.9, "b")
-    inner = Span(6, 10, EntityType.PERSON, text[6:10], 0.99, "c")
-    assert resolve_overlaps([short, inner, long]) == [long]
-    assert resolve_overlaps([inner]) == [inner]
+def test_registry_analyzer_uses_the_pipeline_resolver() -> None:
+    """A person inside an organisation name stays a PERSON (keep types lose overlaps)."""
+
+    class Org:
+        name = "org"
+
+        def detect(self, text: str, language: str = "hu") -> list[Span]:
+            return [Span(0, 15, EntityType.ORGANIZATION, text, 0.6, self.name)]
+
+    class Person:
+        name = "person"
+
+        def detect(self, text: str, language: str = "hu") -> list[Span]:
+            return [Span(0, 10, EntityType.PERSON, text[:10], 0.9, self.name)]
+
+    analyzer = RegistryAnalyzer(["rules"])
+    analyzer.pipeline.detectors = [Org(), Person()]
+    spans = analyzer.analyze("Teszt Elek Kft.", "hu")
+    assert [(s.entity_type, s.start, s.end) for s in spans] == [
+        (EntityType.PERSON, 0, 10),
+        (EntityType.ORGANIZATION, 11, 14),
+    ]
 
 
 # --- logging -------------------------------------------------------------------------------

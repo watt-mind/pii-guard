@@ -34,8 +34,10 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from pii_guard.detect.pipeline import DetectionPipeline
 from pii_guard.eval.fixtures import Document, GoldSpan
 from pii_guard.eval.forms import find_surface_forms, language_forms
+from pii_guard.policy import DEFAULT_POLICIES, PolicySet
 from pii_guard.registry import create_detector
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, Detector, EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, Vault, normalize_value
@@ -59,12 +61,11 @@ __all__ = [
 
 MatchMode = Literal["exact", "overlap"]
 
-#: Default policies from ``docs/entities.md``: everything is masked except organisations
-#: and company identifiers, which the model needs to reason and which aren't personal data.
-DEFAULT_POLICY: Mapping[EntityType, str] = {
-    t: ("keep" if t in {EntityType.ORGANIZATION, EntityType.COMPANY_ID_HU} else "mask")
-    for t in TEXT_ENTITY_TYPES
-}
+#: Default text-type policies (:data:`pii_guard.policy.DEFAULT_POLICIES`, from
+#: ``docs/entities.md``): everything is masked except organisations and company identifiers,
+#: which the model needs to reason and which aren't personal data. Values are
+#: :class:`~pii_guard.policy.Policy` members, which compare equal to ``"mask"``/``"keep"``.
+DEFAULT_POLICY: Mapping[EntityType, str] = {t: DEFAULT_POLICIES[t] for t in TEXT_ENTITY_TYPES}
 
 #: Fixed, public key for evaluation runs only, so placeholders are reproducible.
 EVAL_TENANT_KEY = b"pii-guard-evaluation-only-key-v1"
@@ -275,25 +276,17 @@ class Analyzer(Protocol):
     def analyze(self, text: str, language: str) -> list[Span]: ...
 
 
-def _resolve_overlaps(spans: Sequence[Span]) -> list[Span]:
-    """Greedy, longest then highest score wins; same rule as the API's stand-in resolver."""
-    ranked = sorted(spans, key=lambda s: (-s.length, -s.score, s.start, s.detector))
-    kept: list[Span] = []
-    for span in ranked:
-        if not any(span.overlaps(other) for other in kept):
-            kept.append(span)
-    return sorted(kept, key=lambda s: (s.start, s.end))
-
-
 class DetectorAnalyzer:
-    """Runs registry detectors by name and merges their spans.
+    """Runs registry detectors by name through :class:`DetectionPipeline` (the resolver the
+    API and the gateway use), with the policies' ``keep`` types losing overlaps.
 
     Names that can't be resolved or instantiated are skipped and listed in ``skipped``
     (``(name, reason)``), so ``--detectors rules,llm`` still runs when the LLM detector
     isn't installed yet. A detector that fails *during* detection fails the run.
     """
 
-    def __init__(self, names: Sequence[str]) -> None:
+    def __init__(self, names: Sequence[str], *, policies: PolicySet | None = None) -> None:
+        self.policies = policies or PolicySet()
         self.detectors: list[Detector] = []
         self.loaded: list[str] = []
         self.skipped: list[tuple[str, str]] = []
@@ -309,11 +302,16 @@ class DetectorAnalyzer:
             self.detectors.append(detector)
             self.loaded.append(name)
 
+        self.pipeline: DetectionPipeline | None = (
+            DetectionPipeline(self.detectors, keep_types=self.policies.keep_types)
+            if self.detectors
+            else None
+        )
+
     def analyze(self, text: str, language: str) -> list[Span]:
-        spans: list[Span] = []
-        for detector in self.detectors:
-            spans.extend(detector.detect(text, language=language))
-        return _resolve_overlaps(spans)
+        if self.pipeline is None:
+            raise DetectionError("no detector could be loaded")
+        return self.pipeline.detect(text, language)
 
 
 @dataclass(frozen=True, slots=True)
@@ -342,7 +340,10 @@ def run_documents(
     policy: Mapping[EntityType, str] = DEFAULT_POLICY,
     tenant_key: bytes = EVAL_TENANT_KEY,
 ) -> list[DocumentResult]:
-    """Detect, mask (``mask``-policy predictions only) and unmask every document.
+    """Detect, mask (every prediction not of a ``keep``-policy type) and unmask every document.
+
+    A ``block`` type would refuse the request; here it is masked like ``mask`` so its values
+    never count as leaked.
 
     Each document gets a fresh vault session, as one request would. Errors propagate
     (fail closed): a run with a failing detector produces no scorecard.
@@ -353,7 +354,7 @@ def run_documents(
         started = time.perf_counter()
         predicted = analyzer.analyze(doc.text, doc.language)
         detected = time.perf_counter()
-        to_mask = [s for s in predicted if policy.get(s.entity_type, "mask") == "mask"]
+        to_mask = [s for s in predicted if policy.get(s.entity_type, "mask") != "keep"]
         session = vault.session()
         masked_text = session.mask(doc.text, to_mask, language=doc.language)
         masked = time.perf_counter()

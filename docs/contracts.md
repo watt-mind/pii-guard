@@ -117,6 +117,8 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_PORT` | `port` | `int` | `8787` |
 | `PII_GUARD_LOG_LEVEL` | `log_level` | `str` | `info` |
 | `PII_GUARD_DEFAULT_LANGUAGE` | `default_language` | `str` | `hu` |
+| `PII_GUARD_DETECTORS` | `detectors` | `tuple[str, ...]` (comma-separated registry names) | `rules` |
+| `PII_GUARD_POLICY_OVERRIDES` | `policy_overrides` | `dict[EntityType, Policy]` (`TYPE=mask\|keep\|block,...`) | none |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
@@ -125,6 +127,13 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
+`PII_GUARD_DETECTORS` picks the REST API's detectors (`rules,llm` for the demo; the gateway
+has its own per-mode set). `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
+settings load: an unknown type or policy stops startup. The LLM detector also reads
+`PII_GUARD_LLM_DETECTOR_MODEL` and `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT` from the
+environment; folding those, the text size limit and the gateway settings into `Settings` is
+LAB-1095.
+
 `settings.tenant_key_bytes() -> bytes | None` decodes the hex tenant key (raises
 `ValueError`, without echoing the key, if it isn't hex). A new key goes into `Settings`,
 `.env.example` and this table together; a test checks every `.env.example` key has a field.
@@ -132,7 +141,10 @@ unset. Secrets are `SecretStr`.
 ## Application and CLI (implemented)
 
 - `pii_guard.api.app:create_app(settings: Settings | None = None) -> FastAPI`. Settings are
-  on `request.app.state.settings`.
+  on `request.app.state.settings`, the detector names on `app.state.detector_names` and the
+  `PolicySet` on `app.state.policies`. An unknown name in `PII_GUARD_DETECTORS` raises
+  `DetectionError` here, at startup. The analyzer (`app.state.analyzer`, default
+  `pii_guard.api.deps.RegistryAnalyzer`) runs the detectors through `DetectionPipeline`.
 - `GET /healthz` → `200 {"status": "ok", "version": "<package version>"}`.
 - **Routers.** Every module in `pii_guard/api/routes/` that defines a module-level
   `router: fastapi.APIRouter` is mounted by `pii_guard.api.routes.include_routers(app)`, in
@@ -147,6 +159,30 @@ unset. Secrets are `SecretStr`.
   - `eval [...]` passes everything after `eval` untouched to
     `pii_guard.eval.cli:main(argv: Sequence[str] | None) -> int` and exits with its return
     code (see "Evaluation fixtures and harness" below).
+
+## Entity policies (implemented)
+
+Module: `pii_guard.policy`. Every entity type has a `Policy`: `mask` (replace with a
+placeholder), `keep` (leave in place) or `block` (refuse the request). Defaults are in
+[entities.md](entities.md): `ORGANIZATION`, `COMPANY_ID_HU` and `STAMP` are `keep`, the rest
+`mask`.
+
+```python
+class Policy(StrEnum): MASK = "mask"; KEEP = "keep"; BLOCK = "block"
+DEFAULT_POLICIES: Mapping[EntityType, Policy]
+parse_overrides("ORGANIZATION=mask,EMAIL=block") -> dict[EntityType, Policy]  # ValueError
+PolicySet(overrides=None)            # defaults + overrides; PolicySet.from_settings(settings)
+policies.of(EntityType.EMAIL) -> Policy; policies.keep_types -> frozenset[EntityType]
+policies.apply(spans) -> PolicyDecision(masked, kept)   # raises BlockedEntityError
+class BlockedEntityError(PiiGuardError): code = "blocked_entity"; status_code = 422
+```
+
+Policies are applied **after** the resolver: `keep` types lose overlaps against masked types
+(`DetectionPipeline(keep_types=policies.keep_types)`), so a name inside a sole trader's
+company name is still masked, and are then left in place. `BlockedEntityError` carries types
+and counts (`counts`), never values. The REST API, the gateway and the eval share the
+resolver (`DetectionPipeline`) and the defaults. The gateway's `PII_GUARD_GATEWAY_KEEP_TYPES`
+is a deprecated alias: when set, it is the exact keep set; `PII_GUARD_POLICY_OVERRIDES` wins.
 
 ## REST API (planned)
 
@@ -165,6 +201,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 |---|---|---|
 | 404 | `not_found` | Unknown route, or unknown `session_id` on unmask |
 | 422 | `invalid_request` | Body fails validation. The message lists field locations only, never values. |
+| 422 | `blocked_entity` | `/v1/mask` (or the gateway) found an entity type whose policy is `block`. The message lists types and counts only; nothing is masked, stored or forwarded. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
 | 500 | `internal_error` | Anything unexpected. No exception text is returned. |
@@ -180,14 +217,15 @@ Detect without masking.
 {"text": "Teszt Elek, teszt.elek@example.com", "language": "hu"}
 // response 200
 {"spans": [
-  {"start": 0,  "end": 10, "entity_type": "PERSON", "score": 0.97, "detector": "ner"},
-  {"start": 12, "end": 34, "entity_type": "EMAIL",  "score": 1.0,  "detector": "rules"}
+  {"start": 0,  "end": 10, "entity_type": "PERSON", "score": 0.97, "detector": "ner",   "policy": "mask"},
+  {"start": 12, "end": 34, "entity_type": "EMAIL",  "score": 1.0,  "detector": "rules", "policy": "mask"}
 ]}
 ```
 
-Spans are sorted by `start`, after the resolver has merged overlaps. The raw `text` of a span
-is **not** returned (the caller already has it; it can slice). This is
-`Span.to_public_dict()`.
+Spans are sorted by `start`, after the resolver (`DetectionPipeline`) has merged overlaps. The
+raw `text` of a span is **not** returned (the caller already has it; it can slice). This is
+`Span.to_public_dict()` plus `policy`, the type's effective policy. Every span is returned,
+including `keep` and `block` ones: analyze never refuses on policy.
 
 ### `POST /v1/mask`
 
@@ -198,7 +236,8 @@ is **not** returned (the caller already has it; it can slice). This is
 {
   "masked_text": "[[PERSON_7f3a]] írt [[PERSON_7f3a]]nek.",
   "session_id": "s_2c9e…",
-  "entities": [{"placeholder": "[[PERSON_7f3a]]", "entity_type": "PERSON", "count": 2}]
+  "entities": [{"placeholder": "[[PERSON_7f3a]]", "entity_type": "PERSON", "count": 2}],
+  "kept": []
 }
 ```
 
@@ -206,8 +245,11 @@ is **not** returned (the caller already has it; it can slice). This is
   id reuses its mapping, so the same value keeps the same placeholder across calls.
 - `entities` lists each distinct placeholder once, with how many occurrences were replaced.
   It never contains original values.
-- Entity types whose policy is `keep` are left in place and not listed; a `block` policy hit
-  fails the request.
+- Only `mask`-policy spans are replaced. Spans of `keep` types are left in place and reported
+  in `kept` as `{"entity_type": "ORGANIZATION", "count": 1}`, sorted by type: no values, no
+  offsets.
+- Any `block`-policy span fails the request with `422 blocked_entity`: no masked text, no
+  vault entry (a session the request created is dropped; an existing one is unchanged).
 
 ### `POST /v1/unmask`
 
@@ -311,10 +353,12 @@ leak_report(doc, masked_text) -> list[ValueLeak]; over_masked(doc, masked_spans)
 build_scorecard(results, detectors=[...], fixture_paths=[...]) -> dict; render_markdown(card)
 ```
 
-`run_documents` accepts any object with `analyze(text, language) -> list[Span]`, so a
-detection pipeline plugs in without changes here. Only `mask`-policy types are masked
-(`DEFAULT_POLICY`: everything except `ORGANIZATION` and `COMPANY_ID_HU`), each document in a
-fresh vault session under the public `EVAL_TENANT_KEY`.
+`run_documents` accepts any object with `analyze(text, language) -> list[Span]`.
+`DetectorAnalyzer` resolves with `DetectionPipeline`, the same resolver as the API and the
+gateway. Types whose policy is `keep` are not masked (`DEFAULT_POLICY`, derived from
+`pii_guard.policy.DEFAULT_POLICIES`: everything except `ORGANIZATION` and `COMPANY_ID_HU`);
+`block` types are masked like `mask` ones so their values never count as leaked. Each document
+runs in a fresh vault session under the public `EVAL_TENANT_KEY`.
 
 CLI: `pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language hu[,en]]
 [--json OUT] [--markdown OUT]` (`pii_guard.eval.cli:main(argv)`). `--fixtures` repeats and

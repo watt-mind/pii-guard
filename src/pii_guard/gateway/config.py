@@ -9,8 +9,14 @@ These live here, not in ``pii_guard.config``, until the settings work (LAB-1095)
 | ``PII_GUARD_GATEWAY_UPSTREAM_TIMEOUT`` | ``upstream_timeout`` (s) | ``120`` |
 | ``PII_GUARD_GATEWAY_CACHE_SIZE`` | ``cache_size`` (entries) | ``4096`` |
 | ``PII_GUARD_GATEWAY_CONCURRENCY`` | ``concurrency`` (parallel detections) | ``4`` |
-| ``PII_GUARD_GATEWAY_KEEP_TYPES`` | ``keep_types`` | ``ORGANIZATION,COMPANY_ID_HU`` |
+| ``PII_GUARD_GATEWAY_KEEP_TYPES`` | ``keep_types`` (deprecated) | unset |
 | ``PII_GUARD_LLM_DETECTOR_REASONING_EFFORT`` | ``llm_reasoning_effort`` | unset |
+
+Entity policies (mask / keep / block) come from ``PII_GUARD_POLICY_OVERRIDES`` in
+:class:`pii_guard.config.Settings`, shared with the REST API. ``PII_GUARD_GATEWAY_KEEP_TYPES``
+is a deprecated alias kept for compatibility: when set, it is the exact set of types the
+gateway keeps (the other default-``keep`` types are masked), and ``PII_GUARD_POLICY_OVERRIDES``
+still wins over it. See :func:`pii_guard.gateway.detection.gateway_policies`.
 """
 
 from __future__ import annotations
@@ -21,7 +27,6 @@ from typing import Annotated
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from pii_guard.detect.pipeline import DEFAULT_KEEP_TYPES
 from pii_guard.types import EntityType
 
 __all__ = ["GatewayConfig", "Mode"]
@@ -53,8 +58,9 @@ class GatewayConfig(BaseSettings):
     )
     cache_size: int = Field(default=4096, ge=0, validation_alias="PII_GUARD_GATEWAY_CACHE_SIZE")
     concurrency: int = Field(default=4, ge=1, validation_alias="PII_GUARD_GATEWAY_CONCURRENCY")
-    keep_types: Annotated[frozenset[EntityType], NoDecode] = Field(
-        default=DEFAULT_KEEP_TYPES, validation_alias="PII_GUARD_GATEWAY_KEEP_TYPES"
+    # Deprecated: use PII_GUARD_POLICY_OVERRIDES. None = not set (the policies decide).
+    keep_types: Annotated[frozenset[EntityType] | None, NoDecode] = Field(
+        default=None, validation_alias="PII_GUARD_GATEWAY_KEEP_TYPES"
     )
     llm_reasoning_effort: str | None = Field(
         default=None, validation_alias="PII_GUARD_LLM_DETECTOR_REASONING_EFFORT"

@@ -1,12 +1,15 @@
-"""Shared dependencies of the ``/v1/*`` routers: the analyzer (detection) and the vault.
+"""Shared dependencies of the ``/v1/*`` routers: the analyzer, the policies and the vault.
 
-Both are built lazily, once per app, and cached on ``app.state``:
+All are cached on ``app.state``; the analyzer and vault are built lazily, once per app:
 
 - ``app.state.analyzer`` -- anything with ``analyze(text, language) -> list[Span]``. The
-  default, :class:`RegistryAnalyzer`, runs the detectors named in
-  ``app.state.detector_names`` (default :data:`DEFAULT_DETECTOR_NAMES`) through the registry
-  and drops overlaps. A full detection pipeline (resolver, policies) plugs in by setting
-  ``app.state.analyzer`` -- the routes only depend on the :class:`Analyzer` protocol.
+  default, :class:`RegistryAnalyzer`, runs the detectors named in ``app.state.detector_names``
+  (set by ``create_app`` from ``PII_GUARD_DETECTORS``, default ``rules``) through
+  :class:`~pii_guard.detect.pipeline.DetectionPipeline`, the one resolver shared with the
+  gateway and the eval. Tests and embedders can set ``app.state.analyzer`` directly -- the
+  routes only depend on the :class:`Analyzer` protocol.
+- ``app.state.policies`` -- the :class:`~pii_guard.policy.PolicySet` (defaults plus
+  ``PII_GUARD_POLICY_OVERRIDES``), built by ``create_app``.
 - ``app.state.vault`` -- a :class:`~pii_guard.vault.Vault` keyed by ``PII_GUARD_TENANT_KEY``.
   Without a key every masking endpoint fails closed with ``vault_not_configured``.
 
@@ -18,12 +21,16 @@ partially. No error message or log line contains request text or span values.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
 from fastapi import Request
 
+from pii_guard.config import DEFAULT_DETECTORS, Settings
+from pii_guard.detect.pipeline import DetectionPipeline
+from pii_guard.policy import PolicySet
 from pii_guard.registry import create_detector
 from pii_guard.types import DetectionError, Detector, PiiGuardError, Span
 from pii_guard.vault import Vault
@@ -34,16 +41,19 @@ __all__ = [
     "Analyzer",
     "PayloadTooLargeError",
     "RegistryAnalyzer",
+    "build_detector",
     "get_analyzer",
     "get_language",
     "get_max_text_chars",
+    "get_policies",
     "get_vault",
-    "resolve_overlaps",
 ]
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DETECTOR_NAMES: tuple[str, ...] = ("rules",)
+DEFAULT_DETECTOR_NAMES: tuple[str, ...] = DEFAULT_DETECTORS
+# Read until the settings consolidation (LAB-1095) gives it a Settings field.
+LLM_REASONING_EFFORT_ENV_VAR = "PII_GUARD_LLM_DETECTOR_REASONING_EFFORT"
 # Upper bound on the analysed text, in code points. Override with app.state.max_text_chars.
 DEFAULT_MAX_TEXT_CHARS = 200_000
 
@@ -64,41 +74,56 @@ class Analyzer(Protocol):
     def analyze(self, text: str, language: str) -> list[Span]: ...
 
 
-def resolve_overlaps(spans: Sequence[Span]) -> list[Span]:
-    """Non-overlapping spans sorted by ``start``.
+def build_detector(name: str, settings: Settings | None = None) -> Detector:
+    """A registry detector by name. ``llm`` gets the app's settings and reasoning effort."""
+    if name == "llm":
+        effort = os.environ.get(LLM_REASONING_EFFORT_ENV_VAR) or None
+        return create_detector(name, settings=settings, reasoning_effort=effort)
+    return create_detector(name)
 
-    Greedy: among overlapping spans the longest wins, then the highest score. A stand-in
-    until the detection pipeline's resolver lands.
-    """
-    ranked = sorted(spans, key=lambda s: (-s.length, -s.score, s.start, s.detector))
-    kept: list[Span] = []
-    for span in ranked:
-        if not any(span.overlaps(other) for other in kept):
-            kept.append(span)
-    return sorted(kept, key=lambda s: (s.start, s.end))
+
+class _Checked:
+    """Wraps a detector: unexpected errors and malformed output become ``DetectionError``."""
+
+    def __init__(self, inner: Detector) -> None:
+        self.inner = inner
+        self.name = getattr(inner, "name", type(inner).__name__)
+
+    def detect(self, text: str, language: str = "hu") -> list[Span]:
+        try:
+            found = self.inner.detect(text, language=language)
+        except DetectionError:
+            raise
+        except Exception as exc:
+            # Never str(exc): it may quote the input.
+            raise DetectionError(f"detector {self.name!r} failed") from exc
+        return _checked(found, text, self.name)
 
 
 class RegistryAnalyzer:
-    """Runs registry detectors by name and merges their spans with :func:`resolve_overlaps`."""
+    """Runs registry detectors by name through :class:`DetectionPipeline`.
 
-    def __init__(self, detector_names: Sequence[str] = DEFAULT_DETECTOR_NAMES) -> None:
+    ``keep_types`` (from the policies) lose overlaps against masked types in the resolver, so
+    a person's name inside a sole trader's company name stays a ``PERSON``.
+    """
+
+    def __init__(
+        self,
+        detector_names: Sequence[str] = DEFAULT_DETECTOR_NAMES,
+        *,
+        policies: PolicySet | None = None,
+        settings: Settings | None = None,
+    ) -> None:
         if not detector_names:
             raise DetectionError("no detectors configured")
-        self.detectors: list[Detector] = [create_detector(name) for name in detector_names]
+        self.detectors: list[Detector] = [build_detector(n, settings) for n in detector_names]
+        self.pipeline = DetectionPipeline(
+            [_Checked(d) for d in self.detectors],
+            keep_types=(policies or PolicySet()).keep_types,
+        )
 
     def analyze(self, text: str, language: str) -> list[Span]:
-        spans: list[Span] = []
-        for detector in self.detectors:
-            name = getattr(detector, "name", type(detector).__name__)
-            try:
-                found = detector.detect(text, language=language)
-            except DetectionError:
-                raise
-            except Exception as exc:
-                # Never str(exc): it may quote the input.
-                raise DetectionError(f"detector {name!r} failed") from exc
-            spans.extend(_checked(found, text, name))
-        return resolve_overlaps(spans)
+        return self.pipeline.detect(text, language)
 
 
 def _checked(found: object, text: str, name: str) -> list[Span]:
@@ -125,10 +150,22 @@ def get_analyzer(request: Request) -> Analyzer:
             analyzer = getattr(state, "analyzer", None)
             if analyzer is None:
                 names = getattr(state, "detector_names", None) or DEFAULT_DETECTOR_NAMES
-                analyzer = RegistryAnalyzer(names)
+                analyzer = RegistryAnalyzer(
+                    names, policies=get_policies(request), settings=state.settings
+                )
                 state.analyzer = analyzer
                 logger.info("analyzer ready with detectors: %s", list(names))
     return analyzer
+
+
+def get_policies(request: Request) -> PolicySet:
+    """The app's entity policies (``create_app`` sets them from the settings)."""
+    state = request.app.state
+    policies = getattr(state, "policies", None)
+    if policies is None:
+        policies = PolicySet.from_settings(state.settings)
+        state.policies = policies
+    return policies
 
 
 def get_vault(request: Request) -> Vault:

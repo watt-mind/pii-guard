@@ -243,3 +243,28 @@ def test_run_fails_closed_on_detector_error() -> None:
 
     with pytest.raises(DetectionError):
         run_documents([_doc("szöveg")], Failing())
+
+
+def test_detector_analyzer_uses_the_pipeline_resolver() -> None:
+    """Same resolver as the API and gateway: a PERSON inside an ORGANIZATION stays a PERSON."""
+    from pii_guard.eval.scorer import DetectorAnalyzer
+
+    class Org:
+        name = "org"
+
+        def detect(self, text: str, language: str = "hu") -> list[Span]:
+            return [Span(0, len(text), EntityType.ORGANIZATION, text, 0.6, self.name)]
+
+    class Person:
+        name = "person"
+
+        def detect(self, text: str, language: str = "hu") -> list[Span]:
+            return [Span(0, 10, EntityType.PERSON, text[:10], 0.9, self.name)]
+
+    analyzer = DetectorAnalyzer(["rules"])
+    assert analyzer.pipeline is not None
+    analyzer.pipeline.detectors = [Org(), Person()]
+    spans = analyzer.analyze("Teszt Elek Bt", "hu")
+    assert [s.entity_type for s in spans] == [EntityType.PERSON, EntityType.ORGANIZATION]
+    assert DEFAULT_POLICY[EntityType.ORGANIZATION] == "keep"
+    assert DEFAULT_POLICY[EntityType.PERSON] == "mask"
