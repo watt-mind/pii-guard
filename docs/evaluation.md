@@ -85,3 +85,119 @@ the model versions, corpus seed and commit hash, so anyone can reproduce them.
 The hand-written smoke sets are built by `eval/fixtures/build_smoke.py` (inline
 `{{TYPE|value}}` labels, checksum-valid fictional identifiers); a test fails if the committed
 JSONL is stale.
+
+## Comparison with open-source tools
+
+pii-guard is also scored against the closest open-source alternatives, on the same fixtures
+and with the same scorer (`pii_guard.eval.baselines`):
+
+```bash
+uv sync --extra baselines            # Presidio + spaCy models, in-process
+uv run pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --fixtures eval/fixtures/en-smoke.jsonl \
+    --detectors rules --baselines presidio,llm-guard,privaite --json OUT.json
+python -m pii_guard.eval.baselines.compare OUT.json [MORE.json ...] --out comparison.md
+make baselines                       # the same, plus the live baseline tests
+```
+
+`--baselines` adds a `baselines` object to the scorecard (one section per tool: `info` with
+tool versions, model names and the configuration, `reversible`, `unmapped_labels`, and
+`overall` / `languages` blocks in the usual format) and `meta.skipped_baselines`; the
+Markdown gets a comparison table per language and per entity type. A tool that can't start
+is skipped with a reason, like a detector; a tool that fails on a document fails the run.
+Committed results live in `eval/results/` (see its README for the current numbers).
+
+### The tools and their configuration
+
+Every tool runs with its **default configuration**. The only choices we made are the ones a
+default doesn't cover, listed here.
+
+| Tool | How it runs | Configuration |
+|---|---|---|
+| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default); Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. |
+| **LLM Guard** 0.3.16 | worker process, own environment | `Anonymize(Vault())` with defaults: the `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` NER model, threshold 0.5, its default entity list, language `en` (it supports only `en` and `zh`, so Hungarian documents also go through `en`). `Deanonymize` restores. A fresh vault per document. |
+| **PrivAiTe** 0.7.3 | worker process, own environment | The proxy's `PIIEngine` in-process with the `pii` section of its shipped `config/privaite.openai.yaml`: preset `onnx` (Presidio with `fr_core_news_md` + `en_core_web_lg`, plus the ONNX `openai/privacy-filter` model), placeholder anonymization, cards masked, secrets redacted. Each document is one user message through `process_request`, as the proxy does; `process_response` restores. Its detection doesn't take a language: every text goes through its French and English configuration. |
+
+LLM Guard pins `transformers==4.51.3` and Presidio 2.2.358; PrivAiTe needs
+`transformers>=5.3`. They can't share an environment with each other, so each runs as a
+worker (`src/pii_guard/eval/baselines/workers/`) in an ephemeral `uv` environment built from
+pinned requirements (`src/pii_guard/eval/baselines/envs/*.txt`, compiled from `*.in` with
+`uv pip compile --universal --python-version 3.12 --no-header --no-annotate X.in -o X.txt`).
+pii-guard's own dependencies are unchanged. Presidio caps `numpy` below 2.5, so the `baselines` extra is declared as conflicting with the `ner` extra (`[tool.uv] conflicts`): uv resolves each on its own and the two can't be installed together. Documents reach a worker over a local pipe; the
+only network traffic is the first-run download of packages and models (Hugging Face Hub,
+spaCy wheels). Workers get no credentials from the environment, telemetry switches are set,
+and their stderr is discarded (the tools log detected values) unless
+`PII_GUARD_BASELINE_DEBUG=1`.
+
+### Scoring rules
+
+- **Spans.** P/R/F1 use the spans the tool actually replaced: LLM Guard's and PrivAiTe's
+  are captured from the call into their own replacement step, Presidio's are the analyzer
+  results. Where spans overlap (Presidio), pii-guard's own resolver applies
+  (`detect.pipeline.resolve_spans`, with no detector authoritative): same-type overlaps
+  merge, otherwise `keep` types lose, then longer spans and higher scores win.
+- **Leak rate** is measured on the text the tool itself produces (its own masking), with its
+  placeholders blanked out like pii-guard's. Leak checking doesn't look at types, so a value
+  the tool masked under the wrong type counts as protected for leak rate while costing it a
+  false positive and a miss in P/R.
+- **Over-masking** counts the tool's mapped spans that overlap no gold span. A tool masks
+  everything it detects, including organisations, which pii-guard's policy keeps; masked
+  organisations overlap gold spans, so they don't count as over-masking.
+- **Round trip** uses the tool's own restore (LLM Guard `Deanonymize`, PrivAiTe
+  `process_response`). Presidio's default operator is irreversible: shown as n/a.
+- **Latency** is detection time measured inside the tool, after one warm-up call, CPU only,
+  without the pipe to the worker; masking time is recorded separately in the JSON.
+
+### Entity-label mapping
+
+All three tools use Presidio's label vocabulary plus a few labels of their own. One table
+(`pii_guard.eval.baselines.mapping.LABEL_MAP`) maps them for every tool; LLM Guard's regex
+variants (`EMAIL_ADDRESS_RE`, `CREDIT_CARD_RE`, `US_SSN_RE`) map like the label without `_RE`.
+
+| Tool label | pii-guard type | Emitted by | Note |
+|---|---|---|---|
+| `PERSON` | `PERSON` | all | |
+| `EMAIL_ADDRESS` | `EMAIL` | all | |
+| `PHONE_NUMBER` | `PHONE` | all | |
+| `LOCATION` | `ADDRESS` | Presidio, PrivAiTe | cities, countries and streets; overlap matching credits a city inside an address |
+| `DATE_TIME` | `DATE_OF_BIRTH` | Presidio, PrivAiTe | no tool separates birth dates from other dates: recall for the birth dates it masks, a false positive for every other date |
+| `IBAN_CODE` | `BANK_ACCOUNT` | all | |
+| `CREDIT_CARD` | `BANK_ACCOUNT` | all | cards are `BANK_ACCOUNT` in pii-guard's taxonomy |
+| `US_BANK_NUMBER` | `BANK_ACCOUNT` | Presidio, LLM Guard | |
+| `FINANCIAL` | `BANK_ACCOUNT` | PrivAiTe | privacy-filter `account_number` |
+| `US_SSN` | `ID_DOCUMENT` | all | national numbers without a type of their own |
+| `US_ITIN` | `ID_DOCUMENT` | Presidio | |
+| `US_PASSPORT` | `ID_DOCUMENT` | Presidio | |
+| `US_DRIVER_LICENSE` | `ID_DOCUMENT` | Presidio | |
+| `UK_NHS` | `ID_DOCUMENT` | Presidio, PrivAiTe | |
+| `UK_NINO` | `ID_DOCUMENT` | none by default | not in the default recognizer set; mapped for completeness |
+| `UK_PASSPORT` | `ID_DOCUMENT` | none by default | as above |
+| `ORGANIZATION` | `ORGANIZATION` | Presidio | `keep` policy in pii-guard |
+| `ORG` | `ORGANIZATION` | none by default | alias, mapped for completeness |
+| `URL` | unmapped | all | |
+| `IP_ADDRESS` | unmapped | all | |
+| `MAC_ADDRESS` | unmapped | Presidio | |
+| `CRYPTO` | unmapped | Presidio, LLM Guard | |
+| `UUID` | unmapped | Presidio, LLM Guard | |
+| `NRP` | unmapped | Presidio | nationality, religious or political group |
+| `MEDICAL_LICENSE` | unmapped | Presidio | |
+| `SECRET` | unmapped | PrivAiTe | credentials |
+| `CUSTOM` | unmapped | LLM Guard | hidden names; none by default |
+
+**Unmapped** labels (and any label not in the table) have no pii-guard counterpart: they are
+left out of P/R and over-masking, but the tool still masks them, so the leak rate sees what
+it sent. Their counts per label are in the scorecard (`unmapped_labels`).
+
+Nothing a tool emits maps to `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `COMPANY_ID_HU`,
+`PARCEL_NUMBER_HU` or `VEHICLE_PLATE`: the tools have no such recognizers, so their recall on
+those types is 0 by construction, while their leak rate still credits a value they masked
+under another label (a tax number caught as `PHONE_NUMBER`, say).
+
+### Reading the numbers
+
+- The **Muse-generated** fixtures (`*-synth-sample.jsonl`) were written by the same model
+  family pii-guard's LLM detector uses, which flatters Muse-based detection. The hand-written
+  smoke sets don't have that bias.
+- The fixture sets are small (38 smoke, 30 synthetic documents): differences of a few
+  points are noise.
+- `pii-guard rules` is the rules-only pass, with no name detection; names come from the NER
+  and LLM passes. Compare it with the tools for structured identifiers, not for `PERSON`.

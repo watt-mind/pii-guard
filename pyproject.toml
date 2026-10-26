@@ -33,6 +33,13 @@ pii-guard = "pii_guard.cli:main"
 ocr = [
     "pytesseract>=0.3.13",
 ]
+baselines = [
+    "en-core-web-lg",
+    "hu-core-news-lg",
+    "presidio-analyzer==2.2.365",
+    "presidio-anonymizer==2.2.365",
+    "spacy>=3.8.7,<3.9",
+]
 ner = [
     "protobuf>=7.36.2",
     "sentencepiece>=0.2.2",
@@ -96,3 +103,12 @@ omit = ["*/pytest-of-*/*"]
 show_missing = true
 skip_covered = false
 exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
+
+[tool.uv]
+# presidio-analyzer caps numpy below 2.5; resolve the baselines extra on its own so it never
+# holds back another extra's numpy.
+conflicts = [[{ extra = "baselines" }, { extra = "ner" }]]
+
+[tool.uv.sources]
+en-core-web-lg = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" }
+hu-core-news-lg = { url = "https://huggingface.co/huspacy/hu_core_news_lg/resolve/9160ba69dbbcfe1a2346f3c7c2d72831f8250219/hu_core_news_lg-3.8.1-py3-none-any.whl" }
