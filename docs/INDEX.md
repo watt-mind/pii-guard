@@ -23,3 +23,4 @@
 | [0005](decisions/0005-synthetic-data-only.md) | Synthetic data only, never real personal data |
 | [0006](decisions/0006-fail-closed.md) | Fail closed on every error path |
 | [0007](decisions/0007-keyed-pseudonyms.md) | Keyed, reversible pseudonyms instead of one-way redaction |
+| [0008](decisions/0008-language-packs.md) | Language packs: per-language rules, inflection, prompts and eval forms, with fallbacks |

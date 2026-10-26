@@ -33,9 +33,11 @@ boxes.
 A pipeline of detectors, each returning candidate **spans** `(start, end, entity_type,
 confidence, detector)`:
 
-1. **Rules**: regular expressions plus validation (checksums, date ranges) for structured
-   identifiers: Hungarian tax ID, social security (TAJ) number, company registration number,
-   IBAN, phone numbers, email addresses, postcodes. High precision, deterministic, fast.
+1. **Rules**: regular expressions plus validation (checksums, structural checks, address
+   context) for structured identifiers: IBAN, email, phone numbers and payment cards for every
+   language, plus each language pack's identifiers (Hungarian tax ID, TAJ, company numbers,
+   postcodes; UK/US phone formats, postcodes and ZIP codes, US SSN, UK NINO). High precision,
+   deterministic, fast.
 2. **NER**: a multilingual named-entity model for names, organizations and locations.
 3. **LLM detector**: a small open-weights Llama model, fine-tuned on the synthetic corpus. It
    runs as a second pass that finds what the first two miss (addresses written in prose, names
@@ -44,6 +46,23 @@ confidence, detector)`:
 A **resolver** merges overlapping spans, applies per-entity policies (mask, keep, block), and
 expands each confirmed value to all of its occurrences in the request, **including inflected
 forms** (language-specific morphology, e.g. Hungarian case suffixes).
+
+### Language packs
+
+Everything language-specific is grouped by language code into a **language pack**
+([ADR 0008](decisions/0008-language-packs.md)). Each piece lives in the component that uses
+it and is looked up by primary language (`en-GB` → `en`):
+
+| Piece | Module | Fallback without a pack |
+|---|---|---|
+| Rules | `detect/rules/<code>.py` (`EVERYWHERE` + `RULES`), registered as a `RulePack` | language-independent rules (`detect/rules/common.py`) + every pack's `EVERYWHERE` rules |
+| Inflection | `vault/inflection.py` matcher, `register_inflection` | exact word-boundary matching |
+| LLM prompt | `detect/prompts/languages/<code>.md` + `LanguageProfile` | `default.md`, generic types |
+| Eval surface forms | `eval/forms.py` `LanguageForms` | the vault matcher's suffixes |
+| Corpus templates, policy defaults | `eval/` generator (later), `entities.md` | not measured; generic defaults |
+
+Built-in packs: `hu` (rules, case-suffix matcher, prompt notes, stem-changing surface forms)
+and `en` (rules, possessive matcher, prompt notes, stopwords).
 
 ### `visual`: images and scans
 
