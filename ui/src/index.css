@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --canvas: #f4f3ee;
+  --surface: #ffffff;
+  --surface-2: #faf9f6;
+  --ink: #15171b;
+  --muted: #5d6068;
+  --faint: #8a8d94;
+  --line: #e2e0d8;
+  --line-strong: #cfccc2;
+  /* The guard's own colour: a signal green used only for "protected". */
+  --guard: #2f7d1f;
+  --guard-soft: #e7f5d9;
+  --guard-ink: #1f5413;
+  --model: #3b4a8c;
+  --model-soft: #e9ecf8;
+  --warn: #9a5b00;
+  --warn-soft: #fff1d6;
+  --danger: #b4232c;
+  --danger-soft: #fde4e4;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: #0c0d10;
+  --surface: #14161b;
+  --surface-2: #181b21;
+  --ink: #eceef2;
+  --muted: #a3a7b0;
+  --faint: #737782;
+  --line: #262a32;
+  --line-strong: #353a44;
+  --guard: #b6f36b;
+  --guard-soft: #1d2a12;
+  --guard-ink: #d4f9a8;
+  --model: #9fb0ff;
+  --model-soft: #1a1f35;
+  --warn: #ffc66b;
+  --warn-soft: #2e2210;
+  --danger: #ff8a8f;
+  --danger-soft: #341517;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-guard: var(--guard);
+  --color-guard-soft: var(--guard-soft);
+  --color-guard-ink: var(--guard-ink);
+  --color-model: var(--model);
+  --color-model-soft: var(--model-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+}
+
+html {
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--canvas);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Masked / restored document text. */
+.doc {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-variant-ligatures: none;
+}
+
+/* Subtle ruled background behind the guard boundary. */
+.boundary-rail {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--line-strong) 0 6px,
+    transparent 6px 12px
+  );
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+@media (max-width: 1023px) {
+  .boundary-rail {
+    background-image: repeating-linear-gradient(
+      to right,
+      var(--line-strong) 0 6px,
+      transparent 6px 12px
+    );
+    background-size: 100% 1px;
+  }
+}
+
+@keyframes restore-in {
+  from {
+    background-color: var(--guard-soft);
+    box-shadow: 0 0 0 3px var(--guard);
+  }
+}
+
+@keyframes chunk-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.animate-restore {
+  animation: restore-in 900ms ease-out;
+}
+
+.animate-chunk {
+  animation: chunk-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-restore,
+  .animate-chunk {
+    animation: none;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--guard);
+  outline-offset: 2px;
+}
