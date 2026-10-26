@@ -19,7 +19,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
-from pii_guard.vault.inflection import inflection_for
+from pii_guard.vault.inflection import (
+    InflectionMatcher,
+    Split,
+    following_suffix,
+    inflection_for,
+    restore,
+    splits,
+    variant_stems,
+)
 from pii_guard.vault.placeholders import (
     DEFAULT_ID_LENGTH,
     MAX_ID_LENGTH,
@@ -36,6 +44,7 @@ if TYPE_CHECKING:
 __all__ = [
     "DEFAULT_TTL_SECONDS",
     "MIN_TENANT_KEY_BYTES",
+    "MaskResult",
     "SessionNotFoundError",
     "UnmaskResult",
     "Vault",
@@ -73,41 +82,139 @@ class UnmaskResult:
     __str__ = __repr__
 
 
-class _Entry:
-    """One confirmed value. Never repr'd with its value."""
+@dataclass(frozen=True, slots=True)
+class MaskResult:
+    """Masked text plus where each placeholder went, in offsets of the *input* text.
 
-    __slots__ = ("count", "entity_type", "normalized", "original", "patterns", "placeholder")
+    ``replacements`` holds ``(start, end, placeholder)`` sorted by ``start``; ``text[start:end]``
+    of the input is what the placeholder replaced (the stem, without a detached suffix).
+    ``repr()`` omits ``text``.
+    """
+
+    text: str
+    replacements: tuple[tuple[int, int, str], ...]
+
+    def __repr__(self) -> str:
+        return f"MaskResult(text=<redacted>, replacements={len(self.replacements)})"
+
+    __str__ = __repr__
+
+
+class _Entry:
+    """One confirmed value, keyed on its lemma. Never repr'd with its value.
+
+    ``original`` is the lemma as first written (``Próba Zsuzsanna``). ``surfaces`` are other
+    detected forms that were split onto this lemma (``Próba Zsuzsannának``): they stay
+    occurrence patterns, so a split never masks less than the unsplit value did. ``seen`` maps
+    the (case-folded) suffix that followed an occurrence to the stem as it was written there,
+    so unmask restores the input exactly. ``aliases`` are unconfirmed lemmas of an unsplit
+    span (``Minta Kendét`` may be ``Minta Kende`` + ``t``): their forms are masked with this
+    entry's placeholder too, because a missed form would leak.
+    """
+
+    __slots__ = (
+        "aliases",
+        "count",
+        "entity_type",
+        "language",
+        "normalized",
+        "original",
+        "patterns",
+        "placeholder",
+        "seen",
+        "surfaces",
+    )
 
     def __init__(
-        self, placeholder: str, entity_type: EntityType, original: str, normalized: str
+        self,
+        placeholder: str,
+        entity_type: EntityType,
+        original: str,
+        normalized: str,
+        language: str,
     ) -> None:
         self.placeholder = placeholder
         self.entity_type = entity_type
         self.original = original
         self.normalized = normalized
+        self.language = language
         self.count = 0
         self.patterns: dict[str, re.Pattern[str]] = {}
+        self.surfaces: dict[str, None] = {}
+        self.aliases: dict[str, None] = {}
+        self.seen: dict[str, str] = {}
 
     def __repr__(self) -> str:
         return f"_Entry(placeholder={self.placeholder!r}, value=<redacted>, count={self.count})"
 
+    def add_surface(self, surface: str) -> None:
+        if surface != self.original and surface not in self.surfaces:
+            self.surfaces[surface] = None
+            self.patterns.clear()
+
+    def add_alias(self, lemma: str) -> None:
+        if lemma != self.original and lemma not in self.aliases:
+            self.aliases[lemma] = None
+            self.patterns.clear()
+
+    def remember(self, suffix: str, stem: str) -> None:
+        if suffix:
+            self.seen.setdefault(suffix.casefold(), stem)
+
     def pattern(self, language: str) -> re.Pattern[str]:
-        """Case/whitespace-insensitive pattern for further occurrences of the value."""
+        """Case/whitespace-insensitive pattern for further occurrences of the value.
+
+        A match covers the stem only; an allowed suffix is checked by lookahead and stays
+        outside. Alternatives: the lemma, its changed stems (``Zsuzsanná`` before ``-nak``,
+        ``Kováccs`` before ``-al``) and the detected surface forms split onto it.
+        """
         pattern = self.patterns.get(language)
         if pattern is None:
-            body = r"\s+".join(re.escape(token) for token in self.original.split())
-            left = r"(?<!\w)" if _is_word_char(self.original[0]) else ""
-            right = ""
-            if _is_word_char(self.original[-1]):
-                suffix = inflection_for(language).suffix_pattern(self.original, self.entity_type)
-                right = f"(?=(?:{suffix})?(?!\\w))" if suffix else r"(?!\w)"
-            pattern = re.compile(left + body + right, re.IGNORECASE)
+            matcher = inflection_for(language)
+            alternatives = _forms(matcher, self.original, self.entity_type)
+            alternatives += [_occurrence(matcher, s, self.entity_type) for s in self.surfaces]
+            for alias in self.aliases:
+                alternatives += _forms(matcher, alias, self.entity_type)
+            pattern = re.compile("|".join(f"(?:{a})" for a in alternatives), re.IGNORECASE)
             self.patterns[language] = pattern
         return pattern
 
 
+def _body(value: str) -> str:
+    return r"\s+".join(re.escape(token) for token in value.split())
+
+
+def _forms(matcher: InflectionMatcher, value: str, entity_type: EntityType) -> list[str]:
+    """``value`` with its allowed suffixes, then its changed stems before theirs."""
+    forms = [_occurrence(matcher, value, entity_type)]
+    for stem, suffix in variant_stems(matcher, value, entity_type):
+        left = r"(?<!\w)" if _is_word_char(stem[0]) else ""
+        forms.append(f"{left}{_body(stem)}(?=(?:{suffix})(?!\\w))")
+    return forms
+
+
+def _occurrence(matcher: InflectionMatcher, value: str, entity_type: EntityType) -> str:
+    """``value`` between word boundaries, optionally followed by an allowed suffix."""
+    left = r"(?<!\w)" if _is_word_char(value[0]) else ""
+    right = ""
+    if _is_word_char(value[-1]):
+        suffix = matcher.suffix_pattern(value, entity_type)
+        right = f"(?=(?:{suffix})?(?!\\w))" if suffix else r"(?!\w)"
+    return left + _body(value) + right
+
+
 def _is_word_char(char: str) -> bool:
     return char.isalnum() or char == "_"
+
+
+@dataclass(slots=True)
+class _Plan:
+    """How one detected span is masked: the lemma it is keyed on and the stem it covers."""
+
+    span: Span
+    lemma: str
+    stem_length: int
+    aliases: tuple[str, ...] = ()
 
 
 class VaultSession:
@@ -174,19 +281,34 @@ class VaultSession:
         Further occurrences match case- and whitespace-insensitively and, for ``language``,
         with inflectional suffixes kept outside the placeholder (``[[PERSON_7f3a]]nek``).
 
+        Every form of one value shares one placeholder keyed on its lemma: a span that ends
+        in a suffix is narrowed to the stem (``Próba Zsuzsannának`` -> ``[[PERSON_x]]nak``)
+        and stem-changed forms (``Próba Zsuzsannát``, ``Kováccsal``) are found as occurrences.
+
         Raises :class:`MaskingError` for invalid, out-of-range or overlapping spans, and
         :class:`SessionNotFoundError` once the session has expired. Nothing is recorded when
         it raises.
         """
+        return self.mask_with_report(text, spans, language=language).text
+
+    def mask_with_report(
+        self, text: str, spans: Sequence[Span], *, language: str = "hu"
+    ) -> MaskResult:
+        """Like :meth:`mask`, also returning where each placeholder went."""
         with self._lock:
             self._check_alive()
             ordered = _validated(text, spans)
+            matcher = inflection_for(language)
             taken = bytearray(len(text))
             replacements: list[tuple[int, int, _Entry]] = []
-            for span in ordered:
-                entry = self._entry_for(span.entity_type, span.text)
-                replacements.append((span.start, span.end, entry))
-                taken[span.start : span.end] = b"\x01" * span.length
+            for plan in self._plans(text, ordered, matcher):
+                span, end = plan.span, plan.span.start + plan.stem_length
+                entry = self._entry_for(span.entity_type, plan.lemma, language)
+                entry.add_surface(span.text)
+                for alias in plan.aliases:
+                    entry.add_alias(alias)
+                replacements.append((span.start, end, entry))
+                taken[span.start : end] = b"\x01" * (end - span.start)
             # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
             entries = sorted(self._by_key.values(), key=lambda e: len(e.normalized), reverse=True)
             for entry in entries:
@@ -203,6 +325,7 @@ class VaultSession:
             for start, end, entry in replacements:
                 parts.append(text[cursor:start])
                 parts.append(entry.placeholder)
+                entry.remember(following_suffix(text, end), text[start:end])
                 entry.count += 1
                 per_type[entry.entity_type.value] += 1
                 cursor = end
@@ -213,9 +336,86 @@ class VaultSession:
                 len(ordered),
                 dict(per_type),
             )
-            return "".join(parts)
+            return MaskResult(
+                "".join(parts),
+                tuple((start, end, entry.placeholder) for start, end, entry in replacements),
+            )
 
-    def _entry_for(self, entity_type: EntityType, value: str) -> _Entry:
+    def _plans(self, text: str, ordered: Sequence[Span], matcher: InflectionMatcher) -> list[_Plan]:
+        """The lemma and stem of every span (see :class:`~pii_guard.vault.inflection.Split`).
+
+        - A span that ends inside a word (``Teszt Elek|nek``, ``Próba Zsuzsanná|nak``): the
+          detector chose the stem; its lemma comes from the split that agrees with it.
+        - A whole-word span with a strong split (``Próba Zsuzsannának``): narrowed to the stem.
+        - A weak split (``Próba Zsuzsannát``, ``Teszt Eleknek``) only when the lemma is
+          confirmed: it occurs on its own in ``text``, it is another span's value or lemma,
+          two spans agree on it, or this session already has it. Otherwise the span is its
+          own value, as before, and the candidate lemmas become aliases of it (their forms
+          get the same placeholder): recall never depends on a guess.
+        """
+        plans: list[_Plan | None] = []
+        pending: dict[int, list[Split]] = {}
+        confirmed = {key for key in self._by_key}
+        # Lemma -> the distinct surface forms that can be read as it ("Eleknek", "Eleket").
+        votes: dict[tuple[EntityType, str], set[str]] = {}
+        for index, span in enumerate(ordered):
+            value, end = span.text, span.end
+            if _is_word_char(value[-1]) and end < len(text) and _is_word_char(text[end]):
+                run = following_suffix(text, end)
+                agree = (
+                    next(
+                        (
+                            c
+                            for c in splits(matcher, value + run, span.entity_type)
+                            if c.stem == value
+                        ),
+                        None,
+                    )
+                    if run
+                    else None
+                )
+                lemma = agree.lemma if agree is not None else value
+                plans.append(_Plan(span, lemma, len(value)))
+                confirmed.add((span.entity_type, normalize_value(lemma)))
+                continue
+            candidates = splits(matcher, value, span.entity_type)
+            strong = next((c for c in candidates if c.strong), None)
+            if strong is not None:
+                plans.append(_Plan(span, strong.lemma, len(strong.stem)))
+                confirmed.add((span.entity_type, normalize_value(strong.lemma)))
+            elif candidates:
+                plans.append(None)
+                pending[index] = candidates
+                for lemma in {normalize_value(c.lemma) for c in candidates}:
+                    votes.setdefault((span.entity_type, lemma), set()).add(normalize_value(value))
+            else:
+                plans.append(_Plan(span, value, len(value)))
+            # A span's own value is a confirmed lemma for the others ("Zoltán" for "Zoltánt").
+            confirmed.add((span.entity_type, normalize_value(value)))
+        for index, candidates in pending.items():
+            span = ordered[index]
+            choice = next(
+                (
+                    c
+                    for c in candidates
+                    if (key := (span.entity_type, normalize_value(c.lemma))) in confirmed
+                    or len(votes.get(key, ())) >= 2
+                    or _occurs_alone(text, c.lemma, span)
+                ),
+                None,
+            )
+            if choice is None:
+                aliases = tuple(
+                    dict.fromkeys(
+                        c.lemma for c in candidates if _letters(c.lemma) >= _MIN_ALIAS_LETTERS
+                    )
+                )
+                plans[index] = _Plan(span, span.text, span.length, aliases)
+            else:
+                plans[index] = _Plan(span, choice.lemma, len(choice.stem))
+        return [plan for plan in plans if plan is not None]
+
+    def _entry_for(self, entity_type: EntityType, value: str, language: str = "hu") -> _Entry:
         normalized = normalize_value(value)
         key = (entity_type, normalized)
         entry = self._by_key.get(key)
@@ -233,7 +433,7 @@ class VaultSession:
             if length >= MAX_ID_LENGTH:  # pragma: no cover - a full SHA-256 collision
                 raise MaskingError(f"could not derive a unique {entity_type.value} placeholder")
             length = min(length + 2, MAX_ID_LENGTH)
-        entry = _Entry(placeholder, entity_type, value, normalized)
+        entry = _Entry(placeholder, entity_type, value, normalized, language)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
         return entry
@@ -250,17 +450,24 @@ class VaultSession:
             self._check_alive()
             unresolved: dict[str, None] = {}
             restored = 0
-
-            def replace(match: re.Match[str]) -> str:
-                nonlocal restored
+            parts: list[str] = []
+            cursor = 0
+            for match in PLACEHOLDER_RE.finditer(text):
+                if match.start() < cursor:  # pragma: no cover - a suffix never holds "[["
+                    continue
+                parts.append(text[cursor : match.start()])
+                cursor = match.end()
                 entry = self._by_placeholder.get(match.group(0))
                 if entry is None:
                     unresolved[match.group(0)] = None
-                    return match.group(0)
+                    parts.append(match.group(0))
+                    continue
                 restored += 1
-                return entry.original
-
-            result = PLACEHOLDER_RE.sub(replace, text)
+                suffix = following_suffix(text, cursor)
+                parts.append(_restored(entry, suffix))
+                cursor += len(suffix)
+            parts.append(text[cursor:])
+            result = "".join(parts)
             if unresolved:
                 logger.warning(
                     "unmask left %d unresolved placeholders: %s", len(unresolved), list(unresolved)
@@ -273,6 +480,42 @@ class VaultSession:
         with self._lock:
             self._check_alive()
             return [(e.placeholder, e.entity_type, e.count) for e in self._by_placeholder.values()]
+
+
+def _restored(entry: _Entry, suffix: str) -> str:
+    """The entry's value inflected for the ``suffix`` that follows its placeholder.
+
+    A suffix seen after this value in the input restores the stem as written there (exact
+    round trip); any other suffix, such as one the upstream model added, is re-inflected by
+    the language's matcher (``[[PERSON_x]]nak`` -> ``Próba Zsuzsannának``).
+    """
+    if not suffix:
+        return entry.original
+    stem = entry.seen.get(suffix.casefold())
+    if stem is not None:
+        return stem + suffix
+    return restore(inflection_for(entry.language), entry.original, suffix, entry.entity_type)
+
+
+# An alias's last word needs this many letters: "Kornél" is not read as "Kor" + "nél" ("kor"
+# is a common word), but "Minta Kendét" is also matched as "Minta Kende".
+_MIN_ALIAS_LETTERS = 4
+
+
+def _letters(value: str) -> int:
+    words = value.split()
+    return sum(ch.isalpha() for ch in words[-1]) if words else 0
+
+
+def _occurs_alone(text: str, lemma: str, span: Span) -> bool:
+    """``lemma`` stands on its own (no suffix) somewhere in ``text`` outside ``span``.
+
+    Case-sensitive, so ``Kornél`` is not read as ``Kor`` + ``nél`` because ``kor`` (a common
+    word) occurs in the text.
+    """
+    left = r"(?<!\w)" if _is_word_char(lemma[0]) else ""
+    pattern = re.compile(f"{left}{_body(lemma)}(?!\\w)")
+    return any(m.end() <= span.start or m.start() >= span.end for m in pattern.finditer(text))
 
 
 def _validated(text: str, spans: Sequence[Span]) -> list[Span]:

@@ -4,11 +4,23 @@ A placeholder can be split across chunks (``[[PERS`` + ``ON_7f3a]]``). The unmas
 everything that can no longer become part of a placeholder and holds back only a trailing
 possible prefix (at most one placeholder long), so the concatenated output is identical to
 ``session.unmask()`` of the whole text.
+
+How a placeholder is restored can depend on the suffix right after it (Hungarian
+``[[PERSON_x]]nak`` -> ``Próba Zsuzsannának``), so a complete placeholder followed only by
+word characters is held back too, until a non-word character arrives or the run is too long
+to be a suffix (:data:`~pii_guard.vault.inflection.MAX_SUFFIX_LENGTH`).
 """
 
 from __future__ import annotations
 
-from pii_guard.vault.placeholders import MAX_PLACEHOLDER_LENGTH, is_placeholder_prefix
+import re
+
+from pii_guard.vault.inflection import MAX_SUFFIX_LENGTH
+from pii_guard.vault.placeholders import (
+    MAX_PLACEHOLDER_LENGTH,
+    PLACEHOLDER_RE,
+    is_placeholder_prefix,
+)
 from pii_guard.vault.vault import VaultSession
 
 __all__ = ["StreamUnmasker"]
@@ -53,15 +65,31 @@ class StreamUnmasker:
         return self._unmask(ready)
 
     def _unmask(self, text: str) -> str:
-        if not text:
-            return ""
+        # Called even with nothing ready, so an expired session fails the stream right away.
         result = self._session.unmask_with_report(text)
         self._unresolved.update(dict.fromkeys(result.unresolved))
         return result.text
 
 
+_OPEN_SUFFIX_RE = re.compile(r"-?\w*")
+
+
 def _hold_from(buffer: str) -> int:
-    """Index of the earliest trailing suffix that may still grow into a placeholder."""
+    """Index of the earliest trailing part whose restoration more input could still change.
+
+    That is a possible placeholder prefix, or a complete placeholder followed by a suffix
+    that may still grow (``[[PERSON_x]]na`` before ``k``).
+    """
+    window = max(0, len(buffer) - MAX_PLACEHOLDER_LENGTH - MAX_SUFFIX_LENGTH - 1)
+    last = None
+    for match in PLACEHOLDER_RE.finditer(buffer, window):
+        last = match
+    if (
+        last is not None
+        and len(buffer) - last.end() <= MAX_SUFFIX_LENGTH
+        and _OPEN_SUFFIX_RE.fullmatch(buffer, last.end())
+    ):
+        return last.start()
     # A prefix is shorter than a placeholder, so only the tail window can hold one.
     for index in range(max(0, len(buffer) - MAX_PLACEHOLDER_LENGTH), len(buffer)):
         if buffer[index] == "[" and is_placeholder_prefix(buffer[index:]):

@@ -46,7 +46,10 @@ def test_holds_back_only_a_possible_prefix() -> None:
     assert unmasker.feed("a") == "[[a"  # lowercase can't start a type
     assert unmasker.feed(" [[PERSON") == " "
     assert unmasker.feed("_ffff]] vége") == "[[PERSON_ffff]] vége"
-    assert unmasker.feed(masked[5:-1]) == NAME  # complete placeholder: emitted at once
+    # A complete placeholder waits for the next non-word character: a suffix may follow
+    # and change the restored stem (Hungarian "[[PERSON_x]]nak" -> "...Zsuzsannának").
+    assert unmasker.feed(masked[5:-1]) == ""
+    assert unmasker.feed("!") == f"{NAME}!"
     assert unmasker.flush() == ""
     assert unmasker.unresolved == ("[[PERSON_ffff]]",)
 
@@ -57,8 +60,9 @@ def test_one_character_chunks_and_flush_of_partial_tail() -> None:
     out, _ = stream(session, list(text))
     assert "".join(out) == f"{NAME} írt, {EMAIL} [[PERS"
     assert out[-1] == "[[PERS"
-    # Nothing restored partially: no output piece is a fragment of a value.
-    assert all(piece in ("", NAME, EMAIL) or len(piece) == 1 for piece in out[:-1])
+    # Nothing restored partially: no output piece is a fragment of a value. A value comes
+    # out with the character after its placeholder (which settles any suffix).
+    assert all(piece in ("", f"{NAME} ", f"{EMAIL} ") or len(piece) == 1 for piece in out[:-1])
 
 
 def test_long_bracket_runs_are_not_held_forever() -> None:

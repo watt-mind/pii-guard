@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 
 import httpx
 import openai
@@ -139,8 +140,10 @@ def test_same_value_gets_same_placeholder_everywhere() -> None:
         openai_client(http).chat.completions.create(model="m", messages=full_conversation())
     raw = upstream.requests[0].content.decode()
     placeholders = set(PLACEHOLDER_RE.findall(raw))
-    # 3 people (one also inflected) + 3 emails + 2 phones + 1 IBAN, one placeholder each.
-    assert len(placeholders) == 10
+    # 3 people + 3 emails + 2 phones + 1 IBAN, one placeholder each: the inflected
+    # "Minta Máriának" shares "Minta Mária"'s placeholder, with the suffix kept outside.
+    assert len(placeholders) == 9
+    assert re.search(r"\[\[PERSON_[0-9a-f]+\]\]nak", raw)
 
 
 def test_name_field_with_personal_data_is_dropped() -> None:
@@ -214,7 +217,9 @@ def test_streamed_placeholders_restored_across_any_chunking(cuts: list[int]) -> 
             model="m", messages=conversation_turn_one(), stream=True
         )
         content = "".join(c.choices[0].delta.content or "" for c in stream if c.choices)
-    expected = "Rendben: Teszt Elek, teszt.elek@example.com, +36 30 123 4567, Minta Máriának."
+    # "Minta Máriának" is masked as Minta Mária's placeholder + "nak"; the mock upstream echoes
+    # only the placeholder, so the base form comes back.
+    expected = "Rendben: Teszt Elek, teszt.elek@example.com, +36 30 123 4567, Minta Mária."
     assert content == expected
 
 

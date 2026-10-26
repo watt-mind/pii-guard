@@ -522,3 +522,35 @@ def test_live_meta_model_api(language: str, text: str, name: str) -> None:
     found = {(s.entity_type, s.text) for s in det.detect(text, language=language)}
     assert (E.PERSON, name) in found
     assert (E.EMAIL, "teszt.elek@example.com") in found
+
+
+# --- stem-changed forms (LAB-1115) -------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("value", "text", "expected"),
+    [
+        (
+            "Próba Zsuzsanna",
+            "Próba Zsuzsannának írtunk, Próba Zsuzsanna válaszolt, Próba Zsuzsannát hívjuk.",
+            ["Próba Zsuzsanná", "Próba Zsuzsanna", "Próba Zsuzsanná"],
+        ),
+        ("Minta Kende", "Minta Kendének és Minta Kendét", ["Minta Kendé", "Minta Kendé"]),
+        ("Kovács", "Kovács és Kováccsal", ["Kovács", "Kováccs"]),
+        # "Annál" is a word, not a form of "Anna": no allowed suffix after the long vowel.
+        ("Anna", "Anna és annál inkább Annál", ["Anna"]),
+    ],
+)
+def test_align_finds_lengthened_and_doubled_stems(
+    value: str, text: str, expected: list[str]
+) -> None:
+    detector = make(Recorder(completion(entities_json())))
+    spans = detector.align(text, [LlmEntity(EntityType.PERSON, value)], "hu")
+    assert [s.text for s in spans] == expected
+
+
+def test_align_stem_variants_only_for_inflecting_languages() -> None:
+    detector = make(Recorder(completion(entities_json())))
+    text = "Hanna and Hannát"
+    spans = detector.align(text, [LlmEntity(EntityType.PERSON, "Hanna")], "en")
+    assert [s.text for s in spans] == ["Hanna"]
