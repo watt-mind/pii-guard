@@ -27,7 +27,7 @@ from pii_guard.types import (
     Span,
 )
 
-from .conftest import REPO_ROOT
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Obviously fictional value, used only to check it never leaks into reprs or errors.
 FAKE_NAME = "Teszt Elek"
