@@ -57,9 +57,13 @@ API_KEY_ENV_VAR = "PII_GUARD_SAM_API_KEY"
 
 #: Concept prompts per visual entity type. One request per prompt; results are merged.
 #: ``STAMP`` is listed but not segmented by default (its default policy is ``keep``).
+#: ``SIGNATURE``: on the Meta API (2026-10-26) ``"signature"`` and ``"handwriting"`` returned
+#: nothing for drawn or script-font signatures on synthetic documents, while
+#: ``"squiggly line"`` found the pen scribbles; it may also cover other squiggles (over-masking
+#: is the safe side).
 DEFAULT_PROMPTS: dict[EntityType, tuple[str, ...]] = {
     EntityType.FACE: ("face",),
-    EntityType.SIGNATURE: ("signature", "handwriting"),
+    EntityType.SIGNATURE: ("signature", "squiggly line"),
     EntityType.ID_PHOTO: ("id photo",),
     EntityType.STAMP: ("stamp",),
 }

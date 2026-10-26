@@ -1,0 +1,525 @@
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { EngineKind, RoutingClient } from "../api/engine";
+import { DemoImageUnavailableError, IMAGE_RECORDINGS } from "../api/imageMock";
+import type { ImageMaskResponse, ImageRegion } from "../api/types";
+import { Boundary } from "../components/Boundary";
+import { Pane } from "../components/Pane";
+import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
+import { DEFAULT_IMAGE_SAMPLE, IMAGE_SAMPLES, MAX_UPLOAD_BYTES, UPLOAD_TYPES, type ImageSample } from "../content/imageSamples";
+import { metaFor } from "../lib/entities";
+import {
+  MASK_PADDING,
+  REGION_COLOR,
+  coverageGaps,
+  legendRows,
+  percentBox,
+  policyLabel,
+  regionLabel,
+  samTargets,
+  sourceLabel,
+  summarizeRegions,
+} from "../lib/imageRegions";
+import { toRunError, type RunError } from "../lib/run";
+
+type Selection =
+  | { kind: "sample"; key: string; sample: ImageSample }
+  | { kind: "upload"; key: string; name: string; blob: Blob; url: string };
+
+interface ImageResult {
+  key: string;
+  data: ImageMaskResponse;
+  engine: EngineKind;
+  ms: number;
+}
+
+type ImageError = RunError | { code: "demo_upload"; message: string };
+
+interface Props {
+  client: RoutingClient;
+  /** Fetches a sample's bytes. Injectable for tests (jsdom has no static server). */
+  loadImage?: (src: string) => Promise<Blob>;
+}
+
+async function fetchImage(src: string): Promise<Blob> {
+  const res = await fetch(src);
+  if (!res.ok) throw new Error(`could not load ${src}`);
+  return res.blob();
+}
+
+const sampleSelection = (sample: ImageSample): Selection => ({ kind: "sample", key: `sample:${sample.id}`, sample });
+
+export function Images({ client, loadImage = fetchImage }: Props) {
+  const [selection, setSelection] = useState<Selection>(() => sampleSelection(DEFAULT_IMAGE_SAMPLE));
+  const [result, setResult] = useState<ImageResult | null>(null);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<ImageError | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [active, setActive] = useState<number | null>(null);
+  const [showRegions, setShowRegions] = useState(true);
+  const runId = useRef(0);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const uploadSeq = useRef(0);
+
+  // Revoke the object URL of an upload once it is replaced.
+  const uploadUrl = selection.kind === "upload" ? selection.url : null;
+  useEffect(() => () => {
+    if (uploadUrl) URL.revokeObjectURL(uploadUrl);
+  }, [uploadUrl]);
+
+  const fresh = result !== null && result.key === selection.key;
+  const src = selection.kind === "sample" ? selection.sample.src : selection.url;
+  const alt = selection.kind === "sample" ? selection.sample.alt : `Your upload: ${selection.name}`;
+
+  const select = (next: Selection) => {
+    runId.current++; // a pending run for the previous image is ignored
+    setRunning(false);
+    setSelection(next);
+    setError(null);
+    setActive(null);
+  };
+
+  const onFile = (file: File | undefined) => {
+    setUploadError(null);
+    if (!file) return;
+    if (!(UPLOAD_TYPES as readonly string[]).includes(file.type)) {
+      setUploadError("Only PNG and JPEG images can be masked.");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError(`That image is over ${MAX_UPLOAD_BYTES / 1024 / 1024} MB, the API's limit.`);
+      return;
+    }
+    select({ kind: "upload", key: `upload:${++uploadSeq.current}`, name: file.name, blob: file, url: URL.createObjectURL(file) });
+  };
+
+  const run = async () => {
+    const id = ++runId.current;
+    const target = selection;
+    setRunning(true);
+    setError(null);
+    setActive(null);
+    try {
+      const started = performance.now();
+      const blob = target.kind === "sample" ? await loadImage(target.sample.src) : target.blob;
+      const routed = await client.maskImage({
+        image: blob,
+        sampleId: target.kind === "sample" ? target.sample.id : null,
+        language: "hu",
+      });
+      if (id !== runId.current) return;
+      setResult({ key: target.key, data: routed.data, engine: routed.engine, ms: Math.round(performance.now() - started) });
+    } catch (err) {
+      if (id !== runId.current) return;
+      setResult(null); // fail closed: never leave an older masked image on screen as current
+      setError(err instanceof DemoImageUnavailableError ? { code: "demo_upload", message: err.message } : toRunError(err));
+    } finally {
+      if (id === runId.current) setRunning(false);
+    }
+  };
+
+  const data = fresh ? result.data : null;
+  const summary = useMemo(() => (data ? summarizeRegions(data.regions) : null), [data]);
+
+  return (
+    <div className="space-y-6">
+      <div className="max-w-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Faces, signatures and ID numbers, covered before the image leaves.</h1>
+        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
+          SAM 3.1 segments faces, signatures, ID photos and stamps; OCR plus the text detectors find identifiers printed in the image. Every masked region is filled solid, and the image is rebuilt from pixels, so no metadata leaves either.
+        </p>
+      </div>
+
+      <fieldset className="min-w-0">
+        <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples, or your own image</legend>
+        <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 sm:pb-0">
+          {IMAGE_SAMPLES.map((s) => {
+            const on = selection.kind === "sample" && selection.sample.id === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => select(sampleSelection(s))}
+                className={[
+                  "flex w-[15rem] shrink-0 snap-start items-center gap-3 rounded-xl border p-2 pr-3 text-left transition-colors sm:w-auto",
+                  on ? "border-ink bg-surface shadow-sm" : "border-line bg-surface/60 hover:border-line-strong hover:bg-surface",
+                ].join(" ")}
+              >
+                <img src={s.src} alt="" aria-hidden="true" className="size-12 shrink-0 rounded-md border border-line bg-surface-2 object-cover" />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-ink">{s.title}</span>
+                  <span className="block truncate text-xs text-muted">{s.subtitle}</span>
+                </span>
+              </button>
+            );
+          })}
+          <div className="flex w-[15rem] shrink-0 snap-start flex-col justify-center gap-1 sm:w-auto">
+            <input
+              ref={fileInput}
+              id="image-upload"
+              type="file"
+              accept={UPLOAD_TYPES.join(",")}
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(e) => {
+                onFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant={selection.kind === "upload" ? "primary" : "secondary"}
+              className="h-auto min-h-16 w-full flex-col !items-start gap-0 rounded-xl px-4 py-2 text-left"
+              aria-describedby="upload-hint"
+              onClick={() => fileInput.current?.click()}
+            >
+              <span className="text-sm font-semibold">{selection.kind === "upload" ? "Upload another image" : "Upload an image"}</span>
+              <span id="upload-hint" className="max-w-full truncate text-xs font-normal opacity-75">
+                {selection.kind === "upload" ? selection.name : "PNG or JPEG, up to 10 MB. Fictional only."}
+              </span>
+            </Button>
+          </div>
+        </div>
+        {uploadError && (
+          <p role="alert" className="mt-2 text-sm text-danger">
+            {uploadError}
+          </p>
+        )}
+      </fieldset>
+
+      <div className="flex flex-col lg:flex-row lg:items-stretch">
+        <Pane
+          id="image-input"
+          side="you"
+          eyebrow="Inside your network"
+          title="Your image"
+          className="lg:flex-1"
+          actions={
+            <>
+              {data && data.regions.length > 0 && (
+                <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm text-muted hover:text-ink">
+                  <input type="checkbox" checked={showRegions} onChange={(e) => setShowRegions(e.target.checked)} className="size-4 accent-[var(--guard)]" />
+                  Show regions
+                </label>
+              )}
+              <Button variant="primary" onClick={() => void run()} disabled={running}>
+                {running ? "Masking…" : fresh ? "Run again" : "Mask image"}
+                <span aria-hidden="true">→</span>
+              </Button>
+            </>
+          }
+          footer={
+            data && data.regions.length > 0 ? (
+              <span>Solid outlines: found by SAM 3.1. Dashed: text found by OCR and a detector. Hover, tap or tab to a region for its type.</span>
+            ) : (
+              <span>Pick a sample or upload a fictional image, then mask it.</span>
+            )
+          }
+        >
+          <Figure src={src} alt={alt}>
+            {data &&
+              showRegions &&
+              data.regions.map((r, i) => (
+                <RegionBox key={i} region={r} index={i} width={data.width} height={data.height} active={active === i} onActive={setActive} />
+              ))}
+          </Figure>
+        </Pane>
+
+        <Boundary direction="outbound" label="pii-guard boundary: only the masked image crosses it">
+          {summary && (
+            <dl className="flex gap-3 text-center lg:flex-col lg:gap-2">
+              <Stat label="found" value={summary.found} />
+              <Stat label="masked" value={summary.masked} />
+              <Stat label="kept" value={summary.kept} />
+            </dl>
+          )}
+        </Boundary>
+
+        <Pane
+          id="image-model"
+          side="model"
+          eyebrow="Sent to the model"
+          title="What the model saw"
+          className="lg:flex-1"
+          footer={
+            data && result ? (
+              result.engine === "api" ? (
+                <span>The masked PNG exactly as the API returned it, re-encoded from pixels with no metadata. {result.ms} ms.</span>
+              ) : (
+                <span>Demo mode: regions recorded from a real SAM 3.1 + OCR run on this sample; the black boxes are drawn in your browser.</span>
+              )
+            ) : undefined
+          }
+        >
+          {error ? (
+            error.code === "demo_upload" ? (
+              <DemoUploadNotice />
+            ) : (
+              <BlockedNotice error={error} />
+            )
+          ) : running ? (
+            <Running />
+          ) : data && result ? (
+            <div className="space-y-4">
+              <WhatRan data={data} engine={result.engine} />
+              {result.engine === "api" && data.image ? (
+                <Figure src={`data:image/png;base64,${data.image}`} alt={`Masked image: ${summary?.masked ?? 0} regions covered.`} testId="masked-image">
+                  {active !== null && data.regions[active] && <Highlight region={data.regions[active]} width={data.width} height={data.height} />}
+                </Figure>
+              ) : (
+                <Figure src={src} alt={`Masked image (drawn in the browser): ${summary?.masked ?? 0} regions covered.`} testId="demo-masked-image">
+                  {data.regions.map((r, i) =>
+                    r.policy === "mask" ? (
+                      <span key={i} aria-hidden="true" data-testid="demo-mask" className="absolute bg-black" style={percentBox(r.box, data.width, data.height, MASK_PADDING)} />
+                    ) : null,
+                  )}
+                  {active !== null && data.regions[active] && <Highlight region={data.regions[active]} width={data.width} height={data.height} />}
+                </Figure>
+              )}
+            </div>
+          ) : (
+            <EmptyState
+              title={result ? "The image changed" : "Nothing has been sent yet"}
+              body={result ? "Mask it again to see what the model would get for this image." : "Mask the image to see exactly what would leave your network."}
+            />
+          )}
+        </Pane>
+      </div>
+
+      {data && result && !error && (
+        <section aria-labelledby="regions-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 rounded-2xl border border-line bg-surface p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+          <div className="space-y-4">
+            <div>
+              <h2 id="regions-title" className="text-base font-semibold tracking-tight text-ink">
+                Detected regions
+              </h2>
+              <p className="mt-1 text-sm text-muted">Colour shows the type. Kept regions were found but left visible by policy (company stamps, by default). No region carries the text or pixels it covers.</p>
+            </div>
+            <ImageLegend regions={data.regions} activeType={active !== null ? (data.regions[active]?.entity_type ?? null) : null} />
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted">
+              <dt>Engine</dt>
+              <dd className="text-ink">{result.engine === "api" ? "pii-guard API" : "Demo engine (recorded regions)"}</dd>
+              <dt>Segmentation</dt>
+              <dd className="text-ink">
+                {data.analysis.sam.model} · {summary?.sam ?? 0} {summary?.sam === 1 ? "region" : "regions"}
+              </dd>
+              <dt>Text (OCR)</dt>
+              <dd className="text-ink">{data.analysis.ocr.ran ? `${data.analysis.ocr.engine} · ${summary?.ocr ?? 0} regions` : "off"}</dd>
+              <dt>Image</dt>
+              <dd className="tabular-nums text-ink">
+                {data.width} × {data.height} px
+              </dd>
+            </dl>
+          </div>
+          <div className="min-w-0">
+            <h3 className="mb-2 text-sm font-semibold text-ink">Region list</h3>
+            <RegionTable regions={data.regions} active={active} onActive={setActive} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function Figure({ src, alt, testId, children }: { src: string; alt: string; testId?: string; children?: ReactNode }) {
+  return (
+    <div className="flex justify-center rounded-lg bg-surface-2 p-2 ring-1 ring-line">
+      <div className="relative w-full max-w-[44rem]" data-testid={testId}>
+        <img src={src} alt={alt} className="block h-auto w-full rounded-sm" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function RegionBox({
+  region,
+  index,
+  width,
+  height,
+  active,
+  onActive,
+}: {
+  region: ImageRegion;
+  index: number;
+  width: number;
+  height: number;
+  active: boolean;
+  onActive: (i: number | null) => void;
+}) {
+  const meta = metaFor(region.entity_type);
+  const color = REGION_COLOR[region.entity_type];
+  const kept = region.policy !== "mask";
+  return (
+    <button
+      type="button"
+      data-testid="region-box"
+      aria-label={regionLabel(region)}
+      aria-pressed={active}
+      onMouseEnter={() => onActive(index)}
+      onMouseLeave={() => onActive(null)}
+      onFocus={() => onActive(index)}
+      onBlur={() => onActive(null)}
+      onClick={() => onActive(active ? null : index)}
+      className="absolute rounded-[3px] transition-[box-shadow,background-color] focus-visible:outline-offset-1"
+      style={{
+        ...percentBox(region.box, width, height, MASK_PADDING),
+        border: `2px ${region.source === "ocr" ? "dashed" : "solid"} ${color}`,
+        backgroundColor: active ? `${color}33` : kept ? "transparent" : `${color}14`,
+        boxShadow: active ? `0 0 0 3px ${color}66` : undefined,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        className={[
+          "absolute -top-[1.15rem] left-[-2px] rounded-t px-1 font-mono text-[10px] leading-[1.1rem] font-semibold whitespace-nowrap text-white",
+          // Text regions sit between lines of text: their tag would hide the line above.
+          region.source === "ocr" && !active ? "hidden" : "",
+        ].join(" ")}
+        style={{ backgroundColor: color }}
+      >
+        {meta.short}
+        {kept ? " · kept" : ""}
+      </span>
+    </button>
+  );
+}
+
+function Highlight({ region, width, height }: { region: ImageRegion; width: number; height: number }) {
+  const color = REGION_COLOR[region.entity_type];
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute rounded-[3px]"
+      style={{ ...percentBox(region.box, width, height, MASK_PADDING + 2), boxShadow: `0 0 0 3px ${color}` }}
+    />
+  );
+}
+
+function ImageLegend({ regions, activeType }: { regions: ImageRegion[]; activeType: string | null }) {
+  const rows = legendRows(regions);
+  if (rows.length === 0) return <p className="text-sm text-muted">No regions were found in this image.</p>;
+  return (
+    <ul aria-label="Region legend" className="flex flex-wrap gap-1.5">
+      {rows.map((row) => (
+        <li
+          key={row.type}
+          className={[
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
+            activeType === row.type ? "border-ink text-ink" : "border-line text-muted",
+          ].join(" ")}
+        >
+          <span aria-hidden="true" className="size-2.5 rounded-sm" style={{ backgroundColor: REGION_COLOR[row.type], opacity: row.kept ? 0.55 : 1 }} />
+          <span className="font-medium text-ink">{metaFor(row.type).label}</span>
+          <span className="tabular-nums">{row.count}</span>
+          {row.sources.map((s) => (
+            <span key={s} className="rounded bg-surface-2 px-1 text-[10px] font-semibold tracking-wide text-faint uppercase">
+              {s === "sam" ? "SAM" : "OCR"}
+            </span>
+          ))}
+          {row.kept && <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold tracking-wide text-faint uppercase">kept</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function RegionTable({ regions, active, onActive }: { regions: ImageRegion[]; active: number | null; onActive: (i: number | null) => void }) {
+  if (regions.length === 0) {
+    return <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing to list: the image went out re-encoded but otherwise unchanged.</p>;
+  }
+  return (
+    <div className="overflow-x-auto rounded-lg border border-line">
+      <table className="w-full min-w-[30rem] text-left text-sm">
+        <thead className="bg-surface-2 text-xs text-muted">
+          <tr>
+            <th scope="col" className="px-3 py-2 font-medium">Type</th>
+            <th scope="col" className="px-3 py-2 font-medium">Found by</th>
+            <th scope="col" className="px-3 py-2 font-medium">Policy</th>
+            <th scope="col" className="px-3 py-2 font-medium">Box (px)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {regions.map((r, i) => (
+            <tr
+              key={i}
+              tabIndex={0}
+              aria-label={regionLabel(r)}
+              data-active={active === i || undefined}
+              onMouseEnter={() => onActive(i)}
+              onMouseLeave={() => onActive(null)}
+              onFocus={() => onActive(i)}
+              onBlur={() => onActive(null)}
+              className={["border-t border-line outline-none focus-visible:bg-surface-2", active === i ? "bg-surface-2" : ""].join(" ")}
+            >
+              <td className="px-3 py-2">
+                <span className="inline-flex items-center gap-2 font-medium text-ink">
+                  <span aria-hidden="true" className="size-2.5 rounded-sm" style={{ backgroundColor: REGION_COLOR[r.entity_type] }} />
+                  {metaFor(r.entity_type).label}
+                </span>
+              </td>
+              <td className="px-3 py-2 text-muted">{sourceLabel(r)}</td>
+              <td className="px-3 py-2">
+                <span className={r.policy === "mask" ? "text-guard-ink dark:text-guard" : "text-muted"}>{policyLabel(r.policy)}</span>
+              </td>
+              <td className="px-3 py-2 font-mono text-xs text-muted tabular-nums">{r.box.join(", ")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Say exactly what ran, and what did not, so gaps read as known scope. */
+function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind }) {
+  const gaps = coverageGaps(data.analysis);
+  const ocr = data.analysis.ocr;
+  return (
+    <div className="space-y-2" data-testid="image-scope-note">
+      <div className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink">
+        <p>
+          <span className="font-semibold">SAM 3.1</span> looked for {samTargets(data.analysis)}
+          {ocr.ran ? (
+            <>
+              ; <span className="font-semibold">OCR</span> ({ocr.engine}) read the text for the detectors
+            </>
+          ) : null}
+          .
+        </p>
+        {engine === "mock" && (
+          <p className="mt-0.5 text-muted">
+            Recorded {IMAGE_RECORDINGS.recorded} from the live pipeline on this fictional sample. Nothing was sent anywhere just now.
+          </p>
+        )}
+      </div>
+      {gaps.map((g) => (
+        <p key={g} role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-ink">
+          <span className="font-semibold text-warn">Not covered · </span>
+          {g}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function DemoUploadNotice() {
+  return (
+    <div role="alert" className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
+      <p className="font-semibold text-warn">Uploads need the live API.</p>
+      <p className="mt-1 text-ink">SAM 3.1 runs on the pii-guard server, not in your browser, and the API isn't in use right now. Your image was not sent anywhere.</p>
+      <p className="mt-2 text-muted">
+        Start it with <code className="rounded bg-surface px-1 font-mono text-xs">uv run pii-guard serve</code> (with <code className="font-mono text-xs">META_API_KEY</code> set), or try one of the samples, which replay a recorded run.
+      </p>
+    </div>
+  );
+}
+
+function Running() {
+  return (
+    <div className="space-y-3" role="status">
+      <div aria-hidden="true" className="aspect-[16/10] w-full rounded-lg bg-line motion-safe:animate-pulse" />
+      <p className="text-sm text-muted">Segmenting with SAM 3.1 (one request per concept: face, signature, ID photo, stamp) and reading the text. This takes a few seconds.</p>
+    </div>
+  );
+}

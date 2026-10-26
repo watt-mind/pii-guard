@@ -12,13 +12,21 @@ re-serialised as valid JSON. Arguments that are not valid JSON are masked as pla
 A message ``name`` that contains detected personal data can't carry a placeholder (providers
 restrict it to ``[A-Za-z0-9_-]``), so it is removed instead.
 
-Fail closed (ADR 0006): content parts that can't be masked yet (images, audio, files) and
+Images: ``image_url`` parts whose URL is an inline ``data:image/png|jpeg;base64,...`` URL are
+returned as :class:`ImageSlot` objects; the gateway masks them with the visual pipeline and
+writes a masked PNG data URL back. Remote ``http(s)`` image URLs are rejected: the guard never
+fetches arbitrary URLs, and an image it can't see can't be masked.
+
+Fail closed (ADR 0006): content parts that can't be masked (remote images, audio, files) and
 malformed bodies are rejected; nothing is forwarded.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,6 +34,7 @@ from typing import Any
 from pii_guard.types import PiiGuardError
 
 __all__ = [
+    "ImageSlot",
     "InvalidChatRequestError",
     "TextSlot",
     "UnsupportedContentError",
@@ -35,6 +44,8 @@ __all__ = [
 #: Message-level string fields that carry free text besides ``content``.
 _TEXT_FIELDS = ("refusal", "reasoning_content", "reasoning")
 _TEXT_PART_TYPES = {"text": "text", "refusal": "refusal"}
+_IMAGE_SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
+_DATA_URL_RE = re.compile(r"^data:(image/(?:png|jpeg|jpg));base64,", re.IGNORECASE)
 
 
 class InvalidChatRequestError(PiiGuardError):
@@ -62,10 +73,23 @@ class TextSlot:
 
 
 @dataclass(slots=True)
+class ImageSlot:
+    """One inline image to mask, and how to write the masked PNG back as a data URL."""
+
+    data: bytes = field(repr=False)
+    write: Callable[[str], None] = field(repr=False)
+    where: str = ""
+
+    def __repr__(self) -> str:  # never the bytes
+        return f"ImageSlot(where={self.where!r}, bytes={len(self.data)})"
+
+
+@dataclass(slots=True)
 class CollectedTexts:
     slots: list[TextSlot]
     #: Run after every slot has been written (re-serialise tool-call arguments).
     finalizers: list[Callable[[], None]]
+    images: list[ImageSlot] = field(default_factory=list)
 
     def finalize(self) -> None:
         for finalize in self.finalizers:
@@ -141,17 +165,53 @@ def _collect_part(part: object, where: str, out: CollectedTexts) -> None:
     if not isinstance(part, dict):
         raise InvalidChatRequestError(f"{where} must be an object")
     part_type = part.get("type")
+    if part_type == "image_url":
+        _collect_image(part, where, out)
+        return
     key = _TEXT_PART_TYPES.get(part_type) if isinstance(part_type, str) else None
     if key is None:
         shown = part_type if isinstance(part_type, str) and len(part_type) <= 32 else "unknown"
         raise UnsupportedContentError(
             f"{where}: content parts of type {shown!r} are not supported; the gateway masks "
-            "text only for now and does not forward what it cannot mask"
+            "text and inline images only and does not forward what it cannot mask"
         )
     value = part.get(key)
     if not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
     out.slots.append(TextSlot(value, _setter(part, key)))
+
+
+def _collect_image(part: dict[str, Any], where: str, out: CollectedTexts) -> None:
+    image_url = part.get("image_url")
+    holder: dict[str, Any]
+    if isinstance(image_url, dict) and isinstance(image_url.get("url"), str):
+        holder, key = image_url, "url"
+    elif isinstance(image_url, str):
+        holder, key = part, "image_url"
+    else:
+        raise UnsupportedContentError(f"{where}: image_url parts need an inline data URL")
+    url: str = holder[key]
+    match = _DATA_URL_RE.match(url)
+    if match is None:
+        if url.startswith("data:"):
+            raise UnsupportedContentError(
+                f"{where}: only base64 PNG and JPEG data URLs can be masked"
+            )
+        raise UnsupportedContentError(
+            f"{where}: remote image URLs are not fetched; send the image inline as a "
+            "base64 data URL (data:image/png;base64,...) so it can be masked"
+        )
+    try:
+        data = base64.b64decode("".join(url[match.end() :].split()), validate=True)
+    except (binascii.Error, ValueError):
+        raise InvalidChatRequestError(f"{where}: image data URL is not valid base64") from None
+    if not data.startswith(_IMAGE_SIGNATURES):
+        raise UnsupportedContentError(f"{where}: the inline image is not a PNG or JPEG image")
+
+    def write(masked_url: str) -> None:
+        holder[key] = masked_url
+
+    out.images.append(ImageSlot(data, write, where))
 
 
 def _collect_arguments(function: dict[str, Any], out: CollectedTexts) -> None:

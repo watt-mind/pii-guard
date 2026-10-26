@@ -4,6 +4,8 @@ import type {
   ErrorBody,
   GuardClient,
   HealthResponse,
+  ImageMaskRequest,
+  ImageMaskResponse,
   MaskRequest,
   MaskResponse,
   UnmaskRequest,
@@ -52,20 +54,33 @@ export interface HttpGuardClient extends GuardClient {
   health(): Promise<HealthResponse>;
 }
 
+/** SAM 3.1 makes one request per concept prompt, so an image takes several seconds. */
+export const IMAGE_TIMEOUT_MS = 120_000;
+
 export function createHttpClient(options: HttpClientOptions = {}): HttpGuardClient {
   const baseUrl = (options.baseUrl ?? "").replace(/\/$/, "");
   const doFetch = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const timeoutMs = options.timeoutMs ?? 15_000;
+  const imageTimeoutMs = options.timeoutMs ?? IMAGE_TIMEOUT_MS;
 
-  async function request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  async function request<T>(
+    method: "GET" | "POST",
+    path: string,
+    body?: unknown,
+    raw?: { body: Blob; contentType: string; timeoutMs: number },
+  ): Promise<T> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), raw?.timeoutMs ?? timeoutMs);
     let res: Response;
     try {
       res = await doFetch(`${baseUrl}${path}`, {
         method,
-        headers: body === undefined ? { Accept: "application/json" } : { "Content-Type": "application/json", Accept: "application/json" },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: raw
+          ? { "Content-Type": raw.contentType, Accept: "application/json" }
+          : body === undefined
+            ? { Accept: "application/json" }
+            : { "Content-Type": "application/json", Accept: "application/json" },
+        body: raw ? raw.body : body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,
       });
     } catch {
@@ -104,5 +119,12 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpGuardClie
     analyze: (req: AnalyzeRequest) => request<AnalyzeResponse>("POST", "/v1/analyze", req),
     mask: (req: MaskRequest) => request<MaskResponse>("POST", "/v1/mask", req),
     unmask: (req: UnmaskRequest) => request<UnmaskResponse>("POST", "/v1/unmask", req),
+    maskImage: (req: ImageMaskRequest) =>
+      request<ImageMaskResponse>(
+        "POST",
+        `/v1/mask/image${req.language ? `?language=${encodeURIComponent(req.language)}` : ""}`,
+        undefined,
+        { body: req.image, contentType: req.image.type || "application/octet-stream", timeoutMs: imageTimeoutMs },
+      ),
   };
 }

@@ -21,7 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from pii_guard.api.deps import PayloadTooLargeError, get_max_text_chars
 from pii_guard.types import PiiGuardError
 
-__all__ = ["LoggedRoute", "check_text_size", "log_extra", "v1_router"]
+__all__ = ["LoggedRoute", "check_text_size", "log_extra", "text_body_limit", "v1_router"]
 
 access_logger = logging.getLogger("pii_guard.api.access")
 
@@ -41,7 +41,14 @@ def log_extra(request: Request, **fields: object) -> None:
 
 
 class LoggedRoute(APIRoute):
-    """An ``APIRoute`` that writes a body-free access log line for every request."""
+    """An ``APIRoute`` that writes a body-free access log line for every request.
+
+    Subclasses with larger bodies (images) override :meth:`max_body_bytes`.
+    """
+
+    def max_body_bytes(self, request: Request) -> int:
+        """The largest declared body accepted before parsing; derived from the text limit."""
+        return text_body_limit(request)
 
     def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
         handler = super().get_route_handler()
@@ -51,7 +58,7 @@ class LoggedRoute(APIRoute):
             status = 500
             error_code: str | None = None
             try:
-                _check_body_size(request)
+                _check_body_size(request, self.max_body_bytes(request))
                 response = await handler(request)
                 status = response.status_code
                 return response
@@ -83,12 +90,16 @@ class LoggedRoute(APIRoute):
         return logged
 
 
-def _check_body_size(request: Request) -> None:
-    """Reject bodies whose declared size is far beyond the text limit, before parsing."""
+def text_body_limit(request: Request) -> int:
+    """The body size (bytes) a request at the text limit can legally have, as JSON."""
+    return get_max_text_chars(request) * _BODY_BYTES_PER_CHAR + _BODY_OVERHEAD_BYTES
+
+
+def _check_body_size(request: Request, limit: int) -> None:
+    """Reject bodies whose declared size is beyond ``limit``, before parsing."""
     declared = request.headers.get("content-length")
     if declared is None or not declared.isdigit():
         return
-    limit = get_max_text_chars(request) * _BODY_BYTES_PER_CHAR + _BODY_OVERHEAD_BYTES
     if int(declared) > limit:
         raise PayloadTooLargeError("request body is too large")
 
@@ -100,5 +111,5 @@ def check_text_size(request: Request, text: str) -> None:
         raise PayloadTooLargeError(f"text is longer than {limit} characters")
 
 
-def v1_router() -> APIRouter:
-    return APIRouter(route_class=LoggedRoute, tags=["v1"])
+def v1_router(route_class: type[LoggedRoute] = LoggedRoute) -> APIRouter:
+    return APIRouter(route_class=route_class, tags=["v1"])

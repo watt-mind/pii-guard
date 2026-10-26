@@ -2,8 +2,8 @@
 
 A small web app that makes the guard visible: **what the model saw** next to **what you got
 back**. It talks only to the pii-guard REST API (`/healthz`, `/v1/analyze`, `/v1/mask`,
-`/v1/unmask`, see [docs/contracts.md](../docs/contracts.md)). It never calls a model provider
-and holds no secrets.
+`/v1/unmask`, `/v1/mask/image`, see [docs/contracts.md](../docs/contracts.md)). It never calls a
+model provider and holds no secrets (SAM 3.1 is called by the pii-guard server).
 
 ## Run it
 
@@ -54,6 +54,21 @@ to fall back: the guard failed closed, and the UI says that nothing was sent.
    it freely, or add a placeholder the model "invented"). **Restore** unmasks it in one go;
    **Stream** feeds it in small chunks and shows placeholders split across chunks being held
    back, then restored, as they arrive. Unknown placeholders are left visible and flagged.
+3. **Images.** Pick a fictional sample image (ID card, signed letter with a company stamp,
+   visitor badge) or upload a PNG/JPEG, then mask it. *Your image* shows every region the API
+   found, outlined in its type's colour (solid: SAM 3.1 segmentation, dashed: OCR text found by
+   a detector; a tag on each SAM box, OCR tags on hover/focus); *What the model saw* shows the
+   masked PNG exactly as `/v1/mask/image` returned it. Below: a legend (type, count, SAM/OCR,
+   kept) and the region list (type, source, policy, box). Hover, tap or tab to a region to link
+   both sides. A note says what ran, and what did not: OCR off on the API host, or names not
+   looked for because only the rules detector runs.
+
+   In demo mode the samples replay regions **recorded from a real run** (SAM 3.1 on the Meta
+   API + Tesseract + rules, `src/content/imageRecordings.json`) and the black boxes are drawn
+   in the browser; uploads are refused, because SAM runs on the server.
+
+   For the live pipeline the API needs `META_API_KEY` (SAM 3.1) and, for text in images,
+   `uv sync --extra ocr` plus the `tesseract` binary with `hun` and `eng` data.
 
 All sample data is fictional ([ADR 0005](../docs/decisions/0005-synthetic-data-only.md)).
 Never paste real personal data into the demo.
@@ -88,6 +103,25 @@ pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test --run
 | `src/components/` | Highlighting, placeholders, legend, entity table, panes |
 | `src/screens/` | Playground and Round trip |
 | `src/content/samples.ts` | Fictional Hungarian sample documents and answers |
+| `src/content/imageSamples.ts` | The fictional sample images (`public/samples/*.png`) |
+| `src/content/imageRecordings.json` | Recorded `/v1/mask/image` regions for the demo engine |
+| `src/api/imageMock.ts` | Demo image engine: replays recordings, refuses uploads |
+| `src/lib/imageRegions.ts` | Region geometry, labels, legend rows, coverage notes |
+| `src/screens/Images.tsx` | The Images screen |
+| `scripts/render_samples.py` | Draws the sample images with Pillow |
+
+### Sample images
+
+The PNGs in `public/samples/` are drawn by `scripts/render_samples.py` (ellipse faces, pen
+scribbles, a two-circle stamp, fictional names and checksum-valid fictional IDs). After changing
+a drawing, re-render and re-record the demo regions against a live API:
+
+```bash
+uv run python ui/scripts/render_samples.py
+# API running with META_API_KEY and Tesseract; then for each sample:
+curl -s --data-binary @ui/public/samples/id-card.png -H 'Content-Type: image/png' \
+  http://127.0.0.1:8787/v1/mask/image   # copy the response, minus "image", into imageRecordings.json
+```
 
 Offsets from the API are code-point indices (Python `str`); the UI converts them to UTF-16
 before slicing, so emoji and other non-BMP characters don't shift highlights.

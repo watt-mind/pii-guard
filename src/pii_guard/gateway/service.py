@@ -2,10 +2,13 @@
 
 Order of operations (fail closed at every step, ADR 0006):
 
-1. upstream configured? mode and session headers valid? body well-formed, text only?
+1. upstream configured? mode and session headers valid? body well-formed, nothing it can't
+   mask (remote image URLs, audio, files)?
 2. detect every text (cache first; misses run concurrently, under one per-request timeout);
 3. mask with the conversation's vault session: spans first, then a sweep for every value the
-   session already knows (so a value found in one message is masked in all of them);
+   session already knows (so a value found in one message is masked in all of them); inline
+   images are masked with the visual pipeline (SAM 3.1 + OCR text through this mode's
+   detectors + policies) and replaced by a masked PNG data URL;
 4. forward the masked body; restore the answer (streamed: chunk by chunk);
 5. seed the detection cache with the restored answer, which comes back as history next turn.
 
@@ -15,6 +18,7 @@ Nothing in this module logs or raises with request text, values, masked bodies o
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import re
@@ -29,19 +33,24 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
 from pii_guard.api.deps import PayloadTooLargeError
+from pii_guard.api.routes.image_masking import ImageMasker, default_ocr_engine
 from pii_guard.config import Settings
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import GatewayConfig, Mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
 from pii_guard.gateway.request import (
+    ImageSlot,
     InvalidChatRequestError,
     TextSlot,
     collect_texts,
 )
 from pii_guard.gateway.restore import restore_completion, restore_text
 from pii_guard.gateway.stream import SseRestorer, error_event, iter_sse_data, sse_event
+from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PiiGuardError, Span
 from pii_guard.vault import Vault, VaultSession
+from pii_guard.visual.ocr import OcrEngine
+from pii_guard.visual.sam import SamClient
 
 __all__ = [
     "LANGUAGE_HEADER",
@@ -62,6 +71,7 @@ _SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _LANGUAGE_RE = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})?$")
 _SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _MAX_ERROR_BODY = 65_536
+_UNSET: Any = object()
 
 
 class UpstreamNotConfiguredError(PiiGuardError):
@@ -93,18 +103,28 @@ class RequestStats:
     upstream_ms: float = 0.0
     unresolved: int = 0
     stream: bool = False
+    images: int = 0
+    image_masked: Counter[str] = field(default_factory=Counter)
+    image_kept: Counter[str] = field(default_factory=Counter)
+    image_ocr: bool | None = None
+    image_ms: float = 0.0
 
     def headers(self, session_id: str) -> dict[str, str]:
-        return {
+        out = {
             SESSION_HEADER: session_id,
             MODE_HEADER: self.mode.value,
             "X-PII-Guard-Cache-Hits": str(self.cache_hits),
             "X-PII-Guard-Cache-Misses": str(self.cache_misses),
             "X-PII-Guard-Masked": str(sum(self.masked.values())),
         }
+        if self.images:
+            out["X-PII-Guard-Images"] = str(self.images)
+            out["X-PII-Guard-Image-Regions-Masked"] = str(sum(self.image_masked.values()))
+            out["X-PII-Guard-Image-OCR"] = "on" if self.image_ocr else "off"
+        return out
 
     def log_fields(self) -> dict[str, object]:
-        return {
+        fields: dict[str, object] = {
             "mode": self.mode.value,
             "texts": self.texts,
             "cache_hits": self.cache_hits,
@@ -112,12 +132,17 @@ class RequestStats:
             "masked": _counts(self.masked),
             "detect_ms": f"{self.detect_ms:.0f}",
         }
+        if self.images:
+            fields["images"] = self.images
+            fields["image_masked"] = _counts(self.image_masked)
+            fields["image_ms"] = f"{self.image_ms:.0f}"
+        return fields
 
     def log(self, outcome: str) -> None:
         logger.info(
             "chat.completions %s mode=%s stream=%s texts=%d cache_hits=%d cache_misses=%d "
             "seeded=%d spans=%s masked=%s detect_ms=%.0f detectors=%s upstream=%s "
-            "upstream_ms=%.0f unresolved=%d",
+            "upstream_ms=%.0f unresolved=%d images=%d image_masked=%s image_ms=%.0f",
             outcome,
             self.mode.value,
             self.stream,
@@ -132,6 +157,9 @@ class RequestStats:
             self.upstream_status if self.upstream_status is not None else "-",
             self.upstream_ms,
             self.unresolved,
+            self.images,
+            _counts(self.image_masked),
+            self.image_ms,
         )
 
 
@@ -151,7 +179,11 @@ class Gateway:
         detectors: Mapping[Mode, ModeDetector] | None = None,
         cache: DetectionCache | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        sam: SamClient | None = None,
+        ocr: OcrEngine | None = _UNSET,
     ) -> None:
+        """``sam`` / ``ocr`` mask inline images: default a :class:`SamClient` from the
+        settings and Tesseract when installed; ``ocr=None`` turns OCR off (SAM only)."""
         self.settings = settings
         self.vault = vault
         self.config = config or GatewayConfig()
@@ -159,6 +191,8 @@ class Gateway:
         self.cache = cache or DetectionCache(self.config.cache_size)
         self._transport = transport
         self._semaphore: asyncio.Semaphore | None = None
+        self._sam = sam
+        self._ocr = ocr
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
@@ -168,6 +202,20 @@ class Gateway:
         if self._detectors is None:
             self._detectors = build_mode_detectors(self.settings, self.config)
         return self._detectors
+
+    def image_masker(self, detector: ModeDetector) -> ImageMasker:
+        """The visual pipeline for one mode: OCR text goes through that mode's detectors."""
+        if self._sam is None:
+            self._sam = SamClient(settings=self.settings)
+        if self._ocr is _UNSET:
+            self._ocr = default_ocr_engine()
+        return ImageMasker(
+            sam=self._sam,
+            policies=detector.policies,
+            ocr=self._ocr,
+            text_detector=detector.detector if self._ocr is not None else None,
+            text_detector_names=[detector.mode.value],
+        )
 
     # --- request parsing -----------------------------------------------------------------
 
@@ -326,6 +374,48 @@ class Gateway:
                 self.cache.put(key, spans)
                 stats.seeded += 1
 
+    async def _mask_images(
+        self,
+        images: list[ImageSlot],
+        detector: ModeDetector,
+        language: str,
+        stats: RequestStats,
+    ) -> None:
+        """Mask every inline image (fail closed) and write masked PNG data URLs back."""
+        masker = self.image_masker(detector)
+        stats.image_ocr = masker.ocr is not None
+        started = time.perf_counter()
+
+        def run_all() -> list[bytes]:
+            out: list[bytes] = []
+            for slot in images:
+                outcome = masker.mask(slot.data, language)
+                stats.image_masked.update(
+                    {t.value: n for t, n in outcome.counts(Policy.MASK).items()}
+                )
+                stats.image_kept.update(
+                    {t.value: n for t, n in outcome.counts(Policy.KEEP).items()}
+                )
+                out.append(outcome.image)
+            return out
+
+        try:
+            masked = await asyncio.wait_for(
+                asyncio.to_thread(run_all), timeout=self.config.image_timeout
+            )
+        except TimeoutError:
+            raise DetectionError(
+                f"image masking timed out after {self.config.image_timeout:g}s"
+            ) from None
+        except PiiGuardError:
+            raise
+        except Exception as exc:
+            raise DetectionError(f"image masking failed ({type(exc).__name__})") from exc
+        finally:
+            stats.image_ms = (time.perf_counter() - started) * 1000
+        for slot, png in zip(images, masked, strict=True):
+            slot.write("data:image/png;base64," + base64.b64encode(png).decode("ascii"))
+
     # --- the endpoint --------------------------------------------------------------------
 
     async def chat_completions(
@@ -342,13 +432,24 @@ class Gateway:
         )
         if too_long:
             raise PayloadTooLargeError(f"a message text is longer than {max_text_chars} characters")
+        if len(collected.images) > self.config.max_images:
+            raise PayloadTooLargeError(
+                f"a request may carry at most {self.config.max_images} inline images"
+            )
+        if any(len(img.data) > self.config.max_image_bytes for img in collected.images):
+            raise PayloadTooLargeError(
+                f"an inline image is larger than {self.config.max_image_bytes} bytes"
+            )
         detector = self.detectors[mode]
         session, created = self._session(headers)
         stream = bool(body.get("stream"))
         stats.stream = stream
         stats.texts = len(collected.slots)
+        stats.images = len(collected.images)
         try:
             spans = await self._detect_all(collected.slots, detector, session, language, stats)
+            if collected.images:
+                await self._mask_images(collected.images, detector, language, stats)
             self._mask(collected.slots, spans, session, language, stats)
             collected.finalize()
         except BaseException:

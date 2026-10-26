@@ -1,0 +1,315 @@
+{
+  "recorded": "2026-10-26",
+  "note": "Responses of POST /v1/mask/image (SAM 3.1 on the Meta API + Tesseract OCR + rules) to ui/public/samples/*.png, without the image. Fictional samples only.",
+  "samples": {
+    "id-card": {
+      "media_type": "image/png",
+      "width": 720,
+      "height": 450,
+      "regions": [
+        {
+          "entity_type": "FACE",
+          "box": [
+            73,
+            155,
+            187,
+            260
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAJ",
+          "box": [
+            312,
+            188,
+            432,
+            203
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.95,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAX",
+          "box": [
+            438,
+            232,
+            557,
+            247
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.99,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "SIGNATURE",
+          "box": [
+            269,
+            306,
+            588,
+            353
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        }
+      ],
+      "masked": [
+        {
+          "entity_type": "FACE",
+          "count": 1
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAJ",
+          "count": 1
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAX",
+          "count": 1
+        },
+        {
+          "entity_type": "SIGNATURE",
+          "count": 1
+        }
+      ],
+      "kept": [],
+      "analysis": {
+        "sam": {
+          "model": "sam-3.1",
+          "entity_types": [
+            "FACE",
+            "SIGNATURE",
+            "ID_PHOTO",
+            "STAMP"
+          ]
+        },
+        "ocr": {
+          "ran": true,
+          "engine": "tesseract",
+          "detectors": [
+            "rules"
+          ],
+          "reason": null
+        }
+      }
+    },
+    "signed-letter": {
+      "media_type": "image/png",
+      "width": 640,
+      "height": 820,
+      "regions": [
+        {
+          "entity_type": "ADDRESS",
+          "box": [
+            50,
+            79,
+            75,
+            89
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.75,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "EMAIL",
+          "box": [
+            66,
+            310,
+            325,
+            328
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.99,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PHONE",
+          "box": [
+            66,
+            344,
+            213,
+            358
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.9,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAX",
+          "box": [
+            208,
+            412,
+            316,
+            426
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.99,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "STAMP",
+          "box": [
+            392,
+            573,
+            548,
+            727
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "keep"
+        },
+        {
+          "entity_type": "SIGNATURE",
+          "box": [
+            59,
+            616,
+            358,
+            663
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        }
+      ],
+      "masked": [
+        {
+          "entity_type": "ADDRESS",
+          "count": 1
+        },
+        {
+          "entity_type": "EMAIL",
+          "count": 1
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAX",
+          "count": 1
+        },
+        {
+          "entity_type": "PHONE",
+          "count": 1
+        },
+        {
+          "entity_type": "SIGNATURE",
+          "count": 1
+        }
+      ],
+      "kept": [
+        {
+          "entity_type": "STAMP",
+          "count": 1
+        }
+      ],
+      "analysis": {
+        "sam": {
+          "model": "sam-3.1",
+          "entity_types": [
+            "FACE",
+            "SIGNATURE",
+            "ID_PHOTO",
+            "STAMP"
+          ]
+        },
+        "ocr": {
+          "ran": true,
+          "engine": "tesseract",
+          "detectors": [
+            "rules"
+          ],
+          "reason": null
+        }
+      }
+    },
+    "visitor-badge": {
+      "media_type": "image/png",
+      "width": 480,
+      "height": 680,
+      "regions": [
+        {
+          "entity_type": "FACE",
+          "box": [
+            169,
+            230,
+            311,
+            361
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "EMAIL",
+          "box": [
+            59,
+            486,
+            334,
+            504
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.99,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PHONE",
+          "box": [
+            61,
+            520,
+            220,
+            534
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.85,
+          "policy": "mask"
+        }
+      ],
+      "masked": [
+        {
+          "entity_type": "EMAIL",
+          "count": 1
+        },
+        {
+          "entity_type": "FACE",
+          "count": 1
+        },
+        {
+          "entity_type": "PHONE",
+          "count": 1
+        }
+      ],
+      "kept": [],
+      "analysis": {
+        "sam": {
+          "model": "sam-3.1",
+          "entity_types": [
+            "FACE",
+            "SIGNATURE",
+            "ID_PHOTO",
+            "STAMP"
+          ]
+        },
+        "ocr": {
+          "ran": true,
+          "engine": "tesseract",
+          "detectors": [
+            "rules"
+          ],
+          "reason": null
+        }
+      }
+    }
+  }
+}
