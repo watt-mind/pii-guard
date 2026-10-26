@@ -16,13 +16,29 @@ projects.
 
 ## Development setup
 
-The code scaffold is not in place yet. Once it is:
+You need [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 for you if needed).
 
 ```bash
-uv sync
-uv run pytest
-uv run ruff check . && uv run ruff format --check .
+git clone https://github.com/watt-mind/pii-guard.git
+cd pii-guard
+make setup                 # uv sync + pre-commit hook (ruff)
+cp .env.example .env       # optional; nothing is required to run the tests
 ```
+
+Day to day:
+
+```bash
+make check                 # what CI runs: ruff check, ruff format --check, pytest
+make format                # apply ruff fixes and formatting
+make serve                 # API on http://127.0.0.1:8787 with auto-reload
+```
+
+Or without `make`: `uv sync`, `uv run pytest`, `uv run ruff check . && uv run ruff format
+--check .`, `uv run pii-guard serve`.
+
+The interfaces other components depend on (core types, detector registry, REST, vault, eval
+fixtures) are in [docs/contracts.md](docs/contracts.md). A change to one of them updates that
+file in the same pull request.
 
 ## Commits and pull requests
 

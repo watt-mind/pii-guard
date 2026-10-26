@@ -1,0 +1,174 @@
+"""Core types shared by every pii-guard component.
+
+Detectors, the vault, the API and the evaluation harness all speak in terms of these types.
+They are a public contract: see ``docs/contracts.md`` before changing anything here.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Protocol, runtime_checkable
+
+__all__ = [
+    "TEXT_ENTITY_TYPES",
+    "VISUAL_ENTITY_TYPES",
+    "DetectionError",
+    "Detector",
+    "EntityType",
+    "MaskingError",
+    "PiiGuardError",
+    "Span",
+]
+
+
+class EntityType(StrEnum):
+    """Every entity type in ``docs/entities.md``.
+
+    Values equal names, so ``EntityType("PERSON") is EntityType.PERSON`` and the JSON form
+    of a type is its name.
+    """
+
+    # Text entities
+    PERSON = "PERSON"
+    ADDRESS = "ADDRESS"
+    EMAIL = "EMAIL"
+    PHONE = "PHONE"
+    DATE_OF_BIRTH = "DATE_OF_BIRTH"
+    NATIONAL_ID_HU_TAX = "NATIONAL_ID_HU_TAX"
+    NATIONAL_ID_HU_TAJ = "NATIONAL_ID_HU_TAJ"
+    ID_DOCUMENT = "ID_DOCUMENT"
+    BANK_ACCOUNT = "BANK_ACCOUNT"
+    COMPANY_ID_HU = "COMPANY_ID_HU"
+    ORGANIZATION = "ORGANIZATION"
+    PARCEL_NUMBER_HU = "PARCEL_NUMBER_HU"
+    VEHICLE_PLATE = "VEHICLE_PLATE"
+
+    # Visual entities (image regions, not text spans)
+    FACE = "FACE"
+    SIGNATURE = "SIGNATURE"
+    ID_PHOTO = "ID_PHOTO"
+    STAMP = "STAMP"
+
+    @property
+    def is_visual(self) -> bool:
+        """True for image-region types (``FACE``, ``SIGNATURE``, ``ID_PHOTO``, ``STAMP``)."""
+        return self in VISUAL_ENTITY_TYPES
+
+
+VISUAL_ENTITY_TYPES: frozenset[EntityType] = frozenset(
+    {EntityType.FACE, EntityType.SIGNATURE, EntityType.ID_PHOTO, EntityType.STAMP}
+)
+TEXT_ENTITY_TYPES: frozenset[EntityType] = frozenset(EntityType) - VISUAL_ENTITY_TYPES
+
+
+@dataclass(frozen=True, slots=True)
+class Span:
+    """A detected piece of personal data in a text.
+
+    ``start`` and ``end`` are Python string offsets (code points) into the analysed text,
+    half-open: ``text == source[start:end]``. ``score`` is the detector's confidence in
+    ``[0, 1]``; ``detector`` is the registry name of the detector that produced it.
+
+    ``repr()`` never includes ``text``, so a span can be logged or put in an exception
+    message without leaking the raw value.
+    """
+
+    start: int
+    end: int
+    entity_type: EntityType
+    text: str
+    score: float
+    detector: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.entity_type, EntityType):
+            # Accept the plain string form ("PERSON") and normalize it.
+            try:
+                object.__setattr__(self, "entity_type", EntityType(self.entity_type))
+            except ValueError:
+                raise ValueError(f"unknown entity_type {self.entity_type!r}") from None
+        if self.start < 0 or self.end <= self.start:
+            raise ValueError(f"invalid span offsets start={self.start} end={self.end}")
+        if len(self.text) != self.end - self.start:
+            raise ValueError("span text length does not match end - start")
+        if not 0.0 <= self.score <= 1.0:
+            raise ValueError(f"score must be in [0, 1], got {self.score}")
+        if not self.detector:
+            raise ValueError("detector name must not be empty")
+
+    def __repr__(self) -> str:
+        return (
+            f"Span(start={self.start}, end={self.end}, "
+            f"entity_type={self.entity_type.value}, score={self.score:.3f}, "
+            f"detector={self.detector!r}, text=<redacted>)"
+        )
+
+    __str__ = __repr__
+
+    @property
+    def length(self) -> int:
+        return self.end - self.start
+
+    def overlaps(self, other: Span) -> bool:
+        """True if the two spans share at least one character."""
+        return self.start < other.end and other.start < self.end
+
+    def to_public_dict(self) -> dict[str, object]:
+        """The span without its raw value, as returned by ``POST /v1/analyze``."""
+        return {
+            "start": self.start,
+            "end": self.end,
+            "entity_type": self.entity_type.value,
+            "score": self.score,
+            "detector": self.detector,
+        }
+
+
+@runtime_checkable
+class Detector(Protocol):
+    """Anything that finds personal data in text.
+
+    Implementations must be safe to call repeatedly, must return spans whose offsets refer
+    to ``text`` exactly as given, and must raise :class:`DetectionError` (never return a
+    partial result silently) when they cannot complete. See ADR 0006 (fail closed).
+    """
+
+    name: str
+
+    def detect(self, text: str, language: str = "hu") -> list[Span]: ...
+
+
+class PiiGuardError(Exception):
+    """Base class for every error pii-guard raises on purpose.
+
+    ``code`` is a stable, machine-readable identifier used in API error bodies.
+    Messages must never contain raw personal data: describe entity types, counts or
+    placeholder ids instead.
+    """
+
+    code: str = "internal_error"
+    status_code: int = 500
+
+    def __init__(self, message: str = "", *, code: str | None = None) -> None:
+        super().__init__(message)
+        if code is not None:
+            self.code = code
+
+    @property
+    def message(self) -> str:
+        return str(self.args[0]) if self.args and self.args[0] else self.code
+
+
+class DetectionError(PiiGuardError):
+    """A detector failed or timed out. The request must be blocked."""
+
+    code = "detection_failed"
+    status_code = 503
+
+
+class MaskingError(PiiGuardError):
+    """Masking or re-identification could not complete. The request must be blocked."""
+
+    code = "masking_failed"
+    status_code = 500

@@ -48,6 +48,22 @@ pii-guard aims to fix all four, starting with Hungarian and extending to other E
 The mapping between real values and placeholders **never leaves pii-guard**. Details in
 [docs/architecture.md](docs/architecture.md) and [docs/privacy-model.md](docs/privacy-model.md).
 
+## Quickstart
+
+Requires [uv](https://docs.astral.sh/uv/). Only the skeleton exists so far: the API starts
+and answers health checks; detection and masking endpoints are being built.
+
+```bash
+git clone https://github.com/watt-mind/pii-guard.git
+cd pii-guard
+uv sync
+uv run pii-guard serve                  # http://127.0.0.1:8787
+curl http://127.0.0.1:8787/healthz      # {"status":"ok","version":"0.1.0"}
+```
+
+Or with Docker: `docker compose up --build`. Configuration comes from environment variables;
+see [.env.example](.env.example).
+
 ## Documentation
 
 Start at [docs/INDEX.md](docs/INDEX.md).
