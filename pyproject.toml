@@ -38,6 +38,7 @@ packages = ["src/pii_guard"]
 [dependency-groups]
 dev = [
     "hypothesis>=6.170.12",
+    "openai>=3.39.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.2",
