@@ -1,0 +1,15 @@
+# Local API on http://127.0.0.1:8787. Configuration comes from .env (see .env.example).
+services:
+  api:
+    build: .
+    image: pii-guard:dev
+    ports:
+      - "127.0.0.1:8787:8787"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PII_GUARD_HOST: 0.0.0.0
+      PII_GUARD_PORT: "8787"
+    read_only: true
+    restart: unless-stopped
