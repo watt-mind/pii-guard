@@ -122,7 +122,7 @@ LLM Guard pins `transformers==4.51.3` and Presidio 2.2.358; PrivAiTe needs
 worker (`src/pii_guard/eval/baselines/workers/`) in an ephemeral `uv` environment built from
 pinned requirements (`src/pii_guard/eval/baselines/envs/*.txt`, compiled from `*.in` with
 `uv pip compile --universal --python-version 3.12 --no-header --no-annotate X.in -o X.txt`).
-pii-guard's own dependencies are unchanged. Documents reach a worker over a local pipe; the
+pii-guard's own dependencies are unchanged. Presidio caps `numpy` below 2.5, so the `baselines` extra is declared as conflicting with the `ner` extra (`[tool.uv] conflicts`): uv resolves each on its own and the two can't be installed together. Documents reach a worker over a local pipe; the
 only network traffic is the first-run download of packages and models (Hugging Face Hub,
 spaCy wheels). Workers get no credentials from the environment, telemetry switches are set,
 and their stderr is discarded (the tools log detected values) unless
