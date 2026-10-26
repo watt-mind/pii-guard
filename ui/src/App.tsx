@@ -4,7 +4,7 @@ import { createHttpClient, type HttpGuardClient } from "./api/http";
 import { createMockClient } from "./api/mock";
 import type { GuardClient } from "./api/types";
 import { Header, type Screen } from "./components/Header";
-import { DEFAULT_SAMPLE, SAMPLES, type Sample } from "./data/samples";
+import { DEFAULT_SAMPLE, SAMPLES, type Sample } from "./content/samples";
 import { useEngine } from "./hooks/useEngine";
 import { useTheme } from "./hooks/useTheme";
 import { initialAnswer, runGuard, toRunError, type RunError, type RunResult } from "./lib/run";

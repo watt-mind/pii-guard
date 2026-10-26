@@ -7,7 +7,7 @@ import { Placeholder } from "../components/Placeholder";
 import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
-import { SAMPLES } from "../data/samples";
+import { SAMPLES } from "../content/samples";
 import { valuesByPlaceholder } from "../lib/analysis";
 import { metaFor } from "../lib/entities";
 import { tokenize } from "../lib/placeholders";

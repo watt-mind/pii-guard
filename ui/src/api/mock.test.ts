@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SAMPLES } from "../data/samples";
+import { SAMPLES } from "../content/samples";
 import { placeholderRegex } from "../lib/placeholders";
 import { ApiError } from "./http";
 import { createMockClient, MOCK_SESSION_PREFIX, validHuTaj, validHuTaxId, validIban } from "./mock";

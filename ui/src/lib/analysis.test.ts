@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createMockClient } from "../api/mock";
-import { SAMPLES } from "../data/samples";
+import { SAMPLES } from "../content/samples";
 import { fillAnswerTemplate, genericAnswer, linkPlaceholders, toLocalSpans, type PlaceholderLink } from "./analysis";
 
 /** Every original value that was masked must be absent from the simulated answer. */

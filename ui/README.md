@@ -87,7 +87,7 @@ pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test --run
 | `src/lib/stream.ts` | Chunked streaming simulation |
 | `src/components/` | Highlighting, placeholders, legend, entity table, panes |
 | `src/screens/` | Playground and Round trip |
-| `src/data/samples.ts` | Fictional Hungarian sample documents and answers |
+| `src/content/samples.ts` | Fictional Hungarian sample documents and answers |
 
 Offsets from the API are code-point indices (Python `str`); the UI converts them to UTF-16
 before slicing, so emoji and other non-BMP characters don't shift highlights.

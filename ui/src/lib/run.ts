@@ -1,7 +1,7 @@
 import type { EngineKind, RoutingClient } from "../api/engine";
 import { ApiError, UnreachableError } from "../api/http";
 import type { MaskResponse } from "../api/types";
-import type { Sample } from "../data/samples";
+import type { Sample } from "../content/samples";
 import {
   attachPlaceholders,
   fillAnswerTemplate,

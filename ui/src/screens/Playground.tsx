@@ -9,7 +9,7 @@ import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
 import { Popover } from "../components/Popover";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
-import { SAMPLES, type Sample } from "../data/samples";
+import { SAMPLES, type Sample } from "../content/samples";
 import { detectorsUsed, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
 import type { RunError, RunResult } from "../lib/run";
 
