@@ -23,15 +23,22 @@ release.
 
 Look-alikes are rejected on purpose: wrong check digits, digits that are part of a longer
 digit run (``12345678901`` contains no 10-digit tax ID), and dates.
+
+The one exception is a number right after a strong cue word (``TAJ``, ``passport``,
+``telefon``): every pack's ``cues.tsv`` lists them, and :mod:`pii_guard.languages.cues` masks
+such a number as the cued type even when its checksum fails, at a lower score, unless a
+validated rule already covers it (``PII_GUARD_RULES_CUED_NUMBERS``, default on).
 """
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 
 from pii_guard.detect.rules import common
 from pii_guard.detect.rules._base import Rule, _Hit
 from pii_guard.languages import packs, primary_language
+from pii_guard.languages.cues import Cue, CueMatcher, load_cues, matcher_for
 from pii_guard.types import DetectionError, Span
 
 __all__ = [
@@ -104,7 +111,7 @@ class RuleDetector:
 
     name = "rules"
 
-    def __init__(self) -> None:
+    def __init__(self, *, cued_numbers: bool | None = None) -> None:
         packs = rule_packs()
         #: Run for every language: language-independent rules + every pack's ``everywhere``.
         self._rules: tuple[Rule, ...] = common.RULES + tuple(
@@ -114,22 +121,55 @@ class RuleDetector:
         self._language_rules: dict[str, tuple[Rule, ...]] = {
             code: pack.rules for code, pack in packs.items()
         }
+        if cued_numbers is None:
+            from pii_guard.config import get_settings
+
+            cued_numbers = get_settings().rules_cued_numbers
+        #: Every pack's cue words (``cues.tsv``), or empty when cued numbers are off.
+        self.cued_numbers = cued_numbers
+        self._cues: tuple[tuple[str, tuple[Cue, ...]], ...] = _pack_cues() if cued_numbers else ()
+        self._matchers: dict[str, CueMatcher] = {}
+        self._lock = threading.Lock()
 
     def rules_for(self, language: str) -> tuple[Rule, ...]:
         """Every rule that runs for a text in ``language``."""
         return self._rules + self._language_rules.get(primary_language(language), ())
+
+    def cue_matcher(self, language: str) -> CueMatcher | None:
+        """The cued-number matcher for a text in ``language`` (its own cues win conflicts)."""
+        if not self._cues:
+            return None
+        code = primary_language(language)
+        with self._lock:
+            matcher = self._matchers.get(code)
+            if matcher is None:
+                matcher = self._matchers[code] = matcher_for(code, self._cues)
+        return matcher
 
     def detect(self, text: str, language: str = "hu") -> list[Span]:
         if not isinstance(text, str):
             raise DetectionError(f"rules detector expects str, got {type(text).__name__}")
         try:
             hits = [hit for rule in self.rules_for(language) for hit in rule(text)]
+            matcher = self.cue_matcher(language)
+            if matcher is not None:
+                # A validated hit keeps its span: cued values only fill the gaps.
+                hits += [
+                    cued
+                    for cued in matcher.find(text)
+                    if not any(h.start < cued.end and cued.start < h.end for h in hits)
+                ]
             return [
                 Span(h.start, h.end, h.entity_type, text[h.start : h.end], h.score, self.name)
                 for h in _drop_contained(hits)
             ]
         except Exception as exc:
             raise DetectionError("rules detector failed") from exc
+
+
+def _pack_cues() -> tuple[tuple[str, tuple[Cue, ...]], ...]:
+    """``(code, cues)`` for every pack with a ``cues.tsv``, in pack order."""
+    return tuple((code, load_cues(pack.cues, code)) for code, pack in packs().items() if pack.cues)
 
 
 DETECTOR_CLASS = RuleDetector

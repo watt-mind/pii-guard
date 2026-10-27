@@ -1,0 +1,57 @@
+# Cue words for context-cued numbers (languages/cues.py, LAB-1170); format in hu/cues.tsv.
+phone	PHONE
+telephone	PHONE
+tel	PHONE
+tel.	PHONE
+mobile	PHONE
+cell	PHONE
+fax	PHONE
+call*	PHONE
+card number	BANK_ACCOUNT
+card no.	BANK_ACCOUNT
+credit card	BANK_ACCOUNT
+debit card	BANK_ACCOUNT
+bank card	BANK_ACCOUNT
+account number	BANK_ACCOUNT
+account no.	BANK_ACCOUNT
+bank account	BANK_ACCOUNT
+IBAN	BANK_ACCOUNT
+passport	ID_DOCUMENT
+ID card	ID_DOCUMENT
+ID no.	ID_DOCUMENT
+ID number	ID_DOCUMENT
+national ID	ID_DOCUMENT
+identity card	ID_DOCUMENT
+driving licence	ID_DOCUMENT
+driving license	ID_DOCUMENT
+driver's licence	ID_DOCUMENT
+driver's license	ID_DOCUMENT
+licence number	ID_DOCUMENT
+license number	ID_DOCUMENT
+social security	ID_DOCUMENT
+SSN	ID_DOCUMENT
+tax ID	ID_DOCUMENT
+tax number	ID_DOCUMENT
+tax identification number	ID_DOCUMENT
+national insurance	ID_DOCUMENT
+NINO	ID_DOCUMENT
+order number	-
+order no.	-
+order ID	-
+invoice number	-
+invoice no.	-
+reference	-
+reference number	-
+ref.	-
+tracking number	-
+customer number	-
+booking reference	-
+case number	-
+ticket number	-
+serial number	-
+postcode	-
+zip code	-
+amount	-
+total	-
+and	-
+or	-

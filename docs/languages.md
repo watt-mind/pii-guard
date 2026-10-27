@@ -29,6 +29,7 @@ guide, and every step below points at it.
 | Eval surface forms | `surface_forms` (`SurfaceForms`) | leak rate, corpus spans | exact matching, no stopwords |
 | Lexicons | `lexicons` (`LexiconSpec`) | `pii_guard.lang`, the corpus generator, rules | `LexiconUnavailable` |
 | Document field captions | `captions` (`captions.tsv`) | `visual/captions.py`: the value next to `Név` / `Date of birth` on an ID card is masked | captions in this language not recognised in images |
+| Cue words for numbers | `cues` (`cues.tsv`) | `RuleDetector` via `languages/cues.py`: a number right after `TAJ` or `passport` is masked even when its checksum fails | only the other packs' cues |
 
 The NER and LLM passes are multilingual: a new language needs no model change, only prompt
 notes and a measurement.
@@ -103,6 +104,42 @@ Every German noun is capitalised, so "five digits before a capitalised word" is 
 postcode ("20000 Teilnehmer"); the German postcode rule only fires where an address line
 starts. Hard negatives in the smoke set catch this kind of rule.
 
+**Cue words** (`cues=files(__name__).joinpath("cues.tsv")`, scaffolded with commented
+examples). The rules above only mask what validates, so a card number with a wrong check
+digit or a phone number in an unknown numbering plan is missed even when the text says what
+it is. `cues.tsv` lists the words that say so, one `cue<TAB>ENTITY_TYPE` per line, and a
+number right after one of them is masked as that type at a lower score (0.6), whatever its
+checksum ([languages/cues.py](../src/pii_guard/languages/cues.py)):
+
+```text
+Telefon*	PHONE
+Kreditkarte*	BANK_ACCOUNT
+Steuer-ID	ID_DOCUMENT
+Bestellnummer*	-
+und	-
+```
+
+- The value must have the type's shape (`SHAPES` in `cues.py`: 7–15 digits for a phone,
+  12–34 characters for a card or account, 6–20 letters and digits with at least two digits
+  for a document number ...). A cue may name only a type with a shape; there is no
+  per-language shape to write.
+- Matching ignores case and accents; a space in a cue also matches a hyphen or nothing; a
+  trailing `*` lets the word take suffixes (`Telefonnummer`, `kártyaszámát`). Up to three
+  short words may stand between the cue and the number (`Kreditkarte mit der Nummer`).
+- A `-` cue names a number that is not personal data (order, invoice, customer, reference
+  numbers, amounts, postcodes) or hands the window on (`und`, `oder`): it ends the window, so
+  `Telefon- und Bestellnummer 4500123456` stays unmasked. List the words that introduce
+  numbers in your language's invoices and orders; the conformance suite warns when there are
+  none.
+- Dates, amounts (a currency next to the number) and numbers inside longer runs are rejected,
+  and a validated rule's hit always wins.
+- Cues run for every text, like `EVERYWHERE` rules: a form in your language may carry
+  English labels and the other way round. Pick words that are unambiguous next to a number;
+  when two packs map one cue to different types, the text's own language wins.
+- Check them against `eval/fixtures/negative/` (order numbers, amounts, dates, postcodes and
+  references without a cue: nothing may be masked) and add a `<code>-uncued-numbers.jsonl`
+  there; `PII_GUARD_RULES_CUED_NUMBERS=false` turns the rule off for comparison.
+
 ### 4. Inflection matcher
 
 If names or places take suffixes, the vault must mask `Annas` as `[[PERSON_7f3a]]s` and
@@ -154,7 +191,8 @@ whose value is not personal data, such as `Sex` or `Expiry`: it is still recogni
 bounds the neighbouring fields). Image masking pairs each caption with the value on its right
 or under it and masks that value ([visual/captions.py](../src/pii_guard/visual/captions.py)).
 Write captions as printed, with accents; matching ignores case, accents and punctuation and
-tolerates small OCR errors. The conformance suite checks that the file parses.
+tolerates small OCR errors. The conformance suite checks that the file parses (and
+`cues.tsv`, see [Rules](#3-rules)).
 
 ### 7. Check, measure, document
 

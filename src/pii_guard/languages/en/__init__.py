@@ -34,4 +34,5 @@ def pack() -> LanguagePack:
             kinds=("street_types",),
         ),
         captions=files(__name__).joinpath("captions.tsv"),
+        cues=files(__name__).joinpath("cues.tsv"),
     )
