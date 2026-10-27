@@ -363,4 +363,46 @@ holds no text. Rules (and NER, when configured) run on every request whatever th
 Not covered yet: attacks on the rules themselves (they are deterministic and see the raw
 text, so obfuscated structured identifiers such as a phone number with a zero-width space are
 found only by the LLM), images and documents (OCR output goes through the same text path),
-and attacks on the response side (re-identification).
+and attacks on the response side (re-identification, measured below).
+
+## Re-identification red team
+
+Leak rate asks whether a value survives masking. The red team asks whether a model can get it
+back anyway. `pii-guard eval --redteam` (`pii_guard.eval.redteam`) sends each document's
+masked text to an attacker model (default: Meta's open-weight Muse Spark Open on Baseten,
+`reasoning_effort: low`; any OpenAI-compatible endpoint via `--attacker-url`,
+`--attacker-model`, `--attacker-key-env`) and asks for the original value behind every
+placeholder, as JSON. Two attack contexts:
+
+- `masked-only`: the masked text alone. The attacker has to reconstruct values from clues
+  left in the text (a visible name that spells a masked e-mail, a surname used alone,
+  inflection, formats).
+- `decoys`: every placeholder that hides a labelled value comes with 5 shuffled candidates of
+  its type, the true value and 4 values from other documents of the same corpus (same
+  language first, fixed seed). This is an attacker who holds a customer list and wants to
+  link a masked document to a row; picking at random gives the reported `chance` rate.
+
+Scored per distinct labelled value of a `mask`-policy type (the leak-rate unit): *leaked*
+(survives the masked text, not attacked), *masked* (the targets), *recovered* (a guess equals
+the value after NFKC, case folding and ignoring spaces and punctuation; inflected surface forms
+accepted), *partial* (an identifying token of the value is in the guess). **Re-id rate** =
+recovered / masked; **exposure**, the adversarial leak score, = (leaked + recovered) / values.
+Requests that fail or can't be parsed are counted as `failed` and left out of both. Reports
+break this down per context, language, entity type and document kind, and hold no values,
+guesses or texts. `--redteam-cache DIR` stores answers by request hash, so a re-run costs
+nothing.
+
+**Results** (81 fictional documents in hu, en and de, Muse Spark Open as attacker; full
+tables, the Muse Spark 1.3 comparison and cost in
+[eval/results/2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md)):
+
+| Masking | Context | Re-id | Chance | Exposure |
+|---|---|---:|---:|---:|
+| rules | `masked-only` | 4 / 244 (1.6 %) | – | 43.7 % |
+| rules | `decoys` | 103 / 244 (42.2 %) | 20.0 % | 66.9 % |
+| rules + LLM | `masked-only` | 1 / 421 (0.2 %) | – | 1.4 % |
+| rules + LLM | `decoys` | 165 / 421 (39.2 %) | 20.0 % | 39.9 % |
+
+Placeholders hold against reconstruction from the masked text. They don't prevent linkage:
+with a candidate list the attacker does about twice as well as chance, because the context
+that stays readable narrows the candidates. Masking is pseudonymisation, not anonymisation.

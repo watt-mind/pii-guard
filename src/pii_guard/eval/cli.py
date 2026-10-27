@@ -3,7 +3,7 @@
 ```
 pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language hu[,en]]
                [--json OUT] [--markdown OUT] [--baselines presidio,llm-guard,privaite]
-               [--known-values]
+               [--known-values] [--redteam [--redteam-contexts masked-only,decoys]]
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
 pii-guard eval visual --specimens data/specimens  # visual recall on specimen ID documents
 pii-guard eval injection --detectors rules,llm   # leak rate per prompt-injection attack class
@@ -18,6 +18,9 @@ Fixtures whose documents carry ``meta.attack`` (the prompt-injection sets) also 
 table per attack class (:mod:`pii_guard.eval.injection`).
 ``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
 ``known`` detector), to measure the uplift of pre-loading values an application already knows.
+``--redteam`` then asks an attacker model (Muse Spark Open on Baseten by default) to recover
+the masked values from the masked text, and reports the re-identification rate and exposure
+per context, language and entity type (:mod:`pii_guard.eval.redteam`).
 
 Exit codes: 0 success, 1 a detector or the vault failed during the run, 2 bad arguments,
 unreadable fixtures or no loadable detector.
@@ -85,6 +88,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="pre-load each document's meta.known_values into its session (known detector)",
     )
+    from pii_guard.eval.redteam import add_redteam_arguments
+
+    add_redteam_arguments(parser)
     parser.add_argument("--json", type=Path, metavar="OUT", help="write the JSON scorecard here")
     parser.add_argument(
         "--markdown", type=Path, metavar="OUT", help="also write the Markdown table here"
@@ -128,6 +134,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("pii-guard eval: no fixture documents selected", file=sys.stderr)
         return 2
 
+    attacker = None
+    if args.redteam:  # configuration errors before any detector or model call
+        from pii_guard.eval.redteam import attacker_from_args
+
+        try:
+            attacker = attacker_from_args(args)
+        except PiiGuardError as exc:
+            print(f"pii-guard eval: {exc.message}", file=sys.stderr)
+            return 2
+
     analyzer = DetectorAnalyzer(args.detectors)
     for name, reason in analyzer.skipped:
         print(f"pii-guard eval: warning: skipping detector {name!r}: {reason}", file=sys.stderr)
@@ -165,6 +181,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"\nKnown values pre-loaded from fixture meta: {scorecard['meta']['known_values']} "
             "(`known` detector).\n"
         )
+    if attacker is not None:
+        from pii_guard.eval.redteam import redteam_section
+
+        try:
+            scorecard["redteam"], section = redteam_section(
+                results, args, attacker, analyzer=analyzer
+            )
+        except PiiGuardError as exc:
+            print(f"pii-guard eval: red team failed: {exc.code}: {exc.message}", file=sys.stderr)
+            return 1
+        markdown += section
     if args.baselines:
         from pii_guard.eval.baselines import render_comparison, run_baselines
 
