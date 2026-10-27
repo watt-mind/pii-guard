@@ -3,6 +3,8 @@ import {
   documentCount,
   formatMs,
   formatPct,
+  headline,
+  type HeadlineSide,
   languageName,
   loadBenchmarks,
   originLabel,
@@ -90,6 +92,8 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         <Fact label="Fixture sets" value={`${sets.length} text + ${Object.values(index.fixture_sets).filter((f) => f.kind === "visual").length} image`} />
         <Fact label="Latest run" value={lastRun} />
       </dl>
+
+      <Headline index={index} set={set} lang={lang} />
 
       <section aria-label="Filters" className="space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5">
         <Segmented
@@ -224,6 +228,30 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         <code className="font-mono">pii-guard eval --record &lt;slug&gt;</code>.
       </p>
     </>
+  );
+}
+
+function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; lang: LanguageFilter }) {
+  const h = headline(index, set, lang);
+  if (!h) return null;
+  const side = (x: HeadlineSide) => (
+    <>
+      <strong className="font-semibold text-ink">{x.label}</strong> leaks <strong className="font-semibold tabular-nums text-ink">{formatPct(x.leak)}</strong>
+      {x.p50 !== null && (
+        <span className="text-muted">
+          {" "}
+          ({formatMs(x.p50)} per document{x.hardware ? ` on ${x.hardware}` : ""})
+        </span>
+      )}
+    </>
+  );
+  const scope = lang === "all" ? set : `${set}, ${languageName(lang)}`;
+  return (
+    <p className="rounded-2xl border border-guard/30 bg-guard-soft/60 px-4 py-3 text-sm text-pretty text-ink sm:text-base" data-testid="bench-headline">
+      <span className="mr-1 text-xs font-semibold tracking-[0.08em] text-guard uppercase">Headline · {scope}</span>
+      <br className="sm:hidden" />
+      Best pii-guard configuration: {side(h.ours)}. Best open-source tool: {side(h.theirs)}. Leak = share of labelled personal values still readable after masking.
+    </p>
   );
 }
 
