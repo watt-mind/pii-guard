@@ -2,8 +2,9 @@
 
 Hungarian, English and German chats, streaming, tool definitions, names pre-loaded as known
 values (with Hungarian inflected forms) and an inline image (refused, fail closed, unless SAM is
-configured). Watch them arrive in the traffic log (``/v1/traffic``) or the UI. In rules-only
-mode nothing leaks except the one scenario labelled "needs fast mode (NER)": an expected miss.
+configured). Watch them arrive in the traffic log (``/v1/traffic``) or the UI. ``make demo``
+runs fast mode (rules + NER), so the scenario labelled "needs fast mode (NER)" is masked too;
+with ``make demo MODE=rules`` it is the one expected miss.
 
     uv run python scripts/demo_traffic.py [--url http://127.0.0.1:8787] [--model NAME]
     uv run python scripts/demo_traffic.py --export-ui   # rewrite the UI's copy of the scenarios
@@ -72,7 +73,8 @@ def labelled_summary(url: str, outcomes: list[Outcome]) -> list[str]:
         else:
             verdict = (
                 "this call ran rules only, so its free-text name reached the model as written: "
-                "an expected miss (set PII_GUARD_NER_MODEL for fast mode with the NER)"
+                "an expected miss (`make demo` runs fast mode with the NER; this stack runs "
+                "rules only, e.g. MODE=rules)"
             )
         lines.append(f"  {o.scenario.name}: {o.scenario.label}; {verdict}")
     return lines

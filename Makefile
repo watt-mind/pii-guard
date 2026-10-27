@@ -1,5 +1,5 @@
 .PHONY: help setup lint format test test-all types gate serve check docker docker-smoke audit licences \
-	pii-diff gitleaks links baselines demo demo-traffic smoke bench wheel wheel-smoke
+	pii-diff gitleaks links baselines demo demo-traffic smoke smoke-fast bench wheel wheel-smoke
 
 help: ## list targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-13s %s\n", $$1, $$2}'
@@ -71,15 +71,24 @@ baselines: ## compare with Presidio, LLM Guard and PrivAiTe (first run downloads
 	uv run --no-sync pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --fixtures eval/fixtures/en-smoke.jsonl \
 		--detectors rules --baselines presidio,llm-guard,privaite
 
-demo: ## start API + gateway + UI on a mock upstream (offline); real upstream if configured
-	uv run --extra local-vision python -m pii_guard.visual.segment fetch
-	uv run --extra local-vision python scripts/demo.py
+# `make demo` runs fast mode: rules + NER. Without PII_GUARD_NER_MODEL the NER is the public
+# fallback model (docs/models.md), downloaded once (about 1.1 GB) into ~/.cache/pii-guard/models.
+# MODE=rules: rules only, offline, no NER extra and no model download.
+MODE ?= fast
+DEMO_EXTRAS := --extra local-vision $(if $(filter rules,$(MODE)),,--extra ner)
+
+demo: ## start API + gateway + UI on a mock upstream, fast mode (rules + NER); MODE=rules: offline
+	uv run $(DEMO_EXTRAS) python -m pii_guard.visual.segment fetch
+	uv run $(DEMO_EXTRAS) python scripts/demo.py --mode $(MODE)
 
 demo-traffic: ## send scripted fictional hu/en/de requests through the running demo gateway
 	uv run python scripts/demo_traffic.py
 
-smoke: ## start the stack on the mock upstream, send the demo traffic, assert nothing leaked
-	uv run python scripts/smoke.py
+smoke: ## rules only (CI): start the stack on the mock upstream, send the demo traffic, no leak
+	uv run python scripts/smoke.py --mode rules
+
+smoke-fast: ## fast mode (local): as smoke with rules + NER, the NER-only scenario must be masked
+	uv run --extra ner python scripts/smoke.py --mode fast
 
 bench: ## gateway latency benchmark on the mock upstream (fast mode, concurrency 1 and 8)
 	uv run pii-guard bench latency

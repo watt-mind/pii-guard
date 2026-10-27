@@ -112,6 +112,7 @@ def test_deprecated_keep_types_still_warn(
 
 def test_default_stack_adds_ner_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(stack, "_ner_available", lambda: True)
+    monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "download")  # the default outside tests
     settings = Settings()
     assert default_detector_names(settings) == ("rules", "ner")
     assert rest_detector_names(settings) == ("rules", "ner")
@@ -152,18 +153,36 @@ def test_ner_settings_reach_the_detector(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("PII_GUARD_NER_MODEL", "./models/fictional-ner")
     monkeypatch.setenv("PII_GUARD_NER_REVISION", "abc123")
     monkeypatch.setenv("PII_GUARD_NER_DEVICE", "cpu")
+    monkeypatch.setenv("PII_GUARD_NER_PUBLISHED_MODEL", "fictional/pii-guard-ner@abc")
     build_detector("ner", Settings())
     assert seen == {
         "name": "ner",
         "model": "./models/fictional-ner",
         "revision": "abc123",
         "device": "cpu",
+        "published": "fictional/pii-guard-ner@abc",
+        "fallback": "cached",
     }
     seen.clear()
-    monkeypatch.delenv("PII_GUARD_NER_REVISION")
-    monkeypatch.delenv("PII_GUARD_NER_DEVICE")
+    for name in ("REVISION", "DEVICE", "PUBLISHED_MODEL", "FALLBACK"):
+        monkeypatch.delenv(f"PII_GUARD_NER_{name}")
     build_detector("ner", Settings())
-    assert seen == {"name": "ner", "model": "./models/fictional-ner"}
+    assert seen == {"name": "ner", "model": "./models/fictional-ner", "fallback": "download"}
+
+
+def test_default_stack_without_a_resolvable_model_is_rules_only(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The extra is there but the fallback is off (or not cached): rules only, one warning."""
+    monkeypatch.setattr(stack, "_ner_available", lambda: True)
+    monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "off")
+    with caplog.at_level(logging.WARNING, logger="pii_guard.detect.stack"):
+        assert default_detector_names(Settings()) == ("rules",)
+    assert "PII_GUARD_NER_FALLBACK=off" in caplog.text
+    monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "cached")  # empty model cache (conftest)
+    assert default_detector_names(Settings()) == ("rules",)
+    monkeypatch.setenv("PII_GUARD_NER_MODEL", "./models/fictional-ner")
+    assert default_detector_names(Settings()) == ("rules", "ner")
 
 
 @pytest.mark.parametrize(

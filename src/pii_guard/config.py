@@ -54,9 +54,16 @@ class Settings(BaseSettings):
 
     # NER detector (the "ner" extra): hub id or local directory, hub revision, and device
     # (auto|cpu|mps|cuda). A set model makes a missing "ner" extra stop startup (ADR 0006).
+    # Unset, fast mode resolves (pii_guard.detect.ner_resolve, docs/models.md): the published
+    # pii-guard checkpoint ("repo" or "repo@revision"; none is published yet, LAB-1137), else
+    # the public fallback, fetched once into ~/.cache/pii-guard/models (PII_GUARD_MODELS_DIR).
+    # ner_fallback: "download" fetches it on first use, "cached" only uses it when already
+    # there, "off" never uses it (fast mode is then rules only).
     ner_model: str | None = None
     ner_revision: str | None = None
     ner_device: str | None = None
+    ner_published_model: str | None = None
+    ner_fallback: Literal["download", "cached", "off"] = "download"
 
     # Upstream LLM the gateway forwards masked requests to (OpenAI-compatible).
     upstream_base_url: str | None = None

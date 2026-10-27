@@ -83,6 +83,19 @@ CANDIDATES: dict[str, dict[str, Any]] = {
         "gliner": ("gliner-multi-v2-ft", "LAB-1150 fine-tune of gliner_multi-v2.1, not published"),
         "ai4privacy_train": True,
     },
+    "bardsai-eu-pii-v1": {
+        "label": "pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang)",
+        "ner": (
+            "eu-pii-anonimization-multilang",
+            "bardsai/eu-pii-anonimization-multilang (Apache-2.0), revision 62ca5712, LAB-1192",
+        ),
+        "ai4privacy_train": True,
+        "ai4privacy_note": (
+            "This NER's model card lists ai4privacy/pii-masking-openpii-1m among its training "
+            "data without naming the split, so the ai4privacy scorecard (validation rows) is "
+            "not an out-of-distribution check for it; the hand-written smoke sets are."
+        ),
+    },
     "xlmr-base-v2-hn-gliner-union": {
         "label": "pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150)",
         "ner": ("xlmr-base-v2-hn", "LAB-1150, 10 types, not published"),
@@ -155,7 +168,7 @@ def records_for(card: Mapping[str, Any], fixture: str, candidate: str) -> list[d
                 f["generator"] = f"{public} (not Muse)"
             record["notes"].extend(_PUBLIC_NOTES.get(record["fixture_set"], []))
             if spec["ai4privacy_train"]:
-                record["notes"].append(NOT_OOD)
+                record["notes"].append(spec.get("ai4privacy_note", NOT_OOD))
     return records
 
 

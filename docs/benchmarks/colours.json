@@ -2,6 +2,7 @@
   "about": "Stable chart colours, maintained by `pii-guard eval report`: a new system takes the least-used palette entry, existing entries never change. Edit a value by hand only to recolour a system on purpose.",
   "latency": {
     "gateway-latency:fast:rules": "#0072B2",
+    "gateway-latency:fast:rules+ner:bardsai/eu-pii-anonimization-multilang": "#CC79A7",
     "gateway-latency:fast:rules+ner:pii-guard-ner-xlmr-large-distilled": "#009E73",
     "gateway-latency:strict:rules+llm:muse-spark-open": "#D55E00"
   },
@@ -56,6 +57,10 @@
     },
     "rules+llm:muse-spark-open@reasoning_effort=low": {
       "color": "#D55E00",
+      "shape": "circle"
+    },
+    "rules+ner:eu-pii-anonimization-multilang": {
+      "color": "#882255",
       "shape": "circle"
     },
     "rules+ner:xlm-roberta-base-ner-hrl": {

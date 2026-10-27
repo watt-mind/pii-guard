@@ -1,8 +1,11 @@
 """``make demo``: start the mock upstream, the pii-guard API and the UI, print where to go.
 
-Offline by default (mock upstream, rules-only fast mode). See docs/operations.md.
+Fast mode by default: rules + the NER model (the public fallback is downloaded once into
+~/.cache/pii-guard/models; needs the ``ner`` extra). ``--mode rules`` is rules only, offline,
+nothing downloaded. Mock upstream unless one is configured. See docs/operations.md.
 
-    uv run python scripts/demo.py [--no-ui] [--mock] [--traffic-log masked|full]
+    uv run --extra ner python scripts/demo.py [--mode fast|rules] [--no-ui] [--mock]
+        [--traffic-log masked|full]
 """
 
 from __future__ import annotations
@@ -11,11 +14,17 @@ import argparse
 import signal
 import sys
 
-from demo_stack import Stack, banner, plan
+from demo_stack import MODES, Stack, banner, plan, prepare_ner
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument(
+        "--mode",
+        choices=MODES,
+        default="fast",
+        help="fast: rules + NER (default); rules: rules only, offline, no model download",
+    )
     parser.add_argument("--no-ui", action="store_true", help="API and mock upstream only")
     parser.add_argument("--mock", action="store_true", help="mock upstream even with a key set")
     parser.add_argument("--traffic-log", choices=["masked", "full"], help="default masked")
@@ -29,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
         traffic_log=args.traffic_log,
         api_port=args.api_port,
         mock_port=args.mock_port,
+        mode=args.mode,
     )
     p.ui_port = args.ui_port
 
@@ -38,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGTERM, interrupt)  # stop the stack on `kill` too, not only Ctrl-C
     signal.signal(signal.SIGINT, interrupt)
     try:
+        prepare_ner(p)
         with Stack(p) as stack:
             print(banner(p), flush=True)
             return stack.wait()

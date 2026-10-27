@@ -3,7 +3,11 @@
 # Demo stack (docs/operations.md): docker compose --profile demo up --build
 #   UI http://localhost:5173, demo API + gateway http://127.0.0.1:8788 (traffic log on),
 #   mock upstream (offline). Set PII_GUARD_DEMO_UPSTREAM_URL / _API_KEY for a real upstream.
-#   The local equivalent without Docker is `make demo`.
+#   Fast mode with the NER: the demo image adds the `ner` extra, and the first start downloads
+#   the public fallback NER model (about 1.1 GB, docs/models.md) into the pii-guard-models
+#   volume; demo-api turns healthy once it is loaded. Rules only, offline, no download:
+#   PII_GUARD_DEMO_NER_FALLBACK=off docker compose --profile demo up --build
+#   The local equivalent without Docker is `make demo` (`make demo MODE=rules`).
 # The image ships Tesseract (hun/eng/deu) for the text in images; without OCR, image parts are
 # refused with 503 ocr_unavailable unless PII_GUARD_IMAGE_REQUIRE_OCR=false.
 x-healthcheck: &healthcheck
@@ -11,6 +15,14 @@ x-healthcheck: &healthcheck
   timeout: 3s
   start_period: 10s
   retries: 12
+
+# The demo services share one image with the `ner` extra (torch, transformers).
+x-demo-image: &demo-image
+  image: pii-guard:demo
+  build:
+    context: .
+    args:
+      PII_GUARD_EXTRAS: "ocr local-vision ner"
 
 services:
   api:
@@ -29,8 +41,7 @@ services:
 
   mock-upstream:
     profiles: [demo]
-    image: pii-guard:dev
-    build: .
+    <<: *demo-image
     command: ["pii-guard", "bench", "mock-upstream", "--host", "0.0.0.0", "--port", "8790"]
     read_only: true
     healthcheck:
@@ -39,8 +50,7 @@ services:
 
   demo-api:
     profiles: [demo]
-    image: pii-guard:dev
-    build: .
+    <<: *demo-image
     ports:
       - "127.0.0.1:8788:8787"
     env_file:
@@ -58,19 +68,32 @@ services:
       PII_GUARD_METRICS: "true"
       PII_GUARD_UPSTREAM_BASE_URL: ${PII_GUARD_DEMO_UPSTREAM_URL:-http://mock-upstream:8790/v1}
       PII_GUARD_UPSTREAM_API_KEY: ${PII_GUARD_DEMO_UPSTREAM_API_KEY:-}
-    # A fresh tenant key per container unless .env sets one (pseudonyms are per run).
+      # NER model resolution (docs/models.md): PII_GUARD_NER_MODEL from .env if set, else the
+      # public fallback, downloaded on the first start into the volume below. off: rules only.
+      PII_GUARD_NER_FALLBACK: ${PII_GUARD_DEMO_NER_FALLBACK:-download}
+      PII_GUARD_MODELS_DIR: /app/cache/models
+      HF_HOME: /app/cache/huggingface
+    # A fresh tenant key per container unless .env sets one (pseudonyms are per run). The NER
+    # model is fetched first (progress in the logs; a no-op once it is in the volume).
     command:
       - sh
       - -c
       - >-
         export PII_GUARD_TENANT_KEY="$${PII_GUARD_TENANT_KEY:-$$(python -c 'import secrets; print(secrets.token_hex(32))')}"
+        && python -m pii_guard.detect.ner_resolve fetch
         && exec pii-guard serve
     read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - pii-guard-models:/app/cache
     depends_on:
       mock-upstream:
         condition: service_healthy
     healthcheck:
       <<: *healthcheck
+      # The first start downloads the NER model before the server listens: allow for it.
+      start_period: 900s
       # Healthy = /healthz answers and OCR is available (the image ships Tesseract); prints
       # "ocr on|off". Images are refused (503 ocr_unavailable) without it (ADR 0006).
       test: ["CMD", "python", "-c", "import os, sys, urllib.request; from pii_guard.visual.ocr import tesseract_available as t; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2); ok = t(); print('ocr', 'on' if ok else 'off'); sys.exit(0 if ok or os.environ.get('PII_GUARD_IMAGE_REQUIRE_OCR', 'true').lower() in ('false', '0', 'no', 'off') else 1)"]
@@ -92,3 +115,7 @@ services:
     depends_on:
       demo-api:
         condition: service_healthy
+
+volumes:
+  # Downloaded models (the NER fallback), kept across `docker compose down`; `down -v` drops it.
+  pii-guard-models:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from pii_guard.detect import ner
+from pii_guard.detect import ner, ner_resolve
 from pii_guard.detect.ner import (
     NerDetector,
     RawEntity,
@@ -270,9 +270,45 @@ def test_model_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     assert detector.model == "/models/custom"
     assert detector.revision is None
     monkeypatch.delenv(ner.MODEL_ENV_VAR)
+    monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "download")
     default = NerDetector(backend=FakeBackend())
-    assert (default.model, default.revision) == (ner.DEFAULT_MODEL, ner.DEFAULT_REVISION)
+    # Unset: the public fallback, loaded from its pinned directory in the model cache.
+    fallback = ner_resolve.PUBLIC_FALLBACK
+    assert (default.model, default.revision) == (str(fallback.local_dir()), None)
+    assert fallback.repo_id == ner.DEFAULT_MODEL
+    assert default.choice is not None and default.choice.source == "fallback"
     assert "custom" not in repr(default)
+    # Pinned hub id given explicitly: the pinned revision applies.
+    hub = NerDetector(model=ner.DEFAULT_MODEL, backend=FakeBackend())
+    assert hub.revision == ner.DEFAULT_REVISION
+
+
+def test_unresolved_model_refuses_to_load(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "off")
+    monkeypatch.setattr(ner, "dependencies_available", lambda: True)
+    with pytest.raises(DetectionError, match="PII_GUARD_NER_FALLBACK=off"):
+        NerDetector()
+    assert NerDetector(backend=FakeBackend()).detect("Teszt Elek ír.") is not None
+
+
+def test_missing_fallback_is_downloaded_on_first_load(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "download")
+    monkeypatch.setattr(ner, "dependencies_available", lambda: True)
+    fetched: list[str] = []
+
+    def fake_ensure(choice: ner_resolve.NerChoice) -> str:
+        fetched.append(choice.source)
+        return "/models/fetched"
+
+    built: list[str] = []
+    monkeypatch.setattr(ner_resolve, "ensure", fake_ensure)
+    monkeypatch.setattr(
+        ner, "TransformersBackend", lambda model, **_: built.append(model) or FakeBackend()
+    )
+    detector = NerDetector(preload=False)
+    assert fetched == [] and built == []
+    detector.load()
+    assert (fetched, built) == (["fallback"], ["/models/fetched"])
 
 
 # -- registry and pipeline --
