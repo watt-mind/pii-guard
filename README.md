@@ -26,17 +26,19 @@ then open http://localhost:5173. [More ways to run it](#try-it).
   <img src="docs/assets/demo/demo.webp" alt="Demo in the dark theme with fictional English data: a support e-mail is masked, a chat goes through the gateway and comes back restored, then the live traffic view shows each call, its masks and its latency" width="100%">
 </p>
 
-<p align="center"><sub>Recorded from <code>make demo</code>: fast mode, mock upstream that echoes the masked text back (with a key, the same flow runs on Muse Spark). <b>Video:</b> <i>coming soon</i><!-- LAB-1123: video link --></sub></p>
+<p align="center"><sub>Recorded from <code>make demo</code> in fast mode; the offline mock upstream echoes the masked text back (with a key, the same flow runs on Muse Spark). <b>▶ Video walkthrough:</b> <i>link coming with the submission</i><!-- LAB-1123: video link --></sub></p>
 
 ## Meta's large models teach, Meta's small open model runs
 
 | Job | Meta model | Evidence |
 |---|---|---|
-| **Runs in production (fast mode):** finds names, addresses and dates in process, no API call, no data leaves the machine | **XLM-RoBERTa** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels; 36 ms p50 on a laptop GPU, 241 ms CPU-only | [latency](eval/results/ner/distilled/latency-large.json), [training](docs/models.md#distilled-from-muse-glimmer) |
-| **Teaches it:** labels 4,964 fictional documents for distillation; the audit-mode upper bound | **Muse Glimmer 30B** (open weights, Apache-2.0); **Muse Spark Open** (open weights) on Baseten partner inference | [Glimmer run](eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [audit runs](docs/benchmarks.md#smoke) |
+| **Runs in production (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels: 36 ms p50 on an Apple-silicon GPU, 241 ms CPU-only | [latency](eval/results/ner/distilled/latency-large.json), [training](docs/models.md#distilled-from-muse-glimmer) |
+| **Teaches it, and audits:** labels 4,964 fictional documents for distillation; the optional audit mode and upper bound | **Muse Glimmer 30B** (open weights, Apache-2.0); **Muse Spark Open** (open weights) on Baseten partner inference | [Glimmer run](eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [audit runs](docs/benchmarks.md#smoke) |
 | **Sees images:** faces, ID photos and signatures, filled before the image leaves | **SAM 3.1** (Meta Model API), with OCR for printed text | [specimen results](eval/results/visual/specimens.md) |
-| **Writes the benchmark, attacks the guard:** fictional documents around fictional people; tries to re-identify the people behind masked text | **Muse** (Wonder, Spark 1.3); **Muse Spark Open** as the attacker | [models](docs/models.md#which-model-does-what), [red team](eval/results/2026-10-27-redteam/README.md) |
-| **Answers in the demo:** the downstream model, which only ever sees placeholders | **Muse Spark 1.3** (Meta Model API) | [gateway](docs/architecture-gateway.md) |
+
+**Muse** (Wonder, Spark 1.3) also writes the fictional benchmark ([models](docs/models.md#which-model-does-what)),
+**Muse Spark Open** red-teams the masking ([red team](eval/results/2026-10-27-redteam/README.md)), and
+**Muse Spark 1.3** is the demo's downstream model, which only ever sees placeholders.
 
 The rule behind it: anything that sees real personal data is an open-weight model you can run
 yourself; hosted models only see fictional or already-masked text. All jobs, with status:
@@ -49,7 +51,7 @@ what the model receives (lower is safer). Copied from the generated
 [docs/benchmarks.md](docs/benchmarks.md#results-by-fixture-set); every row there names its run
 records.
 
-| System | Leak, hand-written (51 docs) | Precision | Leak, [ai4privacy](docs/benchmarks.md#ai4privacy) (600 docs) | Precision | Detect p50 | Per message |
+| System | Leak, hand-written (51 docs) | Precision | Leak, [ai4privacy](docs/benchmarks.md#ai4privacy) (600 docs) | Precision | Detect p50 (hand-written, shared CPU) | Per message |
 |---|---:|---:|---:|---:|---:|---|
 | **pii-guard fast** (rules + NER) | **0.6 %** | 98.5 % | 27.6 % | 92.8 % | 94 ms | on-device, $0 |
 | pii-guard audit (`strict` mode: + Muse Spark Open) | 0.6 % | 97.0 % | **3.9 %** | 92.5 % | 1.9 s | one Baseten call |
