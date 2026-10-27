@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     # Model endpoints.
     llm_detector_url: str | None = None
     llm_detector_api_key: SecretStr | None = None
+    # Model name the LLM detector requests; unset uses the detector's built-in default.
+    llm_detector_model: str | None = None
     # Sent as chat_template_kwargs.reasoning_strength (low|medium|high|xhigh). Muse Glimmer on
     # vLLM reads this instead of reasoning_effort; unset sends nothing.
     llm_detector_reasoning_strength: str | None = None
