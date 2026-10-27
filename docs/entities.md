@@ -63,7 +63,7 @@ cued type even when its checksum fails or its phone numbering plan is unknown, a
 (phone 7–15 digits, card or account 12–34 characters, tax ID 10–11 digits, TAJ 9 digits,
 document numbers 6–20 letters and digits with at least two digits); dates, amounts and
 numbers after an order, invoice or reference cue are never masked
-([languages.md](languages.md#3-rules)). Measured in [journey.md](journey.md) (milestone 26).
+([languages.md](languages.md#3-rules)). Measured in [journey.md](journey.md) (milestone 28).
 
 ### Hungarian (`hu`)
 
