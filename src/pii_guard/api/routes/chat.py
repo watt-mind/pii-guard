@@ -19,6 +19,7 @@ from starlette.responses import Response
 
 from pii_guard.api.deps import get_max_text_chars, get_vault
 from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
+from pii_guard.api.routes.image_masking import image_workers_for
 from pii_guard.gateway import Gateway, InvalidChatRequestError
 
 __all__ = ["get_gateway", "router"]
@@ -53,6 +54,7 @@ def get_gateway(request: Request) -> Gateway:
                     detectors=getattr(state, "gateway_detectors", None),
                     transport=getattr(state, "gateway_transport", None),
                     observability=getattr(state, "observability", None),
+                    image_workers=image_workers_for(state, state.settings.image_concurrency),
                 )
                 state.gateway = gateway
     return gateway

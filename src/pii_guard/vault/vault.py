@@ -7,6 +7,8 @@ and errors carry entity types, counts and placeholder ids only (AGENTS.md, ADR 0
 
 from __future__ import annotations
 
+import copy
+import heapq
 import itertools
 import logging
 import re
@@ -44,6 +46,7 @@ if TYPE_CHECKING:
     from pii_guard.config import Settings
 
 __all__ = [
+    "DEFAULT_MAX_SESSIONS",
     "DEFAULT_TTL_SECONDS",
     "MIN_TENANT_KEY_BYTES",
     "MaskResult",
@@ -69,6 +72,8 @@ class PlaceholderInInputError(MaskingError):
 
 
 DEFAULT_TTL_SECONDS = 3600.0
+#: Most live sessions a vault holds; a new one beyond it evicts the least recently used.
+DEFAULT_MAX_SESSIONS = 10_000
 MIN_TENANT_KEY_BYTES = 16
 
 
@@ -272,6 +277,9 @@ class VaultSession:
         self._closed = False
         self._expires_at = clock() + ttl_seconds
         self._known = KnownValues()
+        # A fork (:meth:`fork`) records its successful writes here, for :meth:`commit`.
+        self._journal: list[tuple[str, tuple[Span, ...], str, bool, str]] | None = None
+        self._parent: VaultSession | None = None
 
     def __repr__(self) -> str:
         return (
@@ -313,6 +321,51 @@ class VaultSession:
             self.close()
             raise SessionNotFoundError("vault session not found or expired")
         self._expires_at = self._clock() + self._ttl
+
+    # --- staged writes -------------------------------------------------------------------
+
+    def fork(self) -> VaultSession:
+        """A private copy to mask in; nothing reaches this session until :meth:`commit`.
+
+        Image work runs in a worker thread that may outlive its request (a timeout): it
+        masks into a fork, and only a request that succeeded commits it, so a refused or
+        timed-out image registers nothing here (LAB-1207). Known values are shared, read-only.
+        """
+        with self._lock:
+            self._check_alive()
+            fork = VaultSession(
+                self.session_id,
+                self._tenant_key,
+                ttl_seconds=self._ttl,
+                id_length=self._id_length,
+                clock=self._clock,
+                case_sensitive_placeholders=self._case_sensitive,
+            )
+            memo: dict[int, Any] = {}
+            fork._by_key = copy.deepcopy(self._by_key, memo)
+            fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
+            fork._reserved = set(self._reserved)
+            fork._known = self._known
+            fork._journal = []
+            fork._parent = self
+            return fork
+
+    def commit(self, fork: VaultSession) -> None:
+        """Apply a :meth:`fork`'s writes to this session, in order.
+
+        Placeholders are derived from the tenant key, the session id and the value, so the
+        replay issues the placeholders the fork printed. If a concurrent request changed
+        this session so that the replay comes out differently, raises :class:`MaskingError`
+        (fail closed: the caller must not use the fork's output).
+        """
+        if fork._parent is not self or fork._journal is None:
+            raise ValueError("not a fork of this session")
+        journal, fork._journal = fork._journal, None
+        with self._lock:
+            for text, spans, language, remask, expected in journal:
+                result = self.mask_with_report(text, spans, language=language, remask=remask)
+                if result.text != expected:
+                    raise MaskingError("the session changed while an image was masked")
 
     # --- masking -------------------------------------------------------------------------
 
@@ -371,10 +424,13 @@ class VaultSession:
             added = foreign - self._reserved
             self._reserved |= added
             try:
-                return self._mask_validated(text, ordered, language)
+                result = self._mask_validated(text, ordered, language)
             except BaseException:
                 self._reserved -= added
                 raise
+            if self._journal is not None:
+                self._journal.append((text, tuple(spans), language, remask, result.text))
+            return result
 
     def _foreign_tokens(self, text: str, remask: bool) -> set[str]:
         """Placeholder-shaped tokens in ``text`` this session didn't issue.
@@ -692,6 +748,12 @@ class Vault:
     the initial hex length of placeholder ids (collisions extend it).
     ``case_sensitive_placeholders`` gives each casing class of a value its own placeholder
     (see :meth:`VaultSession.mask`). ``clock`` is injectable for tests.
+
+    ``max_sessions`` caps the live sessions (every ``/v1/mask`` without a ``session_id``
+    creates one): creating one more **evicts the least recently used** session (the one
+    whose sliding TTL ends first), which is closed like an expired one, so its later use is
+    ``404 session_not_found``. Eviction rather than 429 keeps the service up under a flood;
+    a client whose idle session was evicted starts a new one.
     """
 
     def __init__(
@@ -702,6 +764,7 @@ class Vault:
         id_length: int = DEFAULT_ID_LENGTH,
         clock: Callable[[], float] = time.monotonic,
         case_sensitive_placeholders: bool = False,
+        max_sessions: int = DEFAULT_MAX_SESSIONS,
     ) -> None:
         if not isinstance(tenant_key, bytes | bytearray):
             raise TypeError("tenant_key must be bytes")
@@ -711,6 +774,9 @@ class Vault:
             raise ValueError("ttl_seconds must be positive")
         if not MIN_ID_LENGTH <= id_length <= MAX_ID_LENGTH:
             raise ValueError(f"id_length must be in [{MIN_ID_LENGTH}, {MAX_ID_LENGTH}]")
+        if max_sessions < 1:
+            raise ValueError("max_sessions must be at least 1")
+        self._max_sessions = max_sessions
         self._tenant_key = bytes(tenant_key)
         self._ttl = ttl_seconds
         self._id_length = id_length
@@ -724,12 +790,13 @@ class Vault:
         """A vault keyed by ``PII_GUARD_TENANT_KEY``. Fails closed if the key is unset.
 
         ``PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS`` sets ``case_sensitive_placeholders``
-        unless ``kwargs`` does.
+        and ``PII_GUARD_VAULT_MAX_SESSIONS`` sets ``max_sessions``, unless ``kwargs`` does.
         """
         key = settings.tenant_key_bytes()
         if key is None:
             raise MaskingError("PII_GUARD_TENANT_KEY is not set", code="vault_not_configured")
         kwargs.setdefault("case_sensitive_placeholders", settings.vault_case_sensitive_placeholders)
+        kwargs.setdefault("max_sessions", settings.vault_max_sessions)
         return cls(key, **kwargs)
 
     def __repr__(self) -> str:
@@ -751,6 +818,7 @@ class Vault:
         with self._lock:
             self._purge_locked()
             if session_id is None:
+                self._evict_locked(self._max_sessions - 1)
                 session_id = f"s_{secrets.token_hex(16)}"
                 session = VaultSession(
                     session_id,
@@ -779,6 +847,19 @@ class Vault:
         """Drop every expired session; returns how many were dropped."""
         with self._lock:
             return self._purge_locked()
+
+    def _evict_locked(self, keep: int) -> None:
+        """Close the least recently used sessions until at most ``keep`` are left."""
+        excess = len(self._sessions) - keep
+        if excess <= 0:
+            return
+        oldest = heapq.nsmallest(
+            excess, self._sessions.items(), key=lambda item: item[1]._expires_at
+        )
+        for sid, session in oldest:
+            del self._sessions[sid]
+            session.close()
+        logger.info("vault: evicted %d least recently used session(s)", len(oldest))
 
     def _purge_locked(self) -> int:
         stale = [sid for sid, session in self._sessions.items() if session.expired]

@@ -74,6 +74,16 @@ class Settings(BaseSettings):
     # be checked, so image parts are refused with 503 ocr_unavailable. False forwards them
     # masked by SAM only, with X-PII-Guard-Image-OCR: off (text in the image unchecked).
     image_require_ocr: bool = True
+    # Resource limits for image work (LAB-1207). Images above max_pixels are refused with 413
+    # (OCR time and memory grow with pixels); at most image_concurrency images are masked at
+    # once per app, each request within image_timeout seconds (POST /v1/mask/image; the
+    # gateway uses PII_GUARD_GATEWAY_IMAGE_TIMEOUT), Tesseract killed when it runs out.
+    image_max_pixels: int = Field(default=16_000_000, ge=1)
+    image_concurrency: int = Field(default=2, ge=1)
+    image_timeout: float = Field(default=120.0, gt=0)
+
+    # Most live vault sessions; one more evicts the least recently used (docs/operations.md).
+    vault_max_sessions: int = Field(default=10_000, ge=1)
 
     # Model endpoints.
     llm_detector_url: str | None = None

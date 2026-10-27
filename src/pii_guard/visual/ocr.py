@@ -15,9 +15,12 @@ Fail closed (ADR 0006): a missing engine, an OCR failure or a detector failure r
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import shutil
-from collections.abc import Sequence
+import time
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -42,9 +45,12 @@ from pii_guard.visual.regions import Box, Region
 __all__ = [
     "OcrEngine",
     "OcrText",
+    "OcrTimeoutError",
     "OcrWord",
     "TesseractOcr",
     "TextFinding",
+    "check_deadline",
+    "deadline",
     "join_words",
     "ocr_text",
     "tesseract_available",
@@ -77,6 +83,44 @@ class OcrEngine(Protocol):
     name: str
 
     def words(self, image: Image.Image) -> list[OcrWord]: ...
+
+
+class OcrTimeoutError(DetectionError):
+    """The image work ran past its deadline (:func:`deadline`): fail closed, 503."""
+
+
+#: Absolute ``time.monotonic()`` by which the current image work must finish (None: no limit).
+_DEADLINE: contextvars.ContextVar[float | None] = contextvars.ContextVar(
+    "pii_guard_image_deadline", default=None
+)
+
+
+@contextmanager
+def deadline(at: float | None) -> Iterator[None]:
+    """Bound the OCR (and the checks of :func:`check_deadline`) in this context by ``at``.
+
+    ``at`` is a ``time.monotonic()`` value. Tesseract gets the remaining time as its
+    subprocess timeout, so a slow image is killed rather than left running. Image work runs in
+    its own worker thread, so this context is that call's alone.
+    """
+    token = _DEADLINE.set(at)
+    try:
+        yield
+    finally:
+        _DEADLINE.reset(token)
+
+
+def remaining() -> float | None:
+    """Seconds left before the current deadline (``None``: no deadline)."""
+    at = _DEADLINE.get()
+    return None if at is None else at - time.monotonic()
+
+
+def check_deadline() -> None:
+    """Raise :class:`OcrTimeoutError` once the current deadline has passed."""
+    left = remaining()
+    if left is not None and left <= 0:
+        raise OcrTimeoutError("image masking ran past its deadline")
 
 
 def tesseract_available() -> bool:
@@ -133,18 +177,27 @@ class TesseractOcr:
             import pytesseract
         except ImportError as exc:
             raise DetectionError("OCR unavailable: install the 'ocr' extra") from exc
+        check_deadline()
         scale = self.scale_for(image.size)
         source = image
         if scale > 1.0:
             target = (round(image.width * scale), round(image.height * scale))
             source = image.resize(target, Image.Resampling.LANCZOS)
+        check_deadline()
+        left = remaining()
         try:
             data = pytesseract.image_to_data(
                 source,
                 lang=self.lang,
                 config=self.config,
                 output_type=pytesseract.Output.DICT,
+                # pytesseract kills the subprocess when it runs out (0: no limit).
+                timeout=max(left, 0.01) if left is not None else 0,
             )
+        except RuntimeError as exc:
+            if "timeout" in str(exc).lower():
+                raise OcrTimeoutError("OCR ran past the image deadline") from None
+            raise DetectionError(f"OCR failed ({type(exc).__name__})") from exc
         except Exception as exc:
             raise DetectionError(f"OCR failed ({type(exc).__name__})") from exc
         words: list[OcrWord] = []

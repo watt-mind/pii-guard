@@ -47,6 +47,7 @@ from pii_guard.api.routes.image_masking import (
     ImageMasker,
     ImageMaskOutcome,
     default_ocr_engine,
+    mask_images_bounded,
     require_ocr,
 )
 from pii_guard.config import Settings
@@ -68,9 +69,9 @@ from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PiiGuardError, Span
 from pii_guard.vault import Vault, VaultSession
 from pii_guard.vault.known import KnownValues
-from pii_guard.visual.labels import VaultMatcher
 from pii_guard.visual.ocr import OcrEngine
 from pii_guard.visual.sam import SamClient
+from pii_guard.workers import BoundedWorkers
 
 __all__ = [
     "ECHO_HEADER",
@@ -236,10 +237,12 @@ class Gateway:
         sam: SamClient | None = None,
         ocr: OcrEngine | None = _UNSET,
         observability: Observability | None = None,
+        image_workers: BoundedWorkers | None = None,
     ) -> None:
         """``sam`` / ``ocr`` mask inline images: default a :class:`SamClient` from the
         settings and Tesseract when installed; ``ocr=None`` turns OCR off (SAM only).
-        ``observability`` receives one traffic event per call (none: nothing recorded)."""
+        ``observability`` receives one traffic event per call (none: nothing recorded).
+        ``image_workers`` runs image masking (default: a pool of ``image_concurrency``)."""
         self.observability = observability
         self.settings = settings
         self.vault = vault
@@ -247,7 +250,10 @@ class Gateway:
         self._detectors = dict(detectors) if detectors is not None else None
         self.cache = cache or DetectionCache(self.config.cache_size)
         self._transport = transport
-        self._semaphore: asyncio.Semaphore | None = None
+        # Blocking detector calls run on one bounded pool per mode (LAB-1207): a slot stays
+        # taken until the thread finishes, so a hung strict-mode detector can't starve fast.
+        self._detect_workers: dict[Mode, BoundedWorkers] = {}
+        self._image_workers = image_workers
         self._sam = sam
         self._ocr = ocr
 
@@ -272,6 +278,7 @@ class Gateway:
             ocr=self._ocr,
             text_detector=detector.detector if self._ocr is not None else None,
             text_detector_names=[detector.mode.value],
+            max_pixels=self.settings.image_max_pixels,
         )
 
     # --- request parsing -----------------------------------------------------------------
@@ -362,13 +369,15 @@ class Gateway:
             pending[key[1]] = (slot.text, [index], key)
 
         if pending:
-            if self._semaphore is None:
-                self._semaphore = asyncio.Semaphore(self.config.concurrency)
-            semaphore = self._semaphore
+            workers = self._detect_workers.get(detector.mode)
+            if workers is None:
+                workers = BoundedWorkers(
+                    self.config.concurrency, f"pii-guard-detect-{detector.mode.value}"
+                )
+                self._detect_workers[detector.mode] = workers
 
             async def run(text: str) -> tuple[list[Span], dict[str, float]]:
-                async with semaphore:
-                    return await asyncio.to_thread(detector.detect, text, language)
+                return await workers.run(detector.detect, text, language)
 
             started = time.perf_counter()
             jobs = list(pending.values())
@@ -482,36 +491,30 @@ class Gateway:
         # No OCR: refuse (503 ocr_unavailable) unless explicitly opted out; nothing is sent.
         require_ocr(masker.ocr, required=self.settings.image_require_ocr)
         render = self.settings.image_render
+        if self._image_workers is None:
+            self._image_workers = BoundedWorkers(self.settings.image_concurrency, "pii-guard-image")
         started = time.perf_counter()
-
-        def run_all() -> list[ImageMaskOutcome]:
-            matcher = VaultMatcher(session, language) if render == "labels" else None
-            out: list[ImageMaskOutcome] = []
-            for slot in images:
-                outcome = masker.mask(slot.data, language, render=render, matcher=matcher)
-                stats.image_masked.update(
-                    {t.value: n for t, n in outcome.counts(Policy.MASK).items()}
-                )
-                stats.image_kept.update(
-                    {t.value: n for t, n in outcome.counts(Policy.KEEP).items()}
-                )
-                out.append(outcome)
-            return out
-
         try:
-            outcomes = await asyncio.wait_for(
-                asyncio.to_thread(run_all), timeout=self.config.image_timeout
+            # Bounded pool, per-request deadline (Tesseract killed), values registered in the
+            # session only once every image succeeded (LAB-1207).
+            outcomes = await mask_images_bounded(
+                masker,
+                [slot.data for slot in images],
+                language,
+                workers=self._image_workers,
+                timeout=self.config.image_timeout,
+                render=render,
+                session=session,
             )
-        except TimeoutError:
-            raise DetectionError(
-                f"image masking timed out after {self.config.image_timeout:g}s"
-            ) from None
         except PiiGuardError:
             raise
         except Exception as exc:
             raise DetectionError(f"image masking failed ({type(exc).__name__})") from exc
         finally:
             stats.image_ms = (time.perf_counter() - started) * 1000
+        for outcome in outcomes:
+            stats.image_masked.update({t.value: n for t, n in outcome.counts(Policy.MASK).items()})
+            stats.image_kept.update({t.value: n for t, n in outcome.counts(Policy.KEEP).items()})
         for number, (slot, outcome) in enumerate(zip(images, outcomes, strict=True), start=1):
             slot.write("data:image/png;base64," + base64.b64encode(outcome.image).decode("ascii"))
             if outcome.summary is not None:
