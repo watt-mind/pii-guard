@@ -9,6 +9,8 @@ Rules are organised by language pack (ADR 0008, ADR 0010):
 
 - :mod:`.common`: language-independent rules (IBAN, email, international phone numbers,
   payment cards), run for every text;
+- :mod:`.secrets`: language-independent ``SECRET`` rules (API keys, tokens, passwords, private
+  keys), run for every text;
 - each language pack (:mod:`pii_guard.languages`, e.g. ``languages/hu/rules.py``) contributes
   ``everywhere`` rules (identifiers with a checksum or a distinctive validated format, run for
   every language: a Hungarian tax ID in an English e-mail is still personal data) and
@@ -36,7 +38,7 @@ import threading
 from bisect import bisect_left
 from dataclasses import dataclass
 
-from pii_guard.detect.rules import common
+from pii_guard.detect.rules import common, secrets
 from pii_guard.detect.rules._base import Rule, _Hit
 from pii_guard.languages import packs, primary_language
 from pii_guard.languages.cues import Cue, CueMatcher, load_cues, matcher_for
@@ -142,8 +144,10 @@ class RuleDetector:
     def __init__(self, *, cued_numbers: bool | None = None) -> None:
         packs = rule_packs()
         #: Run for every language: language-independent rules + every pack's ``everywhere``.
-        self._rules: tuple[Rule, ...] = common.RULES + tuple(
-            rule for pack in packs.values() for rule in pack.everywhere
+        self._rules: tuple[Rule, ...] = (
+            common.RULES
+            + secrets.RULES
+            + tuple(rule for pack in packs.values() for rule in pack.everywhere)
         )
         #: Run only for their language.
         self._language_rules: dict[str, tuple[Rule, ...]] = {
@@ -184,7 +188,15 @@ class RuleDetector:
                 # A validated hit keeps its span: cued values only fill the gaps.
                 hits += _outside_hits(hits, list(matcher.find(text)))
             return [
-                Span(h.start, h.end, h.entity_type, text[h.start : h.end], h.score, self.name)
+                Span(
+                    h.start,
+                    h.end,
+                    h.entity_type,
+                    text[h.start : h.end],
+                    h.score,
+                    self.name,
+                    subtype=h.subtype,
+                )
                 for h in _drop_contained(hits)
             ]
         except Exception as exc:
