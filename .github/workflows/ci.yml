@@ -1,38 +1,286 @@
+# What CI checks and why: CONTRIBUTING.md, "What CI checks". `ci-ok` is the one job to require.
 name: ci
 
 on:
   push:
     branches: [main, develop]
   pull_request:
+  merge_group:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  UV_LOCKED: "1"
+  FORCE_COLOR: "1"
 
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ui: ${{ steps.filter.outputs.ui }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Which parts changed
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Only pull requests are filtered; pushes, merge queue and manual runs check everything.
+          ui=true
+          if [ "$EVENT" = pull_request ]; then
+            git diff --name-only "$BASE...HEAD" > changed.txt
+            grep -qE '^(ui/|\.github/workflows/ci\.yml$|scripts/ci/licenses\.py$)' changed.txt || ui=false
+          fi
+          echo "ui=$ui" | tee -a "$GITHUB_OUTPUT"
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github .
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+  types:
+    name: types
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: mypy (no errors beyond scripts/ci/mypy-baseline.txt)
+        run: uv run python scripts/ci/mypy_baseline.py
+
   test:
     name: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      HYPOTHESIS_PROFILE: ci
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
-      - name: Install
-        run: uv sync --locked
-      - name: Lint
-        run: uv run ruff check .
-      - name: Format
-        run: uv run ruff format --check .
-      - name: Test
-        run: uv run pytest
+      - run: uv sync
+      - name: Test (coverage floor in pyproject.toml, derandomized Hypothesis)
+        run: uv run pytest --durations=15
       - name: Smoke (demo stack on the mock upstream, offline)
         run: make smoke
       - name: Benchmark report is current
         run: uv run pii-guard eval report --check
       - name: CLI
         run: uv run pii-guard --help
+
+  eval-gate:
+    name: eval-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Quality regression gate (rules only, offline; eval/gates.json)
+        run: uv run python -m pii_guard.eval.gate
+
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          push: false
+          tags: pii-guard:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Size budget, healthcheck, one masked request on the mock upstream
+        run: scripts/ci/docker_smoke.sh pii-guard:ci
+
+  audit:
+    name: audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          # `uv audit` is a preview feature: pin the uv that it was introduced against.
+          version: "0.11.7"
+          enable-cache: true
+      # --frozen: audit uv.lock as committed, without resolving. Nothing is downloaded, which
+      # matters for the baselines extra (never installed in CI; its HuSpaCy wheel is ~400 MB).
+      - name: Python dependency audit (OSV; every extra and group in uv.lock)
+        env:
+          UV_LOCKED: "false"
+        run: uv audit --frozen --preview-features audit
+      - name: Install the runtime set only (no dev group, the image's ocr extra)
+        if: ${{ !cancelled() }}
+        run: uv sync --no-dev --extra ocr
+      - name: Python licences (no GPL/AGPL at runtime)
+        if: ${{ !cancelled() }}
+        run: uv run --no-sync python scripts/ci/licenses.py
+
+  ui:
+    name: ui
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: ui/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - name: Install
+        id: install
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test --run
+      - name: Build
+        run: pnpm build
+      # Audit and licences run even when an earlier step failed: they are independent gates.
+      - name: Audit (production dependencies, high and critical fail)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm audit --prod --audit-level high
+      - name: Licences (no GPL/AGPL in production dependencies)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          pnpm licenses list --prod --json > "$RUNNER_TEMP/ui-licenses.json"
+          python3 ../scripts/ci/licenses.py --pnpm-json "$RUNNER_TEMP/ui-licenses.json"
+
+  workflows:
+    name: workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: zizmor (workflow security lint)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uvx zizmor@1.31.1 --format=github --min-severity=low .github/workflows
+
+  pii-in-diff:
+    name: pii-in-diff
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Report-only while the allow-list settles: findings show as annotations on the PR but do
+    # not fail ci-ok yet (follow-up ticket to make it blocking).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Real-looking PII on the lines this PR adds (pii-guard rules, dogfood)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: uv run python scripts/ci/pii_in_diff.py --base "$BASE"
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Secrets in the commits this change adds
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: scripts/ci/gitleaks.sh "$BASE" "$HEAD"
+
+  links:
+    name: links
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Relative links in README.md and docs/** (offline; external links run weekly)
+        run: scripts/ci/lychee.sh --offline
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs:
+      [changes, lint, types, test, eval-gate, docker, audit, ui, workflows, pii-in-diff, gitleaks, links]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed (or was skipped on purpose)
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "  \(.key): \(.value.result)"'
+          bad=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key] | join(", ")')
+          if [ -n "$bad" ]; then
+            echo "::error title=ci-ok::failed or cancelled: $bad"
+            exit 1
+          fi

@@ -1,0 +1,13 @@
+# gitleaks configuration (CI job "gitleaks" scans the commits a PR adds; scripts/ci/gitleaks.sh).
+# The default rules apply; the allow-list below only covers fixed, fictional test values.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fixed test tenant key used by the test suite (not a secret; tests/**/*helpers.py)"
+regexTarget = "match"
+regexes = ['''0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0''']
+
+[[allowlists]]
+description = "Synthetic fixtures and recorded evaluation outputs"
+paths = ['''^eval/fixtures/''', '''^eval/results/''', '''^tests/fixtures/''']

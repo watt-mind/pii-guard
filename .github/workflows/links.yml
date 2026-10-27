@@ -1,0 +1,31 @@
+# Weekly external link check of README.md and docs/** (the per-PR job in ci.yml is offline).
+# A dead external link fails this scheduled run, which notifies the maintainers; it never
+# blocks a pull request.
+name: links
+
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: links-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  external:
+    name: links (external)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: All links in README.md and docs/**
+        env:
+          # Authenticated requests to github.com links avoid the anonymous rate limit.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scripts/ci/lychee.sh
