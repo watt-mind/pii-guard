@@ -15,11 +15,11 @@ Read [docs/INDEX.md](docs/INDEX.md) before changing anything non-trivial.
 
 ## Issue tracking (Linear)
 
-Team **`LAB`**, project **`PII Guard`**. Full protocol:
-`~/Develop/hdkiller/docs/orgs/linear.md` — read before claiming or filing tickets.
-Follow-ups discovered mid-work → file a Linear issue in `Triage` (do not expand the
-current ticket's scope). PR body: `Fixes LAB-XX`. Commit format:
-`feat(scope): summary (LAB-XX)`.
+Maintainers track work in Linear: team **`LAB`**, project **`PII Guard`**. The conventions
+that apply in this repository are in
+[CONTRIBUTING.md](CONTRIBUTING.md#issues-and-tracking). Follow-ups discovered mid-work →
+file an issue in `Triage` (do not expand the current ticket's scope). PR body:
+`Fixes LAB-XX`. Commit format: `feat(scope): summary (LAB-XX)`.
 
 ## Non-negotiables
 
@@ -75,7 +75,7 @@ router or a vault implementation.
 | `src/pii_guard/languages/` | Language packs (`hu`, `en`, `de`), registry, conformance checks ([docs/languages.md](docs/languages.md)) |
 | `src/pii_guard/detect/` | Detectors (rules, NER, LLM) and span merging |
 | `src/pii_guard/visual/` | OCR boxes, SAM 3.1 segmentation, image masking |
-| `src/pii_guard/documents/` | PDF / DOCX / image ingestion to text + layout |
+| `src/pii_guard/documents/` | Planned, does not exist yet: PDF / DOCX ingestion to text + layout (images are handled in `visual/`) |
 | `src/pii_guard/vault/` | Keyed pseudonyms, mapping store, re-identification |
 | `src/pii_guard/gateway/` | OpenAI-compatible proxy, streaming re-identification |
 | `src/pii_guard/api/` | App factory and `/healthz` (implemented); `/v1/*` routers in `api/routes/` (planned) |
