@@ -24,6 +24,14 @@ results (the "resolver" in ``docs/architecture.md``):
    3. the *adjudicator's* span (default ``llm``) when detectors disagree on the type;
    4. longer spans, then higher scores, then detector order.
 
+   One exception comes first (fail closed, ADR 0006): an authoritative span of a ``keep``
+   type (the rules' ``COMPANY_ID_HU`` on an adószám) that a span of a masked type from any
+   detector overlaps keeps its boundaries but takes that masked type, so a sole trader's
+   tax number the adjudicator calls ``NATIONAL_ID_HU_TAX`` is masked, not kept. The masked
+   type comes from an authoritative span first, then the adjudicator, then the largest
+   overlap, the higher score and detector order; ``Span.forced_by`` names its detector.
+   Only an explicit ``keep`` policy for that type too (``keep_types``) leaves it kept.
+
    A losing span is not simply dropped: the characters it covers that no winner covers are
    kept as a span of the loser's type, so a conflict never un-masks text. The one exception
    is an inflectional suffix directly after an overriding span's stem (``Próba Zsuzsanná|nak``):
@@ -88,6 +96,7 @@ class _Cand:
     authoritative: bool
     rank: int  # detector order, lower first
     overriding: bool = False
+    forced_by: str | None = None  # detector whose masked type replaced a kept type
 
 
 def _is_authoritative(span: Span, authoritative: frozenset[str]) -> bool:
@@ -203,6 +212,37 @@ def _merge_same_type(text: str, cands: list[_Cand]) -> list[_Cand]:
     return out
 
 
+def _force_mask(cands: list[_Cand], keep: frozenset[EntityType], adjudicator: str | None) -> None:
+    """Fail closed: retype authoritative keep-type spans that a masked-type span overlaps.
+
+    The validated span keeps its boundaries (checksum rules are better at them) and takes the
+    masked type of the strongest overlapping candidate; ``forced_by`` records its detector.
+    Overriding spans are left out: they win every conflict anyway.
+    """
+    held = [c for c in cands if c.authoritative and not c.overriding and c.entity_type in keep]
+    if not held:
+        return
+    index = _Intervals(c for c in cands if not c.overriding and c.entity_type not in keep)
+    for c in held:
+        forcing = index.overlapping(c.start, c.end)
+        if not forcing:
+            continue
+        best = min(
+            forcing,
+            key=lambda f: (
+                not f.authoritative,
+                f.detector != adjudicator,
+                -(min(c.end, f.end) - max(c.start, f.start)),
+                -f.score,
+                f.rank,
+                f.start,
+            ),
+        )
+        c.entity_type = best.entity_type
+        c.score = max(c.score, best.score)
+        c.forced_by = best.detector
+
+
 def _outside(text: str, cand: _Cand, auth: list[_Cand]) -> list[_Cand]:
     """``cand`` without the characters the same-type ``auth`` spans cover.
 
@@ -312,6 +352,7 @@ def resolve_spans(
         )
 
     cands = _merge_same_type(text, cands)
+    _force_mask(cands, keep, adjudicator)
 
     by_type: dict[EntityType, list[_Cand]] = {}
     if adjudicator is not None and any(c.detector == adjudicator for c in cands):
@@ -367,13 +408,14 @@ def resolve_spans(
                     c.authoritative,
                     c.rank,
                     c.overriding,
+                    c.forced_by,
                 )
             )
             taken.add(ps, pe)
 
     accepted.sort(key=lambda c: (c.start, c.end))
     return [
-        Span(c.start, c.end, c.entity_type, text[c.start : c.end], c.score, c.detector)
+        Span(c.start, c.end, c.entity_type, text[c.start : c.end], c.score, c.detector, c.forced_by)
         for c in accepted
     ]
 

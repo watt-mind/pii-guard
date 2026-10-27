@@ -6,7 +6,7 @@ They are a public contract: see ``docs/contracts.md`` before changing anything h
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
@@ -72,6 +72,10 @@ class Span:
 
     ``repr()`` never includes ``text``, so a span can be logged or put in an exception
     message without leaking the raw value.
+
+    ``forced_by`` is debugging metadata set by the resolver: the detector whose masked type
+    replaced a kept type on this span (fail closed, LAB-1228). It does not take part in
+    equality or hashing and is not in :meth:`to_public_dict`.
     """
 
     start: int
@@ -80,6 +84,7 @@ class Span:
     text: str
     score: float
     detector: str
+    forced_by: str | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.entity_type, EntityType):
@@ -101,7 +106,9 @@ class Span:
         return (
             f"Span(start={self.start}, end={self.end}, "
             f"entity_type={self.entity_type.value}, score={self.score:.3f}, "
-            f"detector={self.detector!r}, text=<redacted>)"
+            f"detector={self.detector!r}, "
+            + (f"forced_by={self.forced_by!r}, " if self.forced_by else "")
+            + "text=<redacted>)"
         )
 
     __str__ = __repr__
