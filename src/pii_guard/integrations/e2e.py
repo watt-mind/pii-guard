@@ -198,6 +198,8 @@ class Recorder:
         }
 
     async def _forward(self, raw: bytes, stream: bool) -> Response:
+        if self.upstream is None:  # pragma: no cover - chat() only forwards with one
+            raise RuntimeError("no upstream to forward to")
         client = httpx.AsyncClient(timeout=httpx.Timeout(300, connect=10))
         request = client.build_request(
             "POST", self.upstream + "/chat/completions", content=raw, headers=self._headers()
@@ -295,13 +297,15 @@ def serve(app: Any, port: int | None = None) -> Iterator[str]:
 
 
 def gateway_app(upstream_url: str, statuses: list[int]) -> FastAPI:
+    from pydantic import SecretStr
+
     from pii_guard.api.app import create_app
     from pii_guard.config import Settings
 
     settings = Settings(
-        tenant_key=secrets.token_hex(32),
+        tenant_key=SecretStr(secrets.token_hex(32)),
         upstream_base_url=upstream_url,
-        upstream_api_key="recorder-holds-the-real-key",
+        upstream_api_key=SecretStr("recorder-holds-the-real-key"),
     )
     app = create_app(settings)
 
@@ -444,9 +448,9 @@ def run(
                     timeout=timeout,
                 )
             except subprocess.TimeoutExpired as exc:
-                out = exc.stdout or b""
-                out = out.decode(errors="replace") if isinstance(out, bytes) else out
-                proc = subprocess.CompletedProcess(exc.cmd, -1, out, "timed out")
+                partial = exc.stdout or b""
+                text = partial.decode(errors="replace") if isinstance(partial, bytes) else partial
+                proc = subprocess.CompletedProcess(exc.cmd, -1, text, "timed out")
         after = {p.relative_to(work) for p in work.rglob("*") if p.is_file()}
         written = sorted(str(p) for p in after - before)
         texts = "\n".join(

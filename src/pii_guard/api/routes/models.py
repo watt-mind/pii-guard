@@ -140,5 +140,5 @@ async def list_models(request: Request) -> JSONResponse:
         raise UpstreamError("upstream model list is not a JSON object") from None
     if not isinstance(data, list):
         raise UpstreamError("upstream model list has no data array")
-    models = [m for m in (_model(entry) for entry in data[:_MAX_MODELS]) if m is not None]
-    return JSONResponse(_listing(models))
+    found = (_model(entry) for entry in data[:_MAX_MODELS])
+    return JSONResponse(_listing([m for m in found if m is not None]))
