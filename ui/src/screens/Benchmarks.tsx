@@ -145,7 +145,11 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
                         <input type="checkbox" className="sr-only" checked={on} onChange={() => toggle(k)} />
                         <MarkerIcon info={sys} />
                         {sys?.short_label ?? k}
-                        {sys?.default && <span className="rounded bg-guard-soft px-1 text-[10px] font-semibold text-guard-ink uppercase">default</span>}
+                        {sys?.default && (
+                          <span title="The rules-only pipeline: no model call. Used by the gateway's Fast mode." className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-muted uppercase ring-1 ring-line">
+                            fast mode
+                          </span>
+                        )}
                       </label>
                     );
                   })}
@@ -234,24 +238,28 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
 function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; lang: LanguageFilter }) {
   const h = headline(index, set, lang);
   if (!h) return null;
-  const side = (x: HeadlineSide) => (
-    <>
-      <strong className="font-semibold text-ink">{x.label}</strong> leaks <strong className="font-semibold tabular-nums text-ink">{formatPct(x.leak)}</strong>
-      {x.p50 !== null && (
-        <span className="text-muted">
-          {" "}
-          ({formatMs(x.p50)} per document{x.hardware ? ` on ${x.hardware}` : ""})
-        </span>
-      )}
-    </>
-  );
-  const scope = lang === "all" ? set : `${set}, ${languageName(lang)}`;
+  const docs = documentCount(index.fixture_sets[set], lang);
+  const scope = `${docs ?? "?"} fictional ${lang === "all" ? "" : `${languageName(lang)} `}documents (${set})`;
+  const pct = (x: HeadlineSide) => <strong className="font-semibold tabular-nums text-ink">{formatPct(x.leak)}</strong>;
+  const demo = index.snapshots.find((x) => x.fixture_set === set && /muse spark open/i.test(index.systems[x.system]?.label ?? ""));
+  const demoLeak = demo ? pick(demo, lang)?.leak : null;
+  const speed = (x: HeadlineSide) => (x.p50 === null ? "" : `${x.label}: ${formatMs(x.p50)} per document${x.hardware ? ` (${x.hardware})` : ""}`);
   return (
-    <p className="rounded-2xl border border-guard/30 bg-guard-soft/60 px-4 py-3 text-sm text-pretty text-ink sm:text-base" data-testid="bench-headline">
-      <span className="mr-1 text-xs font-semibold tracking-[0.08em] text-guard uppercase">Headline · {scope}</span>
-      <br className="sm:hidden" />
-      Best pii-guard configuration: {side(h.ours)}. Best open-source tool: {side(h.theirs)}. Leak = share of labelled personal values still readable after masking.
-    </p>
+    <div className="rounded-2xl border border-guard/30 bg-guard-soft/60 px-4 py-3" data-testid="bench-headline">
+      <p className="text-base text-pretty text-ink sm:text-lg">
+        On {scope}, pii-guard lets {pct(h.ours)} of personal values through, against {pct(h.theirs)} for the best open-source tool.
+        {demo && demoLeak !== null && demoLeak !== undefined && demo.system !== h.ours.system && (
+          <>
+            {" "}
+            The configuration this demo runs (rules + Muse Spark Open): <strong className="font-semibold tabular-nums text-ink">{formatPct(demoLeak)}</strong>.
+          </>
+        )}
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        Best pii-guard configuration: {h.ours.label}. Best tool: {h.theirs.label}. Leak = labelled personal values still readable after masking. Speed was
+        measured where each ran, so it isn't a like-for-like test: {[speed(h.ours), speed(h.theirs)].filter(Boolean).join("; ")}.
+      </p>
+    </div>
   );
 }
 

@@ -414,7 +414,7 @@ export function LanguageBars({
                           {v !== null && (
                             <div
                               className={["h-full rounded-sm", LANG_BG[i % LANG_BG.length]].join(" ")}
-                              style={{ width: `${Math.max(v * 100, 0.8)}%` }}
+                              style={{ width: v > 0 ? `${Math.max(v * 100, 0.8)}%` : "0%" }}
                             />
                           )}
                         </div>
