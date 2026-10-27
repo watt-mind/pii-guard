@@ -344,7 +344,7 @@ requests. Source: [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README
 
 ### 16. Re-identification red team with Muse (2026-10-27)
 
-PR [#PR](https://github.com/watt-mind/pii-guard/pulls), LAB-1088.
+PR [#28](https://github.com/watt-mind/pii-guard/pull/28), LAB-1088.
 
 Meta's own model against the guard: Muse Spark Open (Baseten) gets the masked text and tries
 to recover every masked value, with and without a candidate list (the true value and 4 decoys).
