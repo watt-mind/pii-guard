@@ -46,6 +46,11 @@ baselines = [
     "presidio-anonymizer==2.2.365",
     "spacy>=3.8.7,<3.9",
 ]
+# On-device face and ID-photo segmentation (pii_guard.visual.segment, LAB-1229): YuNet on
+# OpenCV's CPU DNN. The model file is fetched separately (python -m pii_guard.visual.segment fetch).
+local-vision = [
+    "opencv-python-headless>=4.10",
+]
 ner = [
     "protobuf>=7.36.2",
     "sentencepiece>=0.2.2",

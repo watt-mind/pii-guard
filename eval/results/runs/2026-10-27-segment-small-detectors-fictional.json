@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-segment-small-detectors-fictional",
+  "kind": "visual",
+  "date": "2026-10-27",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "Segmenter small-detectors on fictional-specimens (LAB-1229)",
+  "notes": [
+    "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate small-detectors.",
+    "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 0.0 %, precision 80.6 % (36 boxes); signature: recall@IoU0.5 100.0 %, leak (<95 % covered) 13.3 %, strict leak 13.3 %, precision 27.9 % (61 boxes).",
+    "Per image p50 1099.7 ms, p95 1562.0 ms on Darwin arm64 CPU; model load 6680.4 ms; peak RSS 723.3 MB; weights 26.14 MB; licence MIT (YuNet), Apache-2.0 (YOLOS-tiny signature weights, transformers)."
+  ],
+  "code": {
+    "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+    "dirty": false,
+    "pii_guard_version": null,
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": null,
+    "detectors": [
+      {
+        "name": "local-segmenter",
+        "model": "yunet-2023mar",
+        "model_ref": "opencv_zoo/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+        "revision": "8f2383e4dd3cfbb4",
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "signature-detector",
+        "model": "yolos-tiny-signature",
+        "model_ref": "mdefrance/yolos-tiny-signature-detection",
+        "revision": "b788cf7376464453c3dea1e5ee8589adcaa0c634",
+        "settings": {},
+        "serving": null
+      }
+    ],
+    "key": "visual-segment:yunet-2023mar+yolos-tiny-signature",
+    "label": "segmenter yunet-2023mar+yolos-tiny-signature (no OCR)"
+  },
+  "fixture_set": "fictional-specimens",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/visual/manifest.json",
+      "sha256": null,
+      "set": "fictional-specimens",
+      "language": null,
+      "origin": "generated",
+      "generator": "muse-image",
+      "documents": 24
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "arm64 CPU, one process; host load average 17 (shared with other jobs)",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": {
+    "usd": 0.0,
+    "estimated": false,
+    "gpu_minutes": null,
+    "model_calls": null,
+    "tokens": null,
+    "shared_with": [],
+    "note": "on-device, CPU"
+  },
+  "metrics": {
+    "specimens": 24,
+    "overall": {
+      "regions": 33,
+      "recall_iou50": 1.0,
+      "recall_cov90": 0.9697,
+      "mean_coverage": 0.9922
+    },
+    "by_region_type": {
+      "portrait": {
+        "regions": 18,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 1.0
+      },
+      "signature": {
+        "regions": 15,
+        "recall_iou50": 1.0,
+        "recall_cov90": 0.9333,
+        "mean_coverage": 0.9829
+      }
+    },
+    "by_doc_type": {
+      "badge": {
+        "regions": 3,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 1.0,
+        "specimens": 3
+      },
+      "driving_licence": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 0.8333,
+        "mean_coverage": 0.9716,
+        "specimens": 3
+      },
+      "form": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 1.0,
+        "specimens": 3
+      },
+      "id_card": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 1.0,
+        "specimens": 6
+      },
+      "letter": {
+        "regions": 3,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9713,
+        "specimens": 3
+      },
+      "member_card": {
+        "regions": 3,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 1.0,
+        "specimens": 3
+      },
+      "passport": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 1.0,
+        "specimens": 3
+      }
+    },
+    "by_country": {
+      "DE": {
+        "regions": 11,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 1.0,
+        "specimens": 8
+      },
+      "GB": {
+        "regions": 11,
+        "recall_iou50": 1.0,
+        "recall_cov90": 0.9091,
+        "mean_coverage": 0.9845,
+        "specimens": 8
+      },
+      "HU": {
+        "regions": 11,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9922,
+        "specimens": 8
+      }
+    },
+    "over_masking_mean": 0.0999,
+    "errors": 0,
+    "latency_ms": {
+      "sam_call_p50": null,
+      "sam_call_p95": null,
+      "sam_per_image_p50": 0.0,
+      "sam_per_image_p95": 0.0,
+      "local_per_image_p50": 1099.7,
+      "local_per_image_p95": 1562.0,
+      "total_per_image_p50": 1099.7,
+      "total_per_image_p95": 1562.0,
+      "segment_per_image_p50": 1099.7,
+      "segment_per_image_p95": 1562.0,
+      "segment_first_image": 1227.8,
+      "segment_model_load": 6680.4
+    }
+  }
+}

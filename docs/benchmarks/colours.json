@@ -86,6 +86,22 @@
       "color": "#882255",
       "shape": "circle"
     },
+    "visual-segment:sam-3.1": {
+      "color": "#009E73",
+      "shape": "circle"
+    },
+    "visual-segment:yunet-2023mar": {
+      "color": "#D55E00",
+      "shape": "circle"
+    },
+    "visual-segment:yunet-2023mar+efficientsam-vitt": {
+      "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "visual-segment:yunet-2023mar+yolos-tiny-signature": {
+      "color": "#332288",
+      "shape": "circle"
+    },
     "visual:eka": {
       "color": "#595959",
       "shape": "cross"
@@ -120,6 +136,10 @@
     }
   },
   "visual": {
+    "visual-segment:sam-3.1": "#CC6677",
+    "visual-segment:yunet-2023mar": "#44AA99",
+    "visual-segment:yunet-2023mar+efficientsam-vitt": "#332288",
+    "visual-segment:yunet-2023mar+yolos-tiny-signature": "#88CCEE",
     "visual:eka": "#0072B2",
     "visual:eka-tuned": "#332288",
     "visual:presidio-image": "#88CCEE",

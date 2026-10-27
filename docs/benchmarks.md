@@ -16,6 +16,8 @@ Headline fixture set: **smoke** (hand-written; documents: de 10 + en 10 + hu 31)
 
 ![Visual recall on image documents](benchmarks/visual-recall.svg)
 
+![Segmenters: SAM 3.1 API vs on-device](benchmarks/segmenter-recall.svg)
+
 ![Gateway overhead](benchmarks/latency.svg)
 
 ## How to read this
@@ -378,6 +380,21 @@ Share of labelled regions masked with IoU >= 0.5. `specimens` are official speci
 | `2026-10-27-visual-specimens-rules-llm` | `specimens` | 65 | 24 | 90.8% | 83.8% | 76.7% | 27.7% | 46.6% | 3.1% |
 | `2026-10-27-visual-specimens-rules-llm-captions` | `specimens` | 65 | 24 | 90.8% | 83.8% | 80.0% | 29.2% | 47.8% | 4.8% |
 
+## Segmenters: SAM 3.1 API vs on-device
+
+Portraits and signatures only, no OCR (`python -m pii_guard.visual.segment_eval`, LAB-1229): SAM 3.1 on the Meta API against on-device candidates. Latency is per image on the CPU of the machine in each run's hardware note (SAM: its API calls). Leak, precision, memory and model size are in each run's notes and in [models.md](models.md#local-segmentation).
+
+| Run | Set | Images | Portrait (IoU) | Portrait (cov ≥ 90%) | Signature (IoU) | Signature (cov ≥ 90%) | Over-masking (mean) | p50 / image | p95 / image |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `2026-10-27-segment-efficientsam-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 0.0% | 13.3% | 4.7% | 1.5 s | 4.4 s |
+| `2026-10-27-segment-efficientsam-specimens` | `specimens` | 65 | 92.3% | 87.7% | 0.0% | 8.1% | 6.3% | 2.2 s | 3.3 s |
+| `2026-10-27-segment-local-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 0.0% | 6.7% | 7.7% | 176 ms | 238 ms |
+| `2026-10-27-segment-local-specimens` | `specimens` | 65 | 92.3% | 90.8% | 0.0% | 8.1% | 10.3% | 116 ms | 348 ms |
+| `2026-10-27-segment-sam-api-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 100.0% | 100.0% | 0.7% | 5.1 s | 6.9 s |
+| `2026-10-27-segment-sam-api-specimens` | `specimens` | 65 | 90.8% | 72.3% | 83.8% | 64.9% | 2.1% | 5.5 s | 8.6 s |
+| `2026-10-27-segment-small-detectors-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 100.0% | 93.3% | 10.0% | 1.1 s | 1.6 s |
+| `2026-10-27-segment-small-detectors-specimens` | `specimens` | 65 | 93.8% | 93.8% | 51.3% | 59.5% | 18.9% | 727 ms | 1.6 s |
+
 ## Gateway latency
 
 What the gateway adds to an LLM call, measured by `pii-guard bench latency` against the mock upstream with a fixed delay, so the upstream's own time is taken out: overhead = gateway total - time waiting on the upstream. Streams also report the added time to the first token. Each request is a new session (no cache hits). Stages and fields: [operations.md](operations.md#timing).
@@ -539,6 +556,14 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-visual-fictional-rules-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-visual-fictional-rules` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.24 |
 | 2026-10-27 | `2026-10-27-visual-fictional-muse-image` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `88e98bd` | — | ≈ $0.24 |
+| 2026-10-27 | `2026-10-27-segment-small-detectors-specimens` | segmenter yunet-2023mar+yolos-tiny-signature (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 18 (shared with other jobs) | $0.00 |
+| 2026-10-27 | `2026-10-27-segment-small-detectors-fictional` | segmenter yunet-2023mar+yolos-tiny-signature (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 17 (shared with other jobs) | $0.00 |
+| 2026-10-27 | `2026-10-27-segment-sam-api-specimens` | segmenter sam-3.1 (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 15 (shared with other jobs) | ≈ $0.65 |
+| 2026-10-27 | `2026-10-27-segment-sam-api-fictional` | segmenter sam-3.1 (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 17 (shared with other jobs) | ≈ $0.24 |
+| 2026-10-27 | `2026-10-27-segment-local-specimens` | segmenter yunet-2023mar (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 16 (shared with other jobs) | $0.00 |
+| 2026-10-27 | `2026-10-27-segment-local-fictional` | segmenter yunet-2023mar (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 16 (shared with other jobs) | $0.00 |
+| 2026-10-27 | `2026-10-27-segment-efficientsam-specimens` | segmenter yunet-2023mar+efficientsam-vitt (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 19 (shared with other jobs) | $0.00 |
+| 2026-10-27 | `2026-10-27-segment-efficientsam-fictional` | segmenter yunet-2023mar+efficientsam-vitt (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 23 (shared with other jobs) | $0.00 |
 | 2026-10-27 | `2026-10-27-image-baselines-specimens-presidio-image-tuned` | Presidio Image Redactor (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-specimens-presidio-image` | Presidio Image Redactor (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-specimens-pii-guard-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.00 |

@@ -119,6 +119,18 @@ and OCR availability, and prints `ocr on|off` (`docker inspect --format
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.
 
+### On-device face detection (not the default)
+
+The image pipeline segments faces, ID photos and signatures with SAM 3.1 on the Meta API, so
+images leave the machine (`META_API_KEY`). An on-device detector for faces and ID photos,
+`LocalSegmenter` (YuNet, 0.23 MB, MIT), exists as a library component but is **not** used by the
+API, the gateway or the Docker image: it cannot find signatures, so it can't replace SAM without
+either refusing every image or leaving signatures unmasked (LAB-1229,
+[models.md](models.md#local-segmentation)). To try it: `uv sync --extra local-vision`, then
+`uv run python -m pii_guard.visual.segment fetch` (downloads the pinned file from the OpenCV
+model zoo into `PII_GUARD_MODEL_DIR`, default `~/.cache/pii-guard/models`, and checks its
+SHA-256). Model files are never committed.
+
 ## Exposure and authentication
 
 **There is no authentication by default.** Anyone who can reach the API can mask and unmask,

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "pii-guard eval report",
   "about": "Generated from eval/results/runs/*.json; do not edit. Rates are 0-1; latency in ms.",
-  "runs_digest": "8807a921d70963626754fb64eb995c968cac3d45de2590853c10a28e1e62d185",
+  "runs_digest": "7a35ee6a4a62c907071e0cbcb1976fee998b39f444144c8cca2a3eb972c19e85",
   "languages": [
     "de",
     "en",
@@ -534,6 +534,78 @@
       ],
       "models": [
         "tesseract"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "visual-segment:sam-3.1": {
+      "color": "#009E73",
+      "shape": "circle",
+      "label": "segmenter sam-3.1 (no OCR)",
+      "short_label": "segmenter sam-3.1 (no OCR)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "visual",
+      "detectors": [
+        "sam"
+      ],
+      "models": [
+        "sam-3.1"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "visual-segment:yunet-2023mar": {
+      "color": "#D55E00",
+      "shape": "circle",
+      "label": "segmenter yunet-2023mar (no OCR)",
+      "short_label": "segmenter yunet-2023mar (no OCR)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "visual",
+      "detectors": [
+        "local-segmenter"
+      ],
+      "models": [
+        "yunet-2023mar"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "visual-segment:yunet-2023mar+efficientsam-vitt": {
+      "color": "#CC79A7",
+      "shape": "circle",
+      "label": "segmenter yunet-2023mar+efficientsam-vitt (no OCR)",
+      "short_label": "segmenter yunet-2023mar+efficientsam-vitt (no OCR)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "visual",
+      "detectors": [
+        "local-segmenter",
+        "photo-refiner"
+      ],
+      "models": [
+        "yunet-2023mar",
+        "efficientsam-vitt"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "visual-segment:yunet-2023mar+yolos-tiny-signature": {
+      "color": "#332288",
+      "shape": "circle",
+      "label": "segmenter yunet-2023mar+yolos-tiny-signature (no OCR)",
+      "short_label": "segmenter yunet-2023mar+yolos-tiny-signature (no OCR)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "visual",
+      "detectors": [
+        "local-segmenter",
+        "signature-detector"
+      ],
+      "models": [
+        "yunet-2023mar",
+        "yolos-tiny-signature"
       ],
       "featured": false,
       "default": false
@@ -2291,6 +2363,338 @@
       "notes": [
         "LAB-1164 image baseline. Region types the tool can't mask (portrait, signature) are left out of by_region_type and count as missed in overall.",
         "Word boxes of one detected entity are merged per text line before scoring (the rule pii-guard applies to its own spans); every box the tool returns is counted as masked."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-efficientsam-fictional",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter efficientsam on fictional-specimens (LAB-1229)",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "dirty": false,
+      "system": "visual-segment:yunet-2023mar+efficientsam-vitt",
+      "fixture_set": "fictional-specimens",
+      "origin": "generated",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "local-segmenter",
+          "model": "yunet-2023mar",
+          "model_ref": "opencv_zoo/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "photo-refiner",
+          "model": "efficientsam-vitt",
+          "model_ref": "yformer/EfficientSAM efficient_sam_vitt_{encoder,decoder}.onnx",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 23 (shared with other jobs)",
+      "cost": {
+        "usd": 0.0,
+        "estimated": false,
+        "gpu_minutes": null,
+        "note": "on-device, CPU",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate efficientsam.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 22.2 %, precision 91.7 % (36 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 93.3 %, strict leak 100.0 %, precision n/a (0 boxes).",
+        "Per image p50 1505.9 ms, p95 4417.5 ms on Darwin arm64 CPU; model load 377.2 ms; peak RSS 1464.9 MB; weights 41.6 MB; licence MIT (YuNet), Apache-2.0 (EfficientSAM code and weights)."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-efficientsam-specimens",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter efficientsam on specimens (LAB-1229)",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "dirty": false,
+      "system": "visual-segment:yunet-2023mar+efficientsam-vitt",
+      "fixture_set": "specimens",
+      "origin": "specimens",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "local-segmenter",
+          "model": "yunet-2023mar",
+          "model_ref": "opencv_zoo/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "photo-refiner",
+          "model": "efficientsam-vitt",
+          "model_ref": "yformer/EfficientSAM efficient_sam_vitt_{encoder,decoder}.onnx",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 19 (shared with other jobs)",
+      "cost": {
+        "usd": 0.0,
+        "estimated": false,
+        "gpu_minutes": null,
+        "note": "on-device, CPU",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate efficientsam.",
+        "portrait: recall@IoU0.5 92.3 %, leak (<95 % covered) 16.9 %, strict leak 43.1 %, precision 72.4 % (152 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 91.9 %, strict leak 91.9 %, precision n/a (0 boxes).",
+        "Per image p50 2231.6 ms, p95 3340.7 ms on Darwin arm64 CPU; model load 683.7 ms; peak RSS 1909.8 MB; weights 41.6 MB; licence MIT (YuNet), Apache-2.0 (EfficientSAM code and weights)."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-local-fictional",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter local on fictional-specimens (LAB-1229)",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "dirty": false,
+      "system": "visual-segment:yunet-2023mar",
+      "fixture_set": "fictional-specimens",
+      "origin": "generated",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "local-segmenter",
+          "model": "yunet-2023mar",
+          "model_ref": "opencv_zoo/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 16 (shared with other jobs)",
+      "cost": {
+        "usd": 0.0,
+        "estimated": false,
+        "gpu_minutes": null,
+        "note": "on-device, CPU",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate local.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 5.6 %, precision 80.6 % (36 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 93.3 %, strict leak 93.3 %, precision n/a (0 boxes).",
+        "Per image p50 176.4 ms, p95 238.4 ms on Darwin arm64 CPU; model load 222.0 ms; peak RSS 381.5 MB; weights 0.23 MB; licence MIT (YuNet weights), Apache-2.0 (OpenCV)."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-local-specimens",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter local on specimens (LAB-1229)",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "dirty": false,
+      "system": "visual-segment:yunet-2023mar",
+      "fixture_set": "specimens",
+      "origin": "specimens",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "local-segmenter",
+          "model": "yunet-2023mar",
+          "model_ref": "opencv_zoo/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 16 (shared with other jobs)",
+      "cost": {
+        "usd": 0.0,
+        "estimated": false,
+        "gpu_minutes": null,
+        "note": "on-device, CPU",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate local.",
+        "portrait: recall@IoU0.5 92.3 %, leak (<95 % covered) 10.8 %, strict leak 12.3 %, precision 61.2 % (152 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 91.9 %, strict leak 91.9 %, precision n/a (0 boxes).",
+        "Per image p50 116.0 ms, p95 348.1 ms on Darwin arm64 CPU; model load 102.2 ms; peak RSS 877.1 MB; weights 0.23 MB; licence MIT (YuNet weights), Apache-2.0 (OpenCV)."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-sam-api-fictional",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter sam-api on fictional-specimens (LAB-1229)",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "dirty": false,
+      "system": "visual-segment:sam-3.1",
+      "fixture_set": "fictional-specimens",
+      "origin": "generated",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "sam",
+          "model": "sam-3.1",
+          "model_ref": "meta-api:sam-3.1",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 17 (shared with other jobs)",
+      "cost": {
+        "usd": 0.24,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": "SAM None: 96 calls at $0.0025/call (planning estimate; responses report no price)",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate sam-api.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 88.9 %, precision 100.0 % (36 boxes); signature: recall@IoU0.5 100.0 %, leak (<95 % covered) 6.7 %, strict leak 100.0 %, precision 100.0 % (15 boxes).",
+        "Per image p50 5108.3 ms, p95 6871.2 ms on Darwin arm64 CPU; model load 4.1 ms; peak RSS 155.6 MB; weights hosted; licence hosted (Meta Model API)."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-sam-api-specimens",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter sam-api on specimens (LAB-1229)",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "dirty": false,
+      "system": "visual-segment:sam-3.1",
+      "fixture_set": "specimens",
+      "origin": "specimens",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "sam",
+          "model": "sam-3.1",
+          "model_ref": "meta-api:sam-3.1",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 15 (shared with other jobs)",
+      "cost": {
+        "usd": 0.65,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": "SAM None: 260 calls at $0.0025/call (planning estimate; responses report no price)",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate sam-api.",
+        "portrait: recall@IoU0.5 90.8 %, leak (<95 % covered) 47.7 %, strict leak 83.1 %, precision 90.4 % (136 boxes); signature: recall@IoU0.5 83.8 %, leak (<95 % covered) 51.3 %, strict leak 86.5 %, precision 77.5 % (40 boxes).",
+        "Per image p50 5482.4 ms, p95 8591.3 ms on Darwin arm64 CPU; model load 4.0 ms; peak RSS 630.8 MB; weights hosted; licence hosted (Meta Model API)."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-small-detectors-fictional",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter small-detectors on fictional-specimens (LAB-1229)",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "dirty": false,
+      "system": "visual-segment:yunet-2023mar+yolos-tiny-signature",
+      "fixture_set": "fictional-specimens",
+      "origin": "generated",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "local-segmenter",
+          "model": "yunet-2023mar",
+          "model_ref": "opencv_zoo/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "signature-detector",
+          "model": "yolos-tiny-signature",
+          "model_ref": "mdefrance/yolos-tiny-signature-detection",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 17 (shared with other jobs)",
+      "cost": {
+        "usd": 0.0,
+        "estimated": false,
+        "gpu_minutes": null,
+        "note": "on-device, CPU",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate small-detectors.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 0.0 %, precision 80.6 % (36 boxes); signature: recall@IoU0.5 100.0 %, leak (<95 % covered) 13.3 %, strict leak 13.3 %, precision 27.9 % (61 boxes).",
+        "Per image p50 1099.7 ms, p95 1562.0 ms on Darwin arm64 CPU; model load 6680.4 ms; peak RSS 723.3 MB; weights 26.14 MB; licence MIT (YuNet), Apache-2.0 (YOLOS-tiny signature weights, transformers)."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-small-detectors-specimens",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter small-detectors on specimens (LAB-1229)",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "dirty": false,
+      "system": "visual-segment:yunet-2023mar+yolos-tiny-signature",
+      "fixture_set": "specimens",
+      "origin": "specimens",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "local-segmenter",
+          "model": "yunet-2023mar",
+          "model_ref": "opencv_zoo/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "signature-detector",
+          "model": "yolos-tiny-signature",
+          "model_ref": "mdefrance/yolos-tiny-signature-detection",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 18 (shared with other jobs)",
+      "cost": {
+        "usd": 0.0,
+        "estimated": false,
+        "gpu_minutes": null,
+        "note": "on-device, CPU",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate small-detectors.",
+        "portrait: recall@IoU0.5 93.8 %, leak (<95 % covered) 6.2 %, strict leak 7.7 %, precision 61.2 % (152 boxes); signature: recall@IoU0.5 51.3 %, leak (<95 % covered) 46.0 %, strict leak 54.0 %, precision 9.4 % (288 boxes).",
+        "Per image p50 726.8 ms, p95 1648.3 ms on Darwin arm64 CPU; model load 3746.3 ms; peak RSS 1116.9 MB; weights 26.14 MB; licence MIT (YuNet), Apache-2.0 (YOLOS-tiny signature weights, transformers)."
       ],
       "rescored": null,
       "imported_from": null
@@ -84331,6 +84735,12 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0319,
+      "latency_ms": {
+        "local_per_image_p50": 672.3,
+        "local_per_image_p95": 880.7,
+        "total_per_image_p50": 672.3,
+        "total_per_image_p95": 880.7
+      },
       "cost_usd": null
     },
     {
@@ -84429,6 +84839,12 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0319,
+      "latency_ms": {
+        "local_per_image_p50": 1212.6,
+        "local_per_image_p95": 1403.1,
+        "total_per_image_p50": 1212.6,
+        "total_per_image_p95": 1403.1
+      },
       "cost_usd": null
     },
     {
@@ -84526,6 +84942,16 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0119,
+      "latency_ms": {
+        "sam_call_p50": 1203.3,
+        "sam_call_p95": 1945.2,
+        "sam_per_image_p50": 4868.6,
+        "sam_per_image_p95": 6799.8,
+        "local_per_image_p50": 1384.3,
+        "local_per_image_p95": 4203.1,
+        "total_per_image_p50": 6384.8,
+        "total_per_image_p95": 9565.8
+      },
       "cost_usd": 0.24
     },
     {
@@ -84624,6 +85050,16 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0125,
+      "latency_ms": {
+        "sam_call_p50": 1203.3,
+        "sam_call_p95": 1945.2,
+        "sam_per_image_p50": 4868.6,
+        "sam_per_image_p95": 6799.7,
+        "local_per_image_p50": 3745.6,
+        "local_per_image_p95": 5468.6,
+        "total_per_image_p50": 8351.3,
+        "total_per_image_p95": 11641.7
+      },
       "cost_usd": 0.0
     },
     {
@@ -84710,6 +85146,12 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0111,
+      "latency_ms": {
+        "local_per_image_p50": 375.0,
+        "local_per_image_p95": 597.6,
+        "total_per_image_p50": 375.0,
+        "total_per_image_p95": 597.6
+      },
       "cost_usd": null
     },
     {
@@ -84796,6 +85238,12 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0108,
+      "latency_ms": {
+        "local_per_image_p50": 942.6,
+        "local_per_image_p95": 1163.7,
+        "total_per_image_p50": 942.6,
+        "total_per_image_p95": 1163.7
+      },
       "cost_usd": null
     },
     {
@@ -84866,6 +85314,12 @@
       },
       "countries": 24,
       "over_masking_mean": 0.1077,
+      "latency_ms": {
+        "local_per_image_p50": 597.7,
+        "local_per_image_p95": 915.2,
+        "total_per_image_p50": 597.7,
+        "total_per_image_p95": 915.2
+      },
       "cost_usd": null
     },
     {
@@ -84936,6 +85390,12 @@
       },
       "countries": 24,
       "over_masking_mean": 0.1202,
+      "latency_ms": {
+        "local_per_image_p50": 1615.8,
+        "local_per_image_p95": 2294.7,
+        "total_per_image_p50": 1615.8,
+        "total_per_image_p95": 2294.7
+      },
       "cost_usd": null
     },
     {
@@ -85005,6 +85465,16 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0398,
+      "latency_ms": {
+        "sam_call_p50": 1394.5,
+        "sam_call_p95": 2363.7,
+        "sam_per_image_p50": 5320.0,
+        "sam_per_image_p95": 9149.7,
+        "local_per_image_p50": 1901.3,
+        "local_per_image_p95": 7190.0,
+        "total_per_image_p50": 8022.3,
+        "total_per_image_p95": 12604.3
+      },
       "cost_usd": 0.65
     },
     {
@@ -85075,6 +85545,16 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0473,
+      "latency_ms": {
+        "sam_call_p50": 1394.5,
+        "sam_call_p95": 2363.7,
+        "sam_per_image_p50": 5319.9,
+        "sam_per_image_p95": 9149.7,
+        "local_per_image_p50": 4151.7,
+        "local_per_image_p95": 6316.6,
+        "total_per_image_p50": 9504.1,
+        "total_per_image_p95": 12309.1
+      },
       "cost_usd": 0.0
     },
     {
@@ -85133,6 +85613,12 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0339,
+      "latency_ms": {
+        "local_per_image_p50": 279.9,
+        "local_per_image_p95": 574.4,
+        "total_per_image_p50": 279.9,
+        "total_per_image_p95": 574.4
+      },
       "cost_usd": null
     },
     {
@@ -85191,7 +85677,709 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0393,
+      "latency_ms": {
+        "local_per_image_p50": 1171.2,
+        "local_per_image_p95": 1922.6,
+        "total_per_image_p50": 1171.2,
+        "total_per_image_p95": 1922.6
+      },
       "cost_usd": null
+    },
+    {
+      "run_id": "2026-10-27-segment-efficientsam-fictional",
+      "date": "2026-10-27",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "system": "visual-segment:yunet-2023mar+efficientsam-vitt",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate efficientsam.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 22.2 %, precision 91.7 % (36 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 93.3 %, strict leak 100.0 %, precision n/a (0 boxes).",
+        "Per image p50 1505.9 ms, p95 4417.5 ms on Darwin arm64 CPU; model load 377.2 ms; peak RSS 1464.9 MB; weights 41.6 MB; licence MIT (YuNet), Apache-2.0 (EfficientSAM code and weights)."
+      ],
+      "fixture_set": "fictional-specimens",
+      "specimens": 24,
+      "overall": {
+        "regions": 33,
+        "recall_iou50": 0.5455,
+        "recall_cov90": 0.6061,
+        "mean_coverage": 0.6033
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 18,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9986
+        },
+        "signature": {
+          "regions": 15,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.1333,
+          "mean_coverage": 0.129
+        }
+      },
+      "by_doc_type": {
+        "badge": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9974,
+          "specimens": 3
+        },
+        "driving_licence": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.5,
+          "specimens": 3
+        },
+        "form": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.4994,
+          "specimens": 3
+        },
+        "id_card": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.8333,
+          "mean_coverage": 0.8225,
+          "specimens": 6
+        },
+        "letter": {
+          "regions": 3,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0,
+          "specimens": 3
+        },
+        "member_card": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9952,
+          "specimens": 3
+        },
+        "passport": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.5,
+          "specimens": 3
+        }
+      },
+      "countries": 3,
+      "over_masking_mean": 0.047,
+      "latency_ms": {
+        "sam_call_p50": null,
+        "sam_call_p95": null,
+        "sam_per_image_p50": 0.0,
+        "sam_per_image_p95": 0.0,
+        "local_per_image_p50": 1505.9,
+        "local_per_image_p95": 4417.5,
+        "total_per_image_p50": 1505.9,
+        "total_per_image_p95": 4417.5,
+        "segment_per_image_p50": 1505.9,
+        "segment_per_image_p95": 4417.5,
+        "segment_first_image": 1193.1,
+        "segment_model_load": 377.2
+      },
+      "cost_usd": 0.0
+    },
+    {
+      "run_id": "2026-10-27-segment-efficientsam-specimens",
+      "date": "2026-10-27",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "system": "visual-segment:yunet-2023mar+efficientsam-vitt",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate efficientsam.",
+        "portrait: recall@IoU0.5 92.3 %, leak (<95 % covered) 16.9 %, strict leak 43.1 %, precision 72.4 % (152 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 91.9 %, strict leak 91.9 %, precision n/a (0 boxes).",
+        "Per image p50 2231.6 ms, p95 3340.7 ms on Darwin arm64 CPU; model load 683.7 ms; peak RSS 1909.8 MB; weights 41.6 MB; licence MIT (YuNet), Apache-2.0 (EfficientSAM code and weights)."
+      ],
+      "fixture_set": "specimens",
+      "specimens": 65,
+      "overall": {
+        "regions": 102,
+        "recall_iou50": 0.5882,
+        "recall_cov90": 0.5882,
+        "mean_coverage": 0.6266
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 65,
+          "recall_iou50": 0.9231,
+          "recall_cov90": 0.8769,
+          "mean_coverage": 0.9323
+        },
+        "signature": {
+          "regions": 37,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0811,
+          "mean_coverage": 0.0895
+        }
+      },
+      "by_doc_type": {
+        "driving_licence": {
+          "regions": 15,
+          "recall_iou50": 0.5333,
+          "recall_cov90": 0.5333,
+          "mean_coverage": 0.5306,
+          "specimens": 10
+        },
+        "id_card": {
+          "regions": 74,
+          "recall_iou50": 0.5811,
+          "recall_cov90": 0.5946,
+          "mean_coverage": 0.6397,
+          "specimens": 49
+        },
+        "passport": {
+          "regions": 13,
+          "recall_iou50": 0.6923,
+          "recall_cov90": 0.6154,
+          "mean_coverage": 0.6628,
+          "specimens": 6
+        }
+      },
+      "countries": 24,
+      "over_masking_mean": 0.063,
+      "latency_ms": {
+        "sam_call_p50": null,
+        "sam_call_p95": null,
+        "sam_per_image_p50": 0.0,
+        "sam_per_image_p95": 0.0,
+        "local_per_image_p50": 2231.6,
+        "local_per_image_p95": 3340.7,
+        "total_per_image_p50": 2231.6,
+        "total_per_image_p95": 3340.7,
+        "segment_per_image_p50": 2231.6,
+        "segment_per_image_p95": 3340.7,
+        "segment_first_image": 2696.6,
+        "segment_model_load": 683.7
+      },
+      "cost_usd": 0.0
+    },
+    {
+      "run_id": "2026-10-27-segment-local-fictional",
+      "date": "2026-10-27",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "system": "visual-segment:yunet-2023mar",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate local.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 5.6 %, precision 80.6 % (36 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 93.3 %, strict leak 93.3 %, precision n/a (0 boxes).",
+        "Per image p50 176.4 ms, p95 238.4 ms on Darwin arm64 CPU; model load 222.0 ms; peak RSS 381.5 MB; weights 0.23 MB; licence MIT (YuNet weights), Apache-2.0 (OpenCV)."
+      ],
+      "fixture_set": "fictional-specimens",
+      "specimens": 24,
+      "overall": {
+        "regions": 33,
+        "recall_iou50": 0.5455,
+        "recall_cov90": 0.5758,
+        "mean_coverage": 0.6069
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 18,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9982
+        },
+        "signature": {
+          "regions": 15,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0667,
+          "mean_coverage": 0.1374
+        }
+      },
+      "by_doc_type": {
+        "badge": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0,
+          "specimens": 3
+        },
+        "driving_licence": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.5,
+          "specimens": 3
+        },
+        "form": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.5,
+          "specimens": 3
+        },
+        "id_card": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.6667,
+          "mean_coverage": 0.8435,
+          "specimens": 6
+        },
+        "letter": {
+          "regions": 3,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0,
+          "specimens": 3
+        },
+        "member_card": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9893,
+          "specimens": 3
+        },
+        "passport": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.5,
+          "specimens": 3
+        }
+      },
+      "countries": 3,
+      "over_masking_mean": 0.0774,
+      "latency_ms": {
+        "sam_call_p50": null,
+        "sam_call_p95": null,
+        "sam_per_image_p50": 0.0,
+        "sam_per_image_p95": 0.0,
+        "local_per_image_p50": 176.4,
+        "local_per_image_p95": 238.4,
+        "total_per_image_p50": 176.4,
+        "total_per_image_p95": 238.4,
+        "segment_per_image_p50": 176.4,
+        "segment_per_image_p95": 238.4,
+        "segment_first_image": 194.4,
+        "segment_model_load": 222.0
+      },
+      "cost_usd": 0.0
+    },
+    {
+      "run_id": "2026-10-27-segment-local-specimens",
+      "date": "2026-10-27",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "system": "visual-segment:yunet-2023mar",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate local.",
+        "portrait: recall@IoU0.5 92.3 %, leak (<95 % covered) 10.8 %, strict leak 12.3 %, precision 61.2 % (152 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 91.9 %, strict leak 91.9 %, precision n/a (0 boxes).",
+        "Per image p50 116.0 ms, p95 348.1 ms on Darwin arm64 CPU; model load 102.2 ms; peak RSS 877.1 MB; weights 0.23 MB; licence MIT (YuNet weights), Apache-2.0 (OpenCV)."
+      ],
+      "fixture_set": "specimens",
+      "specimens": 65,
+      "overall": {
+        "regions": 102,
+        "recall_iou50": 0.5882,
+        "recall_cov90": 0.6078,
+        "mean_coverage": 0.6429
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 65,
+          "recall_iou50": 0.9231,
+          "recall_cov90": 0.9077,
+          "mean_coverage": 0.9408
+        },
+        "signature": {
+          "regions": 37,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0811,
+          "mean_coverage": 0.1195
+        }
+      },
+      "by_doc_type": {
+        "driving_licence": {
+          "regions": 15,
+          "recall_iou50": 0.5333,
+          "recall_cov90": 0.5333,
+          "mean_coverage": 0.5337,
+          "specimens": 10
+        },
+        "id_card": {
+          "regions": 74,
+          "recall_iou50": 0.5811,
+          "recall_cov90": 0.6216,
+          "mean_coverage": 0.6616,
+          "specimens": 49
+        },
+        "passport": {
+          "regions": 13,
+          "recall_iou50": 0.6923,
+          "recall_cov90": 0.6154,
+          "mean_coverage": 0.6625,
+          "specimens": 6
+        }
+      },
+      "countries": 24,
+      "over_masking_mean": 0.1029,
+      "latency_ms": {
+        "sam_call_p50": null,
+        "sam_call_p95": null,
+        "sam_per_image_p50": 0.0,
+        "sam_per_image_p95": 0.0,
+        "local_per_image_p50": 116.0,
+        "local_per_image_p95": 348.1,
+        "total_per_image_p50": 116.0,
+        "total_per_image_p95": 348.1,
+        "segment_per_image_p50": 116.0,
+        "segment_per_image_p95": 348.1,
+        "segment_first_image": 74.3,
+        "segment_model_load": 102.2
+      },
+      "cost_usd": 0.0
+    },
+    {
+      "run_id": "2026-10-27-segment-sam-api-fictional",
+      "date": "2026-10-27",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "system": "visual-segment:sam-3.1",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate sam-api.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 88.9 %, precision 100.0 % (36 boxes); signature: recall@IoU0.5 100.0 %, leak (<95 % covered) 6.7 %, strict leak 100.0 %, precision 100.0 % (15 boxes).",
+        "Per image p50 5108.3 ms, p95 6871.2 ms on Darwin arm64 CPU; model load 4.1 ms; peak RSS 155.6 MB; weights hosted; licence hosted (Meta Model API)."
+      ],
+      "fixture_set": "fictional-specimens",
+      "specimens": 24,
+      "overall": {
+        "regions": 33,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9808
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 18,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9893
+        },
+        "signature": {
+          "regions": 15,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9706
+        }
+      },
+      "by_doc_type": {
+        "badge": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9921,
+          "specimens": 3
+        },
+        "driving_licence": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9812,
+          "specimens": 3
+        },
+        "form": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.981,
+          "specimens": 3
+        },
+        "id_card": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9731,
+          "specimens": 6
+        },
+        "letter": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9758,
+          "specimens": 3
+        },
+        "member_card": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9867,
+          "specimens": 3
+        },
+        "passport": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9816,
+          "specimens": 3
+        }
+      },
+      "countries": 3,
+      "over_masking_mean": 0.007,
+      "latency_ms": {
+        "sam_call_p50": 1295.3,
+        "sam_call_p95": 1906.6,
+        "sam_per_image_p50": 5108.3,
+        "sam_per_image_p95": 6871.2,
+        "local_per_image_p50": 0.0,
+        "local_per_image_p95": 0.0,
+        "total_per_image_p50": 5108.3,
+        "total_per_image_p95": 6871.2,
+        "segment_per_image_p50": 5108.3,
+        "segment_per_image_p95": 6871.2,
+        "segment_first_image": 6871.2,
+        "segment_model_load": 4.1
+      },
+      "cost_usd": 0.24
+    },
+    {
+      "run_id": "2026-10-27-segment-sam-api-specimens",
+      "date": "2026-10-27",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "system": "visual-segment:sam-3.1",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate sam-api.",
+        "portrait: recall@IoU0.5 90.8 %, leak (<95 % covered) 47.7 %, strict leak 83.1 %, precision 90.4 % (136 boxes); signature: recall@IoU0.5 83.8 %, leak (<95 % covered) 51.3 %, strict leak 86.5 %, precision 77.5 % (40 boxes).",
+        "Per image p50 5482.4 ms, p95 8591.3 ms on Darwin arm64 CPU; model load 4.0 ms; peak RSS 630.8 MB; weights hosted; licence hosted (Meta Model API)."
+      ],
+      "fixture_set": "specimens",
+      "specimens": 65,
+      "overall": {
+        "regions": 102,
+        "recall_iou50": 0.8824,
+        "recall_cov90": 0.6961,
+        "mean_coverage": 0.8555
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 65,
+          "recall_iou50": 0.9077,
+          "recall_cov90": 0.7231,
+          "mean_coverage": 0.8721
+        },
+        "signature": {
+          "regions": 37,
+          "recall_iou50": 0.8378,
+          "recall_cov90": 0.6486,
+          "mean_coverage": 0.8264
+        }
+      },
+      "by_doc_type": {
+        "driving_licence": {
+          "regions": 15,
+          "recall_iou50": 0.9333,
+          "recall_cov90": 0.9333,
+          "mean_coverage": 0.9167,
+          "specimens": 10
+        },
+        "id_card": {
+          "regions": 74,
+          "recall_iou50": 0.8784,
+          "recall_cov90": 0.6622,
+          "mean_coverage": 0.8551,
+          "specimens": 49
+        },
+        "passport": {
+          "regions": 13,
+          "recall_iou50": 0.8462,
+          "recall_cov90": 0.6154,
+          "mean_coverage": 0.7874,
+          "specimens": 6
+        }
+      },
+      "countries": 24,
+      "over_masking_mean": 0.0213,
+      "latency_ms": {
+        "sam_call_p50": 1362.7,
+        "sam_call_p95": 2246.1,
+        "sam_per_image_p50": 5482.4,
+        "sam_per_image_p95": 8591.3,
+        "local_per_image_p50": 0.0,
+        "local_per_image_p95": 0.0,
+        "total_per_image_p50": 5482.4,
+        "total_per_image_p95": 8591.3,
+        "segment_per_image_p50": 5482.4,
+        "segment_per_image_p95": 8591.3,
+        "segment_first_image": 5940.1,
+        "segment_model_load": 4.0
+      },
+      "cost_usd": 0.65
+    },
+    {
+      "run_id": "2026-10-27-segment-small-detectors-fictional",
+      "date": "2026-10-27",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "system": "visual-segment:yunet-2023mar+yolos-tiny-signature",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate small-detectors.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 0.0 %, precision 80.6 % (36 boxes); signature: recall@IoU0.5 100.0 %, leak (<95 % covered) 13.3 %, strict leak 13.3 %, precision 27.9 % (61 boxes).",
+        "Per image p50 1099.7 ms, p95 1562.0 ms on Darwin arm64 CPU; model load 6680.4 ms; peak RSS 723.3 MB; weights 26.14 MB; licence MIT (YuNet), Apache-2.0 (YOLOS-tiny signature weights, transformers)."
+      ],
+      "fixture_set": "fictional-specimens",
+      "specimens": 24,
+      "overall": {
+        "regions": 33,
+        "recall_iou50": 1.0,
+        "recall_cov90": 0.9697,
+        "mean_coverage": 0.9922
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 18,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0
+        },
+        "signature": {
+          "regions": 15,
+          "recall_iou50": 1.0,
+          "recall_cov90": 0.9333,
+          "mean_coverage": 0.9829
+        }
+      },
+      "by_doc_type": {
+        "badge": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0,
+          "specimens": 3
+        },
+        "driving_licence": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 0.8333,
+          "mean_coverage": 0.9716,
+          "specimens": 3
+        },
+        "form": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0,
+          "specimens": 3
+        },
+        "id_card": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0,
+          "specimens": 6
+        },
+        "letter": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9713,
+          "specimens": 3
+        },
+        "member_card": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0,
+          "specimens": 3
+        },
+        "passport": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0,
+          "specimens": 3
+        }
+      },
+      "countries": 3,
+      "over_masking_mean": 0.0999,
+      "latency_ms": {
+        "sam_call_p50": null,
+        "sam_call_p95": null,
+        "sam_per_image_p50": 0.0,
+        "sam_per_image_p95": 0.0,
+        "local_per_image_p50": 1099.7,
+        "local_per_image_p95": 1562.0,
+        "total_per_image_p50": 1099.7,
+        "total_per_image_p95": 1562.0,
+        "segment_per_image_p50": 1099.7,
+        "segment_per_image_p95": 1562.0,
+        "segment_first_image": 1227.8,
+        "segment_model_load": 6680.4
+      },
+      "cost_usd": 0.0
+    },
+    {
+      "run_id": "2026-10-27-segment-small-detectors-specimens",
+      "date": "2026-10-27",
+      "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+      "system": "visual-segment:yunet-2023mar+yolos-tiny-signature",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate small-detectors.",
+        "portrait: recall@IoU0.5 93.8 %, leak (<95 % covered) 6.2 %, strict leak 7.7 %, precision 61.2 % (152 boxes); signature: recall@IoU0.5 51.3 %, leak (<95 % covered) 46.0 %, strict leak 54.0 %, precision 9.4 % (288 boxes).",
+        "Per image p50 726.8 ms, p95 1648.3 ms on Darwin arm64 CPU; model load 3746.3 ms; peak RSS 1116.9 MB; weights 26.14 MB; licence MIT (YuNet), Apache-2.0 (YOLOS-tiny signature weights, transformers)."
+      ],
+      "fixture_set": "specimens",
+      "specimens": 65,
+      "overall": {
+        "regions": 102,
+        "recall_iou50": 0.7843,
+        "recall_cov90": 0.8137,
+        "mean_coverage": 0.9015
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 65,
+          "recall_iou50": 0.9385,
+          "recall_cov90": 0.9385,
+          "mean_coverage": 0.9704
+        },
+        "signature": {
+          "regions": 37,
+          "recall_iou50": 0.5135,
+          "recall_cov90": 0.5946,
+          "mean_coverage": 0.7804
+        }
+      },
+      "by_doc_type": {
+        "driving_licence": {
+          "regions": 15,
+          "recall_iou50": 0.7333,
+          "recall_cov90": 0.8667,
+          "mean_coverage": 0.8848,
+          "specimens": 10
+        },
+        "id_card": {
+          "regions": 74,
+          "recall_iou50": 0.7973,
+          "recall_cov90": 0.8108,
+          "mean_coverage": 0.908,
+          "specimens": 49
+        },
+        "passport": {
+          "regions": 13,
+          "recall_iou50": 0.7692,
+          "recall_cov90": 0.7692,
+          "mean_coverage": 0.8836,
+          "specimens": 6
+        }
+      },
+      "countries": 24,
+      "over_masking_mean": 0.1892,
+      "latency_ms": {
+        "sam_call_p50": null,
+        "sam_call_p95": null,
+        "sam_per_image_p50": 0.0,
+        "sam_per_image_p95": 0.0,
+        "local_per_image_p50": 726.8,
+        "local_per_image_p95": 1648.3,
+        "total_per_image_p50": 726.8,
+        "total_per_image_p95": 1648.3,
+        "segment_per_image_p50": 726.8,
+        "segment_per_image_p95": 1648.3,
+        "segment_first_image": 949.9,
+        "segment_model_load": 3746.3
+      },
+      "cost_usd": 0.0
     },
     {
       "run_id": "2026-10-27-visual-fictional-muse-image",
@@ -85288,6 +86476,14 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0075,
+      "latency_ms": {
+        "sam_call_p50": 1204.7,
+        "sam_call_p95": 2312.0,
+        "sam_per_image_p50": 5159.2,
+        "sam_per_image_p95": 8837.0,
+        "local_per_image_p50": 633.8,
+        "local_per_image_p95": 1037.2
+      },
       "cost_usd": 0.24
     },
     {
@@ -85385,6 +86581,14 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0079,
+      "latency_ms": {
+        "sam_call_p50": 1420.0,
+        "sam_call_p95": 2608.7,
+        "sam_per_image_p50": 6045.3,
+        "sam_per_image_p95": 7615.7,
+        "local_per_image_p50": 1043.9,
+        "local_per_image_p95": 1522.0
+      },
       "cost_usd": 0.24
     },
     {
@@ -85482,6 +86686,14 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0119,
+      "latency_ms": {
+        "sam_call_p50": 1420.0,
+        "sam_call_p95": 2608.7,
+        "sam_per_image_p50": 6045.3,
+        "sam_per_image_p95": 7615.7,
+        "local_per_image_p50": 1550.6,
+        "local_per_image_p95": 2381.3
+      },
       "cost_usd": 0.0
     },
     {
@@ -85580,6 +86792,14 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0089,
+      "latency_ms": {
+        "sam_call_p50": 1420.0,
+        "sam_call_p95": 2608.7,
+        "sam_per_image_p50": 6045.3,
+        "sam_per_image_p95": 7615.7,
+        "local_per_image_p50": 3930.4,
+        "local_per_image_p95": 6409.3
+      },
       "cost_usd": null
     },
     {
@@ -85678,6 +86898,14 @@
       },
       "countries": 3,
       "over_masking_mean": 0.0125,
+      "latency_ms": {
+        "sam_call_p50": 1420.0,
+        "sam_call_p95": 2608.7,
+        "sam_per_image_p50": 6045.3,
+        "sam_per_image_p95": 7615.7,
+        "local_per_image_p50": 4571.2,
+        "local_per_image_p95": 6289.1
+      },
       "cost_usd": null
     },
     {
@@ -85747,6 +86975,14 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0154,
+      "latency_ms": {
+        "sam_call_p50": 1330.6,
+        "sam_call_p95": 2156.1,
+        "sam_per_image_p50": 5163.9,
+        "sam_per_image_p95": 7222.9,
+        "local_per_image_p50": 521.7,
+        "local_per_image_p95": 1223.4
+      },
       "cost_usd": 0.65
     },
     {
@@ -85816,6 +87052,14 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0205,
+      "latency_ms": {
+        "sam_call_p50": 1372.7,
+        "sam_call_p95": 2280.8,
+        "sam_per_image_p50": 5625.2,
+        "sam_per_image_p95": 7661.5,
+        "local_per_image_p50": 534.4,
+        "local_per_image_p95": 1226.9
+      },
       "cost_usd": 0.65
     },
     {
@@ -85885,6 +87129,14 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0259,
+      "latency_ms": {
+        "sam_call_p50": 1595.9,
+        "sam_call_p95": 3411.1,
+        "sam_per_image_p50": 6586.0,
+        "sam_per_image_p95": 11423.8,
+        "local_per_image_p50": 865.2,
+        "local_per_image_p95": 2044.2
+      },
       "cost_usd": 0.65
     },
     {
@@ -85954,6 +87206,14 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0398,
+      "latency_ms": {
+        "sam_call_p50": 1595.9,
+        "sam_call_p95": 3411.1,
+        "sam_per_image_p50": 6586.0,
+        "sam_per_image_p95": 11423.8,
+        "local_per_image_p50": 2148.6,
+        "local_per_image_p95": 3253.6
+      },
       "cost_usd": 0.0
     },
     {
@@ -86024,6 +87284,14 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0311,
+      "latency_ms": {
+        "sam_call_p50": 1595.9,
+        "sam_call_p95": 3411.1,
+        "sam_per_image_p50": 6586.0,
+        "sam_per_image_p95": 11423.8,
+        "local_per_image_p50": 4490.5,
+        "local_per_image_p95": 6525.2
+      },
       "cost_usd": null
     },
     {
@@ -86094,6 +87362,14 @@
       },
       "countries": 24,
       "over_masking_mean": 0.0479,
+      "latency_ms": {
+        "sam_call_p50": 1595.9,
+        "sam_call_p95": 3411.1,
+        "sam_per_image_p50": 6586.0,
+        "sam_per_image_p95": 11423.8,
+        "local_per_image_p50": 5695.8,
+        "local_per_image_p95": 8528.7
+      },
       "cost_usd": null
     }
   ],
@@ -87436,6 +88712,10 @@
   ],
   "colours": {
     "visual": {
+      "visual-segment:sam-3.1": "#CC6677",
+      "visual-segment:yunet-2023mar": "#44AA99",
+      "visual-segment:yunet-2023mar+efficientsam-vitt": "#332288",
+      "visual-segment:yunet-2023mar+yolos-tiny-signature": "#88CCEE",
       "visual:eka": "#0072B2",
       "visual:eka-tuned": "#332288",
       "visual:presidio-image": "#88CCEE",
