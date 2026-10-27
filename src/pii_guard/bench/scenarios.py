@@ -186,9 +186,6 @@ SCENARIOS: tuple[Scenario, ...] = (
         "hu",
         TEXT_HU_KNOWN,
         ("Minta Mári", "Placeholder Kft", "Teszt Elek"),
-        # Streamed: the streaming restore re-inflects a changed stem ("Máriá" + "nak"); the
-        # non-streaming one does not yet (LAB-1194).
-        stream=True,
         known_values=(
             ("Minta Mária", "PERSON"),
             ("Placeholder Kft.", "ORGANIZATION"),
