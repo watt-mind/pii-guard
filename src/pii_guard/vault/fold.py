@@ -11,15 +11,26 @@ dropped, combining marks composed, Unicode spaces and dashes folded; the view ev
 sees) followed by a full case fold per character (``ß`` -> ``ss``). A match over the folded
 text maps back to the smallest original span covering it (:meth:`FoldedText.to_original`), so
 the placeholder replaces the occurrence exactly as it was written.
+
+A zero-width separator between two letters of the same case is ambiguous: ``teszt\\u200belek``
+may be two words run together or one word with an invisible character put in to break
+matching (``Te\\u200bszt``). The detection fold drops it; :func:`fold_views` also gives the
+reading with every such separator as a space, and the vault searches both, so neither way of
+writing a value hides an occurrence.
 """
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 
-from pii_guard.detect.normalize import normalize_for_detection
+from pii_guard.detect.normalize import (
+    INVISIBLE_CHARS,
+    ZERO_WIDTH_SEPARATORS,
+    normalize_for_detection,
+)
 
-__all__ = ["FoldedText", "fold_text", "fold_value"]
+__all__ = ["FoldedText", "fold_text", "fold_value", "fold_views"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,8 +60,57 @@ class FoldedText:
 
 def fold_text(text: str) -> FoldedText:
     """``text`` normalised as for detection, then case-folded, with the offset map."""
+    return _fold(text, text)
+
+
+def fold_views(text: str) -> tuple[FoldedText, ...]:
+    """The folded views occurrences are searched in: :func:`fold_text`'s, and one more if needed.
+
+    The second view reads every zero-width separator between two letters (invisible
+    characters and combining marks aside) as a space: ``teszt\\u200belek`` as ``teszt elek``.
+    It is given only when ``text`` has such a separator; both views map back to ``text``.
+    """
+    primary = fold_text(text)
+    if text.isascii() or not any(c in ZERO_WIDTH_SEPARATORS for c in text):
+        return (primary,)
+    spaced = _spaced(text)
+    if spaced == text:
+        return (primary,)
+    alternative = _fold(text, spaced)
+    if alternative.text == primary.text:
+        return (primary,)
+    return primary, alternative
+
+
+def _spaced(text: str) -> str:
+    """``text`` with each zero-width separator between two letters replaced by a space.
+
+    One for one, so offsets into the result are offsets into ``text``.
+    """
+    chars = list(text)
+    n = len(text)
+    for k, char in enumerate(text):
+        if char not in ZERO_WIDTH_SEPARATORS:
+            continue
+        before = k - 1
+        while before >= 0 and (text[before] in INVISIBLE_CHARS or _is_mark(text[before])):
+            before -= 1
+        after = k + 1
+        while after < n and text[after] in INVISIBLE_CHARS:
+            after += 1
+        if before >= 0 and after < n and text[before].isalpha() and text[after].isalpha():
+            chars[k] = " "
+    return "".join(chars)
+
+
+def _is_mark(char: str) -> bool:
+    return unicodedata.category(char) in ("Mn", "Mc", "Me")
+
+
+def _fold(original: str, text: str) -> FoldedText:
+    """Fold ``text``, a one-for-one rewrite of ``original``, as the view of ``original``."""
     if text.isascii():
-        return FoldedText(text, text.lower())
+        return FoldedText(original, text.lower())
     norm = normalize_for_detection(text)
     chars: list[str] = []
     starts: list[int] = []
@@ -66,8 +126,8 @@ def fold_text(text: str) -> FoldedText:
     if len(folded_text) == len(text) and all(
         s == i and e == i + 1 for i, (s, e) in enumerate(zip(starts, ends, strict=True))
     ):
-        return FoldedText(text, folded_text)
-    return FoldedText(text, folded_text, tuple(starts), tuple(ends))
+        return FoldedText(original, folded_text)
+    return FoldedText(original, folded_text, tuple(starts), tuple(ends))
 
 
 def fold_value(value: str) -> str:

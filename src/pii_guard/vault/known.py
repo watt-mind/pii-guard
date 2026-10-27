@@ -19,7 +19,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from pii_guard.types import EntityType, PiiGuardError
-from pii_guard.vault.fold import fold_text, fold_value
+from pii_guard.vault.fold import fold_value, fold_views
 from pii_guard.vault.inflection import inflection_for
 from pii_guard.vault.placeholders import normalize_value
 
@@ -158,18 +158,23 @@ class KnownValues:
         """``(value, start, end)`` of every occurrence in ``text``, longest value first.
 
         Offsets are in ``text``; matches may overlap (the caller picks). The search runs over
-        :func:`~pii_guard.vault.fold.fold_text`'s folded view, so another casing, Unicode
+        :func:`~pii_guard.vault.fold.fold_views`' folded views, so another casing, Unicode
         form or ``ß``/``ss`` spelling (``WEISS`` for ``Weiß``) is found too.
         """
         patterns = self.patterns(language)
         if not patterns:
             return []
-        folded = fold_text(text)
+        views = fold_views(text)
         found: list[tuple[KnownValue, int, int]] = []
         for item, pattern in patterns:
-            for match in pattern.finditer(folded.text):
-                if match.end() > match.start():
-                    found.append((item, *folded.to_original(*match.span())))
+            seen: set[tuple[int, int]] = set()
+            for folded in views:
+                for match in pattern.finditer(folded.text):
+                    if match.end() > match.start():
+                        span = folded.to_original(*match.span())
+                        if span not in seen:
+                            seen.add(span)
+                            found.append((item, *span))
         return found
 
     def patterns(self, language: str) -> list[tuple[KnownValue, re.Pattern[str]]]:
