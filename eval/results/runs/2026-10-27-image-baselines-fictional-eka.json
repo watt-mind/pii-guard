@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-image-baselines-fictional-eka",
+  "kind": "visual",
+  "date": "2026-10-27",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "Eka PII Redaction (defaults) on fictional-specimens",
+  "notes": [
+    "LAB-1164 image baseline. Region types the tool can't mask (none) are left out of by_region_type and count as missed in overall.",
+    "Word boxes of one detected entity are merged per text line before scoring (the rule pii-guard applies to its own spans); every box the tool returns is counted as masked."
+  ],
+  "code": {
+    "commit": "b9b2b435d92362197e28028c78486a18b3cfc6ba",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": "LAB-1164 branch; harness, workers and pinned envs at this commit"
+  },
+  "system": {
+    "family": "comparison",
+    "tool": "eka-pii-redaction",
+    "version": "0.7.0",
+    "detectors": [
+      {
+        "name": "eka",
+        "model": "ekacare/document-pii-redactor@c088fc4823f6 image/layoutlmv3 (text PII); ekacare/document-pii-redactor@c088fc4823f6 image/yolo/best.pt (visual entities)",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "detector": "ImagePIIRedactor.detect, all categories, detect_visual=True",
+          "visual_score_threshold": 0.25,
+          "device": "cpu",
+          "ocr_lang": "tesseract default (eng)",
+          "upscale_to": null
+        },
+        "serving": null
+      }
+    ],
+    "key": "visual:eka",
+    "label": "Eka PII Redaction (defaults)",
+    "info": {
+      "tool": "eka-pii-redaction",
+      "versions": {
+        "eka-pii-redaction": "0.7.0",
+        "torch": "2.14.1",
+        "transformers": "5.21.0",
+        "ultralytics": "8.4.190"
+      },
+      "models": [
+        "ekacare/document-pii-redactor@c088fc4823f6 image/layoutlmv3 (text PII)",
+        "ekacare/document-pii-redactor@c088fc4823f6 image/yolo/best.pt (visual entities)"
+      ],
+      "config": {
+        "detector": "ImagePIIRedactor.detect, all categories, detect_visual=True",
+        "visual_score_threshold": 0.25,
+        "device": "cpu",
+        "ocr_lang": "tesseract default (eng)",
+        "upscale_to": null
+      },
+      "supports": [
+        "text",
+        "face",
+        "signature"
+      ]
+    }
+  },
+  "fixture_set": "specimens",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/visual/manifest.json",
+      "sha256": null,
+      "set": "fictional-specimens",
+      "language": null,
+      "origin": "generated",
+      "generator": "muse-image",
+      "documents": 24
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows)",
+    "platform": "darwin",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12"
+  },
+  "cost": null,
+  "metrics": {
+    "specimens": 24,
+    "overall": {
+      "regions": 149,
+      "recall_iou50": 0.8859,
+      "recall_cov90": 0.7919,
+      "mean_coverage": 0.8933
+    },
+    "by_region_type": {
+      "portrait": {
+        "regions": 18,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9944
+      },
+      "signature": {
+        "regions": 15,
+        "recall_iou50": 0.8667,
+        "recall_cov90": 0.8,
+        "mean_coverage": 0.8324
+      },
+      "mrz": {
+        "regions": 6,
+        "recall_iou50": 0.0,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.6769
+      },
+      "text": {
+        "regions": 110,
+        "recall_iou50": 0.9182,
+        "recall_cov90": 0.8,
+        "mean_coverage": 0.8968
+      }
+    },
+    "by_doc_type": {
+      "badge": {
+        "regions": 12,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9611,
+        "specimens": 3
+      },
+      "driving_licence": {
+        "regions": 15,
+        "recall_iou50": 0.8,
+        "recall_cov90": 0.8,
+        "mean_coverage": 0.8469,
+        "specimens": 3
+      },
+      "form": {
+        "regions": 27,
+        "recall_iou50": 0.963,
+        "recall_cov90": 0.7778,
+        "mean_coverage": 0.932,
+        "specimens": 3
+      },
+      "id_card": {
+        "regions": 29,
+        "recall_iou50": 0.7931,
+        "recall_cov90": 0.7586,
+        "mean_coverage": 0.8573,
+        "specimens": 6
+      },
+      "letter": {
+        "regions": 24,
+        "recall_iou50": 0.9167,
+        "recall_cov90": 0.6667,
+        "mean_coverage": 0.8557,
+        "specimens": 3
+      },
+      "member_card": {
+        "regions": 15,
+        "recall_iou50": 0.9333,
+        "recall_cov90": 0.8667,
+        "mean_coverage": 0.9376,
+        "specimens": 3
+      },
+      "passport": {
+        "regions": 27,
+        "recall_iou50": 0.8519,
+        "recall_cov90": 0.8148,
+        "mean_coverage": 0.8975,
+        "specimens": 3
+      }
+    },
+    "by_country": {
+      "DE": {
+        "regions": 50,
+        "recall_iou50": 0.88,
+        "recall_cov90": 0.78,
+        "mean_coverage": 0.9107,
+        "specimens": 8
+      },
+      "GB": {
+        "regions": 49,
+        "recall_iou50": 0.9184,
+        "recall_cov90": 0.7959,
+        "mean_coverage": 0.9023,
+        "specimens": 8
+      },
+      "HU": {
+        "regions": 50,
+        "recall_iou50": 0.86,
+        "recall_cov90": 0.8,
+        "mean_coverage": 0.867,
+        "specimens": 8
+      }
+    },
+    "over_masking_mean": 0.0319,
+    "errors": 0,
+    "latency_ms": {
+      "local_per_image_p50": 672.3,
+      "local_per_image_p95": 880.7,
+      "total_per_image_p50": 672.3,
+      "total_per_image_p95": 880.7
+    }
+  }
+}

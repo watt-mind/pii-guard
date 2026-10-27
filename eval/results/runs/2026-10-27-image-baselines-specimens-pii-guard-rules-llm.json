@@ -1,0 +1,345 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-image-baselines-specimens-pii-guard-rules-llm",
+  "kind": "visual",
+  "date": "2026-10-27",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard image masking (sam-3.1 + tesseract + rules+llm+captions) on specimens (LAB-1164 rerun)",
+  "notes": [
+    "LAB-1164 rerun of pii-guard next to the image baselines (same host, same images).",
+    "LLM detector: Muse Spark Open (meta-models/muse-spark-open-1026) on Baseten, reasoning_effort low; runs are not deterministic."
+  ],
+  "code": {
+    "commit": "b9b2b435d92362197e28028c78486a18b3cfc6ba",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": "LAB-1164 branch; harness, workers and pinned envs at this commit"
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": null,
+    "detectors": [
+      {
+        "name": "sam",
+        "model": "sam-3.1",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "prompts": "{\"FACE\": [\"face\"], \"ID_PHOTO\": [\"photo of a person\"], \"SIGNATURE\": [\"signature\", \"squiggly line\"]}"
+        },
+        "serving": "Meta Model API"
+      },
+      {
+        "name": "ocr",
+        "model": "tesseract",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "upscale_to": 2000
+        },
+        "serving": null
+      },
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "llm",
+        "model": "muse-spark-open",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "reasoning_effort": "low"
+        },
+        "serving": "Baseten Model APIs"
+      },
+      {
+        "name": "captions",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      }
+    ],
+    "key": "visual:sam-3.1+tesseract+rules+llm:muse-spark-open+captions",
+    "label": "pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions)"
+  },
+  "fixture_set": "specimens",
+  "fixtures": [
+    {
+      "path": "eval/visual/manifest.json",
+      "sha256": null,
+      "set": "specimens",
+      "language": null,
+      "origin": "specimens",
+      "generator": null,
+      "documents": 65
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows)",
+    "platform": "darwin",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12"
+  },
+  "cost": {
+    "usd": 0.0,
+    "estimated": true,
+    "gpu_minutes": null,
+    "model_calls": 260,
+    "tokens": null,
+    "shared_with": [],
+    "note": "SAM sam-3.1: 0 live + 260 cached calls at $0.0025/call (planning estimate); Baseten tokens for the LLM detector are not metered by the harness"
+  },
+  "metrics": {
+    "specimens": 65,
+    "overall": {
+      "regions": 406,
+      "recall_iou50": 0.4852,
+      "recall_cov90": 0.3547,
+      "mean_coverage": 0.5359
+    },
+    "by_region_type": {
+      "portrait": {
+        "regions": 65,
+        "recall_iou50": 0.9077,
+        "recall_cov90": 0.7385,
+        "mean_coverage": 0.8772
+      },
+      "signature": {
+        "regions": 37,
+        "recall_iou50": 0.8378,
+        "recall_cov90": 0.6486,
+        "mean_coverage": 0.8284
+      },
+      "mrz": {
+        "regions": 30,
+        "recall_iou50": 0.8,
+        "recall_cov90": 0.6,
+        "mean_coverage": 0.7567
+      },
+      "text": {
+        "regions": 274,
+        "recall_iou50": 0.3029,
+        "recall_cov90": 0.1971,
+        "mean_coverage": 0.3913
+      }
+    },
+    "by_doc_type": {
+      "driving_licence": {
+        "regions": 46,
+        "recall_iou50": 0.5,
+        "recall_cov90": 0.3913,
+        "mean_coverage": 0.5251,
+        "specimens": 10
+      },
+      "id_card": {
+        "regions": 304,
+        "recall_iou50": 0.4967,
+        "recall_cov90": 0.3388,
+        "mean_coverage": 0.5382,
+        "specimens": 49
+      },
+      "passport": {
+        "regions": 56,
+        "recall_iou50": 0.4107,
+        "recall_cov90": 0.4107,
+        "mean_coverage": 0.5327,
+        "specimens": 6
+      }
+    },
+    "by_country": {
+      "AT": {
+        "regions": 27,
+        "recall_iou50": 0.4444,
+        "recall_cov90": 0.3333,
+        "mean_coverage": 0.4178,
+        "specimens": 5
+      },
+      "BE": {
+        "regions": 9,
+        "recall_iou50": 1.0,
+        "recall_cov90": 0.6667,
+        "mean_coverage": 0.8782,
+        "specimens": 2
+      },
+      "BG": {
+        "regions": 19,
+        "recall_iou50": 0.6842,
+        "recall_cov90": 0.2632,
+        "mean_coverage": 0.6042,
+        "specimens": 2
+      },
+      "CY": {
+        "regions": 13,
+        "recall_iou50": 0.3077,
+        "recall_cov90": 0.0769,
+        "mean_coverage": 0.3347,
+        "specimens": 2
+      },
+      "CZ": {
+        "regions": 12,
+        "recall_iou50": 0.5,
+        "recall_cov90": 0.5,
+        "mean_coverage": 0.6966,
+        "specimens": 2
+      },
+      "DE": {
+        "regions": 33,
+        "recall_iou50": 0.6061,
+        "recall_cov90": 0.5455,
+        "mean_coverage": 0.6118,
+        "specimens": 6
+      },
+      "EE": {
+        "regions": 11,
+        "recall_iou50": 0.5455,
+        "recall_cov90": 0.7273,
+        "mean_coverage": 0.7024,
+        "specimens": 2
+      },
+      "ES": {
+        "regions": 24,
+        "recall_iou50": 0.375,
+        "recall_cov90": 0.4167,
+        "mean_coverage": 0.5645,
+        "specimens": 3
+      },
+      "FI": {
+        "regions": 11,
+        "recall_iou50": 0.5455,
+        "recall_cov90": 0.1818,
+        "mean_coverage": 0.4899,
+        "specimens": 2
+      },
+      "FR": {
+        "regions": 29,
+        "recall_iou50": 0.2759,
+        "recall_cov90": 0.2069,
+        "mean_coverage": 0.3554,
+        "specimens": 4
+      },
+      "GR": {
+        "regions": 13,
+        "recall_iou50": 0.5385,
+        "recall_cov90": 0.3846,
+        "mean_coverage": 0.6505,
+        "specimens": 2
+      },
+      "HR": {
+        "regions": 10,
+        "recall_iou50": 0.9,
+        "recall_cov90": 0.5,
+        "mean_coverage": 0.8034,
+        "specimens": 2
+      },
+      "HU": {
+        "regions": 42,
+        "recall_iou50": 0.2619,
+        "recall_cov90": 0.2619,
+        "mean_coverage": 0.4368,
+        "specimens": 6
+      },
+      "IT": {
+        "regions": 21,
+        "recall_iou50": 0.5714,
+        "recall_cov90": 0.381,
+        "mean_coverage": 0.6085,
+        "specimens": 4
+      },
+      "LT": {
+        "regions": 11,
+        "recall_iou50": 0.2727,
+        "recall_cov90": 0.3636,
+        "mean_coverage": 0.4729,
+        "specimens": 2
+      },
+      "LU": {
+        "regions": 12,
+        "recall_iou50": 0.5833,
+        "recall_cov90": 0.3333,
+        "mean_coverage": 0.5458,
+        "specimens": 2
+      },
+      "LV": {
+        "regions": 12,
+        "recall_iou50": 0.75,
+        "recall_cov90": 0.6667,
+        "mean_coverage": 0.891,
+        "specimens": 2
+      },
+      "MT": {
+        "regions": 5,
+        "recall_iou50": 0.4,
+        "recall_cov90": 0.2,
+        "mean_coverage": 0.459,
+        "specimens": 1
+      },
+      "NL": {
+        "regions": 11,
+        "recall_iou50": 0.8182,
+        "recall_cov90": 0.2727,
+        "mean_coverage": 0.6948,
+        "specimens": 2
+      },
+      "PL": {
+        "regions": 34,
+        "recall_iou50": 0.3529,
+        "recall_cov90": 0.3529,
+        "mean_coverage": 0.4346,
+        "specimens": 5
+      },
+      "RO": {
+        "regions": 8,
+        "recall_iou50": 0.75,
+        "recall_cov90": 0.125,
+        "mean_coverage": 0.6444,
+        "specimens": 1
+      },
+      "SE": {
+        "regions": 10,
+        "recall_iou50": 0.2,
+        "recall_cov90": 0.2,
+        "mean_coverage": 0.2036,
+        "specimens": 2
+      },
+      "SI": {
+        "regions": 13,
+        "recall_iou50": 0.4615,
+        "recall_cov90": 0.1538,
+        "mean_coverage": 0.3975,
+        "specimens": 2
+      },
+      "SK": {
+        "regions": 16,
+        "recall_iou50": 0.5625,
+        "recall_cov90": 0.4375,
+        "mean_coverage": 0.6201,
+        "specimens": 2
+      }
+    },
+    "over_masking_mean": 0.0473,
+    "errors": 0,
+    "latency_ms": {
+      "sam_call_p50": 1394.5,
+      "sam_call_p95": 2363.7,
+      "sam_per_image_p50": 5319.9,
+      "sam_per_image_p95": 9149.7,
+      "local_per_image_p50": 4151.7,
+      "local_per_image_p95": 6316.6,
+      "total_per_image_p50": 9504.1,
+      "total_per_image_p95": 12309.1
+    }
+  }
+}

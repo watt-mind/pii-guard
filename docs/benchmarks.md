@@ -226,6 +226,18 @@ Share of labelled regions masked with IoU >= 0.5. `specimens` are official speci
 
 | Run | Set | Images | Countries | portrait | signature | mrz | text | All regions | Over-masking (mean) |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `2026-10-27-image-baselines-fictional-eka` | `fictional-specimens` | 24 | 3 | 100.0% | 86.7% | 0.0% | 91.8% | 88.6% | 3.2% |
+| `2026-10-27-image-baselines-fictional-eka-tuned` | `fictional-specimens` | 24 | 3 | 100.0% | 86.7% | 0.0% | 95.5% | 91.3% | 3.2% |
+| `2026-10-27-image-baselines-fictional-pii-guard-rules` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 100.0% | 87.3% | 90.6% | 1.2% |
+| `2026-10-27-image-baselines-fictional-pii-guard-rules-llm` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 1.2% |
+| `2026-10-27-image-baselines-fictional-presidio-image` | `fictional-specimens` | 24 | 3 | — | — | 0.0% | 50.9% | 37.6% | 1.1% |
+| `2026-10-27-image-baselines-fictional-presidio-image-tuned` | `fictional-specimens` | 24 | 3 | — | — | 0.0% | 50.9% | 38.3% | 1.1% |
+| `2026-10-27-image-baselines-specimens-eka` | `specimens` | 65 | 24 | 56.9% | 46.0% | 6.7% | 32.5% | 35.7% | 10.8% |
+| `2026-10-27-image-baselines-specimens-eka-tuned` | `specimens` | 65 | 24 | 55.4% | 48.6% | 10.0% | 32.5% | 36.0% | 12.0% |
+| `2026-10-27-image-baselines-specimens-pii-guard-rules` | `specimens` | 65 | 24 | 90.8% | 83.8% | 76.7% | 15.0% | 37.9% | 4.0% |
+| `2026-10-27-image-baselines-specimens-pii-guard-rules-llm` | `specimens` | 65 | 24 | 90.8% | 83.8% | 80.0% | 30.3% | 48.5% | 4.7% |
+| `2026-10-27-image-baselines-specimens-presidio-image` | `specimens` | 65 | 24 | — | — | 0.0% | 19.7% | 13.3% | 3.4% |
+| `2026-10-27-image-baselines-specimens-presidio-image-tuned` | `specimens` | 65 | 24 | — | — | 0.0% | 17.5% | 12.3% | 3.9% |
 | `2026-10-27-visual-fictional-muse-image` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 0.0% | 34.5% | 47.6% | 0.8% |
 | `2026-10-27-visual-fictional-rules` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 100.0% | 34.5% | 51.7% | 0.8% |
 | `2026-10-27-visual-fictional-rules-captions` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 100.0% | 87.3% | 90.6% | 1.2% |
@@ -355,6 +367,18 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-visual-fictional-rules-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-visual-fictional-rules` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.24 |
 | 2026-10-27 | `2026-10-27-visual-fictional-muse-image` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `88e98bd` | — | ≈ $0.24 |
+| 2026-10-27 | `2026-10-27-image-baselines-specimens-presidio-image-tuned` | Presidio Image Redactor (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
+| 2026-10-27 | `2026-10-27-image-baselines-specimens-presidio-image` | Presidio Image Redactor (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
+| 2026-10-27 | `2026-10-27-image-baselines-specimens-pii-guard-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.00 |
+| 2026-10-27 | `2026-10-27-image-baselines-specimens-pii-guard-rules` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.65 |
+| 2026-10-27 | `2026-10-27-image-baselines-specimens-eka-tuned` | Eka PII Redaction (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
+| 2026-10-27 | `2026-10-27-image-baselines-specimens-eka` | Eka PII Redaction (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
+| 2026-10-27 | `2026-10-27-image-baselines-fictional-presidio-image-tuned` | Presidio Image Redactor (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
+| 2026-10-27 | `2026-10-27-image-baselines-fictional-presidio-image` | Presidio Image Redactor (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
+| 2026-10-27 | `2026-10-27-image-baselines-fictional-pii-guard-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.00 |
+| 2026-10-27 | `2026-10-27-image-baselines-fictional-pii-guard-rules` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.24 |
+| 2026-10-27 | `2026-10-27-image-baselines-fictional-eka-tuned` | Eka PII Redaction (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
+| 2026-10-27 | `2026-10-27-image-baselines-fictional-eka` | Eka PII Redaction (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-26 | `2026-10-26-rules-muse-spark-smoke-hu` | pii-guard rules + Muse Spark 1.3 | smoke | hu | imported | `62b64fc` | local harness; the LLM detector is a remote API call | — |
 | 2026-10-26 | `2026-10-26-rules-muse-spark-smoke-en` | pii-guard rules + Muse Spark 1.3 | smoke | en | imported | `62b64fc` | local harness; the LLM detector is a remote API call | — |
 | 2026-10-26 | `2026-10-26-comparison-synth-sample-privaite` | PrivAiTe | synth-sample | en, hu | imported | `62b64fc` | arm64, 10 CPUs, CPU only | — |

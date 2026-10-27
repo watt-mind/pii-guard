@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-image-baselines-specimens-presidio-image",
+  "kind": "visual",
+  "date": "2026-10-27",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "Presidio Image Redactor (defaults) on specimens",
+  "notes": [
+    "LAB-1164 image baseline. Region types the tool can't mask (portrait, signature) are left out of by_region_type and count as missed in overall.",
+    "Word boxes of one detected entity are merged per text line before scoring (the rule pii-guard applies to its own spans); every box the tool returns is counted as masked."
+  ],
+  "code": {
+    "commit": "b9b2b435d92362197e28028c78486a18b3cfc6ba",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": "LAB-1164 branch; harness, workers and pinned envs at this commit"
+  },
+  "system": {
+    "family": "comparison",
+    "tool": "presidio-image-redactor",
+    "version": "0.0.62",
+    "detectors": [
+      {
+        "name": "presidio-image",
+        "model": "en_core_web_lg 3.8.0 (en); de_core_news_lg 3.8.0 (de); hu_core_news_lg 3.8.1 (hu, huSpaCy)",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "engine": "ImageAnalyzerEngine(AnalyzerEngine, TesseractOCR), the analysis ImageRedactorEngine.redact fills",
+          "analyzer": "predefined recognizers, default score threshold",
+          "languages": "[\"de\", \"en\", \"hu\"]",
+          "ocr_lang": "tesseract default (eng)",
+          "upscale_to": null
+        },
+        "serving": null
+      }
+    ],
+    "key": "visual:presidio-image",
+    "label": "Presidio Image Redactor (defaults)",
+    "info": {
+      "tool": "presidio-image-redactor",
+      "versions": {
+        "presidio-image-redactor": "0.0.62",
+        "presidio-analyzer": "2.2.365",
+        "spacy": "3.8.18",
+        "pytesseract": "0.3.13"
+      },
+      "models": [
+        "en_core_web_lg 3.8.0 (en)",
+        "de_core_news_lg 3.8.0 (de)",
+        "hu_core_news_lg 3.8.1 (hu, huSpaCy)"
+      ],
+      "config": {
+        "engine": "ImageAnalyzerEngine(AnalyzerEngine, TesseractOCR), the analysis ImageRedactorEngine.redact fills",
+        "analyzer": "predefined recognizers, default score threshold",
+        "languages": [
+          "de",
+          "en",
+          "hu"
+        ],
+        "ocr_lang": "tesseract default (eng)",
+        "upscale_to": null
+      },
+      "supports": [
+        "text"
+      ]
+    }
+  },
+  "fixture_set": "specimens",
+  "fixtures": [
+    {
+      "path": "eval/visual/manifest.json",
+      "sha256": null,
+      "set": "specimens",
+      "language": null,
+      "origin": "specimens",
+      "generator": null,
+      "documents": 65
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows)",
+    "platform": "darwin",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12"
+  },
+  "cost": null,
+  "metrics": {
+    "specimens": 65,
+    "overall": {
+      "regions": 406,
+      "recall_iou50": 0.133,
+      "recall_cov90": 0.0567,
+      "mean_coverage": 0.1774
+    },
+    "by_region_type": {
+      "mrz": {
+        "regions": 30,
+        "recall_iou50": 0.0,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.1186
+      },
+      "text": {
+        "regions": 274,
+        "recall_iou50": 0.1971,
+        "recall_cov90": 0.0839,
+        "mean_coverage": 0.2405
+      }
+    },
+    "by_doc_type": {
+      "driving_licence": {
+        "regions": 46,
+        "recall_iou50": 0.087,
+        "recall_cov90": 0.0435,
+        "mean_coverage": 0.1511,
+        "specimens": 10
+      },
+      "id_card": {
+        "regions": 304,
+        "recall_iou50": 0.1513,
+        "recall_cov90": 0.0493,
+        "mean_coverage": 0.1881,
+        "specimens": 49
+      },
+      "passport": {
+        "regions": 56,
+        "recall_iou50": 0.0714,
+        "recall_cov90": 0.1071,
+        "mean_coverage": 0.1414,
+        "specimens": 6
+      }
+    },
+    "by_country": {
+      "AT": {
+        "regions": 27,
+        "recall_iou50": 0.0741,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.0717,
+        "specimens": 5
+      },
+      "BE": {
+        "regions": 9,
+        "recall_iou50": 0.3333,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.246,
+        "specimens": 2
+      },
+      "BG": {
+        "regions": 19,
+        "recall_iou50": 0.2105,
+        "recall_cov90": 0.0526,
+        "mean_coverage": 0.2322,
+        "specimens": 2
+      },
+      "CY": {
+        "regions": 13,
+        "recall_iou50": 0.1538,
+        "recall_cov90": 0.1538,
+        "mean_coverage": 0.2275,
+        "specimens": 2
+      },
+      "CZ": {
+        "regions": 12,
+        "recall_iou50": 0.4167,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.3913,
+        "specimens": 2
+      },
+      "DE": {
+        "regions": 33,
+        "recall_iou50": 0.0909,
+        "recall_cov90": 0.0909,
+        "mean_coverage": 0.1884,
+        "specimens": 6
+      },
+      "EE": {
+        "regions": 11,
+        "recall_iou50": 0.2727,
+        "recall_cov90": 0.2727,
+        "mean_coverage": 0.362,
+        "specimens": 2
+      },
+      "ES": {
+        "regions": 24,
+        "recall_iou50": 0.1667,
+        "recall_cov90": 0.2917,
+        "mean_coverage": 0.3689,
+        "specimens": 3
+      },
+      "FI": {
+        "regions": 11,
+        "recall_iou50": 0.2727,
+        "recall_cov90": 0.0909,
+        "mean_coverage": 0.2764,
+        "specimens": 2
+      },
+      "FR": {
+        "regions": 29,
+        "recall_iou50": 0.0,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.0164,
+        "specimens": 4
+      },
+      "GR": {
+        "regions": 13,
+        "recall_iou50": 0.1538,
+        "recall_cov90": 0.0769,
+        "mean_coverage": 0.2862,
+        "specimens": 2
+      },
+      "HR": {
+        "regions": 10,
+        "recall_iou50": 0.3,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.2737,
+        "specimens": 2
+      },
+      "HU": {
+        "regions": 42,
+        "recall_iou50": 0.0238,
+        "recall_cov90": 0.0476,
+        "mean_coverage": 0.0851,
+        "specimens": 6
+      },
+      "IT": {
+        "regions": 21,
+        "recall_iou50": 0.1905,
+        "recall_cov90": 0.0476,
+        "mean_coverage": 0.2134,
+        "specimens": 4
+      },
+      "LT": {
+        "regions": 11,
+        "recall_iou50": 0.0,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.028,
+        "specimens": 2
+      },
+      "LU": {
+        "regions": 12,
+        "recall_iou50": 0.0833,
+        "recall_cov90": 0.0833,
+        "mean_coverage": 0.1074,
+        "specimens": 2
+      },
+      "LV": {
+        "regions": 12,
+        "recall_iou50": 0.0,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.0,
+        "specimens": 2
+      },
+      "MT": {
+        "regions": 5,
+        "recall_iou50": 0.2,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.3554,
+        "specimens": 1
+      },
+      "NL": {
+        "regions": 11,
+        "recall_iou50": 0.3636,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.3817,
+        "specimens": 2
+      },
+      "PL": {
+        "regions": 34,
+        "recall_iou50": 0.0294,
+        "recall_cov90": 0.0294,
+        "mean_coverage": 0.0964,
+        "specimens": 5
+      },
+      "RO": {
+        "regions": 8,
+        "recall_iou50": 0.5,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.3686,
+        "specimens": 1
+      },
+      "SE": {
+        "regions": 10,
+        "recall_iou50": 0.0,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.0,
+        "specimens": 2
+      },
+      "SI": {
+        "regions": 13,
+        "recall_iou50": 0.0769,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.0827,
+        "specimens": 2
+      },
+      "SK": {
+        "regions": 16,
+        "recall_iou50": 0.1875,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.2419,
+        "specimens": 2
+      }
+    },
+    "over_masking_mean": 0.0339,
+    "errors": 0,
+    "latency_ms": {
+      "local_per_image_p50": 279.9,
+      "local_per_image_p95": 574.4,
+      "total_per_image_p50": 279.9,
+      "total_per_image_p95": 574.4
+    }
+  }
+}
