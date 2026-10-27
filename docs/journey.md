@@ -61,9 +61,9 @@ documents with LAB-1127; rows after that use the 31-document set where marked.
 | 10-27 07:45 | [#23](https://github.com/watt-mind/pii-guard/pull/23) | rules + NER distilled from Glimmer, large | 10.3 % | 0.0 % | [ner/distilled/large/](../eval/results/ner/distilled/large/) |
 | 10-27 07:45 | [#23](https://github.com/watt-mind/pii-guard/pull/23) | same, plus ID/parcel rules (31 docs) | 0.9 % | 0.0 % | [models.md](models.md#distilled-from-muse-glimmer); measured in [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) |
 | 10-27 08:01 | [#24](https://github.com/watt-mind/pii-guard/pull/24) | rules + Muse Spark Open (Baseten, 31 docs) | 0.9 % | 0.0 % | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md) |
-| 10-27 | [#PR](https://github.com/watt-mind/pii-guard/pull/PR) | fast: rules + distilled NER, large | 0.9 % | 0.0 % | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) |
-| 10-27 | [#PR](https://github.com/watt-mind/pii-guard/pull/PR) | strict: rules + NER + Muse Spark Open | 0.9 % | 0.0 % | same |
-| 10-27 | [#PR](https://github.com/watt-mind/pii-guard/pull/PR) | *Presidio / LLM Guard / PrivAiTe* | *33.0 / 50.0 / 17.9 %* | *10.0 / 30.0 / 0.0 %* | same |
+| 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | fast: rules + distilled NER, large | 0.9 % | 0.0 % | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) |
+| 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | strict: rules + NER + Muse Spark Open | 0.9 % | 0.0 % | same |
+| 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | *Presidio / LLM Guard / PrivAiTe* | *33.0 / 50.0 / 17.9 %* | *10.0 / 30.0 / 0.0 %* | same |
 
 The same history as charts, generated from the run records in
 [`eval/results/runs/`](../eval/results/runs/) by `pii-guard eval report` (all runs, tables and
@@ -459,7 +459,7 @@ the surname is not in the lexicon.
 
 ### 20. Fresh comparison: fast and strict vs Presidio, LLM Guard, PrivAiTe, on a public set too (2026-10-27)
 
-PR [#PR](https://github.com/watt-mind/pii-guard/pull/PR), LAB-1148.
+PR [#45](https://github.com/watt-mind/pii-guard/pull/45), LAB-1148.
 
 Today's two modes against the three open-source tools of milestone 6, on our hand-written
 and Muse-generated sets (now including German) and on a public benchmark nobody here wrote: a
