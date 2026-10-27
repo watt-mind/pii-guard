@@ -3,4 +3,3 @@ presidio-analyzer==2.2.365
 spacy>=3.8.7,<3.9
 en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
 de-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl
-hu-core-news-lg @ https://huggingface.co/huspacy/hu_core_news_lg/resolve/9160ba69dbbcfe1a2346f3c7c2d72831f8250219/hu_core_news_lg-3.8.1-py3-none-any.whl

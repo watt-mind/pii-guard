@@ -54,10 +54,11 @@ gitleaks: ## secrets in commits since origin/develop (needs gitleaks on PATH off
 links: ## relative links in README.md and docs/** (lychee, offline)
 	scripts/ci/lychee.sh --offline
 
-baselines: ## compare with Presidio, LLM Guard and PrivAiTe (first run downloads a few GB)
+baselines: ## compare with Presidio, LLM Guard and PrivAiTe (first run downloads a few GB, once)
 	uv sync --extra baselines
-	PII_GUARD_BASELINE_WORKERS=1 uv run pytest tests/eval/test_baselines_live.py --no-cov
-	uv run pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --fixtures eval/fixtures/en-smoke.jsonl \
+	uv run --no-sync pii-guard baselines download
+	PII_GUARD_BASELINE_WORKERS=1 uv run --no-sync pytest tests/eval/test_baselines_live.py --no-cov
+	uv run --no-sync pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --fixtures eval/fixtures/en-smoke.jsonl \
 		--detectors rules --baselines presidio,llm-guard,privaite
 
 demo: ## start API + gateway + UI on a mock upstream (offline); real upstream if configured

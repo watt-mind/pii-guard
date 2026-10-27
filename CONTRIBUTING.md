@@ -39,6 +39,15 @@ make serve                 # API on http://127.0.0.1:8787 with auto-reload
 Or without `make`: `uv sync`, `uv run pytest`, `uv run ruff check . && uv run ruff format
 --check .`, `uv run pii-guard serve`.
 
+**Keep the uv cache small, especially with many worktrees or agents.** Run `uv sync` (with
+the extras you need) once per worktree, then `uv run --no-sync ...`: a plain `uv run`
+re-syncs first and rebuilds the project whenever its sources changed, and every rebuild
+leaves another copy in `~/.cache/uv`. Run `uv cache prune` now and then to drop unused entries. Never delete
+entries under `~/.cache/uv/archive-v0` by hand: virtualenvs link into them. Models that a
+baseline needs but uv can't cache (the huSpaCy model, see
+[docs/evaluation.md](docs/evaluation.md#comparison-with-open-source-tools)) are fetched once
+with `pii-guard baselines download`, not listed as dependencies.
+
 The interfaces other components depend on (core types, detector registry, REST, vault, eval
 fixtures) are in [docs/contracts.md](docs/contracts.md). A change to one of them updates that
 file in the same pull request.
