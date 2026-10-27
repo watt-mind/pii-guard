@@ -171,16 +171,17 @@ them. Model and reasoning effort are read from the process environment only (not
 reasoning), invalid outputs and refusals per instance, for cost and refusal reporting; it never
 holds text. Prompts live in `src/pii_guard/detect/prompts/`.
 
-**Languages.** `detect(text, language)` picks a language profile (`LANGUAGES` in
-`detect/llm.py`): Hungarian (`hu`) and English (`en`) today. A profile sets the language notes
-added to the prompt (`prompts/languages/<code>.md`), which entity types are requested
+**Languages.** `detect(text, language)` picks a language profile built from the language
+pack (`language_profile` in `detect/llm.py`, [languages.md](languages.md)): Hungarian (`hu`),
+English (`en`) and German (`de`) today. A profile sets the language notes added to the prompt
+(the pack's `prompt.md`), which entity types are requested
 (country-specific types such as `NATIONAL_ID_HU_*` and `PARCEL_NUMBER_HU` only for their
 language; the rules find Hungarian identifiers in any language), and how surface strings are
 aligned: Hungarian lets a match run on into a suffix ("Teszt Elek" inside "Teszt Eleknek"),
 English requires a word end ("Ann" does not match inside "Anne"). An unknown language is not an
-error: it gets language-neutral notes, the generic types, and suffix-tolerant alignment
-(scripts without word spaces, such as Japanese, skip word-boundary checks). Adding a language
-= a notes file plus a `LanguageProfile` entry.
+error: it gets language-neutral notes (`prompts/languages/default.md`), the generic types, and
+suffix-tolerant alignment (scripts without word spaces, such as Japanese, skip word-boundary
+checks). Adding a language = a language pack ([languages.md](languages.md)).
 
 **Target: Muse Spark Open.** Meta's open-weight Muse Spark, served by Baseten
 (`meta-models/muse-spark-open-1026`, OpenAI-compatible). Because the weights are open, the same

@@ -30,6 +30,13 @@ def build_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     ev.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
+
+    lang = sub.add_parser(
+        "lang",
+        help="list, check and scaffold language packs (docs/languages.md)",
+        add_help=False,
+    )
+    lang.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser
 
 
@@ -56,11 +63,19 @@ def _eval(args: argparse.Namespace) -> int:
     return eval_main(args.args)
 
 
+def _lang(args: argparse.Namespace) -> int:
+    from pii_guard.languages.cli import main as lang_main
+
+    return lang_main(args.args)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "eval":
         # Hand everything after "eval" to the eval CLI untouched (it owns its own flags).
         return _eval(argparse.Namespace(args=argv[1:]))
+    if argv and argv[0] == "lang":
+        return _lang(argparse.Namespace(args=argv[1:]))
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "serve":

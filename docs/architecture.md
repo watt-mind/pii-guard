@@ -49,20 +49,24 @@ forms** (language-specific morphology, e.g. Hungarian case suffixes).
 
 ### Language packs
 
-Everything language-specific is grouped by language code into a **language pack**
-([ADR 0008](decisions/0008-language-packs.md)). Each piece lives in the component that uses
-it and is looked up by primary language (`en-GB` → `en`):
+Everything language-specific is one **language pack** per language code: a `LanguagePack` in
+`src/pii_guard/languages/<code>/`, or from another distribution through the
+`pii_guard.languages` entry point ([ADR 0008](decisions/0008-language-packs.md),
+[ADR 0010](decisions/0010-language-pack-plugins.md)). The components ask the pack registry for
+the primary language's pack (`en-GB` → `en`) and keep their own logic:
 
-| Piece | Module | Fallback without a pack |
+| Pack part | Used by | Fallback without a pack |
 |---|---|---|
-| Rules | `detect/rules/<code>.py` (`EVERYWHERE` + `RULES`), registered as a `RulePack` | language-independent rules (`detect/rules/common.py`) + every pack's `EVERYWHERE` rules |
-| Inflection | `vault/inflection.py` matcher, `register_inflection` | exact word-boundary matching |
-| LLM prompt | `detect/prompts/languages/<code>.md` + `LanguageProfile` | `default.md`, generic types |
-| Eval surface forms | `eval/forms.py` `LanguageForms` | the vault matcher's suffixes |
-| Corpus templates, policy defaults | `eval/` generator (later), `entities.md` | not measured; generic defaults |
+| `everywhere` + `rules` | `detect/rules` `RuleDetector` | language-independent rules (`detect/rules/common.py`) + every pack's `everywhere` rules |
+| `inflection` matcher | `vault/inflection.py` `inflection_for`, LLM alignment | exact word-boundary matching |
+| `prompt` notes, `country_entity_types`, `allow_suffix`/`word_boundary` | `detect/llm.py` `language_profile` | `default.md`, generic types |
+| `surface_forms` | `eval/forms.py` `language_forms` | the vault matcher's suffixes |
+| `lexicons` | `pii_guard.lang` | `LexiconUnavailable` |
+| `smoke_fixtures` | conformance suite (`tests/languages/`, `pii-guard lang check`) | — (required) |
 
-Built-in packs: `hu` (rules, case-suffix matcher, prompt notes, stem-changing surface forms)
-and `en` (rules, possessive matcher, prompt notes, stopwords).
+Built-in packs: `hu` (rules, case-suffix matcher, prompt notes, stem-changing surface forms,
+lexicons), `en` (rules, possessive matcher, prompt notes, stopwords) and `de` (rules, genitive
+matcher, prompt notes, stopwords; the worked example of [languages.md](languages.md)).
 
 ### `visual`: images and scans
 

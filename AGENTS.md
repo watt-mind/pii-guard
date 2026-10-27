@@ -71,7 +71,8 @@ router or a vault implementation.
 | `src/pii_guard/types.py` | `Span`, `EntityType`, `Detector`, errors (implemented) |
 | `src/pii_guard/registry.py` | Detector registry, lazy name → class (implemented) |
 | `src/pii_guard/config.py` | Settings from the environment (implemented) |
-| `src/pii_guard/cli.py` | `pii-guard` CLI: `serve`, `eval` (implemented) |
+| `src/pii_guard/cli.py` | `pii-guard` CLI: `serve`, `eval`, `lang` (implemented) |
+| `src/pii_guard/languages/` | Language packs (`hu`, `en`, `de`), registry, conformance checks ([docs/languages.md](docs/languages.md)) |
 | `src/pii_guard/detect/` | Detectors (rules, NER, LLM) and span merging |
 | `src/pii_guard/visual/` | OCR boxes, SAM 3.1 segmentation, image masking |
 | `src/pii_guard/documents/` | PDF / DOCX / image ingestion to text + layout |

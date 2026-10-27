@@ -1,6 +1,7 @@
 # 0008. Language packs
 
-- **Status:** accepted
+- **Status:** accepted; amended by [0010](0010-language-pack-plugins.md) (one `LanguagePack`
+  object and a plugin registry replace the per-component registries described below)
 - **Date:** 2026-10-26
 
 ## Context

@@ -473,7 +473,7 @@ load_fixtures(paths) -> list[Document]          # files or directories; validate
 write_fixtures(path, docs); dump_document(doc)  # JSONL out
 from_markup(id, "… {{PERSON|Teszt Elek}}nek …", language="hu") -> Document; label(type, value)
 find_surface_forms(text, value, entity_type, language) -> list[(start, end)]
-register_language_forms(LanguageForms(...))     # per-language surface-form hook
+register_language_forms(LanguageForms(...))     # override a language pack's surface forms
 DetectorAnalyzer(["rules", "llm"])              # registry names; unloadable ones -> .skipped
 run_documents(docs, analyzer) -> list[DocumentResult]   # detect, vault-mask, unmask
 summarize(results) -> dict; match_counts(gold, pred, "exact"|"overlap"); prf(counts)
