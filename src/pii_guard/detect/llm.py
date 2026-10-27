@@ -13,6 +13,12 @@ Fail closed (ADR 0006): timeouts, HTTP errors and responses that are still not v
 one retry raise :class:`~pii_guard.types.DetectionError`. Error messages never contain the
 input text or the model output, only status codes and counts.
 
+No key, no request (LAB-1290): without ``PII_GUARD_LLM_DETECTOR_API_KEY`` the detector refuses
+with :class:`~pii_guard.detect.stack.DetectionUnavailableError` (``503 detection_unavailable``)
+before any HTTP client exists, so the text never leaves the machine unauthenticated. The one
+exception is an endpoint on the loopback interface (a self-hosted model on this machine), where
+the text does not leave the machine either.
+
 Prompt injection (``docs/evaluation.md``, "Prompt injection"): the input is wrapped in
 delimiters with a fresh random boundary per request and the system prompt says the text is data;
 invisible characters and lookalike letters are normalised before the model sees the text
@@ -23,6 +29,7 @@ add spans, so rule detections survive whatever the model is talked into.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import re
@@ -35,12 +42,14 @@ from functools import cache
 from importlib.resources import files
 from importlib.resources.abc import Traversable
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import SecretStr
 
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect.normalize import normalize_for_detection
+from pii_guard.detect.stack import DetectionUnavailableError
 from pii_guard.languages import LanguagePack, get_pack, packs, primary_language
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, EntityType, Span
 from pii_guard.vault.inflection import inflection_for, variant_stems
@@ -52,6 +61,7 @@ __all__ = [
     "ENTITY_DESCRIPTIONS",
     "GENERIC_ENTITY_TYPES",
     "LANGUAGES",
+    "NO_KEY_MESSAGE",
     "LanguageProfile",
     "LlmDetector",
     "LlmEntity",
@@ -68,6 +78,11 @@ DEFAULT_MODEL = "meta-models/muse-spark-open-1026"
 DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
 DEFAULT_TIMEOUT = 60.0
 DEFAULT_MAX_TOKENS = 4096
+#: Why a keyless detector refuses (the gateway's audit mode and ``/v1/*`` with ``llm``).
+NO_KEY_MESSAGE = (
+    "audit mode needs PII_GUARD_LLM_DETECTOR_API_KEY: the LLM detector has no key, so no text "
+    "was sent"
+)
 _UNSET: Any = object()  # "argument not passed"; an explicit ``max_tokens=None`` means "omit it"
 #: Counters in :attr:`LlmDetector.usage` (token counts as the endpoint reports them).
 USAGE_KEYS = (
@@ -449,6 +464,22 @@ def chunk_text(text: str, size: int, overlap: int) -> list[tuple[int, str]]:
 # --- Detector ---------------------------------------------------------------
 
 
+def _is_loopback(url: str) -> bool:
+    """Whether ``url``'s host is this machine (``localhost``, ``127.0.0.0/8``, ``::1``)."""
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return False
+    if not host:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 class LlmDetector:
     """Detect personal data with an LLM on an OpenAI-compatible Chat Completions endpoint.
 
@@ -537,11 +568,29 @@ class LlmDetector:
     def __repr__(self) -> str:  # never the key
         return f"LlmDetector(url={self.url!r}, model={self.model!r})"
 
+    @property
+    def unavailable_reason(self) -> str | None:
+        """Why this detector refuses to send text, or ``None`` when it may.
+
+        It may with a key, or keyless to an endpoint on the loopback interface (the text stays
+        on this machine). Anything else would send the text unauthenticated: refused.
+        """
+        if (self._api_key or "").strip() or _is_loopback(self.url):
+            return None
+        return NO_KEY_MESSAGE
+
+    def require_available(self) -> None:
+        """Raise :class:`DetectionUnavailableError` if :attr:`unavailable_reason` is set."""
+        reason = self.unavailable_reason
+        if reason is not None:
+            raise DetectionUnavailableError(reason)
+
     # -- public --
 
     def detect(self, text: str, language: str = "hu") -> list[Span]:
         """Spans over ``text``. The model sees :func:`normalize_for_detection`'s cleaned text;
         its spans are mapped back, covering any invisible characters inside a value."""
+        self.require_available()  # before anything else: no key, no request (LAB-1290)
         if not text.strip():
             return []
         norm = normalize_for_detection(text)
@@ -603,6 +652,9 @@ class LlmDetector:
     # -- HTTP --
 
     def _client(self) -> httpx.Client:
+        # Every request goes through a client made here: refuse again, so no future caller of
+        # _client can send text without a key.
+        self.require_available()
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"

@@ -62,7 +62,7 @@ describe("benchmark index helpers", () => {
 describe("headline", () => {
   it("compares the lowest-leak pii-guard configuration with the lowest-leak tool", async () => {
     const { headline } = await import("./benchmarks");
-    const index = (await import("./benchmarks.index.json")).default as unknown as BenchmarkIndex;
+    const index = (await import("virtual:pii-guard/benchmarks-index")).default as BenchmarkIndex;
     const set = index.headline_set ?? "smoke";
     const h = headline(index, set, "all");
     expect(h).not.toBeNull();

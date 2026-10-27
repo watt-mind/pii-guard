@@ -99,6 +99,9 @@ class Settings(BaseSettings):
 
     # Most live vault sessions; one more evicts the least recently used (docs/operations.md).
     vault_max_sessions: int = Field(default=10_000, ge=1)
+    # Most placeholders in one get-or-create gateway session (the URL path, prompt_cache_key
+    # and default sessions, LAB-1286); a full one moves on to a new generation.
+    vault_max_entries: int = Field(default=10_000, ge=1)
 
     # Model endpoints.
     llm_detector_url: str | None = None

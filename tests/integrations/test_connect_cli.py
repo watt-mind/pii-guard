@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,12 @@ import pytest
 from pii_guard.cli import main as root_main
 from pii_guard.integrations import pi
 from pii_guard.integrations.cli import main
-from pii_guard.integrations.common import CANARY_VALUES, write_json
+from pii_guard.integrations.common import (
+    CANARY_VALUES,
+    session_of,
+    session_url,
+    write_json,
+)
 from pii_guard.integrations.e2e import SCRIPTED_MODEL, Recorder, gateway_app, serve
 
 # A hand-formatted file with another provider: connect must keep its text byte for byte.
@@ -54,7 +60,9 @@ def test_write_new_file_then_idempotent(tmp_path: Path, unreachable: str) -> Non
     assert code == 0 and "wrote" in out
     data = json.loads((tmp_path / "models.json").read_text())
     entry = data["providers"]["pii-guard"]
-    assert entry["baseUrl"] == unreachable
+    # A stable vault session in the path (LAB-1286): pi can't send X-PII-Guard-Session.
+    assert re.fullmatch(r"http://127\.0\.0\.1:9/s/c_[0-9a-f]{32}/v1", entry["baseUrl"])
+    assert f"gateway: {entry['baseUrl']}" in out
     assert entry["api"] == "openai-completions"
     assert entry["headers"] == {"X-PII-Guard-Mode": "fast", "X-PII-Guard-Language": "en"}
     assert entry["compat"] == {"supportsDeveloperRole": False, "supportsStore": False}
@@ -62,10 +70,39 @@ def test_write_new_file_then_idempotent(tmp_path: Path, unreachable: str) -> Non
     assert data["$schema"] == pi.SCHEMA_URL
 
     code, out = run(*args)
-    assert code == 0 and "already up to date" in out
+    assert code == 0 and "already up to date" in out  # the session is kept
     assert list(tmp_path.glob("*.pii-guard-backup-*")) == []
     code, out = run(*args, "--dry-run")
     assert "already up to date" in out
+
+
+def test_session_path_kept_replaced_or_off(tmp_path: Path, unreachable: str) -> None:
+    def base_url() -> str:
+        data = json.loads((tmp_path / "models.json").read_text())
+        return str(data["providers"]["pii-guard"]["baseUrl"])
+
+    args = ("pi", "--agent-dir", str(tmp_path), "--model", "m1")
+    run(*args, "--gateway", unreachable)
+    first = base_url()
+    run(*args, "--gateway", unreachable, "--model", "m2")
+    assert base_url() == first  # same gateway: same session
+    run(*args, "--gateway", "http://127.0.0.1:10/v1")
+    assert session_of(base_url()) not in (None, session_of(first))  # another gateway
+    run(*args, "--gateway", "http://127.0.0.1:9/s/mine/v1")
+    assert base_url() == "http://127.0.0.1:9/s/mine/v1"  # given in --gateway: as is
+    run(*args, "--gateway", unreachable, "--no-session-path")
+    assert base_url() == unreachable
+
+
+def test_session_url_helpers() -> None:
+    assert session_of("http://h:1/s/abc/v1") == "abc"
+    assert session_of("http://h:1/v1") is None
+    assert session_url("http://h:1/v1", "http://h:1/s/abc/v1") == "http://h:1/s/abc/v1"
+    assert session_url("http://h:1/v1/", "http://h:1/s/abc/v1/") == "http://h:1/s/abc/v1"
+    assert session_url("http://h:1/s/x/v1", "http://h:1/s/abc/v1") == "http://h:1/s/x/v1"
+    fresh = session_url("http://h:1/v1", "http://other:1/s/abc/v1")
+    assert re.fullmatch(r"http://h:1/s/c_[0-9a-f]{32}/v1", fresh)
+    assert session_url("http://h:1/v1") != session_url("http://h:1/v1")  # random
 
 
 def test_existing_file_kept_and_backed_up(tmp_path: Path, unreachable: str) -> None:
@@ -157,6 +194,7 @@ def test_connect_and_check_through_a_real_gateway(tmp_path: Path) -> None:
         code, out = run("pi", "--check", "--agent-dir", str(tmp_path))
     assert code == 0, out
     assert "ok           : 3 value(s) masked" in out
+    assert "session      : path " in out
     assert "#traffic" in out
     received = out.split("you got back : ")[1].splitlines()[0]
     model_saw = out.split("model saw    : ")[1].splitlines()[0]
@@ -174,7 +212,8 @@ def test_check_fails_when_url_is_not_the_gateway(tmp_path: Path) -> None:
         run("pi", "--gateway", upstream + "/v1", "--agent-dir", str(tmp_path), "--model", "m")
         code, out = run("pi", "--check", "--agent-dir", str(tmp_path))
     assert code == 1
-    assert "no pii_guard echo" in out
+    # The recorder answers /s/<session>/v1/... with 404 and no pii-guard headers.
+    assert "is this URL the pii-guard gateway" in out
 
 
 def test_check_without_provider(tmp_path: Path) -> None:

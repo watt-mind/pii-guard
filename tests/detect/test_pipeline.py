@@ -54,6 +54,7 @@ def recorded_llm(name: str) -> LlmDetector:
     body = FIXTURES[name]["response"]
     return LlmDetector(
         base_url="https://llm.test/v1",
+        api_key="test-key",
         transport=httpx.MockTransport(lambda _: httpx.Response(200, json=body)),
         settings=Settings(),
     )
@@ -341,6 +342,7 @@ def test_unexpected_error_becomes_detection_error_without_raw_text() -> None:
 def test_llm_failure_blocks_the_pipeline() -> None:
     llm = LlmDetector(
         base_url="https://llm.test/v1",
+        api_key="test-key",
         transport=httpx.MockTransport(lambda _: httpx.Response(500)),
         settings=Settings(),
     )

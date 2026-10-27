@@ -35,6 +35,7 @@ import httpx
 from pii_guard.integrations.common import (
     CANARY_PROMPT,
     CANARY_VALUES,
+    NOT_THE_GATEWAY,
     CheckResult,
     ConnectError,
     render_json,
@@ -192,7 +193,11 @@ def run_check(
             client.close()
     result.status = response.status_code
     result.request_id = response.headers.get("x-pii-guard-request-id", "")
+    result.session_source = response.headers.get("x-pii-guard-session-source", "")
     mode = response.headers.get("x-pii-guard-mode", "")
+    if response.status_code != 200 and not result.request_id:
+        result.error = NOT_THE_GATEWAY
+        return result, mode
     try:
         answer = response.json()
     except ValueError:

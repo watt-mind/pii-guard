@@ -19,10 +19,12 @@ from pii_guard.gateway.service import (
     MODE_HEADER,
     REQUEST_ID_HEADER,
     SESSION_HEADER,
+    SESSION_SOURCE_HEADER,
     Gateway,
     UpstreamError,
     UpstreamNotConfiguredError,
 )
+from pii_guard.gateway.sessions import SessionPathMiddleware, SessionSource, resolve_session
 from pii_guard.gateway.stream import SseRestorer
 
 __all__ = [
@@ -31,12 +33,15 @@ __all__ = [
     "MODE_HEADER",
     "REQUEST_ID_HEADER",
     "SESSION_HEADER",
+    "SESSION_SOURCE_HEADER",
     "DetectionCache",
     "Gateway",
     "GatewayConfig",
     "InvalidChatRequestError",
     "Mode",
     "ModeDetector",
+    "SessionPathMiddleware",
+    "SessionSource",
     "SseRestorer",
     "TextSlot",
     "UnsupportedContentError",
@@ -44,4 +49,5 @@ __all__ = [
     "UpstreamNotConfiguredError",
     "build_mode_detectors",
     "collect_texts",
+    "resolve_session",
 ]

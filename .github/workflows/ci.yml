@@ -49,7 +49,8 @@ jobs:
           ui=true docker=true wheel=true
           if [ "$EVENT" = pull_request ]; then
             git diff --name-only "$BASE...HEAD" > changed.txt
-            grep -qE '^(ui/|\.github/workflows/ci\.yml$|scripts/ci/licenses\.py$)' changed.txt || ui=false
+            # The UI bundles the benchmark index, built from the run records (LAB-1269).
+            grep -qE '^(ui/|eval/results/runs/|docs/benchmarks/config\.json$|src/pii_guard/eval/report|\.github/workflows/ci\.yml$|scripts/ci/licenses\.py$)' changed.txt || ui=false
             # What the image is built from (Dockerfile COPY lines) and how it is smoke-tested.
             grep -qE '^(src/|Dockerfile$|\.dockerignore$|pyproject\.toml$|uv\.lock$|README\.md$|LICENSE$|scripts/ci/docker_smoke\.sh$|\.github/workflows/ci\.yml$)' changed.txt || docker=false
             # What the release wheel is built from (`make wheel`: the package and the UI).
@@ -99,6 +100,8 @@ jobs:
     env:
       FULL: ${{ github.event_name != 'pull_request' }}
       PYTEST_ADDOPTS: --durations=15
+      # Tests of the committed report follow the smoke job's choice (LAB-1269).
+      RENDER_DOCS_ON_MERGE: ${{ vars.RENDER_DOCS_ON_MERGE }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -129,8 +132,18 @@ jobs:
       - run: uv sync
       - name: Smoke (demo stack on the mock upstream, offline)
         run: make smoke
-      - name: Benchmark report is current
-        run: uv run pii-guard eval report --check
+      # Who renders the report: CONTRIBUTING.md, "Generated files" (LAB-1269). With the
+      # render-docs workflow on, the committed report is rendered after the merge, so only the
+      # inputs are checked here.
+      - name: Benchmark report is current (or, rendered after merge, its inputs are valid)
+        env:
+          RENDER_DOCS_ON_MERGE: ${{ vars.RENDER_DOCS_ON_MERGE }}
+        run: |
+          if [ "$RENDER_DOCS_ON_MERGE" = true ]; then
+            uv run pii-guard eval report --validate
+          else
+            uv run pii-guard eval report --check
+          fi
       - name: CLI
         run: uv run pii-guard --help
 
@@ -220,6 +233,13 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
+      # The build, the tests and the typecheck read the benchmark index from
+      # `pii-guard eval report --print-index` (ui/vite.config.ts), so pii-guard is installed.
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - name: Install pii-guard (builds the benchmark index)
+        run: uv sync --no-dev
       - name: Install
         id: install
         run: pnpm install --frozen-lockfile

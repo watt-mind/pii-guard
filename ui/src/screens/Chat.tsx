@@ -344,7 +344,8 @@ function TurnView({
       {turn.status === "error" && turn.error ? (
         <div className="lg:col-span-2">
           <BlockedNotice error={turn.error} />
-          {turn.error.code === "detection_failed" && turn.mode === "audit" && (
+          {(turn.error.code === "detection_unavailable" ||
+            (turn.error.code === "detection_failed" && turn.mode === "audit")) && (
             <p className="mt-2 text-sm text-muted">
               Audit mode needs a working LLM detector key on the server (
               <code className="font-mono text-xs">PII_GUARD_LLM_DETECTOR_API_KEY</code>). Switch to Fast to continue.

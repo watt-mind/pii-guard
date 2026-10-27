@@ -35,7 +35,7 @@ pi --provider pii-guard --model muse-spark-1.3
 ```json
 "pii-guard": {
   "name": "pii-guard",
-  "baseUrl": "http://127.0.0.1:8787/v1",
+  "baseUrl": "http://127.0.0.1:8787/s/c_5f0c3a9e1b7d4f2a8c6e0b9d3a1f7e2c/v1",
   "api": "openai-completions",
   "apiKey": "pii-guard",
   "headers": { "X-PII-Guard-Mode": "fast", "X-PII-Guard-Language": "en" },
@@ -44,6 +44,10 @@ pi --provider pii-guard --model muse-spark-1.3
 }
 ```
 
+- `baseUrl` carries a vault session in its path (`/s/<session>/v1`, LAB-1286): pi sends no
+  `X-PII-Guard-Session`, and with the session in the URL a value keeps its placeholder across
+  turns and runs. Rerunning connect keeps the session; `--no-session-path` writes the plain
+  URL (the gateway then uses one default session per client key).
 - The models come from the gateway's `GET /v1/models` (the upstream's list), or `--model ID`
   (repeatable).
 - `apiKey` is a placeholder: pi needs one to list the models, and the gateway sends its own
@@ -60,11 +64,12 @@ pi --provider pii-guard --model muse-spark-1.3
 `--check` prints the round trip:
 
 ```
-gateway      : http://127.0.0.1:8787/v1/chat/completions
+gateway      : http://127.0.0.1:8787/s/c_5f0c3a9e1b7d4f2a8c6e0b9d3a1f7e2c/v1/chat/completions
 sent         : ... email jane.placeholder@example.net, phone +44 20 7946 0958, IBAN GB82 WEST ...
 model saw    : ... email [[EMAIL_3f9c1a]], phone [[PHONE_b20e77]], IBAN [[BANK_ACCOUNT_5d1e04]].
 model said   : Contact: [[EMAIL_3f9c1a]], [[PHONE_b20e77]], [[BANK_ACCOUNT_5d1e04]]
 you got back : Contact: jane.placeholder@example.net, +44 20 7946 0958, GB82 WEST 1234 ...
+session      : path (the session in the base URL: placeholders stay the same across conversations)
 ok           : 3 value(s) masked, none reached the model, answer restored
 dashboard    : http://localhost:5173/#traffic (with PII_GUARD_TRAFFIC_LOG=masked or full)
 ```
@@ -141,4 +146,4 @@ values. Two things showed up with the real model:
 | pi shows `401` | The gateway runs with `PII_GUARD_API_TOKEN`: export it in pi's shell, and rerun `connect pi` so the provider uses `$PII_GUARD_API_TOKEN` |
 | The model writes placeholders into files | It invented or changed one (`[[EMAIL_xyz]]` that isn't in the conversation). Only placeholders the session issued are restored |
 | The model refuses to copy personal data | It sees placeholders and plays safe. Tell it they are restored locally (see above) |
-| `--check` says "no pii_guard echo" | `baseUrl` points at the model itself, not at pii-guard |
+| `--check` says "no pii_guard echo" or "no pii-guard headers" | `baseUrl` points at the model itself, not at pii-guard |

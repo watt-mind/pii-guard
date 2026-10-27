@@ -21,6 +21,7 @@ from pii_guard.vault.inflection import (
 from pii_guard.vault.placeholders import PLACEHOLDER_RE, normalize_value
 from pii_guard.vault.stream import StreamUnmasker
 from pii_guard.vault.vault import (
+    DEFAULT_MAX_ENTRIES,
     DEFAULT_TTL_SECONDS,
     SessionNotFoundError,
     UnmaskResult,
@@ -29,6 +30,7 @@ from pii_guard.vault.vault import (
 )
 
 __all__ = [
+    "DEFAULT_MAX_ENTRIES",
     "DEFAULT_TTL_SECONDS",
     "PLACEHOLDER_RE",
     "ExactMatcher",

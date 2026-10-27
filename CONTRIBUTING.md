@@ -15,7 +15,9 @@ projects.
    change: `uv run pii-guard eval --fixtures eval/fixtures --detectors rules --record <slug>`
    (see [Recording a benchmark run](#recording-a-benchmark-run)), and put the before/after
    numbers in the pull request. If it changes a headline metric (leak rate, F1, latency or
-   cost of a recommended configuration), add a milestone to [docs/journey.md](docs/journey.md).
+   cost of a recommended configuration), add a milestone to the
+   [journey](docs/journey.md): a new file in [docs/journey/](docs/journey/README.md), not an
+   edit to `journey.md`.
 
 ## Development setup
 
@@ -61,15 +63,45 @@ uv run pii-guard eval --fixtures eval/fixtures --detectors rules,ner --record ne
 ```
 
 It runs the evaluation, writes `eval/results/runs/<today>-ner-threshold-0.6.json` (plus one
-record per `--baselines` tool) and regenerates `eval/results/index.json`, the charts in
-`docs/benchmarks/`, `docs/benchmarks.md` and the UI's copy of the index. Commit all of them; CI
-runs `uv run pii-guard eval report --check` and fails if they are out of date.
+record per `--baselines` tool) and regenerates the charts in `docs/benchmarks/` and
+`docs/benchmarks.md`. Commit the record; whether you commit the regenerated report too depends
+on who renders it (next section).
 
 Models, settings, hardware and cost that the harness can't see go in a small JSON file passed
 with `--record-extra` (format in [docs/evaluation.md](docs/evaluation.md#run-records)). A
 scorecard saved earlier with `--json` becomes a record with
 `uv run pii-guard eval record SCORECARD.json --slug <slug>`. Run records hold only types,
 counts and ratios, never a value or a document text.
+
+## Generated files
+
+Some committed files are generated from others, and two pull requests that both regenerate
+one always conflict, even when their inputs don't overlap (LAB-1269). So:
+
+| Generated | From | Committed? |
+|---|---|---|
+| the benchmark index (`eval/results/index.json`, the UI's copy) | run records | **no**: `pii-guard eval report` writes it locally, and the UI build gets it from `pii-guard eval report --print-index` (`ui/vite.config.ts`; run `uv sync` once) |
+| `docs/benchmarks.md`, `docs/benchmarks/*.svg`, `docs/benchmarks/colours.json` | run records, `docs/benchmarks/config.json` | yes, so they read on GitHub |
+| the milestones block of `docs/journey.md` | `docs/journey/*.md`, one file per milestone | yes; numbers are given when it is rendered |
+
+Who renders the committed ones depends on the repository variable `RENDER_DOCS_ON_MERGE`:
+
+- **`true`:** the [`render-docs`](.github/workflows/render-docs.yml) workflow renders them
+  on `develop` after every merge (`pii-guard eval report --journey`) and pushes the result.
+  A pull request commits only its inputs (run records, journey entries) and CI runs
+  `pii-guard eval report --validate`: every record and entry is valid and everything renders.
+  Two pull requests that add runs and milestones never conflict.
+- **unset (today):** a pull request that adds a run record commits the regenerated report,
+  and CI runs `pii-guard eval report --check`. Journey entries are folded in by whoever next
+  runs `pii-guard eval report --journey`; until then they read in `docs/journey/`.
+
+To turn it on, a repository admin, once: in the `protect develop and main` ruleset (or a new
+ruleset for `develop` only), add **GitHub Actions** to the bypass list; then set
+`RENDER_DOCS_ON_MERGE` to `true` under Settings → Secrets and variables → Actions →
+Variables. The workflow only ever pushes to `develop`, and only the generated files.
+
+Not used, and why: a `.gitattributes` merge driver only helps local merges; GitHub ignores
+custom merge drivers, so the pull request still shows the conflict.
 
 ## What CI checks
 
@@ -97,7 +129,7 @@ on its own and something else already covers the same ground on every pull reque
 | `lint` | ruff lint or format | `make lint` |
 | `types` | a mypy error on `src/` not listed in `scripts/ci/mypy-baseline.txt` | `make types` |
 | `test` | a failing test, or total coverage under the floor (see above) | `make test` or `make test-all` |
-| `smoke` | the demo stack leaking on the mock upstream (`make smoke`), or a stale benchmark report | `make smoke` |
+| `smoke` | the demo stack leaking on the mock upstream (`make smoke`), or a stale benchmark report (an invalid run record or journey entry when `RENDER_DOCS_ON_MERGE` is on; [Generated files](#generated-files)) | `make smoke` |
 | `eval-gate` | leak or over-masking rising, or round trip falling, against the newest committed run record on the same fixtures, or past a limit in [`eval/gates.json`](eval/gates.json) | `make gate` |
 | `docker` | the image over its size budget (375 MB unpacked, `scripts/ci/docker_smoke.sh`), an unhealthy container, or a masked request that leaks to the mock upstream | `make docker-smoke` |
 | `audit` | a known vulnerability in `uv.lock` (`uv audit`), or a GPL/AGPL runtime dependency | `make audit licences` |

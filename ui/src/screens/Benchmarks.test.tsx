@@ -3,12 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
 import type { BenchmarkIndex, BenchmarkLoader } from "../api/benchmarks";
-import bundled from "../api/benchmarks.index.json";
+import bundled from "virtual:pii-guard/benchmarks-index";
 import type { HttpGuardClient } from "../api/http";
 import { UnreachableError } from "../api/http";
 import { createMockClient } from "../api/mock";
 
-const INDEX = bundled as unknown as BenchmarkIndex;
+const INDEX = bundled as BenchmarkIndex;
 const load = vi.fn(() => Promise.resolve(INDEX));
 
 function offlineApi(): HttpGuardClient {

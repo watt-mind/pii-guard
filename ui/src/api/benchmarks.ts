@@ -1,9 +1,10 @@
 /**
  * The benchmark index (`eval/results/index.json`, schema_version 1), bundled at build time.
  *
- * `pii-guard eval report` writes a compact copy to `benchmarks.index.json` next to this
- * file, so the Benchmarks tab works without the API (demo mode, static hosting). The JSON is
- * loaded lazily, in its own chunk, the first time the tab opens.
+ * The Vite plugin in `vite.config.ts` builds it from the committed run records
+ * (`pii-guard eval report --print-index`) as `virtual:pii-guard/benchmarks-index`, so the
+ * Benchmarks tab works without the API (demo mode, static hosting). It is not committed
+ * (LAB-1269). The JSON is loaded lazily, in its own chunk, the first time the tab opens.
  */
 
 export interface TypeMetrics {
@@ -149,7 +150,7 @@ export type LanguageFilter = "all" | string;
 export type BenchmarkLoader = () => Promise<BenchmarkIndex>;
 
 export const loadBenchmarks: BenchmarkLoader = () =>
-  import("./benchmarks.index.json").then((m) => m.default as unknown as BenchmarkIndex);
+  import("virtual:pii-guard/benchmarks-index").then((m) => m.default as BenchmarkIndex);
 
 /** The metrics block a language filter selects, or null when that language wasn't run. */
 export function pick(block: { languages: Record<string, Metrics>; all: Metrics }, lang: LanguageFilter): Metrics | null {

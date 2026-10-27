@@ -10,8 +10,10 @@ All data behind these numbers is fictional ([ADR 0005](decisions/0005-synthetic-
 Times are UTC, taken from each pull request's merge time.
 
 **How to keep this current:** a pull request that changes a headline metric (leak rate, F1,
-latency or cost of a recommended configuration) adds or updates its milestone here, and
-updates the two tables below.
+latency or cost of a recommended configuration) adds its milestone as a new file in
+[journey/](journey/) ([how](journey/README.md)), and updates the two tables below. Don't
+number it: it gets the next number when it is folded into this page after the merge, so two
+pull requests that each add a milestone don't conflict (LAB-1269).
 
 ## Where we are (2026-10-27)
 
@@ -1282,6 +1284,85 @@ back onto the upright document ([robustness-fictional.md](../eval/results/visual
   images at a time on one machine. CI covers the logic with a fake `pytesseract`; the real
   Tesseract tests run wherever it is installed.
 - **Cost:** $0. Tesseract runs locally, no SAM calls.
+
+### 44. The gateway stops rebuilding its HTTP client: overhead 5.2 → 1.0 ms (2026-10-27)
+
+LAB-1176, from the LAB-1268 performance audit. **Most of the gateway's own overhead wasn't
+masking at all.** Every upstream call built a new `httpx.AsyncClient`, and building one costs
+about 4.5 ms: loading the certificate bundle into a TLS context (78 % of it) and reading the
+macOS proxy settings (12 %). It ran synchronously on the event loop, so with 8 requests in
+flight each one also waited for the others' clients, and no connection to the upstream was
+ever reused.
+
+Now each gateway builds one client on first use and shares it between
+`/v1/chat/completions` and `/v1/responses`. The upstream timeout is set per request, each
+call closes only its own response, and the app's lifespan closes the client on shutdown. Pool
+limits are settings (`PII_GUARD_GATEWAY_UPSTREAM_MAX_CONNECTIONS`, `_MAX_KEEPALIVE`,
+`_KEEPALIVE_EXPIRY`), and keep-alive is on.
+
+| Cell (fast mode, rules only, mock upstream at 50 ms) | Overhead p50, before → after | `forward` stage | `detect` stage | Throughput |
+|---|---:|---:|---:|---:|
+| 1 client, not streamed | 5.16 → 0.99 ms (0.19x) | 4.28 → 0.08 ms | 0.47 → 0.47 ms | 16.0 → 18.3 rps |
+| 1 client, streamed (added time to first token) | 5.12 → 0.91 ms (0.18x) | 4.26 → 0.08 ms | 0.46 → 0.45 ms | 16.1 → 17.9 rps |
+| 8 clients, not streamed | 12.29 → 2.68 ms (0.22x) | 4.25 → 0.07 ms | 7.33 → 2.15 ms | 83 → 127 rps (1.53x) |
+| 8 clients, streamed (added time to first token) | 11.34 → 2.66 ms (0.24x) | 4.30 → 0.08 ms | 6.70 → 2.22 ms | 78 → 115 rps (1.48x) |
+
+- **Measured** with `pii-guard bench latency --concurrency 1,8 --requests 100`, alternating
+  base and fix runs three times on a loaded machine; medians of the three runs. Read the
+  ratios, not the absolute times. The published run records are re-recorded on an idle
+  machine under LAB-1243.
+- **Deterministic counter:** `httpx.AsyncClient` constructions per 100 gateway requests,
+  100 → 1.
+- **What's left:** at 8 clients the `detect` stage is still about 4.5x its 1-client value,
+  while the rules detector itself takes 0.18 ms. That queueing is LAB-1178.
+- **Cost:** $0. Local runs only.
+
+### 45. One value, one placeholder, every turn: sticky sessions without headers (2026-10-27)
+
+LAB-1286, the follow-up of milestone 39. Placeholders are stable only inside one vault session,
+and the gateway used to open a new session for every request without `X-PII-Guard-Session`.
+Neither Muse Code nor pi can send that header, so every turn masked the same value under a new
+placeholder. The gateway now picks a session for every request: the header, else a session
+in the URL path (`/s/<session>/v1`, which `pii-guard connect` now writes), else one per
+`prompt_cache_key`, else one default session per client key. The derived ids are keyed with
+the tenant key, and `X-PII-Guard-Session-Source` reports which step matched.
+
+Same fictional mini-repo and task as milestones 35 and 39, fast mode (rules + NER), Muse Code
+1.4.14 (the installer's current release; the harness pin is still 1.4.13, LAB-1299).
+"Before" is the harness's `--session per-request`, which reproduces the old behaviour. The
+scripted runs are after the `SECRET` type (milestone 40), so they check 16 gold values; the two
+live runs were made just before it, with 13:
+
+| Run | Requests | Vault sessions | Distinct placeholders upstream | Gold values under >1 placeholder (most for one) | Gold values upstream |
+|---|---:|---:|---:|---:|---:|
+| Muse, scripted, before | 10 | 10 | 150 | 16 of 16 (8) | 0 of 16 |
+| Muse, scripted, `connect` path URL | 11 | 1 | 25 | 0 of 16 (1) | 0 of 16 |
+| Muse, Meta Model API `muse-spark-1.3`, before | 10 | 10 | 155 | 13 of 13 (8) | 0 of 13 |
+| Muse, Meta Model API `muse-spark-1.3`, path URL | 8 | 1 | 21 | 0 of 13 (1) | 0 of 13 |
+| pi 1.4.0, scripted, before | 5 | 5 | 58 | 16 of 16 (4) | 0 of 16 |
+| pi 1.4.0, scripted, path URL | 5 | 1 | 20 | 0 of 16 (1) | 0 of 16 |
+
+- **Restore across turns.** With one session, a placeholder the model saw in turn 1 is
+  restored in turn 5 even when that turn's request no longer carries the value (a gateway
+  test covers it). Before, it only worked because both clients resend their whole history.
+- **No 404 surprises.** The header keeps its strict 404 for an unknown session. The path,
+  `prompt_cache_key` and default sessions are created on first use.
+- **`prompt_cache_key` alone is not enough for Muse.** On the plain URL, Muse's main
+  conversation and each of its three reminder observers send different keys, so a task spans 4
+  sessions and a value gets up to 4 placeholders (all restored). The path URL keeps them in one,
+  which is why `connect` writes it (LAB-1300).
+- **Bounded.** A long-lived path or default session moves to a new, empty generation after
+  `PII_GUARD_VAULT_MAX_ENTRIES` (10 000) placeholders instead of growing forever.
+- **Latency:** session resolution is one HMAC and a dict lookup. The latency bench's mask stage
+  (fast, concurrency 1, 200 requests, two runs each) was p50 0.44/0.25 ms before and 0.34/0.30 ms
+  after, which is noise.
+- **Cost:** $0. Two live Muse runs (18 requests) on free Meta API credits; everything else ran
+  locally.
+
+<!-- journey:begin. Generated by `pii-guard eval report --journey` from docs/journey/*.md; edit those files, not this block. -->
+<!-- journey:end -->
+
+Milestones merged since the last time this page was rendered are in [journey/](journey/), one file each, oldest first.
 
 ## How pii-guard uses Meta's models
 

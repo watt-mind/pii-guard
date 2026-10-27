@@ -64,6 +64,8 @@ class CallTrace:
         self.stream = bool(body.get("stream")) if isinstance(body, Mapping) else False
         self.session_id: str | None = None
         self.session_new = False
+        # Which step chose the session (header|path|prompt_cache_key|default), LAB-1286.
+        self.session_source: str | None = None
         self.stats: RequestStats | None = None
         self.masked_request: bytes | None = None
         self.upstream_body: bytes | None = None
@@ -131,6 +133,7 @@ class CallTrace:
                 obs.traffic.session_ref(self.session_id) if self.session_id is not None else None
             ),
             "session_new": self.session_new,
+            "session_source": self.session_source,
             "detectors": detectors,
             "entities": _entities(stats),
             "cache": (

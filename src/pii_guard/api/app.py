@@ -17,6 +17,7 @@ from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect import stack
 from pii_guard.detect.stack import rest_detector_names
+from pii_guard.gateway.sessions import SessionPathMiddleware
 from pii_guard.observability import (
     Observability,
     ObservabilitySettings,
@@ -58,15 +59,20 @@ def create_app(
 
     With ``PII_GUARD_NER_MODEL`` set, the lifespan loads the NER model before the app serves
     (:func:`~pii_guard.detect.stack.warm_up`, LAB-1274), so concurrent first requests don't
-    race to load it; a model that can't be loaded stops startup.
+    race to load it; a model that can't be loaded stops startup. The gateway
+    (``app.state.gateway``) keeps one upstream HTTP client; the lifespan closes it on shutdown
+    (LAB-1176).
     """
     settings = settings or get_settings()
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if await anyio.to_thread.run_sync(stack.warm_up, settings):
             logger.info("ner model warmed up before serving")
         yield
+        close = getattr(getattr(app.state, "gateway", None), "aclose", None)
+        if close is not None:
+            await close()
 
     app = FastAPI(
         title="pii-guard",
@@ -98,6 +104,9 @@ def create_app(
         return {"status": "ok", "version": __version__}
 
     include_routers(app)
+    # Innermost: /s/<session>/v1/... reaches the /v1 routes with that vault session (LAB-1286);
+    # the Host, loopback and token checks see the URL as sent.
+    app.add_middleware(SessionPathMiddleware)
 
     # Outermost last: Host check, then (full only) loopback sockets, then the token.
     token = settings.api_token
