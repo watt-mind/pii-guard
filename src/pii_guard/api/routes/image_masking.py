@@ -36,27 +36,44 @@ one is re-encoded from pixels (no metadata). Errors and logs carry types and cou
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import datetime as dt
+import io
 import logging
+import threading
+import time
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from PIL import Image
+
+from pii_guard.api.deps import PayloadTooLargeError
 from pii_guard.policy import BlockedEntityError, Policy, PolicySet
-from pii_guard.types import Detector, EntityType, PiiGuardError, Span
+from pii_guard.types import DetectionError, Detector, EntityType, PiiGuardError, Span
+from pii_guard.vault import VaultSession
 from pii_guard.visual.image import load_image, mask_image
 from pii_guard.visual.labels import RegionLabel, VaultMatcher, label_image
-from pii_guard.visual.ocr import OcrEngine, OcrText, TesseractOcr, tesseract_available
+from pii_guard.visual.ocr import (
+    OcrEngine,
+    OcrText,
+    TesseractOcr,
+    check_deadline,
+    deadline,
+    tesseract_available,
+)
 from pii_guard.visual.pipeline import ImageAnalysis, analyze_image_text
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.render import LabelBox, render_labels
 from pii_guard.visual.sam import SamClient
 from pii_guard.visual.summary import ExpiryPolicy
+from pii_guard.workers import BoundedWorkers
 
 __all__ = [
+    "DEFAULT_IMAGE_MAX_PIXELS",
     "DEFAULT_MAX_IMAGE_BYTES",
     "SUPPORTED_MEDIA_TYPES",
     "AnalyzerDetector",
@@ -69,6 +86,8 @@ __all__ = [
     "UnsupportedImageError",
     "decode_base64_image",
     "default_ocr_engine",
+    "image_workers_for",
+    "mask_images_bounded",
     "require_ocr",
     "sniff_media_type",
 ]
@@ -77,6 +96,9 @@ logger = logging.getLogger(__name__)
 
 #: Largest accepted image, in bytes (decoded). Override per app with ``app.state.max_image_bytes``.
 DEFAULT_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+#: Largest accepted image, in pixels (``PII_GUARD_IMAGE_MAX_PIXELS``): OCR time and memory grow
+#: with pixels, and a small PNG can decode to tens of megapixels (LAB-1207).
+DEFAULT_IMAGE_MAX_PIXELS = 16_000_000
 
 #: Accepted input formats and their signatures. The output is always PNG.
 SUPPORTED_MEDIA_TYPES: dict[str, tuple[bytes, ...]] = {
@@ -251,6 +273,7 @@ class ImageMasker:
       (:mod:`pii_guard.visual.captions`; on by default).
     - ``entity_types``: the visual types to segment; default every type ``sam`` has a prompt
       for, so ``keep`` types (``STAMP``) are found and reported, not silently ignored.
+    - ``max_pixels``: larger images are refused (413 ``payload_too_large``) before decoding.
     """
 
     def __init__(
@@ -264,6 +287,7 @@ class ImageMasker:
         text_detector_models: dict[str, str] | None = None,
         entity_types: Sequence[EntityType] | None = None,
         captions: bool = True,
+        max_pixels: int = DEFAULT_IMAGE_MAX_PIXELS,
     ) -> None:
         if (ocr is None) != (text_detector is None):
             raise ValueError("ocr and text_detector go together")
@@ -274,6 +298,7 @@ class ImageMasker:
         self.text_detector_names = list(text_detector_names)
         self.text_detector_models = dict(text_detector_models or {})
         self.captions = captions
+        self.max_pixels = max_pixels
         self.entity_types = list(entity_types) if entity_types is not None else list(sam.prompts)
         if not self.entity_types:
             raise ValueError("at least one visual entity type is needed")
@@ -291,15 +316,34 @@ class ImageMasker:
         matcher: VaultMatcher | None = None,
         expiry: ExpiryPolicy = "reduce",
         today: dt.date | None = None,
+        until: float | None = None,
     ) -> ImageMaskOutcome:
         """Detect, police and cover. ``render="labels"`` needs ``matcher`` (the request's
         :class:`~pii_guard.visual.labels.VaultMatcher`); values are registered in its
-        session only once the image passed the policies (a refused image stores nothing)."""
+        session only once the image passed the policies (a refused image stores nothing).
+
+        ``until`` (a ``time.monotonic()`` deadline) bounds the work: Tesseract is killed when
+        it runs out and the stages check it, raising
+        :class:`~pii_guard.visual.ocr.OcrTimeoutError` (503 ``detection_failed``)."""
         if render not in RENDER_MODES:
             raise ValueError(f"render must be one of {RENDER_MODES}")
         if render == "labels" and matcher is None:
             raise ValueError("render='labels' needs a vault matcher")
         sniff_media_type(data)
+        _check_pixels(data, self.max_pixels)
+        with deadline(until):
+            return self._mask(data, language, render, matcher, expiry, today)
+
+    def _mask(
+        self,
+        data: bytes,
+        language: str,
+        render: Render,
+        matcher: VaultMatcher | None,
+        expiry: ExpiryPolicy,
+        today: dt.date | None,
+    ) -> ImageMaskOutcome:
+        check_deadline()
         try:
             decoded = load_image(data)
         except ValueError:
@@ -315,6 +359,7 @@ class ImageMasker:
             language=language,
             captions=self.captions,
         )
+        check_deadline()
         masked_types = frozenset(t for t in EntityType if self.policies.of(t) is Policy.MASK)
         if render == "labels" and matcher is not None and analysis.ocr is not None:
             # Values the conversation already named, printed where no detector found them.
@@ -335,6 +380,7 @@ class ImageMasker:
         transcript: str | None = None
         summary: dict[str, Any] | None = None
         matches: dict[str, int] = {}
+        check_deadline()  # last check before values are registered
         if render == "labels" and matcher is not None:
             labels = label_image(
                 analysis.ocr,
@@ -392,6 +438,74 @@ class ImageMasker:
     def _police(self, region: Region) -> PolicedRegion:
         origin: Origin = "sam" if region.source == "sam" else "ocr"
         return PolicedRegion(region, origin, self.policies.of(region.entity_type))
+
+
+def _check_pixels(data: bytes, limit: int) -> None:
+    """Refuse an image of more than ``limit`` pixels from its header, before decoding it."""
+    try:
+        with Image.open(io.BytesIO(data)) as raw:
+            pixels = raw.width * raw.height
+    except (OSError, ValueError, Image.DecompressionBombError):
+        raise InvalidImageError("image could not be decoded") from None
+    if pixels > limit:
+        raise PayloadTooLargeError(f"image has more than {limit} pixels")
+
+
+_workers_lock = threading.Lock()
+
+
+def image_workers_for(state: Any, size: int) -> BoundedWorkers:
+    """The app's one image worker pool (``state.image_workers``), created on first use.
+
+    ``POST /v1/mask/image`` and the gateway share it, so ``PII_GUARD_IMAGE_CONCURRENCY``
+    bounds the app's concurrent image work."""
+    workers = getattr(state, "image_workers", None)
+    if workers is None:
+        with _workers_lock:
+            workers = getattr(state, "image_workers", None)
+            if workers is None:
+                workers = BoundedWorkers(size, "pii-guard-image")
+                state.image_workers = workers
+    return workers
+
+
+async def mask_images_bounded(
+    masker: ImageMasker,
+    images: Sequence[bytes],
+    language: str,
+    *,
+    workers: BoundedWorkers,
+    timeout: float,
+    render: Render = "opaque",
+    session: VaultSession | None = None,
+    expiry: ExpiryPolicy = "reduce",
+) -> list[ImageMaskOutcome]:
+    """Mask ``images`` on ``workers`` within ``timeout`` seconds (waiting for a slot included).
+
+    The work holds its worker slot until its thread has finished, and stops at ``timeout``
+    (Tesseract killed, the stages check the deadline). With ``render="labels"`` the values
+    are registered in a fork of ``session``, committed only when every image succeeded: a
+    refused or timed-out request leaves nothing in the session, even if its thread is still
+    finishing (LAB-1207). Raises :class:`~pii_guard.types.DetectionError` on timeout; other
+    errors propagate as the masker raised them.
+    """
+    until = time.monotonic() + timeout
+    scratch = session.fork() if render == "labels" and session is not None else None
+
+    def run_all() -> list[ImageMaskOutcome]:
+        matcher = VaultMatcher(scratch, language) if scratch is not None else None
+        return [
+            masker.mask(data, language, render=render, matcher=matcher, expiry=expiry, until=until)
+            for data in images
+        ]
+
+    try:
+        outcomes = await asyncio.wait_for(workers.run(run_all), timeout=timeout)
+    except TimeoutError:
+        raise DetectionError(f"image masking timed out after {timeout:g}s") from None
+    if scratch is not None and session is not None:
+        session.commit(scratch)
+    return outcomes
 
 
 def _visible_words(analysis: ImageAnalysis, covered: list[PolicedRegion]) -> list[Box]:

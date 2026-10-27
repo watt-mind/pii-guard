@@ -43,7 +43,6 @@ from typing import Annotated, Any
 
 from fastapi import Query, Request
 from pydantic import BaseModel
-from starlette.concurrency import run_in_threadpool
 
 from pii_guard.api.deps import (
     PayloadTooLargeError,
@@ -63,12 +62,13 @@ from pii_guard.api.routes.image_masking import (
     UnsupportedImageError,
     decode_base64_image,
     default_ocr_engine,
+    image_workers_for,
+    mask_images_bounded,
     require_ocr,
 )
 from pii_guard.policy import BlockedEntityError, Policy
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import Vault, VaultSession
-from pii_guard.visual.labels import VaultMatcher
 from pii_guard.visual.ocr import OcrEngine
 from pii_guard.visual.sam import SamClient
 
@@ -198,6 +198,7 @@ def get_image_masker(request: Request) -> ImageMasker:
             if isinstance(model, str) and model:
                 models[getattr(inner, "name", type(inner).__name__)] = model
     return ImageMasker(
+        max_pixels=request.app.state.settings.image_max_pixels,
         sam=_sam_client(request),
         policies=get_policies(request),
         ocr=ocr,
@@ -327,14 +328,17 @@ async def mask_image_endpoint(
     if vault is not None:
         # Unknown or expired id -> 404 session_not_found, before any detection.
         session = vault.session(options.session_id)
+    settings = request.app.state.settings
     try:
-        matcher = VaultMatcher(session, lang) if session is not None else None
-        outcome = await run_in_threadpool(
-            masker.mask,
-            data,
+        # Bounded pool and deadline; values committed to the session only on success.
+        (outcome,) = await mask_images_bounded(
+            masker,
+            [data],
             lang,
+            workers=image_workers_for(request.app.state, settings.image_concurrency),
+            timeout=settings.image_timeout,
             render=render,  # type: ignore[arg-type]
-            matcher=matcher,
+            session=session,
             expiry=options.expiry,  # type: ignore[arg-type]
         )
     except BaseException as exc:

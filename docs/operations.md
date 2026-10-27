@@ -142,6 +142,23 @@ reverse proxy. A container binds `0.0.0.0`; publish its port on `127.0.0.1` only
   is passed through (bring your own key); a pii-guard token sent as the bearer is removed first,
   so send the token as `X-PII-Guard-Token` and your provider key as `Authorization`.
 
+## Resource limits
+
+Every limit fails closed with a JSON error and no value in it:
+
+| Limit | Setting (default) | Over it |
+|---|---|---|
+| Request body | derived from `max_text_chars` (and, for the gateway, `PII_GUARD_GATEWAY_MAX_IMAGES` x `_MAX_IMAGE_BYTES`) | `413 payload_too_large`. A declared `Content-Length` is checked first; a chunked body is counted while it is read and refused as soon as it passes the limit, so it is never buffered whole. |
+| Concurrent detections | `PII_GUARD_GATEWAY_CONCURRENCY` (4) threads **per mode** | A detection that times out (`PII_GUARD_GATEWAY_DETECTION_TIMEOUT`) keeps its thread and its slot until it really finishes, so a hung detector holds at most this many threads, and only its own mode's: a stuck strict-mode LLM never starves fast mode. When all slots are stuck, that mode's requests wait inside their timeout, then `503 detection_failed`. |
+| Concurrent image work | `PII_GUARD_IMAGE_CONCURRENCY` (2) per app | Shared by `POST /v1/mask/image` and the gateway, held until the thread finishes, like detections. |
+| Image time | `PII_GUARD_GATEWAY_IMAGE_TIMEOUT` (120 s, per request) and `PII_GUARD_IMAGE_TIMEOUT` (120 s, `/v1/mask/image`) | `503 detection_failed`. The deadline goes into the work: Tesseract gets the remaining time as its subprocess timeout (killed, not left running) and every stage checks it, so the rest of the request's images are not started. |
+| Image size | `PII_GUARD_IMAGE_MAX_PIXELS` (16 000 000) | `413 payload_too_large`, read from the image header before decoding. OCR time and memory grow with pixels: a 221 KB PNG of 7900 x 5000 took 33 to 73 s and about 1 GB, depending on the machine. The decoder's own cap is 40 MP. |
+| Vault sessions | `PII_GUARD_VAULT_MAX_SESSIONS` (10 000) | Creating one more **evicts the least recently used session** (the one whose sliding TTL ends first). Eviction rather than `429` keeps the service up under a flood of `/v1/mask` calls without `session_id`; a later use of an evicted session is `404 session_not_found`, and the client starts a new one. |
+
+Image values are registered in the vault session only when the whole request succeeded: the
+work masks into a private fork of the session, committed afterwards. A refused or timed-out
+image leaves nothing in the session, even while its thread is still finishing.
+
 ## Traffic log
 
 Every call to `POST /v1/chat/completions` produces one event, kept **in memory only**, when the

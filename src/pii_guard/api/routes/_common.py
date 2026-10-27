@@ -2,7 +2,9 @@
 
 - :class:`LoggedRoute` logs one access line per request -- method, path, status, duration
   and, for masking, entity counts. It never logs bodies, text, session ids or values.
-  It also rejects a declared body size far beyond the text limit before the body is parsed.
+  It also rejects a body far beyond the text limit before it is parsed: a declared
+  ``Content-Length`` at once, and any body (chunked included) as soon as the bytes read so
+  far pass the limit, so an oversized body is never buffered whole (LAB-1207).
 - :func:`v1_router` builds a router with that route class.
 """
 
@@ -58,7 +60,9 @@ class LoggedRoute(APIRoute):
             status = 500
             error_code: str | None = None
             try:
-                _check_body_size(request, self.max_body_bytes(request))
+                limit = self.max_body_bytes(request)
+                _check_body_size(request, limit)
+                await _read_body_capped(request, limit)
                 response = await handler(request)
                 status = response.status_code
                 return response
@@ -102,6 +106,23 @@ def _check_body_size(request: Request, limit: int) -> None:
         return
     if int(declared) > limit:
         raise PayloadTooLargeError("request body is too large")
+
+
+async def _read_body_capped(request: Request, limit: int) -> None:
+    """Read the body with a running byte count; 413 once it passes ``limit``.
+
+    The body is cached on the request (Starlette's ``request.body()`` / ``stream()`` then
+    return it), so the handler reads what was counted here."""
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            raise PayloadTooLargeError("request body is too large")
+        chunks.append(chunk)
+    request._body = b"".join(chunks)
 
 
 def check_text_size(request: Request, text: str) -> None:
