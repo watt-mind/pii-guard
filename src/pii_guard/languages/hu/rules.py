@@ -71,6 +71,10 @@ _TAJ_RE = re.compile(
     NUM_START + NO_GROUP_BEFORE + r"(\d{3})([ -]?)(\d{3})\2(\d{3})"
     r"(?!\d)(?![-./,]\d)" + NO_GROUP_AFTER + NOT_AMOUNT
 )
+# ``123.456.788`` and ``123/456/788``: printed this way too, but a dotted nine-digit number is
+# far more often a thousands-grouped amount or count and a slashed one a file reference, so
+# these two forms count only right after a TAJ cue (LAB-1216).
+_TAJ_DOTTED_RE = re.compile(NUM_START + r"(\d{3})([./])(\d{3})\2(\d{3})" + NUM_END + NOT_AMOUNT)
 _TAJ_CONTEXT = ("taj", "társadalombiztosítási", "social security")
 
 
@@ -85,6 +89,11 @@ def _find_taj(text: str) -> Iterator[_Hit]:
             else:
                 score = 0.8
             yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, score)
+    for m in _TAJ_DOTTED_RE.finditer(text):
+        if is_valid_taj(m.group(1) + m.group(3) + m.group(4)) and context_before(
+            text, m.start(), _TAJ_CONTEXT
+        ):
+            yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, 0.95)
 
 
 # --- Personal identification number (személyi azonosító) --------------------
@@ -200,7 +209,17 @@ def _find_mrz(text: str) -> Iterator[_Hit]:
 
 # --- Bank accounts ----------------------------------------------------------
 
-_GIRO_RE = re.compile(NUM_START + r"(\d{8})([- ]?)(\d{8})(?:\2(\d{8}))?" + NUM_END)
+# Two or three blocks of 8 digits separated by a hyphen, a space or a dot, or nothing.
+_GIRO_RE = re.compile(NUM_START + r"(\d{8})([- .]?)(\d{8})(?:\2(\d{8}))?" + NUM_END)
+# The same account printed in groups of four (``1177 3016 1111 1018``), one consistent space
+# or hyphen, 16 or 24 digits, and not part of a longer grouped number (LAB-1216).
+_GIRO_QUAD_RE = re.compile(
+    NUM_START
+    + NO_GROUP_BEFORE
+    + r"(\d{4}([ -])\d{4}(?:\2\d{4}){2}(?:(?:\2\d{4}){2})?)"
+    + NUM_END
+    + r"(?![ -]\d)"
+)
 
 
 def _find_giro(text: str) -> Iterator[_Hit]:
@@ -214,6 +233,9 @@ def _find_giro(text: str) -> Iterator[_Hit]:
             if third is not None and not m.group(2):
                 continue
             yield _Hit(m.start(), end, EntityType.BANK_ACCOUNT, 0.95)
+    for m in _GIRO_QUAD_RE.finditer(text):
+        if is_valid_giro(m.group(1).replace(m.group(2), "")):
+            yield _Hit(m.start(1), m.end(1), EntityType.BANK_ACCOUNT, 0.95)
 
 
 # --- Contact details --------------------------------------------------------
