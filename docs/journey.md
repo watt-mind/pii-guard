@@ -663,6 +663,51 @@ Recall@IoU ≥ 0.5 over every labelled region, best configuration of each tool:
   [2026-10-27-image-baselines](../eval/results/2026-10-27-image-baselines/README.md) and the
   run records `2026-10-27-image-baselines-*` in [benchmarks.md](benchmarks.md).
 
+### 27. Images that say whose data they hid (2026-10-27)
+
+LAB-1156.
+
+A black box hides a value and says nothing: shown a contract and two masked ID cards, the
+model couldn't tell whose cards they were. Now each covered region shows the vault
+placeholder of what it hides (`[[PERSON_a1b2c3]]`, `PHOTO · [[PERSON_a1b2c3]]`), each image
+comes with a masked transcript and a document summary (type, holder, `expired`, MRZ
+validity), and images are masked in the same vault session as the text. A card's
+`FIKTIV<<MARIA` or `FIKTÍV` / `MÁRIA` is matched to the contract's `Fiktív Mária` by a fuzzy
+matcher that ignores case, accents, token order and OCR confusions (`0`/`o`, `1`/`l`) but
+keeps one real letter of difference apart (`Mustermann` ≠ `Mustermonn`). Close but
+unaccepted matches get a new placeholder and are flagged, never guessed. Session values
+printed where no detector found them (a visitor badge's name) are covered too.
+
+Placeholder matching on the 24 fictional documents of milestone 17: 51 printed values, each
+seeded first in a contract-style text, next to 39 near-namesake sets (`Fiktív Márta`, a
+document number one character off). OCR words recorded from Tesseract, SAM off:
+
+| | Exact matching (before) | **Fuzzy matching (after)** |
+|---|---:|---:|
+| Values carrying the text's placeholder, clean OCR | 36 / 51 = 70.6 % | **50 / 51 = 98.0 %** |
+| Same, simulated OCR noise (5 % per character) | 27 / 51 = 52.9 % | **49 / 51 = 96.1 %** |
+| False merges with a near-namesake | 0 | **0** (clean and noisy) |
+| People with one placeholder in text and image | 15 / 24 | **24 / 24** |
+| Values spelled out in a transcript or summary | 0 | **0** |
+
+- **The demo question** "which parties have an ID?" (one card valid, one expired, one party
+  without a card), answered by Muse Spark Open on Baseten: **3 / 3 parties right** with
+  labelled images, **1 / 3** with opaque boxes (the model called every party "missing";
+  only the party with no card was). The mocked upstream gives the same 3 / 3 vs 1 / 3, and
+  that run is the end-to-end test in CI. No party name or document number was forwarded raw.
+- **Coverage doesn't depend on the mode:** text and MRZ region recall 87.9 % @ IoU ≥ 0.5 in
+  both, 88.7 % of labelled pixels overwritten in both; a narrow box grows to the right, into
+  free space only, so its label stays legible.
+- **Uncertain matches:** 2 on clean OCR, 4 with noise, each a new placeholder and listed in
+  the summary's `fields_uncertain`. The one clean miss is a document number only readable
+  from a garbled MRZ.
+- **Latency:** 65 ms p50 per image for matching, labelling and rendering (recorded OCR words).
+- **Cost:** two live Baseten calls for the committed demo runs, about **$0.014** (≈ $0.03
+  with the two exploratory calls); no SAM or GPU. Source: run records
+  `2026-10-27-visual-placeholders-{exact,fuzzy}-{clean,noisy}` and
+  `2026-10-27-demo-which-parties-{labels,opaque}-{live,mock}` in [benchmarks.md](benchmarks.md);
+  the guide is [examples/README.md](../examples/README.md).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
