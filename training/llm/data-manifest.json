@@ -1,0 +1,124 @@
+{
+  "build_version": 1,
+  "seed": 1109,
+  "source_commit": "7e328ad53fd12df30230a85e33cfb47c6869e3fd",
+  "chunking": {
+    "size": 6000,
+    "overlap": 300
+  },
+  "targets": "labelled spans (gold + adopted teacher names); documents with teacher disagreements excluded; types restricted to those the language's prompt requests",
+  "inputs": {
+    "labelled/hu-distill-train.jsonl": {
+      "sha256": "3784482de825b207e847449f46ac7a80856b07ddb588e48471eb11975d28187f"
+    },
+    "labelled/en-distill-train.jsonl": {
+      "sha256": "cc9af7113b5cd89b23ebb08347d7b3a2d68dca2fc182a1b9a39635252c4670dc"
+    },
+    "labelled/en-distill-dev.jsonl": {
+      "sha256": "b13f9983ca99ade625e05185c76f25611bec6ca33147072fd58dd1e50b25557a"
+    },
+    "labelled/hu-distill-dev.jsonl": {
+      "sha256": "f6dca4b60ca8dfa56d306dfb93ff169e696e350ad6c5e0d062f047c0d6662521"
+    }
+  },
+  "held_out_hashes": {
+    "distill_dev": 741,
+    "eval_fixtures": 200
+  },
+  "held_out_overlap": 0,
+  "output": {
+    "file": "train.jsonl",
+    "sha256": "d919be5bc272401a74937511da396ede588702f370ccb299954797dcfcd53d70",
+    "bytes": 19786792,
+    "examples": 3883
+  },
+  "counts": {
+    "documents": {
+      "en": 2119,
+      "hu": 2104
+    },
+    "empty_answers": {
+      "en": 282,
+      "hu": 271
+    },
+    "examples": {
+      "en": 2094,
+      "hu": 1789
+    },
+    "excluded_disagreement": {
+      "en": 25,
+      "hu": 315
+    },
+    "kind": {
+      "en": {
+        "chat": 143,
+        "court-notice": 68,
+        "csv": 72,
+        "email": 121,
+        "form": 148,
+        "invoice": 84,
+        "lease": 115,
+        "letter": 69,
+        "log": 138,
+        "meeting-notes": 73,
+        "mixed-confusables": 161,
+        "negative-ops": 141,
+        "negative-prose": 141,
+        "power-of-attorney": 69,
+        "sale-contract": 142,
+        "sms": 163,
+        "support-chat": 106,
+        "tool-output": 140
+      },
+      "hu": {
+        "chat": 127,
+        "court-notice": 46,
+        "csv": 49,
+        "email": 133,
+        "form": 90,
+        "invoice": 66,
+        "land-registry": 48,
+        "lease": 110,
+        "letter": 53,
+        "log": 166,
+        "meeting-notes": 13,
+        "mixed-confusables": 131,
+        "negative-ops": 127,
+        "negative-prose": 144,
+        "power-of-attorney": 54,
+        "sale-contract": 117,
+        "sms": 140,
+        "support-chat": 118,
+        "tool-output": 57
+      }
+    },
+    "type": {
+      "en": {
+        "ADDRESS": 1866,
+        "BANK_ACCOUNT": 553,
+        "DATE_OF_BIRTH": 595,
+        "EMAIL": 1281,
+        "ID_DOCUMENT": 263,
+        "ORGANIZATION": 457,
+        "PERSON": 4032,
+        "PHONE": 1528,
+        "VEHICLE_PLATE": 211
+      },
+      "hu": {
+        "ADDRESS": 1740,
+        "BANK_ACCOUNT": 473,
+        "COMPANY_ID_HU": 334,
+        "DATE_OF_BIRTH": 636,
+        "EMAIL": 712,
+        "ID_DOCUMENT": 281,
+        "NATIONAL_ID_HU_TAJ": 333,
+        "NATIONAL_ID_HU_TAX": 416,
+        "ORGANIZATION": 517,
+        "PARCEL_NUMBER_HU": 219,
+        "PERSON": 3689,
+        "PHONE": 1220,
+        "VEHICLE_PLATE": 180
+      }
+    }
+  }
+}

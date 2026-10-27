@@ -1369,6 +1369,26 @@ live runs were made just before it, with 13:
 <!-- journey:end -->
 
 Milestones merged since the last time this page was rendered are in [journey/](journey/), one file each, oldest first.
+### 46. Muse Glimmer fine-tuned to answer without reasoning (2026-10-27, trained; evaluated 2026-10-28)
+
+LAB-1109.
+
+Glimmer zero-shot had the best quality we measured but reasons for about 9 s per document. We
+fine-tuned it (LoRA r 8) on 3,883 fictional documents to emit the detector's JSON directly,
+with the detector's own prompts as input, on Fireworks' free Serverless Training.
+
+- **Training:** 243 steps, 30 minutes, 5.05 M training tokens, loss 0.18 to about 0.003;
+  Fireworks spend **$0.00** before and after every step (list price would have been about
+  $30). Source: [models.md](models.md#answer-only-muse-glimmer-lora-fine-tune-lab-1109),
+  *(ticket comments, LAB-1109)*.
+- **Template:** the training renderer and the model's own chat template agree byte for byte
+  (50/50 prompts); the trained answer is addressed straight to the user, with no reasoning
+  turn.
+- **Blocked on:** Fireworks lets API keys train but not download models, and it doesn't serve
+  trained LoRAs serverless. Serving on our own vLLM (Modal) needs one interactive sign-in to
+  download the adapter; a Fireworks deployment would cost $8 per GPU-hour.
+- **Bar to clear:** fast mode (rules + distilled NER) now scores 98.6-99.6 F1 and 0.5 % leak
+  on the held-out split at 0.1 s, so the fine-tune has to win on leak to earn a GPU.
 
 ## How pii-guard uses Meta's models
 

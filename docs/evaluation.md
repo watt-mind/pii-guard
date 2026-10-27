@@ -1070,3 +1070,22 @@ leak 47.6 → 47.4 %), every other number unchanged; with `rules,ner`, identical
 latency noise. On the 2,472 Hungarian documents of the NER distillation corpus, whose 1,548
 company names are all brand words (`... Villanyszerelő Kft.`), the rule fires 0 times. It adds
 about 0.01 ms to the rules' median detection time.
+
+## Answer-only Muse Glimmer fine-tune (LAB-1109)
+
+Strict mode's LLM detector reasons before it answers, which is where its latency goes. LAB-1109
+fine-tunes Muse Glimmer 30B (LoRA, on Fireworks, $0) to answer with the span JSON directly; the
+recipe is in [models.md](models.md#answer-only-muse-glimmer-lora-fine-tune-lab-1109).
+
+- **Test split.** The model is trained on the LAB-1128 distillation **train** split only. Its
+  **dev** split (seed 11: hu 368, en 373 documents) is the held-out test set, together with the
+  committed fixtures. `training/llm/build_sft.py` refuses to write the training file if any
+  test or fixture document is in it (sha256 of the normalised text).
+- **What is compared** on hu/en/de smoke, hu/en synth-sample and the test split: `rules,llm`
+  with the fine-tuned model against Glimmer zero-shot (`reasoning_strength` low), Muse Spark
+  Open on Baseten, Muse Spark 1.3, and fast mode (`rules,ner`, distilled large). Overlap F1,
+  leak, partial leak, over-masking, p50/p95 latency, invalid outputs and refusals
+  (`LlmDetector.usage`), and whether any answer contains reasoning text.
+- **Status (2026-10-27).** Trained; the fine-tuned rows are pending the adapter download.
+  Fast mode on the test split: hu 99.6 F1 / 0.5 % leak, en 98.6 / 0.5 %, 0.08-0.10 s p50.
+  Scorecards: [eval/results/2026-10-27-glimmer-lora](../eval/results/2026-10-27-glimmer-lora/README.md).
