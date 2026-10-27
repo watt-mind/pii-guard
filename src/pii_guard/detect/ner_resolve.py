@@ -260,7 +260,7 @@ def ensure(
         f"first run only) into {target}"
     )
     try:
-        from huggingface_hub import snapshot_download
+        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
     except ImportError:
         raise DetectionError("ner download needs huggingface_hub (the 'ner' extra)") from None
     try:
