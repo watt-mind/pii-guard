@@ -41,6 +41,18 @@ def test_overhead_is_total_minus_upstream() -> None:
     assert out["added_ttft_ms"] is None
 
 
+def test_overhead_excludes_time_spent_handing_events_to_the_client() -> None:
+    timer = RequestTimer(started=0.0)
+    timer.add("detect", 0.004)
+    timer.add("unmask", 0.002)
+    timer.add("upstream", 0.100)
+    timer.add("client", 1.000)  # a slow reader: 20 events x 50 ms (LAB-1212)
+    timer.ended = 1.110
+    out = timer.breakdown()
+    assert out["stages_ms"]["client"] == pytest.approx(1000.0)
+    assert out["overhead_ms"] == pytest.approx(10.0)
+
+
 def test_added_ttft_subtracts_the_upstreams_own_first_byte_time() -> None:
     timer = RequestTimer(started=10.0)
     timer.upstream_sent = 10.004

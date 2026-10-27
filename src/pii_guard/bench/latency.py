@@ -8,9 +8,9 @@ and streaming (off, on). Each request opens a new session, so nothing is served 
 detection cache.
 
 Per request it keeps the gateway's own timing (:class:`~pii_guard.observability.RequestTimer`:
-stages, per-detector time, ``overhead = total - upstream``, added time to first token) and the
-client-side wall time; per cell it reports p50 / p95 / p99 / mean. Because the upstream is a
-fixed sleep, the overhead is pii-guard's work and nothing else: parsing, detection, masking,
+stages, per-detector time, ``overhead = total - upstream - client``, added time to first token)
+and the client-side wall time; per cell it reports p50 / p95 / p99 / mean. Because the upstream
+is a fixed sleep, the overhead is pii-guard's work and nothing else: parsing, detection, masking,
 the HTTP hop to the upstream and back, unmasking. With ``--record SLUG`` the result is written
 as run records (``kind: latency``, one per mode) in ``eval/results/runs/`` and the benchmark
 report is regenerated.
@@ -419,7 +419,8 @@ def build_records(
                 "title": f"Gateway overhead, {mode} mode, mock upstream at {delay_ms:g} ms",
                 "notes": [
                     f"Mock upstream with a fixed {delay_ms:g} ms delay on loopback; overhead = "
-                    "gateway total - time waiting on the upstream.",
+                    "gateway total - time waiting on the upstream - time handing stream events "
+                    "to the client.",
                     "Each request is a new session (no detection cache hits); one user message "
                     "per request from the fixed fictional corpus.",
                     *notes,

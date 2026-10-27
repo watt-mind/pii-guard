@@ -211,7 +211,7 @@ Both answer `404 traffic_log_disabled` while the log is off.
 | `id` | Request id, also sent back as `X-PII-Guard-Request-Id` on successful responses |
 | `seq`, `time` | Order in this process; UTC timestamp |
 | `level` | `masked` or `full` |
-| `outcome` | `ok`, `blocked` (a `block` policy), `refused` (any other error before or at the upstream), `upstream_error` (upstream HTTP >= 400), `stream_error`, `error` |
+| `outcome` | `ok`, `blocked` (a `block` policy), `refused` (any other error before or at the upstream), `upstream_error` (upstream HTTP >= 400), `stream_error`, `client_disconnected` (the client went away mid-stream; the partial answer does not seed the detection cache), `error` |
 | `error` | `{"code", "status"}` and, for `blocked`, `entity_types` (counts) |
 | `mode`, `language`, `stream`, `model` | As requested |
 | `session_ref`, `session_new` | Hashed session (see above); whether the call started the conversation |
@@ -240,11 +240,13 @@ received until the answer is built (non-streamed) or the stream has ended:
 | `upstream` | All time spent waiting on the upstream: headers, body or each stream read |
 | `unmask` | Restoring a stream, summed over its chunks |
 | `response` | Restoring a non-streamed answer and building the response |
+| `client` | Streams: time spent handing each event to the client (its read speed, network backpressure); neither pii-guard's work nor the upstream's |
 
 Derived fields:
 
-- `total_ms`, `upstream_ms` and **`overhead_ms = total_ms - upstream_ms`**: what pii-guard
-  added to the call.
+- `total_ms`, `upstream_ms` and **`overhead_ms = total_ms - upstream_ms - client`**: what
+  pii-guard added to the call. A slow-reading client makes a stream's `total_ms` longer, not
+  its overhead.
 - Streams: `ttft_ms` (to the first event sent to the client), `upstream_ttft_ms` (the
   upstream's own time from send to its first data event) and **`added_ttft_ms = ttft_ms -
   upstream_ttft_ms`**: the delay pii-guard added before the first token.

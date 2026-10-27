@@ -259,7 +259,9 @@ def test_overhead_and_added_ttft_streaming() -> None:
     assert t["upstream_ttft_ms"] >= DELAY * 1000
     assert t["added_ttft_ms"] == pytest.approx(t["ttft_ms"] - t["upstream_ttft_ms"], abs=0.01)
     assert t["added_ttft_ms"] < DELAY * 1000
-    assert t["overhead_ms"] == pytest.approx(t["total_ms"] - t["upstream_ms"], abs=0.01)
+    # Streams also take out the time spent handing events to the client (LAB-1212).
+    client_ms = t["stages_ms"]["client"]
+    assert t["overhead_ms"] == pytest.approx(t["total_ms"] - t["upstream_ms"] - client_ms, abs=0.01)
     assert t["overhead_ms"] < DELAY * 1000
     assert t["stages_ms"]["unmask"] > 0
 
