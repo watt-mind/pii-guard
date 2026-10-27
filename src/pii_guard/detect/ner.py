@@ -151,6 +151,11 @@ DEFAULT_THRESHOLDS: dict[str, dict[EntityType, float]] = {
 # house numbers ("1982.06.26.", "utca 12."); a PERSON span loses a trailing dot.
 _TRIM = " \t\r\n,;:!?()[]{}\"'\u00ab\u00bb\u201e\u201c\u201d\u2018\u2019\u2013\u2014-/"
 _REQUIRED_MODULES = ("torch", "transformers")
+#: Windows per forward pass in :meth:`TransformersBackend.predict_batch` (LAB-1279), the cap
+#: on padded tokens per pass (8 full 512-token windows), and on padded / real tokens.
+DEFAULT_BATCH_SIZE = 8
+DEFAULT_MAX_BATCH_TOKENS = 4096
+DEFAULT_MAX_PADDING = 2.0
 #: What a backend runs once on its device before it is published (fictional, no PII).
 WARM_UP_TEXT = "Warm-up sentence for the model."
 
@@ -182,7 +187,12 @@ class RawEntity:
 
 
 class NerBackend(Protocol):
-    """Runs the model: text in, raw entities with character offsets into that text out."""
+    """Runs the model: text in, raw entities with character offsets into that text out.
+
+    A backend may also offer ``predict_batch(texts) -> list[list[RawEntity]]`` (one result per
+    text, in order); :meth:`NerDetector.detect_batch` uses it when present and loops
+    ``predict`` otherwise.
+    """
 
     def predict(self, text: str) -> list[RawEntity]: ...
 
@@ -298,6 +308,9 @@ class TransformersBackend:
     """A Hugging Face token-classification model run with PyTorch.
 
     ``max_length`` and ``stride`` (tokens) set the window and overlap for long inputs.
+    :meth:`predict_batch` runs the windows of several texts in length-sorted micro-batches of
+    at most ``batch_size`` windows, ``max_batch_tokens`` padded tokens and ``max_padding``
+    times their real tokens (LAB-1279).
     """
 
     def __init__(
@@ -310,9 +323,14 @@ class TransformersBackend:
         stride: int = 64,
         aggregation: str | None = None,
         local_files_only: bool = False,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        max_batch_tokens: int = DEFAULT_MAX_BATCH_TOKENS,
+        max_padding: float = DEFAULT_MAX_PADDING,
     ) -> None:
         if stride >= max_length // 2:
             raise ValueError("stride must be less than half of max_length")
+        if batch_size < 1 or max_batch_tokens < 1 or max_padding < 1:
+            raise ValueError("batch_size, max_batch_tokens and max_padding must be positive")
         import torch
         from transformers import AutoModelForTokenClassification, AutoTokenizer
 
@@ -334,42 +352,108 @@ class TransformersBackend:
         model_max = getattr(self.tokenizer, "model_max_length", max_length) or max_length
         self.max_length = min(max_length, model_max if model_max < 100_000 else max_length)
         self.stride = stride
+        self.batch_size = batch_size
+        self.max_batch_tokens = max_batch_tokens
+        self.max_padding = max_padding
         self._lock = threading.Lock()  # fast tokenizers are not safe for concurrent calls
         # One forward on the device before anyone else can see this backend (LAB-1274).
         self.predict(WARM_UP_TEXT)
 
     def predict(self, text: str) -> list[RawEntity]:
+        return self.predict_batch([text])[0]
+
+    def predict_batch(self, texts: Sequence[str]) -> list[list[RawEntity]]:
+        """Raw entities for each of ``texts``, in order, from batched forward passes.
+
+        All texts are tokenized together into windows (``overflow_to_sample_mapping`` maps a
+        window back to its text). The windows run longest first in micro-batches, each padded
+        on the right to its own longest window, under one acquisition of the inference lock.
+        Logits go to the CPU once per micro-batch; softmax and argmax run there (on MPS that is
+        faster than two device syncs). Every window is decoded on its own and a text's entities
+        are merged across its windows, as for one text. Any error fails the whole batch.
+        """
+        if not texts:
+            return []
         torch = self._torch
         with self._lock, torch.inference_mode():
             enc = self.tokenizer(
-                text,
+                list(texts),
                 return_offsets_mapping=True,
                 return_overflowing_tokens=True,
                 truncation=True,
                 max_length=self.max_length,
                 stride=self.stride,
-                padding=True,
-                return_tensors="pt",
             )
-            offsets = enc.pop("offset_mapping").tolist()
-            enc.pop("overflow_to_sample_mapping", None)
+            offsets = enc.pop("offset_mapping")
+            samples = enc.pop("overflow_to_sample_mapping", None)
+            if samples is None:
+                samples = list(range(len(offsets)))
             word_ids = [enc.word_ids(i) for i in range(len(offsets))]
-            inputs = {k: v.to(self.device) for k, v in enc.items()}
-            probs = torch.softmax(self.model(**inputs).logits.float(), dim=-1)
-            best, ids = probs.max(dim=-1)
-            best, ids = best.cpu().tolist(), ids.cpu().tolist()
-        entities: list[RawEntity] = []
-        for window in range(len(offsets)):
-            entities.extend(
+            features = {key: enc[key] for key in enc}
+            lengths = [len(ids) for ids in features["input_ids"]]
+            pad_values = {
+                "input_ids": self.tokenizer.pad_token_id,
+                "token_type_ids": getattr(self.tokenizer, "pad_token_type_id", 0),
+            }
+            best: list[list[float]] = [[] for _ in lengths]
+            label_ids: list[list[int]] = [[] for _ in lengths]
+            for chunk in self._micro_batches(lengths):
+                width = lengths[chunk[0]]  # longest first
+                inputs = {
+                    key: torch.tensor(
+                        [
+                            [*values[w], *[pad_values.get(key, 0)] * (width - lengths[w])]
+                            for w in chunk
+                        ]
+                    ).to(self.device)
+                    for key, values in features.items()
+                }
+                logits = self.model(**inputs).logits.float().cpu()
+                scores, ids = torch.softmax(logits, dim=-1).max(dim=-1)
+                for row, window in enumerate(chunk):
+                    n = lengths[window]  # padded on the right
+                    best[window] = scores[row, :n].tolist()
+                    label_ids[window] = ids[row, :n].tolist()
+        per_text: list[list[RawEntity]] = [[] for _ in texts]
+        for window, sample in enumerate(samples):
+            per_text[sample].extend(
                 decode_tokens(
                     [tuple(o) for o in offsets[window]],
                     word_ids[window],
-                    [self.id2label[i] for i in ids[window]],
+                    [self.id2label[i] for i in label_ids[window]],
                     best[window],
                     aggregation=self.aggregation,
                 )
             )
-        return merge_entities(entities)
+        return [merge_entities(entities) for entities in per_text]
+
+    def _micro_batches(self, lengths: Sequence[int]) -> list[list[int]]:
+        """Window indices, longest first, cut into batches for :meth:`predict_batch`.
+
+        A window joins the current batch while the batch stays within ``batch_size`` windows
+        and ``max_batch_tokens`` padded tokens, and padding stays at most
+        ``max_padding`` x its real tokens (a long system prompt does not pad seven short tool
+        descriptions to its length).
+        """
+        order = sorted(range(len(lengths)), key=lambda w: (-lengths[w], w))
+        batches: list[list[int]] = []
+        real = 0
+        for window in order:
+            current = batches[-1] if batches else None
+            if current is not None:
+                # Sorted longest first, so the first window of a batch sets its padded length.
+                padded = (len(current) + 1) * lengths[current[0]]
+                if (
+                    len(current) < self.batch_size
+                    and padded <= self.max_batch_tokens
+                    and padded <= self.max_padding * (real + lengths[window])
+                ):
+                    current.append(window)
+                    real += lengths[window]
+                    continue
+            batches.append([window])
+            real = lengths[window]
+        return batches
 
 
 def _normalize_thresholds(
@@ -585,6 +669,34 @@ class NerDetector:
         except Exception as exc:
             raise DetectionError(f"ner inference failed ({type(exc).__name__})") from exc
         return self.to_spans(text, raw, language)
+
+    def detect_batch(self, texts: Sequence[str], language: str = "hu") -> list[list[Span]]:
+        """``[detect(t, language) for t in texts]``, with the model run on all texts at once.
+
+        Uses the backend's ``predict_batch`` when it has one (one lock acquisition, batched
+        forwards), else calls ``predict`` per text. Fail closed: any error raises
+        :class:`DetectionError` for the whole batch and no spans are returned.
+        """
+        out: list[list[Span]] = [[] for _ in texts]
+        todo = [i for i, text in enumerate(texts) if text.strip()]
+        if not todo:
+            return out
+        backend = self.load()
+        batch = getattr(backend, "predict_batch", None)
+        try:
+            if batch is not None:
+                raws = batch([texts[i] for i in todo])
+            else:
+                raws = [backend.predict(texts[i]) for i in todo]
+        except DetectionError:
+            raise
+        except Exception as exc:
+            raise DetectionError(f"ner inference failed ({type(exc).__name__})") from exc
+        if not isinstance(raws, list) or len(raws) != len(todo):
+            raise DetectionError("ner backend returned the wrong number of batch results")
+        for i, raw in zip(todo, raws, strict=True):
+            out[i] = self.to_spans(texts[i], raw, language)
+        return out
 
     def to_spans(self, text: str, raw: Sequence[RawEntity], language: str = "hu") -> list[Span]:
         """Map labels, apply thresholds, trim span ends and build :class:`Span` objects."""

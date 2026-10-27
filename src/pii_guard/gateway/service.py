@@ -455,13 +455,18 @@ class Gateway:
             async def run(text: str) -> tuple[list[Span], dict[str, float]]:
                 return await workers.run(detector.detect, text, language)
 
+            async def run_all(texts: list[str]) -> list[tuple[list[Span], dict[str, float]]]:
+                # Fast mode: one job for every uncached text, so the NER model batches them
+                # (LAB-1279). Timings are per job; the first output carries them.
+                found, timings = await workers.run(detector.detect_many, texts, language)
+                return [(spans, timings if i == 0 else {}) for i, spans in enumerate(found)]
+
             started = time.perf_counter()
             jobs = list(pending.values())
+            texts = [text for text, _, _ in jobs]
+            work = run_all(texts) if detector.batches else asyncio.gather(*map(run, texts))
             try:
-                outputs = await asyncio.wait_for(
-                    asyncio.gather(*(run(text) for text, _, _ in jobs)),
-                    timeout=self.config.detection_timeout,
-                )
+                outputs = await asyncio.wait_for(work, timeout=self.config.detection_timeout)
             except TimeoutError:
                 raise DetectionError(
                     f"detection timed out after {self.config.detection_timeout:g}s "

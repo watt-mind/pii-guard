@@ -7,6 +7,8 @@ All text is fictional.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from pii_guard.detect import ner, ner_resolve
@@ -448,3 +450,274 @@ def test_detector_loads_a_local_model(tiny_model_dir, monkeypatch: pytest.Monkey
     assert isinstance(detector.load(), ner.TransformersBackend)
     assert detector.load().aggregation == "first"
     assert isinstance(detector.detect("Teszt Elek lakik", "hu"), list)
+
+
+# -- batching (LAB-1279) --
+
+
+class FakeBatchBackend:
+    """Entities chosen per text by ``finder``; ``predict_batch`` records each batch."""
+
+    def __init__(self, finder, error: Exception | None = None, wrong_count: bool = False):
+        self.finder = finder
+        self.error = error
+        self.wrong_count = wrong_count
+        self.batches: list[list[str]] = []
+        self.calls = 0
+
+    def predict(self, text: str) -> list[RawEntity]:
+        self.calls += 1
+        return self.finder(text)
+
+    def predict_batch(self, texts):
+        self.batches.append(list(texts))
+        if self.error is not None:
+            raise self.error
+        out = [self.finder(t) for t in texts]
+        return out[:-1] if self.wrong_count else out
+
+
+def _find_test_names(text: str) -> list[RawEntity]:
+    found = []
+    for name in ("Teszt Elek", "Minta Mária"):
+        start = text.find(name)
+        if start >= 0:
+            found.append(RawEntity("PER", start, start + len(name), 0.91))
+    start = text.find("Minta Kft.")
+    if start >= 0:
+        found.append(RawEntity("ORG", start, start + len("Minta Kft."), 0.4))  # below threshold
+    return found
+
+
+BATCH_TEXTS = [
+    "Teszt Elek lakik Budapesten.",
+    "   ",
+    "Nincs itt senki.",
+    "Minta Mária a Minta Kft. ügyvezetője, Teszt Elek a helyettese.",
+    "",
+]
+
+
+def test_detect_batch_equals_detect_per_text() -> None:
+    backend = FakeBatchBackend(_find_test_names)
+    detector = NerDetector(backend=backend)
+    batched = detector.detect_batch(BATCH_TEXTS, "hu")
+    assert backend.batches == [[t for t in BATCH_TEXTS if t.strip()]]  # one call, blanks skipped
+    assert batched == [detector.detect(t, "hu") for t in BATCH_TEXTS]
+    assert [len(s) for s in batched] == [1, 0, 0, 2, 0]
+
+
+def test_detect_batch_loops_predict_without_predict_batch() -> None:
+    raw = [RawEntity("PER", 0, 10, 0.9)]
+    backend = FakeBackend(raw)
+    detector = NerDetector(backend=backend)
+    texts = ["Teszt Elek lakik itt", "Teszt Elek dolgozik"]
+    assert detector.detect_batch(texts, "hu") == [detector.detect(t, "hu") for t in texts]
+    assert backend.calls == 4
+    assert detector.detect_batch(["", " "]) == [[], []]
+    assert backend.calls == 4  # nothing to run, the model is not called
+
+
+@pytest.mark.parametrize(
+    ("backend", "match"),
+    [
+        (FakeBatchBackend(_find_test_names, error=RuntimeError("Teszt Elek")), "RuntimeError"),
+        (FakeBatchBackend(_find_test_names, error=DetectionError("boom")), "boom"),
+        (FakeBatchBackend(_find_test_names, wrong_count=True), "number of batch results"),
+    ],
+)
+def test_detect_batch_fails_closed(backend, match: str) -> None:
+    detector = NerDetector(backend=backend)
+    with pytest.raises(DetectionError, match=match) as info:
+        detector.detect_batch(BATCH_TEXTS, "hu")
+    assert "Teszt" not in info.value.message
+
+
+def test_detect_batch_rejects_offsets_outside_a_text() -> None:
+    detector = NerDetector(backend=FakeBatchBackend(lambda t: [RawEntity("PER", 0, 999, 0.9)]))
+    with pytest.raises(DetectionError, match="offsets outside"):
+        detector.detect_batch(["Teszt Elek"], "hu")
+
+
+def _counting(forward):
+    shapes: list[tuple[int, ...]] = []
+
+    def wrapped(**inputs):
+        shapes.append(tuple(inputs["input_ids"].shape))
+        return forward(**inputs)
+
+    return wrapped, shapes
+
+
+def _batch_texts() -> list[str]:
+    long = "Teszt Elek lakik Budapesten és a Minta Kft. dolgozik " * 3 + "Teszt  Elek"
+    return [
+        "Teszt Elek lakik Budapesten",
+        long,
+        "a Minta Kft. dolgozik",
+        "",
+        "Elek",
+        "Teszt Elek és Teszt Elek",
+        long[:60],
+    ]
+
+
+def test_predict_batch_equals_predict_per_text(tiny_model_dir) -> None:
+    path, vocab = tiny_model_dir
+    backend = ner.TransformersBackend(str(path), device="cpu", max_length=12, stride=2)
+    backend.model, shapes = _counting(_stub_forward(vocab))
+    texts = _batch_texts()
+    singles = [backend.predict(t) for t in texts]
+    shapes.clear()
+    assert backend.predict_batch(texts) == singles
+    # The long text needs several windows; all windows of all texts in ceil(n / 8) forwards.
+    windows = sum(
+        len(
+            backend.tokenizer(
+                t, return_overflowing_tokens=True, truncation=True, max_length=12, stride=2
+            )["input_ids"]
+        )
+        for t in texts
+    )
+    assert windows > len(texts)
+    assert sum(rows for rows, _ in shapes) == windows
+    assert len(shapes) < windows and all(rows <= 8 for rows, _ in shapes)
+    # Longest windows first: the padded width never grows from one micro-batch to the next.
+    assert [s[1] for s in shapes] == sorted((s[1] for s in shapes), reverse=True)
+    detector = NerDetector(backend=backend)
+    assert detector.detect_batch(texts, "hu") == [detector.detect(t, "hu") for t in texts]
+    assert backend.predict_batch([]) == []
+
+
+def test_predict_batch_respects_the_token_cap(tiny_model_dir) -> None:
+    path, vocab = tiny_model_dir
+    backend = ner.TransformersBackend(
+        str(path), device="cpu", max_length=12, stride=2, batch_size=8, max_batch_tokens=24
+    )
+    backend.model, shapes = _counting(_stub_forward(vocab))
+    texts = _batch_texts()
+    singles = [backend.predict(t) for t in texts]
+    shapes.clear()
+    assert backend.predict_batch(texts) == singles
+    assert shapes and all(rows * width <= 24 or rows == 1 for rows, width in shapes)
+    with pytest.raises(ValueError, match="positive"):
+        ner.TransformersBackend(str(path), device="cpu", batch_size=0)
+
+
+def test_micro_batches_bound_count_tokens_and_padding(tiny_model_dir) -> None:
+    path, _ = tiny_model_dir
+    backend = ner.TransformersBackend(str(path), device="cpu")
+    # A long system prompt is not batched with short tool texts (padding over 2x).
+    lengths = [282, 24, 23, 24, 5, 5, 5, 5, 5, 5, 5, 5, 5, 3]
+    batches = backend._micro_batches(lengths)
+    assert sorted(w for b in batches for w in b) == list(range(len(lengths)))
+    assert batches[0][0] == 0 and len(batches[0]) <= 2
+    for batch in batches:
+        width = lengths[batch[0]]
+        assert all(lengths[w] <= width for w in batch)
+        assert len(batch) <= 8
+        assert len(batch) * width <= 2 * sum(lengths[w] for w in batch)
+    # Equal lengths: full batches of 8 up to the token cap.
+    assert [len(b) for b in backend._micro_batches([512] * 20)] == [8, 8, 4]
+    backend.max_batch_tokens = 1024
+    assert [len(b) for b in backend._micro_batches([512] * 5)] == [2, 2, 1]
+
+
+def test_padded_batch_matches_unpadded_forward(tiny_model_dir) -> None:
+    """With the real (random) tiny model: right padding + attention mask leave scores as is."""
+    path, _ = tiny_model_dir
+    backend = ner.TransformersBackend(str(path), device="cpu", max_length=12, stride=2)
+    texts = [t for t in _batch_texts() if t]
+    singles = [backend.predict(t) for t in texts]
+    batched = backend.predict_batch(texts)
+
+    def rounded(entities):
+        return [(e.label, e.start, e.end, round(e.score, 4)) for e in entities]
+
+    assert [rounded(b) for b in batched] == [rounded(s) for s in singles]
+
+
+def test_predict_batch_softmax_runs_on_cpu(tiny_model_dir) -> None:
+    """Logits leave the device once per micro-batch; softmax and argmax run on the CPU."""
+    path, vocab = tiny_model_dir
+    backend = ner.TransformersBackend(str(path), device="cpu", max_length=12, stride=2)
+    forward = _stub_forward(vocab)
+    moved: list[str] = []
+
+    class Logits:
+        def __init__(self, inner):
+            self.inner = inner
+
+        def float(self):
+            return self
+
+        def cpu(self):
+            moved.append("cpu")
+            return self.inner.float()
+
+    class Out:
+        def __init__(self, logits):
+            self.logits = Logits(logits)
+
+    forwards: list[int] = []
+
+    def model(**inputs):
+        forwards.append(1)
+        return Out(forward(**inputs).logits)
+
+    backend.model = model
+    backend.predict_batch(_batch_texts())
+    assert len(forwards) > 1
+    assert len(moved) == len(forwards)  # one device-to-CPU copy per micro-batch
+
+
+# -- the shipped checkpoint, where one is available (PII_GUARD_NER_MODEL) --
+
+
+# Read at import: the autouse ``clean_env`` fixture clears ``PII_GUARD_*`` for every test.
+REAL_MODEL = os.environ.get(ner.MODEL_ENV_VAR, "")
+
+
+def _real_model_path() -> str:
+    if not REAL_MODEL or not os.path.isdir(REAL_MODEL):
+        pytest.skip(f"{ner.MODEL_ENV_VAR} does not point at a local checkpoint")
+    if not dependencies_available():
+        pytest.skip("needs the 'ner' extra")
+    return REAL_MODEL
+
+
+def _fixture_docs() -> list[tuple[str, str]]:
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "eval" / "fixtures"
+    docs = []
+    for path in sorted(root.glob("*-smoke.jsonl")) + sorted(root.glob("public/*-ai4privacy.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                doc = json.loads(line)
+                docs.append((doc.get("language", "hu"), doc["text"]))
+    return docs
+
+
+def test_real_model_detect_batch_equals_detect() -> None:
+    """Batched and per-text detection agree span for span on the smoke + ai4privacy fixtures."""
+    detector = NerDetector(model=_real_model_path(), device="cpu")
+    docs = _fixture_docs()
+    long_text = " ".join(text for _, text in docs[:40])  # several 512-token windows
+    assert len(detector.load().tokenizer(long_text)["input_ids"]) > 1024
+    docs.append(("en", long_text))
+
+    def key(spans):
+        return [(s.start, s.end, s.entity_type, s.text) for s in spans]
+
+    by_language: dict[str, list[str]] = {}
+    for language, text in docs:
+        by_language.setdefault(language, []).append(text)
+    for language, texts in by_language.items():
+        batched = detector.detect_batch(texts, language)
+        singles = [detector.detect(t, language) for t in texts]
+        assert [key(b) for b in batched] == [key(s) for s in singles]
+        # Padding changes the float sums slightly: scores agree to 1e-4, not bit for bit.
+        for b, s in zip(batched, singles, strict=True):
+            assert all(abs(x.score - y.score) <= 1e-4 for x, y in zip(b, s, strict=True))

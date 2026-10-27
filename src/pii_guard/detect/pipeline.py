@@ -491,12 +491,33 @@ class DetectionPipeline:
         is found whole by all of them; their spans are mapped back to ``text``, covering any
         invisible characters inside a value. Text with nothing to clean is passed unchanged.
         """
-        norm = normalize_for_detection(text)
-        seen = norm.text if norm.changed else text
-        spans: list[Span] = []
+        return self._detect_texts([text], language, batched=False)[0]
+
+    def detect_many(self, texts: Sequence[str], language: str = "hu") -> list[list[Span]]:
+        """``[detect(t, language) for t in texts]``, letting detectors batch (LAB-1279).
+
+        A detector with ``detect_batch(texts, language)`` (the NER detector: one batched model
+        run) gets all texts in one call; the others are called per text. Normalisation, the
+        mapping back to the original text and :func:`resolve_spans` stay per text. Fail closed:
+        any detector error raises :class:`DetectionError` for the whole call.
+        """
+        return self._detect_texts(list(texts), language, batched=True)
+
+    def _detect_texts(self, texts: list[str], language: str, *, batched: bool) -> list[list[Span]]:
+        norms = [normalize_for_detection(text) for text in texts]
+        seen = [n.text if n.changed else t for n, t in zip(norms, texts, strict=True)]
+        spans: list[list[Span]] = [[] for _ in texts]
         for detector in self.detectors:
+            batch = getattr(detector, "detect_batch", None) if batched else None
             try:
-                found = detector.detect(seen, language)
+                if batch is not None:
+                    found_all = batch(seen, language)
+                    if not isinstance(found_all, list) or len(found_all) != len(seen):
+                        raise DetectionError(
+                            f"detector {detector.name!r} returned the wrong number of results"
+                        )
+                else:
+                    found_all = [detector.detect(t, language) for t in seen]
             except DetectionError:
                 raise
             except Exception as exc:
@@ -504,18 +525,25 @@ class DetectionPipeline:
                 raise DetectionError(
                     f"detector {detector.name!r} failed ({type(exc).__name__})"
                 ) from exc
-            kept = [s for s in found if s.score >= self.min_score]
-            if norm.changed:
-                kept = [_to_original(norm, text, s) for s in kept]
-            spans.extend(kept)
-        resolved = resolve_spans(
-            text,
-            spans,
-            detector_order=[d.name for d in self.detectors],
-            authoritative=self.authoritative,
-            adjudicator=self.adjudicator,
-            keep_types=self.keep_types,
-            overriding=self.overriding,
-        )
-        logger.debug("pipeline resolved %d candidate spans into %d", len(spans), len(resolved))
-        return resolved
+            for i, found in enumerate(found_all):
+                kept = [s for s in found if s.score >= self.min_score]
+                if norms[i].changed:
+                    kept = [_to_original(norms[i], texts[i], s) for s in kept]
+                spans[i].extend(kept)
+        order = [d.name for d in self.detectors]
+        out: list[list[Span]] = []
+        for text, candidates in zip(texts, spans, strict=True):
+            resolved = resolve_spans(
+                text,
+                candidates,
+                detector_order=order,
+                authoritative=self.authoritative,
+                adjudicator=self.adjudicator,
+                keep_types=self.keep_types,
+                overriding=self.overriding,
+            )
+            logger.debug(
+                "pipeline resolved %d candidate spans into %d", len(candidates), len(resolved)
+            )
+            out.append(resolved)
+        return out
