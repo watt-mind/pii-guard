@@ -33,7 +33,13 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from pii_guard.detect.ner import NerDetector, RawEntity, merge_entities, select_device
+from pii_guard.detect.ner import (
+    WARM_UP_TEXT,
+    NerDetector,
+    RawEntity,
+    merge_entities,
+    select_device,
+)
 from pii_guard.types import DetectionError, EntityType
 
 __all__ = [
@@ -126,6 +132,8 @@ class GlinerBackend:
         self.window_words = window_words
         self.batch_size = batch_size
         self._lock = threading.Lock()
+        # One forward on the device before the backend is published (LAB-1274).
+        self.predict(WARM_UP_TEXT)
 
     def predict(self, text: str) -> list[RawEntity]:
         windows = word_windows(text, self.window_words, max(self.window_words // 5, 1))

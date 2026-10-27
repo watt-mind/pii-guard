@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "An open-source privacy firewall for AI agents: reversible PII masking for text, documents and images."
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12,<3.13"
 authors = [{ name = "pii-guard contributors" }]
 classifiers = [
