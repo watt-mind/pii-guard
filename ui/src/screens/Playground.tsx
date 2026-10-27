@@ -78,6 +78,9 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
   return (
     <div className="space-y-6">
       <Intro />
+      <p className="sr-only" aria-live="polite">
+        {running ? "Masking the document" : error ? "" : fresh && summary ? `Done: ${summary.masked} values masked, ${summary.kept} kept by policy` : ""}
+      </p>
 
       <SamplePicker selected={sampleId} onPick={(s) => { setEditing(false); onSample(s); }} />
 
@@ -194,10 +197,8 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           footer={
             result && fresh && summary ? (
               result.engine === "mock" ? (
-                <span>Every value was swapped for a typed, keyed placeholder. The model never sees the originals.</span>
-              ) : (
-                <span>{liveScope(summary, detectorsUsed(result.spans))}</span>
-              )
+                <span>Highlighted values were swapped for typed, keyed placeholders. The demo engine is a small in-browser rule set: anything without a highlight was not detected and would be sent as written.</span>
+              ) : undefined
             ) : undefined
           }
         >
@@ -267,12 +268,6 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
       </Popover>
     </div>
   );
-}
-
-function liveScope(summary: Summary, detectors: string[]): string {
-  const by = detectors.length ? ` by ${joinList(detectors)}` : "";
-  const kept = summary.kept ? ` ${summary.kept} kept by policy.` : "";
-  return `${summary.masked} ${summary.masked === 1 ? "value" : "values"} masked${by}.${kept} Text without a highlight was not detected and was sent as written.`;
 }
 
 /** Live mode: say exactly what this engine did, so gaps read as known scope rather than a promise. */
