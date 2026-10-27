@@ -175,7 +175,7 @@ export function tagPlacements(
   regions: readonly ImageRegion[],
   width: number,
   height: number,
-  tagWidth = 0.09,
+  tagWidth = 0.16,
   tagHeight = 0.06,
 ): TagPlacement[] {
   const used: { x: number; y: number }[] = [];

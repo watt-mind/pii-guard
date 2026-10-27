@@ -38,7 +38,7 @@ describe("App in demo mode", () => {
     await user.click(screen.getByRole("button", { name: /send it to the model/i }));
     const panel = screen.getByRole("tabpanel", { name: /chat/i });
     await user.click(within(panel).getByRole("button", { name: "Replay a document" }));
-    const answer = within(panel).getByLabelText("Simulated model answer") as HTMLTextAreaElement;
+    const answer = within(panel).getByRole("textbox", { name: "Simulated model answer" }) as HTMLTextAreaElement;
     expect(answer.value).toMatch(/Seller: \[\[PERSON_[0-9a-f]{4,}\]\]/);
     expect(answer.value).not.toContain("Bárdos Kinga");
 
@@ -133,7 +133,7 @@ describe("App against a live API", () => {
 
     await user.click(screen.getByRole("tab", { name: /chat/i }));
     await user.click(screen.getByRole("button", { name: "Replay a document" }));
-    expect(screen.getByRole("heading", { level: 1, name: /masked values restored/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /masked values restored/ })).toBeInTheDocument();
   });
 });
 

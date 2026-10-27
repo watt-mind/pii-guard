@@ -141,6 +141,10 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
         </p>
       </div>
 
+      <p className="sr-only" aria-live="polite">
+        {running ? "Masking the image" : summary ? `Image masked: ${summary.masked} regions covered, ${summary.kept} kept` : ""}
+      </p>
+
       <fieldset className="min-w-0">
         <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples, or your own image</legend>
         <div className="relative -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
@@ -401,7 +405,7 @@ function RegionBox({
         ].join(" ")}
         style={{ backgroundColor: color }}
       >
-        {meta.short}
+        {meta.label}
         {kept ? " · kept" : ""}
       </span>
     </button>

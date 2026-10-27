@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
 import { engineReason } from "./api/engine";
 import { createHttpClient, type HttpGuardClient } from "./api/http";
@@ -17,6 +17,11 @@ import { RoundTrip } from "./screens/RoundTrip";
 import { Chat, type ChatDraft } from "./screens/Chat";
 import type { KnownRow } from "./lib/knownRows";
 import type { KnownSession } from "./lib/run";
+
+// The open tab lives in the URL hash, so a reload (or a shared link) lands on the same screen.
+const HASH_TO_SCREEN: Record<string, Screen> = { "#mask": "playground", "#chat": "chat", "#images": "images", "#benchmarks": "benchmarks" };
+const SCREEN_TO_HASH: Record<Screen, string> = { playground: "#mask", chat: "#chat", images: "#images", benchmarks: "#benchmarks" };
+const screenFromHash = (): Screen => HASH_TO_SCREEN[globalThis.location?.hash ?? ""] ?? "playground";
 
 export interface AppProps {
   api?: HttpGuardClient;
@@ -39,13 +44,28 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
   const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null);
   const [theme, setTheme] = useTheme();
 
-  const [screen, setScreen] = useState<Screen>("playground");
+  const [screen, setScreenState] = useState<Screen>(screenFromHash);
   // Benchmarks load their data lazily on first open, then stay mounted (filters survive tab switches).
-  const [benchmarksOpened, setBenchmarksOpened] = useState(false);
-  const openScreen = (s: Screen) => {
+  const [benchmarksOpened, setBenchmarksOpened] = useState(() => screenFromHash() === "benchmarks");
+  const setScreen = useCallback((s: Screen) => {
     if (s === "benchmarks") setBenchmarksOpened(true);
-    setScreen(s);
-  };
+    setScreenState(s);
+    try {
+      if (globalThis.location.hash !== SCREEN_TO_HASH[s]) history.replaceState(null, "", SCREEN_TO_HASH[s]);
+    } catch {
+      // sandboxed frames may refuse; the tab still works
+    }
+  }, []);
+  const openScreen = setScreen;
+  useEffect(() => {
+    // Only tab hashes switch tabs (the skip link's #main must not).
+    const onHash = () => {
+      const s = HASH_TO_SCREEN[globalThis.location.hash];
+      if (s) setScreen(s);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [setScreen]);
   const [sampleId, setSampleId] = useState<string | null>(DEFAULT_SAMPLE.id);
   const [text, setText] = useState(DEFAULT_SAMPLE.text);
   const [language, setLanguage] = useState<"hu" | "en">(DEFAULT_SAMPLE.language);

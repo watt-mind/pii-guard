@@ -40,7 +40,7 @@ interface Props {
 }
 
 const MODES: { id: ChatMode; label: string; hint: string }[] = [
-  { id: "strict", label: "Strict", hint: "Rules + Muse Spark Open detector. Finds names; adds a few seconds." },
+  { id: "strict", label: "Strict", hint: "Rules + an AI detector (Muse Spark Open). Finds names too; adds a few seconds." },
   { id: "fast", label: "Fast", hint: "Rules only, no model call. Structured data (emails, phones, IDs, IBANs) only." },
 ];
 
@@ -66,14 +66,6 @@ export function Chat({ client, live, draft, replay }: Props) {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  // A document handed over from the Mask screen becomes the next message.
-  useEffect(() => {
-    if (!draft || draft.nonce === lastDraft.current) return;
-    lastDraft.current = draft.nonce;
-    setView("chat");
-    setText(draft.text);
-    setLanguage(draft.language);
-  }, [draft]);
 
   const reset = () => {
     abortRef.current?.abort();
@@ -93,18 +85,21 @@ export function Chat({ client, live, draft, replay }: Props) {
   const update = (id: number, patch: Partial<Turn>) =>
     setTurns((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
-  const send = async () => {
-    const message = text.trim();
-    if (!message || busy) return;
+  const send = async (override?: { text: string; language: "hu" | "en" }) => {
+    const message = (override?.text ?? text).trim();
+    const lang = override?.language ?? language;
+    const fresh = override !== undefined;
+    if (!message || (busy && !fresh)) return;
+    if (fresh) abortRef.current?.abort();
     const id = nextId.current++;
     const history: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
-    for (const t of turns) {
+    for (const t of fresh ? [] : turns) {
       if (t.status !== "done") continue;
       history.push({ role: "user", content: t.user }, { role: "assistant", content: t.answer });
     }
     history.push({ role: "user", content: message });
     setTurns((ts) => [
-      ...ts.filter((t) => t.status !== "error"),
+      ...(fresh ? [] : ts.filter((t) => t.status !== "error")),
       { id, user: message, mode, status: "masking", thinking: false, maskedUser: null, maskedSystem: null, answer: "", maskedAnswer: null, masked: null, ms: null, error: null },
     ]);
     setText("");
@@ -115,8 +110,8 @@ export function Chat({ client, live, draft, replay }: Props) {
         messages: history,
         model,
         mode,
-        language,
-        sessionId,
+        language: lang,
+        sessionId: fresh ? null : sessionId,
         signal: controller.signal,
         onMaskedRequest: (msgs) =>
           update(id, {
@@ -151,6 +146,19 @@ export function Chat({ client, live, draft, replay }: Props) {
   };
 
   const stop = () => abortRef.current?.abort();
+
+  // A document handed over from the Mask screen starts a new conversation and is sent at once.
+  const conversationRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!draft || draft.nonce === lastDraft.current) return;
+    lastDraft.current = draft.nonce;
+    setView("chat");
+    setLanguage(draft.language);
+    setSessionId(null);
+    void send({ text: draft.text, language: draft.language });
+    requestAnimationFrame(() => conversationRef.current?.focus({ preventScroll: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per handed-over draft
+  }, [draft]);
 
   return (
     <div className="space-y-6">
@@ -196,7 +204,17 @@ export function Chat({ client, live, draft, replay }: Props) {
             </p>
           )}
 
-          <section aria-label="Conversation" className="space-y-5">
+          <p className="sr-only" aria-live="polite">
+            {(() => {
+              const t = turns[turns.length - 1];
+              if (!t) return "";
+              if (t.status === "masking") return "Masking your message";
+              if (t.status === "streaming") return t.maskedUser ? "Masked message sent; waiting for the answer" : "";
+              if (t.status === "error") return "Blocked. Nothing was sent to the model.";
+              return "Answer received and restored";
+            })()}
+          </p>
+          <section ref={conversationRef} tabIndex={-1} aria-label="Conversation" className="space-y-5 focus:outline-none">
             {turns.length === 0 && (
               <div className="rounded-2xl border border-dashed border-line px-6 py-8 text-center">
                 <p className="text-sm font-semibold text-ink">No messages yet</p>
@@ -275,7 +293,7 @@ function TurnView({
     <article aria-label="Chat turn" className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-6">
       {/* Row 1: what you wrote | what the model received */}
       <Bubble side="you" label="You wrote">
-        <RestoredText segments={userSegments} activeKey={activeKey} onActivate={onActivate} />
+        <RestoredText segments={userSegments} activeKey={activeKey} onActivate={onActivate} outgoing />
         {turn.maskedUser !== null && (
           <p className="mt-2 text-xs text-muted">
             {maskedValues === 0
@@ -288,7 +306,7 @@ function TurnView({
         {turn.status === "error" && turn.maskedUser === null ? (
           <p className="text-sm text-muted">Nothing was sent.</p>
         ) : turn.maskedUser === null ? (
-          <Pending label={turn.mode === "strict" ? "Detecting personal data (rules + Muse Spark Open)…" : "Detecting personal data (rules)…"} />
+          <Pending label={turn.mode === "strict" ? "Detecting personal data (rules + AI detector)…" : "Detecting personal data (rules)…"} />
         ) : (
           <>
             <MaskedText text={turn.maskedUser} activeKey={activeKey} onActivate={onActivate} />
@@ -316,7 +334,7 @@ function TurnView({
       ) : (
         <>
           <Bubble side="you" label="What you got back" className="lg:order-none">
-            <div aria-live="polite" aria-busy={turn.status !== "done"}>
+            <div>
               {answerSegments ? (
                 <RestoredText segments={answerSegments} activeKey={activeKey} onActivate={onActivate} />
               ) : turn.answer ? (

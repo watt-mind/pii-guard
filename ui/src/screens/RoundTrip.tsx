@@ -168,7 +168,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
           id="answer"
           side="model"
           eyebrow="From the model"
-          title={chunksShown ? "Streaming in" : "Model answer"}
+          title={streaming ? "Simulated answer, streaming in" : chunksShown ? "Simulated answer, streamed" : "Simulated model answer"}
           className="lg:flex-1"
           actions={
             !chunksShown ? (
@@ -359,11 +359,11 @@ function PlaceholderDetails({ placeholder, restored }: { placeholder: string; re
 function RoundTripIntro({ live = false }: { live?: boolean }) {
   return (
     <div className="max-w-3xl">
-      <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">
+      <h2 className="text-xl font-semibold tracking-tight text-balance text-ink sm:text-2xl">
         {live ? "The answer comes back with the masked values restored." : "The answer comes back with the real names in it."}
-      </h1>
+      </h2>
       <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-        The model writes about placeholders. On the way back, pii-guard swaps them for the original values, even mid-stream, when a placeholder is split across two chunks.
+        A replay of the document from the Mask tab with a simulated, editable model answer. The model writes about placeholders; on the way back, pii-guard swaps them for the original values, even mid-stream, when a placeholder is split across two chunks.
       </p>
     </div>
   );
