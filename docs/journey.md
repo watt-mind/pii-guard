@@ -450,6 +450,29 @@ the surname is not in the lexicon.
   bare `Bt.`), so `Fekete Kavics Kft.` stays intact and `Fekete Kft.` is accepted as a possible
   miss.
 
+### 20. Every detector sees normalised text (2026-10-27)
+
+LAB-1146.
+
+The prompt-injection red team (LAB-1107) showed that only the LLM detector cleaned invisible
+characters and lookalike letters. A zero-width space inside a phone number hid it from the
+rules, and a zero-width joiner inside an e-mail address made the rules match only the part
+after it; that validated rule span then kept its boundaries over the LLM's whole-address span,
+so the local part leaked. The pipeline now normalises once, before any detector runs, and maps
+every span back to the original text, invisible characters included.
+
+- **Before → after**, `pii-guard eval injection`, `zero-width` class (14 values): rules alone
+  **9 leaked / 5 partial → 6 / 3**, e-mail and phone exact recall 0 → 100 %; the rest are
+  names, addresses and a birth date only a language model finds. Rules + Muse Spark Open
+  (Baseten, `reasoning_effort: low`) **3 partial → 0**, so all 175 injection values are now
+  masked whole (partial leak 1.7 % → 0.0 %). Source: run records
+  `2026-10-27-injection-{rules,spark-open}-{before,after}-normalise` in
+  [benchmarks.md](benchmarks.md), *(ticket comment, LAB-1146)*.
+- **No regression:** `hu-smoke` and `en-smoke` scorecards with the rules are identical before
+  and after; on the default fixture set only the injection documents changed, all for the
+  better.
+- **Cost:** two Baseten runs, about $0.30.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
