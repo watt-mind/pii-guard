@@ -1088,6 +1088,42 @@ union of the two encoders.
 - **Source:** run records `2026-10-27-ner-v2-<fixture>-<candidate>` (13 candidates × 11
   fixtures) and [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md).
 
+### 38. Muse Code works through the gateway: the Responses API (2026-10-27)
+
+LAB-1256, the follow-up of milestone 35. Muse Code, Meta's terminal coding agent, speaks the
+OpenAI **Responses API**, not Chat Completions. The gateway now serves it natively:
+`POST /v1/responses` (streamed and not) and the `GET /muse-code/models` catalog Muse reads
+first. `pii-guard connect muse-code` points Muse's `settings.json` at the gateway
+(`endpoint_transport.base_url`, `auth: "bearer"`), with a backup, `--dry-run` and `--check`.
+
+A real Muse Code 1.4.13, installed with the official installer into a throwaway `HOME`, got
+the same fictional mini-repo and task as pi in milestone 35:
+
+| Run (fast mode, rules + NER) | Requests | Refused | Gold values upstream | Real values in `reply.md` | Placeholders left |
+|---|---:|---:|---:|---:|---:|
+| Scripted mock model (also in CI when Muse is installed) | 10 | 0 | 0 of 13 | 13 of 13 | 0 |
+| Meta Model API, `muse-spark-1.3` | 7 | 0 | 0 of 13 | 6 | 0 |
+
+- **Fail-closed, field by field.** The request walker masks `instructions`, every `input`
+  item (messages, `function_call` arguments, `function_call_output`, reasoning summaries) and
+  the tool definitions, and refuses any field or item type it doesn't know. Hosted tools,
+  media parts and server-side state (`previous_response_id`, `conversation`) get a 400.
+  `reasoning.encrypted_content` passes through untouched both ways.
+- **Streaming restore per delta stream.** Output text, refusals, reasoning summaries and
+  function-call arguments each get their own unmasker, so a placeholder split across deltas
+  is held back until it's complete; `sequence_number` is renumbered for the extra deltas.
+- **Line-number gutters broke names.** Muse's `read_file` prints `12|Jane Placeholder`. Glued
+  to the gutter, the name detector masked only the surname. The walker now hides gutters from
+  the detectors and puts them back in the forwarded text.
+- **What's left:** in 1–2 places per run a first name glued to a CSV comma (`1,Jane`) still
+  reaches the model while the surname is masked (LAB-1258, LAB-1284). Image inputs are refused
+  for now (LAB-1285), and each Muse turn gets its own vault session because Muse can't send
+  headers (LAB-1286).
+- **Mode:** Muse can't send `X-PII-Guard-Mode`, so a gateway for Muse runs with
+  `PII_GUARD_GATEWAY_MODE=fast`; `connect` says so.
+- **Cost:** $0. About 10 requests on free Meta API credits (one live run and `--check`); the
+  rest ran locally.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
