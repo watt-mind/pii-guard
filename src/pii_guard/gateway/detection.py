@@ -19,6 +19,10 @@ place, and any ``block`` span raises :class:`~pii_guard.policy.BlockedEntityErro
 request is refused and nothing is forwarded.
 
 Every detector is wrapped to record its wall time, for the per-request log line.
+
+In fast mode the gateway detects all of a request's uncached texts in one
+:meth:`ModeDetector.detect_many` call, so the NER model runs them in batched forwards
+(LAB-1279) instead of one forward per text.
 """
 
 from __future__ import annotations
@@ -41,7 +45,7 @@ from pii_guard.detect.stack import (
 )
 from pii_guard.gateway.config import GatewayConfig, Mode
 from pii_guard.policy import PolicySet
-from pii_guard.types import Detector, Span
+from pii_guard.types import DetectionError, Detector, Span
 
 __all__ = ["ModeDetector", "build_mode_detectors", "detector_timings", "gateway_policies"]
 
@@ -50,6 +54,27 @@ logger = logging.getLogger(__name__)
 _timings: contextvars.ContextVar[dict[str, float] | None] = contextvars.ContextVar(
     "pii_guard_gateway_timings", default=None
 )
+
+
+class _CheckedBatch(CheckedDetector):
+    """:class:`CheckedDetector` that also passes ``detect_batch`` through, checked per text."""
+
+    def detect_batch(self, texts: Sequence[str], language: str = "hu") -> list[list[Span]]:
+        batch = getattr(self.inner, "detect_batch", None)
+        if batch is None:
+            return [self.detect(text, language) for text in texts]
+        try:
+            found = batch(list(texts), language)
+        except DetectionError:
+            raise
+        except Exception as exc:
+            # Never str(exc): it may quote the input.
+            raise DetectionError(f"detector {self.name!r} failed") from exc
+        if not isinstance(found, list) or len(found) != len(texts):
+            raise DetectionError(f"detector {self.name!r} returned the wrong number of results")
+        return [
+            check_spans(spans, text, self.name) for spans, text in zip(found, texts, strict=True)
+        ]
 
 
 class _Timed:
@@ -64,10 +89,23 @@ class _Timed:
         try:
             return self.inner.detect(text, language)
         finally:
-            timings = _timings.get()
-            if timings is not None:
-                elapsed = (time.perf_counter() - started) * 1000
-                timings[self.name] = timings.get(self.name, 0.0) + elapsed
+            self._record(started)
+
+    def detect_batch(self, texts: Sequence[str], language: str = "hu") -> list[list[Span]]:
+        started = time.perf_counter()
+        try:
+            batch = getattr(self.inner, "detect_batch", None)
+            if batch is None:
+                return [self.inner.detect(text, language) for text in texts]
+            return batch(texts, language)
+        finally:
+            self._record(started)
+
+    def _record(self, started: float) -> None:
+        timings = _timings.get()
+        if timings is not None:
+            elapsed = (time.perf_counter() - started) * 1000
+            timings[self.name] = timings.get(self.name, 0.0) + elapsed
 
 
 @dataclass(frozen=True)
@@ -80,6 +118,10 @@ class ModeDetector:
     policies: PolicySet
     #: Why this mode can't run as configured (audit without an LLM key), else ``None``.
     unavailable: str | None = None
+    #: The gateway sends all of a request's uncached texts as one :meth:`detect_many` job
+    #: (LAB-1279). Off for audit mode: its LLM detector is remote and per text, so its texts
+    #: still run as parallel jobs.
+    batches: bool = False
 
     def require_available(self) -> None:
         """Raise :class:`DetectionUnavailableError` when the mode is unavailable. The gateway
@@ -102,6 +144,34 @@ class ModeDetector:
             _timings.reset(token)
         spans = check_spans(spans, text, f"{self.mode.value} pipeline")
         return self.policies.apply(spans).masked, timings
+
+    def detect_many(
+        self, texts: Sequence[str], language: str
+    ) -> tuple[list[list[Span]], dict[str, float]]:
+        """:meth:`detect` for several texts in one call (one worker job), with summed timings.
+
+        Uses the pipeline's ``detect_many`` when it has one, so the NER model runs on all
+        texts in batched forwards. Fail closed: any error fails every text.
+        """
+        self.require_available()
+        token = _timings.set({})
+        try:
+            many = getattr(self.detector, "detect_many", None)
+            if many is not None:
+                found = many(list(texts), language)
+            else:
+                found = [self.detector.detect(text, language) for text in texts]
+            timings = dict(_timings.get() or {})
+        finally:
+            _timings.reset(token)
+        if not isinstance(found, list) or len(found) != len(texts):
+            raise DetectionError(f"{self.mode.value} pipeline returned the wrong number of results")
+        name = f"{self.mode.value} pipeline"
+        masked = [
+            self.policies.apply(check_spans(spans, text, name)).masked
+            for spans, text in zip(found, texts, strict=True)
+        ]
+        return masked, timings
 
 
 def gateway_policies(settings: Settings, config: GatewayConfig) -> PolicySet:
@@ -138,7 +208,7 @@ def build_mode_detectors(
     def build(mode: Mode, detectors: Iterable[Detector]) -> ModeDetector:
         detectors = list(detectors)
         pipeline = DetectionPipeline(
-            [_Timed(CheckedDetector(d)) for d in detectors], keep_types=policies.keep_types
+            [_Timed(_CheckedBatch(d)) for d in detectors], keep_types=policies.keep_types
         )
         llm_model = getattr(llm_detector, "model", "")
         parts = [d.name for d in detectors]
@@ -151,6 +221,7 @@ def build_mode_detectors(
             f"{mode.value}:" + ";".join(parts),
             policies,
             unavailable_reason(detectors),
+            batches=mode is Mode.FAST,
         )
 
     detectors = {

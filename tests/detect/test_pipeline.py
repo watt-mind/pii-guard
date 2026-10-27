@@ -348,3 +348,79 @@ def test_llm_failure_blocks_the_pipeline() -> None:
     )
     with pytest.raises(DetectionError):
         DetectionPipeline([RuleDetector(), llm]).detect("E-mail: teszt.elek@example.com")
+
+
+# --- detect_many: detectors that batch get every text at once (LAB-1279) ---------------------
+
+
+class NameFinder:
+    """Finds the fictional names in any text; counts per-text and batch calls."""
+
+    def __init__(self, name: str = "ner", *, batch: bool = True, fail: bool = False) -> None:
+        self.name = name
+        self.fail = fail
+        self.detect_calls = 0
+        self.batches: list[list[str]] = []
+        if not batch:
+            self.detect_batch = None  # type: ignore[assignment]
+
+    def detect(self, text: str, language: str = "hu") -> list[Span]:
+        self.detect_calls += 1
+        return self._find(text)
+
+    def detect_batch(self, texts, language: str = "hu"):  # type: ignore[no-untyped-def]
+        self.batches.append(list(texts))
+        if self.fail:
+            raise RuntimeError("Teszt Elek")  # a raw value: must not reach the message
+        return [self._find(t) for t in texts]
+
+    def _find(self, text: str) -> list[Span]:
+        out = []
+        for name in ("Teszt Elek", "Minta Mária"):
+            start = text.find(name)
+            if start >= 0:
+                out.append(Span(start, start + len(name), E.PERSON, name, 0.9, self.name))
+        return out
+
+
+MANY_TEXTS = [
+    "Teszt Elek e-mail címe teszt.elek@example.com.",
+    "Nincs itt semmi.",
+    "Minta​ Mária hívja Teszt Eleket: +36 30 123 4567",  # normalised: zero-width space
+    "",
+    "Teszt Elek",
+]
+
+
+def test_detect_many_equals_detect_per_text() -> None:
+    ner = NameFinder()
+    pipeline = DetectionPipeline(["rules", ner])
+    many = pipeline.detect_many(MANY_TEXTS, "hu")
+    assert len(ner.batches) == 1 and len(ner.batches[0]) == len(MANY_TEXTS)
+    assert ner.detect_calls == 0
+    assert many == [pipeline.detect(t, "hu") for t in MANY_TEXTS]
+    assert ner.detect_calls == len(MANY_TEXTS)  # detect() itself does not batch
+    # The zero-width space is inside the mapped-back name.
+    assert next(s.text for s in many[2] if s.entity_type is E.PERSON) == "Minta​ Mária"
+    assert pipeline.detect_many([], "hu") == []
+
+
+def test_detect_many_loops_detectors_without_detect_batch() -> None:
+    ner = NameFinder(batch=False)
+    pipeline = DetectionPipeline(["rules", ner])
+    assert pipeline.detect_many(MANY_TEXTS) == [pipeline.detect(t) for t in MANY_TEXTS]
+    assert ner.batches == []
+
+
+def test_detect_many_fails_closed() -> None:
+    pipeline = DetectionPipeline(["rules", NameFinder(fail=True)])
+    with pytest.raises(DetectionError, match="RuntimeError") as info:
+        pipeline.detect_many(MANY_TEXTS)
+    assert "Teszt" not in info.value.message
+
+
+def test_detect_many_rejects_a_wrong_result_count() -> None:
+    finder = NameFinder()
+    finder.detect_batch = lambda texts, language="hu": [[]]  # type: ignore[method-assign]
+    with pytest.raises(DetectionError, match="number of results"):
+        DetectionPipeline([finder]).detect_many(["a", "b"])

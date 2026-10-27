@@ -9,16 +9,20 @@ from __future__ import annotations
 import itertools
 import json
 import re
+import time
 
 import httpx
 import openai
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gateway_helpers import (
     EMAILS,
     IBAN,
     NAMES,
+    TEST_TENANT_KEY,
     UPSTREAM_KEY,
+    UPSTREAM_URL,
     FakeLlm,
     MockUpstream,
     completion,
@@ -30,8 +34,11 @@ from gateway_helpers import (
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from pii_guard.api.app import create_app
 from pii_guard.config import Settings
-from pii_guard.gateway import GatewayConfig, Mode
+from pii_guard.detect.rules import RuleDetector
+from pii_guard.gateway import GatewayConfig, Mode, build_mode_detectors
+from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -590,3 +597,124 @@ def test_logs_carry_no_values(caplog: pytest.LogCaptureFixture) -> None:
     assert "chat.completions ok" in text
     for value in (*NAMES, *EMAILS, IBAN, UPSTREAM_KEY, *sessions):
         assert value not in text
+
+
+# --- LAB-1279: fast mode detects a request's uncached texts in one batched job --------------
+
+
+class BatchingNames:
+    """A batching detector (like NER) that finds the fictional names; counts its calls."""
+
+    name = "ner"
+
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.batches: list[list[str]] = []
+        self.detect_calls = 0
+
+    def detect(self, text: str, language: str = "hu") -> list[Span]:
+        self.detect_calls += 1
+        return self._find(text)
+
+    def detect_batch(self, texts: list[str], language: str = "hu") -> list[list[Span]]:
+        self.batches.append(list(texts))
+        if self.fail:
+            raise RuntimeError("Teszt Elek")
+        return [self._find(t) for t in texts]
+
+    def _find(self, text: str) -> list[Span]:
+        return [
+            Span(m.start(), m.end(), EntityType.PERSON, m.group(), 0.9, self.name)
+            for name in NAMES
+            for m in re.finditer(re.escape(name), text)
+        ]
+
+
+def batching_app(upstream: MockUpstream, ner: BatchingNames, **config: object) -> FastAPI:
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY, upstream_base_url=UPSTREAM_URL, upstream_api_key=UPSTREAM_KEY
+    )
+    gateway_config = GatewayConfig(mode=Mode.FAST, **config)
+    app = create_app(settings)
+    app.state.gateway_config = gateway_config
+    app.state.gateway_transport = upstream.transport()
+    app.state.gateway_detectors = build_mode_detectors(
+        settings, gateway_config, base=[RuleDetector(), ner], llm_detector=FakeLlm()
+    )
+    return app
+
+
+def test_fast_mode_detects_uncached_texts_in_one_batch() -> None:
+    ner = BatchingNames()
+    upstream = MockUpstream()
+    messages = full_conversation()
+    with TestClient(batching_app(upstream, ner)) as http:
+        client = openai_client(http)
+        first = client.chat.completions.with_raw_response.create(model="m", messages=messages)
+        first.parse()
+        misses = int(first.headers["x-pii-guard-cache-misses"])
+        assert misses > 3
+        # One worker job and one detector call for every uncached text of the request.
+        assert len(ner.batches) == 1 and len(ner.batches[0]) == misses
+        assert ner.detect_calls == 0
+        assert len(set(ner.batches[0])) == misses  # a repeated text is detected once
+        session = first.headers["x-pii-guard-session"]
+
+        # Cache hits are unchanged: the same request again detects nothing.
+        again = client.chat.completions.with_raw_response.create(
+            model="m", messages=messages, extra_headers={"X-PII-Guard-Session": session}
+        )
+        again.parse()
+        assert again.headers["x-pii-guard-cache-misses"] == "0"
+        assert len(ner.batches) == 1
+
+        # A new message: one batch with just that text.
+        extra = [*messages, {"role": "user", "content": "Teszt Elek kérdezi: kész?"}]
+        third = client.chat.completions.with_raw_response.create(
+            model="m", messages=extra, extra_headers={"X-PII-Guard-Session": session}
+        )
+        third.parse()
+        assert third.headers["x-pii-guard-cache-misses"] == "1"
+        assert ner.batches[-1] == ["Teszt Elek kérdezi: kész?"]
+    assert leaked_values(upstream.requests[0].content) == []
+    assert all(leaked_values(r.content) == [] for r in upstream.requests)
+
+
+def test_fast_mode_batch_error_blocks_the_whole_request() -> None:
+    upstream = MockUpstream()
+    app = batching_app(upstream, BatchingNames(fail=True))
+    with TestClient(app) as http:
+        response = http.post(
+            "/v1/chat/completions", json={"model": "m", "messages": full_conversation()}
+        )
+        assert len(app.state.gateway.vault) == 0
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "detection_failed"
+    assert upstream.requests == []
+    assert "Teszt" not in response.text
+
+
+def test_fast_mode_batch_keeps_the_detection_timeout() -> None:
+    class Slow(BatchingNames):
+        def detect_batch(self, texts: list[str], language: str = "hu") -> list[list[Span]]:
+            time.sleep(1.0)
+            return super().detect_batch(texts, language)
+
+    upstream = MockUpstream()
+    with TestClient(batching_app(upstream, Slow(), detection_timeout=0.1)) as http:
+        response = http.post(
+            "/v1/chat/completions", json={"model": "m", "messages": conversation_turn_one()}
+        )
+    assert response.status_code == 503
+    assert "timed out" in response.json()["error"]["message"]
+    assert upstream.requests == []
+
+
+def test_audit_mode_still_detects_texts_as_parallel_jobs() -> None:
+    # The LLM detector is remote and per text: audit mode keeps one job per text.
+    llm = FakeLlm()
+    with TestClient(make_app(MockUpstream(), llm=llm)) as http:
+        raw = openai_client(http).chat.completions.with_raw_response.create(
+            model="m", messages=full_conversation()
+        )
+    assert llm.calls == int(raw.headers["x-pii-guard-cache-misses"])
