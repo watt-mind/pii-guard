@@ -441,7 +441,7 @@ function ImageLegend({ regions, activeType }: { regions: ImageRegion[]; activeTy
           <span className="tabular-nums">{row.count}</span>
           {row.sources.map((s) => (
             <span key={s} className="rounded bg-surface-2 px-1 text-[10px] font-semibold tracking-wide text-faint uppercase">
-              {s === "sam" ? "SAM" : "OCR"}
+              {s === "sam" ? "SAM" : s === "local" ? "On-device" : "OCR"}
             </span>
           ))}
           {row.kept && <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold tracking-wide text-faint uppercase">kept</span>}

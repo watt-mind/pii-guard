@@ -11,7 +11,8 @@
 | Structured identifiers | Rules (no model) | pii-guard container | yes (inside the boundary) |
 | Names, organizations, addresses (dates of birth when fine-tuned) | Multilingual NER encoder (XLM-RoBERTa-base, open) | pii-guard container (CPU / MPS / CUDA) | yes |
 | Second-pass detection and adjudication | **Muse Spark Open** (open weights), optionally fine-tuned; **Muse Glimmer** as a smaller local candidate | Baseten (`meta-models/muse-spark-open-1026`), or your own hardware | yes |
-| Faces, signatures, ID photos | **SAM 3.1** (default; an on-device face/ID-photo detector was measured and falls short on signatures, see [Local segmentation](#local-segmentation)) | GPU endpoint | yes |
+| Faces, ID photos | **YuNet** (OpenCV model zoo, 0.23 MB, MIT; the default `hybrid` segmenter, see [Local segmentation](#local-segmentation)) | pii-guard container (CPU) | yes |
+| Signatures (and faces with `PII_GUARD_SEGMENTER=sam-api`) | **SAM 3.1** | Meta Model API, or a GPU endpoint (`PII_GUARD_SAM_URL`) | yes |
 | OCR | Open OCR engine | pii-guard container or GPU endpoint | yes |
 | Synthetic corpus generation | **Muse** (Wonder for documents, Spark for variations) | Meta Model API | **no**: fictional data only |
 | The downstream model in the demo | **Muse Spark** | Meta Model API | **no**: only masked data |
@@ -302,11 +303,44 @@ the Meta Model API (with `META_API_KEY` set) and Baseten (with `BASETEN_API_KEY`
 ## Local segmentation
 
 LAB-1229 asked whether faces, ID photos and signatures can be found **on the device** instead of
-with SAM 3.1 on the Meta API (four API calls and 5-6 s per image today, and the image leaves the
-machine). **Answer: faces and ID photos yes, signatures no.** SAM 3.1 stays the default
-segmenter; `pii_guard.visual.segment.LocalSegmenter` (YuNet) ships as a library component for
-faces and ID photos, not wired into the API or the gateway, because a local mode that cannot find
-signatures would either refuse every image or let signatures through.
+with SAM 3.1 on the Meta API (four API calls and 5-6 s per image, and the image leaves the
+machine). **Answer: faces and ID photos yes, signatures no.** So since LAB-1245 the default
+segmenter is **`hybrid`** (`PII_GUARD_SEGMENTER`, see
+[operations.md](operations.md#segmenter-faces-on-the-device-signatures-on-sam-31)): YuNet
+(`pii_guard.visual.segment.LocalSegmenter`) finds faces and ID photos on the CPU, and SAM 3.1
+only the signatures.
+
+### Hybrid vs SAM-only (LAB-1245)
+
+| Fictional set (24 images) | Portrait recall | Portrait leak | Signature recall | Signature leak | SAM calls / image | `/v1/mask/image` p50 / p95 |
+|---|---:|---:|---:|---:|---:|---:|
+| `sam-api` (SAM 3.1 for everything, the previous default) | 100.0 % | 0.0 % | 100.0 % | 6.7 % | 5 | 7.2 s / 8.1 s |
+| **`hybrid`** (YuNet + SAM 3.1 for signatures, the default) | 100.0 % | 0.0 % | 100.0 % | 6.7 % | **2** | **3.8 s / 5.0 s** |
+
+- **Calls:** `/v1/mask/image` with `sam-api` sends 5 SAM requests per image (`face`,
+  `signature`, `squiggly line`, `photo of a person`, and `stamp`, whose regions are `keep`), not
+  the 4 the eval harness counts; `hybrid` sends 2 (`signature`, `squiggly line`), measured on
+  every image. Stamps are only segmented when their policy is not `keep`.
+- **Latency:** end to end through the app (`python -m pii_guard.visual.segment_eval
+  --e2e-bench`: Tesseract OCR, rules detector, `render=opaque`), the two modes alternating per
+  image, live SAM, 3 rounds; medians of the per-round p50 / p95 on a laptop shared with other
+  jobs (load average 11.5). Per round: hybrid p50 3.96 / 3.26 / 3.77 s, sam-api 7.24 / 6.80 /
+  7.61 s. Segmentation alone (no OCR, replayed SAM latency): p50 2.26 s vs 4.78 s.
+- **Signatures** come from the same SAM prompts in both modes, so their numbers are identical.
+  The YuNet portrait boxes over-mask around the photo (precision 80.6 % vs SAM's 100 % on this
+  set), the safe side.
+- **Specimens** (65 official documents): not re-run in LAB-1245, because the images are fetched
+  locally and were not on the measuring machine. LAB-1229's runs on that set
+  (`2026-10-27-segment-{sam-api,local}-specimens`) give the expected picture: YuNet's portrait
+  leak 10.8 % vs SAM's 47.7 % at equal or better recall, and signatures unchanged by
+  construction (same SAM prompts).
+- The labelled-image eval (LAB-1156 placeholders) and the "which parties have an ID?" demo do
+  not depend on the segmenter's portraits and are unchanged (fuzzy 50/51 values, 0 false
+  merges, 24/24 transcripts; demo 3/3 with `hybrid` and with `sam-api`).
+- Run record: `eval/results/runs/2026-10-27-segment-hybrid-fictional` (segment-only metrics
+  plus the end-to-end medians in `latency_ms.mask_image_per_image_*`).
+
+### The LAB-1229 spike
 
 Measured with `python -m pii_guard.visual.segment_eval` on the portrait and signature regions of
 the fictional set (24 images, committed) and the official specimen set (65 images, fetched
@@ -363,6 +397,12 @@ Why the rest fell short:
   no access (HTTP 403); the owner has to request it. At 3.4 GB they would also miss the 200 MB
   bar.
 
+**Model pin.** YuNet `face_detection_yunet_2023mar.onnx` from the OpenCV model zoo
+(`https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx`),
+232,589 bytes, SHA-256 `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`,
+licence **MIT** (weights; OpenCV itself is Apache-2.0). The Docker build fetches it from that URL
+and fails on a checksum mismatch; `LocalSegmenter` refuses a file whose SHA-256 differs.
+
 Use `LocalSegmenter` directly (it raises `DetectionError` if asked for `SIGNATURE`):
 
 ```bash
@@ -381,6 +421,9 @@ rows replay the eval's response cache, `--offline`):
 
 ```bash
 uv run python -m pii_guard.visual.segment_eval --candidate local --set specimens --record segment-local-specimens
+# LAB-1245: hybrid vs sam-api end to end (live SAM, free credits), then the hybrid record
+uv run python -m pii_guard.visual.segment_eval --e2e-bench --set fictional --rounds 3 --json e2e.json
+uv run python -m pii_guard.visual.segment_eval --candidate hybrid --set fictional --e2e e2e.json --record segment-hybrid-fictional
 ```
 
 ## Hackathon partners

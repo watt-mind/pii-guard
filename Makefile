@@ -61,7 +61,8 @@ baselines: ## compare with Presidio, LLM Guard and PrivAiTe (first run downloads
 		--detectors rules --baselines presidio,llm-guard,privaite
 
 demo: ## start API + gateway + UI on a mock upstream (offline); real upstream if configured
-	uv run python scripts/demo.py
+	uv run --extra local-vision python -m pii_guard.visual.segment fetch
+	uv run --extra local-vision python scripts/demo.py
 
 demo-traffic: ## send scripted fictional hu/en/de requests through the running demo gateway
 	uv run python scripts/demo_traffic.py

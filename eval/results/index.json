@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "pii-guard eval report",
   "about": "Generated from eval/results/runs/*.json; do not edit. Rates are 0-1; latency in ms.",
-  "runs_digest": "811ab9be9c7f2fb55ccfbcd50fa0704f433463e0c001437cc873810e2cbf6ea3",
+  "runs_digest": "90f737c12fa71d511ca3a64bbd4cb3890981be10389c5914d403ae7b2f831f40",
   "languages": [
     "de",
     "en",
@@ -587,6 +587,25 @@
       "models": [
         "yunet-2023mar",
         "efficientsam-vitt"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "visual-segment:yunet-2023mar+sam-3.1": {
+      "color": "#999933",
+      "shape": "circle",
+      "label": "segmenter yunet-2023mar+sam-3.1 (no OCR)",
+      "short_label": "segmenter yunet-2023mar+sam-3.1 (no OCR)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "visual",
+      "detectors": [
+        "local-segmenter",
+        "sam"
+      ],
+      "models": [
+        "yunet-2023mar",
+        "sam-3.1"
       ],
       "featured": false,
       "default": false
@@ -2453,6 +2472,53 @@
         "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate efficientsam.",
         "portrait: recall@IoU0.5 92.3 %, leak (<95 % covered) 16.9 %, strict leak 43.1 %, precision 72.4 % (152 boxes); signature: recall@IoU0.5 0.0 %, leak (<95 % covered) 91.9 %, strict leak 91.9 %, precision n/a (0 boxes).",
         "Per image p50 2231.6 ms, p95 3340.7 ms on Darwin arm64 CPU; model load 683.7 ms; peak RSS 1909.8 MB; weights 41.6 MB; licence MIT (YuNet), Apache-2.0 (EfficientSAM code and weights)."
+      ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-segment-hybrid-fictional",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "recorded",
+      "title": "Segmenter hybrid on fictional-specimens (LAB-1245)",
+      "commit": "df2d70d63b44242734a8c9ca5c9557ec1629f46a",
+      "dirty": true,
+      "system": "visual-segment:yunet-2023mar+sam-3.1",
+      "fixture_set": "fictional-specimens",
+      "origin": "generated",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "local-segmenter",
+          "model": "yunet-2023mar",
+          "model_ref": "opencv_zoo/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "sam",
+          "model": "sam-3.1",
+          "model_ref": "meta-api:sam-3.1",
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64 CPU, one process; host load average 14 (shared with other jobs)",
+      "cost": {
+        "usd": 0.12,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": "SAM None: 48 calls at $0.0025/call (planning estimate; responses report no price)",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate hybrid.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 5.6 %, precision 80.6 % (36 boxes); signature: recall@IoU0.5 100.0 %, leak (<95 % covered) 6.7 %, strict leak 93.3 %, precision 100.0 % (15 boxes).",
+        "Per image p50 2262.8 ms, p95 3030.1 ms on Darwin arm64 CPU; model load 302.2 ms; peak RSS 428.2 MB; weights 0.23 MB; licence MIT (YuNet weights), Apache-2.0 (OpenCV); hosted (Meta Model API) for signatures.",
+        "LAB-1245 hybrid segmenter (PII_GUARD_SEGMENTER=hybrid, the new serving default): YuNet on the CPU for FACE and ID_PHOTO, SAM 3.1 on the Meta API for SIGNATURE only (prompts signature, squiggly line). Segment-only latency here is the longer of YuNet and the SAM calls (they run concurrently), SAM replayed from the eval cache at its recorded latency.",
+        "End-to-end POST /v1/mask/image (render=opaque, Tesseract OCR, rules detector), hybrid and sam-api alternating per image, live SAM, 3 rounds x 24 images, medians of the per-round values: hybrid p50 3774 ms / p95 5013 ms, 2.0 SAM calls per image; sam-api p50 7235 ms / p95 8125 ms, 5.0 SAM calls per image (face, signature, squiggly line, photo of a person, stamp). Host load average 11.5 (shared with other jobs). 0 errors."
       ],
       "rescored": null,
       "imported_from": null
@@ -92618,6 +92684,111 @@
       "cost_usd": 0.0
     },
     {
+      "run_id": "2026-10-27-segment-hybrid-fictional",
+      "date": "2026-10-27",
+      "commit": "df2d70d63b44242734a8c9ca5c9557ec1629f46a",
+      "system": "visual-segment:yunet-2023mar+sam-3.1",
+      "notes": [
+        "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate hybrid.",
+        "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 5.6 %, precision 80.6 % (36 boxes); signature: recall@IoU0.5 100.0 %, leak (<95 % covered) 6.7 %, strict leak 93.3 %, precision 100.0 % (15 boxes).",
+        "Per image p50 2262.8 ms, p95 3030.1 ms on Darwin arm64 CPU; model load 302.2 ms; peak RSS 428.2 MB; weights 0.23 MB; licence MIT (YuNet weights), Apache-2.0 (OpenCV); hosted (Meta Model API) for signatures.",
+        "LAB-1245 hybrid segmenter (PII_GUARD_SEGMENTER=hybrid, the new serving default): YuNet on the CPU for FACE and ID_PHOTO, SAM 3.1 on the Meta API for SIGNATURE only (prompts signature, squiggly line). Segment-only latency here is the longer of YuNet and the SAM calls (they run concurrently), SAM replayed from the eval cache at its recorded latency.",
+        "End-to-end POST /v1/mask/image (render=opaque, Tesseract OCR, rules detector), hybrid and sam-api alternating per image, live SAM, 3 rounds x 24 images, medians of the per-round values: hybrid p50 3774 ms / p95 5013 ms, 2.0 SAM calls per image; sam-api p50 7235 ms / p95 8125 ms, 5.0 SAM calls per image (face, signature, squiggly line, photo of a person, stamp). Host load average 11.5 (shared with other jobs). 0 errors."
+      ],
+      "fixture_set": "fictional-specimens",
+      "specimens": 24,
+      "overall": {
+        "regions": 33,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9877
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 18,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9982
+        },
+        "signature": {
+          "regions": 15,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.975
+        }
+      },
+      "by_doc_type": {
+        "badge": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0,
+          "specimens": 3
+        },
+        "driving_licence": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9857,
+          "specimens": 3
+        },
+        "form": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9847,
+          "specimens": 3
+        },
+        "id_card": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9951,
+          "specimens": 6
+        },
+        "letter": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9758,
+          "specimens": 3
+        },
+        "member_card": {
+          "regions": 3,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9893,
+          "specimens": 3
+        },
+        "passport": {
+          "regions": 6,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9842,
+          "specimens": 3
+        }
+      },
+      "countries": 3,
+      "over_masking_mean": 0.0776,
+      "latency_ms": {
+        "sam_call_p50": 1196.6,
+        "sam_call_p95": 1935.7,
+        "sam_per_image_p50": 2262.8,
+        "sam_per_image_p95": 3030.1,
+        "local_per_image_p50": 115.4,
+        "local_per_image_p95": 179.8,
+        "total_per_image_p50": 2384.8,
+        "total_per_image_p95": 3158.4,
+        "segment_per_image_p50": 2262.8,
+        "segment_per_image_p95": 3030.1,
+        "segment_first_image": 2140.1,
+        "segment_model_load": 302.2,
+        "mask_image_per_image_p50": 3774.3,
+        "mask_image_per_image_p95": 5013.2
+      },
+      "cost_usd": 0.12
+    },
+    {
       "run_id": "2026-10-27-segment-local-fictional",
       "date": "2026-10-27",
       "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
@@ -95473,6 +95644,7 @@
       "visual-segment:sam-3.1": "#CC6677",
       "visual-segment:yunet-2023mar": "#44AA99",
       "visual-segment:yunet-2023mar+efficientsam-vitt": "#332288",
+      "visual-segment:yunet-2023mar+sam-3.1": "#DDCC77",
       "visual-segment:yunet-2023mar+yolos-tiny-signature": "#88CCEE",
       "visual:eka": "#0072B2",
       "visual:eka-tuned": "#332288",

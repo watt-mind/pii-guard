@@ -16,7 +16,8 @@ What it finds:
 It does **not** find ``SIGNATURE``: no permissively licensed small detector came close to SAM
 3.1 on ID documents (see ``docs/models.md``, *Local segmentation*). Asking for it raises
 :class:`~pii_guard.types.DetectionError` rather than returning a result that silently skips
-signatures (fail closed, ADR 0006). This is why SAM 3.1 stays the default segmenter.
+signatures (fail closed, ADR 0006). The default ``hybrid`` segmenter
+(:mod:`pii_guard.visual.segmenters`, LAB-1245) therefore pairs it with SAM 3.1 for signatures.
 
 Fail closed: a missing OpenCV, a missing model file or one whose SHA-256 does not match, an
 undecodable image and any inference error raise :class:`DetectionError`. Messages carry
@@ -29,6 +30,7 @@ Get the model once (official OpenCV model zoo URL, SHA-256 checked)::
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import os
@@ -236,6 +238,8 @@ class LocalSegmenter:
                 "local segmenter needs OpenCV (uv sync --extra local-vision)"
             ) from exc
         self._cv2 = cv2
+        with contextlib.suppress(AttributeError):  # OpenCV 5's DNN backend notice is not an error
+            cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
         path = Path(model_path) if model_path else model_dir() / YUNET.filename
         if not path.is_file():
             raise DetectionError(

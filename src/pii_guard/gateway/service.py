@@ -70,7 +70,8 @@ from pii_guard.types import DetectionError, PiiGuardError, Span
 from pii_guard.vault import Vault, VaultSession
 from pii_guard.vault.known import KnownValues
 from pii_guard.visual.ocr import OcrEngine
-from pii_guard.visual.sam import SamClient
+from pii_guard.visual.segment import Segmenter
+from pii_guard.visual.segmenters import build_segmenter
 from pii_guard.workers import BoundedWorkers
 
 __all__ = [
@@ -234,13 +235,14 @@ class Gateway:
         detectors: Mapping[Mode, ModeDetector] | None = None,
         cache: DetectionCache | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
-        sam: SamClient | None = None,
+        sam: Segmenter | None = None,
         ocr: OcrEngine | None = _UNSET,
         observability: Observability | None = None,
         image_workers: BoundedWorkers | None = None,
     ) -> None:
-        """``sam`` / ``ocr`` mask inline images: default a :class:`SamClient` from the
-        settings and Tesseract when installed; ``ocr=None`` turns OCR off (SAM only).
+        """``sam`` / ``ocr`` mask inline images: default the segmenter of the settings
+        (:func:`~pii_guard.visual.segmenters.build_segmenter`) and Tesseract when installed;
+        ``ocr=None`` turns OCR off (segmenter only).
         ``observability`` receives one traffic event per call (none: nothing recorded).
         ``image_workers`` runs image masking (default: a pool of ``image_concurrency``)."""
         self.observability = observability
@@ -269,7 +271,7 @@ class Gateway:
     def image_masker(self, detector: ModeDetector) -> ImageMasker:
         """The visual pipeline for one mode: OCR text goes through that mode's detectors."""
         if self._sam is None:
-            self._sam = SamClient(settings=self.settings)
+            self._sam = build_segmenter(self.settings)
         if self._ocr is _UNSET:
             self._ocr = default_ocr_engine()
         return ImageMasker(

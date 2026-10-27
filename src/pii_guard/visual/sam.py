@@ -210,6 +210,11 @@ class SamClient:
     def __repr__(self) -> str:  # never the key
         return f"SamClient(url={self.url!r}, model={self.model!r})"
 
+    @property
+    def configured(self) -> bool:
+        """True when an API key is set (without one every call fails closed)."""
+        return bool(self._api_key)
+
     def segment(
         self,
         image: bytes,

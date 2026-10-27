@@ -12,6 +12,12 @@ const analysis = (ocr: Partial<ImageAnalysis["ocr"]>): ImageAnalysis => ({
 });
 
 describe("image regions", () => {
+  it("counts on-device face regions as segmenter regions, not OCR", () => {
+    const local: ImageRegion = { ...face, source: "local", detector: "yunet", score: 0.9 };
+    expect(summarizeRegions([local, taj])).toMatchObject({ sam: 1, ocr: 1 });
+    expect(legendRows([local])[0]?.sources).toEqual(["local"]);
+  });
+
   it("turns inclusive pixel boxes into percentages, padded and clipped", () => {
     expect(percentBox([10, 20, 59, 69], 100, 100)).toEqual({ left: "10.000%", top: "20.000%", width: "50.000%", height: "50.000%" });
     expect(percentBox([0, 0, 99, 99], 100, 100, 2)).toEqual({ left: "0.000%", top: "0.000%", width: "100.000%", height: "100.000%" });
@@ -19,6 +25,7 @@ describe("image regions", () => {
 
   it("labels regions without values", () => {
     expect(sourceLabel(face)).toBe("SAM 3.1");
+    expect(sourceLabel({ ...face, source: "local", detector: "yunet" })).toBe("YuNet (on-device)");
     expect(sourceLabel(taj)).toBe("OCR + Rules + checksum");
     expect(sourceLabel({ ...taj, entity_type: "EMAIL" })).toBe("OCR + Rules");
     expect(sourceLabel({ ...taj, entity_type: "PERSON", detector: "llm" }, { llm: "muse-spark-1.3" })).toBe("OCR + Muse Spark 1.3 (Meta API)");

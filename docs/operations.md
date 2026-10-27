@@ -119,17 +119,36 @@ and OCR availability, and prints `ocr on|off` (`docker inspect --format
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.
 
-### On-device face detection (not the default)
+### Segmenter: faces on the device, signatures on SAM 3.1
 
-The image pipeline segments faces, ID photos and signatures with SAM 3.1 on the Meta API, so
-images leave the machine (`META_API_KEY`). An on-device detector for faces and ID photos,
-`LocalSegmenter` (YuNet, 0.23 MB, MIT), exists as a library component but is **not** used by the
-API, the gateway or the Docker image: it cannot find signatures, so it can't replace SAM without
-either refusing every image or leaving signatures unmasked (LAB-1229,
-[models.md](models.md#local-segmentation)). To try it: `uv sync --extra local-vision`, then
-`uv run python -m pii_guard.visual.segment fetch` (downloads the pinned file from the OpenCV
-model zoo into `PII_GUARD_MODEL_DIR`, default `~/.cache/pii-guard/models`, and checks its
-SHA-256). Model files are never committed.
+`PII_GUARD_SEGMENTER` picks who finds the visual personal data in images (LAB-1245,
+[contracts.md](contracts.md), [models.md](models.md#local-segmentation)):
+
+| Value | Faces, ID photos | Signatures | SAM 3.1 calls per image | Image leaves the machine |
+|---|---|---|---:|---|
+| `hybrid` (default) | YuNet on the CPU | SAM 3.1 (`signature`, `squiggly line`) | 2 | yes, for the signature prompts |
+| `sam-api` (the default before LAB-1245) | SAM 3.1 | SAM 3.1 | 5 (with `stamp`) | yes |
+| `local` | YuNet on the CPU | not found: images are refused while `SIGNATURE` is masked | 0 | no |
+| `off` | — | — | 0 | no; every image is refused |
+
+`hybrid` is a latency and cost win, not a privacy win: the image still goes to the Meta API for
+the signature prompts. YuNet (OpenCV model zoo, 0.23 MB, MIT) runs alongside those calls.
+`STAMP` is `keep` by default, so `hybrid` does not ask SAM for stamps; give it another policy
+and it does (one more call).
+
+**Fallback (fail closed, ADR 0006).** The segmenter is built on the first image. If OpenCV or
+the YuNet model is missing, `hybrid` logs a warning (`on-device face detection unavailable ...;
+faces and ID photos go to SAM 3.1 too`) and sends every type to SAM (4 calls): still masked.
+With no SAM API key either, every image is `503 detection_failed`. `local` never falls back to
+the API, and any SAM or YuNet error while an image is processed refuses the image.
+
+**Getting YuNet.** The Docker image ships it: the `local-vision` extra (OpenCV headless) and the
+model, fetched at build time from its pinned OpenCV model zoo URL and checked against its
+pinned SHA-256 (the build fails on a mismatch), in `/app/models` (`PII_GUARD_MODEL_DIR`). That
+adds about 223 MB (`docker image inspect`, arm64: 430 MB → 653 MB; OpenCV headless about 87 MB
+and numpy about 68 MB of it, the model 0.23 MB). `make demo` fetches it too. Elsewhere: `uv sync --extra local-vision`, then
+`uv run python -m pii_guard.visual.segment fetch` (into `PII_GUARD_MODEL_DIR`, default
+`~/.cache/pii-guard/models`). Model files are never committed.
 
 ## Exposure and authentication
 
