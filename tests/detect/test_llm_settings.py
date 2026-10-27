@@ -84,6 +84,7 @@ def test_limits_read_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PII_GUARD_LLM_DETECTOR_REASONING_EFFORT", "low")
     monkeypatch.setenv("PII_GUARD_LLM_DETECTOR_MAX_TOKENS", "8192")
     monkeypatch.setenv("PII_GUARD_LLM_DETECTOR_TIMEOUT", "120")
+    monkeypatch.setenv("PII_GUARD_LLM_DETECTOR_API_KEY", "test-key")
     detector = LlmDetector(settings=Settings(_env_file=None))
     assert detector.timeout == 120.0
     assert detector._client().timeout == httpx.Timeout(120.0)

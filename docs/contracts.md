@@ -81,6 +81,8 @@ class Detector(Protocol):
 ```python
 class PiiGuardError(Exception):      # code = "internal_error",   status_code = 500
 class DetectionError(PiiGuardError): # code = "detection_failed", status_code = 503
+class DetectionUnavailableError(DetectionError):  # pii_guard.detect.stack
+                                     # code = "detection_unavailable", status_code = 503
 class MaskingError(PiiGuardError):   # code = "masking_failed",   status_code = 500
 
 PiiGuardError(message: str = "", *, code: str | None = None)
@@ -330,6 +332,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
+| 503 | `detection_unavailable` | `DetectionUnavailableError` (a `DetectionError`): a configured detector can't run safely, so nothing ran and nothing was sent. Today: the LLM detector without `PII_GUARD_LLM_DETECTOR_API_KEY` (gateway audit mode, or `PII_GUARD_DETECTORS` with `llm` on `/v1/*`); the message is "audit mode needs PII_GUARD_LLM_DETECTOR_API_KEY …". Refused before any detection, image segmentation or request, so the text never leaves the machine. A keyless endpoint on loopback (`localhost`, `127.0.0.1`, `::1`) is allowed: the text stays on the machine. |
 | 500 | `internal_error` | Anything unexpected. No exception text is returned. |
 
 Fail closed: on any error the response carries no masked or partially masked text.

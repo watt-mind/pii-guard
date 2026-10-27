@@ -21,6 +21,17 @@ stands in for the model unless you configure a real one.
   detector endpoint. Opt in per request (`X-PII-Guard-Mode: audit`) or per server
   (`PII_GUARD_GATEWAY_MODE=audit`).
 
+**Audit mode needs a key.** Without `PII_GUARD_LLM_DETECTOR_API_KEY`, audit mode is
+unavailable: every audit request (header, `PII_GUARD_GATEWAY_MODE=audit`, chat or responses,
+text or images) gets `503 detection_unavailable` ("audit mode needs
+PII_GUARD_LLM_DETECTOR_API_KEY") before anything is detected, segmented or sent, and the
+gateway logs one warning at startup. The same holds for `/v1/*` with `PII_GUARD_DETECTORS`
+naming `llm`. Before LAB-1290 the text was sent to the default endpoint unauthenticated and the
+request failed only on the endpoint's 403. A self-hosted detector on loopback (`localhost`,
+`127.0.0.1`, `::1`) may run without a key, since the text stays on the machine; anywhere else,
+set a key (any value your endpoint accepts). `make demo` prints "audit mode unavailable (no LLM
+detector key)" in this case, and the Chat UI shows the same hint.
+
 **Rename.** Audit mode was called `strict` until LAB-1186, which read as the safer choice and
 clashed with policy strictness (block vs mask). `strict` still works everywhere a mode is
 accepted, as a deprecated alias of `audit`: the `X-PII-Guard-Mode` header (the response then

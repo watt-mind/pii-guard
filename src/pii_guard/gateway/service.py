@@ -365,6 +365,9 @@ class Gateway:
         language: str,
         stats: RequestStats,
     ) -> list[list[Span]]:
+        # Audit mode without an LLM key: 503 detection_unavailable before anything is detected,
+        # cached, segmented or sent (LAB-1290). Runs first in chat and responses alike.
+        detector.require_available()
         results: list[list[Span] | None] = [None] * len(slots)
         pending: dict[bytes, tuple[str, list[int], Any]] = {}
         for index, slot in enumerate(slots):

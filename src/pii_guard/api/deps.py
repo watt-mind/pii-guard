@@ -19,6 +19,8 @@ Fail closed (ADR 0006): any detector error, including an unexpected exception or
 span, is raised as :class:`~pii_guard.types.DetectionError`
 (:class:`~pii_guard.detect.stack.CheckedDetector`, shared with the gateway); nothing is ever
 returned partially. No error message or log line contains request text or span values.
+A detector that can't run safely as configured (``llm`` without a key, LAB-1290) makes the
+analyzer refuse with ``503 detection_unavailable`` before any detector runs.
 """
 
 from __future__ import annotations
@@ -34,9 +36,11 @@ from pii_guard.config import DEFAULT_DETECTORS, Settings
 from pii_guard.detect.pipeline import DetectionPipeline
 from pii_guard.detect.stack import (
     CheckedDetector,
+    DetectionUnavailableError,
     build_detector,
     build_detectors,
     rest_detector_names,
+    unavailable_reason,
 )
 from pii_guard.policy import PolicySet
 from pii_guard.types import Detector, PiiGuardError, Span
@@ -98,8 +102,21 @@ class RegistryAnalyzer:
             [CheckedDetector(d) for d in self.detectors],
             keep_types=(policies or PolicySet()).keep_types,
         )
+        #: Why the analyzer refuses (a configured detector can't run safely), else ``None``.
+        self.unavailable: str | None = unavailable_reason(self.detectors)
+        if self.unavailable is not None:
+            logger.warning(
+                "analyzer unavailable (requests get 503 detection_unavailable): %s",
+                self.unavailable,
+            )
+
+    def require_available(self) -> None:
+        """Raise :class:`DetectionUnavailableError` if a configured detector can't run."""
+        if self.unavailable is not None:
+            raise DetectionUnavailableError(self.unavailable)
 
     def analyze(self, text: str, language: str) -> list[Span]:
+        self.require_available()
         return self.pipeline.detect(text, language)
 
 

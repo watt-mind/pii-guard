@@ -13,13 +13,17 @@ what they return, so ``/v1/mask`` and gateway fast mode can't drift apart:
 - :class:`CheckedDetector` / :func:`check_spans` -- detector output must be a list of spans
   whose offsets match the text. Anything else, or an unexpected exception, is a
   ``DetectionError``. Messages never quote request text or span values.
+- :class:`DetectionUnavailableError` / :func:`unavailable_reason` -- a detector that can't run
+  safely as configured (the LLM detector without a key, LAB-1290) says why in
+  ``unavailable_reason``; callers refuse with ``503 detection_unavailable`` before any detector
+  runs, so nothing is sent anywhere.
 """
 
 from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from pii_guard.config import Settings
@@ -29,16 +33,44 @@ from pii_guard.types import DetectionError, Detector, Span
 __all__ = [
     "NER_EXTRA_MISSING",
     "CheckedDetector",
+    "DetectionUnavailableError",
     "build_detector",
     "build_detectors",
     "check_spans",
     "default_detector_names",
     "rest_detector_names",
+    "unavailable_reason",
 ]
 
 logger = logging.getLogger(__name__)
 
 NER_EXTRA_MISSING = "ner configured but the 'ner' extra is not installed"
+
+
+class DetectionUnavailableError(DetectionError):
+    """A configured detector can't run safely (for example the LLM detector has no key).
+
+    Raised before any detector runs or any request is made. Still a ``DetectionError``, so
+    everything that fails closed on detection errors refuses this too.
+    """
+
+    code = "detection_unavailable"
+    status_code = 503
+
+
+def unavailable_reason(detectors: Iterable[object]) -> str | None:
+    """The first ``unavailable_reason`` among ``detectors`` (wrappers are looked through)."""
+    for detector in detectors:
+        seen = 0
+        current: object | None = detector
+        while current is not None and seen < 8:  # _Timed(CheckedDetector(LlmDetector))
+            reason = getattr(current, "unavailable_reason", None)
+            if isinstance(reason, str) and reason:
+                return reason
+            current = getattr(current, "inner", None)
+            seen += 1
+    return None
+
 
 _warn_lock = threading.Lock()
 _warned_no_ner = False

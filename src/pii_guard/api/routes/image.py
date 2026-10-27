@@ -193,7 +193,14 @@ def _ocr_engine(request: Request) -> OcrEngine | None:
 def get_image_masker(request: Request) -> ImageMasker:
     """SAM + (OCR + the app's analyzer, when an OCR engine is available) + the app's policies."""
     ocr = _ocr_engine(request)
-    detector = AnalyzerDetector(get_analyzer(request)) if ocr is not None else None
+    analyzer = get_analyzer(request) if ocr is not None else None
+    if analyzer is not None:
+        # OCR text would reach a detector that can't run (llm without a key): refuse before
+        # the image is segmented or sent anywhere (503 detection_unavailable, LAB-1290).
+        require = getattr(analyzer, "require_available", None)
+        if callable(require):
+            require()
+    detector = AnalyzerDetector(analyzer) if analyzer is not None else None
     names = list(getattr(request.app.state, "detector_names", None) or [])
     models: dict[str, str] = {}
     if detector is not None:
