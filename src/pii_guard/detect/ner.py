@@ -135,6 +135,16 @@ DEFAULT_THRESHOLDS: dict[str, dict[EntityType, float]] = {
 # house numbers ("1982.06.26.", "utca 12."); a PERSON span loses a trailing dot.
 _TRIM = " \t\r\n,;:!?()[]{}\"'\u00ab\u00bb\u201e\u201c\u201d\u2018\u2019\u2013\u2014-/"
 _REQUIRED_MODULES = ("torch", "transformers")
+#: What a backend runs once on its device before it is published (fictional, no PII).
+WARM_UP_TEXT = "Warm-up sentence for the model."
+
+# Model loading is process-wide (LAB-1274): the REST API and the gateway each build a
+# NerDetector, and two loads (or first forwards) at once on Apple MPS crashed the process with
+# signal 11. One lock serialises every load and its warm-up forward, and detectors with the same
+# configuration share the loaded backend, so a model is in memory once and its inference lock
+# serialises all callers.
+_load_lock = threading.Lock()
+_shared_backends: dict[tuple[object, ...], NerBackend] = {}
 
 
 def dependencies_available() -> bool:
@@ -306,6 +316,8 @@ class TransformersBackend:
         self.max_length = min(max_length, model_max if model_max < 100_000 else max_length)
         self.stride = stride
         self._lock = threading.Lock()  # fast tokenizers are not safe for concurrent calls
+        # One forward on the device before anyone else can see this backend (LAB-1274).
+        self.predict(WARM_UP_TEXT)
 
     def predict(self, text: str) -> list[RawEntity]:
         torch = self._torch
@@ -377,8 +389,9 @@ class NerDetector:
     - ``preload``: load the model in the constructor (default), so a missing or broken model
       fails when the detector is built; ``False`` defers it to the first call.
 
-    The model is loaded once, thread-safely; a load failure raises :class:`DetectionError`
-    (and a deferred load is retried on the next call).
+    The model is loaded once per process, under a process-wide lock, and detectors with the
+    same model, revision, device and window settings share it (LAB-1274). A load failure raises
+    :class:`DetectionError` (and a deferred load is retried on the next call).
     """
 
     name = "ner"
@@ -433,7 +446,6 @@ class NerDetector:
             self._backend = backend  # type: ignore[assignment]
         elif backend is not None:
             self._factory = backend  # type: ignore[assignment]
-        self._lock = threading.Lock()
         if preload:
             self.load()
 
@@ -443,46 +455,71 @@ class NerDetector:
     # -- loading --
 
     def load(self) -> NerBackend:
-        """Load the model (once). Raises :class:`DetectionError` if it can't be loaded."""
-        if self._backend is not None:
-            return self._backend
-        with self._lock:
+        """Load the model (once per process and configuration). Raises :class:`DetectionError`.
+
+        Double-checked under the process-wide load lock: the backend is published only after it
+        is fully built (on its device, in eval mode, one warm-up forward done).
+        """
+        backend = self._backend
+        if backend is not None:
+            return backend
+        with _load_lock:
             if self._backend is None:
                 try:
-                    if self._factory is not None:
-                        backend = self._factory()
-                    elif self.backend_kind == "gliner" or os.path.isfile(
-                        os.path.join(self.model, "gliner_config.json")
-                    ):
-                        from pii_guard.detect import ner_gliner
-
-                        if not ner_gliner.dependencies_available():
-                            raise DetectionError("ner gliner backend needs the 'gliner' extra")
-                        backend = ner_gliner.GlinerBackend(
-                            self.model, revision=self.revision, device=self.device
-                        )
-                    else:
-                        if not dependencies_available():
-                            raise DetectionError(
-                                "ner detector needs the 'ner' extra (torch, transformers)"
-                            )
-                        backend = TransformersBackend(
-                            self.model,
-                            revision=self.revision,
-                            device=self.device,
-                            max_length=self.max_length,
-                            stride=self.stride,
-                            aggregation=self.aggregation,
-                        )
+                    self._backend = self._build_backend()
                 except DetectionError:
                     raise
                 except Exception as exc:
                     raise DetectionError(
                         f"ner model could not be loaded ({type(exc).__name__})"
                     ) from exc
-                logger.info("ner model loaded: %s", self.model)
-                self._backend = backend
         return self._backend
+
+    def _shared_key(self) -> tuple[object, ...]:
+        device = (self.device or os.environ.get(DEVICE_ENV_VAR) or "auto").strip().lower()
+        return (
+            self.backend_kind,
+            self.model,
+            self.revision,
+            device,
+            self.max_length,
+            self.stride,
+            self.aggregation,
+        )
+
+    def _build_backend(self) -> NerBackend:
+        """Called with ``_load_lock`` held."""
+        if self._factory is not None:
+            return self._factory()
+        key = self._shared_key()
+        shared = _shared_backends.get(key)
+        if shared is not None:
+            return shared
+        backend: NerBackend
+        if self.backend_kind == "gliner" or os.path.isfile(
+            os.path.join(self.model, "gliner_config.json")
+        ):
+            from pii_guard.detect import ner_gliner
+
+            if not ner_gliner.dependencies_available():
+                raise DetectionError("ner gliner backend needs the 'gliner' extra")
+            backend = ner_gliner.GlinerBackend(
+                self.model, revision=self.revision, device=self.device
+            )
+        else:
+            if not dependencies_available():
+                raise DetectionError("ner detector needs the 'ner' extra (torch, transformers)")
+            backend = TransformersBackend(
+                self.model,
+                revision=self.revision,
+                device=self.device,
+                max_length=self.max_length,
+                stride=self.stride,
+                aggregation=self.aggregation,
+            )
+        logger.info("ner model loaded: %s", self.model)
+        _shared_backends[key] = backend
+        return backend
 
     # -- detection --
 

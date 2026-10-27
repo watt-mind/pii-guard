@@ -8,6 +8,8 @@ what they return, so ``/v1/mask`` and gateway fast mode can't drift apart:
   :class:`~pii_guard.types.DetectionError` (fail closed, ADR 0006) instead of quietly running
   rules only. Without a configured model it falls back to rules and logs one WARNING.
 - :func:`rest_detector_names` -- an explicit ``PII_GUARD_DETECTORS``, else the default stack.
+- :func:`warm_up` -- load the NER model before serving (LAB-1274), when ``PII_GUARD_NER_MODEL``
+  is set and the ``ner`` extra is installed.
 - :func:`build_detector` -- a registry detector, configured from the settings (``llm`` gets
   the settings, ``ner`` gets ``ner_model`` / ``ner_revision`` / ``ner_device``).
 - :class:`CheckedDetector` / :func:`check_spans` -- detector output must be a list of spans
@@ -34,6 +36,7 @@ __all__ = [
     "check_spans",
     "default_detector_names",
     "rest_detector_names",
+    "warm_up",
 ]
 
 logger = logging.getLogger(__name__)
@@ -106,6 +109,23 @@ def build_detectors(names: Sequence[str], settings: Settings | None = None) -> l
     if not names:
         raise DetectionError("no detectors configured")
     return [build_detector(name, settings) for name in names]
+
+
+def warm_up(settings: Settings) -> bool:
+    """Load the configured NER model now, so the first requests don't race to load it.
+
+    Runs only when ``PII_GUARD_NER_MODEL`` is set and the ``ner`` extra is installed; returns
+    whether it loaded. The REST API's and the gateway's NER detectors share the loaded model
+    (:mod:`pii_guard.detect.ner`). A model that can't be loaded raises
+    :class:`DetectionError` (fail closed: startup stops).
+    """
+    if not settings.ner_model or not _ner_available():
+        return False
+    detector = build_detector("ner", settings)
+    load = getattr(detector, "load", None)
+    if callable(load):
+        load()
+    return True
 
 
 def check_spans(found: object, text: str, name: str) -> list[Span]:
