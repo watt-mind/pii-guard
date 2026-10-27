@@ -140,7 +140,8 @@ Moved here from the README.
   held back until complete, in content and in tool-call arguments.
 - **Layered detection with one resolver:** rules with checksums (Hungarian tax and TAJ
   numbers, IBAN, giro accounts, company IDs, US SSN, UK NINO, payment cards…), the NER model
-  (fast mode), the LLM detector (strict mode), merged by one deterministic resolver.
+  (fast mode, the default), the LLM detector (audit mode, opt-in), merged by one
+  deterministic resolver.
 - **The LLM never rewrites your text.** It only names spans; pii-guard finds them in the
   original, drops anything the model invented, and lets checksum-validated rules win on
   structured IDs. A hallucination can't add text, and a disagreement can't unmask anything.

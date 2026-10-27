@@ -1162,6 +1162,129 @@ the same fictional mini-repo and task as pi in milestone 35:
 - **Cost:** $0. About 10 requests on free Meta API credits (one live run and `--check`); the
   rest ran locally.
 
+### 40. API keys and passwords no longer reach the model (2026-10-27)
+
+LAB-1257. Entry 35 found that every fake key in the mini-repo's `.env` reached the model. There
+is now a `SECRET` type, masked by default. Language-independent rules
+(`detect/rules/secrets.py`) find three things: provider key shapes (AWS, GitHub, Slack,
+Stripe, `sk-` keys, Google, JWTs, PEM private keys), passwords in URLs, and values assigned to
+a secret-ish key (`API_KEY=`, `password:`, `"client_secret":`, `Authorization: Bearer`). Each
+span names the rule that found it as a subtype. Restore works as for every other type, so the
+agent's files get the real values back.
+
+| Check (rules only) | Before | After |
+|---|---:|---:|
+| pi + scripted mock: `.env` secrets upstream | 3 of 3 | **0 of 3** |
+| pi + scripted mock: gold values restored in the written file | 11 of 11 | 14 of 14 |
+| New `secrets` gate suite (17 docs, 5 hard negatives): leak / over-masking | n/a | 0 / 0 |
+| Over-masking check: mini-repo, 6 repo files, `uv.lock`, `ui/pnpm-lock.yaml` (431k chars): `SECRET` spans that aren't secrets | n/a | 0 |
+
+- **Code stays readable.** A value must look like a literal, not code. So `api_key=api_key`,
+  `password: str`, `os.environ[...]`, `${DB_PASSWORD}`, `<your API key>` and `****` are left
+  alone. Lockfile hashes, git SHAs and UUIDs are masked only when they're assigned to a
+  secret-ish key. A generic `*_KEY` name (`STORAGE_KEY`) needs a value that looks generated.
+- **`PASSWORD=changeme` is masked.** A weak password in a config file is still a password.
+- **Found on the way:** the existing number rules mask 14 integrity-hash fragments in
+  `uv.lock` as TAJ or ID numbers, which isn't new. It's a follow-up ticket.
+- **Cost:** $0, all local.
+
+### 41. Strict mode becomes audit mode, and fast is the default (2026-10-27)
+
+LAB-1186. The gateway's two modes were `fast` (rules + NER) and `strict` (+ an LLM detector),
+and `strict` was the code default. The name read as the safer, more careful choice, so a
+privacy-minded user would pick it, and it clashed with policy strictness (block vs mask). In
+production it is the wrong pick: about 2 s and $2.5–3 per 1,000 messages, and every message
+goes to the detector endpoint. Its real jobs are sampled or offline quality checks, labels and
+teacher data for the NER, and the benchmark upper bound.
+
+- **Renamed `audit`**, in the header, `PII_GUARD_GATEWAY_MODE`, the CLI (`--mode`, `--modes`,
+  `--system`, `--audit-requests`), the demo banner and the UI's mode picker, whose help text
+  says what audit mode is for. The old name still works as a deprecated alias, with a
+  `Deprecation` / `Warning` response header, a log line or a stderr warning
+  ([operations.md](operations.md#modes)).
+- **`fast` is now the code default** of `PII_GUARD_GATEWAY_MODE`; audit mode is opt-in. The
+  demo stack and Docker already ran fast.
+- **History kept:** run records stay as written, under their `-strict` IDs; `pii-guard eval
+  report` shows them as audit at read time, so [benchmarks.md](benchmarks.md) and the charts
+  say audit with no record rewritten. Earlier milestones on this page keep the old name.
+- **Numbers:** none changed; this is a rename and a default.
+- **Cost:** $0.
+
+### 42. A name found whole repairs the same name found in part (2026-10-27)
+
+LAB-1284, from milestone 39. When NER found only part of a name (`Placeholder` in the CSV
+row `1,Jane Placeholder`), the gateway sent `1,Jane [[PERSON_x]]` upstream, even when the same
+request had `Jane Placeholder` whole in the client letter. The second-pass sweep couldn't
+repair it: once the surname was a placeholder, the full name no longer matched.
+
+Now, before masking, a full name the gateway already knows widens the partial span. That's a
+name found elsewhere in the same request, confirmed earlier in the session, or pre-loaded. It
+has to occur around the span, matched the way the vault matches (word boundaries, any casing
+or Unicode form, Hungarian suffixes outside), and the longest name wins. Several fragments
+(`Jane` + `Placeholder`) become one span. A name is never widened into another span, so
+`Mark Jane Placeholder` with `Mark Jane` detected stays two values. Surname-first Hungarian
+(`Minta Jánosnak`) widens like English.
+
+| e2e harness, scripted mock, fast mode | Before | After |
+|---|---:|---:|
+| pi, NER v1 checkpoint: `gold_partial_upstream` | 1 | **0** |
+| Muse Code, NER v1 checkpoint: `gold_partial_upstream` | 2 | **0** |
+| pi / Muse Code, NER v2 (base + hard negatives): `gold_partial_upstream` | 0 / 0 | 0 / 0 |
+| Gold values upstream (all four runs) | 0 of 13 | 0 of 13 |
+| Gate suites: over-masking | unchanged | unchanged |
+
+- **NER v2 already finds these names whole** on the mini-repo, so the repair matters most
+  with weaker or other-language checkpoints. It's a guarantee rather than a model property.
+- **Muse Code:** the official installer now ships 1.4.14, but the harness is pinned to
+  1.4.13. These runs used 1.4.14 without changing the pin.
+- **Cost:** $0, all local.
+
+### 43. Turned, skewed and small-text images get masked (2026-10-27)
+
+LAB-1210, from the 2026-10-27 code review. **A document photographed sideways, upside down or
+at an angle went upstream with its text unmasked:** Tesseract read it in the default page mode,
+with no orientation detection and no deskew. A fictional TAJ card turned 90° came back with no
+regions at all. Small text in large screenshots failed too: an image 2,000 px or wider is never
+enlarged, so 11 px text came back as 8 px boxes and was misread (`123 458788`).
+
+The OCR now reads every page upright and straight, and maps the boxes back:
+
+- **Orientation.** Each reading is scored by its share of confidently read characters. Upright
+  fictional documents score 0.72–1.0 and turned ones 0.03–0.28. If the words stand upright
+  (text running up or down), the page is read again a quarter turn each way. A poor reading is
+  read again upside down. A middling one asks Tesseract's orientation detection (OSD). The
+  best reading wins, so a wrong guess costs a pass, never the upright reading.
+- **Deskew.** A projection profile (pure Pillow, about 30 rotations of a 600 px copy) finds
+  skews of 1–20°. The page is straightened before reading.
+- **Captions and MRZ zones are found in the straightened frame**, where the layout rules hold.
+  Only then do the boxes go back to the input, as the bounding box of each turned box.
+- **Small text.** A line under 12 px at OCR resolution is read again on a tile enlarged to
+  40 px line height, and replaces the first reading only if it reads better.
+
+Text and MRZ regions at least 90 % covered, OCR and rules only, no SAM, with the cover turned
+back onto the upright document ([robustness-fictional.md](../eval/results/visual/robustness-fictional.md),
+[robustness-specimens.md](../eval/results/visual/robustness-specimens.md)):
+
+| Transform | Fictional (24 docs), before → after | Specimens (65, local only), before → after |
+|---|---:|---:|
+| upright | 86.2 % → 86.2 % | 14.1 % → 14.1 % |
+| 90° / 180° / 270° | 0.0 / 0.0 / 31.0 % → 86.2 % each | 0.3 / 0.0 / 4.9 % → 13.8 % each |
+| skewed 5° / −10° / 15° | 53.4 / 10.3 / 3.4 % → 84.5 / 86.2 / 89.7 % | 7.6 / 0.0 / 0.0 % → 15.1 / 13.5 / 9.9 % |
+| screenshot 2560 px, 11 px text: identifiers masked | 1 of 2 → 2 of 2 | – |
+
+- **Cost: latency on hard images.** Fictional upright p50 is unchanged (1.10 → 1.14 s). On the
+  official specimens, upright p50 goes from 1.4 s to 2.7 s (p95 2.1 → 5.9 s). Half of them read
+  only middlingly even upright, which costs an OSD check. On security print OSD often says
+  "upside down", which costs a second pass. Turned images take 2–6 s. A cheaper upright check
+  is a follow-up.
+- **Skewed specimens stay behind upright ones** (9.9–15.1 % against 14.1 %, and 23–28
+  regions lost at an angle). Straightening resamples print that Tesseract barely reads anyway.
+  The better reader (LAB-1183) is the fix for that.
+- **Measured** with `tests/visual/robustness.py` (`--before` turns the three passes off), six
+  images at a time on one machine. CI covers the logic with a fake `pytesseract`; the real
+  Tesseract tests run wherever it is installed.
+- **Cost:** $0. Tesseract runs locally, no SAM calls.
+
 <!-- journey:begin. Generated by `pii-guard eval report --journey` from docs/journey/*.md; edit those files, not this block. -->
 <!-- journey:end -->
 

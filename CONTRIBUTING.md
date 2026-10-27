@@ -169,6 +169,18 @@ When a gate fails:
   it.
 - Design changes that are hard to reverse get an ADR in `docs/decisions/`.
 
+## Issues and tracking
+
+- **Outside contributors:** open a [GitHub issue](https://github.com/watt-mind/pii-guard/issues)
+  for a bug or an idea, and a pull request when you have a change. You don't need an account
+  anywhere else. A leak is a security issue: see below.
+- **Maintainers** track the same work in Linear, team `LAB`, project `PII Guard`. Pull
+  requests that close a ticket say `Fixes LAB-XX` in the body, and their commits end in
+  `(LAB-XX)`. Work discovered while doing something else becomes its own issue rather than
+  growing the current pull request.
+- Issues, commits and pull requests are public. Like the code, they must not contain real
+  personal data, secrets, or names of customers, clients or private projects.
+
 ## Reporting a leak
 
 A way to get personal data past the guard is a **security issue**. Do not open a public

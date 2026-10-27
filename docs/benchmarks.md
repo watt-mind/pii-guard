@@ -77,7 +77,7 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 51 | 90.0% | 96.4% | 93.1% | 0.0% | 2.3% | 7.2% | 100.0% | 81 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 51 | 98.0% | 98.5% | 98.2% | 1.2% | 2.9% | 1.1% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 51 | 89.0% | 92.3% | 90.6% | 1.2% | 2.9% | 5.9% | 100.0% | 14 ms* | 2026-10-27 | `910a6a2` |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 51 | 97.0% | 99.5% | 98.2% | 0.6% | 1.2% | 1.1% | 100.0% | 1.9 s* | 2026-10-27 | `4f84c6a` |
+| pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 51 | 97.0% | 99.5% | 98.2% | 0.6% | 1.2% | 1.1% | 100.0% | 1.9 s* | 2026-10-27 | `4f84c6a` |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 51 | 90.5% | 91.8% | 91.1% | 0.0% | 0.6% | 4.8% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 51 | 92.8% | 90.7% | 91.7% | 0.0% | 0.6% | 1.1% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 51 | 97.0% | 97.4% | 97.2% | 0.0% | 2.3% | 0.6% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
@@ -113,7 +113,7 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 95.3% | 94.3% | 91.9% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 98.8% | 98.6% | 97.9% | 0.0% | 0.0% | 1.9% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 94.0% | 87.3% | 90.4% | 0.0% | 0.0% | 1.9% |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 100.0% | 100.0% | 97.2% | 0.0% | 0.0% | 0.9% |
+| pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 100.0% | 100.0% | 97.2% | 0.0% | 0.0% | 0.9% |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 93.9% | 91.3% | 90.1% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 96.2% | 91.0% | 90.4% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 95.1% | 100.0% | 97.1% | 0.0% | 0.0% | 0.0% |
@@ -153,7 +153,7 @@ mixed; documents: de 200 + en 200 + hu 200.
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 600 | 86.6% | 98.7% | 92.2% | 0.4% | 0.1% | 5.4% | 100.0% | 136 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 600 | 86.7% | 79.3% | 82.8% | 13.8% | 1.7% | 2.6% | 100.0% | 18 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 600 | 97.5% | 98.5% | 98.0% | 0.5% | 0.2% | 1.0% | 100.0% | 17 ms* | 2026-10-27 | `b6e7bac` |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) ‡ | 600 | 92.5% | 93.9% | 93.2% | 3.9% | 0.1% | 2.4% | 100.0% | 2.1 s* | 2026-10-27 | `4f84c6a` |
+| pii-guard audit (rules + NER + Muse Spark Open, Baseten) ‡ | 600 | 92.5% | 93.9% | 93.2% | 3.9% | 0.1% | 2.4% | 100.0% | 2.1 s* | 2026-10-27 | `4f84c6a` |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 600 | 98.8% | 99.0% | 98.9% | 0.3% | 0.1% | 0.3% | 100.0% | 29 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 600 | 98.5% | 98.6% | 98.6% | 0.4% | 0.1% | 0.2% | 100.0% | 35 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 600 | 90.0% | 81.9% | 85.8% | 12.5% | 1.8% | 1.7% | 100.0% | 29 ms* | 2026-10-27 | `b6e7bac` |
@@ -179,7 +179,7 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 92.5% | 90.8% | 93.5% | 0.3% | 0.2% | 0.5% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 82.1% | 79.5% | 86.9% | 13.5% | 15.0% | 12.6% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 97.7% | 97.2% | 99.0% | 0.6% | 0.5% | 0.4% |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 94.5% | 92.1% | 93.3% | 4.8% | 3.5% | 3.7% |
+| pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 94.5% | 92.1% | 93.3% | 4.8% | 3.5% | 3.7% |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 98.9% | 98.4% | 99.5% | 0.5% | 0.0% | 0.4% |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 98.7% | 97.5% | 99.6% | 0.5% | 0.2% | 0.4% |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 86.5% | 82.3% | 88.8% | 10.8% | 14.3% | 12.1% |
@@ -205,7 +205,7 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 0.4% | 99.4% (165/166) | 0.0% (0/166) | 97.7% (726/743) | 0.0% (0/743) | 0.6% (8/1276) |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 13.8% | 98.2% (163/166) | 0.0% (0/166) | 61.2% (455/743) | 20.3% (151/743) | 11.8% (150/1276) |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 0.5% | 100.0% (166/166) | 0.0% (0/166) | 97.3% (723/743) | 0.0% (0/743) | 0.9% (11/1276) |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) § | 3.9% | 100.0% (166/166) | 0.0% (0/166) | 87.8% (652/743) | 6.5% (48/743) | 2.8% (36/1276) |
+| pii-guard audit (rules + NER + Muse Spark Open, Baseten) § | 3.9% | 100.0% (166/166) | 0.0% (0/166) | 87.8% (652/743) | 6.5% (48/743) | 2.8% (36/1276) |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 0.3% | 100.0% (166/166) | 0.0% (0/166) | 98.1% (729/743) | 0.0% (0/743) | 0.5% (6/1276) |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 96.9% (720/743) | 0.0% (0/743) | 0.6% (8/1276) |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 12.5% | 99.4% (165/166) | 0.0% (0/166) | 64.5% (479/743) | 19.8% (147/743) | 10.0% (127/1276) |
@@ -218,7 +218,7 @@ By language:
 
 These runs kept no per-document predictions, so each system was run again to classify them (LAB-1201); the Leak column is the original records', unchanged. "Other values" are every value that is not a number type (names, addresses, e-mail).
 
-§ The re-run did not reproduce the headline counts exactly (an LLM detector doesn't answer the same way twice): the breakdown adds up to the re-run's own totals. strict (rules + NER + Muse Spark Open, Baseten) (re-run leak 3.8%, headline 3.9%).
+§ The re-run did not reproduce the headline counts exactly (an LLM detector doesn't answer the same way twice): the breakdown adds up to the re-run's own totals. audit (rules + NER + Muse Spark Open, Baseten) (re-run leak 3.8%, headline 3.9%).
 
 ### `company-names`
 
@@ -354,6 +354,22 @@ By language:
 | pii-guard rules + Muse Spark 1.3 | 100.0% | 100.0% | 0.0% | 0.0% |
 
 
+### `secrets`
+
+hand-written; documents: en 17.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 17 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 0.35 ms | 2026-10-27 | `72bcc27` |
+
+
+By language:
+
+| System | en F1 | en leak |
+|---|---:|---:|
+| **pii-guard rules** | 100.0% | 0.0% |
+
+
 ### `synth-dev`
 
 generated; documents: en 24 + hu 24.
@@ -390,7 +406,7 @@ generated by muse-spark-1.3-contributor; documents: en 10 + hu 20.
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 30 | 74.5% | 96.4% | 84.1% | 0.0% | 1.2% | 23.3% | 63.3% | 298 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 30 | 97.2% | 97.2% | 97.2% | 0.0% | 1.2% | 0.0% | 100.0% | 26 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 30 | 96.4% | 96.4% | 96.4% | 0.0% | 1.2% | 0.0% | 100.0% | 26 ms* | 2026-10-27 | `910a6a2` |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 2.0 s* | 2026-10-27 | `4f84c6a` |
+| pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 2.0 s* | 2026-10-27 | `4f84c6a` |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 30 | 95.9% | 95.9% | 95.9% | 0.0% | 1.2% | 0.0% | 100.0% | 60 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 30 | 96.9% | 96.9% | 96.9% | 0.0% | 1.2% | 0.0% | 100.0% | 63 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 30 | 97.4% | 97.4% | 97.4% | 0.0% | 1.2% | 0.0% | 100.0% | 60 ms* | 2026-10-27 | `910a6a2` |
@@ -419,7 +435,7 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 82.2% | 85.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 100.0% | 95.9% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 100.0% | 94.8% | 0.0% | 0.0% |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 98.8% | 99.8% | 0.0% | 0.0% |
+| pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 98.8% | 99.8% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 100.0% | 94.1% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 100.0% | 95.6% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 100.0% | 96.3% | 0.0% | 0.0% |
@@ -567,17 +583,18 @@ What the gateway adds to an LLM call, measured by `pii-guard bench latency` agai
 | fast: rules + ner | 1 | yes | 200 | 39 ms | 47 ms | 57 ms | 32 ms | 37 ms | 46 ms | 50 | `2026-10-27-gateway-latency-ner-fast` |
 | fast: rules + ner | 8 | no | 200 | 166 ms | 182 ms | 203 ms | 160 ms | — | — | 50 | `2026-10-27-gateway-latency-ner-fast` |
 | fast: rules + ner | 8 | yes | 200 | 173 ms | 183 ms | 189 ms | 166 ms | 172 ms | 182 ms | 50 | `2026-10-27-gateway-latency-ner-fast` |
-| strict: rules + llm | 1 | no | 10 | 1.2 s | 1.8 s | 2.1 s | 1.2 s | — | — | 50 | `2026-10-27-gateway-latency-baseten-strict` |
-| strict: rules + llm | 1 | yes | 10 | 1.3 s | 1.6 s | 1.7 s | 1.3 s | 1.3 s | 1.6 s | 50 | `2026-10-27-gateway-latency-baseten-strict` |
-| strict: rules + llm | 8 | no | 10 | 1.9 s | 2.4 s | 2.5 s | 1.9 s | — | — | 50 | `2026-10-27-gateway-latency-baseten-strict` |
-| strict: rules + llm | 8 | yes | 10 | 2.2 s | 3.0 s | 3.2 s | 2.2 s | 2.2 s | 3.0 s | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+| audit: rules + llm | 1 | no | 10 | 1.2 s | 1.8 s | 2.1 s | 1.2 s | — | — | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+| audit: rules + llm | 1 | yes | 10 | 1.3 s | 1.6 s | 1.7 s | 1.3 s | 1.3 s | 1.6 s | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+| audit: rules + llm | 8 | no | 10 | 1.9 s | 2.4 s | 2.5 s | 1.9 s | — | — | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+| audit: rules + llm | 8 | yes | 10 | 2.2 s | 3.0 s | 3.2 s | 2.2 s | 2.2 s | 3.0 s | 50 | `2026-10-27-gateway-latency-baseten-strict` |
 
 ## Run log
 
-Newest first. `imported` runs were converted from earlier scorecards and Linear/PR notes; `recorded` ones were written by `pii-guard eval --record`.
+Newest first. `imported` runs were converted from earlier scorecards and Linear/PR notes; `recorded` ones were written by `pii-guard eval --record`. Audit mode was called `strict` until LAB-1186: run IDs ending in `-strict` are audit-mode runs, kept under their original IDs.
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-secrets-rules` | pii-guard rules | secrets | en | recorded | `72bcc27` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-negative-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | uncued-numbers | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-negative-rules` | pii-guard rules | uncued-numbers | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
@@ -833,17 +850,17 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-comparison-hu-smoke-presidio` | Presidio | smoke | hu | recorded | `8944f96` | arm64, 10 CPUs, CPU only | — |
 | 2026-10-27 | `2026-10-27-comparison-hu-smoke-llm-guard` | LLM Guard | smoke | hu | recorded | `8944f96` | arm64, 10 CPUs, CPU only | — |
 | 2026-10-27 | `2026-10-27-comparison-hu-smoke` | pii-guard rules | smoke | hu | recorded | `8944f96` | — | — |
-| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | ai4privacy | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 18.3 at start (machine not idle) | ≈ $0.51 |
-| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | ai4privacy | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 13.9 at start (machine not idle) | ≈ $0.54 |
-| 2026-10-27 | `2026-10-27-gateway-latency-baseten-strict` | pii-guard gateway, strict mode (rules + llm muse-spark-open) | latency-corpus | de, en, hu | recorded | `4ee1b15` | Apple M1 Max, 10 CPUs, local loopback | — |
+| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-strict` | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | ai4privacy | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 18.3 at start (machine not idle) | ≈ $0.51 |
+| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-strict` | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | ai4privacy | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 13.9 at start (machine not idle) | ≈ $0.54 |
+| 2026-10-27 | `2026-10-27-gateway-latency-baseten-strict` | pii-guard gateway, audit mode (rules + llm muse-spark-open) | latency-corpus | de, en, hu | recorded | `4ee1b15` | Apple M1 Max, 10 CPUs, local loopback | — |
 | 2026-10-27 | `2026-10-27-gateway-latency-ner-fast` | pii-guard gateway, fast mode (rules + ner pii-guard-ner-xlmr-large-distilled) | latency-corpus | de, en, hu | recorded | `4ee1b15` | Apple M1 Max, 10 CPUs, local loopback | — |
 | 2026-10-27 | `2026-10-27-gateway-latency-rules-fast` | pii-guard gateway, fast mode (rules) | latency-corpus | de, en, hu | recorded | `4ee1b15` | Apple M1 Max, 10 CPUs, local loopback | — |
-| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | ai4privacy | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 18.1 at start (machine not idle) | ≈ $0.59 |
-| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | synth-sample | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 15.8 at start (machine not idle) | ≈ $0.03 |
-| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | synth-sample | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 14.6 at start (machine not idle) | ≈ $0.07 |
-| 2026-10-27 | `2026-10-27-comparison-de-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 13.3 at start (machine not idle) | ≈ $0.02 |
-| 2026-10-27 | `2026-10-27-comparison-en-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 13.4 at start (machine not idle) | ≈ $0.02 |
-| 2026-10-27 | `2026-10-27-comparison-hu-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 16.6 at start (machine not idle) | ≈ $0.08 |
+| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-strict` | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | ai4privacy | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 18.1 at start (machine not idle) | ≈ $0.59 |
+| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-strict` | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | synth-sample | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 15.8 at start (machine not idle) | ≈ $0.03 |
+| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-strict` | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | synth-sample | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 14.6 at start (machine not idle) | ≈ $0.07 |
+| 2026-10-27 | `2026-10-27-comparison-de-smoke-strict` | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | smoke | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 13.3 at start (machine not idle) | ≈ $0.02 |
+| 2026-10-27 | `2026-10-27-comparison-en-smoke-strict` | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | smoke | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 13.4 at start (machine not idle) | ≈ $0.02 |
+| 2026-10-27 | `2026-10-27-comparison-hu-smoke-strict` | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | smoke | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 16.6 at start (machine not idle) | ≈ $0.08 |
 | 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.9 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.1 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 19.9 at start (machine not idle) | — |

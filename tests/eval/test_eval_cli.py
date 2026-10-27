@@ -52,7 +52,9 @@ def test_hu_smoke_covers_every_text_entity_type() -> None:
     docs = load_fixtures(HU)
     assert 25 <= len(docs) <= 40
     assert {d.language for d in docs} == {"hu"}
-    assert {s.entity_type for d in docs for s in d.spans} == set(TEXT_ENTITY_TYPES)
+    # SECRET (API keys, passwords) is not Hungarian prose: eval/fixtures/secrets covers it.
+    expected = set(TEXT_ENTITY_TYPES) - {EntityType.SECRET}
+    assert {s.entity_type for d in docs for s in d.spans} == expected
     negatives = [d for d in docs if "hard-negative" in d.meta.get("tags", [])]
     assert len(negatives) >= 3
     assert all(not d.spans for d in negatives)

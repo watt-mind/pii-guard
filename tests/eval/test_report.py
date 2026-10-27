@@ -218,3 +218,29 @@ def test_validate_compares_nothing_but_rejects_bad_input(
     assert not Path("eval/results/index.json").exists()
     Path("eval/results/runs/broken.json").write_text('{"run_id": "broken"}')
     assert cli.main(["eval", "report", "--validate"]) == 2
+
+
+def test_old_strict_records_display_as_audit_and_stay_untouched(
+    records: list[dict[str, Any]], index: dict[str, Any]
+) -> None:
+    """Mode ``strict`` became ``audit`` (LAB-1186): renamed for display, never on disk."""
+    from pii_guard.eval.report_index import display_mode, display_record
+
+    old = [r for r in records if r["run_id"].endswith("-strict")]
+    assert old, "the committed runs include strict-mode records"
+    before = copy.deepcopy(old)
+    shown = [display_record(r) for r in old]
+    assert old == before  # the records themselves are not changed
+    for rec in shown:
+        assert "strict" not in rec["system"]["label"]
+        assert "audit" in rec["system"]["label"]
+        assert rec["run_id"].endswith("-strict")  # identity kept
+        assert "strict mode" not in json.dumps(rec.get("notes", []))
+        for cell in (rec.get("metrics") or {}).get("cells") or []:
+            assert cell["mode"] != "strict"
+    labels = [s["label"] for s in index["systems"].values()]
+    assert any(label.startswith("pii-guard audit") for label in labels)
+    assert not any("pii-guard strict" in label for label in labels)
+    assert display_mode("strict") == "audit" and display_mode("fast") == "fast"
+    page = render_page(index, headline_set=CONFIG["headline_set"], featured=index["featured"])
+    assert "pii-guard strict" not in page and "strict mode" not in page

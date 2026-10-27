@@ -688,7 +688,9 @@ def render_page(index: Mapping[str, Any], *, headline_set: str, featured: Sequen
     out.append("## Run log\n")
     out.append(
         "Newest first. `imported` runs were converted from earlier scorecards and Linear/PR "
-        "notes; `recorded` ones were written by `pii-guard eval --record`.\n"
+        "notes; `recorded` ones were written by `pii-guard eval --record`. Audit mode was "
+        "called `strict` until LAB-1186: run IDs ending in `-strict` are audit-mode runs, "
+        "kept under their original IDs.\n"
     )
     out.append(_run_log(index))
     out.append(

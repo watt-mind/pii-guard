@@ -20,17 +20,17 @@ def _card(tmp_path: Path) -> dict:
 
 def test_rows_name_systems_and_carry_cost(tmp_path):
     rules = _card(tmp_path)
-    strict = copy.deepcopy(rules)
-    strict["meta"]["detectors"] = ["rules", "ner", "llm"]
-    strict["run"]["llm"] = {"usd_per_1k_messages": 2.5}
-    strict["baselines"] = {
+    audit = copy.deepcopy(rules)
+    audit["meta"]["detectors"] = ["rules", "ner", "llm"]
+    audit["run"]["llm"] = {"usd_per_1k_messages": 2.5}
+    audit["baselines"] = {
         "presidio": {"overall": rules["overall"], "reversible": False},
     }
-    got = table.rows([strict, rules])
-    assert [r["system"] for r in got] == ["pii-guard rules", "pii-guard strict", "presidio"]
+    got = table.rows([audit, rules])
+    assert [r["system"] for r in got] == ["pii-guard rules", "pii-guard audit", "presidio"]
     assert got[1]["usd_per_1k"] == 2.5
     assert got[2]["roundtrip"] is None
-    md = table.render_table([strict, rules])
+    md = table.render_table([audit, rules])
     assert "| `en-smoke` | presidio |" in md
     assert "n/a" in md
     assert "2.50" in md

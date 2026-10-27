@@ -240,7 +240,7 @@ def test_no_field_reaches_the_upstream_raw(case: str) -> None:
     upstream = MockUpstream()
     client = TestClient(_app(upstream))
     body = {"model": "m", "messages": HELLO, **extra}
-    r = client.post("/v1/chat/completions", json=body, headers={"X-PII-Guard-Mode": "strict"})
+    r = client.post("/v1/chat/completions", json=body, headers={"X-PII-Guard-Mode": "audit"})
 
     forwarded = b"".join(req.content for req in upstream.requests).decode()
     assert not [v for v in GOLD if v in forwarded], "personal data reached the upstream"

@@ -10,12 +10,15 @@ is built: [architecture.md](architecture.md#gateway-the-proxy). Running and expo
 
 | Mode | Detection | Model call per message | Use it for |
 |---|---|---|---|
-| `fast` | rules + the in-process NER (rules only without a checkpoint) | none | production: the request path |
-| `strict` | rules + NER + an LLM detector | one, to the detector endpoint | offline audits and evaluation |
+| `fast` (default) | rules + the in-process NER (rules only without a checkpoint) | none: local, nothing leaves the machine | production: the request path |
+| `audit` | rules + NER + an LLM detector | one, to the detector endpoint (about 2 s, $2.5–3 per 1k messages) | a second opinion: sampled or offline quality checks, label generation, the benchmark upper bound |
 
-Choose per request with `X-PII-Guard-Mode`, or for the server with `PII_GUARD_GATEWAY_MODE`
-(the code default is still `strict`). Current numbers for both:
-[benchmarks.md](benchmarks.md#smoke).
+Fast mode is the default (`PII_GUARD_GATEWAY_MODE`, code default `fast`); opt into audit per
+request with `X-PII-Guard-Mode: audit`, or for the whole server with
+`PII_GUARD_GATEWAY_MODE=audit`. Audit mode is not meant for production traffic: it sends every
+message to the detector endpoint. Current numbers for both:
+[benchmarks.md](benchmarks.md#smoke). Old mode names and the rename:
+[operations.md](operations.md#modes).
 
 ## Run it
 
@@ -25,14 +28,13 @@ only ([models.md](models.md#ner-detector)).
 ```bash
 uv sync --extra ner
 export PII_GUARD_TENANT_KEY=$(openssl rand -hex 32)
-export PII_GUARD_GATEWAY_MODE=fast
 export PII_GUARD_NER_MODEL=/path/to/your/ner-checkpoint      # optional
 export PII_GUARD_UPSTREAM_BASE_URL=https://api.meta.ai/v1     # any OpenAI-compatible API
 export PII_GUARD_UPSTREAM_API_KEY=$META_API_KEY
 uv run pii-guard serve                                         # http://127.0.0.1:8787
 ```
 
-Strict mode adds the LLM detector. The default endpoint and model are Muse Spark Open on
+Audit mode adds the LLM detector. The default endpoint and model are Muse Spark Open on
 Baseten Model APIs (`https://inference.baseten.co/v1`, `meta-models/muse-spark-open-1026`), so
 only the key and the reasoning effort are needed:
 
@@ -44,7 +46,7 @@ export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low     # required: see docs/mode
 Muse Spark 1.3 on the Meta Model API works the same way (fictional text only): set
 `PII_GUARD_LLM_DETECTOR_URL=https://api.meta.ai/v1`, `PII_GUARD_LLM_DETECTOR_MODEL=muse-spark-1.3`
 and `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=minimal`. Which endpoint may see real data:
-[models.md](models.md#baseten-model-apis-production-detector).
+[models.md](models.md#baseten-model-apis-the-audit-mode-detector).
 
 ## From Python
 
@@ -88,7 +90,7 @@ for chunk in stream:
 | Header | Direction | Meaning |
 |---|---|---|
 | `X-PII-Guard-Session` | both | The conversation. Omit it to start one; the response carries it. Same session = same placeholders, and history is not detected again. Unknown or expired → 404. |
-| `X-PII-Guard-Mode` | request | `strict` (rules + LLM detector, the code default) or `fast` (rules + NER, no model call). |
+| `X-PII-Guard-Mode` | both | Request: `fast` (rules + NER, no model call; the default) or `audit` (+ the LLM detector). The response carries the mode that ran. |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
 | `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
