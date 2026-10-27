@@ -44,6 +44,7 @@ from pii_guard.detect.rules._base import (
     Rule,
     _Hit,
     context_before,
+    reference_or_amount_before,
 )
 from pii_guard.lang import LexiconUnavailable, lexicon, postcode_index
 from pii_guard.languages.hu.companies import find_company_person
@@ -77,7 +78,12 @@ def _find_taj(text: str) -> Iterator[_Hit]:
     for m in _TAJ_RE.finditer(text):
         if is_valid_taj(m.group(1) + m.group(3) + m.group(4)):
             # A mod-10 check passes for 1 in 10 random numbers: context matters more here.
-            score = 0.95 if context_before(text, m.start(), _TAJ_CONTEXT) else 0.8
+            if context_before(text, m.start(), _TAJ_CONTEXT):
+                score = 0.95
+            elif reference_or_amount_before(text, m.start()):
+                continue  # "Order number: 123456788", "INV-123456788", "$123 456 788"
+            else:
+                score = 0.8
             yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, score)
 
 

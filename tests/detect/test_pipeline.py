@@ -153,6 +153,72 @@ def test_authoritative_structured_span_keeps_boundaries() -> None:
     assert [(s.text, s.detector) for s in spans] == [("+36 30 123 4567", "rules")]
 
 
+# A same-type span from another detector that runs past the validated span keeps its rest,
+# as a span of another type does (LAB-1205): the rules cut the value short, not the LLM.
+@pytest.mark.parametrize(
+    ("text", "rule", "other", "entity_type", "rest"),
+    [
+        ("Write to user@example.xn--p1ai now", "user@example.xn", "user@example.xn--p1ai",
+         E.EMAIL, "p1ai"),
+        ("Write to x@ex.xn--qxam now", "x@ex.xn", "x@ex.xn--qxam", E.EMAIL, "qxam"),
+        ("Hívjon: +36 1 234 5678 / 123 mellék", "+36 1 234 5678", "+36 1 234 5678 / 123",
+         E.PHONE, "123"),
+        ("Hívjon: 06 1 234 5678", "1 234 5678", "06 1 234 5678", E.PHONE, "06"),
+    ],
+)  # fmt: skip
+@pytest.mark.parametrize("other_detector", ["llm", "ner"])
+def test_same_type_overlap_keeps_the_rest_of_the_longer_span(
+    text: str, rule: str, other: str, entity_type: EntityType, rest: str, other_detector: str
+) -> None:
+    spans = resolve_spans(
+        text,
+        [
+            span(text, rule, entity_type, "rules", 0.9),
+            span(text, other, entity_type, other_detector),
+        ],
+        detector_order=["rules", other_detector],
+    )
+    assert [(s.entity_type, s.text, s.detector) for s in spans] == sorted(
+        [(entity_type, rule, "rules"), (entity_type, rest, other_detector)],
+        key=lambda t: text.index(t[1]),
+    )
+    # The validated span keeps its boundaries and takes the higher score; nothing is lost.
+    assert next(s for s in spans if s.detector == "rules").score == 0.9
+    covered = {i for s in spans for i in range(s.start, s.end)}
+    assert all(i in covered for i in range(text.index(other), text.index(other) + len(other))
+               if text[i].isalnum())  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("text", "rule", "other"),
+    [
+        ("Hívj: +36 30 123 4567 (mobil)", "+36 30 123 4567", "+36 30 123 4567 (mobil)"),
+        ("E-mail: teszt@example.com", "teszt@example.com", "E-mail: teszt@example.com"),
+        ("Írjon a teszt@example.com-ra", "teszt@example.com", "teszt@example.com-ra"),
+    ],
+)
+def test_same_type_overlap_drops_label_words_and_suffixes(text: str, rule: str, other: str) -> None:
+    entity_type = E.EMAIL if "@" in rule else E.PHONE
+    spans = resolve_spans(
+        text, [span(text, rule, entity_type, "rules", 0.9), span(text, other, entity_type, "llm")]
+    )
+    assert [(s.text, s.detector) for s in spans] == [(rule, "rules")]
+
+
+def test_same_type_rest_merges_with_other_detectors_rest() -> None:
+    text = "Hívjon: +36 1 234 5678 / 123 mellék"
+    spans = resolve_spans(
+        text,
+        [
+            span(text, "+36 1 234 5678", E.PHONE, "rules", 0.9),
+            span(text, "+36 1 234 5678 / 12", E.PHONE, "ner", 0.7),
+            span(text, "+36 1 234 5678 / 123", E.PHONE, "llm", 0.85),
+        ],
+        detector_order=["rules", "ner", "llm"],
+    )
+    assert [(s.text, s.detector) for s in spans] == [("+36 1 234 5678", "rules"), ("123", "llm")]
+
+
 def test_authoritative_span_beats_longer_llm_span_of_another_type() -> None:
     text = "Írj: teszt.elek@example.com most."
     spans = resolve_spans(

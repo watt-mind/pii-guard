@@ -7,7 +7,11 @@ results (the "resolver" in ``docs/architecture.md``):
    detector flagged is left out. Exception: a span from an *authoritative* detector (default
    ``rules``) for a *structured* type (checksum- or format-validated identifiers such as
    ``EMAIL``, ``BANK_ACCOUNT``, ``NATIONAL_ID_HU_TAX``) keeps its exact boundaries and absorbs
-   overlapping same-type spans from other detectors.
+   the part of an overlapping same-type span from another detector that it covers. The rest
+   of that span is kept when it can be the rest of the value (it holds a digit, or continues
+   the span without a space): a longer detection such as ``user@example.xn--p1ai`` against a
+   rule's ``user@example.xn``, or a phone number with its extension, never un-masks text,
+   while a label word the other detector took along (``(mobil)``) stays unmasked.
 2. **Different types, overlapping** spans are resolved greedily by priority:
 
    0. spans of an *overriding* detector (default ``known``, the values an application
@@ -34,6 +38,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Sequence
+from copy import copy
 from dataclasses import dataclass
 
 from pii_guard.detect.normalize import NormalizedText, normalize_for_detection
@@ -88,8 +93,8 @@ def _is_authoritative(span: Span, authoritative: frozenset[str]) -> bool:
     return span.detector in authoritative and span.entity_type in STRUCTURED_TYPES
 
 
-def _merge_same_type(cands: list[_Cand]) -> list[_Cand]:
-    """Union overlapping same-type candidates; authoritative ones absorb the others."""
+def _merge_same_type(text: str, cands: list[_Cand]) -> list[_Cand]:
+    """Union overlapping same-type candidates; authoritative ones absorb what they cover."""
     out: list[_Cand] = []
     by_type: dict[EntityType, list[_Cand]] = {}
     for c in cands:
@@ -104,7 +109,7 @@ def _merge_same_type(cands: list[_Cand]) -> list[_Cand]:
             for c in rest:
                 if c.start < a.end and a.start < c.end:
                     a.score = max(a.score, c.score)
-        rest = [c for c in rest if not any(c.start < a.end and a.start < c.end for a in auth)]
+        rest = [piece for c in rest for piece in _outside(text, c, auth)]
         # Authoritative spans of the same type never overlap each other in practice; if they
         # do, keep both and let the cross-type pass split them.
         out.extend(auth)
@@ -122,6 +127,48 @@ def _merge_same_type(cands: list[_Cand]) -> list[_Cand]:
                 merged.append(c)
         out.extend(merged)
     return out
+
+
+def _outside(text: str, cand: _Cand, auth: list[_Cand]) -> list[_Cand]:
+    """``cand`` without the characters the same-type ``auth`` spans cover.
+
+    What is left of ``cand`` is kept (trimmed) when it can be the rest of the value the
+    validated span cut short: it holds a digit (a phone extension ``/ 123``), or it continues
+    the authoritative span without a space (a punycode TLD ``--p1ai``). A word set off by a
+    space (``(mobil)``, ``E-mail:``) is the other detector's over-reach and is dropped, and so
+    is an inflectional suffix right after the span (``...@example.com-ra``), which stays
+    outside the placeholder as the vault keeps it.
+    """
+    covering = [a for a in auth if cand.start < a.end and a.start < cand.end]
+    if not covering:
+        return [cand]
+    pieces: list[_Cand] = []
+    for ps, pe in _subtract(cand.start, cand.end, [(a.start, a.end) for a in covering]):
+        trimmed = _trim(text, ps, pe)
+        if trimmed is None:
+            continue
+        ts, te = trimmed
+        if not any(ch.isdigit() for ch in text[ts:te]) and not any(
+            _continues(text, a, ts, te) for a in covering
+        ):
+            continue
+        piece = copy(cand)
+        piece.start, piece.end = ts, te
+        pieces.append(piece)
+    return pieces
+
+
+def _continues(text: str, a: _Cand, start: int, end: int) -> bool:
+    """``text[start:end]`` is joined to span ``a`` without a space, and is not a suffix of it."""
+    if a.end <= start:
+        if a.end + len(following_suffix(text, a.end)) >= end:
+            return False
+        gap = text[a.end : start]
+    elif end <= a.start:
+        gap = text[end : a.start]
+    else:
+        return False
+    return not any(ch.isspace() for ch in gap)
 
 
 def _subtract(start: int, end: int, taken: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -190,7 +237,7 @@ def resolve_spans(
             )
         )
 
-    cands = _merge_same_type(cands)
+    cands = _merge_same_type(text, cands)
 
     def disagrees(c: _Cand) -> bool:
         return any(
