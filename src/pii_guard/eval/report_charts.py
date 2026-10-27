@@ -9,7 +9,9 @@ the run dates and the commits. Output depends only on the index, so it is byte-s
 - :func:`by_language`: overlap F1 and full leak per language, per system;
 - :func:`progress`: leak rate of each pii-guard system over time, with the best so far;
 - :func:`type_recall_heatmap`: overlap recall per entity type and system;
-- :func:`visual_recall`: image-region recall per region type, per visual run.
+- :func:`visual_recall`: image-region recall per region type, per visual run;
+- :func:`latency`: what the gateway adds per request (p50 / p95 per mode, concurrency and
+  streaming) and the stage breakdown of the p50 overhead.
 """
 
 from __future__ import annotations
@@ -20,7 +22,14 @@ from collections.abc import Mapping, Sequence
 from html import escape
 from typing import Any
 
-__all__ = ["by_language", "leak_vs_latency", "progress", "type_recall_heatmap", "visual_recall"]
+__all__ = [
+    "by_language",
+    "latency",
+    "leak_vs_latency",
+    "progress",
+    "type_recall_heatmap",
+    "visual_recall",
+]
 
 W, H = 1600, 900
 FONT = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
@@ -806,3 +815,187 @@ def visual_recall(index: Mapping[str, Any]) -> str:
         body,
         caption,
     )
+
+
+# --- Gateway latency ----------------------------------------------------------------------
+
+#: Stage colours (Okabe-Ito), in pipeline order; ``other`` is untimed glue (HTTP, scheduling).
+STAGE_COLORS = {
+    "parse": "#56B4E9",
+    "detect": "#0072B2",
+    "image": "#CC79A7",
+    "mask": "#009E73",
+    "forward": "#E69F00",
+    "unmask": "#D55E00",
+    "response": "#F0E442",
+    "other": "#BBBBBB",
+}
+
+
+def latest_latency(index: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """The newest latency run of each system, in first-seen order."""
+    latest: dict[str, Mapping[str, Any]] = {}
+    for run in index.get("latency", []):
+        latest[run["system"]] = run
+    return list(latest.values())
+
+
+def latency_label(run: Mapping[str, Any]) -> str:
+    """``fast: rules + ner`` from a latency run's system."""
+    mode = str(run["system"]).split(":")[1] if ":" in str(run["system"]) else "?"
+    names = [d for d in run["detectors"] if d not in ("known", "visual")]
+    return f"{mode}: " + (" + ".join(names) or "none")
+
+
+def stage_shares(cell: Mapping[str, Any]) -> list[tuple[str, float]]:
+    """p50 of each own stage, plus ``other`` = overhead p50 minus their sum (>= 0)."""
+    stages = cell["stages_ms"]
+    out = [
+        (name, float((stages.get(name) or {}).get("p50") or 0.0))
+        for name in STAGE_COLORS
+        if name != "other"
+    ]
+    overhead = float((cell["overhead_ms"] or {}).get("p50") or 0.0)
+    out.append(("other", max(overhead - sum(v for _, v in out), 0.0)))
+    return out
+
+
+def latency(index: Mapping[str, Any]) -> str:
+    runs = latest_latency(index)
+    rows: list[tuple[str, Mapping[str, Any], str]] = []
+    for k, run in enumerate(runs):
+        for cell in run["cells"]:
+            label = f"{latency_label(run)}, c={cell['concurrency']}" + (
+                ", stream" if cell["stream"] else ""
+            )
+            rows.append((label, cell, PALETTE_LATENCY[k % len(PALETTE_LATENCY)]))
+    body = [
+        _text(
+            56,
+            112,
+            "Latency pii-guard adds to an LLM call (total minus upstream), mock upstream with a "
+            "fixed delay",
+            size=24,
+            fill=MUTED,
+        )
+    ]
+    # Left: overhead p50 (bar) and p95 (tick), log scale.
+    lx0, lx1, ly0, ly1 = 420, 900, 190, 720
+    values = [
+        v
+        for _, c, _ in rows
+        for v in ((c["overhead_ms"] or {}).get("p50"), (c["overhead_ms"] or {}).get("p95"))
+        if v
+    ]
+    lo = 10 ** math.floor(math.log10(max(min(values), 0.01))) if values else 0.1
+    hi = 10 ** math.ceil(math.log10(max(values))) if values else 10.0
+    hi = max(hi, lo * 10)
+
+    def sx(ms: float) -> float:
+        ms = min(max(ms, lo), hi)
+        return lx0 + (math.log10(ms) - math.log10(lo)) / (math.log10(hi) - math.log10(lo)) * (
+            lx1 - lx0
+        )
+
+    body.append(_text(56, 165, "Overhead per request: p50 bar, p95 tick", size=24, weight="700"))
+    decade = lo
+    while decade <= hi * 1.0001:
+        x = sx(decade)
+        body.append(
+            f'<line x1="{_n(x)}" y1="{ly0}" x2="{_n(x)}" y2="{ly1}" stroke="{GRID}" '
+            'stroke-width="2"/>'
+        )
+        body.append(_text(x, ly1 + 32, _ms(decade), size=20, fill=MUTED, anchor="middle"))
+        decade *= 10
+    rh = (ly1 - ly0) / max(len(rows), 1)
+    bar = min(30.0, rh * 0.6)
+    for i, (label, cell, color) in enumerate(rows):
+        y = ly0 + i * rh + rh / 2
+        p = cell["overhead_ms"] or {}
+        body.append(_text(lx0 - 14, y + 7, label, size=19, anchor="end"))
+        if p.get("p50"):
+            body.append(
+                f'<rect x="{lx0}" y="{_n(y - bar / 2)}" width="{_n(max(sx(p["p50"]) - lx0, 2))}" '
+                f'height="{_n(bar)}" fill="{color}"/>'
+            )
+        if p.get("p95"):
+            x = sx(p["p95"])
+            body.append(
+                f'<line x1="{_n(x)}" y1="{_n(y - bar / 2 - 4)}" x2="{_n(x)}" '
+                f'y2="{_n(y + bar / 2 + 4)}" stroke="{INK}" stroke-width="4"/>'
+            )
+        if p.get("p50"):
+            body.append(
+                _text(
+                    max(sx(p.get("p95") or p["p50"]), sx(p["p50"])) + 12,
+                    y + 7,
+                    f"{_ms(p['p50'])} / {_ms(p.get('p95'))}",
+                    size=18,
+                    fill=MUTED,
+                )
+            )
+    body.append(
+        f'<line x1="{lx0}" y1="{ly1}" x2="{lx1}" y2="{ly1}" stroke="{AXIS}" stroke-width="2"/>'
+    )
+    # Right: where the p50 overhead goes (c=1, not streamed), as shares of the bar.
+    rx0, rx1 = 1080, 1544
+    body.append(
+        _text(rx0 - 20, 165, "Where it goes (p50, c=1, not streamed)", size=24, weight="700")
+    )
+    ry = 210
+    for run in runs:
+        cell = next(
+            (c for c in run["cells"] if c["concurrency"] == 1 and not c["stream"]),
+            run["cells"][0] if run["cells"] else None,
+        )
+        if cell is None:
+            continue
+        shares = stage_shares(cell)
+        total = sum(v for _, v in shares) or 1.0
+        body.append(_text(rx0 - 20, ry, latency_label(run), size=20, weight="600"))
+        x = float(rx0 - 20)
+        width = rx1 - (rx0 - 20)
+        for name, v in shares:
+            w = v / total * width
+            if w <= 0:
+                continue
+            body.append(
+                f'<rect x="{_n(x)}" y="{ry + 12}" width="{_n(w)}" height="40" '
+                f'fill="{STAGE_COLORS[name]}"/>'
+            )
+            if w >= 70:
+                ink = BG if name in ("detect", "unmask") else INK
+                body.append(_text(x + w / 2, ry + 40, _ms(v), size=17, fill=ink, anchor="middle"))
+            x += w
+        ry += 110
+    lx, ly = float(rx0 - 20), float(max(ry, 560))
+    for name, color in STAGE_COLORS.items():
+        tw = text_width(name, 19) + 46
+        if lx + tw > rx1 + 10:
+            lx, ly = float(rx0 - 20), ly + 34
+        body.append(f'<rect x="{_n(lx)}" y="{_n(ly - 18)}" width="20" height="20" fill="{color}"/>')
+        body.append(_text(lx + 28, ly, name, size=19))
+        lx += tw
+    delays = sorted({f"{r['upstream_delay_ms']:g} ms" for r in runs})
+    hardware = sorted({str(r["hardware"]) for r in runs if r.get("hardware")})
+    caption = [
+        f"pii-guard bench latency: fixed fictional corpus, a new session per request, mock "
+        f"upstream delay {', '.join(delays) or 'n/a'}; c = concurrent requests.",
+        "Overhead = gateway total - time waiting on the upstream; 'other' = untimed work (HTTP, "
+        "scheduling). Hardware: " + ("; ".join(hardware) or "n/a") + ".",
+        (
+            f"Runs {_span([r['date'] for r in runs])} · commits "
+            f"{', '.join(sorted({_short(r['commit']) for r in runs}))} · generated by `pii-guard "
+            "eval report` from eval/results/runs/"
+        ),
+    ]
+    return _svg(
+        "Gateway overhead",
+        "Horizontal bars of the p50 and p95 latency pii-guard adds per request for each mode, "
+        "concurrency and streaming setting, and stacked bars of where the p50 overhead goes.",
+        body,
+        caption,
+    )
+
+
+PALETTE_LATENCY = ["#0072B2", "#009E73", "#D55E00", "#CC79A7", "#332288", "#999933"]

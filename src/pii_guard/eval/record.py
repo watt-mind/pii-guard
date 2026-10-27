@@ -743,6 +743,8 @@ def validate(record: Mapping[str, Any], schema: Mapping[str, Any] | None = None)
         errors.append("$.metrics: a text run needs 'overall' and 'languages'")
     if kind == "visual" and "by_region_type" not in metrics:
         errors.append("$.metrics: a visual run needs 'by_region_type'")
+    if kind == "latency" and "cells" not in metrics:
+        errors.append("$.metrics: a latency run needs 'cells'")
     if not str(record["run_id"]).startswith(record["date"]):
         errors.append("$.run_id: must start with the run date")
     return errors

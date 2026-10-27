@@ -37,6 +37,13 @@ def build_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     lang.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
+
+    bench = sub.add_parser(
+        "bench",
+        help="gateway latency benchmark and the mock upstream (docs/operations.md)",
+        add_help=False,
+    )
+    bench.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser
 
 
@@ -44,12 +51,19 @@ def _serve(args: argparse.Namespace) -> int:
     import uvicorn
 
     from pii_guard.config import get_settings
+    from pii_guard.observability import ObservabilitySettings, TrafficLogConfigError, check_bind
 
     settings = get_settings()
+    host = args.host or settings.host
+    try:
+        check_bind(ObservabilitySettings().traffic_log, host)
+    except TrafficLogConfigError as exc:
+        print(f"pii-guard serve: {exc}", file=sys.stderr)
+        return 2
     uvicorn.run(
         "pii_guard.api.app:create_app",
         factory=True,
-        host=args.host or settings.host,
+        host=host,
         port=args.port or settings.port,
         reload=args.reload,
         log_level=settings.log_level,
@@ -69,8 +83,16 @@ def _lang(args: argparse.Namespace) -> int:
     return lang_main(args.args)
 
 
+def _bench(args: argparse.Namespace) -> int:
+    from pii_guard.bench.cli import main as bench_main
+
+    return bench_main(args.args)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "bench":
+        return _bench(argparse.Namespace(args=argv[1:]))
     if argv and argv[0] == "eval":
         # Hand everything after "eval" to the eval CLI untouched (it owns its own flags).
         return _eval(argparse.Namespace(args=argv[1:]))
