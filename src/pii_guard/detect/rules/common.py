@@ -14,7 +14,7 @@ import re
 from collections.abc import Iterator
 
 from pii_guard.detect.checksums import IBAN_LENGTHS, is_valid_iban
-from pii_guard.detect.rules._base import Rule, _Hit
+from pii_guard.detect.rules._base import Rule, _Hit, context_before, reference_or_amount_before
 from pii_guard.types import EntityType
 
 __all__ = ["RULES", "is_valid_card_number", "luhn_check_digit"]
@@ -156,6 +156,15 @@ def is_valid_card_number(digits: str) -> bool:
     return _card_issuer_ok(digits) and luhn_check_digit(digits[:-1]) == int(digits[-1])
 
 
+# A card or account label anywhere shortly before the number: it is then a card number even
+# after a reference word ("Kártyaszám (rendelés): 4111 ..."). Hungarian "számla" alone is an
+# invoice, "számlaszám" / "bankszámla" an account.
+_CARD_CONTEXT = (
+    "card", "kártya", "kartya", "karte", "carte", "tarjeta", "visa", "mastercard", "maestro",
+    "amex", "american express", "discover", "jcb", "unionpay", "diners", "credit", "debit",
+    "account", "számlaszám", "szamlaszam", "bankszámla", "bankszamla", "konto",
+)  # fmt: skip
+
 # Printed in groups of 4 ("4111 1111 1111 1111", Amex "3782 822463 10005") with one consistent
 # separator, or compact. Never part of a longer number.
 _CARD_RE = re.compile(
@@ -173,6 +182,13 @@ def _find_payment_card(text: str) -> Iterator[_Hit]:
     for m in _CARD_RE.finditer(text):
         digits = "".join(ch for ch in m.group() if ch.isdigit())
         if is_valid_card_number(digits):
+            # A Luhn check passes for 1 in 10 numbers: right after an order, SKU or ticket
+            # label, an ID prefix or a currency it is that number, unless a card cue says
+            # otherwise (LAB-1227).
+            if not context_before(text, m.start(), _CARD_CONTEXT) and (
+                reference_or_amount_before(text, m.start())
+            ):
+                continue
             score = 0.9 if m.group("compact") else 0.95
             yield _Hit(m.start(), m.end(), EntityType.BANK_ACCOUNT, score)
 

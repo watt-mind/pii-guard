@@ -61,3 +61,20 @@ _REFERENCE_WINDOW = 40
 def reference_or_amount_before(text: str, start: int) -> bool:
     """True if an order/invoice/reference label, an ID prefix or a currency ends at ``start``."""
     return _REFERENCE_BEFORE_RE.search(text, max(0, start - _REFERENCE_WINDOW), start) is not None
+
+
+# A legal-form word after a settlement makes it part of a company name ("1999 Budapest Kft.",
+# "Budapest Bank Zrt.", "10115 Berlin GmbH"), so the number before it is not a postcode. Up to
+# two more capitalised words of the name may stand between the place and the form (LAB-1227).
+_LEGAL_FORM = (
+    r"nonprofit[ \t]+kft|kft|zrt|nyrt|bt|kkt|kht|rt|gmbh|mbh|ag|kg|ohg|ug|ltd|llc|inc|plc|corp"
+)
+_LEGAL_FORM_AFTER_RE = re.compile(
+    r"(?:[ \t]+(?=[A-ZÀ-ÖØ-ÞŐŰ])\w[\w&\-]*){0,2}?"
+    rf"[ \t]+(?i:{_LEGAL_FORM})\.?(?![\w])"
+)
+
+
+def legal_form_after(text: str, end: int) -> bool:
+    """True if a legal-form word (``Kft.``, ``GmbH``, ``Ltd``) follows ``end`` within a name."""
+    return _LEGAL_FORM_AFTER_RE.match(text, end) is not None
