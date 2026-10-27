@@ -1,0 +1,291 @@
+# Why pii-guard
+
+What pii-guard does that we did not find elsewhere, and the evidence for each claim. Every
+number links to a committed file on `develop`: a run record, a scorecard, a test or a decision
+record. Where the only source is a write-up of a run whose scorecard is not committed, the
+link goes to that write-up and says so. All data behind these numbers is fictional
+([ADR 0005](decisions/0005-synthetic-data-only.md)).
+
+**Status** means: **shipped** = merged to `develop`; **in review** = pull request open;
+**in progress** / **planned** = tracked on the named ticket, not merged.
+
+As of 2026-10-27. When a number changes, update it here, in the README's "Why pii-guard"
+section, in [submission.md](submission.md) and in [journey.md](journey.md) together.
+
+| # | Differentiator | Headline evidence | Status |
+|---|---|---|---|
+| 1 | [Reversible placeholders, consistent for a whole session](#1-reversible-placeholders-consistent-for-a-whole-session) | 100 % round trip; one placeholder per person on every repeated mention (`hu-smoke`) | shipped |
+| 2 | [Grammar-aware: Hungarian inflection in and out](#2-grammar-aware-hungarian-inflection-in-and-out) | inflected-name leak 18/30 → 0/30 | shipped |
+| 3 | [Built on Meta's models end to end](#3-built-on-metas-models-end-to-end) | 6 Meta models, each with a job and a reason | shipped; Glimmer LoRA in progress |
+| 4 | [Two modes with published leak, latency and cost](#4-two-modes-with-published-leak-latency-and-cost) | strict: 0.9 % / 0.0 % leak at 1.8 s / 1.2 s, ~$2–2.50 per 1k messages | shipped |
+| 5 | [Head-to-head with Presidio, LLM Guard and PrivAiTe](#5-head-to-head-with-presidio-llm-guard-and-privaite) | Hungarian leak 1.0 % vs 19.6–49.5 % | shipped; refresh in progress |
+| 6 | [The LLM can only point, never write; red-teamed](#6-the-llm-can-only-point-never-write-red-teamed) | prompt-injection leak 3.4 % → 0.0 % (two runs), no partial leaks left | shipped |
+| 7 | [Honest about re-identification](#7-honest-about-re-identification) | exposure 1.4 % from masked text; 39.9 % with a 5-name candidate list | shipped |
+| 8 | [A drop-in gateway that fails closed](#8-a-drop-in-gateway-that-fails-closed) | masks tools, metadata and response schemas; rejects pasted placeholders | shipped |
+| 9 | [Images: faces, signatures, machine-readable zones](#9-images-faces-signatures-machine-readable-zones) | portrait recall 90.8 % on official specimen IDs; MRZ 0 % → 76.7 % | shipped; text on IDs in progress; labelled images planned |
+| 10 | [Hungarian depth as a showcase for hard languages](#10-hungarian-depth-as-a-showcase-for-hard-languages) | names inside company names 61.1 % → 0 % leaked | shipped |
+| 11 | [Add a language with a checklist](#11-add-a-language-with-a-checklist) | German pack: every structured identifier found, other languages unchanged | shipped |
+| 12 | [Known values and per-type policies](#12-known-values-and-per-type-policies) | pre-loaded values: leak 93.3 % → 0 % | shipped |
+| 13 | [Benchmarking in the open](#13-benchmarking-in-the-open) | 61 run records, report checked in CI, about $12 total spend | shipped |
+
+## 1. Reversible placeholders, consistent for a whole session
+
+Most redaction tools replace a value with `[REDACTED]` or `<PERSON>`, so the model's answer
+can't name the person you asked about. pii-guard swaps each value for a keyed placeholder
+(`[[PERSON_525263]]`), the same one every time that value appears in the conversation, and
+puts the real value back in the answer, also while it streams, also inside tool-call
+arguments. Placeholders are HMAC-derived, so they are unlinkable across sessions and tenants,
+and the mapping never leaves pii-guard's vault.
+
+- **Evidence:** round trip 100 % (every document unmasks back to the original exactly) and
+  placeholder consistency 97.2 % of entities, 100 % of entities mentioned more than once, on
+  `hu-smoke` with rules + Muse Spark Open; the remaining 2.8 % are values not masked at all,
+  which the metric counts as inconsistent
+  ([run record](../eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json)). Design:
+  [ADR 0007](decisions/0007-keyed-pseudonyms.md). Streaming: placeholders split across chunks
+  are held back until complete
+  ([tests/vault/test_vault_stream.py](../tests/vault/test_vault_stream.py)).
+- **Status:** shipped (LAB-1082, LAB-1100). Exact casing on restore is opt-in (LAB-1119).
+
+## 2. Grammar-aware: Hungarian inflection in and out
+
+In Hungarian a name changes with every case: `Próba Zsuzsanna`, `Próba Zsuzsannának`,
+`Próba Zsuzsannával`. pii-guard keys every form on its lemma, so all of them get the same
+placeholder, keeps the case ending outside it (`[[PERSON_x]]nak`) so the model still writes
+grammatical sentences, and re-inflects the stem on unmask. Grammar lives in the language pack,
+so every detector benefits.
+
+- **Evidence:** on the inflection fixtures
+  ([eval/fixtures/hu-inflection.jsonl](../eval/fixtures/hu-inflection.jsonl)), leaked values
+  18/30 → **0/30** and "same person, same placeholder" 11/18 → **18/18**
+  ([journey.md, milestone 10](journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333);
+  the scorecard is not committed). The behaviour is pinned by property tests
+  ([tests/vault/test_vault_inflection_hu.py](../tests/vault/test_vault_inflection_hu.py)).
+- **Status:** shipped (LAB-1115). Old-orthography names with `th` and `cz` (`Kiss Tóthtal`,
+  `Gipsz Kováczcal`) and long vowels the model writes on its own are masked and restored too (LAB-1131,
+  [tests/vault/test_vault_inflection_hu_orthography.py](../tests/vault/test_vault_inflection_hu_orthography.py)).
+
+## 3. Built on Meta's models end to end
+
+Each Meta model does the job it is best at, under one rule: **anything that sees real personal
+data is an open-weights model you can run yourself; hosted models only see fictional or
+masked data** ([models.md](models.md)).
+
+| Role | Meta model | Why this model | Evidence | Status |
+|---|---|---|---|---|
+| Strict-mode detector (production) | **Muse Spark Open** (open weights) on Baseten Model APIs, or your own GPUs | Open weights, so the detector can move inside your boundary; Muse Spark quality at 1.2–1.8 s p50 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md) | shipped |
+| Teacher for the fast-mode NER | **Muse Glimmer 30B** (open weights, Apache-2.0), vLLM on one H100 | Best zero-shot quality we measured (F1 99.3, leak 0.0 % on the smoke sets), too slow for the request path (9.4 s p50), so we distilled it | [run record](../eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [models.md](models.md#distilled-from-muse-glimmer) | shipped |
+| Fast-mode NER student | **XLM-RoBERTa** base and large (FacebookAI, MIT) | Multilingual encoder, in-process, tens of milliseconds | [eval/results/ner/distilled/](../eval/results/ner/distilled/) | shipped (train it yourself; weights not published yet) |
+| Glimmer as a fine-tuned detector | **Muse Glimmer** LoRA on Fireworks | An answer-only detector that is fast enough for the request path | LAB-1109 | in progress |
+| Synthetic benchmark and distillation corpus | **Muse Spark 1.3**, contributor tier | Writes realistic Hungarian and English documents around fictional identities; $1.05 for the 5,004-call distillation corpus | [models.md](models.md#distilled-from-muse-glimmer) | shipped |
+| Red-team attacker | **Muse Spark Open**, and **Muse Spark 1.3** for comparison | Meta's own model tries to undo the masking | [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md) | shipped |
+| Fictional ID specimens | **Muse Image** | Portraits, signatures and stamps of people who don't exist, so image tests need no real ID | [eval/fixtures/visual/generation.json](../eval/fixtures/visual/generation.json) | shipped |
+| Faces, ID photos, signatures in images | **SAM 3.1** (Meta Model API) | Finds regions from a text prompt | [eval/results/visual/specimens.md](../eval/results/visual/specimens.md) | shipped |
+| Downstream model in the demo | **Muse Spark 1.3** | Only ever sees placeholders | [README, gateway](../README.md#gateway-drop-in-for-any-openai-compatible-client) | shipped |
+
+The pattern: use the big model where its cost doesn't matter (writing fictional data,
+labelling it, attacking the guard) and ship a small, fast model distilled from it.
+
+- **Status:** shipped (LAB-1086, LAB-1087, LAB-1089, LAB-1108, LAB-1121, LAB-1128); the
+  Glimmer LoRA fine-tune is in progress (LAB-1109).
+
+## 4. Two modes with published leak, latency and cost
+
+**Strict** mode (the gateway default) runs rules plus the LLM detector; **fast** mode runs
+rules plus the in-process NER with no model call. Both numbers are published, including the
+cost per 1,000 messages, so you can choose.
+
+| Mode | Language | Leak | F1 (overlap) | p50 latency | $ / 1k messages | Source |
+|---|---|---:|---:|---:|---:|---|
+| strict (rules + Muse Spark Open, Baseten) | Hungarian | **0.9 %** | 98.4 | 1.8 s | 2.42 | [hu-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json) |
+| strict | English | **0.0 %** | 97.1 | 1.2 s | 1.99 | [en-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-en-smoke.json) |
+| fast (rules + distilled NER, large) | English | **0.0 %** | 98.5 | 36 ms (MPS) | no API call | [run record](../eval/results/runs/2026-10-27-distilled-large-en-smoke.json), [latency](../eval/results/ner/distilled/latency-large.json) |
+| fast | Hungarian | 0.9 % | 97.9 | 36 ms (MPS) | no API call | [models.md](models.md#distilled-from-muse-glimmer) (no committed scorecard yet; the committed one, before the ID rules, says 10.3 %) |
+| rules only (floor) | Hungarian / English | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [ner/distilled/rules/](../eval/results/ner/distilled/rules/) |
+
+- **Caveats:** the smoke sets are small (31 Hungarian, 10 English documents; one leaked value
+  is about 1 point on Hungarian and 3 on English). NER latency was measured under heavy
+  unrelated load; CPU p50 is 241 ms. Fast mode needs a NER checkpoint you train yourself
+  ([models.md](models.md#ner-detector)); without one it is rules only.
+- **Status:** shipped. A committed fast-mode Hungarian scorecard comes with the fresh
+  comparison (LAB-1148, in progress).
+
+## 5. Head-to-head with Presidio, LLM Guard and PrivAiTe
+
+The three closest open-source tools, each in its default configuration, scored with the same
+scorer on the same hand-written fixtures.
+
+| `hu-smoke` (28 docs) | F1 | Leak | Over-masking |
+|---|---:|---:|---:|
+| Presidio | 70.1 | 28.9 | 15.5 |
+| LLM Guard | 49.2 | 49.5 | 41.7 |
+| PrivAiTe | 50.2 | 19.6 | 26.6 |
+| **pii-guard rules + Muse Spark 1.3** | **98.2** | **1.0** | **0.0** |
+
+- **Evidence:** [eval/results/2026-10-26-baselines/comparison.md](../eval/results/2026-10-26-baselines/comparison.md).
+  On English the gap is smaller: PrivAiTe also leaks 0.0 %, at 22.0 % over-masking.
+- **Caveats:** this run predates the distilled NER, the Hungarian ID and address rules and the
+  Baseten detector; the sets are small. The comparison runs on the hand-written sets because
+  the Muse-generated ones flatter a Muse-based detector
+  ([evaluation.md](evaluation.md#reading-the-numbers)).
+- **Status:** shipped (LAB-1098). A fresh comparison with today's fast and strict modes and a
+  public benchmark (ai4privacy OpenPII-1M) is **in progress** (LAB-1148). An image baseline
+  against Presidio Image Redactor is **planned** (LAB-1164).
+
+## 6. The LLM can only point, never write; red-teamed
+
+The LLM detector returns the strings it thinks are personal data. pii-guard finds each one in
+the original text itself, drops anything the model invented, and lets checksum-validated rules
+keep their spans. A hallucination can't add text and a disagreement can't unmask anything: the
+model can only add spans. Then we attacked it: 62 fictional messages in 15 attack classes
+(instructions to stop reporting, fake end-of-JSON, role-play, zero-width characters,
+homoglyphs, base64, spoofed placeholders, long padding and more).
+
+- **Evidence:** leak on the injection set 3.4 % before hardening, **0.0 %** in two runs after
+  (and 0.0 % with Muse Spark 1.3); 0 refusals and 0 invalid outputs in every run; no
+  regression on the smoke sets
+  ([eval/results/2026-10-27-injection](../eval/results/2026-10-27-injection/README.md),
+  run records [run 1](../eval/results/runs/2026-10-27-injection-spark-open-run1.json),
+  [run 2](../eval/results/runs/2026-10-27-injection-spark-open-run2.json)).
+- **Then the partial leaks:** 3 values (zero-width characters inside e-mail addresses) were
+  masked only in part, because only the LLM detector cleaned invisible characters. Now every
+  detector sees normalised text and all 175 injection values are masked whole: partial leak
+  1.7 % → **0.0 %**
+  ([run record](../eval/results/runs/2026-10-27-injection-spark-open-after-normalise.json),
+  [journey.md, milestone 20](journey.md#20-every-detector-sees-normalised-text-2026-10-27)).
+- **Status:** shipped (LAB-1107, LAB-1146).
+
+## 7. Honest about re-identification
+
+Masking a value doesn't make a document anonymous. We gave Meta's own model the masked text
+and asked it to recover every value, with and without a list of five candidates (the true
+value and four decoys), on 81 fictional documents in Hungarian, English and German.
+
+| Masking | Context | Re-identified | Chance | Exposure |
+|---|---|---:|---:|---:|
+| rules + Muse Spark Open | masked text only | 0.2 % | – | **1.4 %** |
+| rules + Muse Spark Open | with 5 candidates | 39.2 % | 20.0 % | 39.9 % |
+
+- **Evidence:** [eval/results/2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md).
+- **What we conclude:** placeholders hold against reconstruction from the text alone, but
+  someone who already holds a short candidate list links a document to the right person about
+  twice as often as chance. pii-guard is **pseudonymisation, not anonymisation**, and the docs
+  say so ([privacy-model.md](privacy-model.md)). Generalising the remaining context is filed
+  (LAB-1152, triage).
+- **Status:** shipped (LAB-1088).
+
+## 8. A drop-in gateway that fails closed
+
+Adopting pii-guard is a change of API base URL: it is an OpenAI-compatible
+`/v1/chat/completions` proxy with streaming, tool calls and per-message detection caching
+(chat clients resend the whole history; only new messages are detected). It masks the places
+agents actually leak data: tool definitions, `response_format` JSON schemas and request
+metadata, not just message text.
+
+- **Evidence:** tools, legacy functions, response schemas and metadata are masked and
+  streamed tool calls restored
+  ([tests/gateway/test_request_tools_metadata.py](../tests/gateway/test_request_tools_metadata.py));
+  a placeholder the session issued earlier and pasted back into a later message is refused
+  with 422 and nothing is forwarded, because restoring it would put a real value into text
+  that was never masked
+  ([tests/gateway/test_gateway_placeholder_input.py](../tests/gateway/test_gateway_placeholder_input.py),
+  [contracts.md](contracts.md)).
+  A detector timeout, model error or malformed answer blocks the request; nothing is sent
+  unmasked ([ADR 0006](decisions/0006-fail-closed.md)).
+- **Status:** shipped (LAB-1100, LAB-1113, LAB-1092).
+
+## 9. Images: faces, signatures, machine-readable zones
+
+Scans and photos carry personal data too. pii-guard finds faces, ID photos and signatures with
+SAM 3.1, finds machine-readable zones (MRZ) on ID documents by their OCR layout, fills the
+regions and strips metadata before the image goes anywhere.
+
+| Set | Portrait | Signature | MRZ | Source |
+|---|---:|---:|---:|---|
+| 65 official specimen ID documents, 24 countries | **90.8 %** | 83.8 % | 0 % → **76.7 %** | [specimens.md](../eval/results/visual/specimens.md); MRZ: [journey.md, milestone 18](journey.md#18-machine-readable-zones-masked-by-their-layout-2026-10-27) (report not committed), [tests/visual/test_mrz.py](../tests/visual/test_mrz.py) |
+| 24 fictional specimens painted with Muse Image | **100 %** | **100 %** | 0 % → **100 %** | [fictional.md](../eval/results/visual/fictional.md), same MRZ note |
+
+Recall is the share of labelled regions masked with IoU ≥ 0.5.
+
+- **Caveats:** printed text values on ID cards (names, numbers) are barely masked without the
+  LLM detector (0.4 % on specimens, 34.5 % on the fictional set). Fixing that is **in
+  progress** (LAB-1125).
+- **Planned (LAB-1156):** placeholder-labelled image masking. Each masked region carries the
+  session's own placeholder (`PHOTO · [[PERSON_a1b2]]`) and the image comes back with a masked
+  transcript that shares the text vault, so an assistant can answer "which parties have an ID
+  on file?" without seeing a real value. As far as we found in a survey on 2026-10-27, no
+  open-source tool shares placeholders between images and the text session.
+- **Status:** shipped (LAB-1089, LAB-1110, LAB-1120, LAB-1121, LAB-1124).
+
+## 10. Hungarian depth as a showcase for hard languages
+
+Hungarian is a hard case: rich morphology, family name first, and identifiers that look like
+ordinary numbers. Getting it right shows what a language pack can carry.
+
+- **Checksum-validated identifiers:** tax and TAJ numbers, the personal identification number,
+  ID card, passport and licence numbers, TD1/TD3 MRZ with ICAO check digits, IBAN and giro
+  accounts, company registration numbers. `ID_DOCUMENT` leaks 10 → 0 and land-registry parcel
+  numbers 6 → 0 on `hu-smoke`, rules only, no new false positives
+  ([evaluation.md](evaluation.md#id-documents-and-parcel-numbers)).
+- **Addresses validated against the postcode–settlement table:** exact address recall 0.00 →
+  1.00, partial leaks 12 → 0 on `hu-smoke`
+  ([evaluation.md](evaluation.md#lexicons-diversity-and-the-address-rule)), using KSH lexicons
+  committed under their CC BY 4.0 terms ([ADR 0009](decisions/0009-third-party-lexicons.md)).
+- **Person names inside company names** (`Tóth és Társa Bt.`, `Molnár Péter e.v.`): leaked
+  names 61.1 % → **0 %** with rules + NER on 44 documents, 0 of 30 person-free company names
+  over-masked ([evaluation.md](evaluation.md#person-names-inside-company-names),
+  [tests/languages/test_hu_companies.py](../tests/languages/test_hu_companies.py)).
+- **Status:** shipped (LAB-1126, LAB-1127, LAB-1149).
+
+## 11. Add a language with a checklist
+
+A language is one plugin unit (`LanguagePack`: rules, inflection matcher, prompt notes, eval
+forms, lexicons), discovered through an entry point, so it can ship as a separate package.
+`pii-guard lang new <code>` writes the skeleton and `pii-guard lang check <code>` runs a
+conformance suite that says what is missing and gates round trip and precision.
+
+- **Evidence:** the German pack, added through this path: every structured identifier on the
+  German smoke set found (addresses, e-mails, phones, Steuer-IDs, social security numbers,
+  IBANs), rules precision 100 %, round trip 100 %, Hungarian and English scorecards unchanged
+  ([languages.md, "German smoke results"](languages.md#german-smoke-results),
+  [tests/languages/test_conformance.py](../tests/languages/test_conformance.py),
+  [ADR 0010](decisions/0010-language-pack-plugins.md)).
+- **Status:** shipped (LAB-1130). Hungarian, English and German today.
+
+## 12. Known values and per-type policies
+
+An application that already knows the client's name or an internal case number can pre-load
+it into the session; it is then masked in every inflected form, with no model. Each entity type
+has a policy: **mask**, **keep** (organisations stay readable by default, so the model can still
+reason about who is who) or **block** (refuse the request).
+
+- **Evidence:** on the known-values fixtures with rules only, leak 93.3 % → **0 %**, overlap
+  recall 5.3 % → 100 %
+  ([evaluation.md](evaluation.md#known-values-pre-loaded-into-the-session),
+  [tests/detect/test_known.py](../tests/detect/test_known.py)). Policies:
+  [entities.md](entities.md), [tests/test_policy.py](../tests/test_policy.py).
+- **Status:** shipped (LAB-1101, LAB-1099, LAB-1136).
+
+## 13. Benchmarking in the open
+
+Every evaluation run is one JSON record in a fixed schema; the benchmark page, its charts and
+the index are generated from them, and CI fails if they are out of date. The leak rate, not
+F1, is the headline number. Generated sets are reported, but the headline uses the
+hand-written ones because the generated ones flatter a Muse-based detector.
+
+- **Evidence:** 61 run records in [eval/results/runs/](../eval/results/runs/) against
+  [run.schema.json](../eval/results/schema/run.schema.json);
+  [benchmarks.md](benchmarks.md) generated by `pii-guard eval report`; `pii-guard eval report
+  --check` runs on every pull request ([ci.yml](../.github/workflows/ci.yml)). How the numbers
+  moved, milestone by milestone, with what each step cost (about $12 of compute in total):
+  [journey.md](journey.md).
+- **Status:** shipped (LAB-1129, LAB-1141).
+
+## What is not here yet
+
+- Published distilled NER weights, so fast mode works without training a model first.
+- Written confirmation of Baseten's data-retention terms for the shared Model APIs (LAB-1139).
+  Until then only fictional or masked data goes there; for real data, run the same open
+  weights on hardware you control ([models.md](models.md#baseten-model-apis-production-detector)).
+- English names on Muse-generated English text: 2.5 % leak on `en-synth-sample` (LAB-1138).
+- It is a hackathon build, not production-hardened.

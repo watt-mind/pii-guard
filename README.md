@@ -16,6 +16,27 @@ back into the model's answer, even while the answer is streaming.
 > the OpenAI-compatible gateway, image masking with SAM 3.1, the evaluation harness). It is not
 > production-hardened yet. See [what works today](#what-works-today).
 
+## Why pii-guard
+
+- **Reversible, consistent placeholders**: the answer names the real person, and every document
+  in the Hungarian smoke set unmasks back to its original exactly
+  ([100 % round trip](eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json)).
+- **Grammar-aware**: Hungarian case endings stay outside the placeholder; inflected-name leaks
+  went [18/30 → 0/30](docs/journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333).
+- **Leak from about half to under 1 %** with Meta's open-weight Muse Spark Open, at 1.8 s and
+  [$2.42 per 1,000 messages](eval/results/2026-10-27-baseten/README.md) (Hungarian).
+- **Against Presidio, LLM Guard and PrivAiTe**: 1.0 % Hungarian leak vs 19.6–49.5 %
+  ([comparison](eval/results/2026-10-26-baselines/comparison.md); fresh rerun in progress).
+- **Red-teamed by Meta's own model**: prompt-injection leak
+  [3.4 % → 0.0 %](eval/results/2026-10-27-injection/README.md); re-identification
+  [measured and published](eval/results/2026-10-27-redteam/README.md).
+- **Images too**: SAM 3.1 masks [90.8 % of portraits](eval/results/visual/specimens.md) on 65
+  official specimen ID documents, plus machine-readable zones.
+- **Measured in the open**: [61 run records](eval/results/runs/), charts regenerated and checked
+  in CI, fictional data only.
+
+All 13 differentiators, with evidence and status: **[docs/why-pii-guard.md](docs/why-pii-guard.md)**.
+
 ## Why it matters
 
 Every company that wants AI agents to work on real documents hits the same wall: the useful
