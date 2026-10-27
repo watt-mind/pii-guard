@@ -1,4 +1,6 @@
-"""``pii-guard connect``: pi config merge (dry-run, idempotent, backup), --check, muse-code."""
+"""``pii-guard connect``: pi config merge (dry-run, idempotent, backup), --check.
+
+Muse Code: tests/integrations/test_muse_code.py."""
 
 from __future__ import annotations
 
@@ -185,12 +187,9 @@ def test_check_and_dry_run_exclusive(tmp_path: Path) -> None:
         run("pi", "--check", "--dry-run", "--agent-dir", str(tmp_path))
 
 
-def test_muse_code_reports_the_finding() -> None:
-    code, out = run("muse-code")
-    assert code == 1
-    assert "Responses API" in out and "connect pi" in out
-
-
-def test_root_cli_dispatches_connect(capsys: pytest.CaptureFixture[str]) -> None:
-    assert root_main(["connect", "muse-code"]) == 1
-    assert "Muse Code" in capsys.readouterr().out
+def test_root_cli_dispatches_connect(
+    tmp_path: Path, unreachable: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    args = ["connect", "muse-code", "--dry-run", "--gateway", unreachable]
+    assert root_main([*args, "--muse-dir", str(tmp_path)]) == 0
+    assert "endpoint_transport" in capsys.readouterr().out

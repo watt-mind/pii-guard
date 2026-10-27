@@ -1,0 +1,88 @@
+{
+  "client": "muse-code",
+  "client_version": "1.4.13-R6996.1",
+  "upstream": "https://api.meta.ai/v1",
+  "model": "muse-spark-1.3",
+  "ner": true,
+  "client_exit": 0,
+  "requests": 7,
+  "gateway_statuses": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "refused": 0,
+  "placeholders_upstream": 101,
+  "gaps_upstream": {
+    "secrets": 3,
+    "csv_names": 0
+  },
+  "files_written": [
+    "reply.md"
+  ],
+  "placeholders_in_files": 0,
+  "placeholders_by_type": {
+    "BANK_ACCOUNT": 15,
+    "EMAIL": 26,
+    "PERSON": 45,
+    "PHONE": 15
+  },
+  "request_keys": {
+    "top_level": [
+      "include",
+      "input",
+      "instructions",
+      "max_output_tokens",
+      "model",
+      "prompt_cache_key",
+      "reasoning",
+      "store",
+      "stream",
+      "tools"
+    ],
+    "message": [
+      "function_call.arguments",
+      "function_call.call_id",
+      "function_call.id",
+      "function_call.name",
+      "function_call.type",
+      "function_call_output.call_id",
+      "function_call_output.output",
+      "function_call_output.type",
+      "message.content",
+      "message.id",
+      "message.phase",
+      "message.role",
+      "message.type",
+      "reasoning.encrypted_content",
+      "reasoning.id",
+      "reasoning.summary",
+      "reasoning.type"
+    ],
+    "roles": [
+      "assistant",
+      "developer",
+      "user"
+    ],
+    "input_items": [
+      "function_call",
+      "function_call_output",
+      "message",
+      "reasoning"
+    ]
+  },
+  "seconds": 42.4,
+  "gold_partial_upstream": 1,
+  "kind": "coding-agent-e2e",
+  "date": "2026-10-27",
+  "gateway_mode": "fast",
+  "gold_checked": 13,
+  "gold_upstream": 0,
+  "restored_in_files": 6,
+  "ok": true,
+  "data": "fictional (examples/coding-agents/mini-repo)"
+}

@@ -3,7 +3,7 @@
 ```
 pii-guard connect pi [--gateway URL] [--model ID ...] [--mode fast|strict] [--language en]
                      [--api-key VALUE] [--agent-dir DIR] [--dry-run | --check]
-pii-guard connect muse-code
+pii-guard connect muse-code [--gateway URL] [--muse-dir DIR] [--model ID] [--dry-run | --check]
 ```
 
 - ``connect pi`` merges a ``pii-guard`` provider into pi's ``models.json`` (a backup of the old
@@ -14,9 +14,14 @@ pii-guard connect muse-code
   ``baseUrl``, headers and first model from ``models.json``) and prints what was sent, what the
   model saw (masked) and what came back (restored). With the traffic log on, the call shows
   up on the Live traffic tab.
-- ``connect muse-code`` prints why Muse Code can't be connected yet (docs/integrations/).
+- ``connect muse-code`` points Muse Code's ``settings.json`` (``$XDG_CONFIG_HOME/muse``,
+  default ``~/.config/muse``) at the gateway: ``endpoint_transport.base_url`` and
+  ``endpoint_transport.auth: "bearer"``, keeping every other setting (backup first, idempotent,
+  ``--dry-run``). Muse then reads ``/muse-code/models`` and sends ``/v1/responses`` through
+  pii-guard. ``--check`` sends the canary the way Muse does (``POST <base_url>/responses``, with
+  ``$META_API_KEY`` as Muse sends it) and prints what the model saw and what came back.
 
-Exit codes: 0 done, 1 the check failed (or Muse Code), 2 bad arguments or a problem to fix.
+Exit codes: 0 done, 1 the check failed, 2 bad arguments or a problem to fix.
 """
 
 from __future__ import annotations
@@ -81,6 +86,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--agent-dir",
         default=None,
         help="pi's agent dir (default: $PI_CODING_AGENT_DIR or ~/.pi/agent)",
+    )
+    parser.add_argument(
+        "--muse-dir",
+        default=None,
+        help="Muse Code's config dir (default: $XDG_CONFIG_HOME/muse or ~/.config/muse)",
     )
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--dry-run", action="store_true", help="print the diff, write nothing")
@@ -162,16 +172,59 @@ def _pi_check(path: os.PathLike[str], args: argparse.Namespace, out: list[str]) 
     return 0 if result.ok else 1
 
 
+def _muse(args: argparse.Namespace, out: list[str]) -> int:
+    path = muse_code.config_path(args.muse_dir)
+    existing, old = muse_code.load(path)
+    if args.check:
+        return _muse_check(path, existing, args, out)
+    gateway = (args.gateway or default_gateway_url()).rstrip("/")
+    new = muse_code.render(existing, old, gateway)
+    diff = json_diff(path, old, new)
+    if args.dry_run:
+        out.append(diff or f"{path} is already up to date")
+        return 0
+    backup = write_json(path, new)
+    if old == new:
+        out.append(f"{path} is already up to date (endpoint_transport -> {gateway})")
+    else:
+        out.append(diff)
+        if backup is not None:
+            out.append(f"backup: {backup}")
+        out.append(f"wrote {path}: endpoint_transport.base_url = {gateway}, auth = bearer")
+    out.append(f"note: {muse_code.MODE_NOTE}")
+    out.append("next: muse   (check it: pii-guard connect muse-code --check)")
+    return 0
+
+
+def _muse_check(
+    path: os.PathLike[str], existing: dict[str, object], args: argparse.Namespace, out: list[str]
+) -> int:
+    transport = existing.get("endpoint_transport")
+    base_url = args.gateway or (transport.get("base_url") if isinstance(transport, dict) else None)
+    if not isinstance(base_url, str) or not base_url:
+        raise ConnectError(
+            f"{path} has no endpoint_transport.base_url; run `pii-guard connect muse-code`"
+        )
+    # Muse sends $META_API_KEY (or its saved key) as the bearer token; so does the check.
+    token = os.environ.get("META_API_KEY") or _token()
+    model = (args.model or [None])[0] or muse_code.fetch_catalog(base_url, token=token)[0]
+    result, mode = muse_code.run_check(base_url, model, token=token)
+    out.append(f"client config: {path}")
+    out.extend(result.lines())
+    if mode:
+        out.append(f"gateway mode : {mode}")
+    if mode == "strict":
+        out.append(f"note         : {muse_code.MODE_NOTE}")
+    out.append(f"dashboard    : {DASHBOARD_URL} (with PII_GUARD_TRAFFIC_LOG=masked or full)")
+    return 0 if result.ok else 1
+
+
 def main(argv: Sequence[str] | None = None, *, stdout=None) -> int:  # type: ignore[no-untyped-def]
     stdout = stdout or sys.stdout
     args = build_parser().parse_args(list(argv) if argv is not None else None)
     out: list[str] = []
     try:
-        if args.client == "muse-code":
-            out.append(muse_code.FINDING.rstrip("\n"))
-            code = 1
-        else:
-            code = _pi(args, out)
+        code = _muse(args, out) if args.client == "muse-code" else _pi(args, out)
     except ConnectError as exc:
         for line in out:
             print(line, file=stdout)
