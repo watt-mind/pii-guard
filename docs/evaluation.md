@@ -693,6 +693,28 @@ Placeholders hold against reconstruction from the masked text. They don't preven
 with a candidate list the attacker does about twice as well as chance, because the context
 that stays readable narrows the candidates. Masking is pseudonymisation, not anonymisation.
 
+## Where the specimen images live (visual)
+
+The official specimen set (65 ID documents from Wikimedia Commons, LAB-1120) is fetched locally
+and never committed (ADR 0005); only `eval/visual/manifest.json` (URLs + SHA-256) and the labels
+are. By default the images go to `data/specimens/` and the SAM 3.1 response cache to
+`data/visual-cache/`, both inside the checkout. Removing a git worktree deletes them, which
+already happened once (LAB-1245). Keep them outside every worktree instead:
+
+```bash
+export PII_GUARD_SPECIMENS_DIR=~/Develop/.pii-guard-data/specimens    # the images
+export PII_GUARD_VISUAL_CACHE=~/Develop/.pii-guard-data/visual-cache  # SAM responses
+uv run python eval/visual/fetch_specimens.py   # ~46 MB, polite (1 request/s), SHA-256 checked
+```
+
+`eval/visual/fetch_specimens.py` (`--out`), `pii-guard eval visual` (`--specimens`, `--cache`)
+and `python -m pii_guard.visual.segment_eval` (`--cache`; the `specimens` set's images) all
+default to these two settings (`pii_guard.eval.data_dirs`). Unset, they use the `data/`
+paths. Images whose SHA-256 does not match the manifest are skipped. A fetch into a directory
+outside the checkout records `$PII_GUARD_SPECIMENS_DIR`, not the path, in the manifest's
+`out_dir`, so a home directory never ends up in a commit. Never commit the images, their OCR
+text or the cache.
+
 ## Fictional specimen-style documents (visual)
 
 The official specimen set (LAB-1120) can't be committed, so the visual eval also runs on a

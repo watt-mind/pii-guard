@@ -960,10 +960,12 @@ The owner's call: make it the default for faces and keep SAM 3.1 for signatures 
 (`signature`, `squiggly line`); `sam-api` keeps the old behaviour, `local` and `off` never call
 the API and refuse images they can't fully check.
 
-| Fictional set, `POST /v1/mask/image` with OCR | SAM calls / image | p50 | p95 | Portrait leak | Signature recall |
+| `POST /v1/mask/image` with OCR | SAM calls / image | p50 | p95 | Portrait leak | Signature recall |
 |---|---:|---:|---:|---:|---:|
-| `sam-api` (before) | 5 | 7.2 s | 8.1 s | 0.0 % | 100.0 % |
-| **`hybrid`** (now) | **2** | **3.8 s** | **5.0 s** | 0.0 % | 100.0 % |
+| 65 official specimens, `sam-api` (before) | 5 | 7.9 s | 11.6 s | 47.7 % | 83.8 % |
+| 65 official specimens, **`hybrid`** (now) | **2** | **4.1 s** | **6.1 s** | **10.8 %** | 83.8 % |
+| 24 fictional documents, `sam-api` | 5 | 7.2 s | 8.1 s | 0.0 % | 100.0 % |
+| 24 fictional documents, **`hybrid`** | **2** | **3.8 s** | **5.0 s** | 0.0 % | 100.0 % |
 
 - **The call count was 5, not 4.** The served pipeline also asked SAM for `stamp`, whose regions
   are `keep` (left visible). The hybrid mode only segments types whose policy is not `keep`.
@@ -974,9 +976,13 @@ the API and refuse images they can't fully check.
   (still masked); with no API key either, images are refused. The Docker image now ships OpenCV
   headless and the pinned, checksum-verified YuNet file (+160 MB unpacked; the CI size budget
   went from 375 to 525 MB).
-- **Not re-measured:** the 65 official specimens, whose images were no longer on the machine;
-  LAB-1229's runs on them have YuNet's portrait leak at 10.8 % against SAM's 47.7 %.
-- **Cost:** $0. About 620 SAM 3.1 calls on free Meta API credits.
+- **Acceptance met on both sets:** portrait leak at or below SAM's (a quarter of it on real
+  specimens), signatures from the same SAM prompts and the same boxes, 2 calls instead of 5,
+  the median image about 47 % faster.
+- **The specimens went missing once:** they lived in a worktree's `data/` and were deleted with
+  it. They were re-fetched (SHA-256 checked) into `PII_GUARD_SPECIMENS_DIR`, a new setting that
+  keeps them, and the SAM cache (`PII_GUARD_VISUAL_CACHE`), outside every worktree.
+- **Cost:** $0. About 2,250 SAM 3.1 calls on free Meta API credits.
 
 ### 35. A coding agent works through the gateway (2026-10-27)
 
