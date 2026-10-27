@@ -1,7 +1,8 @@
 """Hungarian inflection: case suffixes and the stem changes they cause (vault, LLM alignment).
 
 Part of the Hungarian language pack. The protocol and the module-level helpers that use these
-optional methods live in :mod:`pii_guard.vault.inflection`.
+optional methods live in :mod:`pii_guard.languages.inflection` and
+:mod:`pii_guard.vault.inflection`.
 """
 
 from __future__ import annotations
@@ -9,8 +10,8 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
+from pii_guard.languages.inflection import Split
 from pii_guard.types import EntityType
-from pii_guard.vault.inflection import Split
 
 __all__ = ["HungarianSuffixMatcher"]
 

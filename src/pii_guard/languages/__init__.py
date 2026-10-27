@@ -43,7 +43,7 @@ from pii_guard.types import EntityType, PiiGuardError
 
 if TYPE_CHECKING:
     from pii_guard.detect.rules import Rule
-    from pii_guard.vault.inflection import InflectionMatcher
+    from pii_guard.languages.inflection import InflectionMatcher
 
 __all__ = [
     "ENTRY_POINT_GROUP",

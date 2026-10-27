@@ -32,10 +32,9 @@ looked up by primary language, so ``en-GB`` uses the ``en`` matcher.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
 
 from pii_guard.languages import get_pack
+from pii_guard.languages.inflection import ExactMatcher, InflectionMatcher, Split
 from pii_guard.types import EntityType
 
 __all__ = [
@@ -66,48 +65,6 @@ def following_suffix(text: str, pos: int) -> str:
     match = _FOLLOWING_RE.match(text, pos)
     run = match.group(0) if match else ""
     return run if len(run) <= MAX_SUFFIX_LENGTH else ""
-
-
-@dataclass(frozen=True, slots=True)
-class Split:
-    """One way to read a surface form as ``stem + suffix`` of a lemma. Never logged.
-
-    ``stem + suffix`` is the surface form; ``lemma`` is the dictionary form as written
-    (``Próba Zsuzsannának`` -> lemma ``Próba Zsuzsanna``, stem ``Próba Zsuzsanná``, suffix
-    ``nak``). ``strong`` splits are unambiguous enough to apply on their own; the vault applies
-    a weak one only when the lemma is confirmed (it occurs on its own, another span or an
-    earlier request has it).
-    """
-
-    lemma: str
-    stem: str
-    suffix: str
-    strong: bool = False
-
-    def __repr__(self) -> str:
-        return f"Split(suffix_length={len(self.suffix)}, strong={self.strong})"
-
-    __str__ = __repr__
-
-
-@runtime_checkable
-class InflectionMatcher(Protocol):
-    """Says what may directly follow an occurrence of a confirmed value."""
-
-    def suffix_pattern(self, value: str, entity_type: EntityType) -> str:
-        """A regex fragment, without capturing groups, matching an allowed suffix.
-
-        The empty string means "no suffix": the value must end at a word boundary. The
-        vault compiles the fragment case-insensitively and requires a word boundary after it.
-        """
-        ...
-
-
-class ExactMatcher:
-    """No inflection: the value must stand on its own between word boundaries."""
-
-    def suffix_pattern(self, value: str, entity_type: EntityType) -> str:
-        return ""
 
 
 #: Matchers registered with :func:`register_inflection`; they take precedence over packs.

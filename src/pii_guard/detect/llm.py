@@ -50,6 +50,7 @@ __all__ = [
     "chunk_text",
     "find_occurrences",
     "language_profile",
+    "pack_profile",
     "parse_entities",
 ]
 
@@ -173,7 +174,7 @@ class LanguageProfile:
     word_boundary: bool = True
 
 
-def _pack_profile(pack: LanguagePack) -> LanguageProfile:
+def pack_profile(pack: LanguagePack) -> LanguageProfile:
     """A language pack's prompt notes, requested types and alignment (ADR 0010)."""
     extra = frozenset(pack.country_entity_types)
     return LanguageProfile(
@@ -193,7 +194,7 @@ class _PackProfiles(Mapping[str, LanguageProfile]):
         pack = get_pack(code) if code == primary_language(code) else None
         if pack is None:
             raise KeyError(code)
-        return _pack_profile(pack)
+        return pack_profile(pack)
 
     def __iter__(self) -> Iterator[str]:
         return iter(packs())
@@ -221,7 +222,7 @@ def language_profile(language: str) -> LanguageProfile:
     code = primary_language(language)
     pack = get_pack(code)
     if pack is not None:
-        return _pack_profile(pack)
+        return pack_profile(pack)
     return LanguageProfile(
         code,
         code,
@@ -244,13 +245,16 @@ def _notes(notes: str | Traversable) -> str:
     return notes.read_text(encoding="utf-8")
 
 
-def build_messages(text: str, language: str) -> list[dict[str, str]]:
+def build_messages(
+    text: str, language: str, *, profile: LanguageProfile | None = None
+) -> list[dict[str, str]]:
     """The chat messages for one chunk, for ``language`` (see :func:`language_profile`).
 
-    Placeholders are substituted with ``str.replace`` so braces in the input or in the JSON
-    example are never interpreted.
+    ``profile`` overrides the looked-up profile (the conformance suite renders an
+    unregistered pack's prompt this way). Placeholders are substituted with ``str.replace``
+    so braces in the input or in the JSON example are never interpreted.
     """
-    profile = language_profile(language)
+    profile = profile if profile is not None else language_profile(language)
     types = "\n".join(f"- {t.value}: {ENTITY_DESCRIPTIONS[t]}" for t in profile.entity_types)
     system = (
         _template("system.md")

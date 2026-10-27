@@ -29,7 +29,7 @@ def test_english_matcher_by_primary_language(language: str) -> None:
 
 def test_region_fallback_for_other_languages() -> None:
     assert isinstance(inflection_for("hu-HU"), HungarianSuffixMatcher)
-    assert isinstance(inflection_for("de-AT"), ExactMatcher)
+    assert isinstance(inflection_for("fi-FI"), ExactMatcher)  # no fi pack
     assert isinstance(inflection_for(""), ExactMatcher)
 
 
