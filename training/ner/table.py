@@ -33,9 +33,23 @@ ORDER = (
     "gliner-multi-zero-shot",
     "gliner-multi-v2",
     "xlmr-base-v2-hn-gliner-union",
+    "xlmr-base-v21-hn-e1",
+    "xlmr-base-v21-hn-e2",
+    "xlmr-base-v21-hn-e3",
+    "xlmr-base-v21-hn-e4",
+    "xlmr-base-v21-hn-e5",
 )
 SMOKE = ("hu-smoke", "en-smoke", "de-smoke")
 PUBLIC = ("hu-ai4privacy", "en-ai4privacy", "de-ai4privacy")
+#: LAB-1306: pooled groups (leaked / values, over-masked / masked, over hu + en + de). The
+#: ``agent-traffic-dev`` split selects; the LAB-1226 test sets are reported, never selected on.
+GROUPS = {
+    "agent-traffic-dev": ("hu-agent-traffic-dev", "en-agent-traffic-dev", "de-agent-traffic-dev"),
+    "agent-traffic (test)": ("hu-agent-traffic", "en-agent-traffic", "de-agent-traffic"),
+    "cee-pii (test)": ("hu-cee-pii", "en-cee-pii"),
+    "nemotron-pii (test)": ("en-nemotron-pii",),
+    "gretel-finance (test)": ("en-gretel-finance", "de-gretel-finance"),
+}
 
 
 def _pct(x: float | None) -> str:
@@ -94,6 +108,30 @@ def render(cards: dict[str, dict[str, dict[str, Any]]]) -> str:
             f"{_pct(max((o['leak']['rate'] for o in smoke), default=None))} | "
             f"{_pct(max((o['over_masking']['rate'] for o in smoke), default=None))} |"
         )
+    groups = [
+        g for g, names in GROUPS.items() if any(n in cards[c] for c in candidates for n in names)
+    ]
+    if groups:
+        lines += [
+            "",
+            "| Candidate | " + " | ".join(f"{g} leak / over-masking" for g in groups) + " |",
+            "|---|" + "---:|" * len(groups),
+        ]
+        for c in candidates:
+            cells = []
+            for g in groups:
+                cards_g = [cards[c][n] for n in GROUPS[g] if n in cards[c]]
+                if len(cards_g) != len(GROUPS[g]):
+                    cells.append("-")
+                    continue
+                leak = sum(o["leak"]["leaked"] for o in cards_g) / max(
+                    sum(o["leak"]["values"] for o in cards_g), 1
+                )
+                over = sum(o["over_masking"]["over_masked"] for o in cards_g) / max(
+                    sum(o["over_masking"]["masked"] for o in cards_g), 1
+                )
+                cells.append(f"{_pct(leak)} / {_pct(over)}")
+            lines.append(f"| {c} | " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
 
 
