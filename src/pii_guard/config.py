@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     known_values_max: int = Field(default=1000, ge=1)
     known_values_max_length: int = Field(default=256, ge=3)
 
+    # Vault: give each casing of a value (ALL CAPS, lower case) its own placeholder, so
+    # unmask restores the casing exactly. Off: one placeholder, restored as first written.
+    vault_case_sensitive_placeholders: bool = False
+
     # Model endpoints.
     llm_detector_url: str | None = None
     llm_detector_api_key: SecretStr | None = None

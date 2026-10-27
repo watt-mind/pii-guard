@@ -34,6 +34,7 @@ from pii_guard.vault.placeholders import (
     MAX_ID_LENGTH,
     MIN_ID_LENGTH,
     PLACEHOLDER_RE,
+    casing_class,
     derive_id,
     format_placeholder,
     normalize_value,
@@ -124,10 +125,15 @@ class _Entry:
     so unmask restores the input exactly. ``aliases`` are unconfirmed lemmas of an unsplit
     span (``Minta Kendét`` may be ``Minta Kende`` + ``t``): their forms are masked with this
     entry's placeholder too, because a missed form would leak.
+
+    ``variants`` (case-sensitive placeholders only) holds one entry per other casing class an
+    occurrence was written in (``TESZT ELEK`` for ``Teszt Elek``): each has its own placeholder,
+    ``original`` and ``seen``, and shares this entry's patterns, which only it holds.
     """
 
     __slots__ = (
         "aliases",
+        "casing",
         "count",
         "entity_type",
         "language",
@@ -137,6 +143,7 @@ class _Entry:
         "placeholder",
         "seen",
         "surfaces",
+        "variants",
     )
 
     def __init__(
@@ -157,6 +164,8 @@ class _Entry:
         self.surfaces: dict[str, None] = {}
         self.aliases: dict[str, None] = {}
         self.seen: dict[str, str] = {}
+        self.casing = casing_class(original)
+        self.variants: dict[str, _Entry] = {}
 
     def __repr__(self) -> str:
         return f"_Entry(placeholder={self.placeholder!r}, value=<redacted>, count={self.count})"
@@ -246,8 +255,10 @@ class VaultSession:
         ttl_seconds: float,
         id_length: int,
         clock: Callable[[], float],
+        case_sensitive_placeholders: bool = False,
     ) -> None:
         self.session_id = session_id
+        self._case_sensitive = case_sensitive_placeholders
         self._tenant_key = tenant_key
         self._ttl = ttl_seconds
         self._id_length = id_length
@@ -323,6 +334,14 @@ class VaultSession:
         in a suffix is narrowed to the stem (``Próba Zsuzsannának`` -> ``[[PERSON_x]]nak``)
         and stem-changed forms (``Próba Zsuzsannát``, ``Kováccsal``) are found as occurrences.
 
+        Casing: by default every casing of a value shares its placeholder too, and
+        :meth:`unmask` restores the value as first written (``TESZT ELEK és Teszt Elek`` with
+        a span on ``Teszt Elek`` round-trips to ``Teszt Elek és Teszt Elek``). With
+        ``case_sensitive_placeholders`` (``PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS``) an
+        occurrence written in another casing class (ALL CAPS, lower case, mixed) gets a
+        placeholder of its own and round-trips exactly; the upstream model then sees two ids
+        for one value. Both modes mask every casing.
+
         Placeholder-shaped tokens already in ``text``: one equal to a placeholder this session
         issued raises :class:`PlaceholderInInputError` (``placeholder_in_input``, 422), since
         :meth:`unmask` would restore a value into text that was never masked. Any other
@@ -386,7 +405,7 @@ class VaultSession:
             entry.add_surface(span.text)
             for alias in plan.aliases:
                 entry.add_alias(alias)
-            replacements.append((span.start, end, entry))
+            replacements.append((span.start, end, self._cased(entry, text[span.start : end])))
             taken[span.start : end] = b"\x01" * (end - span.start)
         # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
         entries = sorted(self._by_key.values(), key=lambda e: len(e.normalized), reverse=True)
@@ -395,7 +414,7 @@ class VaultSession:
                 start, end = match.span()
                 if any(taken[start:end]):
                     continue
-                replacements.append((start, end, entry))
+                replacements.append((start, end, self._cased(entry, text[start:end])))
                 taken[start:end] = b"\x01" * (end - start)
         replacements.sort(key=lambda r: r[0])
         parts: list[str] = []
@@ -500,22 +519,49 @@ class VaultSession:
         entry = self._by_key.get(key)
         if entry is not None:
             return entry
-        length = self._id_length
-        while True:
-            placeholder_id = derive_id(
-                self._tenant_key, self.session_id, entity_type, normalized, length
-            )
-            placeholder = format_placeholder(entity_type, placeholder_id)
-            if placeholder not in self._by_placeholder and placeholder not in self._reserved:
-                break
-            # Collision with a different value: extend the id (ADR 0007).
-            if length >= MAX_ID_LENGTH:  # pragma: no cover - a full SHA-256 collision
-                raise MaskingError(f"could not derive a unique {entity_type.value} placeholder")
-            length = min(length + 2, MAX_ID_LENGTH)
+        placeholder = self._new_placeholder(entity_type, normalized)
         entry = _Entry(placeholder, entity_type, value, normalized, language)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
         return entry
+
+    def _cased(self, entry: _Entry, written: str) -> _Entry:
+        """The entry an occurrence written as ``written`` is masked with.
+
+        ``entry`` itself, unless placeholders are case-sensitive and ``written`` is in another
+        casing class than the entry's value: then that class's variant, created on first use.
+        """
+        if not self._case_sensitive:
+            return entry
+        casing = casing_class(written)
+        if casing == entry.casing:
+            return entry
+        variant = entry.variants.get(casing)
+        if variant is None:
+            placeholder = self._new_placeholder(entry.entity_type, entry.normalized, casing)
+            original = _recased(entry.original, written, entry.normalized, casing)
+            variant = _Entry(
+                placeholder, entry.entity_type, original, entry.normalized, entry.language
+            )
+            entry.variants[casing] = variant
+            self._by_placeholder[placeholder] = variant
+        return variant
+
+    def _new_placeholder(self, entity_type: EntityType, normalized: str, casing: str = "") -> str:
+        length = self._id_length
+        # The casing class is passed only for a variant: canonical ids are derived as always.
+        extra = {"casing": casing} if casing else {}
+        while True:
+            placeholder_id = derive_id(
+                self._tenant_key, self.session_id, entity_type, normalized, length, **extra
+            )
+            placeholder = format_placeholder(entity_type, placeholder_id)
+            if placeholder not in self._by_placeholder and placeholder not in self._reserved:
+                return placeholder
+            # Collision with a different value: extend the id (ADR 0007).
+            if length >= MAX_ID_LENGTH:  # pragma: no cover - a full SHA-256 collision
+                raise MaskingError(f"could not derive a unique {entity_type.value} placeholder")
+            length = min(length + 2, MAX_ID_LENGTH)
 
     # --- re-identification ---------------------------------------------------------------
 
@@ -561,8 +607,24 @@ class VaultSession:
             return [(e.placeholder, e.entity_type, e.count) for e in self._by_placeholder.values()]
 
 
+def _recased(original: str, written: str, normalized: str, casing: str) -> str:
+    """The value a casing variant restores: as written if ``written`` is the whole value,
+    otherwise (a changed stem such as ``ZSUZSANNÁ``) ``original`` in that casing class.
+    """
+    if normalize_value(written) == normalized:
+        return written
+    if casing == "upper":
+        return original.upper()
+    if casing == "lower":
+        return original.lower()
+    return re.sub(r"\w+", lambda m: m.group(0).capitalize(), original)
+
+
 def _restored(entry: _Entry, suffix: str) -> str:
     """The entry's value inflected for the ``suffix`` that follows its placeholder.
+
+    Without case-sensitive placeholders that is the value as first written, whatever the
+    casing of the occurrence was (a documented limitation, see :meth:`VaultSession.mask`).
 
     A suffix seen after this value in the input restores the stem as written there (exact
     round trip); any other suffix, such as one the upstream model added, is re-inflected by
@@ -627,8 +689,9 @@ class Vault:
 
     ``tenant_key`` keys every placeholder id (at least 16 bytes; ``openssl rand -hex 32``
     decoded). ``ttl_seconds`` is sliding: each use of a session extends it. ``id_length`` is
-    the initial hex length of placeholder ids (collisions extend it). ``clock`` is injectable
-    for tests.
+    the initial hex length of placeholder ids (collisions extend it).
+    ``case_sensitive_placeholders`` gives each casing class of a value its own placeholder
+    (see :meth:`VaultSession.mask`). ``clock`` is injectable for tests.
     """
 
     def __init__(
@@ -638,6 +701,7 @@ class Vault:
         ttl_seconds: float = DEFAULT_TTL_SECONDS,
         id_length: int = DEFAULT_ID_LENGTH,
         clock: Callable[[], float] = time.monotonic,
+        case_sensitive_placeholders: bool = False,
     ) -> None:
         if not isinstance(tenant_key, bytes | bytearray):
             raise TypeError("tenant_key must be bytes")
@@ -651,15 +715,21 @@ class Vault:
         self._ttl = ttl_seconds
         self._id_length = id_length
         self._clock = clock
+        self._case_sensitive = case_sensitive_placeholders
         self._lock = threading.Lock()
         self._sessions: dict[str, VaultSession] = {}
 
     @classmethod
     def from_settings(cls, settings: Settings, **kwargs: Any) -> Vault:
-        """A vault keyed by ``PII_GUARD_TENANT_KEY``. Fails closed if the key is unset."""
+        """A vault keyed by ``PII_GUARD_TENANT_KEY``. Fails closed if the key is unset.
+
+        ``PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS`` sets ``case_sensitive_placeholders``
+        unless ``kwargs`` does.
+        """
         key = settings.tenant_key_bytes()
         if key is None:
             raise MaskingError("PII_GUARD_TENANT_KEY is not set", code="vault_not_configured")
+        kwargs.setdefault("case_sensitive_placeholders", settings.vault_case_sensitive_placeholders)
         return cls(key, **kwargs)
 
     def __repr__(self) -> str:
@@ -688,6 +758,7 @@ class Vault:
                     ttl_seconds=self._ttl,
                     id_length=self._id_length,
                     clock=self._clock,
+                    case_sensitive_placeholders=self._case_sensitive,
                 )
                 self._sessions[session_id] = session
                 return session

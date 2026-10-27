@@ -21,6 +21,7 @@ __all__ = [
     "MAX_PLACEHOLDER_LENGTH",
     "MIN_ID_LENGTH",
     "PLACEHOLDER_RE",
+    "casing_class",
     "derive_id",
     "format_placeholder",
     "is_placeholder_prefix",
@@ -54,24 +55,39 @@ def normalize_value(value: str) -> str:
     return _WHITESPACE_RE.sub(" ", folded).strip()
 
 
+def casing_class(value: str) -> str:
+    """``"upper"`` (``TESZT ELEK``), ``"lower"`` (``teszt elek``) or ``"mixed"`` (anything else).
+
+    A value without cased letters (``1234 5678``) is ``"mixed"``: it has no casing to keep.
+    """
+    if value.isupper():
+        return "upper"
+    if value.islower():
+        return "lower"
+    return "mixed"
+
+
 def derive_id(
     tenant_key: bytes,
     session_id: str,
     entity_type: EntityType,
     normalized: str,
     length: int = DEFAULT_ID_LENGTH,
+    *,
+    casing: str = "",
 ) -> str:
-    """Lowercase hex id: the first ``length`` characters of the keyed HMAC-SHA256."""
+    """Lowercase hex id: the first ``length`` characters of the keyed HMAC-SHA256.
+
+    ``casing`` is set only for a casing variant (case-sensitive placeholders, see
+    :class:`~pii_guard.vault.Vault`): it is mixed in so the variant gets an id of its own.
+    Empty, the message (and so every id) is the same as without it.
+    """
     if not MIN_ID_LENGTH <= length <= MAX_ID_LENGTH:
         raise ValueError(f"id length must be in [{MIN_ID_LENGTH}, {MAX_ID_LENGTH}]")
-    message = _SEP.join(
-        (
-            _HMAC_DOMAIN,
-            entity_type.value.encode(),
-            session_id.encode(),
-            normalized.encode(),
-        )
-    )
+    fields = [_HMAC_DOMAIN, entity_type.value.encode(), session_id.encode(), normalized.encode()]
+    if casing:
+        fields.append(b"casing:" + casing.encode())
+    message = _SEP.join(fields)
     return hmac.new(tenant_key, message, hashlib.sha256).hexdigest()[:length]
 
 

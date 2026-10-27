@@ -124,6 +124,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
 | `PII_GUARD_KNOWN_VALUES_MAX` | `known_values_max` | `int` (known values per session) | `1000` |
 | `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` | `known_values_max_length` | `int` (characters per value) | `256` |
+| `PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS` | `vault_case_sensitive_placeholders` | `bool` | `false` |
 | `PII_GUARD_LLM_DETECTOR_URL` | `llm_detector_url` | `str \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_API_KEY` | `llm_detector_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_MODEL` | `llm_detector_model` | `str \| None` | unset (detector default `meta-models/muse-spark-open-1026`) |
@@ -436,6 +437,16 @@ class StreamUnmasker:
 - `unmask` re-inflects: a known placeholder followed by a suffix restores the stem as written in
   the input for that suffix, or, for a suffix the model added itself, the language's inflected
   stem (`[[PERSON_x]]nak` → `Próba Zsuzsannának`, `[[PERSON_y]]val` → `Kováccsal`).
+- **Casing:** occurrences match case-insensitively, so `TESZT ELEK` and `teszt elek` are
+  masked along with a `Teszt Elek` span. By default they share its placeholder and `unmask`
+  restores the value as first written (`TESZT ELEK és Teszt Elek.` → `Teszt Elek és Teszt
+  Elek.`): a known limitation that keeps one id per value for the upstream model, and lets an
+  ALL-CAPS name from an ID card share the placeholder of the same name written in prose.
+  `PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS=true` (`Vault(case_sensitive_placeholders=True)`)
+  gives an occurrence in another casing class (ALL CAPS, lower case, mixed) its own
+  placeholder, with the class mixed into the HMAC, so the round trip is exact; the model then
+  sees one id per casing. Within a class the first-written form is restored (`Teszt ELEK`
+  after `Teszt Elek` comes back as `Teszt Elek`).
 - `mask` raises `MaskingError` on overlapping or out-of-range spans rather than guessing.
 - `StreamUnmasker.feed("[[PERS") + feed("ON_7f3a]] ok") + flush()` equals
   `session.unmask("[[PERSON_7f3a]] ok")`: concatenated output is identical to unmasking the
