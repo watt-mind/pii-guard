@@ -145,8 +145,9 @@ the API, and any SAM or YuNet error while an image is processed refuses the imag
 **Getting YuNet.** The Docker image ships it: the `local-vision` extra (OpenCV headless) and the
 model, fetched at build time from its pinned OpenCV model zoo URL and checked against its
 pinned SHA-256 (the build fails on a mismatch), in `/app/models` (`PII_GUARD_MODEL_DIR`). That
-adds about 223 MB (`docker image inspect`, arm64: 430 MB → 653 MB; OpenCV headless about 87 MB
-and numpy about 68 MB of it, the model 0.23 MB). `make demo` fetches it too. Elsewhere: `uv sync --extra local-vision`, then
+adds about 160 MB unpacked (`du` inside the container, arm64: 317 MB → 478 MB; `docker image
+inspect` on Docker Desktop: 430 MB → 653 MB): OpenCV headless about 87 MB, numpy about 68 MB, the
+model 0.23 MB. The CI size budget (`scripts/ci/docker_smoke.sh`) went from 375 to 525 MB. `make demo` fetches it too. Elsewhere: `uv sync --extra local-vision`, then
 `uv run python -m pii_guard.visual.segment fetch` (into `PII_GUARD_MODEL_DIR`, default
 `~/.cache/pii-guard/models`). Model files are never committed.
 

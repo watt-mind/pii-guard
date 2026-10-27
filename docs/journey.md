@@ -969,7 +969,8 @@ the API and refuse images they can't fully check.
   and cost win, not a privacy one.
 - **Fail closed:** without OpenCV or the model the hybrid mode warns and sends faces to SAM
   (still masked); with no API key either, images are refused. The Docker image now ships OpenCV
-  headless and the pinned, checksum-verified YuNet file (+223 MB).
+  headless and the pinned, checksum-verified YuNet file (+160 MB unpacked; the CI size budget
+  went from 375 to 525 MB).
 - **Not re-measured:** the 65 official specimens, whose images were no longer on the machine;
   LAB-1229's runs on them have YuNet's portrait leak at 10.8 % against SAM's 47.7 %.
 - **Cost:** $0. About 620 SAM 3.1 calls on free Meta API credits.
