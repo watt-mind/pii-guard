@@ -38,6 +38,15 @@ export function HighlightedText({ text, spans, activeKey, onActivate }: Props) {
         ].join(" ")}
       >
         {text.slice(span.start, span.end)}
+        {span.detector === "known" && (
+          <span
+            aria-hidden="true"
+            data-known
+            className="ml-1 inline-block translate-y-[-1px] rounded bg-guard-soft px-1 align-middle font-sans text-[10px] leading-4 font-semibold tracking-wide text-guard-ink uppercase ring-1 ring-guard/40"
+          >
+            known
+          </span>
+        )}
         <span className="sr-only"> ({describeSpan(span)})</span>
       </mark>,
     );

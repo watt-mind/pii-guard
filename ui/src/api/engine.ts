@@ -10,7 +10,14 @@
 
 import { ApiError, UnreachableError } from "./http";
 import { MOCK_SESSION_PREFIX } from "./mock";
-import type { GuardClient, HealthResponse, ImageMaskRequest, ImageMaskResponse } from "./types";
+import type {
+  GuardClient,
+  HealthResponse,
+  ImageMaskRequest,
+  ImageMaskResponse,
+  KnownValue,
+  KnownValuesResponse,
+} from "./types";
 
 export type ModePreference = "auto" | "api" | "mock";
 export type EngineKind = "api" | "mock";
@@ -62,6 +69,8 @@ export interface RoutingClient {
   mask(...args: Parameters<GuardClient["mask"]>): Promise<Routed<Awaited<ReturnType<GuardClient["mask"]>>>>;
   unmask(...args: Parameters<GuardClient["unmask"]>): Promise<Routed<Awaited<ReturnType<GuardClient["unmask"]>>>>;
   maskImage(req: ImageMaskRequest): Promise<Routed<ImageMaskResponse>>;
+  createSession(known_values: KnownValue[]): Promise<Routed<KnownValuesResponse>>;
+  addKnownValues(session_id: string, known_values: KnownValue[]): Promise<Routed<KnownValuesResponse>>;
 }
 
 export interface RoutingDeps {
@@ -75,19 +84,24 @@ export interface RoutingDeps {
 }
 
 export function createRoutingClient(deps: RoutingDeps): RoutingClient {
-  async function route<K extends "analyze" | "mask" | "maskImage">(
+  async function route<K extends "analyze" | "mask" | "maskImage" | "createSession">(
     method: K,
     req: Parameters<Required<GuardClient>[K]>[0],
   ): Promise<Routed<Awaited<ReturnType<Required<GuardClient>[K]>>>> {
     type Result = Awaited<ReturnType<Required<GuardClient>[K]>>;
     const state = deps.getState();
     const call = (client: GuardClient) => {
-      const fn = client[method] as ((r: typeof req) => Promise<Result>) | undefined;
+      const fn = (client[method] as ((r: typeof req) => Promise<Result>) | undefined)?.bind(client);
       // An engine without this method (a text-only test double) counts as not reachable.
       if (!fn) return Promise.reject(new UnreachableError(`${method} is not available`));
       return fn(req);
     };
     if (state.preference === "mock") return { data: await call(deps.mock), engine: "mock" };
+    // A session lives in the engine that created it.
+    const sessionId = typeof req === "object" && req !== null && "session_id" in req ? req.session_id : null;
+    if (typeof sessionId === "string" && sessionId.startsWith(MOCK_SESSION_PREFIX)) {
+      return { data: await call(deps.mock), engine: "mock" };
+    }
     // In auto mode every call tries the API first, so a transient 404 or a missed health
     // check can't pin the session to the demo engine.
     try {
@@ -112,6 +126,13 @@ export function createRoutingClient(deps: RoutingDeps): RoutingClient {
     analyze: (req) => route("analyze", req),
     mask: (req) => route("mask", req),
     maskImage: (req) => route("maskImage", req),
+    createSession: (known) => route("createSession", known),
+    async addKnownValues(sessionId, known) {
+      const mock = sessionId.startsWith(MOCK_SESSION_PREFIX);
+      const client = mock ? deps.mock : deps.api;
+      if (!client.addKnownValues) throw new UnreachableError("addKnownValues is not available");
+      return { data: await client.addKnownValues(sessionId, known), engine: mock ? "mock" : "api" };
+    },
     // A session lives in the engine that created it.
     async unmask(req) {
       if (req.session_id.startsWith(MOCK_SESSION_PREFIX)) {

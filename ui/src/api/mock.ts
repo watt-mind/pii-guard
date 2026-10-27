@@ -12,6 +12,8 @@ import type {
   AnalyzeRequest,
   AnalyzeResponse,
   GuardClient,
+  KnownValue,
+  KnownValuesResponse,
   MaskRequest,
   MaskResponse,
   PublicSpan,
@@ -25,7 +27,7 @@ interface RawSpan {
   end: number;
   entity_type: TextEntityType;
   score: number;
-  detector: "rules" | "ner" | "llm";
+  detector: "rules" | "ner" | "llm" | "known";
 }
 
 // --- checksums (same rules the real `rules` detector validates) -------------
@@ -104,6 +106,8 @@ const PATTERNS: Pattern[] = [
     score: 0.97,
     re: /(?<![\w+])(?:\+36|06)[ -]?(?:1|[2-9]\d)[ -/]?\d{3}[ -]?\d{3,4}\b/g,
   },
+  { type: "PHONE", detector: "rules", score: 0.97, re: /\+44 ?\d{2} ?\d{4} ?\d{4}\b/g },
+  { type: "PERSON", detector: "ner", score: 0.95, re: /\b(?:Jane Placeholder|Sam Example|John Sample)\b/g },
   { type: "VEHICLE_PLATE", detector: "rules", score: 0.96, re: /\b(?:[A-Z]{2} )?[A-Z]{2,3}-\d{3}\b/g },
   { type: "ID_DOCUMENT", detector: "rules", score: 0.93, re: /\b\d{6}[A-Z]{2}\b/g },
   {
@@ -180,6 +184,36 @@ export function detect(text: string): RawSpan[] {
   return resolve(found);
 }
 
+// --- known values (the `known` detector) -------------------------------------
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Every whole-word occurrence of a known value, case-insensitive, with any suffix glued on
+ * (Gyakorló Tihamérnak): the span covers the value, the suffix stays outside.
+ */
+export function detectKnown(text: string, known: readonly KnownValue[]): RawSpan[] {
+  const out: RawSpan[] = [];
+  for (const k of known) {
+    const words = k.value.trim().split(/\s+/).map(escapeRe).join("\\s+");
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${words}`, "giu");
+    for (const m of text.matchAll(re)) {
+      out.push({ start: m.index, end: m.index + m[0].length, entity_type: k.entity_type, score: 1, detector: "known" });
+    }
+  }
+  return out;
+}
+
+/** Known spans win every conflict, as in the real resolver. */
+export function mergeKnown(spans: RawSpan[], known: RawSpan[]): RawSpan[] {
+  if (!known.length) return spans;
+  const winners = resolve(known);
+  const rest = spans.filter((s) => winners.every((k) => s.end <= k.start || s.start >= k.end));
+  return [...rest, ...winners].sort((a, b) => a.start - b.start);
+}
+
 // --- vault ------------------------------------------------------------------
 
 function fnv1a(input: string): string {
@@ -208,6 +242,7 @@ interface MockSession {
   values: Map<string, string>; // placeholder -> original surface value
   counts: Map<string, number>;
   types: Map<string, TextEntityType>;
+  known: KnownValue[];
 }
 
 export interface MockClientOptions {
@@ -234,6 +269,33 @@ export function createMockClient(options: MockClientOptions = {}): GuardClient {
     }));
   }
 
+  function newSession(): [string, MockSession] {
+    const id = MOCK_SESSION_PREFIX + randomHex(6);
+    const session: MockSession = { salt: randomHex(8), byKey: new Map(), values: new Map(), counts: new Map(), types: new Map(), known: [] };
+    sessions.set(id, session);
+    return [id, session];
+  }
+
+  function addKnown(sessionId: string, session: MockSession, values: KnownValue[]): KnownValuesResponse {
+    values.forEach((v, i) => {
+      if (v.value.replace(/\s/g, "").length < 3) {
+        throw new ApiError(422, "invalid_known_value", `known value ${i} (${v.entity_type}) is too short: at least 3 non-space characters`);
+      }
+    });
+    let added = 0;
+    for (const v of values) {
+      const key = `${v.entity_type}:${normalize(v.entity_type, v.value)}`;
+      if (session.known.some((k) => `${k.entity_type}:${normalize(k.entity_type, k.value)}` === key)) continue;
+      session.known.push({ value: v.value.trim(), entity_type: v.entity_type });
+      added++;
+    }
+    return { session_id: sessionId, added, total: session.known.length };
+  }
+
+  function spansFor(text: string, session: MockSession | undefined): RawSpan[] {
+    return mergeKnown(detect(text), session ? detectKnown(text, session.known) : []);
+  }
+
   function placeholderFor(session: MockSession, type: TextEntityType, value: string): string {
     const key = `${type}:${normalize(type, value)}`;
     const existing = session.byKey.get(key);
@@ -254,7 +316,30 @@ export function createMockClient(options: MockClientOptions = {}): GuardClient {
   return {
     async analyze(req: AnalyzeRequest): Promise<AnalyzeResponse> {
       await wait();
-      return { spans: toPublic(req.text, detect(req.text)) };
+      let session: MockSession | undefined;
+      if (req.session_id) {
+        session = sessions.get(req.session_id);
+        if (!session) throw new ApiError(404, "not_found", "unknown session_id");
+      }
+      return { spans: toPublic(req.text, spansFor(req.text, session)) };
+    },
+
+    async createSession(known: KnownValue[]): Promise<KnownValuesResponse> {
+      await wait();
+      const [id, session] = newSession();
+      try {
+        return addKnown(id, session, known);
+      } catch (err) {
+        sessions.delete(id);
+        throw err;
+      }
+    },
+
+    async addKnownValues(sessionId: string, known: KnownValue[]): Promise<KnownValuesResponse> {
+      await wait();
+      const session = sessions.get(sessionId);
+      if (!session) throw new ApiError(404, "not_found", "unknown session_id");
+      return addKnown(sessionId, session, known);
     },
 
     async mask(req: MaskRequest): Promise<MaskResponse> {
@@ -267,12 +352,11 @@ export function createMockClient(options: MockClientOptions = {}): GuardClient {
         session = found;
         sessionId = req.session_id;
       } else {
-        sessionId = MOCK_SESSION_PREFIX + randomHex(6);
-        session = { salt: randomHex(8), byKey: new Map(), values: new Map(), counts: new Map(), types: new Map() };
-        sessions.set(sessionId, session);
+        [sessionId, session] = newSession();
       }
 
-      const spans = detect(req.text).filter((s) => ENTITY_META[s.entity_type].policy === "mask");
+      // Known values are masked even for a `keep` type: the application asked for it.
+      const spans = spansFor(req.text, session).filter((s) => s.detector === "known" || ENTITY_META[s.entity_type].policy === "mask");
       const used = new Map<string, number>();
       let out = "";
       let cursor = 0;
