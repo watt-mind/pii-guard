@@ -115,3 +115,51 @@ def test_streaming_unmask_matches_at_every_split(answer_tail: str) -> None:
     for cut in range(len(answer) + 1):
         assert _stream(session, answer, [cut]) == expected
     assert _stream(session, answer, list(range(1, len(answer)))) == expected
+
+
+# --- restore() changes the stem of names only (found in review of LAB-1194) ----------------
+
+
+@pytest.mark.parametrize(
+    ("value", "entity_type", "suffix", "expected"),
+    [
+        ("anna@firma.de", EntityType.EMAIL, "re", "anna@firma.dere"),
+        ("anna@firma.de", EntityType.EMAIL, "nak", "anna@firma.denak"),
+        ("info@bit.ly", EntityType.EMAIL, "val", "info@bit.lyval"),
+        ("123456AB", EntityType.ID_DOCUMENT, "vel", "123456ABvel"),
+        ("AB123456", EntityType.ID_DOCUMENT, "nak", "AB123456nak"),
+        # A word-like value of a non-name type keeps its spelling too.
+        ("Próba Zsuzsanna", EntityType.EMAIL, "nak", "Próba Zsuzsannanak"),
+        # An e-mail address labelled as a name is still not word-like.
+        ("anna@firma.de", PERSON, "re", "anna@firma.dere"),
+        # Names keep their stem changes.
+        ("Próba Zsuzsanna", PERSON, "nak", "Próba Zsuzsannának"),
+        ("Minta utca", EntityType.ADDRESS, "ban", "Minta utcában"),
+        ("Kiss Tóth", EntityType.ORGANIZATION, "val", "Kiss Tóthtal"),
+    ],
+)
+def test_restore_changes_the_stem_of_names_only(
+    value: str, entity_type: EntityType, suffix: str, expected: str
+) -> None:
+    assert HU.restore(value, suffix, entity_type) == expected
+
+
+@pytest.mark.parametrize("case_sensitive", [False, True])
+@pytest.mark.parametrize(
+    ("value", "entity_type", "suffix"),
+    [
+        ("anna@firma.de", "EMAIL", "re"),
+        ("info@bit.ly", "EMAIL", "val"),
+        ("123456AB", "ID_DOCUMENT", "vel"),
+    ],
+)
+def test_unmask_appends_suffix_to_emails_and_ids(
+    value: str, entity_type: str, suffix: str, case_sensitive: bool
+) -> None:
+    session = _session(case_sensitive=case_sensitive)
+    text = f"Írj ide: {value} ma."
+    masked = session.mask(text, [span_of(text, value, entity_type)])
+    (token,) = _tokens(masked)
+    answer = f"Írtam {token}{suffix}."
+    assert session.unmask(answer) == f"Írtam {value}{suffix}."
+    assert _stream(session, answer, list(range(1, len(answer)))) == session.unmask(answer)
