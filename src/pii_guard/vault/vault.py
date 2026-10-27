@@ -46,6 +46,7 @@ __all__ = [
     "DEFAULT_TTL_SECONDS",
     "MIN_TENANT_KEY_BYTES",
     "MaskResult",
+    "PlaceholderInInputError",
     "SessionNotFoundError",
     "UnmaskResult",
     "Vault",
@@ -53,6 +54,18 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+class PlaceholderInInputError(MaskingError):
+    """The text to mask already holds a placeholder this session issued (422).
+
+    Restoring it later would put a value into text the caller never masked. The message
+    names a count only, never the token or any value.
+    """
+
+    code = "placeholder_in_input"
+    status_code = 422
+
 
 DEFAULT_TTL_SECONDS = 3600.0
 MIN_TENANT_KEY_BYTES = 16
@@ -242,6 +255,9 @@ class VaultSession:
         self._lock = threading.RLock()
         self._by_key: dict[tuple[EntityType, str], _Entry] = {}
         self._by_placeholder: dict[str, _Entry] = {}
+        # Placeholder-shaped tokens seen in input that this session did not issue. They are
+        # never issued later, so a token the caller wrote can't turn into a masked value.
+        self._reserved: set[str] = set()
         self._closed = False
         self._expires_at = clock() + ttl_seconds
         self._known = KnownValues()
@@ -266,6 +282,7 @@ class VaultSession:
             self._closed = True
             self._by_key.clear()
             self._by_placeholder.clear()
+            self._reserved.clear()
             self._known.clear()
 
     @property
@@ -288,7 +305,14 @@ class VaultSession:
 
     # --- masking -------------------------------------------------------------------------
 
-    def mask(self, text: str, spans: Sequence[Span], *, language: str = "hu") -> str:
+    def mask(
+        self,
+        text: str,
+        spans: Sequence[Span],
+        *,
+        language: str = "hu",
+        remask: bool = False,
+    ) -> str:
         """Replace each span, and every other occurrence of a confirmed value, by its placeholder.
 
         Confirmed values are those in ``spans`` plus every value this session masked before.
@@ -299,61 +323,102 @@ class VaultSession:
         in a suffix is narrowed to the stem (``Próba Zsuzsannának`` -> ``[[PERSON_x]]nak``)
         and stem-changed forms (``Próba Zsuzsannát``, ``Kováccsal``) are found as occurrences.
 
+        Placeholder-shaped tokens already in ``text``: one equal to a placeholder this session
+        issued raises :class:`PlaceholderInInputError` (``placeholder_in_input``, 422), since
+        :meth:`unmask` would restore a value into text that was never masked. Any other
+        token is reserved: left as it is and never issued as a placeholder later.
+        ``remask=True`` is for text this session's own :meth:`mask` produced (a second pass
+        that catches values confirmed later): its issued placeholders are expected there.
+
         Raises :class:`MaskingError` for invalid, out-of-range or overlapping spans, and
         :class:`SessionNotFoundError` once the session has expired. Nothing is recorded when
         it raises.
         """
-        return self.mask_with_report(text, spans, language=language).text
+        return self.mask_with_report(text, spans, language=language, remask=remask).text
 
     def mask_with_report(
-        self, text: str, spans: Sequence[Span], *, language: str = "hu"
+        self,
+        text: str,
+        spans: Sequence[Span],
+        *,
+        language: str = "hu",
+        remask: bool = False,
     ) -> MaskResult:
         """Like :meth:`mask`, also returning where each placeholder went."""
         with self._lock:
             self._check_alive()
             ordered = _validated(text, spans)
-            matcher = inflection_for(language)
-            taken = bytearray(len(text))
-            replacements: list[tuple[int, int, _Entry]] = []
-            for plan in self._plans(text, ordered, matcher):
-                span, end = plan.span, plan.span.start + plan.stem_length
-                entry = self._entry_for(span.entity_type, plan.lemma, language)
-                entry.add_surface(span.text)
-                for alias in plan.aliases:
-                    entry.add_alias(alias)
-                replacements.append((span.start, end, entry))
-                taken[span.start : end] = b"\x01" * (end - span.start)
-            # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
-            entries = sorted(self._by_key.values(), key=lambda e: len(e.normalized), reverse=True)
-            for entry in entries:
-                for match in entry.pattern(language).finditer(text):
-                    start, end = match.span()
-                    if any(taken[start:end]):
-                        continue
-                    replacements.append((start, end, entry))
-                    taken[start:end] = b"\x01" * (end - start)
-            replacements.sort(key=lambda r: r[0])
-            parts: list[str] = []
-            cursor = 0
-            per_type: Counter[str] = Counter()
-            for start, end, entry in replacements:
-                parts.append(text[cursor:start])
-                parts.append(entry.placeholder)
-                entry.remember(following_suffix(text, end), text[start:end])
-                entry.count += 1
-                per_type[entry.entity_type.value] += 1
-                cursor = end
-            parts.append(text[cursor:])
-            logger.debug(
-                "masked %d occurrences (%d from spans): %s",
-                len(replacements),
-                len(ordered),
-                dict(per_type),
+            foreign = self._foreign_tokens(text, remask)
+            added = foreign - self._reserved
+            self._reserved |= added
+            try:
+                return self._mask_validated(text, ordered, language)
+            except BaseException:
+                self._reserved -= added
+                raise
+
+    def _foreign_tokens(self, text: str, remask: bool) -> set[str]:
+        """Placeholder-shaped tokens in ``text`` this session didn't issue.
+
+        Raises :class:`PlaceholderInInputError` for one it did, unless ``remask``.
+        """
+        foreign: set[str] = set()
+        issued = 0
+        for match in PLACEHOLDER_RE.finditer(text):
+            token = match.group(0)
+            if token in self._by_placeholder:
+                issued += 1
+            else:
+                foreign.add(token)
+        if issued and not remask:
+            raise PlaceholderInInputError(
+                f"the text contains {issued} placeholder(s) already issued in this session"
             )
-            return MaskResult(
-                "".join(parts),
-                tuple((start, end, entry.placeholder) for start, end, entry in replacements),
-            )
+        return foreign
+
+    def _mask_validated(self, text: str, ordered: Sequence[Span], language: str) -> MaskResult:
+        matcher = inflection_for(language)
+        taken = bytearray(len(text))
+        replacements: list[tuple[int, int, _Entry]] = []
+        for plan in self._plans(text, ordered, matcher):
+            span, end = plan.span, plan.span.start + plan.stem_length
+            entry = self._entry_for(span.entity_type, plan.lemma, language)
+            entry.add_surface(span.text)
+            for alias in plan.aliases:
+                entry.add_alias(alias)
+            replacements.append((span.start, end, entry))
+            taken[span.start : end] = b"\x01" * (end - span.start)
+        # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
+        entries = sorted(self._by_key.values(), key=lambda e: len(e.normalized), reverse=True)
+        for entry in entries:
+            for match in entry.pattern(language).finditer(text):
+                start, end = match.span()
+                if any(taken[start:end]):
+                    continue
+                replacements.append((start, end, entry))
+                taken[start:end] = b"\x01" * (end - start)
+        replacements.sort(key=lambda r: r[0])
+        parts: list[str] = []
+        cursor = 0
+        per_type: Counter[str] = Counter()
+        for start, end, entry in replacements:
+            parts.append(text[cursor:start])
+            parts.append(entry.placeholder)
+            entry.remember(following_suffix(text, end), text[start:end])
+            entry.count += 1
+            per_type[entry.entity_type.value] += 1
+            cursor = end
+        parts.append(text[cursor:])
+        logger.debug(
+            "masked %d occurrences (%d from spans): %s",
+            len(replacements),
+            len(ordered),
+            dict(per_type),
+        )
+        return MaskResult(
+            "".join(parts),
+            tuple((start, end, entry.placeholder) for start, end, entry in replacements),
+        )
 
     def _plans(self, text: str, ordered: Sequence[Span], matcher: InflectionMatcher) -> list[_Plan]:
         """The lemma and stem of every span (see :class:`~pii_guard.vault.inflection.Split`).
@@ -441,7 +506,7 @@ class VaultSession:
                 self._tenant_key, self.session_id, entity_type, normalized, length
             )
             placeholder = format_placeholder(entity_type, placeholder_id)
-            if placeholder not in self._by_placeholder:
+            if placeholder not in self._by_placeholder and placeholder not in self._reserved:
                 break
             # Collision with a different value: extend the id (ADR 0007).
             if length >= MAX_ID_LENGTH:  # pragma: no cover - a full SHA-256 collision
