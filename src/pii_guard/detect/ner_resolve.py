@@ -5,13 +5,15 @@ Resolution order (LAB-1192, ``docs/models.md``), first match wins:
 1. **Configured**: ``PII_GUARD_NER_MODEL``, a local directory or a Hugging Face hub id (with
    ``PII_GUARD_NER_REVISION``). A configured model that can't load stops startup (ADR 0006).
 2. **Published**: the published pii-guard checkpoint, ``PII_GUARD_NER_PUBLISHED_MODEL``
-   (``repo`` or ``repo@revision``), else :data:`PUBLISHED`. None exists yet (LAB-1137), so this
-   step is a placeholder that is skipped.
+   (``repo`` or ``repo@revision``, default :data:`PUBLISHED_REPO`). It is used only once it is
+   pinned: a ``@revision`` in the setting, or :data:`PUBLISHED`'s revision, which LAB-1306 fills
+   in with the weights' SHA-256 when it publishes. Until then this step is skipped.
 3. **Public fallback**: :data:`PUBLIC_FALLBACK`, a public multilingual PII token classifier
-   (Apache-2.0), pinned to a hub revision. ``PII_GUARD_NER_FALLBACK`` decides what happens when
-   it is not in the cache yet: ``download`` (default) fetches it on first use, ``cached`` uses it
-   only if it is already there, ``off`` never uses it (fast mode is then rules only). Only
-   ``download`` fetches anything, a pinned published model included.
+   (Apache-2.0), pinned to a hub revision. A stop-gap until the published checkpoint exists:
+   it leaks little but over-masks (about 23 % on en-smoke). ``PII_GUARD_NER_FALLBACK`` decides
+   what happens when it is not in the cache yet: ``download`` (default) fetches it on first
+   use, ``cached`` uses it only if it is already there, ``off`` never uses it (fast mode is
+   then rules only). Only ``download`` fetches anything, a pinned published model included.
 
 Pinned models are fetched with ``huggingface_hub.snapshot_download`` at their revision, only the
 files the detector reads, into ``$PII_GUARD_MODELS_DIR/ner/<repo>-<revision>`` (default
@@ -43,6 +45,7 @@ __all__ = [
     "PUBLIC_FALLBACK",
     "PUBLISHED",
     "PUBLISHED_ENV_VAR",
+    "PUBLISHED_REPO",
     "NerChoice",
     "PinnedModel",
     "describe",
@@ -124,8 +127,16 @@ PUBLIC_FALLBACK = PinnedModel(
     weights_sha256="03ec34b3cd297c25ab8c720352c125f571ebf844684d3fbb583927a73a7752fd",
 )
 
-#: The published pii-guard checkpoint, once there is one (LAB-1137). ``None``: not published.
-PUBLISHED: PinnedModel | None = None
+#: Where the trained pii-guard NER is published (owner decision, LAB-1306).
+PUBLISHED_REPO = "hdkiller/pii-guard-ner-xlmr-base"
+#: The published checkpoint. LAB-1306 sets ``revision``, ``weights_sha256``, ``licence`` and
+#: ``size_mb`` when it publishes; with an empty revision the step is skipped (nothing to pin).
+PUBLISHED = PinnedModel(
+    repo_id=PUBLISHED_REPO,
+    revision="",
+    licence="see its model card",
+    size_mb=1110,
+)
 
 
 def models_dir() -> Path:
@@ -162,12 +173,14 @@ def _env(env: Mapping[str, str] | None, name: str) -> str:
 
 
 def _published(value: str) -> PinnedModel | None:
-    if not value:
-        return PUBLISHED
-    repo, _, revision = value.partition("@")
+    """The published checkpoint to try, or ``None`` while it has no pinned revision."""
+    repo, _, revision = (value or PUBLISHED_REPO).partition("@")
+    if not revision and repo == PUBLISHED.repo_id:
+        revision = PUBLISHED.revision
     if not revision:
-        # An unpinned published id: loaded through the hub cache by transformers, unpinned.
-        return PinnedModel(repo_id=repo, revision="", licence="see its model card", size_mb=0)
+        return None  # not published yet (LAB-1306): never load an unpinned checkpoint
+    if repo == PUBLISHED.repo_id and revision == PUBLISHED.revision:
+        return PUBLISHED
     return PinnedModel(repo_id=repo, revision=revision, licence="see its model card", size_mb=0)
 
 
@@ -200,8 +213,6 @@ def resolve(
     if mode != "off":
         candidates.append(("fallback", PUBLIC_FALLBACK))
     for source, pinned in candidates:
-        if not pinned.revision:  # unpinned published hub id: transformers' own hub cache
-            return NerChoice(source, pinned.repo_id, None, pinned, ready=True)
         ready = pinned.is_ready(base)
         if ready or mode == "download":
             return NerChoice(
@@ -233,7 +244,7 @@ def ensure(
     if choice.model is None:
         raise DetectionError(f"no ner model: {choice.reason}")
     pinned = choice.pinned
-    if pinned is None or choice.ready or not pinned.revision:
+    if pinned is None or choice.ready:
         return choice.model
     if pinned.is_ready(base):
         return str(pinned.local_dir(base))

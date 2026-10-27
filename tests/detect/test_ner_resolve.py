@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from pii_guard.config import Settings
 from pii_guard.detect import ner_resolve
 from pii_guard.detect.ner_resolve import (
     PUBLIC_FALLBACK,
@@ -62,7 +63,10 @@ def test_public_fallback_is_pinned_and_licence_checked() -> None:
     assert PUBLIC_FALLBACK.licence == "Apache-2.0"
     assert len(PUBLIC_FALLBACK.revision) == 40
     assert len(PUBLIC_FALLBACK.weights_sha256) == 64
-    assert ner_resolve.PUBLISHED is None  # LAB-1137: nothing published yet
+    # LAB-1306 publishes the trained checkpoint here; until it pins a revision, step 2 is skipped.
+    assert ner_resolve.PUBLISHED.repo_id == ner_resolve.PUBLISHED_REPO
+    assert ner_resolve.PUBLISHED.revision == ""
+    assert Settings().ner_published_model == ner_resolve.PUBLISHED_REPO
 
 
 def test_models_dir_default_and_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -94,12 +98,24 @@ def test_published_before_fallback(fallback: PinnedModel) -> None:
     assert "published pii-guard model" in describe(choice)
     # "cached" never downloads: an unready published model is skipped, so is the fallback.
     assert resolve(published="fictional/pii-guard-ner@abcdef1", fallback="cached").model is None
-    unpinned = resolve(published="fictional/pii-guard-ner")
-    assert (unpinned.source, unpinned.model, unpinned.ready) == (
-        "published",
-        "fictional/pii-guard-ner",
-        True,
+    # No revision: not published yet, so never loaded unpinned; the fallback runs instead.
+    for unpinned in ("fictional/pii-guard-ner", "", ner_resolve.PUBLISHED_REPO):
+        assert resolve(published=unpinned).source == "fallback"
+
+
+def test_published_default_once_pinned(
+    monkeypatch: pytest.MonkeyPatch, fallback: PinnedModel
+) -> None:
+    pinned = PinnedModel(
+        repo_id=ner_resolve.PUBLISHED_REPO,
+        revision="fedcba9876543210fedcba9876543210fedcba98",
+        licence="Apache-2.0",
+        size_mb=1,
     )
+    monkeypatch.setattr(ner_resolve, "PUBLISHED", pinned)
+    choice = resolve()
+    assert (choice.source, choice.pinned) == ("published", pinned)
+    assert choice.model == str(pinned.local_dir())
 
 
 def test_fallback_modes(fallback: PinnedModel, hub: list[dict[str, Any]]) -> None:

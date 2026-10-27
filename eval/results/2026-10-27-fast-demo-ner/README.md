@@ -4,7 +4,8 @@
 checkout, because the trained pii-guard checkpoints are not published (LAB-1137). LAB-1150
 compared two public zero-shot models (GLiNER multi v2.1 and Davlan's XLM-R). This run adds a
 third, a public multilingual PII token classifier, on the same fixtures with the same scorer,
-and it becomes the fallback (`pii_guard.detect.ner_resolve.PUBLIC_FALLBACK`,
+and it becomes the fallback, a stop-gap until the trained checkpoint is published as
+`hdkiller/pii-guard-ner-xlmr-base` (LAB-1306) (`pii_guard.detect.ner_resolve.PUBLIC_FALLBACK`,
 [docs/models.md](../../../docs/models.md#which-ner-model-fast-mode-runs)).
 
 - **Model:** [`bardsai/eu-pii-anonimization-multilang`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang)

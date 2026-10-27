@@ -36,7 +36,7 @@ loaded and any inference error raise `DetectionError` (fail closed).
 |---|---|---|
 | Model (hub id or directory) | `PII_GUARD_NER_MODEL` | unset: the published checkpoint, else the public fallback ([below](#which-ner-model-fast-mode-runs)) |
 | Revision | `PII_GUARD_NER_REVISION` | pinned for the published and fallback models |
-| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | none yet (LAB-1137); `repo` or `repo@revision` |
+| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `hdkiller/pii-guard-ner-xlmr-base`, used once pinned (LAB-1306); `repo` or `repo@revision` |
 | Fallback | `PII_GUARD_NER_FALLBACK` | `download`: fetch it on first use; `cached`: only if already downloaded; `off`: never |
 | Model cache | `PII_GUARD_MODELS_DIR` | `~/.cache/pii-guard/models` |
 | Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
@@ -56,11 +56,16 @@ would run, without downloading).
 
 1. **`PII_GUARD_NER_MODEL`**, a local directory or a hub id (with `PII_GUARD_NER_REVISION`).
    If it is set and can't load, startup stops (fail closed, ADR 0006).
-2. **The published pii-guard checkpoint** (`PII_GUARD_NER_PUBLISHED_MODEL`). None is
-   published yet; the owner decides after LAB-1150 (LAB-1137), so this step is skipped today.
-3. **The public fallback**, so that fast mode is rules + NER from a clean checkout:
+2. **The published pii-guard checkpoint**, `hdkiller/pii-guard-ner-xlmr-base`
+   (`PII_GUARD_NER_PUBLISHED_MODEL`). The owner decided to publish the trained XLM-R base
+   NER there; LAB-1306 trains it and pins its revision and SHA-256 in
+   `pii_guard.detect.ner_resolve.PUBLISHED`. A checkpoint is never loaded unpinned, so until
+   that lands this step is skipped (or set `repo@revision` yourself).
+3. **The public fallback**, a **stop-gap** so that fast mode is rules + NER from a clean
+   checkout until step 2 is pinned:
    [`bardsai/eu-pii-anonimization-multilang`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang)
-   at revision `62ca5712368705bac11b8fea19e42e65cce088dd`.
+   at revision `62ca5712368705bac11b8fea19e42e65cce088dd`. It leaks little but **over-masks:
+   about 23 % on en-smoke** (below).
 
 `make demo`, `make smoke-fast`, `docker compose --profile demo up` and the banners print the
 line `rules + NER: <model>@<revision> (public fallback, Apache-2.0)`, or why it is rules only.
@@ -267,7 +272,9 @@ ablation, which never saw those rows, is the held-out figure.
 - Use `xlmr-base-v2-hn` for fast mode. It meets the ~150 ms CPU p95 limit everywhere,
   including 85 ms on a 4-vCPU T4 container.
 - Use large + hard negatives on GPU or MPS hosts.
-- Neither checkpoint is published (the owner decides), so point `PII_GUARD_NER_MODEL` at one you trained.
+- Neither checkpoint is published yet. The owner decided to publish the trained base model as
+  `hdkiller/pii-guard-ner-xlmr-base` (LAB-1306, step 2 of [the resolution order](#which-ner-model-fast-mode-runs));
+  until then point `PII_GUARD_NER_MODEL` at one you trained.
 
 **GLiNER:**
 - GLiNER is not adopted as the default. It leaks and over-masks more zero-shot, over-masks

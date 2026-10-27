@@ -167,7 +167,12 @@ def test_ner_settings_reach_the_detector(monkeypatch: pytest.MonkeyPatch) -> Non
     for name in ("REVISION", "DEVICE", "PUBLISHED_MODEL", "FALLBACK"):
         monkeypatch.delenv(f"PII_GUARD_NER_{name}")
     build_detector("ner", Settings())
-    assert seen == {"name": "ner", "model": "./models/fictional-ner", "fallback": "download"}
+    assert seen == {
+        "name": "ner",
+        "model": "./models/fictional-ner",
+        "published": "hdkiller/pii-guard-ner-xlmr-base",
+        "fallback": "download",
+    }
 
 
 def test_default_stack_without_a_resolvable_model_is_rules_only(
