@@ -896,6 +896,30 @@ follows the registry, and the e-mail rule accepts `xn--` TLDs and quoted local p
   `2026-10-27-rules-resolve-{before,after}-{smoke,ai4privacy}-{rules,fast}` in
   [benchmarks.md](benchmarks.md).
 
+### 32. Valid vs invalid numbers on the public set, headline unchanged (2026-10-27)
+
+PR [#66](https://github.com/watt-mind/pii-guard/pull/66), LAB-1201. **No headline number changes:** this splits the published Ai4Privacy
+leak rate by whether a structured identifier passes the language packs' own validators
+(Luhn, IBAN, TAJ and tax-ID check digits, phone numbering plans, ID-document checksums).
+Owner decision: invalid numbers stay in the headline, because a mistyped real identifier is
+still personal data; the split only shows where the gap comes from. Of the set's 909 numbers,
+166 are valid.
+
+| Ai4Privacy (de + en + hu, 600 docs) | Leak | Valid numbers leaked | Invalid numbers leaked | Other values leaked |
+|---|---:|---:|---:|---:|
+| pii-guard fast | 27.6 % | 0 of 166 | 63.4 % | 10.4 % |
+| pii-guard strict | 3.9 % | 0 of 166 | 6.5 % | 2.8 % |
+| PrivAiTe | 9.5 % | 7 of 166 | 3.0 % | 14.0 % |
+
+- **Fast mode masks every valid number and leaks 10.4 % of names, addresses and e-mail**
+  (PrivAiTe 14.0 %). Its gap on this set is invalid numbers, which the rules skip on purpose.
+- The runs kept no per-document predictions, so each system was run again to classify them,
+  with the run's own code. Every local re-run reproduced its record exactly. Strict mode
+  came out at 3.8 % vs 3.9 %, and its row is marked.
+- **Cost:** $1.65 Baseten for the strict re-run (budget $2); the rest ran locally. Breakdown
+  in [benchmarks.md](benchmarks.md#ai4privacy) (`validity-ai4privacy.svg`) and
+  [evaluation.md](evaluation.md#number-validity).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

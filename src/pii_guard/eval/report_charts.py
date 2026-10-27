@@ -10,6 +10,8 @@ the run dates and the commits. Output depends only on the index, so it is byte-s
 - :func:`progress`: leak rate of each pii-guard system over time, with the best so far;
 - :func:`type_recall_heatmap`: overlap recall per entity type and system;
 - :func:`visual_recall`: image-region recall per region type, per visual run;
+- :func:`number_validity`: leak rate per system, split by whether a structured identifier
+  passes the language packs' validators (LAB-1201);
 - :func:`latency`: what the gateway adds per request (p50 / p95 per mode, concurrency and
   streaming) and the stage breakdown of the p50 overhead.
 """
@@ -28,6 +30,7 @@ __all__ = [
     "by_language",
     "latency",
     "leak_vs_latency",
+    "number_validity",
     "progress",
     "type_recall_heatmap",
     "visual_recall",
@@ -491,6 +494,106 @@ def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence
         "Grouped bars of overlap F1 and full leak rate per language for each system on the "
         + fixture_set
         + " fixtures.",
+        body,
+        caption,
+    )
+
+
+# --- (b2) number validity ------------------------------------------------------------------
+
+#: (key in the compact validity block or ``None`` for the headline, legend, colour)
+VALIDITY_BARS: tuple[tuple[str | None, str, str], ...] = (
+    (None, "All values (headline)", "#4A4A52"),
+    ("valid", "Valid numbers", "#117733"),
+    ("invalid", "Invalid numbers", "#CC6677"),
+    ("excluding_number_types", "Other values (names, addresses, e-mail)", "#332288"),
+)
+
+
+def number_validity(index: Mapping[str, Any], *, fixture_set: str) -> str:
+    """Leak rate per system: headline, valid numbers, invalid numbers, every other value."""
+    order = {key: i for i, key in enumerate(index["systems"])}
+    snaps = sorted(
+        (
+            s
+            for s in index["snapshots"]
+            if s["fixture_set"] == fixture_set and s["all"].get("validity")
+        ),
+        key=lambda s: order.get(s["system"], len(order)),
+    )
+    styles = index["systems"]
+    label_w = (
+        max([text_width(styles[s["system"]]["short_label"], 21, bold=True) for s in snaps] + [100])
+        + 28
+        + 32
+    )
+    top, bottom = 210, 730
+    row_h = (bottom - top) / max(len(snaps), 1)
+    bar_h = min(24, (row_h - 12) / len(VALIDITY_BARS))
+    x0 = 56 + label_w
+    pw = W - x0 - 140
+    body = [
+        _text(
+            56,
+            112,
+            "Full leak rate per system, split by whether a number passes the language packs' "
+            "validators",
+            size=24,
+            fill=MUTED,
+        )
+    ]
+    lx = 56
+    for _, name, color in VALIDITY_BARS:
+        body.append(f'<rect x="{lx}" y="140" width="22" height="22" fill="{color}"/>')
+        body.append(_text(lx + 30, 159, name, size=21))
+        lx += 30 + text_width(name, 21) + 36
+    for t in (0, 0.25, 0.5, 0.75, 1.0):
+        x = x0 + t * pw
+        body.append(
+            f'<line x1="{_n(x)}" y1="{top}" x2="{_n(x)}" y2="{bottom}" stroke="{GRID}" '
+            'stroke-width="2"/>'
+        )
+        body.append(_text(x, bottom + 30, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="middle"))
+    off = []
+    for i, s in enumerate(snaps):
+        st, m, v = styles[s["system"]], s["all"], s["all"]["validity"]
+        y = top + i * row_h + (row_h - bar_h * len(VALIDITY_BARS)) / 2
+        mid = y + bar_h * len(VALIDITY_BARS) / 2
+        body.append(
+            _marker(st["shape"], 56 + 10, mid, 9, st["color"], hollow=st["family"] == "comparison")
+        )
+        label = st["short_label"] + ("" if v["matches_headline"] else " §")
+        body.append(_text(56 + 28, mid + 8, label, size=21, weight="600"))
+        if not v["matches_headline"]:
+            off.append(f"{st['short_label']} re-run {_pct(v['rerun_leak'])}%")
+        for j, (key, _, color) in enumerate(VALIDITY_BARS):
+            value = m["leak"] if key is None else v[key]["leak"]
+            yy = y + j * bar_h
+            if value is None:
+                body.append(_text(x0 + 6, yy + bar_h - 5, "no values", size=18, fill=MUTED))
+                continue
+            w = max(value * pw, 2)
+            body.append(
+                f'<rect x="{_n(x0)}" y="{_n(yy + 2)}" width="{_n(w)}" '
+                f'height="{_n(bar_h - 4)}" fill="{color}"/>'
+            )
+            body.append(_text(x0 + w + 8, yy + bar_h - 6, _pct(value), size=19, fill=INK))
+    caption = [
+        set_caption(index, fixture_set) + ", " + pooled_languages(index, fixture_set) + ".",
+        "Valid = a validated rule of the type recognises the value (checksum, numbering plan, "
+        "format). Invalid numbers stay in the headline.",
+    ]
+    if off:
+        caption.append(
+            "§ Breakdown from a re-run that differs from the headline: " + "; ".join(off) + "."
+        )
+    caption.append(_provenance(snaps))
+    return _svg(
+        "Leak rate by number validity",
+        "Grouped bars of the full leak rate per system on the "
+        + fixture_set
+        + " fixtures: all values, numbers that pass their validators, numbers that fail them, "
+        "and every other value.",
         body,
         caption,
     )

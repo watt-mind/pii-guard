@@ -17,6 +17,12 @@ records `eval/results/runs/2026-10-27-comparison-*.json`
 > instead of a placeholder 0.0. Leak and recall are unchanged.
 > [benchmarks.md](../../../docs/benchmarks.md) has the re-scored numbers.
 
+> **Number validity (LAB-1201).** The `*-ai4privacy` run records now also split leak and
+> recall by whether a number passes the language packs' validators
+> ([evaluation.md](../../../docs/evaluation.md#number-validity)). The runs kept no
+> per-document predictions, so each system was run again to classify them; the headline
+> numbers below are unchanged.
+
 ## Systems
 
 | System | What runs |

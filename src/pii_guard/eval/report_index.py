@@ -58,9 +58,11 @@ __all__ = [
     "SHA_DIGITS",
     "build_index",
     "compact",
+    "compact_validity",
     "current_versions",
     "fixture_shas",
     "pool",
+    "pool_validity",
     "run_order",
 ]
 
@@ -271,6 +273,88 @@ def pool(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "latency_ms": {"detect": latency("detect"), "mask": latency("mask")},
         "per_type": per_type,
         "latency_pooled": True,
+        **({"validity": v} if (v := pool_validity(blocks)) else {}),
+    }
+
+
+_VALIDITY_PARTS = ("valid", "invalid", "excluding_number_types")
+_VALIDITY_COUNTS = ("gold", "found", "values", "leaked")
+
+
+def _sum_counts(items: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    return {k: sum(int(i[k]) for i in items) for k in _VALIDITY_COUNTS}
+
+
+def _headline_counts(block: Mapping[str, Any]) -> dict[str, int]:
+    return {
+        "gold": block["overlap"]["gold"],
+        "found": block["overlap"]["tp_gold"],
+        "values": block["leak"]["values"],
+        "leaked": block["leak"]["leaked"],
+    }
+
+
+def pool_validity(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:
+    """The number-validity breakdowns of ``blocks`` summed, or ``None`` if one has none.
+
+    A pooled ``source`` is ``None`` only when every block computed it in the run itself;
+    ``matches_headline`` holds when every re-run reproduced its record's counts, and
+    ``rerun_headline`` otherwise sums what the breakdowns add up to.
+    """
+    vals = [b.get("validity") for b in blocks]
+    if not vals or any(not v for v in vals):
+        return None
+    out: dict[str, Any] = {k: _sum_counts([v[k] for v in vals]) for k in _VALIDITY_PARTS}
+    per_type: dict[str, Any] = {}
+    for name in type_order(n for v in vals for n in v["per_type"]):
+        rows = [v["per_type"][name] for v in vals if name in v["per_type"]]
+        per_type[name] = {c: _sum_counts([r[c] for r in rows]) for c in ("valid", "invalid")}
+    out["per_type"] = per_type
+    sources = [v.get("source") for v in vals]
+    if all(s is None for s in sources):
+        out["source"] = None
+        return out
+    matches = all(s is None or s["matches_headline"] for s in sources)
+    rerun = [
+        (s or {}).get("rerun_headline") or _headline_counts(b)
+        for s, b in zip(sources, blocks, strict=True)
+    ]
+    out["source"] = {
+        "by": "+".join(sorted({s["by"] for s in sources if s})),
+        "method": "rerun",
+        "commit": "+".join(sorted({s["commit"] for s in sources if s})),
+        "date": "+".join(sorted({s["date"] for s in sources if s})),
+        "matches_headline": matches,
+        "rerun_headline": None if matches else _sum_counts(rerun),
+        "note": " ".join(dict.fromkeys(s["note"] for s in sources if s)),
+    }
+    return out
+
+
+def _compact_counts(c: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        **{k: int(c[k]) for k in _VALIDITY_COUNTS},
+        "recall": _r(_ratio(c["found"], c["gold"])),
+        "leak": _r(_ratio(c["leaked"], c["values"])),
+    }
+
+
+def compact_validity(v: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The validity breakdown with rates, for tables, charts and the UI."""
+    if not v:
+        return None
+    source = v.get("source")
+    rerun = (source or {}).get("rerun_headline")
+    return {
+        **{k: _compact_counts(v[k]) for k in _VALIDITY_PARTS},
+        "per_type": {
+            name: {c: _compact_counts(row[c]) for c in ("valid", "invalid")}
+            for name, row in v["per_type"].items()
+        },
+        "rerun": source is not None,
+        "matches_headline": source is None or bool(source["matches_headline"]),
+        "rerun_leak": None if not rerun else _r(_ratio(rerun["leaked"], rerun["values"])),
+        "by": None if source is None else source["by"],
     }
 
 
@@ -309,6 +393,7 @@ def compact(block: Mapping[str, Any]) -> dict[str, Any]:
         "detect_p95_ms": _r(detect.get("p95"), 3),
         "latency_pooled": bool(block.get("latency_pooled", False)),
         "per_type": per_type,
+        **({"validity": compact_validity(block["validity"])} if block.get("validity") else {}),
     }
 
 

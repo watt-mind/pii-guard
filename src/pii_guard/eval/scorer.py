@@ -33,6 +33,9 @@ Definitions (``docs/evaluation.md``):
   of one type that are surface forms of each other (``Minta Anna``, ``Minta Annának``,
   ``TESZT ELEK``; :func:`pii_guard.eval.forms.surface_pattern`). An occurrence left unmasked
   makes its entity inconsistent. ``multi_rate`` counts only entities with 2+ occurrences.
+- **Number validity** (public sets only): recall and leak split by whether a structured
+  identifier passes the language packs' validators, plus the leak of every other value
+  (:mod:`pii_guard.eval.validity`). The headline counts are not changed by it.
 """
 
 from __future__ import annotations
@@ -43,7 +46,7 @@ import statistics
 import time
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from pii_guard.detect.pipeline import DetectionPipeline
@@ -216,6 +219,9 @@ class ValueLeak:
     occurrences: int
     leaked: bool
     partial: bool
+    #: The labelled value (first occurrence), for in-process breakdowns only: never in
+    #: ``repr`` or :meth:`to_dict`.
+    value: str = field(default="", repr=False, compare=False)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -279,7 +285,7 @@ def leak_report(
                 if find_surface_forms(clean, token, EntityType.PERSON, doc.language):
                     partial = True
                     break
-        report.append(ValueLeak(entity_type, len(spans), leaked, partial))
+        report.append(ValueLeak(entity_type, len(spans), leaked, partial, value))
     return report
 
 
@@ -570,6 +576,9 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
 
     detect_ms = [r.detect_ms for r in results]
     mask_ms = [r.mask_ms for r in results]
+    from pii_guard.eval.validity import is_public, validity_block
+
+    extra: dict[str, object] = {"validity": validity_block(results)} if is_public(results) else {}
     return {
         "documents": len(results),
         "gold_spans": sum(len(r.document.spans) for r in results),
@@ -604,6 +613,7 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
             "detect": {"p50": _percentile(detect_ms, 0.5), "p95": _percentile(detect_ms, 0.95)},
             "mask": {"p50": _percentile(mask_ms, 0.5), "p95": _percentile(mask_ms, 0.95)},
         },
+        **extra,
     }
 
 

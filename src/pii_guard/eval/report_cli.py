@@ -11,7 +11,8 @@ pure function of the inputs so ``--check`` compares them byte for byte:
 
 - ``eval/results/index.json``: the index (:mod:`pii_guard.eval.report_index`);
 - ``ui/src/api/benchmarks.index.json``: the same index, compact, bundled into the UI;
-- ``docs/benchmarks/*.svg``: the charts (:mod:`pii_guard.eval.report_charts`);
+- ``docs/benchmarks/*.svg``: the charts (:mod:`pii_guard.eval.report_charts`), plus
+  ``validity-<set>.svg`` for each set with a number-validity breakdown;
 - ``docs/benchmarks.md``: tables, embedded charts and method notes;
 - ``docs/benchmarks/colours.json``: the append-only colour registry
   (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
@@ -86,6 +87,16 @@ _OPTIONAL = {"visual-recall.svg": "visual", "latency.svg": "latency"}
 def _drawn(index: Mapping[str, Any], name: str) -> bool:
     key = _OPTIONAL.get(name)
     return key is None or bool(index.get(key))
+
+
+def validity_sets(index: Mapping[str, Any]) -> list[str]:
+    """Fixture sets with a number-validity breakdown in some current snapshot."""
+    return sorted({s["fixture_set"] for s in index["snapshots"] if s["all"].get("validity")})
+
+
+def validity_chart(fixture_set: str) -> str:
+    """File name of a set's number-validity chart under ``docs/benchmarks/``."""
+    return f"validity-{fixture_set}.svg"
 
 
 # --- Page ---------------------------------------------------------------------------------
@@ -276,6 +287,81 @@ def _stale_table(index: Mapping[str, Any], fixture_set: str) -> str:
             rows,
         )
     )
+
+
+def _share(c: Mapping[str, Any], num: str, den: str) -> str:
+    return f"{_pct(c[num] / c[den] if c[den] else None)} ({c[num]}/{c[den]})"
+
+
+def _validity_section(index: Mapping[str, Any], fixture_set: str) -> str:
+    """Number-validity breakdown of the set (LAB-1201), or "" when no run has one."""
+    snaps = [s for s in _ordered_snapshots(index, fixture_set) if s["all"].get("validity")]
+    if not snaps:
+        return ""
+    rows = []
+    for s in snaps:
+        m, v = s["all"], s["all"]["validity"]
+        mark = "" if v["matches_headline"] else " §"
+        rows.append(
+            [
+                _label(index, s["system"]) + mark,
+                _pct(m["leak"]),
+                _share(v["valid"], "found", "gold"),
+                _share(v["valid"], "leaked", "values"),
+                _share(v["invalid"], "found", "gold"),
+                _share(v["invalid"], "leaked", "values"),
+                _share(v["excluding_number_types"], "leaked", "values"),
+            ]
+        )
+    first = snaps[0]["all"]["validity"]["per_type"]
+    shares = ", ".join(
+        f"`{name}` {row['valid']['gold']}/{row['valid']['gold'] + row['invalid']['gold']}"
+        for name, row in first.items()
+    )
+    out = [
+        "\n**Number validity.** The headline leak above, split by whether a structured identifier "
+        "passes the language packs' own validators (card Luhn, IBAN, TAJ and tax-ID check "
+        "digits, phone numbering plans, ID-document checksums and formats). Invalid numbers "
+        "stay in the headline: a mistyped real identifier is still personal data "
+        "([evaluation.md](evaluation.md#number-validity)). Valid values per type: "
+        f"{shares}.\n",
+        f"\n![Leak rate by number validity](benchmarks/{validity_chart(fixture_set)})\n\n",
+        _table(
+            [
+                "System",
+                "Leak",
+                "Recall, valid numbers",
+                "Leak, valid numbers",
+                "Recall, invalid numbers",
+                "Leak, invalid numbers",
+                "Leak, other values",
+            ],
+            ["---", "---:", "---:", "---:", "---:", "---:", "---:"],
+            rows,
+        ),
+    ]
+    reruns = sorted({v["by"] for s in snaps if (v := s["all"]["validity"])["rerun"]})
+    if reruns:
+        out.append(
+            f"\nThese runs kept no per-document predictions, so each system was run again to "
+            f"classify them ({', '.join(reruns)}); the Leak column is the original records', "
+            'unchanged. "Other values" are every value that is not a number type (names, '
+            "addresses, e-mail).\n"
+        )
+    off = [s for s in snaps if not s["all"]["validity"]["matches_headline"]]
+    if off:
+        names = "; ".join(
+            f"{index['systems'][s['system']]['short_label']} "
+            f"(re-run leak {_pct(s['all']['validity']['rerun_leak'])}, "
+            f"headline {_pct(s['all']['leak'])})"
+            for s in off
+        )
+        out.append(
+            "\n§ The re-run did not reproduce the headline counts exactly (an LLM detector "
+            "doesn't answer the same way twice): the breakdown adds up to the re-run's own "
+            f"totals. {names}.\n"
+        )
+    return "".join(out)
 
 
 def _language_table(index: Mapping[str, Any], fixture_set: str) -> str:
@@ -491,6 +577,7 @@ def render_page(index: Mapping[str, Any], *, headline_set: str, featured: Sequen
         out.append(_set_table(index, name))
         out.append("\nBy language:\n")
         out.append(_language_table(index, name))
+        out.append(_validity_section(index, name))
         stale = _stale_table(index, name)
         if stale:
             out.append(stale)
@@ -584,6 +671,10 @@ def build_outputs(
         if not _drawn(index, name):
             continue
         outputs[docs_dir / "benchmarks" / name] = render(index, headline, systems)
+    for name in validity_sets(index):
+        outputs[docs_dir / "benchmarks" / validity_chart(name)] = charts.number_validity(
+            index, fixture_set=name
+        )
     outputs[docs_dir / "benchmarks.md"] = render_page(
         index, headline_set=headline, featured=systems
     )

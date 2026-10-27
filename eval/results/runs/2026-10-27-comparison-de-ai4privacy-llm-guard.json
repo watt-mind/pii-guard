@@ -260,6 +260,79 @@
             "over_masked": 0
           }
         }
+      },
+      "validity": {
+        "valid": {
+          "gold": 41,
+          "found": 39,
+          "values": 41,
+          "leaked": 2
+        },
+        "invalid": {
+          "gold": 222,
+          "found": 43,
+          "values": 222,
+          "leaked": 166
+        },
+        "excluding_number_types": {
+          "gold": 365,
+          "found": 279,
+          "values": 365,
+          "leaked": 82
+        },
+        "per_type": {
+          "PHONE": {
+            "valid": {
+              "gold": 35,
+              "found": 35,
+              "values": 35,
+              "leaked": 0
+            },
+            "invalid": {
+              "gold": 29,
+              "found": 29,
+              "values": 29,
+              "leaked": 0
+            }
+          },
+          "ID_DOCUMENT": {
+            "valid": {
+              "gold": 1,
+              "found": 0,
+              "values": 1,
+              "leaked": 1
+            },
+            "invalid": {
+              "gold": 155,
+              "found": 0,
+              "values": 155,
+              "leaked": 144
+            }
+          },
+          "BANK_ACCOUNT": {
+            "valid": {
+              "gold": 5,
+              "found": 4,
+              "values": 5,
+              "leaked": 1
+            },
+            "invalid": {
+              "gold": 38,
+              "found": 14,
+              "values": 38,
+              "leaked": 22
+            }
+          }
+        },
+        "source": {
+          "by": "LAB-1201",
+          "method": "rerun",
+          "commit": "80e63e8",
+          "date": "2026-10-27",
+          "matches_headline": true,
+          "rerun_headline": null,
+          "note": "The run kept no per-document predictions; the tool was run again (same pinned version and configuration) on develop at the commit above to classify them."
+        }
       }
     },
     "languages": {
@@ -410,6 +483,79 @@
               "masked": 20,
               "over_masked": 0
             }
+          }
+        },
+        "validity": {
+          "valid": {
+            "gold": 41,
+            "found": 39,
+            "values": 41,
+            "leaked": 2
+          },
+          "invalid": {
+            "gold": 222,
+            "found": 43,
+            "values": 222,
+            "leaked": 166
+          },
+          "excluding_number_types": {
+            "gold": 365,
+            "found": 279,
+            "values": 365,
+            "leaked": 82
+          },
+          "per_type": {
+            "PHONE": {
+              "valid": {
+                "gold": 35,
+                "found": 35,
+                "values": 35,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 29,
+                "found": 29,
+                "values": 29,
+                "leaked": 0
+              }
+            },
+            "ID_DOCUMENT": {
+              "valid": {
+                "gold": 1,
+                "found": 0,
+                "values": 1,
+                "leaked": 1
+              },
+              "invalid": {
+                "gold": 155,
+                "found": 0,
+                "values": 155,
+                "leaked": 144
+              }
+            },
+            "BANK_ACCOUNT": {
+              "valid": {
+                "gold": 5,
+                "found": 4,
+                "values": 5,
+                "leaked": 1
+              },
+              "invalid": {
+                "gold": 38,
+                "found": 14,
+                "values": 38,
+                "leaked": 22
+              }
+            }
+          },
+          "source": {
+            "by": "LAB-1201",
+            "method": "rerun",
+            "commit": "80e63e8",
+            "date": "2026-10-27",
+            "matches_headline": true,
+            "rerun_headline": null,
+            "note": "The run kept no per-document predictions; the tool was run again (same pinned version and configuration) on develop at the commit above to classify them."
           }
         }
       }
