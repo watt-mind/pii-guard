@@ -11,7 +11,7 @@
 | Structured identifiers | Rules (no model) | pii-guard container | yes (inside the boundary) |
 | Names, organizations, addresses (dates of birth when fine-tuned) | Multilingual NER encoder (XLM-RoBERTa-base, open) | pii-guard container (CPU / MPS / CUDA) | yes |
 | Second-pass detection and adjudication | **Muse Spark Open** (open weights), optionally fine-tuned; **Muse Glimmer** as a smaller local candidate | Baseten (`meta-models/muse-spark-open-1026`), or your own hardware | yes |
-| Faces, signatures, ID photos | **SAM 3.1** | GPU endpoint | yes |
+| Faces, signatures, ID photos | **SAM 3.1** (default; an on-device face/ID-photo detector was measured and falls short on signatures, see [Local segmentation](#local-segmentation)) | GPU endpoint | yes |
 | OCR | Open OCR engine | pii-guard container or GPU endpoint | yes |
 | Synthetic corpus generation | **Muse** (Wonder for documents, Spark for variations) | Meta Model API | **no**: fictional data only |
 | The downstream model in the demo | **Muse Spark** | Meta Model API | **no**: only masked data |
@@ -298,6 +298,89 @@ recorded test fixtures in `tests/detect/fixtures/` are responses to fictional te
 
 Tests mock HTTP with recorded responses; `uv run pytest -m live` runs the live checks against
 the Meta Model API (with `META_API_KEY` set) and Baseten (with `BASETEN_API_KEY` set).
+
+## Local segmentation
+
+LAB-1229 asked whether faces, ID photos and signatures can be found **on the device** instead of
+with SAM 3.1 on the Meta API (four API calls and 5-6 s per image today, and the image leaves the
+machine). **Answer: faces and ID photos yes, signatures no.** SAM 3.1 stays the default
+segmenter; `pii_guard.visual.segment.LocalSegmenter` (YuNet) ships as a library component for
+faces and ID photos, not wired into the API or the gateway, because a local mode that cannot find
+signatures would either refuse every image or let signatures through.
+
+Measured with `python -m pii_guard.visual.segment_eval` on the portrait and signature regions of
+the fictional set (24 images, committed) and the official specimen set (65 images, fetched
+locally, never committed), without OCR. Run records: `eval/results/runs/2026-10-27-segment-*`;
+chart and table: [benchmarks.md](benchmarks.md#segmenters-sam-31-api-vs-on-device).
+
+| Candidate | Set | Portrait recall (IoU ≥ 0.5) | Portrait leak | Signature recall | Signature leak | p50 / p95 per image | Weights | Licence |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| **SAM 3.1, Meta API** (baseline) | fictional | 100.0 % | 0.0 % | 100.0 % | 6.7 % | 5.1 s / 6.9 s | hosted | hosted API |
+| | specimens | 90.8 % | 47.7 % | 83.8 % | 51.3 % | 5.5 s / 8.6 s | | |
+| **YuNet** (`local`) | fictional | 100.0 % | 0.0 % | — | — | 176 / 238 ms | 0.23 MB | MIT (weights), Apache-2.0 (OpenCV) |
+| | specimens | 92.3 % | 10.8 % | — | — | 116 / 348 ms | | |
+| YuNet + YOLOS-tiny signatures (`small-detectors`) | fictional | 100.0 % | 0.0 % | 100.0 % | 13.3 % | 1.1 s / 1.6 s | 26 MB | MIT, Apache-2.0 |
+| | specimens | 93.8 % | 6.2 % | 51.3 % | 46.0 % | 727 ms / 1.6 s | | |
+| YuNet + EfficientSAM-ViT-T photo refinement (`efficientsam`) | fictional | 100.0 % | 0.0 % | — | — | 1.5 s / 4.4 s | 42 MB | MIT, Apache-2.0 |
+| | specimens | 92.3 % | 16.9 % | — | — | 2.2 s / 3.3 s | | |
+| SAM 3 locally | — | not run | | | | | 3.4 GB | gated |
+
+- **Leak** is a labelled region less than 95 % covered by the boxes returned (the specimen
+  labels are hand-drawn to about ±1-2 % of the image side; with a 100 % threshold every
+  candidate "leaks" through label slack: SAM 83 % of specimen portraits, YuNet 12 %). Each
+  run's notes also give that strict figure and **precision** (boxes that hit a labelled region
+  of their kind): portraits 90 % SAM vs 61 % YuNet on the specimens. YuNet's ID-photo box is
+  the face box grown by a fixed margin, so it over-masks around the photo; over-masking is the
+  safe side.
+- **Latency** is CPU wall time on an Apple M-series laptop that was running other jobs (load
+  average 15-23, in each record's hardware note), so it is pessimistic; SAM's is the sum of its
+  four sequential API calls. Model load: YuNet 0.1-0.2 s, YOLOS 3.7-6.7 s. Peak RSS of the whole
+  eval process: 0.4-0.9 GB (YuNet), 0.7-1.1 GB (with YOLOS), 1.5-1.9 GB (EfficientSAM). Not
+  measured: the CI runner, MPS/GPU (OpenCV's YuNet runs on the CPU only).
+- **YuNet's ID-photo margin** (`PHOTO_PADDING`) was picked among four settings on these same
+  two sets, so its numbers are slightly optimistic; recall does not depend on it.
+
+**Against the "close enough" rule** (on both sets: face/ID-photo leak ≤ SAM's and recall within
+2 pp; signature recall within 5 pp; p50 ≤ 500 ms on CPU; weights ≤ 200 MB, permissive):
+
+| Rule | YuNet (`local`) | `small-detectors` | `efficientsam` |
+|---|---|---|---|
+| Face/ID-photo leak ≤ SAM, recall within 2 pp | pass (0.0 / 10.8 % vs 0.0 / 47.7 %; recall +0 / +1.5 pp) | pass | pass |
+| Signature recall within 5 pp | **fail** (finds none) | **fail** (−32.4 pp on specimens) | **fail** (finds none) |
+| p50 ≤ 500 ms on CPU | pass | **fail** | **fail** |
+| ≤ 200 MB, permissive licence | pass | pass | pass |
+
+Why the rest fell short:
+
+- **Signatures.** The permissively licensed small detectors on Hugging Face (YOLOS-tiny and
+  YOLOS-small by `mdefrance`, Conditional-DETR-50 by `tech4humans`, all Apache-2.0, trained on
+  scanned pages) find 16-32 % of the specimen signatures on the whole image; 2×2 tiles raise
+  YOLOS-tiny to 51 % at 9 % precision (288 boxes for 37 signatures). The YOLOv8 signature
+  detectors are AGPL (Ultralytics) and were not used.
+- **EfficientSAM** (Apache-2.0, ONNX export from the authors' repository), prompted with the
+  grown face box, did not raise portrait recall and costs 1.5-2.2 s per image.
+- **SAM 3 locally**: the Hugging Face weights (`facebook/sam3`) are gated and this account has
+  no access (HTTP 403); the owner has to request it. At 3.4 GB they would also miss the 200 MB
+  bar.
+
+Use `LocalSegmenter` directly (it raises `DetectionError` if asked for `SIGNATURE`):
+
+```bash
+uv sync --extra local-vision                     # opencv-python-headless
+uv run python -m pii_guard.visual.segment fetch  # YuNet from the OpenCV model zoo, SHA-256 checked
+```
+
+```python
+from pii_guard.visual.segment import LocalSegmenter
+regions = LocalSegmenter().segment(png_bytes)  # FACE + ID_PHOTO, on the CPU
+```
+
+Reproduce the table (specimens: `uv run python eval/visual/fetch_specimens.py` first; the SAM
+rows replay the eval's response cache, `--offline`):
+
+```bash
+uv run python -m pii_guard.visual.segment_eval --candidate local --set specimens --record segment-local-specimens
+```
 
 ## Hackathon partners
 

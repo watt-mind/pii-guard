@@ -75,6 +75,11 @@ CHARTS: list[tuple[str, str, Chart]] = [
         lambda i, s, f: charts.visual_recall(i),
     ),
     (
+        "segmenter-recall.svg",
+        "Segmenters: SAM 3.1 API vs on-device",
+        lambda i, s, f: charts.visual_recall(i, segmenters=True),
+    ),
+    (
         "latency.svg",
         "Gateway overhead",
         lambda i, s, f: charts.latency(i),
@@ -85,6 +90,10 @@ _OPTIONAL = {"visual-recall.svg": "visual", "latency.svg": "latency"}
 
 
 def _drawn(index: Mapping[str, Any], name: str) -> bool:
+    if name == "segmenter-recall.svg":
+        return any(charts.is_segment_run(r) for r in index.get("visual") or [])
+    if name == "visual-recall.svg":
+        return any(not charts.is_segment_run(r) for r in index.get("visual") or [])
     key = _OPTIONAL.get(name)
     return key is None or bool(index.get(key))
 
@@ -394,11 +403,12 @@ def _type_table(index: Mapping[str, Any], fixture_set: str, systems: Sequence[st
 
 
 def _visual_table(index: Mapping[str, Any]) -> str:
+    runs = [r for r in index["visual"] if not charts.is_segment_run(r)]
     region_types: list[str] = []
-    for r in index["visual"]:
+    for r in runs:
         region_types += [k for k in r["by_region_type"] if k not in region_types]
     rows = []
-    for r in index["visual"]:
+    for r in runs:
         per = [_pct((r["by_region_type"].get(k) or {}).get("recall_iou50")) for k in region_types]
         rows.append(
             [
@@ -416,6 +426,37 @@ def _visual_table(index: Mapping[str, Any]) -> str:
         ["---", "---", "---:", "---:"] + ["---:"] * (len(region_types) + 2),
         rows,
     )
+
+
+def _segmenter_table(index: Mapping[str, Any]) -> str:
+    rows = []
+    for r in index["visual"]:
+        if not charts.is_segment_run(r):
+            continue
+        lat = r.get("latency_ms") or {}
+        by = r["by_region_type"]
+        rows.append(
+            [
+                f"`{r['run_id']}`",
+                f"`{r.get('fixture_set') or 'specimens'}`",
+                r["specimens"],
+                _pct((by.get("portrait") or {}).get("recall_iou50")),
+                _pct((by.get("portrait") or {}).get("recall_cov90")),
+                _pct((by.get("signature") or {}).get("recall_iou50")),
+                _pct((by.get("signature") or {}).get("recall_cov90")),
+                _pct(r["over_masking_mean"]),
+                _ms(lat.get("segment_per_image_p50")),
+                _ms(lat.get("segment_per_image_p95")),
+            ]
+        )
+    return _table(
+        [
+            "Run", "Set", "Images", "Portrait (IoU)", "Portrait (cov ≥ 90%)", "Signature (IoU)",
+            "Signature (cov ≥ 90%)", "Over-masking (mean)", "p50 / image", "p95 / image",
+        ],
+        ["---", "---", "---:"] + ["---:"] * 7,
+        rows,
+    )  # fmt: skip
 
 
 def _latency_table(index: Mapping[str, Any]) -> str:
@@ -596,6 +637,16 @@ def render_page(index: Mapping[str, Any], *, headline_set: str, featured: Sequen
             "hold different documents, so compare runs within a set.\n"
         )
         out.append(_visual_table(index))
+    if any(charts.is_segment_run(r) for r in index["visual"]):
+        out.append("## Segmenters: SAM 3.1 API vs on-device\n")
+        out.append(
+            "Portraits and signatures only, no OCR (`python -m pii_guard.visual.segment_eval`, "
+            "LAB-1229): SAM 3.1 on the Meta API against on-device candidates. Latency is per "
+            "image on the CPU of the machine in each run's hardware note (SAM: its API calls). "
+            "Leak, precision, memory and model size are in each run's notes and in "
+            "[models.md](models.md#local-segmentation).\n"
+        )
+        out.append(_segmenter_table(index))
     if index.get("latency"):
         out.append("## Gateway latency\n")
         out.append(

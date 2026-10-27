@@ -248,3 +248,24 @@ def test_candidates_and_parser() -> None:
     assert CANDIDATES["sam-api"].size_bytes is None
     args = build_parser().parse_args(["--candidate", "local", "--set", "fictional"])
     assert (args.candidate, args.set_name, args.offline) == ("local", "fictional", False)
+
+
+def test_report_keeps_segmenter_runs_apart() -> None:
+    import json
+
+    from pii_guard.eval import report_charts as charts
+    from pii_guard.eval import report_cli
+
+    index = json.loads((ROOT / "eval" / "results" / "index.json").read_text(encoding="utf-8"))
+    segment_runs = [r for r in index["visual"] if charts.is_segment_run(r)]
+    assert {r["fixture_set"] for r in segment_runs} == {"fictional-specimens", "specimens"}
+    main_chart = charts.visual_recall(index)
+    seg_chart = charts.visual_recall(index, segmenters=True)
+    assert "yunet" not in main_chart and "yunet-2023mar" in seg_chart
+    assert "Segmenters: SAM 3.1 API vs on-device" in seg_chart
+    table = report_cli._segmenter_table(index)
+    assert table.count("\n") == len(segment_runs) + 2
+    assert "segment-" not in report_cli._visual_table(index)
+    assert report_cli._drawn(index, "segmenter-recall.svg")
+    assert report_cli._drawn(index, "visual-recall.svg")
+    assert not report_cli._drawn({"visual": []}, "segmenter-recall.svg")

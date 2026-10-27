@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-segment-sam-api-fictional",
+  "kind": "visual",
+  "date": "2026-10-27",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "Segmenter sam-api on fictional-specimens (LAB-1229)",
+  "notes": [
+    "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate sam-api.",
+    "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 0.0 %, strict leak 88.9 %, precision 100.0 % (36 boxes); signature: recall@IoU0.5 100.0 %, leak (<95 % covered) 6.7 %, strict leak 100.0 %, precision 100.0 % (15 boxes).",
+    "Per image p50 5108.3 ms, p95 6871.2 ms on Darwin arm64 CPU; model load 4.1 ms; peak RSS 155.6 MB; weights hosted; licence hosted (Meta Model API)."
+  ],
+  "code": {
+    "commit": "02c510ebb6a0e2d037727fbbf9c5477fb220be42",
+    "dirty": false,
+    "pii_guard_version": null,
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": null,
+    "detectors": [
+      {
+        "name": "sam",
+        "model": "sam-3.1",
+        "model_ref": "meta-api:sam-3.1",
+        "revision": null,
+        "settings": {},
+        "serving": null
+      }
+    ],
+    "key": "visual-segment:sam-3.1",
+    "label": "segmenter sam-3.1 (no OCR)"
+  },
+  "fixture_set": "fictional-specimens",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/visual/manifest.json",
+      "sha256": null,
+      "set": "fictional-specimens",
+      "language": null,
+      "origin": "generated",
+      "generator": "muse-image",
+      "documents": 24
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "arm64 CPU, one process; host load average 17 (shared with other jobs)",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": {
+    "usd": 0.24,
+    "estimated": true,
+    "gpu_minutes": null,
+    "model_calls": 96,
+    "tokens": null,
+    "shared_with": [],
+    "note": "SAM None: 96 calls at $0.0025/call (planning estimate; responses report no price)"
+  },
+  "metrics": {
+    "specimens": 24,
+    "overall": {
+      "regions": 33,
+      "recall_iou50": 1.0,
+      "recall_cov90": 1.0,
+      "mean_coverage": 0.9808
+    },
+    "by_region_type": {
+      "portrait": {
+        "regions": 18,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9893
+      },
+      "signature": {
+        "regions": 15,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9706
+      }
+    },
+    "by_doc_type": {
+      "badge": {
+        "regions": 3,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9921,
+        "specimens": 3
+      },
+      "driving_licence": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9812,
+        "specimens": 3
+      },
+      "form": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.981,
+        "specimens": 3
+      },
+      "id_card": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9731,
+        "specimens": 6
+      },
+      "letter": {
+        "regions": 3,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9758,
+        "specimens": 3
+      },
+      "member_card": {
+        "regions": 3,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9867,
+        "specimens": 3
+      },
+      "passport": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9816,
+        "specimens": 3
+      }
+    },
+    "by_country": {
+      "DE": {
+        "regions": 11,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9871,
+        "specimens": 8
+      },
+      "GB": {
+        "regions": 11,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9739,
+        "specimens": 8
+      },
+      "HU": {
+        "regions": 11,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9814,
+        "specimens": 8
+      }
+    },
+    "over_masking_mean": 0.007,
+    "errors": 0,
+    "latency_ms": {
+      "sam_call_p50": 1295.3,
+      "sam_call_p95": 1906.6,
+      "sam_per_image_p50": 5108.3,
+      "sam_per_image_p95": 6871.2,
+      "local_per_image_p50": 0.0,
+      "local_per_image_p95": 0.0,
+      "total_per_image_p50": 5108.3,
+      "total_per_image_p95": 6871.2,
+      "segment_per_image_p50": 5108.3,
+      "segment_per_image_p95": 6871.2,
+      "segment_first_image": 6871.2,
+      "segment_model_load": 4.1
+    }
+  }
+}

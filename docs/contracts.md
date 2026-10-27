@@ -530,6 +530,16 @@ With `render: "labels"` (the default) the response also carries:
   a neutral labelled box with `labels`), `keep` regions
   (`STAMP` by default) are reported and left visible, any `block` region is
   `422 blocked_entity` with no image.
+- Segmenters (`pii_guard.visual.segment.Segmenter`): anything with
+  `segment(image: bytes, entity_types=None) -> list[Region]` that raises `DetectionError` on
+  any failure, including a requested type it cannot find. `SamClient` (SAM 3.1, Meta API) is
+  the one the API and gateway use. `LocalSegmenter` (YuNet on the CPU, `uv sync --extra
+  local-vision`, model via `python -m pii_guard.visual.segment fetch` into
+  `PII_GUARD_MODEL_DIR`, default `~/.cache/pii-guard/models`) finds `FACE` and `ID_PHOTO` only
+  (`source: "yunet"`, with scores) and raises for `SIGNATURE`; a missing OpenCV, a missing model
+  or one whose SHA-256 differs from the pinned value raises too. It is not wired into the API
+  (LAB-1229: no local signature detector is close enough to SAM; see
+  [models.md](models.md#local-segmentation)).
 - SAM segments every visual type it has a prompt for (one Meta API request per prompt:
   `face`, `signature`, `squiggly line`, `photo of a person`, `stamp`). It needs `META_API_KEY` (or
   `PII_GUARD_SAM_API_KEY`); without one every call is `503 detection_failed`.

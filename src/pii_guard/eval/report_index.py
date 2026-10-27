@@ -624,6 +624,7 @@ def build_index(
                 "by_doc_type": m["by_doc_type"],
                 "countries": len(m["by_country"]),
                 "over_masking_mean": m["over_masking_mean"],
+                "latency_ms": m["latency_ms"],
                 "cost_usd": (rec.get("cost") or {}).get("usd"),
             }
         )
