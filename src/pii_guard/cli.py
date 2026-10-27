@@ -20,6 +20,39 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"pii-guard {__version__}")
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
+    up = sub.add_parser(
+        "up",
+        help="start here: API, gateway and web UI on one port (8787), offline mock model",
+        description="Start everything in one process: the REST API, the OpenAI-compatible "
+        "gateway and the bundled web UI at /. The gateway masks in fast mode (local rules, plus "
+        "NER when the ner extra is installed; no LLM call). Without --upstream-url (or "
+        "PII_GUARD_UPSTREAM_BASE_URL) an offline mock model answers by echoing what it receives.",
+    )
+    up.add_argument("--host", default="127.0.0.1", help="bind address (default 127.0.0.1)")
+    up.add_argument("--port", type=int, default=8787, help="port (default 8787)")
+    up.add_argument("--no-browser", action="store_true", help="don't open the browser")
+    up.add_argument(
+        "--upstream-url",
+        default=None,
+        help="OpenAI-compatible upstream base URL (env: PII_GUARD_UPSTREAM_BASE_URL)",
+    )
+    up.add_argument(
+        "--api-key-env",
+        default=None,
+        metavar="VAR",
+        help="name of the environment variable holding the upstream key, e.g. OPENAI_API_KEY",
+    )
+    up.add_argument(
+        "--mock", action="store_true", help="use the offline mock model even if an upstream is set"
+    )
+    up.add_argument(
+        "--traffic-log",
+        choices=["masked", "full"],
+        default=None,
+        help="live traffic log: masked (default, placeholders only) or full (also the original "
+        "personal data; loopback binds only)",
+    )
+
     serve = sub.add_parser("serve", help="run the REST API (default port 8787)")
     serve.add_argument("--host", default=None, help="bind address (env: PII_GUARD_HOST)")
     serve.add_argument("--port", type=int, default=None, help="port (env: PII_GUARD_PORT)")
@@ -92,6 +125,22 @@ def _serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _up(args: argparse.Namespace) -> int:
+    from pii_guard.app_bundle import UpOptions, run_up
+
+    return run_up(
+        UpOptions(
+            host=args.host,
+            port=args.port,
+            browser=not args.no_browser,
+            upstream_url=args.upstream_url,
+            api_key_env=args.api_key_env,
+            mock=args.mock,
+            traffic_log=args.traffic_log,
+        )
+    )
+
+
 def _eval(args: argparse.Namespace) -> int:
     from pii_guard.eval.cli import main as eval_main
 
@@ -147,6 +196,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "serve":
         return _serve(args)
+    if args.command == "up":
+        return _up(args)
     if args.command == "baselines":
         return _baselines(args, parser)
     parser.print_help()

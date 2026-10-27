@@ -125,6 +125,22 @@ At phone width: [Mask](docs/assets/demo/5-mask-mobile.webp) ·
 
 ## Try it
 
+One command, no clone, Node or Docker: only [uv](https://docs.astral.sh/uv/). It starts the
+API, the OpenAI-compatible gateway and the web UI with the live dashboard on
+http://localhost:8787, with an offline mock upstream unless you pass `--upstream-url`:
+
+```bash
+uvx --from https://github.com/watt-mind/pii-guard/releases/download/vX.Y.Z/wattmind_pii_guard-X.Y.Z-py3-none-any.whl pii-guard up
+```
+
+Take the wheel URL from the [latest release](https://github.com/watt-mind/pii-guard/releases).
+Once it is on PyPI this becomes `uvx --from wattmind-pii-guard pii-guard up`. From source,
+`uvx --from git+https://github.com/watt-mind/pii-guard pii-guard up` runs the API and gateway
+without the UI. To put an agent behind it, run `pii-guard connect pi` with the same
+`uvx --from` prefix ([operations.md](docs/operations.md#one-command-pii-guard-up)).
+
+From a checkout:
+
 ```bash
 make demo           # API + gateway + UI on a mock upstream: http://localhost:5173
 make demo-traffic   # second terminal: fictional calls (with tools and streaming) through the gateway
