@@ -120,8 +120,9 @@ class LocalServer:
         import uvicorn
 
         self.port = port or _free_port()
+        # lifespan "auto": the gateway's shutdown closes its pooled upstream client (LAB-1176).
         config = uvicorn.Config(
-            app, host="127.0.0.1", port=self.port, log_level="warning", lifespan="off"
+            app, host="127.0.0.1", port=self.port, log_level="warning", lifespan="auto"
         )
         self.server = uvicorn.Server(config)
         self.thread = threading.Thread(target=self.server.run, daemon=True)

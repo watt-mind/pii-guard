@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "description": "OCR robustness fixtures (LAB-1210): every fictional document of manifest.json is also read turned by each of 'transforms' (degrees counter-clockwise, as Pillow's rotate with expand and a white fill; 0 is the document as it is), and each synthetic screenshot is drawn with Pillow's default font. All values are fictional (the TAJ and tax ID pass their checksums but belong to no one). Scored by tests/visual/robustness.py: the share of labelled text and MRZ regions at least 90 % covered, measured after turning the cover back onto the upright document.",
+  "transforms": [0, 90, 180, 270, 5, -10, 15],
+  "screenshots": [
+    {
+      "id": "screenshot-2560-11px",
+      "size": [2560, 1440],
+      "font_size": 11,
+      "lines": [
+        [20, 20, "Patient TAJ: 123 456 788"],
+        [20, 42, "Adoazonosito jel: 8123456786"],
+        [900, 700, "Some other window text here"]
+      ],
+      "values": ["123 456 788", "8123456786"]
+    },
+    {
+      "id": "screenshot-3840-13px",
+      "size": [3840, 2160],
+      "font_size": 13,
+      "lines": [
+        [1600, 400, "Patient TAJ: 123 456 788"],
+        [1600, 426, "Adoazonosito jel: 8123456786"]
+      ],
+      "values": ["123 456 788", "8123456786"]
+    },
+    {
+      "id": "screenshot-1280-11px",
+      "size": [1280, 720],
+      "font_size": 11,
+      "lines": [
+        [20, 20, "Patient TAJ: 123 456 788"],
+        [20, 42, "Adoazonosito jel: 8123456786"]
+      ],
+      "values": ["123 456 788", "8123456786"]
+    }
+  ]
+}
