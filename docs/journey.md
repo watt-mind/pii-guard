@@ -400,6 +400,33 @@ Over-masking is 0.8 % of image area. Cost: 33 Muse Image images, about $0.33
   never masked: Tesseract reads long `<` runs as `K`, and only the Hungarian pack has the MRZ
   recogniser (LAB-1124). Names need the LLM detector (LAB-1125).
 
+### 18. Machine-readable zones masked by their layout (2026-10-27)
+
+LAB-1124.
+
+Re-measured on `develop` first: the Hungarian text-MRZ rule of milestone 12 needs exact
+30/44-character lines with valid check digits, and Tesseract's reading of the OCR-B zone
+never satisfies it, so the specimen MRZ recall was still **0/30**. The new finder
+(`visual/mrz.py`) needs neither the check digits nor a text detector: it looks for stacked
+OCR lines of about 30, 36 or 44 characters made almost only of `A-Z0-9<` (and the glyphs
+Tesseract turns `<` into: `«`, `K`, `c`, `£`), and returns one `ID_DOCUMENT` box per zone,
+the union of its words, so a single box covers the whole zone.
+
+| SAM 3.1 + Tesseract + rules | MRZ regions | MRZ recall @ IoU ≥ 0.5 before | after | Over-masking before | after |
+|---|---:|---:|---:|---:|---:|
+| Official specimens (LAB-1120) | 30 | 0.0 % | **76.7 %** | 2.1 % | 2.6 % |
+| Fictional set (milestone 17) | 6 | 0.0 % | **100.0 %** | 0.8 % | 0.8 % |
+
+Overall specimen recall moves from 23.2 % to 28.8 %; portrait, signature and text values are
+unchanged. No stray zone on the 35 specimen images without an MRZ. Cost: 260 + 96 SAM calls,
+about $0.89 (the specimen re-run was served from the cache). Reports are local, not
+committed; reproduce with the commands in [evaluation.md](evaluation.md).
+
+- **Still missed (7/30):** zones where Tesseract returns too little to work with (a
+  hologram-covered French card, a Polish passport with three words read), single surviving
+  lines (one line of a 2- or 3-line zone covers under half the labelled box), and a one-line
+  driving-licence MRZ with a single filler.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
@@ -432,7 +459,7 @@ data, labelling it, judging), and ship a small, fast, self-hostable model distil
   so a third language is a checklist.
 - **Prompt-injection red team** (LAB-1107): text that tries to talk the LLM detector out of
   reporting values.
-- **Images:** mask MRZ zones and printed values on ID cards (LAB-1124, LAB-1125).
+- **Images:** mask printed values on ID cards (LAB-1125); MRZ zones are masked since milestone 18.
 - **English names** still missed on Muse-generated English (2.5–5.0 % leak across runs,
   LAB-1138).
 - **Publish the distilled weights**, so fast mode works without training a model first.

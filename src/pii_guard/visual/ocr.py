@@ -25,6 +25,7 @@ from PIL import Image
 
 from pii_guard.types import DetectionError, Detector, PiiGuardError
 from pii_guard.visual.image import load_image
+from pii_guard.visual.mrz import mrz_regions
 from pii_guard.visual.regions import Box, Region
 
 __all__ = [
@@ -152,7 +153,9 @@ def text_regions(
     language: str = "hu",
 ) -> list[Region]:
     """OCR ``image``, run every text detector on the recognised text, and return one region
-    per detected span per text line (the union of the overlapped word boxes).
+    per detected span per text line (the union of the overlapped word boxes), plus one
+    ``ID_DOCUMENT`` region per machine-readable zone found by its layout
+    (:func:`~pii_guard.visual.mrz.mrz_regions`).
     """
     if not detectors:
         raise DetectionError("no text detector configured for OCR text")
@@ -173,7 +176,8 @@ def text_regions(
         return []
     text, offsets = join_words(words)
 
-    regions: list[Region] = []
+    # Layout-found MRZ zones: one box per zone, whatever the text detectors make of it.
+    regions: list[Region] = mrz_regions(words)
     for detector in detectors:
         try:
             spans = detector.detect(text, language)
