@@ -95,6 +95,26 @@ The hand-written smoke sets are built by `eval/fixtures/build_smoke.py` (inline
 `{{TYPE|value}}` labels, checksum-valid fictional identifiers); a test fails if the committed
 JSONL is stale.
 
+## Known values (pre-loaded into the session)
+
+`pii-guard eval --known-values` pre-loads each document's `meta.known_values`
+(`[{"value": ..., "entity_type": ...}]`, the body of `POST /v1/sessions/{id}/known-values`)
+into its vault session, so the `known` detector runs on top of `--detectors`. Run the same
+fixtures with and without the flag to measure the uplift; the scorecard's
+`meta.known_values` records how many values were pre-loaded. The fixtures in
+`eval/fixtures/known-values/` (not part of the default run) are written for this: unusual
+fictional names in inflected and possessive forms, and an internal id format.
+
+```bash
+uv run pii-guard eval --fixtures eval/fixtures/known-values
+uv run pii-guard eval --fixtures eval/fixtures/known-values --known-values
+```
+
+With the rules detector only, pre-loading takes overall overlap recall on that set from 5.3% to
+100% and the leak rate from 93.3% to 0% (round trip and consistency 100%). Exact-match scores
+stay lower for Hungarian because the gold spans include the case suffix, which the placeholder
+leaves outside by design.
+
 ## Lexicons: diversity and the address rule
 
 Measured when the lexicons landed ([ADR 0009](decisions/0009-third-party-lexicons.md)).

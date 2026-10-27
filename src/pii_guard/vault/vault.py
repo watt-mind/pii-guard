@@ -28,6 +28,7 @@ from pii_guard.vault.inflection import (
     splits,
     variant_stems,
 )
+from pii_guard.vault.known import KnownValues
 from pii_guard.vault.placeholders import (
     DEFAULT_ID_LENGTH,
     MAX_ID_LENGTH,
@@ -243,6 +244,7 @@ class VaultSession:
         self._by_placeholder: dict[str, _Entry] = {}
         self._closed = False
         self._expires_at = clock() + ttl_seconds
+        self._known = KnownValues()
 
     def __repr__(self) -> str:
         return (
@@ -264,6 +266,18 @@ class VaultSession:
             self._closed = True
             self._by_key.clear()
             self._by_placeholder.clear()
+            self._known.clear()
+
+    @property
+    def known_values(self) -> KnownValues:
+        """Values pre-loaded into this session (:mod:`pii_guard.vault.known`).
+
+        They expire and are forgotten with the session. Raises :class:`SessionNotFoundError`
+        once the session has expired; otherwise extends its TTL like any other use.
+        """
+        with self._lock:
+            self._check_alive()
+            return self._known
 
     def _check_alive(self) -> None:
         """Raise if expired; otherwise extend the TTL (sliding expiry)."""

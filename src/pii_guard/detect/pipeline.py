@@ -10,6 +10,9 @@ results (the "resolver" in ``docs/architecture.md``):
    overlapping same-type spans from other detectors.
 2. **Different types, overlapping** spans are resolved greedily by priority:
 
+   0. spans of an *overriding* detector (default ``known``, the values an application
+      pre-loaded into the session, see :mod:`pii_guard.detect.known`): they win every
+      conflict, also against same-type spans, which are not merged into them;
    1. authoritative structured spans;
    2. types that are masked by default over ``keep`` types (``ORGANIZATION``,
       ``COMPANY_ID_HU``), so a person's name inside a sole trader's company name stays a
@@ -18,7 +21,9 @@ results (the "resolver" in ``docs/architecture.md``):
    4. longer spans, then higher scores, then detector order.
 
    A losing span is not simply dropped: the characters it covers that no winner covers are
-   kept as a span of the loser's type, so a conflict never un-masks text.
+   kept as a span of the loser's type, so a conflict never un-masks text. The one exception
+   is an inflectional suffix directly after an overriding span's stem (``Próba Zsuzsanná|nak``):
+   it stays outside the placeholder, as the vault keeps it.
 
 Agreement (several detectors on the same span) keeps the winner's ``detector`` name and the
 highest score. Fail closed: if any detector raises, :class:`DetectionError` propagates and no
@@ -33,6 +38,7 @@ from dataclasses import dataclass
 
 from pii_guard.registry import create_detector
 from pii_guard.types import DetectionError, Detector, EntityType, Span
+from pii_guard.vault.inflection import following_suffix
 
 __all__ = [
     "DEFAULT_KEEP_TYPES",
@@ -74,6 +80,7 @@ class _Cand:
     detector: str
     authoritative: bool
     rank: int  # detector order, lower first
+    overriding: bool = False
 
 
 def _is_authoritative(span: Span, authoritative: frozenset[str]) -> bool:
@@ -85,6 +92,9 @@ def _merge_same_type(cands: list[_Cand]) -> list[_Cand]:
     out: list[_Cand] = []
     by_type: dict[EntityType, list[_Cand]] = {}
     for c in cands:
+        if c.overriding:  # kept exactly; the cross-type pass subtracts them from the rest
+            out.append(c)
+            continue
         by_type.setdefault(c.entity_type, []).append(c)
     for group in by_type.values():
         auth = [c for c in group if c.authoritative]
@@ -129,6 +139,10 @@ def _subtract(start: int, end: int, taken: list[tuple[int, int]]) -> list[tuple[
     return pieces
 
 
+def _word(char: str) -> bool:
+    return char.isalnum() or char == "_"
+
+
 def _trim(text: str, start: int, end: int) -> tuple[int, int] | None:
     while start < end and text[start] in _TRIM:
         start += 1
@@ -147,6 +161,7 @@ def resolve_spans(
     authoritative: Iterable[str] = ("rules",),
     adjudicator: str | None = "llm",
     keep_types: Iterable[EntityType] = DEFAULT_KEEP_TYPES,
+    overriding: Iterable[str] = ("known",),
 ) -> list[Span]:
     """Merge possibly overlapping spans from several detectors into non-overlapping spans.
 
@@ -155,6 +170,7 @@ def resolve_spans(
     """
     auth = frozenset(authoritative)
     keep = frozenset(keep_types)
+    override = frozenset(overriding)
     order = {name: i for i, name in enumerate(detector_order)}
     cands: list[_Cand] = []
     for s in spans:
@@ -169,6 +185,7 @@ def resolve_spans(
                 s.detector,
                 _is_authoritative(s, auth),
                 order.get(s.detector, len(order)),
+                s.detector in override,
             )
         )
 
@@ -183,6 +200,7 @@ def resolve_spans(
     def priority(c: _Cand) -> tuple[object, ...]:
         adjudicates = adjudicator is not None and c.detector == adjudicator and disagrees(c)
         return (
+            not c.overriding,
             not c.authoritative,
             c.entity_type in keep,
             not adjudicates,
@@ -194,15 +212,34 @@ def resolve_spans(
 
     accepted: list[_Cand] = []
     taken: list[tuple[int, int]] = []
+    # Where an overriding span ends inside a word: the suffix after it is not a remainder.
+    stems_end = {
+        c.end
+        for c in cands
+        if c.overriding and 0 < c.end < len(text) and _word(text[c.end - 1]) and _word(text[c.end])
+    }
     for c in sorted(cands, key=priority):
         for ps, pe in _subtract(c.start, c.end, taken):
+            if not c.overriding and ps in stems_end:
+                ps = min(pe, ps + len(following_suffix(text, ps)))
+                if ps >= pe:
+                    continue
             if (ps, pe) != (c.start, c.end):
                 trimmed = _trim(text, ps, pe)
                 if trimmed is None:
                     continue
                 ps, pe = trimmed
             accepted.append(
-                _Cand(ps, pe, c.entity_type, c.score, c.detector, c.authoritative, c.rank)
+                _Cand(
+                    ps,
+                    pe,
+                    c.entity_type,
+                    c.score,
+                    c.detector,
+                    c.authoritative,
+                    c.rank,
+                    c.overriding,
+                )
             )
             taken.append((ps, pe))
 
@@ -231,6 +268,7 @@ class DetectionPipeline:
         adjudicator: str | None = "llm",
         keep_types: Iterable[EntityType] = DEFAULT_KEEP_TYPES,
         min_score: float = 0.0,
+        overriding: Iterable[str] = ("known",),
     ) -> None:
         if not detectors:
             raise ValueError("a pipeline needs at least one detector")
@@ -241,6 +279,7 @@ class DetectionPipeline:
         self.adjudicator = adjudicator
         self.keep_types = frozenset(keep_types)
         self.min_score = min_score
+        self.overriding = frozenset(overriding)
 
     def detect(self, text: str, language: str = "hu") -> list[Span]:
         spans: list[Span] = []
@@ -262,6 +301,7 @@ class DetectionPipeline:
             authoritative=self.authoritative,
             adjudicator=self.adjudicator,
             keep_types=self.keep_types,
+            overriding=self.overriding,
         )
         logger.debug("pipeline resolved %d candidate spans into %d", len(spans), len(resolved))
         return resolved

@@ -80,7 +80,7 @@ class LoggedRoute(APIRoute):
                 access_logger.info(
                     "%s %s %d %.1fms%s%s",
                     request.method,
-                    request.url.path,
+                    self.path,  # the template: never a session id from the URL
                     status,
                     (time.perf_counter() - started) * 1000,
                     f" error={error_code}" if error_code else "",

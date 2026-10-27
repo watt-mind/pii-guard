@@ -4,7 +4,9 @@ Order of operations (fail closed at every step, ADR 0006):
 
 1. upstream configured? mode and session headers valid? body well-formed, nothing it can't
    mask (remote image URLs, audio, files)?
-2. detect every text (cache first; misses run concurrently, under one per-request timeout);
+2. detect every text (cache first; misses run concurrently, under one per-request timeout),
+   then add the session's pre-loaded known values (:mod:`pii_guard.detect.known`), which win
+   their conflicts and are masked even for a ``keep`` type (a ``block`` type still refuses);
 3. mask with the conversation's vault session: spans first, then a sweep for every value the
    session already knows (so a value found in one message is masked in all of them); inline
    images are masked with the visual pipeline (SAM 3.1 + OCR text through this mode's
@@ -35,6 +37,7 @@ from starlette.responses import Response
 from pii_guard.api.deps import PayloadTooLargeError
 from pii_guard.api.routes.image_masking import ImageMasker, default_ocr_engine
 from pii_guard.config import Settings
+from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import GatewayConfig, Mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
@@ -49,6 +52,7 @@ from pii_guard.gateway.stream import SseRestorer, error_event, iter_sse_data, ss
 from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PiiGuardError, Span
 from pii_guard.vault import Vault, VaultSession
+from pii_guard.vault.known import KnownValues
 from pii_guard.visual.ocr import OcrEngine
 from pii_guard.visual.sam import SamClient
 
@@ -329,9 +333,29 @@ class Gateway:
                 for index in indices:
                     results[index] = spans
         out = [r if r is not None else [] for r in results]
+        known = session.known_values
+        if known:
+            # After the cache: values pre-loaded later still apply to cached detections.
+            out = [
+                self._with_known(slot.text, spans, known, detector, language)
+                for slot, spans in zip(slots, out, strict=True)
+            ]
         for spans in out:
             stats.spans.update(s.entity_type.value for s in spans)
         return out
+
+    @staticmethod
+    def _with_known(
+        text: str,
+        spans: list[Span],
+        known: KnownValues,
+        detector: ModeDetector,
+        language: str,
+    ) -> list[Span]:
+        merged = merge_known(text, spans, known, language, keep_types=detector.policies.keep_types)
+        # BlockedEntityError for a known value of a ``block`` type; ``keep`` ones are masked.
+        detector.policies.apply(s for s in merged if s.detector == KNOWN_DETECTOR)
+        return merged
 
     def _mask(
         self,

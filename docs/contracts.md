@@ -122,6 +122,8 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
+| `PII_GUARD_KNOWN_VALUES_MAX` | `known_values_max` | `int` (known values per session) | `1000` |
+| `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` | `known_values_max_length` | `int` (characters per value) | `256` |
 | `PII_GUARD_LLM_DETECTOR_URL` | `llm_detector_url` | `str \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_API_KEY` | `llm_detector_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
@@ -201,6 +203,8 @@ Every non-2xx response, including validation errors and unknown routes, has this
 |---|---|---|
 | 404 | `not_found` | Unknown route, or unknown `session_id` on unmask |
 | 422 | `invalid_request` | Body fails validation. The message lists field locations only, never values. |
+| 422 | `invalid_known_value` | A pre-loaded known value is too short (< 3 non-space characters), too long, or has an unknown or visual type. The message names its index and type, never the value. |
+| 422 | `too_many_known_values` | The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values; nothing is added. |
 | 422 | `blocked_entity` | `/v1/mask` (or the gateway) found an entity type whose policy is `block`. The message lists types and counts only; nothing is masked, stored or forwarded. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
@@ -250,6 +254,45 @@ including `keep` and `block` ones: analyze never refuses on policy.
   offsets.
 - Any `block`-policy span fails the request with `422 blocked_entity`: no masked text, no
   vault entry (a session the request created is dropped; an existing one is unchanged).
+- If the session has known values (below), the `known` detector runs on top of the configured
+  detectors: its spans win every conflict in the resolver and are masked even when their
+  type's policy is `keep` (the application asked for it); a `block` type still refuses.
+
+### `POST /v1/sessions` and `POST /v1/sessions/{session_id}/known-values`
+
+Pre-load values the application already knows are sensitive in this conversation (a customer
+record, a case file, a contact list). Every occurrence is then masked by the deterministic
+`known` detector (`src/pii_guard/detect/known.py`, score `1.0`), in `/v1/mask` and in the
+gateway (`X-PII-Guard-Session`), even when no statistical detector finds it. It is an extra
+detector, never a requirement.
+
+```json
+// POST /v1/sessions (the body is optional)
+{"known_values": [{"value": "Gyakorló Tihamér", "entity_type": "PERSON"},
+                  {"value": "KX-77-3021", "entity_type": "ID_DOCUMENT"}]}
+// response 201
+{"session_id": "s_2c9e…", "added": 2, "total": 2}
+
+// POST /v1/sessions/s_2c9e…/known-values
+{"known_values": [{"value": "Minta Rozália", "entity_type": "PERSON"}]}
+// response 200
+{"session_id": "s_2c9e…", "added": 1, "total": 3}
+```
+
+- Matching follows the vault's occurrence rules: case- and whitespace-insensitive, whole words,
+  and per language the inflected forms (Hungarian suffixes and stem changes such as
+  `Gyakorló Tihamérnak`, `Próba Zsuzsannát`, `Kováccsal`; the English possessive). Spans cover
+  the stem, so the suffix stays outside the placeholder.
+- Placeholders are the usual keyed ones: a value that is pre-loaded *and* found by another
+  detector (or masked earlier in the session) gets one placeholder.
+- Values are stored only on the vault session (same sliding TTL) and are forgotten when it
+  expires or is dropped. They are never logged or echoed: responses carry counts only
+  (`added` excludes duplicates), and the access log shows the route template, not the id.
+- Limits: `PII_GUARD_KNOWN_VALUES_MAX` values per session (default 1000) and
+  `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` characters per value (default 256). Values with fewer
+  than 3 non-space characters are refused (`422 invalid_known_value`): they would over-mask.
+  A refused request adds nothing; a refused `POST /v1/sessions` creates no session.
+- Unknown or expired `session_id` → 404 `not_found`.
 
 ### `POST /v1/unmask`
 

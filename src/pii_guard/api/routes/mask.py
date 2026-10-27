@@ -4,6 +4,11 @@ Entity policies (:mod:`pii_guard.policy`): only ``mask`` spans are replaced; ``k
 stay in place and are reported in ``kept`` by type and count; any ``block`` span refuses the
 request with ``422 blocked_entity``.
 
+Known values pre-loaded into the session (``POST /v1/sessions/{id}/known-values``) are found
+by the ``known`` detector on top of the configured ones and win their conflicts; they are
+masked even when their type's policy is ``keep`` (the application asked for it), and a
+``block`` type still refuses the request.
+
 Fail closed (ADR 0006): the vault and session are resolved before detection, and any
 detection, policy or masking error is returned as an error body -- never the input or a
 partially masked text. A session this request created is dropped again on error, so a
@@ -12,6 +17,7 @@ refused text leaves nothing in the vault.
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -20,6 +26,7 @@ from pydantic import BaseModel, Field
 from pii_guard.api.deps import Analyzer, get_analyzer, get_language, get_policies, get_vault
 from pii_guard.api.routes._common import check_text_size, log_extra, v1_router
 from pii_guard.api.routes.analyze import Language
+from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.policy import BlockedEntityError, PolicySet
 from pii_guard.vault import Vault
 
@@ -69,11 +76,16 @@ def mask(
     session = vault.session(body.session_id)
     try:
         spans = analyzer.analyze(body.text, language)
+        known = session.known_values
+        if known:
+            spans = merge_known(body.text, spans, known, language, keep_types=policies.keep_types)
         decision = policies.apply(spans)  # BlockedEntityError before anything is stored
+        kept = [s for s in decision.kept if s.detector != KNOWN_DETECTOR]
+        to_mask = decision.masked + [s for s in decision.kept if s.detector == KNOWN_DETECTOR]
 
         # entities() counts across the whole session; report only what this call replaced.
         before = {placeholder: count for placeholder, _, count in session.entities()}
-        masked_text = session.mask(body.text, decision.masked, language=language)
+        masked_text = session.mask(body.text, to_mask, language=language)
     except BaseException as exc:
         if isinstance(exc, BlockedEntityError):
             log_extra(request, blocked=",".join(f"{t.value}:{n}" for t, n in exc.counts.items()))
@@ -85,20 +97,21 @@ def mask(
         for placeholder, entity_type, count in session.entities()
         if (delta := count - before.get(placeholder, 0)) > 0
     ]
-    kept = [
+    kept_entities = [
         KeptEntity(entity_type=entity_type.value, count=count)
-        for entity_type, count in sorted(decision.kept_counts().items())
+        for entity_type, count in sorted(Counter(s.entity_type for s in kept).items())
     ]
     log_extra(
         request,
         spans=len(spans),
         replaced=sum(e.count for e in entities),
-        kept=sum(k.count for k in kept),
+        kept=sum(k.count for k in kept_entities),
+        known=sum(s.detector == KNOWN_DETECTOR for s in spans),
         new_session=body.session_id is None,
     )
     return {
         "masked_text": masked_text,
         "session_id": session.session_id,
         "entities": entities,
-        "kept": kept,
+        "kept": kept_entities,
     }

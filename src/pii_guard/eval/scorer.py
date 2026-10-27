@@ -410,11 +410,16 @@ def run_documents(
     *,
     policy: Mapping[EntityType, str] = DEFAULT_POLICY,
     tenant_key: bytes = EVAL_TENANT_KEY,
+    known_values: bool = False,
 ) -> list[DocumentResult]:
     """Detect, mask (every prediction not of a ``keep``-policy type) and unmask every document.
 
     A ``block`` type would refuse the request; here it is masked like ``mask`` so its values
     never count as leaked.
+
+    With ``known_values``, a document's ``meta.known_values`` (``[{"value", "entity_type"}]``)
+    is pre-loaded into its session and found by the ``known`` detector, as
+    ``POST /v1/sessions/{id}/known-values`` would; this measures the uplift of pre-loading.
 
     Each document gets a fresh vault session, as one request would. Errors propagate
     (fail closed): a run with a failing detector produces no scorecard.
@@ -424,6 +429,17 @@ def run_documents(
     for doc in documents:
         started = time.perf_counter()
         predicted = analyzer.analyze(doc.text, doc.language)
+        if known_values and doc.meta.get("known_values"):
+            from pii_guard.detect.known import KnownValuesDetector, merge_known
+            from pii_guard.vault.known import KnownValueError, known_values_from
+
+            try:
+                items = known_values_from(doc.meta["known_values"])
+            except KnownValueError as exc:
+                raise KnownValueError(f"document {doc.id!r}: {exc.message}") from None
+            predicted = merge_known(
+                doc.text, predicted, KnownValuesDetector(items), doc.language, keep_types=()
+            )
         detected = time.perf_counter()
         to_mask = [s for s in predicted if policy.get(s.entity_type, "mask") != "keep"]
         session = vault.session()

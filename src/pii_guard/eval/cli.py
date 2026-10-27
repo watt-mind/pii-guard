@@ -3,6 +3,7 @@
 ```
 pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language hu[,en]]
                [--json OUT] [--markdown OUT] [--baselines presidio,llm-guard,privaite]
+               [--known-values]
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
 pii-guard eval visual --specimens data/specimens  # visual recall on specimen ID documents
 ```
@@ -12,6 +13,8 @@ default is ``eval/fixtures``. Detectors are looked up in the registry by name; o
 can't be loaded is skipped with a warning. The Markdown scorecard goes to stdout (and to
 ``--markdown``), the JSON scorecard to ``--json``. ``--baselines`` also runs open-source
 tools over the same documents (:mod:`pii_guard.eval.baselines`) and appends a comparison.
+``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
+``known`` detector), to measure the uplift of pre-loading values an application already knows.
 
 Exit codes: 0 success, 1 a detector or the vault failed during the run, 2 bad arguments,
 unreadable fixtures or no loadable detector.
@@ -74,6 +77,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAMES",
         help="also score these open-source tools: presidio, llm-guard, privaite",
     )
+    parser.add_argument(
+        "--known-values",
+        action="store_true",
+        help="pre-load each document's meta.known_values into its session (known detector)",
+    )
     parser.add_argument("--json", type=Path, metavar="OUT", help="write the JSON scorecard here")
     parser.add_argument(
         "--markdown", type=Path, metavar="OUT", help="also write the Markdown table here"
@@ -121,7 +129,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     try:
-        results = run_documents(documents, analyzer)
+        results = run_documents(documents, analyzer, known_values=args.known_values)
     except PiiGuardError as exc:
         # Fail closed and say why without raw values (messages carry types and counts only).
         print(f"pii-guard eval: run failed: {exc.code}: {exc.message}", file=sys.stderr)
@@ -134,7 +142,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         fixture_paths=fixture_paths,
         languages=args.language,
     )
+    if args.known_values:
+        scorecard["meta"]["known_values"] = sum(
+            len(d.meta.get("known_values") or ()) for d in documents
+        )
     markdown = render_markdown(scorecard)
+    if args.known_values:
+        markdown += (
+            f"\nKnown values pre-loaded from fixture meta: {scorecard['meta']['known_values']} "
+            "(`known` detector).\n"
+        )
     if args.baselines:
         from pii_guard.eval.baselines import render_comparison, run_baselines
 
