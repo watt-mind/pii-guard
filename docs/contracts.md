@@ -536,8 +536,8 @@ With `render: "labels"` (the default) the response also carries:
 
 The gateway (`POST /v1/chat/completions`) runs the same pipeline on `image_url` content parts
 whose URL is an inline `data:image/png|jpeg;base64,…` URL, with the request mode's detectors
-for OCR text, and forwards a masked PNG data URL in its place (other part fields such as
-`detail` are kept). Remote `http(s)` and other URLs are `400 unsupported_content`: the guard
+for OCR text, and forwards a masked PNG data URL in its place (`detail` is kept; any other
+field is rejected, see [Gateway request fields](#gateway-request-fields-implemented)). Remote `http(s)` and other URLs are `400 unsupported_content`: the guard
 never fetches URLs. Limits: `PII_GUARD_GATEWAY_MAX_IMAGES` (4) images of
 `PII_GUARD_GATEWAY_MAX_IMAGE_BYTES` (10 MiB) each, `PII_GUARD_GATEWAY_IMAGE_TIMEOUT` (120 s)
 for all of a request's images. With `PII_GUARD_IMAGE_RENDER=labels` (the default) images are
@@ -546,6 +546,58 @@ share one placeholder, and a text part follows each image part: `[pii-guard: ima
 masked; …]`, its document summary (JSON) and its masked transcript. The model's answer is
 unmasked as usual. Responses to requests with images carry `X-PII-Guard-Images`,
 `X-PII-Guard-Image-Regions-Masked` and `X-PII-Guard-Image-OCR: on|off`.
+
+## Gateway request fields (implemented)
+
+`POST /v1/chat/completions` walks the whole body against an allow-list
+(`pii_guard.gateway.request`) and fails closed (ADR 0006): every key below is masked, checked
+or passed through as stated, and **any other key is rejected** with
+`400 unsupported_content`, at the top level, in a message, a content part, a tool call or a
+nested object listed here. A malformed value (a string where a number belongs, a non-object
+message, ...) is `400 invalid_request`. Nothing is forwarded or vault-stored for a rejected
+request, and error messages name the location (a field name, or `#position` when the key
+itself could be a value), never the value.
+
+Treatments:
+
+- **mask**: free text. Detected values are replaced by placeholders and restored in the
+  answer.
+- **mask JSON**: every string in the value, object keys included, is masked as its own text.
+- **check**: an identifier or enum-like setting that can't carry a placeholder. Detected
+  personal data rejects the request (`400 unsupported_content`); otherwise it is forwarded
+  unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.
+- **pass**: numbers, booleans and null only (strings are `400 invalid_request`), or an opaque
+  provider-issued blob forwarded untouched.
+
+| Where | Key | Treatment |
+| --- | --- | --- |
+| body | `model` | pass (non-empty string, required) |
+| body | `messages` | per message, below (non-empty array, required) |
+| body | `temperature`, `top_p`, `n`, `max_tokens`, `max_completion_tokens`, `presence_penalty`, `frequency_penalty`, `seed`, `logprobs`, `top_logprobs`, `stream`, `parallel_tool_calls`, `store`, and the extension knobs `top_k`, `min_p`, `repetition_penalty` | pass |
+| body | `reasoning_effort`, `service_tier`, `verbosity`, `modalities`, `stream_options`, `audio`, `tool_choice`, `function_call` | check (every string and key) |
+| body | `user`, `safety_identifier`, `prompt_cache_key` | mask |
+| body | `stop` (string or array of strings) | mask |
+| body | `prediction` | `type` check; `content` mask (string or text parts) |
+| body | `web_search_options` | `search_context_size` check; `user_location` mask JSON |
+| body | `logit_bias` | keys must be token ids, values numbers |
+| body | `metadata` | keys check; values mask JSON |
+| body | `tools`, `functions` | definitions: `name` and other keys check; `parameters`/`schema` walked as JSON Schema (free text masked, `properties` keys and `required` entries checked, `type`/`$ref`/`format`/... passed); every other string or array mask JSON (e.g. an MCP tool's `server_description`); entries must be objects |
+| body | `response_format` | `type` check; `json_schema` as a definition |
+| message | `role` | one of `system`, `developer`, `user`, `assistant`, `tool`, `function` |
+| message | `content` | string mask; array of content parts, below |
+| message | `refusal`, `reasoning_content`, `reasoning` | mask (a non-string value: mask JSON) |
+| message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass (opaque, provider-signed) |
+| message | `audio` | `transcript` mask; `id` check; `expires_at` pass |
+| message | `annotations` | mask JSON |
+| message | `name` | detected personal data removes the field; for `role: function` it is checked instead (it must match the call) |
+| message | `tool_call_id`, `cache_control`, `prefix` | check |
+| message | `tool_calls[]` | `id`, `type` check; `index` pass; `function.name` check; `function.arguments` as below; `custom.name` check, `custom.input` mask JSON |
+| message | `function_call` | `name` check; `arguments` as below |
+| tool call | `arguments` | a JSON string: parsed, mask JSON, re-serialised (not JSON: mask); an object or array (LiteLLM/Ollama style): mask JSON in place; anything else `400 invalid_request` |
+| content part | `{"type": "text"}` | `text` mask; `cache_control` check |
+| content part | `{"type": "refusal"}` | `refusal` mask |
+| content part | `{"type": "image_url"}` | inline PNG/JPEG data URL masked as an image (above); `image_url.detail` and `cache_control` check |
+| content part | any other type (`input_audio`, `file`, ...) | `400 unsupported_content` |
 
 ## Vault (implemented)
 

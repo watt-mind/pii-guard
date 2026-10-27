@@ -202,7 +202,8 @@ def test_collect_texts_masks_json_keys_and_nested_values() -> None:
     texts = sorted(s.text for s in collected.slots)
     assert "Teszt Elek" in texts and "teszt.elek@example.com" in texts
     assert "not json Teszt Elek" in texts and "thinking" in texts
-    assert "lookup" not in texts  # function names are not personal data
+    # A function result's name is only checked as an identifier, never masked.
+    assert {s.kind for s in collected.slots if s.text == "lookup"} == {"identifier"}
     for slot in collected.slots:
         slot.write(slot.text.replace("Teszt Elek", "[[PERSON_aaaa]]"))
     collected.finalize()
