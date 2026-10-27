@@ -95,6 +95,7 @@ def make_app(
     ocr: object = "fake",
     config: GatewayConfig | None = None,
     policy_overrides: str | None = None,
+    require_ocr: bool = True,
 ) -> FastAPI:
     settings = Settings(
         tenant_key=TEST_TENANT_KEY,
@@ -102,6 +103,7 @@ def make_app(
         upstream_api_key=UPSTREAM_KEY,
         policy_overrides=policy_overrides,
         image_render="opaque",  # solid boxes; labels: tests/visual/test_labelled_images.py
+        image_require_ocr=require_ocr,
     )
     config = config or GatewayConfig()
     app = create_app(settings)
@@ -182,9 +184,61 @@ def test_string_image_url_form_is_masked_too() -> None:
     assert filled(img, FACE)
 
 
-def test_without_ocr_header_says_off() -> None:
+def test_without_ocr_the_image_is_refused_and_nothing_is_forwarded() -> None:
+    """Fail closed (ADR 0006, LAB-1209): without OCR the TAJ on the card can't be found, so
+    the request is refused with 503 instead of forwarding the card readable."""
+    upstream, sam = MockUpstream(), Sam()
+    with TestClient(make_app(upstream, sam, ocr=None)) as http:
+        response = http.post(
+            "/v1/chat/completions", json={"model": "m", "messages": messages_with(data_url(png()))}
+        )
+    assert response.status_code == 503, response.text
+    assert response.json()["error"]["code"] == "ocr_unavailable"
+    assert upstream.requests == []
+    assert sam.prompts == []
+
+
+def test_tesseract_not_installed_refuses_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The shipped-container case: the gateway picks its OCR engine itself and finds none."""
+    import pii_guard.api.routes.image_masking as image_masking
+
+    monkeypatch.setattr(image_masking, "tesseract_available", lambda: False)
+    upstream = MockUpstream()
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY, upstream_base_url=UPSTREAM_URL, upstream_api_key=UPSTREAM_KEY
+    )
+    config = GatewayConfig()
+    app = create_app(settings)
+    app.state.gateway = Gateway(
+        settings=settings,
+        vault=Vault.from_settings(settings),
+        config=config,
+        detectors=build_mode_detectors(settings, config, llm_detector=FakeLlm()),
+        transport=upstream.transport(),
+        sam=SamClient(api_key="test-key", transport=httpx.MockTransport(Sam()), max_retries=0),
+    )
+    with TestClient(app) as http:
+        response = http.post(
+            "/v1/chat/completions", json={"model": "m", "messages": messages_with(data_url(png()))}
+        )
+    assert response.status_code == 503, response.text
+    assert response.json()["error"]["code"] == "ocr_unavailable"
+    assert upstream.requests == []
+
+
+def test_text_only_requests_need_no_ocr() -> None:
     upstream = MockUpstream()
     with TestClient(make_app(upstream, Sam(), ocr=None)) as http:
+        response = http.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": [{"role": "user", "content": "Szia, Teszt Elek!"}]},
+        )
+    assert response.status_code == 200, response.text
+
+
+def test_without_ocr_and_opted_out_header_says_off() -> None:
+    upstream = MockUpstream()
+    with TestClient(make_app(upstream, Sam(), ocr=None, require_ocr=False)) as http:
         response = http.post(
             "/v1/chat/completions", json={"model": "m", "messages": messages_with(data_url(png()))}
         )

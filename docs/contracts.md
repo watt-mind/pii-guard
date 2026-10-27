@@ -526,10 +526,12 @@ With `render: "labels"` (the default) the response also carries:
   `face`, `signature`, `squiggly line`, `id photo`, `stamp`). It needs `META_API_KEY` (or
   `PII_GUARD_SAM_API_KEY`); without one every call is `503 detection_failed`.
 - Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
-  binary with `hun`/`eng` data), OCR text goes through the API's detectors
-  (`PII_GUARD_DETECTORS`, so names need `llm`). Otherwise only SAM runs and `analysis.ocr` is
-  `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "tesseract_unavailable"}`: text in
-  the image was **not** checked.
+  binary with `hun`/`eng` data; the Docker image ships both), OCR text goes through the API's
+  detectors (`PII_GUARD_DETECTORS`, so names need `llm`). Without it the image is refused with
+  `503 ocr_unavailable` before SAM runs (fail closed), here and in the gateway. Only with
+  `PII_GUARD_IMAGE_REQUIRE_OCR=false` does SAM run alone, and `analysis.ocr` is
+  `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "tesseract_unavailable"}`:
+  text in the image was **not** checked (the gateway says `X-PII-Guard-Image-OCR: off`).
 - Fail closed: any SAM, OCR or detector error is `503 detection_failed`, a masking error
   `500 masking_failed`; an undecodable image or bad base64 is `422 invalid_image`. Error bodies
   never contain the image.

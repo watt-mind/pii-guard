@@ -132,6 +132,25 @@ def plan(
     return p
 
 
+def ocr_status() -> str:
+    """The banner's image line: OCR on, or why images will be refused (LAB-1209)."""
+    from pii_guard.visual.ocr import tesseract_available
+
+    if tesseract_available():
+        return "OCR on (Tesseract): text in images is masked"
+    if os.environ.get("PII_GUARD_IMAGE_REQUIRE_OCR", "true").strip().lower() in (
+        "false",
+        "0",
+        "no",
+        "off",
+    ):
+        return "OCR off and not required: text in images is NOT checked"
+    return (
+        "OCR off: image parts are refused (503 ocr_unavailable); install Tesseract and "
+        "`uv sync --extra ocr` (docs/operations.md)"
+    )
+
+
 def banner(p: Plan) -> str:
     upstream = {
         "mock": f"mock upstream (offline, echoes the masked text) at {p.mock_url}/v1",
@@ -160,6 +179,7 @@ def banner(p: Plan) -> str:
             ]
         ),
         f"  strict mode    {strict}",
+        f"  images         {ocr_status()}",
         "",
         "  send demo traffic:  make demo-traffic      stop: Ctrl-C",
         "",

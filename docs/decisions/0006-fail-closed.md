@@ -26,3 +26,14 @@ Every error path blocks the outbound request:
 - Availability of pii-guard and its model endpoints directly affects availability of the
   application. Health checks and readiness must reflect model availability.
 - Tests must cover each failure path and assert that nothing reached the upstream.
+
+## Note: OCR for images (2026-10-27, LAB-1209)
+
+An image whose text can't be read is an unchecked input: without Tesseract a card with a TAJ
+reached the upstream readable, with `200` and `X-PII-Guard-Image-OCR: off`, and that was the
+default Docker deployment. Now the image ships Tesseract (`hun`/`eng`/`deu`), and without an
+OCR engine image parts are refused with `503 ocr_unavailable` (gateway and `/v1/mask/image`).
+`PII_GUARD_IMAGE_REQUIRE_OCR=false` is an explicit, documented opt-out to SAM-only masking:
+the image is still masked (faces, signatures), but its text is not checked, and the response
+says so (`X-PII-Guard-Image-OCR: off`). The container healthcheck fails while OCR is required
+and unavailable.

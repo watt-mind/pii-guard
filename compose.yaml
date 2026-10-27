@@ -4,6 +4,8 @@
 #   UI http://localhost:5173, demo API + gateway http://127.0.0.1:8788 (traffic log on),
 #   mock upstream (offline). Set PII_GUARD_DEMO_UPSTREAM_URL / _API_KEY for a real upstream.
 #   The local equivalent without Docker is `make demo`.
+# The image ships Tesseract (hun/eng/deu) for the text in images; without OCR, image parts are
+# refused with 503 ocr_unavailable unless PII_GUARD_IMAGE_REQUIRE_OCR=false.
 x-healthcheck: &healthcheck
   interval: 5s
   timeout: 3s
@@ -67,7 +69,9 @@ services:
         condition: service_healthy
     healthcheck:
       <<: *healthcheck
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2)"]
+      # Healthy = /healthz answers and OCR is available (the image ships Tesseract); prints
+      # "ocr on|off". Images are refused (503 ocr_unavailable) without it (ADR 0006).
+      test: ["CMD", "python", "-c", "import os, sys, urllib.request; from pii_guard.visual.ocr import tesseract_available as t; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2); ok = t(); print('ocr', 'on' if ok else 'off'); sys.exit(0 if ok or os.environ.get('PII_GUARD_IMAGE_REQUIRE_OCR', 'true').lower() in ('false', '0', 'no', 'off') else 1)"]
 
   ui:
     profiles: [demo]
