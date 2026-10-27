@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # Key for deriving pseudonyms (HMAC), hex encoded (openssl rand -hex 32).
     tenant_key: SecretStr | None = None
 
+    # Values an application pre-loads into a session (POST /v1/sessions/{id}/known-values).
+    known_values_max: int = Field(default=1000, ge=1)
+    known_values_max_length: int = Field(default=256, ge=3)
+
     # Model endpoints.
     llm_detector_url: str | None = None
     llm_detector_api_key: SecretStr | None = None
