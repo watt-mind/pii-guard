@@ -266,6 +266,7 @@ for chunk in stream:
 | `X-PII-Guard-Session` | both | The conversation. Omit it to start one; the response carries it. Same session = same placeholders, and history is not detected again. Unknown or expired → 404. |
 | `X-PII-Guard-Mode` | request | `strict` (rules + LLM detector, the default) or `fast` (rules only, no model call). |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
+| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
 | `X-PII-Guard-Request-Id` | response | The call's id in the traffic log; with `PII_GUARD_SERVER_TIMING=true` a `Server-Timing` header gives the per-stage latency ([operations.md](docs/operations.md#timing)). |
 
