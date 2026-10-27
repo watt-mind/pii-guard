@@ -12,11 +12,15 @@ interface Props {
   counts: KnownValuesResponse | null;
   /** The row the guard refused, with its message. */
   error: { index: number; message: string } | null;
+  /** Loads a fictional example: a row plus a sentence using it in the document. */
+  onTry: () => void;
+  /** After a run: how many spans came from known values (null before a run). */
+  found: number | null;
 }
 
 
 /** Values the application already knows are sensitive, pre-loaded into the session. */
-export function KnownValues({ rows, onRows, counts, error }: Props) {
+export function KnownValues({ rows, onRows, counts, error, onTry, found }: Props) {
   const base = useId();
   const used = rows.filter((r) => r.value.trim() !== "");
   const set = (id: number, patch: Partial<KnownRow>) => onRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -96,13 +100,18 @@ export function KnownValues({ rows, onRows, counts, error }: Props) {
             + Add a value
           </Button>
           {rows.length === 0 && (
-            <Button variant="ghost" onClick={() => onRows([newKnownRow("Gyakorló Tihamér")])}>
-              Try a fictional one
+            <Button variant="ghost" onClick={onTry} title="Adds a fictional name here and a sentence using it, in an inflected form, to the document">
+              Try a fictional example
             </Button>
           )}
           {counts && used.length > 0 && (
             <p className="text-xs text-muted" data-testid="known-counts">
               {counts.total} known {counts.total === 1 ? "value" : "values"} loaded in this session ({counts.added} new)
+            </p>
+          )}
+          {found === 0 && used.length > 0 && (
+            <p role="note" className="w-full text-xs text-warn">
+              None of your known values appear in this document, so nothing extra was masked. Add a sentence that uses one (in any inflected form) and run it again.
             </p>
           )}
         </div>

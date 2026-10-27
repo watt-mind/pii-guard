@@ -23,6 +23,8 @@ export interface RunResult {
   sampleId: string | null;
   /** Counts from the known-values session, when values were pre-loaded. */
   known: KnownValuesResponse | null;
+  /** The known values this result was made with (see `knownSignatureOf`). */
+  knownSignature: string;
 }
 
 export interface RunError {
@@ -41,6 +43,14 @@ export interface KnownSession {
 }
 
 export const knownKey = (v: KnownValue) => `${v.entity_type}:${v.value.trim().toLowerCase()}`;
+
+/** Order-insensitive fingerprint of the known values in use. */
+export const knownSignatureOf = (values: readonly KnownValue[]) =>
+  values
+    .filter((v) => v.value.trim() !== "")
+    .map(knownKey)
+    .sort()
+    .join("|");
 
 export function toRunError(err: unknown): RunError {
   if (err instanceof ApiError) {
@@ -120,6 +130,7 @@ export async function runGuard(client: RoutingClient, text: string, sampleId: st
     input: text,
     language,
     known,
+    knownSignature: knownSignatureOf(options.known ?? []),
     spans: attachPlaceholders(local, links),
     mask: masked.data,
     links,

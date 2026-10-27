@@ -142,7 +142,7 @@ describe("Known values and Chat in demo mode", () => {
     const user = userEvent.setup();
     render(<App api={offlineApi()} mock={createMockClient()} />);
     await user.click(screen.getByText("Known values"));
-    await user.click(screen.getByRole("button", { name: "Try a fictional one" }));
+    await user.click(screen.getByRole("button", { name: "Try a fictional example" }));
     const input = screen.getByLabelText("Document text");
     await user.clear(input);
     await user.type(input, "Kedves Gyakorló Tihamérnak küldöm.");
@@ -180,5 +180,24 @@ describe("Known values and Chat in demo mode", () => {
     const back = within(panel).getByRole("region", { name: "What you got back" });
     await waitFor(() => expect(back.querySelector("mark[data-restored]")).not.toBeNull());
     expect(back).toHaveTextContent("Teszt Elek");
+  });
+});
+
+describe("Known values example", () => {
+  it("adds a fictional value and a sentence using it, and says when no known value was found", async () => {
+    const user = userEvent.setup();
+    render(<App api={offlineApi()} mock={createMockClient()} />);
+    await user.click(screen.getByText("Known values"));
+    await user.click(screen.getByRole("button", { name: "Try a fictional example" }));
+    expect((screen.getByLabelText("Document text") as HTMLTextAreaElement).value).toContain("Gyakorló Tihamérnak");
+    await user.click(screen.getByRole("button", { name: /mask document/i }));
+    const panel = screen.getByRole("tabpanel", { name: /mask/i });
+    await within(panel).findByTestId("masked-text");
+    expect(panel.querySelector("[data-known]")).not.toBeNull();
+    // Editing a known value makes the result stale.
+    await user.type(screen.getByLabelText("Known value 1"), "x");
+    expect(within(panel).getByText("The settings changed")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /mask document/i }));
+    expect(await within(panel).findByText(/None of your known values appear in this document/)).toBeInTheDocument();
   });
 });

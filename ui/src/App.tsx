@@ -16,7 +16,8 @@ import { Images } from "./screens/Images";
 import { RoundTrip } from "./screens/RoundTrip";
 import { Chat, type ChatDraft } from "./screens/Chat";
 import type { KnownRow } from "./lib/knownRows";
-import type { KnownSession } from "./lib/run";
+import { knownSignatureOf, type KnownSession } from "./lib/run";
+import { newKnownRow } from "./lib/knownRows";
 
 // The open tab lives in the URL hash, so a reload (or a shared link) lands on the same screen.
 const HASH_TO_SCREEN: Record<string, Screen> = { "#mask": "playground", "#chat": "chat", "#images": "images", "#benchmarks": "benchmarks" };
@@ -170,6 +171,14 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
             onLanguage={setLanguage}
             known={known}
             onKnown={setKnown}
+            knownSignature={knownSignatureOf(known)}
+            onTryKnown={() => {
+              setKnown((rows) => [...rows, newKnownRow("Gyakorló Tihamér")]);
+              editText(
+                text.replace(/\s*$/, "") +
+                  (language === "hu" ? "\n\nA lakás kulcsait Gyakorló Tihamérnak kell átadni." : "\n\nPlease hand the keys to Gyakorló Tihamér's assistant."),
+              );
+            }}
             onContinue={() => {
               const sample = SAMPLES.find((s) => s.id === sampleId && s.text === text);
               setChatDraft({ text: sample ? `${sample.task}\n\n${text}` : text, language, nonce: Date.now() });

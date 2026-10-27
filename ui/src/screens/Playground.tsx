@@ -29,9 +29,12 @@ interface Props {
   onLanguage: (l: "hu" | "en") => void;
   known: KnownRow[];
   onKnown: (rows: KnownRow[]) => void;
+  onTryKnown: () => void;
+  /** Known-value rows as they were when `result` was made; a change makes the result stale. */
+  knownSignature: string;
 }
 
-export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue, language, onLanguage, known, onKnown }: Props) {
+export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue, language, onLanguage, known, onKnown, onTryKnown, knownSignature }: Props) {
   const [editing, setEditing] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -40,7 +43,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
     setAnchor(key ? (el ?? null) : null);
   };
 
-  const fresh = result !== null && result.input === text && result.language === language;
+  const fresh = result !== null && result.input === text && result.language === language && result.knownSignature === knownSignature;
   const showHighlighted = fresh && !editing;
   const sample = SAMPLES.find((s) => s.id === sampleId);
 
@@ -87,7 +90,9 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
       <KnownValues
         rows={known}
         onRows={onKnown}
-        counts={result?.known ?? null}
+        onTry={onTryKnown}
+        found={fresh && result ? result.spans.filter((s) => s.detector === "known").length : null}
+        counts={fresh ? (result?.known ?? null) : null}
         error={error?.code === "invalid_known_value" && error.knownIndex !== undefined ? { index: error.knownIndex, message: error.message } : null}
       />
 
@@ -197,7 +202,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           footer={
             result && fresh && summary ? (
               result.engine === "mock" ? (
-                <span>Highlighted values were swapped for typed, keyed placeholders. The demo engine is a small in-browser rule set: anything without a highlight was not detected and would be sent as written.</span>
+                <span>Demo engine: a small rule set running in your browser, so it misses more than the live pipeline.</span>
               ) : undefined
             ) : undefined
           }
@@ -214,12 +219,12 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                   {sample.task}
                 </p>
               )}
-              {result.engine === "api" && summary && <ScopeNote summary={summary} detectors={detectorsUsed(result.spans)} />}
+              {summary && <ScopeNote summary={summary} detectors={detectorsUsed(result.spans)} />}
               <MaskedText text={result.mask.masked_text} activeKey={activeKey} onActivate={activate} />
             </div>
           ) : (
             <EmptyState
-              title={result ? "The document changed" : "Nothing has been sent yet"}
+              title={result ? (result.input === text ? "The settings changed" : "The document changed") : "Nothing has been sent yet"}
               body={
                 result
                   ? "Run the guard again to see what the model would get for this version."
