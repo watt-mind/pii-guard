@@ -616,6 +616,51 @@ Results: [fictional-captions.md](../eval/results/visual/fictional-captions.md),
 `2026-10-27-visual-{fictional,specimens}-rules{,-llm}{,-captions}`. The LLM detector is
 configured as for the API (`PII_GUARD_LLM_DETECTOR_*`); its runs are not deterministic.
 
+## Image redaction baselines
+
+`pii-guard eval visual --baseline NAME` scores an open-source image redaction tool on the same
+images, with the same scorer (IoU ≥ 0.5 region recall per region type, coverage,
+over-masking) and the same 2 px padding as pii-guard
+(`pii_guard.eval.baselines.image`, LAB-1164). Like the text baselines, each tool runs as a
+worker in its own pinned `uv` environment (`src/pii_guard/eval/baselines/envs/presidio-image.txt`,
+`eka.txt`; workers in `.../workers/`, protocol in `workers/_image_protocol.py`). The worker
+gets each image as the PNG pii-guard sees and returns the boxes the tool would black out, with
+no recognised text. Its own time per image is the latency.
+
+- `presidio-image`: Presidio Image Redactor's `ImageAnalyzerEngine` (Tesseract + Presidio
+  analyzer, predefined recognizers, default threshold) with spaCy models for en, de and hu
+  (huSpaCy, as in the text baseline). It analyses each document in its own language where a
+  model exists (`hu` for HU, `de` for DE and AT, else `en`). It is text-only by design.
+- `eka`: Eka PII Redaction's `ImagePIIRedactor` (LayoutLMv3 text PII over Tesseract words,
+  plus YOLO11m faces, signatures, stamps, QR codes and logos), all categories, CPU, weights
+  pinned to a revision.
+- `presidio-image-tuned`, `eka-tuned`: the same tools with pii-guard's OCR input
+  (Tesseract `hun+eng`, images enlarged to 2000 px).
+
+Text tools return one box per OCR word. The words of one detected entity are merged per text
+line before scoring, which is the rule pii-guard applies to its own spans. Region types a tool
+can't mask are left out of its per-type breakdown (`pipeline.unsupported_region_types`) and
+still count as missed in `overall`. The run records have family `comparison` and system key
+`visual:<name>`. LeakageBench (arXiv 2609.02207) was considered as a public image set and
+skipped: its data is available only under a research Data Use Agreement.
+
+**Results** (2026-10-27; full tables, versions, cost and caveats in
+[eval/results/2026-10-27-image-baselines](../eval/results/2026-10-27-image-baselines/README.md)).
+Recall@IoU ≥ 0.5 in %; "all" counts every labelled region:
+
+| Set | System | Portrait | Signature | MRZ | Text | All | Over-masking |
+|---|---|---:|---:|---:|---:|---:|---:|
+| fictional (24) | pii-guard rules + LLM | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 1.2 |
+| fictional (24) | Eka (tuned) | 100.0 | 86.7 | 0.0 | 95.5 | 91.3 | 3.2 |
+| fictional (24) | Presidio (defaults) | n/a | n/a | 0.0 | 50.9 | 37.6 | 1.1 |
+| specimens (65) | pii-guard rules + LLM | 90.8 | 83.8 | 80.0 | 30.3 | 48.5 | 4.7 |
+| specimens (65) | Eka (tuned) | 55.4 | 48.6 | 10.0 | 32.5 | 36.0 | 12.0 |
+| specimens (65) | Presidio (defaults) | n/a | n/a | 0.0 | 19.7 | 13.3 | 3.4 |
+
+pii-guard masks the most regions overall, mainly through portraits, signatures and MRZ zones.
+Eka's layout-aware classifier finds slightly more of the hard specimen text values than
+pii-guard with the LLM, at about 2.5× the over-masking.
+
 ## Person names inside company names
 
 `eval/fixtures/hu-company-names.jsonl` (44 documents, built by

@@ -631,6 +631,38 @@ offline, the tab replays calls recorded at level `masked`. "Send demo traffic" r
   thumbnail in the log (LAB-1188), streamed tool-call arguments in the log (LAB-1189) and the
   card number typed as an IBAN (LAB-1187).
 
+### 26. Image masking against Presidio Image Redactor and Eka (2026-10-27)
+
+LAB-1164.
+
+The text comparison (milestones 6 and 24) had no image counterpart. Now the visual eval scores
+open-source image redactors with the same scorer: Presidio Image Redactor (Tesseract +
+Presidio analyzer, spaCy en/de/hu) and Eka PII Redaction (LayoutLMv3 text PII + YOLO faces and
+signatures, CPU). Each ran with its defaults and once more with pii-guard's own OCR input.
+Recall@IoU ≥ 0.5 over every labelled region, best configuration of each tool:
+
+| Set | pii-guard rules | pii-guard rules + LLM | Eka | Presidio | Over-masking (pii-guard LLM / Eka / Presidio) |
+|---|---:|---:|---:|---:|---:|
+| Fictional set (24 images, 149 regions) | 90.6 % | **100.0 %** | 91.3 % | 38.3 % | 1.2 / 3.2 / 1.1 % |
+| Official specimens (65 images, 406 regions) | 37.9 % | **48.5 %** | 36.0 % | 13.3 % | 4.7 / 12.0 / 3.4 % |
+
+- **Where pii-guard leads:** on the specimens it masks portraits at 90.8 % (Eka 55–57 %),
+  signatures at 83.8 % (46–49 %) and MRZ zones at 80.0 % (≤ 10 %). Presidio's redactor is
+  text-only by design and masks none of these.
+- **Where it doesn't:** Eka finds 32.5 % of the 274 specimen text values, against pii-guard's
+  30.3 % with the LLM and 15.0 % with rules alone, but at 2.5× the over-masking. This is the
+  same OCR-bound gap milestone 22 named. A layout-aware reader is the lead to follow, not more
+  rules.
+- **Speed:** the baselines take 0.3–1.6 s per image on the CPU. pii-guard takes 6–10 s, most
+  of it four sequential SAM 3.1 API calls.
+- **Caveats:** Eka is trained on Indian documents, and Presidio has no Hungarian recognizers
+  beyond the language-independent ones. Word boxes were merged per entity and line for every
+  tool. LeakageBench was skipped because its data sits behind a research Data Use Agreement.
+- **Cost:** about $0.89 of SAM calls (the response cache was empty on this machine) and about
+  $0.3–0.5 of Baseten tokens (not metered). Source:
+  [2026-10-27-image-baselines](../eval/results/2026-10-27-image-baselines/README.md) and the
+  run records `2026-10-27-image-baselines-*` in [benchmarks.md](benchmarks.md).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
