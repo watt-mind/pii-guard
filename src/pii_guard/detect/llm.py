@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import secrets
 import threading
@@ -67,8 +66,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "meta-models/muse-spark-open-1026"
 DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
-#: Fallback for ``reasoning_effort`` when the caller passes none (the eval CLI, the registry).
-REASONING_EFFORT_ENV_VAR = "PII_GUARD_LLM_DETECTOR_REASONING_EFFORT"
+DEFAULT_TIMEOUT = 60.0
+DEFAULT_MAX_TOKENS = 4096
+_UNSET: Any = object()  # "argument not passed"; an explicit ``max_tokens=None`` means "omit it"
 #: Counters in :attr:`LlmDetector.usage` (token counts as the endpoint reports them).
 USAGE_KEYS = (
     "requests",
@@ -457,6 +457,9 @@ class LlmDetector:
     ``PII_GUARD_LLM_DETECTOR_MODEL``, then the Baseten Muse Spark Open defaults.
 
     - ``base_url``: the API root (``.../v1``) or the full ``.../chat/completions`` URL.
+    - ``timeout`` / ``max_tokens``: per request; unset ones come from
+      ``PII_GUARD_LLM_DETECTOR_TIMEOUT`` / ``PII_GUARD_LLM_DETECTOR_MAX_TOKENS``, then 60 s and
+      4096. ``max_tokens=None`` sends no ``max_tokens`` at all.
     - ``reasoning_effort``: sent only when set (default
       ``PII_GUARD_LLM_DETECTOR_REASONING_EFFORT``). Muse Spark always reasons and rejects
       ``"none"``; use ``"minimal"`` or ``"low"`` for detection. Muse Spark Open on Baseten
@@ -487,13 +490,13 @@ class LlmDetector:
         base_url: str | None = None,
         api_key: str | SecretStr | None = None,
         model: str | None = None,
-        timeout: float = 60.0,
+        timeout: float | None = None,
         max_retries: int = 1,
         temperature: float = 0.0,
         reasoning_effort: str | None = None,
         reasoning_strength: str | None = None,
         json_mode: bool = True,
-        max_tokens: int | None = 4096,
+        max_tokens: int | None = _UNSET,
         chunk_size: int = 6000,
         chunk_overlap: int = 300,
         score: float = 0.85,
@@ -512,12 +515,16 @@ class LlmDetector:
         if not 0.0 <= score <= 1.0:
             raise ValueError("score must be in [0, 1]")
         chunk_text("", chunk_size, chunk_overlap)  # validates the chunk parameters
-        self.timeout = timeout
+        self.timeout = (
+            timeout if timeout is not None else (settings.llm_detector_timeout or DEFAULT_TIMEOUT)
+        )
         self.max_retries = max_retries
         self.temperature = temperature
-        self.reasoning_effort = reasoning_effort or os.environ.get(REASONING_EFFORT_ENV_VAR) or None
+        self.reasoning_effort = reasoning_effort or settings.llm_detector_reasoning_effort or None
         self.reasoning_strength = reasoning_strength or settings.llm_detector_reasoning_strength
         self.json_mode = json_mode
+        if max_tokens is _UNSET:
+            max_tokens = settings.llm_detector_max_tokens or DEFAULT_MAX_TOKENS
         self.max_tokens = max_tokens
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap

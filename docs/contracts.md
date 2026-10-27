@@ -127,16 +127,19 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_LLM_DETECTOR_URL` | `llm_detector_url` | `str \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_API_KEY` | `llm_detector_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_MODEL` | `llm_detector_model` | `str \| None` | unset (detector default `meta-models/muse-spark-open-1026`) |
+| `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT` | `llm_detector_reasoning_effort` | `str \| None` | unset (not sent) |
+| `PII_GUARD_LLM_DETECTOR_MAX_TOKENS` | `llm_detector_max_tokens` | `int \| None` (>= 256) | unset (detector default `4096`) |
+| `PII_GUARD_LLM_DETECTOR_TIMEOUT` | `llm_detector_timeout` | `float \| None` (> 0, seconds) | unset (detector default `60`) |
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
 `PII_GUARD_DETECTORS` picks the REST API's detectors (`rules,llm` for the demo; the gateway
 has its own per-mode set). `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
-settings load: an unknown type or policy stops startup. `LlmDetector` resolves its model as
-the `model` argument, then `llm_detector_model` (environment or `.env`), then its built-in
-default, so the registry and `pii-guard eval` honour it too. It also reads
-`PII_GUARD_LLM_DETECTOR_REASONING_EFFORT` from the process environment itself (Muse Spark
-Open on Baseten needs `REASONING_EFFORT=low`); folding that, the text size limit and the
+settings load: an unknown type or policy stops startup. `LlmDetector` resolves its model,
+reasoning effort, max tokens and timeout as the constructor argument, then the setting
+(environment or `.env`), then its built-in default, so the registry and `pii-guard eval`
+honour them too (Muse Spark Open on Baseten needs `REASONING_EFFORT=low`; contract-length
+documents need a larger `MAX_TOKENS` and `TIMEOUT`). Folding the text size limit and the
 gateway settings into `Settings` is LAB-1095.
 
 `settings.tenant_key_bytes() -> bytes | None` decodes the hex tenant key (raises
