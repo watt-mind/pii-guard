@@ -187,6 +187,8 @@ class Specimen:
     sha256: str
     path: Path
     regions: tuple[ExpectedRegion, ...]
+    #: The document's language for the text detectors; ``None``: derived from the country.
+    language: str | None = None
 
 
 def load_specimens(
@@ -231,6 +233,7 @@ def load_specimens(
                 sha,
                 path,
                 tuple(regions),
+                entry.get("language"),
             )
         )
     return out
@@ -377,7 +380,7 @@ def evaluate(
         live_before = transport.live_ms
         start = time.perf_counter()
         try:
-            outcome = masker.mask(data, _LANGUAGE.get(specimen.country, "en"))
+            outcome = masker.mask(data, specimen.language or _LANGUAGE.get(specimen.country, "en"))
         except PiiGuardError as exc:
             result.error = exc.code
             covered: list[Region] = []
@@ -524,7 +527,7 @@ def _pct(value: float | None) -> str:
 def render_markdown(report: dict[str, Any]) -> str:
     pipe = report["pipeline"]
     lines = [
-        "# Visual recall on official specimen ID documents",
+        f"# {report.get('title') or 'Visual recall on official specimen ID documents'}",
         "",
         f"{report['specimens']} specimen images, SAM `{pipe['sam_model']}` "
         f"({', '.join(pipe['sam_types'])}), OCR `{pipe['ocr_engine'] or 'off'}`, "
@@ -713,6 +716,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--limit", type=int, help="prompt study: at most this many images per entity type"
     )
+    parser.add_argument("--title", help="report heading (default: the official specimen set)")
     parser.add_argument("--json", type=Path, metavar="OUT")
     parser.add_argument("--markdown", type=Path, metavar="OUT")
     return parser
@@ -803,6 +807,8 @@ def main(
                 sam_cost=args.sam_cost,
                 max_side=args.max_side,
             )
+            if args.title:
+                output = {"title": args.title, **output}
             markdown = render_markdown(output)
     except PiiGuardError as exc:
         log(f"run failed: {exc.code}: {exc.message}")

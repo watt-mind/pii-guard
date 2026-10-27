@@ -1,0 +1,21 @@
+AI-GENERATED FICTIONAL SPECIMENS - NOT REAL DOCUMENTS
+
+Every image in this directory is a fictional, specimen-style document made for testing
+pii-guard's image masking (LAB-1121, ADR 0005: synthetic data only).
+
+- The portraits, handwritten signatures, rubber stamps and paper/card textures were generated
+  by Muse Image (muse-image-1.0, Meta Model API). The people shown do not exist.
+- Every name, date, address, e-mail address, phone number and identification number is made
+  up. The identification numbers and MRZ check digits are checksum-valid by construction but
+  belong to no one. E-mail domains are the reserved example.* domains; UK phone numbers use
+  Ofcom's drama range (07700 900xxx).
+- The layouts are our own. They do not copy or imitate any official document design, coat of
+  arms, national symbol or security feature. The issuer is a "Fictional Specimen Authority"
+  and the MRZ state code is UTO, ICAO's fictional "Utopia".
+- Every document is overprinted "MINTA / SPECIMEN" and carries an "AI-generated fictional
+  specimen" footer. They are not valid for any purpose and must not be used as identity
+  documents.
+
+How they were made: eval/visual/generate_images.py; prompts, model, outcomes and image
+hashes: generation.json; exact region labels: labels.json; file list and hashes:
+manifest.json.

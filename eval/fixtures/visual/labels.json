@@ -1,0 +1,1946 @@
+{
+  "version": 1,
+  "description": "Exact personal-data regions of the fictional documents in manifest.json, keyed by image SHA-256. Known from the composition step (where each value, portrait, signature and MRZ was drawn), not drawn by hand.",
+  "box_format": "[x1, y1, x2, y2] as fractions of the image width and height",
+  "method": "Pillow text bounding boxes (+2 px), pasted portrait rectangles, the ink bounding box of each pasted signature (+3 px) and the MRZ lines (+3 px).",
+  "region_types": {
+    "portrait": "the generated face photo",
+    "signature": "a generated handwritten signature",
+    "mrz": "the machine-readable zone (all lines, valid check digits)",
+    "text": "one personal-data value; 'entity' says which kind"
+  },
+  "unscored_types": {
+    "stamp": "a generated rubber stamp (STAMP is kept by the default policy)",
+    "overprint": "the MINTA / SPECIMEN marks (whole image)"
+  },
+  "specimens": {
+    "ae5eb3ac9969e6ab552b835fe5bd26a55c3d4b7eed0e8ec8cf537021a85c1ec5": {
+      "id": "hu-id_card-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.0474,
+            0.1881,
+            0.2846,
+            0.6771
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3142,
+            0.1959,
+            0.3874,
+            0.2335
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3142,
+            0.268,
+            0.3893,
+            0.3056
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.3142,
+            0.3464,
+            0.4328,
+            0.3777
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.3142,
+            0.4185,
+            0.4249,
+            0.4498
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.3142,
+            0.4906,
+            0.4516,
+            0.5219
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.0692,
+            0.7288,
+            0.3034,
+            0.8824
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "a55c65641a0b4f4c77670deecf990a1770a5d5ec152555092298294d13405c9f": {
+      "id": "hu-id_card-back",
+      "regions": [
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.0455,
+            0.1034,
+            0.3656,
+            0.1426
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.0455,
+            0.1834,
+            0.1492,
+            0.221
+          ]
+        },
+        {
+          "type": "mrz",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0563,
+            0.652,
+            0.7737,
+            0.8699
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "d3e34403ceacd8a58bcf84d9a0f8d5f4d27f60516b40d32bf88e3a8e4a354026": {
+      "id": "hu-passport-data_page",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.04,
+            0.1477,
+            0.272,
+            0.5795
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3024,
+            0.1511,
+            0.3712,
+            0.1818
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3024,
+            0.208,
+            0.3776,
+            0.2386
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.6384,
+            0.2716,
+            0.744,
+            0.2955
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.3024,
+            0.3284,
+            0.4072,
+            0.3523
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.3024,
+            0.3852,
+            0.3728,
+            0.4148
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.3024,
+            0.4477,
+            0.4232,
+            0.4716
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.384,
+            0.6386,
+            0.5272,
+            0.742
+          ]
+        },
+        {
+          "type": "mrz",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0376,
+            0.8136,
+            0.9296,
+            0.9125
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "e42fae06f98af1af098c02920ff61c5fa46a112887df465ad04f78c5e365a210": {
+      "id": "hu-driving_licence-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.6719,
+            0.1881,
+            0.9328,
+            0.7085
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.0455,
+            0.2006,
+            0.1937,
+            0.2335
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.0455,
+            0.2727,
+            0.2273,
+            0.3056
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0455,
+            0.3464,
+            0.1532,
+            0.3777
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.0978,
+            0.7602,
+            0.2984,
+            0.8981
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "d666b5bee35267d77b7319237992cba0cfff94349e7560f2fcb19f91701f73f3": {
+      "id": "hu-badge-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.2656,
+            0.1771,
+            0.7344,
+            0.5729
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.0906,
+            0.6156,
+            0.5281,
+            0.65
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.0906,
+            0.6802,
+            0.6078,
+            0.7094
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.0906,
+            0.7271,
+            0.4031,
+            0.751
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "0007640aa168c4fca6f83c41a7288157fd91504da4ca1bd5d677c1a638ec448b": {
+      "id": "hu-member_card-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.0474,
+            0.1881,
+            0.2648,
+            0.627
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.2945,
+            0.2132,
+            0.4328,
+            0.2524
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.2945,
+            0.2931,
+            0.413,
+            0.3245
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "NATIONAL_ID_HU_TAJ",
+          "box": [
+            0.2945,
+            0.3652,
+            0.418,
+            0.3966
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.2945,
+            0.4357,
+            0.6018,
+            0.4749
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "90149ea761a51e8341aef5fc20662fee6416f4ef5bc380737e5d1be03ccb37d7": {
+      "id": "hu-form-page",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.72,
+            0.0495,
+            0.92,
+            0.2334
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.094,
+            0.2942,
+            0.261,
+            0.3098
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.094,
+            0.3656,
+            0.223,
+            0.3805
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.094,
+            0.4356,
+            0.2,
+            0.4547
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.094,
+            0.5064,
+            0.422,
+            0.5255
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.094,
+            0.5771,
+            0.411,
+            0.5962
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.094,
+            0.6485,
+            0.279,
+            0.6634
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "NATIONAL_ID_HU_TAX",
+          "box": [
+            0.094,
+            0.7192,
+            0.231,
+            0.7341
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.16,
+            0.7935,
+            0.404,
+            0.8685
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "ae7b8278b7b87337a4d30d5b2a57b7cdea005ff4c9034b075380bbf2acfc8de7": {
+      "id": "hu-letter-page",
+      "regions": [
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.078,
+            0.1358,
+            0.207,
+            0.1506
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.078,
+            0.1584,
+            0.348,
+            0.1768
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.148,
+            0.2702,
+            0.266,
+            0.2836
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.179,
+            0.3635,
+            0.421,
+            0.3798
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.186,
+            0.3897,
+            0.338,
+            0.4052
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "NATIONAL_ID_HU_TAX",
+          "box": [
+            0.265,
+            0.4151,
+            0.381,
+            0.4307
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.132,
+            0.4958,
+            0.367,
+            0.5778
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.077,
+            0.5849,
+            0.194,
+            0.6025
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.505,
+            0.5205,
+            0.695,
+            0.6068
+          ]
+        },
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "3c0df0a018501ca0804d0c62cca593b320db1e98b3b25cc594597a9321350b3e": {
+      "id": "de-id_card-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.0474,
+            0.1881,
+            0.2846,
+            0.6771
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3142,
+            0.2022,
+            0.4753,
+            0.2335
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3142,
+            0.2743,
+            0.3864,
+            0.3056
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.3142,
+            0.3464,
+            0.4269,
+            0.3777
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.3142,
+            0.4185,
+            0.4417,
+            0.4498
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.0702,
+            0.7288,
+            0.2955,
+            0.8824
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "f13057eb71ef95957e4596469a502e6448711a313e0c116b00d37ff1a191fe79": {
+      "id": "de-id_card-back",
+      "regions": [
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.0455,
+            0.105,
+            0.3696,
+            0.1426
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.0455,
+            0.1834,
+            0.1107,
+            0.2147
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0455,
+            0.2555,
+            0.1828,
+            0.2868
+          ]
+        },
+        {
+          "type": "mrz",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0553,
+            0.652,
+            0.7737,
+            0.8699
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "6823a5f6869196143243680518bf64758a51342839525e66e198a4c28167ccf3": {
+      "id": "de-passport-data_page",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.04,
+            0.1477,
+            0.272,
+            0.5795
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3024,
+            0.158,
+            0.3928,
+            0.1818
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3024,
+            0.2148,
+            0.372,
+            0.2386
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.6384,
+            0.2716,
+            0.7528,
+            0.2955
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.3024,
+            0.3284,
+            0.4016,
+            0.3523
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.3024,
+            0.3852,
+            0.3592,
+            0.4091
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.3024,
+            0.442,
+            0.4232,
+            0.4659
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.3632,
+            0.6386,
+            0.5296,
+            0.742
+          ]
+        },
+        {
+          "type": "mrz",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0376,
+            0.8136,
+            0.9296,
+            0.9125
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "620d2c9d65868e40f0b1b0b4417e4cdff99a9962152130aff3167b3b566441b2": {
+      "id": "de-driving_licence-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.6719,
+            0.1881,
+            0.9328,
+            0.7085
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.0455,
+            0.2022,
+            0.1838,
+            0.2335
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.0455,
+            0.2743,
+            0.251,
+            0.3056
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0455,
+            0.3464,
+            0.2085,
+            0.3777
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.1136,
+            0.7602,
+            0.2885,
+            0.8981
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "706d186b5c3c815fd81268b54a45bdfc92e844fa302890e6d8fa72f129ca0ce7": {
+      "id": "de-badge-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.2656,
+            0.1771,
+            0.7344,
+            0.5729
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.0906,
+            0.6156,
+            0.4922,
+            0.65
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.0906,
+            0.6802,
+            0.5938,
+            0.7094
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.0906,
+            0.7271,
+            0.3797,
+            0.751
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "5aa38051c45b605e94ff79f8d90f0c8640162fd07ea3cacff287c190508a7901": {
+      "id": "de-member_card-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.0474,
+            0.1881,
+            0.2648,
+            0.627
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.2945,
+            0.2147,
+            0.4506,
+            0.2461
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.2945,
+            0.2868,
+            0.4071,
+            0.3182
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.2945,
+            0.3589,
+            0.4457,
+            0.3903
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.2945,
+            0.431,
+            0.6393,
+            0.4687
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "9a94626d215e9499ec840102f318bcdd80a89d71b015ae4bb7581d0db69ce3da": {
+      "id": "de-form-page",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.72,
+            0.0495,
+            0.92,
+            0.2334
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.094,
+            0.2942,
+            0.209,
+            0.3098
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.094,
+            0.3656,
+            0.218,
+            0.3805
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.094,
+            0.4364,
+            0.159,
+            0.4512
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.094,
+            0.5071,
+            0.432,
+            0.5248
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.094,
+            0.5771,
+            0.353,
+            0.5962
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.094,
+            0.6485,
+            0.265,
+            0.6634
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.094,
+            0.7192,
+            0.245,
+            0.7341
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.168,
+            0.7935,
+            0.422,
+            0.8685
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "f027a6b07789cdf5c95d40cd05a4d470bbc74e5a736bb0a0e6c000dfa7994e85": {
+      "id": "de-letter-page",
+      "regions": [
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.078,
+            0.1358,
+            0.265,
+            0.1506
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.078,
+            0.1584,
+            0.386,
+            0.1768
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.218,
+            0.2702,
+            0.389,
+            0.2836
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.18,
+            0.3635,
+            0.474,
+            0.3798
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.186,
+            0.3897,
+            0.323,
+            0.4052
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.206,
+            0.4151,
+            0.33,
+            0.4307
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.109,
+            0.4958,
+            0.391,
+            0.5778
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.078,
+            0.5877,
+            0.208,
+            0.6061
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.505,
+            0.5488,
+            0.627,
+            0.5693
+          ]
+        },
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "5434cb85f51f5dc20ddb04f7334dd37c2febf1f605530363e75042a5018e696e": {
+      "id": "en-id_card-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.0474,
+            0.1881,
+            0.2846,
+            0.6771
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3142,
+            0.2022,
+            0.4842,
+            0.2335
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3142,
+            0.2743,
+            0.3765,
+            0.3056
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.3142,
+            0.3464,
+            0.4506,
+            0.3777
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.3142,
+            0.4185,
+            0.4249,
+            0.4498
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.0889,
+            0.7288,
+            0.2846,
+            0.8824
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "b192e2c1e998c5ceb1948ce8deb459cb9bc324025591fd2df9568b373365c878": {
+      "id": "en-id_card-back",
+      "regions": [
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.0455,
+            0.105,
+            0.4121,
+            0.1426
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.0455,
+            0.1834,
+            0.1354,
+            0.2147
+          ]
+        },
+        {
+          "type": "mrz",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0563,
+            0.652,
+            0.7737,
+            0.8699
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "9f42dbdec875648deb72be8ee9a32918455a599b15c3db423d51f28bfc75c492": {
+      "id": "en-passport-data_page",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.04,
+            0.1477,
+            0.272,
+            0.5795
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3024,
+            0.158,
+            0.3856,
+            0.1818
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.3024,
+            0.2148,
+            0.3776,
+            0.2386
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.6384,
+            0.2716,
+            0.7376,
+            0.2955
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.3024,
+            0.3284,
+            0.42,
+            0.3523
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.3024,
+            0.3852,
+            0.3608,
+            0.4091
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.3024,
+            0.442,
+            0.4112,
+            0.4659
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.3688,
+            0.6386,
+            0.5424,
+            0.742
+          ]
+        },
+        {
+          "type": "mrz",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0376,
+            0.8136,
+            0.9296,
+            0.9125
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "40ae85fc55cd15db7b4a4fc7bcbf1decc6385ec6979430ed2e406863b16dd097": {
+      "id": "en-driving_licence-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.6719,
+            0.1881,
+            0.9328,
+            0.7085
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.0455,
+            0.2022,
+            0.2292,
+            0.2398
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.0455,
+            0.2806,
+            0.2767,
+            0.3119
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.0455,
+            0.3527,
+            0.2619,
+            0.384
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.0968,
+            0.7602,
+            0.3063,
+            0.8981
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "7e2b1ca2e6e3fc76a76a075bfcd91925498723b3beda91985f7bf39c1f86eef1": {
+      "id": "en-badge-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.2656,
+            0.1771,
+            0.7344,
+            0.5729
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.0906,
+            0.6156,
+            0.5109,
+            0.6583
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.0875,
+            0.6802,
+            0.5984,
+            0.7094
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.0906,
+            0.7271,
+            0.3563,
+            0.751
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "635a8b9b4b7c1085faf9298af9668b6d75f9908c0701537a58e0c84f3aefd972": {
+      "id": "en-member_card-front",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.0474,
+            0.1881,
+            0.2648,
+            0.627
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.2945,
+            0.2147,
+            0.4486,
+            0.2461
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.2945,
+            0.2868,
+            0.4239,
+            0.3182
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.2945,
+            0.3589,
+            0.4249,
+            0.3903
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.2945,
+            0.431,
+            0.6235,
+            0.4687
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "9d6ba5718f860ff1dea3a8b727e04046d47d522c856c34b6a3350906e7ec8634": {
+      "id": "en-form-page",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "FACE",
+          "box": [
+            0.72,
+            0.0495,
+            0.92,
+            0.2334
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.094,
+            0.2949,
+            0.267,
+            0.3133
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "DATE_OF_BIRTH",
+          "box": [
+            0.094,
+            0.3656,
+            0.242,
+            0.3805
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PLACE_OF_BIRTH",
+          "box": [
+            0.094,
+            0.4364,
+            0.17,
+            0.4512
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.094,
+            0.5064,
+            0.482,
+            0.5255
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.094,
+            0.5771,
+            0.414,
+            0.5962
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.094,
+            0.6485,
+            0.251,
+            0.6634
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.094,
+            0.7192,
+            0.231,
+            0.7341
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.19,
+            0.7935,
+            0.4,
+            0.8685
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "51ff03306597be6be56f92675fb41d77e7e002a6920671ccfc48eee037734dc8": {
+      "id": "en-letter-page",
+      "regions": [
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.078,
+            0.1358,
+            0.253,
+            0.1542
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ADDRESS",
+          "box": [
+            0.078,
+            0.1584,
+            0.411,
+            0.1768
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.126,
+            0.2702,
+            0.286,
+            0.2864
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "EMAIL",
+          "box": [
+            0.171,
+            0.3635,
+            0.452,
+            0.3798
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PHONE",
+          "box": [
+            0.175,
+            0.3918,
+            0.309,
+            0.4052
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "ID_DOCUMENT",
+          "box": [
+            0.322,
+            0.4151,
+            0.436,
+            0.4307
+          ]
+        },
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.11,
+            0.4958,
+            0.389,
+            0.5778
+          ]
+        },
+        {
+          "type": "text",
+          "entity": "PERSON",
+          "box": [
+            0.078,
+            0.5877,
+            0.196,
+            0.6061
+          ]
+        }
+      ],
+      "unscored": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.505,
+            0.5205,
+            0.695,
+            0.6068
+          ]
+        },
+        {
+          "type": "overprint",
+          "entity": null,
+          "box": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    }
+  }
+}
