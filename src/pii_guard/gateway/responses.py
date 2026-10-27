@@ -234,21 +234,19 @@ class ResponsesGateway:
         if trace.payloads:
             trace.masked_request = payload
         masked_input = _masked_input(body) if echo else None
-        client = httpx.AsyncClient(
-            timeout=httpx.Timeout(gw.config.upstream_timeout, connect=10.0),
-            transport=gw._transport,
-        )
+        client = gw.upstream_client()  # shared with /v1/chat/completions (LAB-1176)
         upstream_headers = gw._upstream_headers(headers)
         if stream:
             upstream_headers["Accept"] = "text/event-stream"
-        request = client.build_request("POST", url, content=payload, headers=upstream_headers)
+        request = client.build_request(
+            "POST", url, content=payload, headers=upstream_headers, timeout=gw.upstream_timeout()
+        )
         started = time.perf_counter()
         timer.add("forward", started - forwarding)
         timer.upstream_sent = started
         try:
             response = await client.send(request, stream=True)
         except httpx.HTTPError as exc:
-            await client.aclose()
             timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")
             raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
@@ -262,7 +260,6 @@ class ResponsesGateway:
                 raw = await _read_limited(response)
             finally:
                 await response.aclose()
-                await client.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
             if response.status_code in (404, 405):
                 stats.log("responses_unsupported")
@@ -277,7 +274,6 @@ class ResponsesGateway:
         if not stream or not is_sse:
             return await self._whole(
                 response,
-                client,
                 started,
                 timer,
                 trace,
@@ -290,13 +286,12 @@ class ResponsesGateway:
                 masked_input,
             )
         return self._streamed(
-            response, client, timer, trace, stats, session, language, detector, out_headers
+            response, timer, trace, stats, session, language, detector, out_headers
         )
 
     async def _whole(
         self,
         response: httpx.Response,
-        client: httpx.AsyncClient,
         started: float,
         timer: RequestTimer,
         trace: CallTrace,
@@ -314,7 +309,6 @@ class ResponsesGateway:
             raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
         finally:
             await response.aclose()
-            await client.aclose()
         stats.upstream_ms = (time.perf_counter() - started) * 1000
         timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
         if trace.payloads:
@@ -347,7 +341,6 @@ class ResponsesGateway:
     def _streamed(
         self,
         response: httpx.Response,
-        client: httpx.AsyncClient,
         timer: RequestTimer,
         trace: CallTrace,
         stats: RequestStats,
@@ -412,7 +405,6 @@ class ResponsesGateway:
             finally:
                 await source.aclose()
                 await response.aclose()
-                await client.aclose()
                 stats.upstream_ms = timer.stages["upstream"] * 1000
                 stats.unresolved = len(restorer.unresolved)
                 if outcome == "ok":

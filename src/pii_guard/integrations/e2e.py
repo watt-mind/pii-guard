@@ -543,8 +543,9 @@ def serve(app: Any, port: int | None = None) -> Iterator[str]:
     import uvicorn
 
     port = port or free_port()
+    # lifespan "auto": the gateway's shutdown closes its pooled upstream client (LAB-1176).
     server = uvicorn.Server(
-        uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", lifespan="off")
+        uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", lifespan="auto")
     )
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()

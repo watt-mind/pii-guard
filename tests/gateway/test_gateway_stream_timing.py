@@ -186,6 +186,8 @@ def _assert_disconnected(app: FastAPI, stream: _Stream) -> None:
     gateway = app.state.gateway
     assert len(gateway.cache) == 1  # only the request's own message, detected before forwarding
     assert stream.closed and stream.pulled < stream.count
+    # The disconnect closed the upstream *response*; the shared client stays open (LAB-1176).
+    assert gateway._client is not None and not gateway._client.is_closed
     metrics = app.state.observability.metrics.render()
     assert 'pii_guard_gateway_requests_total{mode="audit",outcome="client_disconnected"} 1' in (
         metrics

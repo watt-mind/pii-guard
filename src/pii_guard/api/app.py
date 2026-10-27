@@ -59,15 +59,20 @@ def create_app(
 
     With ``PII_GUARD_NER_MODEL`` set, the lifespan loads the NER model before the app serves
     (:func:`~pii_guard.detect.stack.warm_up`, LAB-1274), so concurrent first requests don't
-    race to load it; a model that can't be loaded stops startup.
+    race to load it; a model that can't be loaded stops startup. The gateway
+    (``app.state.gateway``) keeps one upstream HTTP client; the lifespan closes it on shutdown
+    (LAB-1176).
     """
     settings = settings or get_settings()
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if await anyio.to_thread.run_sync(stack.warm_up, settings):
             logger.info("ner model warmed up before serving")
         yield
+        close = getattr(getattr(app.state, "gateway", None), "aclose", None)
+        if close is not None:
+            await close()
 
     app = FastAPI(
         title="pii-guard",
