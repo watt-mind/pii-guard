@@ -1,0 +1,28 @@
+{
+  "detectors": "fast:rules;ner",
+  "files": [
+    "client-letter.md",
+    "customers.csv",
+    ".env",
+    "notify.py",
+    "service.py",
+    "app.py",
+    "cli.py",
+    "config.py",
+    "pi.py",
+    "operations.md"
+  ],
+  "chars": 80720,
+  "masked": 23,
+  "by_kind": {
+    "value": 23
+  },
+  "by_kind_and_type": {
+    "value:ADDRESS": 3,
+    "value:BANK_ACCOUNT": 4,
+    "value:EMAIL": 7,
+    "value:PERSON": 5,
+    "value:PHONE": 4
+  },
+  "code_spans": []
+}

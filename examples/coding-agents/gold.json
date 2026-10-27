@@ -1,0 +1,31 @@
+{
+  "_comment": "Fictional values in mini-repo/ (ADR 0005). 'rules' and 'ner' must never reach the upstream (ner: only checked when the NER detector is installed). 'known_gaps' are values pii-guard does not cover yet; runs count them, they are not failures.",
+  "rules": [
+    "jane.placeholder@example.net",
+    "john.sample@example.org",
+    "teszt.elek@example.com",
+    "max.mustermann@example.de",
+    "support@example.com",
+    "+44 20 7946 0958",
+    "+36 30 123 4567",
+    "+49 30 12345678",
+    "GB82 WEST 1234 5698 7654 32",
+    "HU42 1177 3016 1111 1018 0000 0000",
+    "DE89 3704 0044 0532 0130 00"
+  ],
+  "ner": [
+    "Jane Placeholder",
+    "John Sample"
+  ],
+  "known_gaps": {
+    "secrets": [
+      "fake-payments-key-0000-0000-0000",
+      "fake-token-0000-0000-0000-000000000000",
+      "fake-password"
+    ],
+    "csv_names": [
+      "Teszt Elek",
+      "Max Mustermann"
+    ]
+  }
+}
