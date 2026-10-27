@@ -153,6 +153,7 @@ def check_structure(pack: LanguagePack) -> list[Finding]:
     findings += _check_inflection(pack)
     findings += _check_surface_forms(pack)
     findings += _check_lexicons(pack)
+    findings += _check_captions(pack)
     if not pack.smoke_fixtures:
         findings.append(
             _error(
@@ -361,6 +362,28 @@ def _check_lexicons(pack: LanguagePack) -> list[Finding]:
         if not present:
             findings.append(_error("structure.lexicons", f"lexicon {kind!r} is missing or empty"))
     return findings
+
+
+def _check_captions(pack: LanguagePack) -> list[Finding]:
+    if pack.captions is None:
+        return [
+            _info(
+                "structure.captions",
+                "no document field captions (values next to captions in images are left to "
+                "the text detectors)",
+            )
+        ]
+    if not isinstance(pack.captions, Traversable):
+        return [_error("structure.captions", "captions must be a resource (importlib.resources)")]
+    from pii_guard.visual.captions import load_captions
+
+    try:
+        captions = load_captions(pack.captions, pack.code)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        return [_error("structure.captions", f"captions.tsv is invalid: {exc}")]
+    if not any(c.entity_type is not None for c in captions):
+        return [_error("structure.captions", "captions.tsv has no personal-data caption")]
+    return []
 
 
 # --- Fixtures -------------------------------------------------------------------------------

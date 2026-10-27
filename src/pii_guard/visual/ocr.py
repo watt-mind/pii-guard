@@ -24,6 +24,7 @@ from typing import Protocol, runtime_checkable
 from PIL import Image
 
 from pii_guard.types import DetectionError, Detector, PiiGuardError
+from pii_guard.visual.captions import CaptionLexicon, caption_value_regions
 from pii_guard.visual.image import load_image
 from pii_guard.visual.mrz import mrz_regions
 from pii_guard.visual.regions import Box, Region
@@ -74,30 +75,59 @@ def tesseract_available() -> bool:
     return shutil.which("tesseract") is not None
 
 
+#: Images are enlarged for OCR until their longer side reaches this many pixels.
+DEFAULT_UPSCALE_TO = 2000
+#: The most an image is enlarged for OCR.
+MAX_UPSCALE = 4.0
+
+
 class TesseractOcr:
     """Tesseract via ``pytesseract``. ``lang`` is Tesseract's language list (``"hun+eng"``).
 
     ``min_confidence`` drops words Tesseract itself scores below it (0-100); keep it low,
     since a dropped word is a word that can't be masked.
+
+    ``upscale_to``: a smaller image is enlarged (Lanczos, at most :data:`MAX_UPSCALE` times)
+    until its longer side has this many pixels before OCR, and the word boxes are mapped
+    back. Field captions on ID cards are printed 6-10 px high at card resolution, below what
+    Tesseract reads; enlarged, they come back (``Családi név / Surname``), and so do the
+    values under them. ``None`` reads the image as it is.
     """
 
     name = "tesseract"
 
     def __init__(
-        self, lang: str = "hun+eng", *, config: str = "", min_confidence: float = 0.0
+        self,
+        lang: str = "hun+eng",
+        *,
+        config: str = "",
+        min_confidence: float = 0.0,
+        upscale_to: int | None = DEFAULT_UPSCALE_TO,
     ) -> None:
         self.lang = lang
         self.config = config
         self.min_confidence = min_confidence
+        self.upscale_to = upscale_to
+
+    def scale_for(self, size: tuple[int, int]) -> float:
+        """The factor :meth:`words` enlarges an image of ``size`` by (``1.0``: not at all)."""
+        if not self.upscale_to or max(size) <= 0:
+            return 1.0
+        return max(1.0, min(MAX_UPSCALE, self.upscale_to / max(size)))
 
     def words(self, image: Image.Image) -> list[OcrWord]:
         try:
             import pytesseract
         except ImportError as exc:
             raise DetectionError("OCR unavailable: install the 'ocr' extra") from exc
+        scale = self.scale_for(image.size)
+        source = image
+        if scale > 1.0:
+            target = (round(image.width * scale), round(image.height * scale))
+            source = image.resize(target, Image.Resampling.LANCZOS)
         try:
             data = pytesseract.image_to_data(
-                image,
+                source,
                 lang=self.lang,
                 config=self.config,
                 output_type=pytesseract.Output.DICT,
@@ -121,10 +151,18 @@ class TesseractOcr:
                     int(data["line_num"][i]),
                 )
                 box = Box(left, top, left + width - 1, top + height - 1)
+                if scale > 1.0:
+                    box = _clamp(box.scaled(1 / scale, 1 / scale), image.size)
                 words.append(OcrWord(text, box, line))
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             raise DetectionError("OCR output has an unexpected format") from exc
         return words
+
+
+def _clamp(box: Box, size: tuple[int, int]) -> Box:
+    width, height = size
+    x2, y2 = min(box.x2, width - 1), min(box.y2, height - 1)
+    return Box(min(box.x1, x2), min(box.y1, y2), x2, y2)
 
 
 def join_words(words: Sequence[OcrWord]) -> tuple[str, list[tuple[int, int]]]:
@@ -151,11 +189,17 @@ def text_regions(
     *,
     ocr: OcrEngine,
     language: str = "hu",
+    captions: bool | CaptionLexicon = True,
 ) -> list[Region]:
     """OCR ``image``, run every text detector on the recognised text, and return one region
-    per detected span per text line (the union of the overlapped word boxes), plus one
-    ``ID_DOCUMENT`` region per machine-readable zone found by its layout
-    (:func:`~pii_guard.visual.mrz.mrz_regions`).
+    per detected span per text line (the union of the overlapped word boxes), plus:
+
+    - one ``ID_DOCUMENT`` region per machine-readable zone found by its layout
+      (:func:`~pii_guard.visual.mrz.mrz_regions`);
+    - one region per value printed next to a known field caption (``Név``, ``Date of
+      birth``; :func:`~pii_guard.visual.captions.caption_value_regions`), unless
+      ``captions`` is ``False``. A :class:`~pii_guard.visual.captions.CaptionLexicon` replaces
+      the language packs' captions.
     """
     if not detectors:
         raise DetectionError("no text detector configured for OCR text")
@@ -178,6 +222,10 @@ def text_regions(
 
     # Layout-found MRZ zones: one box per zone, whatever the text detectors make of it.
     regions: list[Region] = mrz_regions(words)
+    # Values next to known field captions, whatever the text detectors make of them.
+    if captions is not False:
+        lexicon = captions if isinstance(captions, CaptionLexicon) else None
+        regions.extend(caption_value_regions(words, lexicon))
     for detector in detectors:
         try:
             spans = detector.detect(text, language)

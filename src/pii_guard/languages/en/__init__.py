@@ -33,4 +33,5 @@ def pack() -> LanguagePack:
             directory=files("pii_guard.lang").joinpath("data", "en"),
             kinds=("street_types",),
         ),
+        captions=files(__name__).joinpath("captions.tsv"),
     )

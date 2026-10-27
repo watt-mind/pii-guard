@@ -1,0 +1,56 @@
+# Field captions on English-language identity documents and forms (visual/captions.py).
+# caption <TAB> entity type of the value printed next to it, or "-" when that value is not
+# personal data (the caption is still recognised, so it bounds its neighbours).
+Name	PERSON
+Surname	PERSON
+Family name	PERSON
+Given name	PERSON
+Given names	PERSON
+First name	PERSON
+Forename	PERSON
+Forenames	PERSON
+Full name	PERSON
+Name at birth	PERSON
+Alternate name	PERSON
+Father's name	PERSON
+Mother's name	PERSON
+Fathers name	PERSON
+Mothers name	PERSON
+Date of birth	DATE_OF_BIRTH
+Place of birth	ADDRESS
+Place and date of birth	DATE_OF_BIRTH
+Address	ADDRESS
+Residence	ADDRESS
+Document no	ID_DOCUMENT
+Document number	ID_DOCUMENT
+Card no	ID_DOCUMENT
+Card number	ID_DOCUMENT
+Identity card number	ID_DOCUMENT
+Passport no	ID_DOCUMENT
+Personal no	ID_DOCUMENT
+Personal number	ID_DOCUMENT
+Personal code	ID_DOCUMENT
+ID number	ID_DOCUMENT
+National Insurance no	ID_DOCUMENT
+National register number	ID_DOCUMENT
+Licence number	ID_DOCUMENT
+Phone	PHONE
+Telephone	PHONE
+Email	EMAIL
+E-mail	EMAIL
+Sex	-
+Gender	-
+Nationality	-
+Citizenship	-
+Expiry	-
+Date of expiry	-
+Expires on	-
+Valid until	-
+Date of issue	-
+Issued by	-
+Issuing authority	-
+Authority	-
+Signature	-
+Holder's signature	-
+Categories	-
+Height	-

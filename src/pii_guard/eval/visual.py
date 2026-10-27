@@ -4,6 +4,7 @@
 pii-guard eval visual --specimens data/specimens [--manifest eval/visual/manifest.json]
                       [--labels eval/visual/labels.json] [--cache data/visual-cache]
                       [--offline] [--max-live-calls 800] [--no-ocr] [--country HU,DE]
+                      [--detectors rules[,ner,llm]] [--no-captions] [--ocr-upscale 2000]
                       [--prompts JSON] [--prompt-study JSON] [--json OUT] [--markdown OUT]
 ```
 
@@ -48,7 +49,7 @@ from PIL import Image, ImageDraw
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import DetectionError, Detector, EntityType, PiiGuardError
 from pii_guard.visual.image import encode_image, load_image
-from pii_guard.visual.ocr import OcrEngine
+from pii_guard.visual.ocr import DEFAULT_UPSCALE_TO, OcrEngine
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.sam import DEFAULT_PROMPTS, SamClient
 
@@ -355,6 +356,7 @@ def evaluate(
     ocr: OcrEngine | None,
     detector: Detector | None,
     entity_types: Sequence[EntityType] = EVAL_SAM_TYPES,
+    captions: bool = True,
     max_side: int = DEFAULT_MAX_SIDE,
     log: Callable[[str], None] = lambda _msg: None,
 ) -> list[SpecimenResult]:
@@ -370,6 +372,7 @@ def evaluate(
         ocr=ocr,
         text_detector=detector,
         entity_types=list(entity_types),
+        captions=captions,
     )
     results: list[SpecimenResult] = []
     for specimen in specimens:
@@ -434,6 +437,8 @@ def build_report(
     detector_name: str | None,
     sam_cost: float,
     max_side: int,
+    captions: bool = True,
+    ocr_upscale_to: int | None = None,
 ) -> dict[str, Any]:
     all_scores = [s for r in results for s in r.scores]
     by_type = {t: _group([s for s in all_scores if s.type == t]) for t in REGION_TYPES}
@@ -471,6 +476,8 @@ def build_report(
             "sam_prompts": {t.value: list(sam.prompts[t]) for t in entity_types},
             "ocr_engine": ocr_engine,
             "text_detector": detector_name,
+            "captions": captions if ocr_engine else False,
+            "ocr_upscale_to": ocr_upscale_to if ocr_engine else None,
             "max_side": max_side,
             "iou_threshold": IOU_THRESHOLD,
             "coverage_threshold": COVERAGE_THRESHOLD,
@@ -531,7 +538,13 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         f"{report['specimens']} specimen images, SAM `{pipe['sam_model']}` "
         f"({', '.join(pipe['sam_types'])}), OCR `{pipe['ocr_engine'] or 'off'}`, "
-        f"text detector `{pipe['text_detector'] or 'off'}`. A region is a hit at IoU ≥ "
+        f"text detector `{pipe['text_detector'] or 'off'}`"
+        + (
+            f" (OCR on images enlarged to {pipe['ocr_upscale_to']} px)"
+            if pipe.get("ocr_upscale_to")
+            else ""
+        )
+        + f". A region is a hit at IoU ≥ "
         f"{pipe['iou_threshold']} with one covered box; coverage is the share of its pixels "
         f"under any mask (cov ≥ {pipe['coverage_threshold']} = fully covered).",
         "",
@@ -701,7 +714,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--sam-cost", type=float, default=DEFAULT_SAM_COST, metavar="USD")
     parser.add_argument("--no-ocr", action="store_true", help="SAM only (no OCR text masking)")
-    parser.add_argument("--detectors", default="rules", help="text detector for OCR text")
+    parser.add_argument(
+        "--detectors",
+        type=_csv,
+        default=["rules"],
+        help="text detectors for OCR text, comma-separated (rules,ner,llm)",
+    )
+    parser.add_argument(
+        "--no-captions",
+        action="store_true",
+        help="don't mask the values next to known field captions (visual/captions.py)",
+    )
+    parser.add_argument(
+        "--ocr-upscale",
+        type=int,
+        default=DEFAULT_UPSCALE_TO,
+        metavar="PX",
+        help="enlarge images for OCR to this longer side (0: read them as they are)",
+    )
     parser.add_argument("--country", type=_csv, help="only these countries (comma-separated)")
     parser.add_argument("--max-side", type=int, default=DEFAULT_MAX_SIDE)
     parser.add_argument(
@@ -722,15 +752,37 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _ocr_and_detector(args: argparse.Namespace) -> tuple[OcrEngine | None, Detector | None]:
+def _ocr_and_detector(
+    args: argparse.Namespace,
+) -> tuple[OcrEngine | None, Detector | None, str | None]:
+    """The OCR engine, the text detector (one detector, or the pipeline the API runs for
+    several) and its report name (``rules+llm``)."""
     if args.no_ocr:
-        return None, None
-    from pii_guard.registry import create_detector
+        return None, None, None
     from pii_guard.visual.ocr import TesseractOcr, tesseract_available
 
     if not tesseract_available():
         raise DetectionError("OCR unavailable (install the 'ocr' extra and tesseract)")
-    return TesseractOcr(), create_detector(args.detectors)
+    ocr = TesseractOcr(upscale_to=args.ocr_upscale or None)
+    names = list(dict.fromkeys(args.detectors))
+    if len(names) == 1:
+        from pii_guard.registry import create_detector
+
+        detector: Detector = create_detector(names[0])
+        loaded = [getattr(detector, "name", names[0])]
+    else:
+        from pii_guard.api.routes.image_masking import AnalyzerDetector
+        from pii_guard.eval.scorer import DetectorAnalyzer
+
+        analyzer = DetectorAnalyzer(names)
+        if analyzer.skipped:
+            reasons = "; ".join(f"{name}: {reason}" for name, reason in analyzer.skipped)
+            raise DetectionError(f"text detector unavailable ({reasons})")
+        detector = AnalyzerDetector(analyzer)
+        loaded = analyzer.loaded
+    if not args.no_captions:
+        loaded.append("captions")
+    return ocr, detector, "+".join(loaded)
 
 
 def main(
@@ -786,7 +838,7 @@ def main(
             }
             markdown = render_prompt_study(rows)
         else:
-            ocr, detector = _ocr_and_detector(args)
+            ocr, detector, detector_name = _ocr_and_detector(args)
             sam = sam_factory()
             results = evaluate(
                 specimens,
@@ -795,6 +847,7 @@ def main(
                 ocr=ocr,
                 detector=detector,
                 max_side=args.max_side,
+                captions=not args.no_captions,
                 log=log,
             )
             output = build_report(
@@ -803,9 +856,11 @@ def main(
                 sam=sam,
                 entity_types=EVAL_SAM_TYPES,
                 ocr_engine=getattr(ocr, "name", None),
-                detector_name=getattr(detector, "name", None),
+                detector_name=detector_name,
                 sam_cost=args.sam_cost,
                 max_side=args.max_side,
+                captions=not args.no_captions,
+                ocr_upscale_to=args.ocr_upscale or None,
             )
             if args.title:
                 output = {"title": args.title, **output}
