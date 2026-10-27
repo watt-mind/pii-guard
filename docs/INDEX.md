@@ -24,3 +24,4 @@
 | [0006](decisions/0006-fail-closed.md) | Fail closed on every error path |
 | [0007](decisions/0007-keyed-pseudonyms.md) | Keyed, reversible pseudonyms instead of one-way redaction |
 | [0008](decisions/0008-language-packs.md) | Language packs: per-language rules, inflection, prompts and eval forms, with fallbacks |
+| [0009](decisions/0009-third-party-lexicons.md) | Third-party lexicons: committed only where terms allow, used by the generator and the address rule |

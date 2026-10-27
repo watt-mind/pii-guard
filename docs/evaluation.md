@@ -14,7 +14,13 @@ where.
 
 1. **Fictional identities.** A generator produces people, addresses, ID numbers (with valid
    checksums), bank accounts and companies. All values are fictional and generated from a
-   seed, so runs are reproducible.
+   seed, so runs are reproducible. Hungarian names, settlements, postcodes and streets are
+   drawn by frequency from the language pack's lexicons
+   ([ADR 0009](decisions/0009-third-party-lexicons.md)) and combined at random; every address
+   uses one of its settlement's own postcodes. Each prompt also asks for a few **hard
+   negatives** that are never labelled: a surname that is a common word, used as the word
+   ("egy nagy doboz"), a town outside an address ("a Szeged felé tartó vonat"), a capitalised
+   phrase ("Eladó lakás", "Fekete Péntek").
 2. **Documents.** A Meta Muse model writes realistic documents around those identities, from
    templates that cover the real shapes of the work:
    - sale and lease contracts, powers of attorney, land registry extracts;
@@ -88,6 +94,41 @@ the model versions, corpus seed and commit hash, so anyone can reproduce them.
 The hand-written smoke sets are built by `eval/fixtures/build_smoke.py` (inline
 `{{TYPE|value}}` labels, checksum-valid fictional identifiers); a test fails if the committed
 JSONL is stale.
+
+## Lexicons: diversity and the address rule
+
+Measured when the lexicons landed ([ADR 0009](decisions/0009-third-party-lexicons.md)).
+
+**Generator diversity.** Distinct values in the 50 documents `plan_document("hu", seed, i)`
+plans for `i < 50` (no model call; surnames count people and mothers):
+
+| Seed | Generator | Surname slots | Distinct surnames | Address slots | Distinct settlements | Hard negatives |
+|---|---|---:|---:|---:|---:|---:|
+| 42 | v1 (hand lists: 54 surnames, 20 towns) | 106 | 45 | 78 | 19 | 0 |
+| 42 | v2 (lexicons) | 116 | 85 | 79 | 69 | 122 |
+| 7 | v1 | 113 | 45 | 83 | 18 | 0 |
+| 7 | v2 | 113 | 82 | 90 | 77 | 129 |
+
+A 50-document sample can't show 10× more distinct values than before: it has only ~110
+surname and ~80-90 address slots, and the old lists already filled 45 and 19 of them. v2
+fills ~73% of surname slots and ~86% of address slots with distinct values, against 40-42%
+and 22-24%;
+the lists behind them are 227 surnames (4×) and 3155 settlements (158×). Budapest still makes
+up about a sixth of addresses, as in real life.
+
+**Rules-only ADDRESS detection** (`uv run pii-guard eval --fixtures eval/fixtures/hu-<set>.jsonl
+--detectors rules`), before and after the full-address recogniser:
+
+| Set | | Exact P | Exact R | Overlap P | Overlap R | Leaked | Partially leaked | Over-masked |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| hu-smoke (13 addresses) | before | 0.00 | 0.00 | 1.00 | 0.92 | 1 | 12 | 0 |
+| | after | **1.00** | **1.00** | 1.00 | **1.00** | **0** | **0** | 0 |
+| hu-synth-sample (39) | before | 0.00 | 0.00 | 1.00 | 1.00 | 0 | 37 | 0 |
+| | after | **1.00** | **1.00** | 1.00 | 1.00 | 0 | **0** | 0 |
+
+Before, only the postcode was masked, so the street and house number survived ("partially
+leaked"); now the whole address is one span. A postcode that belongs to another settlement
+keeps the address shape but isn't boosted above a bare postcode's score.
 
 ## Comparison with open-source tools
 

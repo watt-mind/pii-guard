@@ -54,7 +54,10 @@ checkpoints/
 # --- Data -------------------------------------------------------------------
 # Only synthetic, generated data may ever be committed, and only under
 # eval/fixtures/. Everything below is local working data.
-data/
+# data/lexicons/ holds the lexicon fetcher and its manifest; downloads stay local.
+data/*
+!data/lexicons/
+data/lexicons/raw/
 eval/generated/
 eval/runs/
 # Real documents must never enter the repository, not even temporarily.

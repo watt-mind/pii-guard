@@ -6,15 +6,18 @@ the ``+36`` / ``0036`` / ``06`` prefix (validated against the area code), compan
 prefix and run for **every** language (``EVERYWHERE``): a Hungarian ID inside an English text
 is still personal data.
 
-Postcodes (four digits before a settlement name, or in context) and vehicle plates are formats
-without a checksum, so they run only when the text is Hungarian (``RULES``); in other
-languages "2019 Robin" or "ISO-900" style look-alikes would be false positives.
+Addresses, postcodes (four digits before a settlement name, or in context) and vehicle plates
+are formats without a checksum, so they run only when the text is Hungarian (``RULES``); in
+other languages "2019 Robin" or "ISO-900" style look-alikes would be false positives. A full
+address is validated against the gazetteer instead (``pii_guard.lang``, ADR 0009): its
+postcode must belong to its settlement.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Iterator
+from functools import cache
 
 from pii_guard.detect.checksums import (
     is_valid_giro,
@@ -32,7 +35,9 @@ from pii_guard.detect.rules._base import (
     _Hit,
     context_before,
 )
+from pii_guard.lang import LexiconUnavailable, lexicon, postcode_index
 from pii_guard.types import EntityType
+from pii_guard.vault.inflection import inflection_for
 
 __all__ = ["EVERYWHERE", "RULES"]
 
@@ -150,6 +155,10 @@ _NOT_PLACES = frozenset({
 
 
 def _find_postcode(text: str) -> Iterator[_Hit]:
+    """A postcode on its own (``3300 Eger``, ``irányítószám: 8200``): the code is the span.
+
+    A full address around it is found by :func:`_find_address`, whose span contains this one.
+    """
     for m in _POSTCODE_RE.finditer(text):
         place = _PLACE_AFTER_RE.match(text, m.end())
         if m.group("prefix"):
@@ -157,10 +166,122 @@ def _find_postcode(text: str) -> Iterator[_Hit]:
         elif context_before(text, m.start(), _POSTCODE_CONTEXT, window=25):
             score = 0.85
         elif place and place.group(1) not in _NOT_PLACES:
-            score = 0.75
+            # The postcode check works like a checksum: only a consistent pair is boosted.
+            settlement = _settlement(place.group(1))
+            consistent = settlement is not None and _postcodes_agree(m.group("code"), settlement)
+            score = 0.85 if consistent else 0.75
         else:
             continue
         yield _Hit(m.start("code"), m.end("code"), EntityType.ADDRESS, score)
+
+
+# A full address: ``[<postcode>] <settlement>[ <district>], <street name> <street type>
+# <house number>[ <floor/door>]``, e.g. ``1051 Budapest, Minta utca 12. 3/5.``,
+# ``9021 Győr, Gyöngyvirág utca 7. fszt. 2.`` or, without a postcode, ``Debrecen, Kitalált
+# utca 5.`` (then the settlement must be in the gazetteer, possibly inflected: ``Szegeden``).
+#
+# Validation, like a checksum for a structured ID: the postcode must belong to the settlement
+# (``pii_guard.lang.postcode_index``). Consistent pairs score highest; a settlement the
+# gazetteer doesn't know scores lower; a known settlement with a postcode of another place is
+# not boosted above a bare postcode.
+_STREET_ABBREVIATIONS = ("u.", "krt.", "ltp.", "rkp.", "stny.", "sgt.")
+_DOOR = r"\d{1,3}\.?(?:[ \t]*ajtó)?"
+_UNIT = (
+    r"(?:"
+    rf"(?:fszt|mfszt|földszint)\.?(?:[ \t]+{_DOOR})?"
+    rf"|\d{{1,2}}\.[ \t]*em(?:elet|\.)(?:[ \t]+{_DOOR})?"
+    r"|\d{1,2}/\d{1,3}\.?"
+    r")"
+)
+_HOUSE_NUMBER = r"\d{1,4}(?:/[A-Za-z](?!\w)|[/-]\d{1,4}|[A-Za-z](?!\w))?\.?"
+
+SCORE_CONSISTENT = 0.97
+SCORE_UNVALIDATED = 0.85
+SCORE_MISMATCH = 0.75
+
+
+@cache
+def _address_re() -> re.Pattern[str]:
+    try:
+        types = list(lexicon("street_types", "hu"))
+    except LexiconUnavailable:  # pragma: no cover - the lists ship with the package
+        types = ["utca", "út", "tér", "köz", "sor", "körút", "sétány", "rakpart"]
+    alternatives = sorted({*types, *_STREET_ABBREVIATIONS}, key=len, reverse=True)
+    street_type = "|".join(re.escape(t) for t in alternatives)
+    return re.compile(
+        r"(?<![\w\-./,])"
+        r"(?:(?:HU?-)?(?P<code>[1-9]\d{3})[ \t]+)?"
+        rf"(?P<place>[{_UPPER}][{_LOWER}]{{2,}})"
+        r"(?:[ \t]+(?P<district>[IVX]{1,5})\.(?:[ \t]*ker(?:ület|\.))?)?"
+        r",[ \t]*(?:\n[ \t]*)?"
+        rf"(?P<street>[{_UPPER}\d][\w.\-]*(?:[ \t]+[\w.\-]+){{0,3}}?)"
+        rf"[ \t]+(?:{street_type})(?!\w)"
+        rf"[ \t]+{_HOUSE_NUMBER}"
+        rf"(?:[ \t]+{_UNIT})*",
+    )
+
+
+@cache
+def _settlement(word: str) -> str | None:
+    """The gazetteer settlement ``word`` names, also in an inflected form (``Szegeden``)."""
+    try:
+        settlements = lexicon("settlements", "hu")
+    except LexiconUnavailable:  # pragma: no cover
+        return None
+    if word in settlements:
+        return word
+    matcher = inflection_for("hu")
+    for cut in range(len(word) - 1, 2, -1):
+        stem = word[:cut]
+        if stem in settlements:
+            suffix = matcher.suffix_pattern(stem, EntityType.ADDRESS)
+            if suffix and re.fullmatch(suffix, word[cut:], re.IGNORECASE):
+                return stem
+    return None
+
+
+def _postcodes_agree(code: str, settlement: str) -> bool:
+    try:
+        return postcode_index("hu").consistent(code, settlement)
+    except LexiconUnavailable:  # pragma: no cover
+        return False
+
+
+_ROMAN = {"I": 1, "V": 5, "X": 10}
+
+
+def _roman(numeral: str) -> int:
+    total = 0
+    for current, following in zip(numeral, [*numeral[1:], ""], strict=True):
+        value = _ROMAN[current]
+        total += -value if following and _ROMAN[following] > value else value
+    return total
+
+
+def _district_agrees(code: str, district: str | None) -> bool:
+    """A Budapest district (``XIII.``) must match the postcode's 2nd-3rd digits (``1134``)."""
+    return district is None or not code.startswith("1") or int(code[1:3]) == _roman(district)
+
+
+def _find_address(text: str) -> Iterator[_Hit]:
+    for m in _address_re().finditer(text):
+        word = m.group("place")
+        if word in _NOT_PLACES:
+            continue
+        settlement = _settlement(word)
+        code = m.group("code")
+        if code is None:
+            if settlement is None:
+                continue  # "Kedves Anna, Minta utca 1." is not an address without a town
+            score = SCORE_UNVALIDATED
+        elif settlement is None:
+            score = SCORE_UNVALIDATED
+        elif _postcodes_agree(code, settlement) and _district_agrees(code, m.group("district")):
+            score = SCORE_CONSISTENT
+        else:
+            score = SCORE_MISMATCH
+        start = m.start("code") if code is not None else m.start("place")
+        yield _Hit(start, m.end(), EntityType.ADDRESS, score)
 
 
 # --- Vehicles ---------------------------------------------------------------
@@ -214,4 +335,4 @@ EVERYWHERE: tuple[Rule, ...] = (
     _find_taj,
     _find_hu_phone,
 )
-RULES: tuple[Rule, ...] = (_find_vehicle_plate, _find_postcode)
+RULES: tuple[Rule, ...] = (_find_vehicle_plate, _find_address, _find_postcode)
