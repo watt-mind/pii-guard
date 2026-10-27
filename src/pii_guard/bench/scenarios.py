@@ -1,9 +1,14 @@
 """Scripted demo traffic through the gateway, and the checks the smoke test makes on it.
 
 Every value is fictional (ADR 0005): the names are the project's placeholder identities, the
-e-mail domains are ``example.*`` and the identifiers are well-known test numbers. Each scenario
-lists its **gold** values: the ones the rules detector (the offline default) must mask, so
-none of them may ever reach the upstream.
+e-mail domains are ``example.*`` and the identifiers are checksum-valid test numbers. Each
+scenario lists its **gold** values: the ones the offline default (fast mode, rules only) must
+mask, so none of them may ever reach the upstream. Names are pre-loaded as session known values
+(the ``known`` detector), with Hungarian inflected forms in the text.
+
+One scenario is labelled :data:`NER_LABEL` (``requires=("ner",)``): a free-text name no rule
+can find. In rules-only mode it is an **expected miss**, reported but not a failure; its gold
+is asserted only when the NER runs (``check(..., detectors={"ner"})``).
 
 With the mock upstream (:mod:`pii_guard.bench.mock_upstream`) the answers are predictable:
 the client must get back ``Echo: <its own last message>`` -- exactly, after unmasking -- or a
@@ -18,28 +23,51 @@ import base64
 import io
 import json
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 
-__all__ = ["SCENARIOS", "Outcome", "Scenario", "check", "gold_values", "leaks", "run"]
+__all__ = [
+    "NER_LABEL",
+    "SCENARIOS",
+    "Outcome",
+    "Scenario",
+    "check",
+    "expected_misses",
+    "gold_values",
+    "leaks",
+    "run",
+    "ui_export",
+]
 
 TEXT_HU = (
     "Szia! Teszt Elek vagyok, e-mail: teszt.elek@example.com, telefon: +36 30 123 4567. "
-    "Kérlek, utald a díjat a HU42 1177 3016 1111 1018 0000 0000 számlára, TAJ számom "
-    "123 456 788."
+    "Kérlek, utald a díjat a HU42 1177 3016 1111 1018 0000 0000 számlára. TAJ számom "
+    "123 456 788, adóazonosító jelem 8456789011."
+)
+TEXT_HU_FOLLOW_UP = (
+    "Köszönöm! A visszaigazolást Teszt Eleknek küldd, a teszt.elek@example.com címre."
 )
 TEXT_HU_ADDRESS = "Az új lakcímem 1051 Budapest, Minta utca 12., kérlek frissítsd a szerződésen."
+TEXT_HU_KNOWN = (
+    "Kérlek, írj egy rövid levelet Minta Máriának a Placeholder Kft.-vel kötött szerződésről, "
+    "és egyeztesd a határidőt Teszt Elekkel."
+)
 TEXT_EN = (
     "Hi, this is Jane Placeholder (jane.placeholder@example.net, +44 20 7946 0958). Please "
-    "refund the deposit to GB82 WEST 1234 5698 7654 32 and void card 4111 1111 1111 1111."
+    "refund the deposit to GB82 WEST 1234 5698 7654 32 and void Jane Placeholder's card "
+    "4111 1111 1111 1111."
 )
 TEXT_DE = (
     "Hallo, hier ist Erika Mustermann, E-Mail erika.mustermann@example.de, Telefon "
     "+49 30 901820. Bitte überweisen Sie auf DE89 3704 0044 0532 0130 00."
 )
+# A free-text name with no known value and no rule cue: only the NER (or strict mode's LLM
+# detector) can find it. Labelled, so rules-only runs show it as an expected miss.
+TEXT_HU_NER = "Tegnap Gipsz Jakab telefonált, és azt kérte, hogy holnap délelőtt hívjam vissza."
+NER_LABEL = "needs fast mode (NER)"
 TOOLS = [
     {
         "type": "function",
@@ -58,7 +86,11 @@ TOOLS = [
 
 @dataclass(frozen=True)
 class Scenario:
-    """One scripted request. ``expect``: ``echo``, ``tool`` or ``refused_or_echo`` (images)."""
+    """One scripted request. ``expect``: ``echo``, ``tool`` or ``refused_or_echo`` (images).
+
+    Names are pre-loaded as session known values (``known_values``), as an application that
+    knows its parties would (a CRM record, a case file): rules-only mode then masks them too.
+    """
 
     name: str
     language: str
@@ -72,7 +104,14 @@ class Scenario:
     image: bool = False
     follow_up: str | None = None  # a second turn in the same session
     mode: str = "fast"
+    # Detectors the gold values need beyond rules + known values, e.g. ("ner",). Such a
+    # scenario's gold is asserted only when that detector runs; otherwise it is an expected
+    # miss, shown as such (``label``) in make demo-traffic and the Live traffic tab.
+    requires: tuple[str, ...] = ()
+    label: str | None = None
 
+
+TESZT_ELEK = (("Teszt Elek", "PERSON"),)
 
 SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
@@ -80,13 +119,16 @@ SCENARIOS: tuple[Scenario, ...] = (
         "hu",
         TEXT_HU,
         (
+            "Teszt Elek",
             "teszt.elek@example.com",
             "+36 30 123 4567",
             "HU42 1177 3016 1111 1018 0000 0000",
             "123 456 788",
+            "8456789011",
         ),
         system="Ügyfélszolgálati asszisztens vagy. Válaszolj röviden.",
-        follow_up="Köszönöm! Kérlek, erősítsd meg az e-mail címemet: teszt.elek@example.com.",
+        known_values=TESZT_ELEK,
+        follow_up=TEXT_HU_FOLLOW_UP,
     ),
     Scenario(
         "hu-stream",
@@ -100,44 +142,75 @@ SCENARIOS: tuple[Scenario, ...] = (
         "en",
         TEXT_EN,
         (
+            "Jane Placeholder",
             "jane.placeholder@example.net",
             "+44 20 7946 0958",
             "GB82 WEST 1234 5698 7654 32",
             "4111 1111 1111 1111",
         ),
         stream=True,
+        known_values=(("Jane Placeholder", "PERSON"),),
     ),
     Scenario(
         "de-tools",
         "de",
         TEXT_DE,
-        ("erika.mustermann@example.de", "+49 30 901820", "DE89 3704 0044 0532 0130 00"),
+        (
+            "Erika Mustermann",
+            "erika.mustermann@example.de",
+            "+49 30 901820",
+            "DE89 3704 0044 0532 0130 00",
+        ),
         tools=True,
         expect="tool",
+        known_values=(("Erika Mustermann", "PERSON"),),
     ),
     Scenario(
         "de-tools-stream",
         "de",
         TEXT_DE,
-        ("erika.mustermann@example.de", "+49 30 901820", "DE89 3704 0044 0532 0130 00"),
+        (
+            "Erika Mustermann",
+            "erika.mustermann@example.de",
+            "+49 30 901820",
+            "DE89 3704 0044 0532 0130 00",
+        ),
         tools=True,
         stream=True,
         expect="tool",
+        known_values=(("Erika Mustermann", "PERSON"),),
     ),
     Scenario(
-        "en-known-values",
-        "en",
-        "Please draft a short note to Minta Mária about the Placeholder Kft. contract.",
-        ("Minta Mária", "Placeholder Kft."),
-        known_values=(("Minta Mária", "PERSON"), ("Placeholder Kft.", "ORGANIZATION")),
+        # Hungarian inflection round trip: "Máriának" (stem change), "Kft.-vel", "Elekkel".
+        "hu-known-values",
+        "hu",
+        TEXT_HU_KNOWN,
+        ("Minta Mári", "Placeholder Kft", "Teszt Elek"),
+        # Streamed: the streaming restore re-inflects a changed stem ("Máriá" + "nak"); the
+        # non-streaming one does not yet (LAB-1194).
+        stream=True,
+        known_values=(
+            ("Minta Mária", "PERSON"),
+            ("Placeholder Kft.", "ORGANIZATION"),
+            *TESZT_ELEK,
+        ),
     ),
     Scenario(
         "hu-image",
         "hu",
         "Mi látható ezen a képen? Teszt Elek személyi igazolványa.",
-        (),
+        ("Teszt Elek",),
         image=True,
         expect="refused_or_echo",
+        known_values=TESZT_ELEK,
+    ),
+    Scenario(
+        "hu-needs-ner",
+        "hu",
+        TEXT_HU_NER,
+        ("Gipsz Jakab",),
+        requires=("ner",),
+        label=NER_LABEL,
     ),
 )
 
@@ -157,8 +230,46 @@ class Outcome:
     headers: dict[str, str] = field(default_factory=dict)
 
 
-def gold_values(scenarios: Sequence[Scenario] = SCENARIOS) -> list[str]:
-    return sorted({g for s in scenarios for g in s.gold})
+def gold_values(
+    scenarios: Sequence[Scenario] = SCENARIOS, *, detectors: Collection[str] = ()
+) -> list[str]:
+    """Gold values that must be masked when ``detectors`` run on top of rules + known values.
+
+    Scenarios that require a detector not in ``detectors`` are left out (expected misses).
+    """
+    return sorted({g for s in scenarios if set(s.requires) <= set(detectors) for g in s.gold})
+
+
+def ui_export(scenarios: Sequence[Scenario] = SCENARIOS) -> dict[str, Any]:
+    """The scenarios as the UI's "Send demo traffic" mirror reads them.
+
+    ``ui/src/content/demoScenarios.json`` holds this; a test keeps it in sync. Write it with
+    ``uv run python scripts/demo_traffic.py --export-ui``.
+    """
+    out = []
+    for s in scenarios:
+        item: dict[str, Any] = {"name": s.name, "language": s.language}
+        if s.system:
+            item["system"] = s.system
+        item["text"] = s.text
+        item["gold"] = list(s.gold)
+        for key, value in (("stream", s.stream), ("tools", s.tools), ("image", s.image)):
+            if value:
+                item[key] = True
+        if s.known_values:
+            item["known"] = [{"value": v, "entity_type": t} for v, t in s.known_values]
+        if s.follow_up:
+            item["followUp"] = s.follow_up
+        if s.requires:
+            item["requires"] = list(s.requires)
+            item["label"] = s.label
+        out.append(item)
+    return {
+        "generated": "uv run python scripts/demo_traffic.py --export-ui "
+        "(from src/pii_guard/bench/scenarios.py)",
+        "tools": TOOLS,
+        "scenarios": out,
+    }
 
 
 def _png() -> str:
@@ -354,8 +465,28 @@ def leaks(received: Sequence[str], gold: Sequence[str]) -> list[str]:
     return sorted(set(found))
 
 
-def check(outcomes: Sequence[Outcome], received: Sequence[str]) -> list[str]:
-    """Failures: a wrong (not exactly restored) answer, an unexpected error, or a leak."""
+def expected_misses(
+    outcomes: Sequence[Outcome], received: Sequence[str], *, detectors: Collection[str] = ()
+) -> list[tuple[Scenario, list[str]]]:
+    """Labelled scenarios whose gold reached the upstream because a required detector is off."""
+    out = []
+    for s in {o.scenario.name: o.scenario for o in outcomes}.values():
+        if s.requires and not set(s.requires) <= set(detectors):
+            found = leaks(received, s.gold)
+            if found:
+                out.append((s, found))
+    return out
+
+
+def check(
+    outcomes: Sequence[Outcome], received: Sequence[str], *, detectors: Collection[str] = ()
+) -> list[str]:
+    """Failures: a wrong (not exactly restored) answer, an unexpected error, or a leak.
+
+    ``detectors``: the optional detectors running beyond rules + known values (``{"ner"}``
+    with ``PII_GUARD_NER_MODEL``). A labelled scenario's gold counts only when they cover its
+    ``requires``; its answer must still be restored exactly either way.
+    """
     failures = []
     for o in outcomes:
         label = f"{o.scenario.name} (turn {o.turn})"
@@ -375,7 +506,7 @@ def check(outcomes: Sequence[Outcome], received: Sequence[str]) -> list[str]:
                 failures.append(f"{label}: tool arguments were not restored exactly")
         elif o.content != o.expected:
             failures.append(f"{label}: answer was not restored exactly")
-    gold = gold_values([o.scenario for o in outcomes])
+    gold = gold_values([o.scenario for o in outcomes], detectors=detectors)
     for value in leaks(received, gold):
         failures.append(f"gold value reached the upstream: {value}")
     return failures

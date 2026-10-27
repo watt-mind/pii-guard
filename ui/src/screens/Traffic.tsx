@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { sendDemoTraffic, type DemoProgress } from "../api/demoTraffic";
+import { LABELLED_SCENARIOS, labelledScenarioFor, sendDemoTraffic, type DemoProgress, type LabelledMatch } from "../api/demoTraffic";
 import { ApiError } from "../api/http";
 import type { TrafficConnectOptions, TrafficEvent, TrafficStatus } from "../api/traffic";
 import type { EntityType } from "../api/types";
@@ -353,6 +353,10 @@ function EmptyCalls({ hasAny, source, status }: { hasAny: boolean; source: Traff
   );
 }
 
+const LABELLED_NOTE = LABELLED_SCENARIOS.length
+  ? `; ${LABELLED_SCENARIOS.length} labelled “${LABELLED_SCENARIOS[0]!.label}”: in rules-only mode its name is an expected miss`
+  : "";
+
 function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
   const [state, setState] = useState<{ running: boolean; progress: DemoProgress | null; error: string | null }>({ running: false, progress: null, error: null });
   const run = async () => {
@@ -377,7 +381,7 @@ function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
       <span aria-live="polite" className="text-xs text-muted tabular-nums">
         {state.running && p ? `${p.done} of ${p.total} sent` : null}
         {!state.running && p
-          ? `Sent ${p.done} fictional calls${p.refused ? `; ${p.refused} refused (an image without SAM is refused: fail closed)` : ""}.`
+          ? `Sent ${p.done} fictional calls${p.refused ? `; ${p.refused} refused (an image without SAM is refused: fail closed)` : ""}${LABELLED_NOTE}.`
           : null}
         {state.error ? <span className="text-danger">Could not send: {state.error}.</span> : null}
       </span>
@@ -406,6 +410,43 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
   );
 }
 
+/** A labelled demo scenario (info tone, not a problem badge): its name needs the NER. */
+function LabelTag({ match }: { match: LabelledMatch }) {
+  const missed = match.missed.length > 0;
+  return (
+    <span
+      title={`Demo scenario labelled “${match.scenario.label}”${missed ? ": in rules-only mode its name is an expected miss" : ""}`}
+      className="rounded px-1.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-model ring-1 ring-model/30 ring-inset bg-model-soft"
+    >
+      needs NER{missed ? <span className="font-normal"> · expected</span> : null}
+    </span>
+  );
+}
+
+/** Why the labelled demo call's name reached the model as written (or that the NER caught it). */
+function LabelledNote({ match }: { match: LabelledMatch }) {
+  const missed = match.missed.length > 0;
+  return (
+    <div role="note" className="mt-3 rounded-xl border border-model/30 bg-model-soft/60 p-3 text-sm">
+      <p className="font-semibold text-model">
+        Demo scenario {match.scenario.name}: {match.scenario.label}.{" "}
+        {missed ? "Expected miss in rules-only mode." : "The NER ran and masked the name."}
+      </p>
+      <p className="mt-1 text-ink">
+        {missed ? (
+          <>
+            This call names a person in free text, with no pre-loaded known value and nothing a rule can recognise, so the name ({match.missed.join(", ")}) reached the
+            mock model as written. Every other demo call masks its names, because they are pre-loaded as session known values. This one is kept on purpose, to show what
+            the NER adds: run fast mode with <code className="font-mono text-xs">PII_GUARD_NER_MODEL</code> set, or strict mode, and it is masked too.
+          </>
+        ) : (
+          <>Without the NER this free-text name would reach the model as written: no known value and no rule covers it.</>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function Tag({ children }: { children: ReactNode }) {
   return <span className="rounded px-1.5 py-0.5 text-[11px] font-medium text-muted ring-1 ring-line ring-inset">{children}</span>;
 }
@@ -428,6 +469,7 @@ function EntityChips({ counts }: { counts: Partial<Record<EntityType, number>> }
 function CallRow({ event: e, selected, onSelect }: { event: TrafficEvent; selected: boolean; onSelect: () => void }) {
   const hasTools = requestTools(e.request?.masked ?? e.request?.original).length > 0;
   const hasImage = (e.entities?.images?.count ?? 0) > 0;
+  const labelled = labelledScenarioFor(e);
   return (
     <button
       type="button"
@@ -444,13 +486,20 @@ function CallRow({ event: e, selected, onSelect }: { event: TrafficEvent; select
         {e.stream && <Tag>stream</Tag>}
         {hasTools && <Tag>tools</Tag>}
         {hasImage && <Tag>image</Tag>}
+        {labelled && <LabelTag match={labelled} />}
         <OutcomeBadge outcome={e.outcome} />
         <span className="ml-auto font-semibold text-ink tabular-nums" title="pii-guard overhead">
           +{formatMsShort(e.timing.overhead_ms)}
         </span>
       </span>
       <span className="flex w-full items-start justify-between gap-2">
-        <EntityChips counts={maskedCounts(e)} />
+        {labelled && labelled.missed.length > 0 && totalMasked(e) === 0 ? (
+          <span className="text-xs text-muted">
+            {labelled.missed.length} name passed: expected, needs NER
+          </span>
+        ) : (
+          <EntityChips counts={maskedCounts(e)} />
+        )}
         <span className="shrink-0 truncate text-xs text-faint">{e.model ?? ""}</span>
       </span>
     </button>
@@ -475,6 +524,7 @@ function CallDetail({
   const showOriginals = canShowOriginals(e, pageHost, source);
   const maskedBody = e.request?.masked;
   const forwarded = maskedBody !== undefined && maskedBody !== null;
+  const labelled = labelledScenarioFor(e);
   return (
     <>
       <section aria-labelledby="detail-title" className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
@@ -506,12 +556,14 @@ function CallDetail({
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
           <span>Masked:</span>
           <EntityChips counts={maskedCounts(e)} />
+          {labelled && labelled.missed.length > 0 ? <span>· {labelled.missed.length} name passed (expected, needs NER)</span> : null}
           {e.upstream?.unresolved_placeholders ? (
             <span className="rounded-full bg-danger-soft px-2 py-0.5 font-semibold text-danger ring-1 ring-danger/40">
               {e.upstream.unresolved_placeholders} placeholder{e.upstream.unresolved_placeholders === 1 ? "" : "s"} the model invented (not restored)
             </span>
           ) : null}
         </div>
+        {labelled && <LabelledNote match={labelled} />}
       </section>
 
       {!forwarded && e.outcome !== "ok" && (

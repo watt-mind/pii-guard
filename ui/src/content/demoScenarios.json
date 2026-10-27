@@ -1,0 +1,163 @@
+{
+  "generated": "uv run python scripts/demo_traffic.py --export-ui (from src/pii_guard/bench/scenarios.py)",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an e-mail on the user's behalf.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "hu-chat",
+      "language": "hu",
+      "system": "Ügyfélszolgálati asszisztens vagy. Válaszolj röviden.",
+      "text": "Szia! Teszt Elek vagyok, e-mail: teszt.elek@example.com, telefon: +36 30 123 4567. Kérlek, utald a díjat a HU42 1177 3016 1111 1018 0000 0000 számlára. TAJ számom 123 456 788, adóazonosító jelem 8456789011.",
+      "gold": [
+        "Teszt Elek",
+        "teszt.elek@example.com",
+        "+36 30 123 4567",
+        "HU42 1177 3016 1111 1018 0000 0000",
+        "123 456 788",
+        "8456789011"
+      ],
+      "known": [
+        {
+          "value": "Teszt Elek",
+          "entity_type": "PERSON"
+        }
+      ],
+      "followUp": "Köszönöm! A visszaigazolást Teszt Eleknek küldd, a teszt.elek@example.com címre."
+    },
+    {
+      "name": "hu-stream",
+      "language": "hu",
+      "text": "Az új lakcímem 1051 Budapest, Minta utca 12., kérlek frissítsd a szerződésen.",
+      "gold": [
+        "1051 Budapest, Minta utca 12"
+      ],
+      "stream": true
+    },
+    {
+      "name": "en-stream",
+      "language": "en",
+      "text": "Hi, this is Jane Placeholder (jane.placeholder@example.net, +44 20 7946 0958). Please refund the deposit to GB82 WEST 1234 5698 7654 32 and void Jane Placeholder's card 4111 1111 1111 1111.",
+      "gold": [
+        "Jane Placeholder",
+        "jane.placeholder@example.net",
+        "+44 20 7946 0958",
+        "GB82 WEST 1234 5698 7654 32",
+        "4111 1111 1111 1111"
+      ],
+      "stream": true,
+      "known": [
+        {
+          "value": "Jane Placeholder",
+          "entity_type": "PERSON"
+        }
+      ]
+    },
+    {
+      "name": "de-tools",
+      "language": "de",
+      "text": "Hallo, hier ist Erika Mustermann, E-Mail erika.mustermann@example.de, Telefon +49 30 901820. Bitte überweisen Sie auf DE89 3704 0044 0532 0130 00.",
+      "gold": [
+        "Erika Mustermann",
+        "erika.mustermann@example.de",
+        "+49 30 901820",
+        "DE89 3704 0044 0532 0130 00"
+      ],
+      "tools": true,
+      "known": [
+        {
+          "value": "Erika Mustermann",
+          "entity_type": "PERSON"
+        }
+      ]
+    },
+    {
+      "name": "de-tools-stream",
+      "language": "de",
+      "text": "Hallo, hier ist Erika Mustermann, E-Mail erika.mustermann@example.de, Telefon +49 30 901820. Bitte überweisen Sie auf DE89 3704 0044 0532 0130 00.",
+      "gold": [
+        "Erika Mustermann",
+        "erika.mustermann@example.de",
+        "+49 30 901820",
+        "DE89 3704 0044 0532 0130 00"
+      ],
+      "stream": true,
+      "tools": true,
+      "known": [
+        {
+          "value": "Erika Mustermann",
+          "entity_type": "PERSON"
+        }
+      ]
+    },
+    {
+      "name": "hu-known-values",
+      "language": "hu",
+      "text": "Kérlek, írj egy rövid levelet Minta Máriának a Placeholder Kft.-vel kötött szerződésről, és egyeztesd a határidőt Teszt Elekkel.",
+      "gold": [
+        "Minta Mári",
+        "Placeholder Kft",
+        "Teszt Elek"
+      ],
+      "stream": true,
+      "known": [
+        {
+          "value": "Minta Mária",
+          "entity_type": "PERSON"
+        },
+        {
+          "value": "Placeholder Kft.",
+          "entity_type": "ORGANIZATION"
+        },
+        {
+          "value": "Teszt Elek",
+          "entity_type": "PERSON"
+        }
+      ]
+    },
+    {
+      "name": "hu-image",
+      "language": "hu",
+      "text": "Mi látható ezen a képen? Teszt Elek személyi igazolványa.",
+      "gold": [
+        "Teszt Elek"
+      ],
+      "image": true,
+      "known": [
+        {
+          "value": "Teszt Elek",
+          "entity_type": "PERSON"
+        }
+      ]
+    },
+    {
+      "name": "hu-needs-ner",
+      "language": "hu",
+      "text": "Tegnap Gipsz Jakab telefonált, és azt kérte, hogy holnap délelőtt hívjam vissza.",
+      "gold": [
+        "Gipsz Jakab"
+      ],
+      "requires": [
+        "ner"
+      ],
+      "label": "needs fast mode (NER)"
+    }
+  ]
+}

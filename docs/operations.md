@@ -48,10 +48,34 @@ Other ports: `scripts/demo.py --api-port 9787 --mock-port 9790 --ui-port 6173`.
 `make demo-traffic` (`scripts/demo_traffic.py --url …`) sends Hungarian, English and German
 requests built from fictional values (ADR 0005): a two-turn chat in one session (the second
 turn carries the restored answer as history), streamed answers, tool definitions with a tool
-call back (plain and streamed), values pre-loaded into a session
-(`POST /v1/sessions` known values) and a message with an inline image. Without SAM configured
+call back (plain and streamed) and a message with an inline image. Without SAM configured
 the image request is refused (fail closed, nothing forwarded), which shows up in the traffic
-log as `refused`.
+log as `refused`. The scenarios live in `src/pii_guard/bench/scenarios.py`; the Live traffic
+tab's **Send demo traffic** sends the same ones (`ui/src/content/demoScenarios.json`, written
+by `scripts/demo_traffic.py --export-ui` and kept in sync by a test).
+
+**What it shows in rules-only mode** (the default: no `PII_GUARD_NER_MODEL`). Nothing reaches
+the model except in the one labelled scenario:
+
+- **Names** are pre-loaded as session **known values** (`POST /v1/sessions`), the way an
+  application that knows its parties would (a CRM record, a case file). The `known` detector
+  then masks them in any inflected form, and the answer is restored in that form:
+  `Teszt Eleknek`, `Teszt Elekkel`, `Minta Máriának` (a changed stem), `Placeholder Kft.-vel`.
+  The `hu-known-values` scenario shows this round trip: `make demo-traffic` prints
+  `restored exactly`, and the Live traffic tab shows the restored answer next to the masked
+  one when the stack runs `uv run python scripts/demo.py --traffic-log full` (localhost only;
+  the recorded replay is `masked`, so it shows the placeholders and their count).
+- **Numbers** are checksum-valid fictional identifiers the rules find on their own: TAJ,
+  adóazonosító jel, HU / GB / DE IBANs, a Luhn test card, phone numbers, e-mail addresses and
+  a postal address.
+- **`hu-needs-ner`, labelled "needs fast mode (NER)"**: a free-text name with no known value
+  and no rule cue (`Tegnap Gipsz Jakab telefonált…`). In rules-only mode it reaches the mock
+  model as written: an **expected miss**, kept on purpose to show what the NER adds.
+  `make demo-traffic` prints it as such, and the Live traffic tab marks the call
+  "needs fast mode (NER) · expected miss" with the reason.
+
+**In fast mode with the NER** (`PII_GUARD_NER_MODEL` set, `uv sync --extra ner`) the labelled
+name is masked too, and the tab says the NER ran.
 
 ### Smoke test
 
@@ -61,7 +85,9 @@ log as `refused`.
 1. every answer comes back restored **exactly** (`Echo: <the original message>`, or tool
    arguments equal to `{"text": <the original message>}`);
 2. no gold value of any scenario reached the upstream, raw, JSON-escaped or without spaces
-   (the mock keeps what it received, `GET /_mock/received`);
+   (the mock keeps what it received, `GET /_mock/received`). In rules-only mode that covers
+   every scenario except the one labelled "needs fast mode (NER)": its name is printed as an
+   expected miss, not a failure. With `PII_GUARD_NER_MODEL` set, its name must be masked too;
 3. every call has a traffic event with a timing breakdown, and the log holds no raw session
    id and no credentials.
 

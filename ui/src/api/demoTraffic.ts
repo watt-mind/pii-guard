@@ -1,37 +1,39 @@
 // "Send demo traffic" on the Live traffic screen: the same scripted, fictional requests as
-// `make demo-traffic` (src/pii_guard/bench/scenarios.py), sent from the browser through the
-// gateway. With `make demo` the upstream is the offline mock, which echoes what it received.
+// `make demo-traffic`, sent from the browser through the gateway. With `make demo` the
+// upstream is the offline mock, which echoes what it received.
 //
-// Every value is fictional (ADR 0005): placeholder identities, example.* domains and
-// well-known test numbers.
+// The scenarios are not copied by hand: ../content/demoScenarios.json is written from
+// src/pii_guard/bench/scenarios.py (`uv run python scripts/demo_traffic.py --export-ui`) and
+// a pytest keeps the two in sync. Every value is fictional (ADR 0005): placeholder
+// identities, example.* domains and checksum-valid test numbers. Names are pre-loaded as
+// session known values, so rules-only mode masks them too, except in the one scenario
+// labelled "needs fast mode (NER)": a free-text name only the NER can find.
 
+import exported from "../content/demoScenarios.json";
 import { ApiError, UnreachableError } from "./http";
+import type { TrafficEvent } from "./traffic";
+import { requestMessages } from "../lib/traffic";
 
 export const DEMO_MODEL = import.meta.env.VITE_PII_GUARD_DEMO_MODEL || "pii-guard-mock";
 
-const TEXT_HU =
-  "Szia! Teszt Elek vagyok, e-mail: teszt.elek@example.com, telefon: +36 30 123 4567. " +
-  "Kérlek, utald a díjat a HU42 1177 3016 1111 1018 0000 0000 számlára, TAJ számom 123 456 788.";
-const TEXT_HU_ADDRESS = "Az új lakcímem 1051 Budapest, Minta utca 12., kérlek frissítsd a szerződésen.";
-const TEXT_EN =
-  "Hi, this is Jane Placeholder (jane.placeholder@example.net, +44 20 7946 0958). Please " +
-  "refund the deposit to GB82 WEST 1234 5698 7654 32 and void card 4111 1111 1111 1111.";
-const TEXT_DE =
-  "Hallo, hier ist Erika Mustermann, E-Mail erika.mustermann@example.de, Telefon +49 30 901820. " +
-  "Bitte überweisen Sie auf DE89 3704 0044 0532 0130 00.";
-const TOOLS = [
-  {
-    type: "function",
-    function: {
-      name: "send_email",
-      description: "Send an e-mail on the user's behalf.",
-      parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
-    },
-  },
-];
 /** A small grey test card (the same image as the Python scenarios). */
 const TEST_PNG =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABACAIAAABqVuVZAAAArElEQVR4nO3csQ3DMBAEQcpQbSyatbAYVSBuJMDBTPrZ4uK/9t6Dd7/DDYGaBQWBgkBBoCBQuN8Oa63xsTnn+HsWFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQEChcHgucWVAQKAgUBAoCBYHG2QOKEQipU5r5KgAAAABJRU5ErkJggg==";
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABACAIAAABqVuVZAAAArElEQVR4nO3csQ3DMBAEQcpQbSyatbAYVSBuJMDBTPrZ4uK/9t6Dd7/DDYGaBQWBgkBBoCBQuN8Oa63xsTnn+HsWFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQECgIFAQKAgWBgkBBoCBQEChcHgucWVAQKAgUBAoCBYHG2QOKEQipU5r5KgAAAABJRU5ErkJggg==";
+
+interface ExportedScenario {
+  name: string;
+  language: string;
+  system?: string;
+  text: string;
+  gold: string[];
+  stream?: boolean;
+  tools?: boolean;
+  image?: boolean;
+  known?: { value: string; entity_type: string }[];
+  followUp?: string;
+  requires?: string[];
+  label?: string | null;
+}
 
 export interface DemoScenario {
   name: string;
@@ -41,45 +43,68 @@ export interface DemoScenario {
   tools?: boolean;
   known?: { value: string; entity_type: string }[];
   followUp?: string;
+  /** The user text of the first turn. */
+  text: string;
+  /** Values that must not reach the model (when `requires` is met). */
+  gold: string[];
+  /** Detectors the gold needs beyond rules + known values, e.g. ["ner"]. */
+  requires: string[];
+  /** Shown on its calls, e.g. "needs fast mode (NER)". */
+  label: string | null;
 }
 
-export const DEMO_SCENARIOS: DemoScenario[] = [
-  {
-    name: "hu-chat",
-    language: "hu",
-    messages: [
-      { role: "system", content: "Ügyfélszolgálati asszisztens vagy. Válaszolj röviden." },
-      { role: "user", content: TEXT_HU },
-    ],
-    followUp: "Köszönöm! Kérlek, erősítsd meg az e-mail címemet: teszt.elek@example.com.",
-  },
-  { name: "hu-stream", language: "hu", messages: [{ role: "user", content: TEXT_HU_ADDRESS }], stream: true },
-  { name: "en-stream", language: "en", messages: [{ role: "user", content: TEXT_EN }], stream: true },
-  { name: "de-tools", language: "de", messages: [{ role: "user", content: TEXT_DE }], tools: true },
-  { name: "de-tools-stream", language: "de", messages: [{ role: "user", content: TEXT_DE }], tools: true, stream: true },
-  {
-    name: "en-known-values",
-    language: "en",
-    messages: [{ role: "user", content: "Please draft a short note to Minta Mária about the Placeholder Kft. contract." }],
-    known: [
-      { value: "Minta Mária", entity_type: "PERSON" },
-      { value: "Placeholder Kft.", entity_type: "ORGANIZATION" },
-    ],
-  },
-  {
-    name: "hu-image",
-    language: "hu",
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "Mi látható ezen a képen? Teszt Elek személyi igazolványa." },
-          { type: "image_url", image_url: { url: TEST_PNG } },
-        ],
-      },
-    ],
-  },
-];
+const TOOLS = exported.tools;
+
+function toScenario(s: ExportedScenario): DemoScenario {
+  const user = s.image
+    ? { role: "user", content: [{ type: "text", text: s.text }, { type: "image_url", image_url: { url: TEST_PNG } }] }
+    : { role: "user", content: s.text };
+  return {
+    name: s.name,
+    language: s.language,
+    messages: [...(s.system ? [{ role: "system", content: s.system }] : []), user],
+    stream: s.stream,
+    tools: s.tools,
+    known: s.known,
+    followUp: s.followUp,
+    text: s.text,
+    gold: s.gold,
+    requires: s.requires ?? [],
+    label: s.label ?? null,
+  };
+}
+
+export const DEMO_SCENARIOS: DemoScenario[] = (exported.scenarios as ExportedScenario[]).map(toScenario);
+
+/** Scenarios whose values only an optional detector finds: expected misses in rules-only mode. */
+export const LABELLED_SCENARIOS = DEMO_SCENARIOS.filter((s) => s.requires.length > 0);
+
+const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export interface LabelledMatch {
+  scenario: DemoScenario;
+  /** Gold values that reached the model as written (the expected miss in rules-only mode). */
+  missed: string[];
+}
+
+/**
+ * The labelled demo scenario this call came from, if any: its last user message is the
+ * scenario's text, with each gold value either as written (missed) or as a placeholder.
+ */
+export function labelledScenarioFor(event: TrafficEvent): LabelledMatch | null {
+  const messages = requestMessages(event.request?.masked);
+  const last = [...messages].reverse().find((m) => m.role === "user");
+  const part = last?.parts.find((p) => p.kind === "text");
+  if (!part || part.kind !== "text") return null;
+  for (const scenario of LABELLED_SCENARIOS) {
+    let pattern = escapeRe(scenario.text);
+    for (const g of scenario.gold) pattern = pattern.split(escapeRe(g)).join(`(?:${escapeRe(g)}|\\[\\[[A-Z_]+_[0-9a-f]+\\]\\])`);
+    if (new RegExp(`^${pattern}$`).test(part.text)) {
+      return { scenario, missed: scenario.gold.filter((g) => part.text.includes(g)) };
+    }
+  }
+  return null;
+}
 
 export interface DemoProgress {
   done: number;

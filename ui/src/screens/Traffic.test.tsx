@@ -64,6 +64,24 @@ describe("Live traffic", () => {
     );
   });
 
+  it("labels the NER-only demo call as an expected miss in rules-only mode", async () => {
+    const replay = (fixture.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
+    const nerOnly = replay.find((e) => JSON.stringify(e.request).includes("Gipsz Jakab"))!;
+    const others = replay.filter((e) => e !== nerOnly && e.outcome === "ok").slice(0, 2);
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([...others, nerOnly]);
+    const list = await screen.findByTestId("call-list");
+    expect(within(list).getAllByText(/needs NER/)).toHaveLength(2); // the tag and the row summary
+    expect(within(list).getByText("1 name passed: expected, needs NER")).toBeInTheDocument();
+    expect(within(list).getByTitle(/labelled “needs fast mode \(NER\)”: in rules-only mode its name is an expected miss/)).toBeInTheDocument();
+    const note = within(screen.getByRole("region", { name: /Call at/ })).getByRole("note");
+    expect(note).toHaveTextContent("Demo scenario hu-needs-ner: needs fast mode (NER). Expected miss in rules-only mode.");
+    expect(note).toHaveTextContent("Gipsz Jakab");
+    // the existing per-call detector caveat still explains why
+    expect(screen.getByTestId("masked-request")).toHaveTextContent(/not names/);
+  });
+
   it("never shows an original value at level masked", async () => {
     const f = fakeConnect();
     const { container } = render(<Traffic connect={f.connect} pageHost="localhost" />);
