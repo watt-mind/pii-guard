@@ -836,6 +836,23 @@ class VaultSession:
             self._check_alive()
             return [(e.placeholder, e.entity_type, e.count) for e in self._by_placeholder.values()]
 
+    def confirmed_values(self, entity_types: Iterable[EntityType]) -> list[str]:
+        """The confirmed values of ``entity_types``, as first written, plus pre-loaded ones.
+
+        Personal data: for widening a partly detected span to a value this session already
+        has (:func:`~pii_guard.detect.known.widen_to_known`), never for output or logs.
+        """
+        types = frozenset(entity_types)
+        with self._lock:
+            self._check_alive()
+            found = dict.fromkeys(
+                e.original for e in self._by_key.values() if e.entity_type in types
+            )
+            found.update(
+                dict.fromkeys(v.value for v in self._known.values() if v.entity_type in types)
+            )
+            return list(found)
+
 
 def _occurrences(pattern: re.Pattern[str], views: tuple[FoldedText, ...]) -> list[tuple[int, int]]:
     """Original ``(start, end)`` of every non-empty match of ``pattern`` in the folded views.

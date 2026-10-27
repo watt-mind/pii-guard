@@ -7,7 +7,10 @@ Order of operations (fail closed at every step, ADR 0006):
 2. detect every text (cache first; misses run concurrently, under one per-request timeout),
    then add the session's pre-loaded known values (:mod:`pii_guard.detect.known`), which win
    their conflicts and are masked even for a ``keep`` type (a ``block`` type still refuses);
-3. mask with the conversation's vault session: spans first, then a sweep for every value the
+3. widen a name detected only in part to a full name known from this request or the session
+   (:func:`~pii_guard.detect.known.widen_request`: ``1,Jane Placeholder`` with only the surname
+   detected becomes one span), then
+   mask with the conversation's vault session: spans first, then a sweep for every value the
    session already knows (so a value found in one message is masked in all of them); inline
    images are masked with the visual pipeline (SAM 3.1 + OCR text through this mode's
    detectors + policies) and replaced by a masked PNG data URL. With placeholder labels
@@ -51,7 +54,7 @@ from pii_guard.api.routes.image_masking import (
     require_ocr,
 )
 from pii_guard.config import Settings
-from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
+from pii_guard.detect.known import KNOWN_DETECTOR, WIDENED_TYPES, merge_known, widen_request
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
@@ -453,9 +456,13 @@ class Gateway:
         session: VaultSession,
         language: str,
     ) -> list[str]:
+        # A name found whole in one text repairs the same name found in part in another, or
+        # one this session already has ("1,Jane Placeholder" with only "Placeholder" detected).
+        texts = [slot.text for slot in slots]
+        spans = widen_request(texts, spans, session.confirmed_values(WIDENED_TYPES), language)
         masked = [
-            session.mask(slot.text, found, language=language)
-            for slot, found in zip(slots, spans, strict=True)
+            session.mask(text, found, language=language)
+            for text, found in zip(texts, spans, strict=True)
         ]
         # Second pass: values confirmed in a later text are masked in earlier ones too.
         return [session.mask(text, [], language=language, remask=True) for text in masked]
