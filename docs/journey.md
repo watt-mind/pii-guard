@@ -20,21 +20,24 @@ updates the two tables below.
 leak 52.6 % (Hungarian) and 46.7 % (English) of labelled values. Rules plus Muse Spark Open on
 Baseten leak 0.9 % and 0.0 %, at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. A
 fast mode with no LLM call (rules plus a small NER model distilled from Muse Glimmer) gets
-Hungarian down to 0.9 % and English to 0.0 % at tens of milliseconds per message.
+Hungarian down to 0.9 % and English to 0.0 % at tens of milliseconds per message. On a public benchmark
+(Ai4Privacy OpenPII, 600 documents, milestone 24) strict mode leaks 3.9 % and fast mode 38.0 %:
+fast mode suits text like ours, not unfamiliar number formats.
 
 | Language | Mode | Best configuration | Leak | F1 (overlap) | p50 latency | $ / 1k msgs | Source |
 |---|---|---|---:|---:|---:|---:|---|
 | Hungarian | strict | rules + Muse Spark Open (Baseten, `low`) | **0.9 %** | 98.4 | 1.8 s | 2.42 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md), `hu-smoke` (31 docs) |
 | English | strict | rules + Muse Spark Open (Baseten, `low`) | **0.0 %** | 97.1 | 1.2 s | 1.99 | same, `en-smoke` (10 docs) |
-| Hungarian | fast | rules (with ID/parcel rules) + distilled NER, large | **0.9 %** | 97.9 | 36 ms (MPS) | no API call | [models.md, "Distilled from Muse Glimmer"](models.md#distilled-from-muse-glimmer)¹, [latency-large.json](../eval/results/ner/distilled/latency-large.json) |
+| Hungarian | fast | rules (with ID/parcel rules) + distilled NER, large | **0.9 %** | 97.9 | 28 ms (MPS)¹ | no API call | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md), `hu-smoke` (31 docs) |
 | English | fast | rules + distilled NER, large | **0.0 %** | 98.5 | 36 ms (MPS) | no API call | [distilled/large/en-smoke.md](../eval/results/ner/distilled/large/en-smoke.md), [latency-large.json](../eval/results/ner/distilled/latency-large.json) |
 | either | none | rules only (baseline) | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [distilled/rules/](../eval/results/ner/distilled/rules/) `hu-smoke.md`, `en-smoke.md` |
 
-¹ The figure for this exact combination is stated in docs/models.md; the committed scorecard
-in `eval/results/ner/distilled/large/` predates the ID/parcel rules (10.3 % leak). NER latency
-was measured on an M1 Max under heavy unrelated load, so read it as relative; CPU p50 is
-241 ms. The distilled weights are not published yet: you train them yourself (see
-[models.md](models.md#ner-detector)).
+¹ Measured in the 2026-10-27 comparison (milestone 24), which confirmed the 0.9 % figure
+that milestone 14 had only stated in docs/models.md: 1 of 106 labelled values, F1 97.9. That
+run's machine was under unrelated load too (load average about 15 on 10 cores), so read
+the latency as relative. On the public Ai4Privacy set the same fast mode leaks 35–40 %
+(milestone 24); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
+you train them yourself (see [models.md](models.md#ner-detector)).
 
 Leak = share of labelled values that still appear, in any surface form, in the text the
 model would receive ([evaluation.md](evaluation.md#leak-rate-in-practice)). The smoke sets
@@ -56,8 +59,11 @@ documents with LAB-1127; rows after that use the 31-document set where marked.
 | 10-26 23:14 | [#16](https://github.com/watt-mind/pii-guard/pull/16) | *Presidio / LLM Guard / PrivAiTe* | *28.9 / 49.5 / 19.6 %* | *10.0 / 30.0 / 0.0 %* | same |
 | 10-26 23:10 | (not merged) | rules + Muse Glimmer 30B, zero-shot | 0.0 % (hu + en pooled) | | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md#compared-with-muse-spark-13-and-muse-glimmer), *(ticket comment, LAB-1109)* |
 | 10-27 07:45 | [#23](https://github.com/watt-mind/pii-guard/pull/23) | rules + NER distilled from Glimmer, large | 10.3 % | 0.0 % | [ner/distilled/large/](../eval/results/ner/distilled/large/) |
-| 10-27 07:45 | [#23](https://github.com/watt-mind/pii-guard/pull/23) | same, plus ID/parcel rules (31 docs) | 0.9 % | 0.0 % | [models.md](models.md#distilled-from-muse-glimmer) |
+| 10-27 07:45 | [#23](https://github.com/watt-mind/pii-guard/pull/23) | same, plus ID/parcel rules (31 docs) | 0.9 % | 0.0 % | [models.md](models.md#distilled-from-muse-glimmer); measured in [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) |
 | 10-27 08:01 | [#24](https://github.com/watt-mind/pii-guard/pull/24) | rules + Muse Spark Open (Baseten, 31 docs) | 0.9 % | 0.0 % | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md) |
+| 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | fast: rules + distilled NER, large | 0.9 % | 0.0 % | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) |
+| 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | strict: rules + NER + Muse Spark Open | 0.9 % | 0.0 % | same |
+| 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | *Presidio / LLM Guard / PrivAiTe* | *33.0 / 50.0 / 17.9 %* | *10.0 / 30.0 / 0.0 %* | same |
 
 The same history as charts, generated from the run records in
 [`eval/results/runs/`](../eval/results/runs/) by `pii-guard eval report` (all runs, tables and
@@ -69,7 +75,7 @@ the run log: [benchmarks.md](benchmarks.md)). The table above is their text vers
 
 ### Spend so far
 
-About **$12** of compute for everything measured here.
+About **$17** of compute for everything measured here.
 
 | What | Where | Cost | Source |
 |---|---|---:|---|
@@ -79,6 +85,7 @@ About **$12** of compute for everything measured here.
 | Visual eval on specimen IDs (505 live SAM calls) | Meta Model API, SAM 3.1 | ~$1.26 | *(ticket comment, LAB-1120)* |
 | Production detector: four eval runs + tests | Baseten Model APIs | ~$0.84 of the $100 credit | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md#spend) |
 | Re-identification red team (four runs + pilots) | Baseten Model APIs; Meta Model API | ~$1.9 Baseten; 343k Meta API tokens (price not published to us) | [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md#spend) |
+| Fresh comparison: strict mode on 8 fixture sets incl. 600 public documents | Baseten Model APIs | ≤ $4.50 | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md#spend) |
 
 Early development calls to the Meta Model API (the first corpus samples, live tests) were not
 metered separately and are not included.
@@ -554,6 +561,49 @@ through the real gateway (a new opt-in `X-PII-Guard-Echo: masked` header returns
 model saw and said, masked), Images and Benchmarks (a one-sentence headline). Five rounds of an
 end-user critic at 375 and 1280 px, light and dark, found 10 major issues, all fixed in the
 UI; backend findings were filed as tickets. Screenshots: [docs/assets/demo](assets/demo/).
+
+### 24. Fresh comparison: fast and strict vs Presidio, LLM Guard, PrivAiTe, on a public set too (2026-10-27)
+
+PR [#45](https://github.com/watt-mind/pii-guard/pull/45), LAB-1148.
+
+Today's two modes against the three open-source tools of milestone 6, on our hand-written
+and Muse-generated sets (now including German) and on a public benchmark nobody here wrote: a
+seeded 600-document sample (200 each in Hungarian, English and German) of Ai4Privacy's
+OpenPII 1M, CC-BY-4.0. Leak rate, pooled over languages (smoke: 51 documents):
+
+| System | Smoke leak | Ai4Privacy leak | Ai4Privacy F1 | p50 | $ / 1k msgs |
+|---|---:|---:|---:|---:|---:|
+| pii-guard rules | 41.6 % | 73.5 % | 41.0 | 0.2–0.4 ms | |
+| **pii-guard fast** (rules + distilled NER, large) | **0.6 %** | 38.0 % | 70.0 | 24–31 ms | |
+| **pii-guard strict** (+ Muse Spark Open, Baseten, `low`) | **0.6 %** | **3.9 %** | **88.4** | 1.8–2.3 s | 2.03–2.95 |
+| Presidio | 24.3 % | 29.6 % | 38.9 | 8–136 ms | |
+| LLM Guard | 45.1 % | 43.8 % | 64.0 | 61–133 ms | |
+| PrivAiTe | 12.7 % | 9.5 % | 58.3 | 93–182 ms | |
+
+Sources: [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) (per-fixture table and run conditions),
+[benchmarks.md](benchmarks.md) (pooled rows, generated from the run records).
+
+- **The fast-mode claim holds:** `hu-smoke` 0.9 % leak, F1 97.9, now from a committed
+  scorecard (it was only stated in models.md before).
+- **Fast mode is not enough on unfamiliar text.** On the public set it leaks 35–40 %, more
+  than PrivAiTe (6.5–14.0 %) and Presidio. Most of the gap is numbers: about 90 % of the
+  set's card, tax and TAJ numbers fail their checksums, and pii-guard's rules require valid
+  ones on purpose. Strict mode, which adds the LLM pass, is the safest system on every set
+  (3.5–4.8 % on the public set). Follow-up: LAB-1170.
+- **On our own sets strict buys nothing over fast:** the same leak, F1 within a point, at
+  about 70× the latency plus the API bill. Fast mode is the better default where its recall
+  is enough.
+- **Caveats:** the public text is machine-generated and often unnatural in Hungarian;
+  dates, ages, gender, titles and bare towns are policy-excluded, which raises everyone's
+  over-masking; LLM Guard's model was fine-tuned on an earlier Ai4Privacy release, so its
+  public numbers are probably optimistic. The machine was under unrelated load (load
+  average 13–27 on 10 cores), so latency is relative
+  ([evaluation.md](evaluation.md#public-benchmark-ai4privacy-openpii-1m)).
+- **Cost:** ≤ $4.50 on Baseten for every strict run of the ticket, $1.87 of it for the
+  committed runs (the rest: runs superseded when LAB-1129 and LAB-1149 merged, and one run
+  that aborted when one German document's completion was truncated twice, so the pipeline
+  failed closed). 0 refusals, 0 invalid outputs, 0 blocked documents in the 682 committed
+  requests. Ran on develop with LAB-1149 (company names) included.
 
 ## How pii-guard uses Meta's models
 

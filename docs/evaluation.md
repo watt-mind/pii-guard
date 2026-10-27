@@ -366,6 +366,92 @@ under another label (a tax number caught as `PHONE_NUMBER`, say).
 - `pii-guard rules` is the rules-only pass, with no name detection; names come from the NER
   and LLM passes. Compare it with the tools for structured identifiers, not for `PERSON`.
 
+### Latest results (2026-10-27)
+
+[eval/results/2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) has the
+full table (every system on every fixture, with exact F1, partial leak, round trip, p95) and
+the run conditions; the run records are `eval/results/runs/2026-10-27-comparison-*.json`.
+Leak rate in %, pooled over languages, and detection p50:
+
+| System | Hand-written smoke (hu 31 + en 10 + de 10) | Ai4Privacy (hu + en + de, 600) | p50 | $ / 1k msgs |
+|---|---:|---:|---:|---:|
+| pii-guard rules | 41.6 | 73.5 | 0.2–0.4 ms | |
+| **pii-guard fast** (rules + distilled NER, large) | **0.6** | 38.0 | 24–31 ms (MPS) | |
+| **pii-guard strict** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.9** | 1.8–2.3 s | 2.03–2.95 |
+| Presidio | 24.3 | 29.6 | 8–136 ms | |
+| LLM Guard | 45.1 | 43.8 | 61–133 ms | |
+| PrivAiTe | 12.7 | 9.5 | 93–182 ms | |
+
+Pooled figures are from [docs/benchmarks.md](benchmarks.md) (generated from the run records);
+p50 and cost ranges are over the per-fixture rows. The machine was under unrelated load during
+these runs (load average 13–27 on 10 cores), so latency is relative. Fast mode is as safe as
+strict on the hand-written sets but leaks 35–40 % on the public set, mostly numbers that fail
+the checksums pii-guard's rules require (see the caveats below); strict mode is the safest
+system on both.
+
+### Public benchmark: Ai4Privacy OpenPII 1M
+
+Our own fixtures are small and partly written by the model family pii-guard's LLM detector
+uses, so the comparison also runs on a public set nobody here wrote:
+[`ai4privacy/pii-masking-openpii-1m`](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m)
+by Ai4Privacy / Ai Suisse SA, CC-BY-4.0. A seeded sample of its validation split (200
+documents each for `en`, `hu`, `de`, seed 2026, revision `ecfdc547`) is committed under
+`eval/fixtures/public/` with an attribution note and a manifest (revision, file SHA-256,
+sample ids, label counts). `pii_guard.eval.public.ai4privacy` rebuilds it:
+
+```bash
+uv run python -m pii_guard.eval.public.ai4privacy fetch --check   # streams ~920 MB once
+uv run pii-guard eval --fixtures eval/fixtures/public/hu-ai4privacy.jsonl --detectors rules \
+    --baselines presidio,llm-guard,privaite
+```
+
+Only the open OpenPII component is used. The older Ai4Privacy releases (`pii-masking-400k`,
+`-300k`) are licensed for academic, non-commercial use without redistribution, and the other
+components of the commercial PII-Masking-2M set need a commercial licence.
+
+**Label mapping** (`pii_guard.eval.public.ai4privacy.LABEL_MAP`):
+
+| Dataset label | pii-guard type | Note |
+|---|---|---|
+| `GIVENNAME`, `SURNAME` | `PERSON` | merged into one span when only spaces separate them |
+| `STREET`, `BUILDINGNUM`, `ZIPCODE`, `CITY` | `ADDRESS` | parts separated only by spaces or a comma are merged into one address |
+| `EMAIL` | `EMAIL` | |
+| `TELEPHONENUM` | `PHONE` | |
+| `CREDITCARDNUMBER` | `BANK_ACCOUNT` | cards are `BANK_ACCOUNT` in pii-guard's taxonomy |
+| `IDCARDNUM`, `PASSPORTNUM`, `DRIVERLICENSENUM` | `ID_DOCUMENT` | |
+| `SOCIALNUM` | `ID_DOCUMENT`; `NATIONAL_ID_HU_TAJ` for `hu` | |
+| `TAXNUM` | `ID_DOCUMENT`; `NATIONAL_ID_HU_TAX` for `hu` | |
+| `DATE`, `AGE`, `GENDER`, `SEX`, `TITLE`, a `CITY` on its own | *policy-excluded* | not masked by pii-guard's policy (any date, not only birth dates; bare towns are kept on purpose) |
+
+**Policy-excluded** labels are left out of the gold spans, so they count neither as leaks nor
+as misses; the manifest counts them per language (about 3 per document). A tool that masks
+them (Presidio's and PrivAiTe's `DATE_TIME` maps to `DATE_OF_BIRTH`) is charged
+over-masking for it, so over-masking on this set is higher for every system that masks dates
+or towns, and is best read relative to the smoke sets. There is no `ORGANIZATION` label.
+
+**Caveats.**
+
+- **Machine-generated text.** A spot check of 20 Hungarian rows: the grammar is mostly
+  correct but the text is slot-filled and often unnatural ("Asszony Cermeli 64 éves Nem
+  meghatározott végezte el"), most names are not Hungarian, dates and months are often in
+  English formats ("November/62", "May 16, 1999"), districts are repeated ("6726 Szeged
+  Tarján Tarján"), one row labelled `hu` is in English, and gender words and honorifics sit
+  where a name would. Labels were accurate on all 20 (offsets, types), but a few names were
+  labelled only in part (a surname without its given name).
+- **Numbers aren't valid.** Only about 10 % of the sample's card, tax and TAJ numbers pass
+  their checksums (2 of 41 English cards, 1 of 41 Hungarian tax numbers, 4 of 42 TAJ numbers),
+  and phone numbers use formats no numbering plan has (`+9-559-028.9863`). pii-guard's rules
+  validate checksums and numbering plans on purpose, to avoid masking order numbers and
+  amounts, so its rules miss most of these; tools that match the shape alone, or a model,
+  don't. On real text these numbers would be valid.
+- **Contamination.** LLM Guard's default model,
+  `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2`, was fine-tuned on an earlier
+  Ai4Privacy release generated by the same pipeline, so its numbers here are probably
+  optimistic. PrivAiTe's `openai/privacy-filter` training data isn't documented. pii-guard's
+  NER and LLM detector have not seen this dataset.
+- Leak is measured on what survives in the masked text, regardless of type, so a value masked
+  under the wrong label still counts as protected.
+
 ## Prompt injection
 
 The LLM detector reads untrusted text, and a message can try to talk it out of reporting the

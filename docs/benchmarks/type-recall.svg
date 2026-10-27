@@ -5,8 +5,9 @@
 <text x="56" y="70" font-size="40" fill="#1B1B1F" font-weight="700">Recall by entity type</text>
 <text x="56" y="112" font-size="24" fill="#4A4A52">Overlap recall per entity type (share of gold spans found), per system</text>
 <text x="500.3" y="214" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">rules</text>
-<text x="660.9" y="190" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">rules + NER</text>
-<text x="660.9" y="214" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">(distilled large)</text>
+<text x="660.9" y="166" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">fast (rules +</text>
+<text x="660.9" y="190" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">NER distilled</text>
+<text x="660.9" y="214" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">large)</text>
 <text x="821.4" y="166" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">rules + Muse</text>
 <text x="821.4" y="190" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">Spark Open</text>
 <text x="821.4" y="214" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">(Baseten)</text>
@@ -16,39 +17,39 @@
 <text x="1303.1" y="214" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">LLM Guard</text>
 <text x="1463.7" y="214" font-size="20" fill="#1B1B1F" text-anchor="middle" font-weight="600">PrivAiTe</text>
 <text x="406" y="257.8" font-size="19" fill="#1B1B1F" text-anchor="end">PERSON</text>
-<text x="320.8" y="257.8" font-size="18" fill="#4A4A52" text-anchor="end">n=48</text>
-<rect x="422" y="232" width="156.6" height="37.5" fill="#F3F6FB"/>
-<text x="500.3" y="257.8" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
-<rect x="582.6" y="232" width="156.6" height="37.5" fill="#113B74"/>
-<text x="660.9" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">96</text>
+<text x="320.8" y="257.8" font-size="18" fill="#4A4A52" text-anchor="end">n=61</text>
+<rect x="422" y="232" width="156.6" height="37.5" fill="#EFF4FA"/>
+<text x="500.3" y="257.8" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">2</text>
+<rect x="582.6" y="232" width="156.6" height="37.5" fill="#0B346F"/>
+<text x="660.9" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">98</text>
 <rect x="743.1" y="232" width="156.6" height="37.5" fill="#0C356F"/>
 <text x="821.4" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">98</text>
 <rect x="903.7" y="232" width="156.6" height="37.5" fill="#08306B"/>
 <text x="982" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
-<rect x="1064.3" y="232" width="156.6" height="37.5" fill="#113B74"/>
-<text x="1142.6" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">96</text>
-<rect x="1224.9" y="232" width="156.6" height="37.5" fill="#19467E"/>
-<text x="1303.1" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">91</text>
-<rect x="1385.4" y="232" width="156.6" height="37.5" fill="#3C72A3"/>
-<text x="1463.7" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">74</text>
+<rect x="1064.3" y="232" width="156.6" height="37.5" fill="#154179"/>
+<text x="1142.6" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">93</text>
+<rect x="1224.9" y="232" width="156.6" height="37.5" fill="#1F4D84"/>
+<text x="1303.1" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">89</text>
+<rect x="1385.4" y="232" width="156.6" height="37.5" fill="#396EA0"/>
+<text x="1463.7" y="257.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">75</text>
 <text x="406" y="299.3" font-size="19" fill="#1B1B1F" text-anchor="end">ADDRESS</text>
-<text x="308.2" y="299.3" font-size="18" fill="#4A4A52" text-anchor="end">n=17</text>
-<rect x="422" y="273.5" width="156.6" height="37.5" fill="#2B5C91"/>
-<text x="500.3" y="299.3" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">82</text>
+<text x="308.2" y="299.3" font-size="18" fill="#4A4A52" text-anchor="end">n=22</text>
+<rect x="422" y="273.5" width="156.6" height="37.5" fill="#1A477E"/>
+<text x="500.3" y="299.3" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">91</text>
 <rect x="582.6" y="273.5" width="156.6" height="37.5" fill="#08306B"/>
 <text x="660.9" y="299.3" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="743.1" y="273.5" width="156.6" height="37.5" fill="#08306B"/>
 <text x="821.4" y="299.3" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="903.7" y="273.5" width="156.6" height="37.5" fill="#08306B"/>
 <text x="982" y="299.3" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
-<rect x="1064.3" y="273.5" width="156.6" height="37.5" fill="#2B5C91"/>
-<text x="1142.6" y="299.3" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">82</text>
+<rect x="1064.3" y="273.5" width="156.6" height="37.5" fill="#235288"/>
+<text x="1142.6" y="299.3" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">86</text>
 <rect x="1224.9" y="273.5" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1303.1" y="299.3" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <rect x="1385.4" y="273.5" width="156.6" height="37.5" fill="#08306B"/>
 <text x="1463.7" y="299.3" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <text x="406" y="340.8" font-size="19" fill="#1B1B1F" text-anchor="end">EMAIL</text>
-<text x="329.7" y="340.8" font-size="18" fill="#4A4A52" text-anchor="end">n=9</text>
+<text x="329.7" y="340.8" font-size="18" fill="#4A4A52" text-anchor="end">n=12</text>
 <rect x="422" y="315.1" width="156.6" height="37.5" fill="#08306B"/>
 <text x="500.3" y="340.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="582.6" y="315.1" width="156.6" height="37.5" fill="#08306B"/>
@@ -57,14 +58,14 @@
 <text x="821.4" y="340.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="903.7" y="315.1" width="156.6" height="37.5" fill="#08306B"/>
 <text x="982" y="340.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
-<rect x="1064.3" y="315.1" width="156.6" height="37.5" fill="#1E4C83"/>
-<text x="1142.6" y="340.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">89</text>
+<rect x="1064.3" y="315.1" width="156.6" height="37.5" fill="#18457D"/>
+<text x="1142.6" y="340.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">92</text>
 <rect x="1224.9" y="315.1" width="156.6" height="37.5" fill="#08306B"/>
 <text x="1303.1" y="340.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="1385.4" y="315.1" width="156.6" height="37.5" fill="#08306B"/>
 <text x="1463.7" y="340.8" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <text x="406" y="382.4" font-size="19" fill="#1B1B1F" text-anchor="end">PHONE</text>
-<text x="333.3" y="382.4" font-size="18" fill="#4A4A52" text-anchor="end">n=11</text>
+<text x="333.3" y="382.4" font-size="18" fill="#4A4A52" text-anchor="end">n=16</text>
 <rect x="422" y="356.6" width="156.6" height="37.5" fill="#08306B"/>
 <text x="500.3" y="382.4" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="582.6" y="356.6" width="156.6" height="37.5" fill="#08306B"/>
@@ -73,14 +74,14 @@
 <text x="821.4" y="382.4" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="903.7" y="356.6" width="156.6" height="37.5" fill="#08306B"/>
 <text x="982" y="382.4" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
-<rect x="1064.3" y="356.6" width="156.6" height="37.5" fill="#1A477E"/>
-<text x="1142.6" y="382.4" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">91</text>
+<rect x="1064.3" y="356.6" width="156.6" height="37.5" fill="#215086"/>
+<text x="1142.6" y="382.4" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">88</text>
 <rect x="1224.9" y="356.6" width="156.6" height="37.5" fill="#08306B"/>
 <text x="1303.1" y="382.4" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="1385.4" y="356.6" width="156.6" height="37.5" fill="#08306B"/>
 <text x="1463.7" y="382.4" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <text x="406" y="423.9" font-size="19" fill="#1B1B1F" text-anchor="end">DATE_OF_BIRTH</text>
-<text x="237.2" y="423.9" font-size="18" fill="#4A4A52" text-anchor="end">n=8</text>
+<text x="237.2" y="423.9" font-size="18" fill="#4A4A52" text-anchor="end">n=11</text>
 <rect x="422" y="398.2" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="500.3" y="423.9" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <rect x="582.6" y="398.2" width="156.6" height="37.5" fill="#08306B"/>
@@ -89,12 +90,12 @@
 <text x="821.4" y="423.9" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="903.7" y="398.2" width="156.6" height="37.5" fill="#08306B"/>
 <text x="982" y="423.9" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
-<rect x="1064.3" y="398.2" width="156.6" height="37.5" fill="#AFD2E8"/>
-<text x="1142.6" y="423.9" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">25</text>
+<rect x="1064.3" y="398.2" width="156.6" height="37.5" fill="#77B5D9"/>
+<text x="1142.6" y="423.9" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">45</text>
 <rect x="1224.9" y="398.2" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1303.1" y="423.9" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
-<rect x="1385.4" y="398.2" width="156.6" height="37.5" fill="#528EBB"/>
-<text x="1463.7" y="423.9" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">62</text>
+<rect x="1385.4" y="398.2" width="156.6" height="37.5" fill="#3E75A5"/>
+<text x="1463.7" y="423.9" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">73</text>
 <text x="406" y="465.5" font-size="19" fill="#1B1B1F" text-anchor="end">NATIONAL_ID_HU_TAX</text>
 <text x="176.5" y="465.5" font-size="18" fill="#4A4A52" text-anchor="end">n=6</text>
 <rect x="422" y="439.7" width="156.6" height="37.5" fill="#08306B"/>
@@ -128,23 +129,23 @@
 <rect x="1385.4" y="481.2" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1463.7" y="507" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <text x="406" y="548.5" font-size="19" fill="#1B1B1F" text-anchor="end">ID_DOCUMENT</text>
-<text x="256.5" y="548.5" font-size="18" fill="#4A4A52" text-anchor="end">n=11</text>
-<rect x="422" y="522.8" width="156.6" height="37.5" fill="#C6DEEF"/>
-<text x="500.3" y="548.5" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">17</text>
-<rect x="582.6" y="522.8" width="156.6" height="37.5" fill="#C6DEEF"/>
-<text x="660.9" y="548.5" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">17</text>
+<text x="256.5" y="548.5" font-size="18" fill="#4A4A52" text-anchor="end">n=17</text>
+<rect x="422" y="522.8" width="156.6" height="37.5" fill="#08306B"/>
+<text x="500.3" y="548.5" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
+<rect x="582.6" y="522.8" width="156.6" height="37.5" fill="#08306B"/>
+<text x="660.9" y="548.5" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="743.1" y="522.8" width="156.6" height="37.5" fill="#08306B"/>
 <text x="821.4" y="548.5" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="903.7" y="522.8" width="156.6" height="37.5" fill="#08306B"/>
 <text x="982" y="548.5" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
-<rect x="1064.3" y="522.8" width="156.6" height="37.5" fill="#C6DEEF"/>
-<text x="1142.6" y="548.5" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">17</text>
+<rect x="1064.3" y="522.8" width="156.6" height="37.5" fill="#D3E5F2"/>
+<text x="1142.6" y="548.5" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">12</text>
 <rect x="1224.9" y="522.8" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1303.1" y="548.5" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <rect x="1385.4" y="522.8" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1463.7" y="548.5" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <text x="406" y="590.1" font-size="19" fill="#1B1B1F" text-anchor="end">BANK_ACCOUNT</text>
-<text x="247.6" y="590.1" font-size="18" fill="#4A4A52" text-anchor="end">n=10</text>
+<text x="247.6" y="590.1" font-size="18" fill="#4A4A52" text-anchor="end">n=12</text>
 <rect x="422" y="564.3" width="156.6" height="37.5" fill="#08306B"/>
 <text x="500.3" y="590.1" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="582.6" y="564.3" width="156.6" height="37.5" fill="#08306B"/>
@@ -153,10 +154,10 @@
 <text x="821.4" y="590.1" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="903.7" y="564.3" width="156.6" height="37.5" fill="#08306B"/>
 <text x="982" y="590.1" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
-<rect x="1064.3" y="564.3" width="156.6" height="37.5" fill="#437CAB"/>
-<text x="1142.6" y="590.1" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">70</text>
-<rect x="1224.9" y="564.3" width="156.6" height="37.5" fill="#437CAB"/>
-<text x="1303.1" y="590.1" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">70</text>
+<rect x="1064.3" y="564.3" width="156.6" height="37.5" fill="#3A6FA0"/>
+<text x="1142.6" y="590.1" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">75</text>
+<rect x="1224.9" y="564.3" width="156.6" height="37.5" fill="#3A6FA0"/>
+<text x="1303.1" y="590.1" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">75</text>
 <rect x="1385.4" y="564.3" width="156.6" height="37.5" fill="#08306B"/>
 <text x="1463.7" y="590.1" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <text x="406" y="631.6" font-size="19" fill="#1B1B1F" text-anchor="end">COMPANY_ID_HU (kept)</text>
@@ -176,27 +177,27 @@
 <rect x="1385.4" y="605.8" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1463.7" y="631.6" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <text x="406" y="673.2" font-size="19" fill="#1B1B1F" text-anchor="end">ORGANIZATION (kept)</text>
-<text x="191.4" y="673.2" font-size="18" fill="#4A4A52" text-anchor="end">n=13</text>
+<text x="191.4" y="673.2" font-size="18" fill="#4A4A52" text-anchor="end">n=16</text>
 <rect x="422" y="647.4" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="500.3" y="673.2" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
-<rect x="582.6" y="647.4" width="156.6" height="37.5" fill="#17437B"/>
-<text x="660.9" y="673.2" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">92</text>
+<rect x="582.6" y="647.4" width="156.6" height="37.5" fill="#144078"/>
+<text x="660.9" y="673.2" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">94</text>
 <rect x="743.1" y="647.4" width="156.6" height="37.5" fill="#08306B"/>
 <text x="821.4" y="673.2" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="903.7" y="647.4" width="156.6" height="37.5" fill="#08306B"/>
 <text x="982" y="673.2" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
-<rect x="1064.3" y="647.4" width="156.6" height="37.5" fill="#17437B"/>
-<text x="1142.6" y="673.2" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">92</text>
+<rect x="1064.3" y="647.4" width="156.6" height="37.5" fill="#215086"/>
+<text x="1142.6" y="673.2" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">88</text>
 <rect x="1224.9" y="647.4" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1303.1" y="673.2" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <rect x="1385.4" y="647.4" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1463.7" y="673.2" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <text x="406" y="714.7" font-size="19" fill="#1B1B1F" text-anchor="end">PARCEL_NUMBER_HU</text>
 <text x="195.9" y="714.7" font-size="18" fill="#4A4A52" text-anchor="end">n=6</text>
-<rect x="422" y="688.9" width="156.6" height="37.5" fill="#F3F6FB"/>
-<text x="500.3" y="714.7" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
-<rect x="582.6" y="688.9" width="156.6" height="37.5" fill="#F3F6FB"/>
-<text x="660.9" y="714.7" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
+<rect x="422" y="688.9" width="156.6" height="37.5" fill="#08306B"/>
+<text x="500.3" y="714.7" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
+<rect x="582.6" y="688.9" width="156.6" height="37.5" fill="#295A8F"/>
+<text x="660.9" y="714.7" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">83</text>
 <rect x="743.1" y="688.9" width="156.6" height="37.5" fill="#08306B"/>
 <text x="821.4" y="714.7" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="600">100</text>
 <rect x="903.7" y="688.9" width="156.6" height="37.5" fill="#08306B"/>
@@ -223,7 +224,7 @@
 <text x="1303.1" y="756.2" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
 <rect x="1385.4" y="730.5" width="156.6" height="37.5" fill="#F3F6FB"/>
 <text x="1463.7" y="756.2" font-size="19" fill="#1B1B1F" text-anchor="middle" font-weight="600">0</text>
-<text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; en 10 docs + hu 31 docs), hu + en pooled. Cells are recall in %; n = gold spans of the type.</text>
+<text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs), hu + en pooled. Cells are recall in %; n = gold spans of the type.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">(kept) types are not masked by policy, so they cannot leak. Comparison tools have no recognisers for Hungarian identifiers.</text>
-<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-26 to 2026-10-27 · commits 62b64fc, 9fad0fa, c611f99, c759b54 · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-27 · commits 4f84c6a, 8944f96, 9fad0fa, c759b54 · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>
