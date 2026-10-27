@@ -1,10 +1,16 @@
 """Per-mode detection for the gateway.
 
-- ``fast``: ``rules`` (+ ``ner`` once a loadable NER detector is registered).
+- ``fast``: :func:`~pii_guard.detect.stack.default_detector_names` -- ``rules`` + ``ner`` when
+  available, the same stack the REST API runs without ``PII_GUARD_DETECTORS``. A configured
+  (``PII_GUARD_NER_MODEL``) but missing NER raises ``DetectionError`` at startup.
 - ``strict``: the fast detectors + the LLM detector, resolved by
   :class:`~pii_guard.detect.pipeline.DetectionPipeline`.
 
-Entity policies (:mod:`pii_guard.policy`, shared with the REST API) are applied *after*
+Every detector's output is checked by :class:`~pii_guard.detect.stack.CheckedDetector` (a list of
+spans whose offsets match the text, else ``DetectionError``), as in the REST API.
+
+Entity policies (:meth:`pii_guard.policy.PolicySet.from_settings`, shared with the REST API)
+are applied *after*
 resolution: ``keep`` spans still lose overlaps against masked types but are themselves left in
 place, and any ``block`` span raises :class:`~pii_guard.policy.BlockedEntityError`, so the
 request is refused and nothing is forwarded.
@@ -21,11 +27,12 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from pii_guard.config import Settings
+from pii_guard.detect import stack
 from pii_guard.detect.pipeline import DetectionPipeline
+from pii_guard.detect.stack import CheckedDetector, build_detectors, check_spans
 from pii_guard.gateway.config import GatewayConfig, Mode
-from pii_guard.policy import DEFAULT_POLICIES, Policy, PolicySet
-from pii_guard.registry import create_detector, resolve_detector
-from pii_guard.types import DetectionError, Detector, EntityType, Span
+from pii_guard.policy import PolicySet
+from pii_guard.types import Detector, Span
 
 __all__ = ["ModeDetector", "build_mode_detectors", "detector_timings", "gateway_policies"]
 
@@ -74,31 +81,18 @@ class ModeDetector:
             timings = dict(_timings.get() or {})
         finally:
             _timings.reset(token)
-        if not isinstance(spans, list) or not all(isinstance(s, Span) for s in spans):
-            raise DetectionError(f"{self.mode.value} detector returned something other than spans")
+        spans = check_spans(spans, text, f"{self.mode.value} pipeline")
         return self.policies.apply(spans).masked, timings
 
 
 def gateway_policies(settings: Settings, config: GatewayConfig) -> PolicySet:
-    """``PII_GUARD_POLICY_OVERRIDES``, over the deprecated ``PII_GUARD_GATEWAY_KEEP_TYPES``."""
-    overrides: dict[EntityType, Policy] = {}
-    if config.keep_types is not None:
-        logger.warning("PII_GUARD_GATEWAY_KEEP_TYPES is deprecated; use PII_GUARD_POLICY_OVERRIDES")
-        for entity_type, default in DEFAULT_POLICIES.items():
-            if entity_type in config.keep_types:
-                overrides[entity_type] = Policy.KEEP
-            elif default is Policy.KEEP:
-                overrides[entity_type] = Policy.MASK
-    overrides.update(getattr(settings, "policy_overrides", None) or {})
-    return PolicySet(overrides)
+    """:meth:`PolicySet.from_settings`, with ``config.keep_types`` as the deprecated keep list."""
+    return PolicySet.from_settings(settings, keep_types=config.keep_types)
 
 
 def _ner_available() -> bool:
-    try:
-        resolve_detector("ner")
-    except DetectionError:
-        return False
-    return True
+    """Kept for callers of the old name; the decision lives in :mod:`pii_guard.detect.stack`."""
+    return stack._ner_available()
 
 
 def build_mode_detectors(
@@ -110,12 +104,12 @@ def build_mode_detectors(
 ) -> dict[Mode, ModeDetector]:
     """The fast and strict detectors.
 
-    ``base`` defaults to ``rules`` (+ ``ner`` when available); ``llm_detector`` defaults to
+    ``base`` defaults to :func:`~pii_guard.detect.stack.default_detector_names` (``rules`` +
+    ``ner`` when available, built from the settings); ``llm_detector`` defaults to
     :class:`~pii_guard.detect.llm.LlmDetector` from the settings. Both are injectable for tests.
     """
     if base is None:
-        names = ["rules"] + (["ner"] if _ner_available() else [])
-        base = [create_detector(name) for name in names]
+        base = build_detectors(stack.default_detector_names(settings), settings)
     if llm_detector is None:
         from pii_guard.detect.llm import LlmDetector
 
@@ -124,7 +118,9 @@ def build_mode_detectors(
 
     def build(mode: Mode, detectors: Iterable[Detector]) -> ModeDetector:
         detectors = list(detectors)
-        pipeline = DetectionPipeline([_Timed(d) for d in detectors], keep_types=policies.keep_types)
+        pipeline = DetectionPipeline(
+            [_Timed(CheckedDetector(d)) for d in detectors], keep_types=policies.keep_types
+        )
         llm_model = getattr(llm_detector, "model", "")
         parts = [d.name for d in detectors]
         if mode is Mode.STRICT:

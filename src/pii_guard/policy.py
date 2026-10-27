@@ -15,6 +15,7 @@ settings load, so a typo stops startup instead of silently masking less.
 
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -31,6 +32,8 @@ __all__ = [
     "PolicySet",
     "parse_overrides",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class Policy(StrEnum):
@@ -117,9 +120,30 @@ class PolicySet:
         self._policies: Mapping[EntityType, Policy] = MappingProxyType(policies)
 
     @classmethod
-    def from_settings(cls, settings: object) -> PolicySet:
-        """From ``Settings.policy_overrides`` (absent or empty -> the defaults)."""
-        return cls(getattr(settings, "policy_overrides", None) or {})
+    def from_settings(
+        cls, settings: object, *, keep_types: Iterable[EntityType] | None = None
+    ) -> PolicySet:
+        """The one policy builder for the REST API and the gateway.
+
+        ``Settings.policy_overrides`` on top of the deprecated keep list (``keep_types``, else
+        ``Settings.gateway_keep_types`` from ``PII_GUARD_GATEWAY_KEEP_TYPES``): listed types
+        are kept, the other default ``keep`` types are masked. Neither set -> the defaults.
+        """
+        if keep_types is None:
+            keep_types = getattr(settings, "gateway_keep_types", None)
+        overrides: dict[EntityType, Policy] = {}
+        if keep_types is not None:
+            logger.warning(
+                "PII_GUARD_GATEWAY_KEEP_TYPES is deprecated; use PII_GUARD_POLICY_OVERRIDES"
+            )
+            kept = frozenset(keep_types)
+            for entity_type, default in DEFAULT_POLICIES.items():
+                if entity_type in kept:
+                    overrides[entity_type] = Policy.KEEP
+                elif default is Policy.KEEP:
+                    overrides[entity_type] = Policy.MASK
+        overrides.update(getattr(settings, "policy_overrides", None) or {})
+        return cls(overrides)
 
     def __repr__(self) -> str:
         changed = {t.value: p.value for t, p in self.overrides().items()}

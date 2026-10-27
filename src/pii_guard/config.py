@@ -43,10 +43,20 @@ class Settings(BaseSettings):
     api_token: SecretStr | None = None
 
     # Detection and policies for the REST API (/v1/analyze, /v1/mask).
-    # Comma-separated registry names, run through the DetectionPipeline: "rules,llm".
-    detectors: Annotated[tuple[str, ...], NoDecode] = DEFAULT_DETECTORS
+    # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
+    # the gateway fast-mode stack, rules + ner when available (pii_guard.detect.stack).
+    detectors: Annotated[tuple[str, ...] | None, NoDecode] = None
     # "TYPE=mask|keep|block,..." on top of the defaults in docs/entities.md.
     policy_overrides: Annotated[dict[EntityType, Policy], NoDecode] = Field(default_factory=dict)
+    # Deprecated (use policy_overrides): types to keep, the rest of the default keeps masked.
+    # Applied by PolicySet.from_settings for the REST API and the gateway alike.
+    gateway_keep_types: Annotated[frozenset[EntityType] | None, NoDecode] = None
+
+    # NER detector (the "ner" extra): hub id or local directory, hub revision, and device
+    # (auto|cpu|mps|cuda). A set model makes a missing "ner" extra stop startup (ADR 0006).
+    ner_model: str | None = None
+    ner_revision: str | None = None
+    ner_device: str | None = None
 
     # Upstream LLM the gateway forwards masked requests to (OpenAI-compatible).
     upstream_base_url: str | None = None
@@ -118,6 +128,13 @@ class Settings(BaseSettings):
             value = [part.strip() for part in value.split(",") if part.strip()]
         if isinstance(value, list | tuple) and not value:
             raise ValueError("PII_GUARD_DETECTORS needs at least one detector name")
+        return value
+
+    @field_validator("gateway_keep_types", mode="before")
+    @classmethod
+    def _split_keep_types(cls, value: object) -> object:
+        if isinstance(value, str):
+            return frozenset(part.strip().upper() for part in value.split(",") if part.strip())
         return value
 
     @field_validator("allowed_hosts", mode="before")

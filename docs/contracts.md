@@ -197,8 +197,12 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_PORT` | `port` | `int` | `8787` |
 | `PII_GUARD_LOG_LEVEL` | `log_level` | `str` | `info` |
 | `PII_GUARD_DEFAULT_LANGUAGE` | `default_language` | `str` | `hu` |
-| `PII_GUARD_DETECTORS` | `detectors` | `tuple[str, ...]` (comma-separated registry names) | `rules` |
+| `PII_GUARD_DETECTORS` | `detectors` | `tuple[str, ...] \| None` (comma-separated registry names) | unset (the gateway fast-mode stack: `rules`, plus `ner` when available) |
 | `PII_GUARD_POLICY_OVERRIDES` | `policy_overrides` | `dict[EntityType, Policy]` (`TYPE=mask\|keep\|block,...`) | none |
+| `PII_GUARD_GATEWAY_KEEP_TYPES` | `gateway_keep_types` | `frozenset[EntityType] \| None` (deprecated) | unset |
+| `PII_GUARD_NER_MODEL` | `ner_model` | `str \| None` (hub id or directory) | unset (detector default; a set model makes a missing `ner` extra stop startup) |
+| `PII_GUARD_NER_REVISION` | `ner_revision` | `str \| None` | unset (pinned for the default model) |
+| `PII_GUARD_NER_DEVICE` | `ner_device` | `str \| None` (`auto\|cpu\|mps\|cuda`) | unset (`auto`) |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
@@ -215,8 +219,16 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `hybrid` |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
-`PII_GUARD_DETECTORS` picks the REST API's detectors (`rules,llm` for the demo; the gateway
-has its own per-mode set). `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
+One factory, `pii_guard.detect.stack`, picks the detectors for both the REST API and the
+gateway (LAB-1270). Without `PII_GUARD_DETECTORS` the REST API runs the gateway fast-mode stack:
+`rules`, plus `ner` when the `ner` extra is installed. An explicit `PII_GUARD_DETECTORS`
+(`rules,llm`, say) wins for the REST API only; the gateway keeps its per-mode set. NER fails
+closed (ADR 0006): with `PII_GUARD_NER_MODEL` set but the extra missing, startup raises
+`DetectionError` ("ner configured but the 'ner' extra is not installed") in both; with neither,
+NER is skipped and one WARNING is logged. `NerDetector` gets its model, revision and device
+from `Settings`. Every detector's output goes through `CheckedDetector`: anything other than a
+list of spans whose offsets match the text is `503 detection_failed`, in the gateway as in the
+REST API. `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
 settings load: an unknown type or policy stops startup. `LlmDetector` resolves its model,
 reasoning effort, max tokens and timeout as the constructor argument, then the setting
 (environment or `.env`), then its built-in default, so the registry and `pii-guard eval`
@@ -232,8 +244,8 @@ gateway settings into `Settings` is LAB-1095.
 
 - `pii_guard.api.app:create_app(settings: Settings | None = None) -> FastAPI`. Settings are
   on `request.app.state.settings`, the detector names on `app.state.detector_names` and the
-  `PolicySet` on `app.state.policies`. An unknown name in `PII_GUARD_DETECTORS` raises
-  `DetectionError` here, at startup. The analyzer (`app.state.analyzer`, default
+  `PolicySet` on `app.state.policies`. An unknown name in `PII_GUARD_DETECTORS`, or a
+  configured but missing NER, raises `DetectionError` here, at startup. The analyzer (`app.state.analyzer`, default
   `pii_guard.api.deps.RegistryAnalyzer`) runs the detectors through `DetectionPipeline`.
 - `GET /healthz` → `200 {"status": "ok", "version": "<package version>"}`.
 - **Routers.** Every module in `pii_guard/api/routes/` that defines a module-level
@@ -279,8 +291,10 @@ the adjudicator, then the largest overlap, score and detector order, and `Span.f
 names the detector it came from. Only a `keep` policy for that masked type as well leaves the
 value in place. `BlockedEntityError` carries types
 and counts (`counts`), never values. The REST API, the gateway and the eval share the
-resolver (`DetectionPipeline`) and the defaults. The gateway's `PII_GUARD_GATEWAY_KEEP_TYPES`
-is a deprecated alias: when set, it is the exact keep set; `PII_GUARD_POLICY_OVERRIDES` wins.
+resolver (`DetectionPipeline`), the defaults and one policy builder, `PolicySet.from_settings`.
+`PII_GUARD_GATEWAY_KEEP_TYPES` is a deprecated alias, applied to the REST API and the gateway
+alike: when set, it is the exact keep set (with a deprecation warning);
+`PII_GUARD_POLICY_OVERRIDES` wins.
 
 ## REST API (implemented)
 
@@ -575,7 +589,7 @@ With `render: "labels"` (the default) the response also carries:
   is `503 detection_failed`.
 - Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
   binary with `hun`/`eng` data; the Docker image ships both), OCR text goes through the API's
-  detectors (`PII_GUARD_DETECTORS`, so names need `llm`). Without it the image is refused with
+  detectors (`PII_GUARD_DETECTORS`, else rules + ner when available; names need `llm` too). Without it the image is refused with
   `503 ocr_unavailable` before SAM runs (fail closed), here and in the gateway. Only with
   `PII_GUARD_IMAGE_REQUIRE_OCR=false` does SAM run alone, and `analysis.ocr` is
   `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "tesseract_unavailable"}`:
