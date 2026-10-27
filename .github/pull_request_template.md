@@ -13,5 +13,5 @@
 - [ ] No raw values in logs or errors (types, counts and placeholder ids only).
 - [ ] Detection change: a run is recorded with `pii-guard eval ... --record <slug>`, before/after
       numbers are below, and the generated report is committed
-      ([CONTRIBUTING.md](../CONTRIBUTING.md#recording-a-benchmark-run)).
-- [ ] An interface in [docs/contracts.md](../docs/contracts.md) changed: that file is updated too.
+      ([CONTRIBUTING.md](https://github.com/watt-mind/pii-guard/blob/develop/CONTRIBUTING.md#recording-a-benchmark-run)).
+- [ ] An interface in [docs/contracts.md](https://github.com/watt-mind/pii-guard/blob/develop/docs/contracts.md) changed: that file is updated too.
