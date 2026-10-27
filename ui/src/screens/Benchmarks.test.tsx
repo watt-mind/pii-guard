@@ -29,7 +29,7 @@ function resultsTable(panel: HTMLElement) {
   return within(section).getByRole("table");
 }
 
-const nameOf = (h: HTMLElement | null) => h?.textContent?.replace(/fast mode\s*\(Fast mode, rules only\)/, "").trim();
+const nameOf = (h: HTMLElement | null) => h?.textContent?.replace(/fast mode, rules only/, "").trim();
 
 function rowNames(table: HTMLElement) {
   return within(table).getAllByRole("rowheader").map(nameOf);

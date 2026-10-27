@@ -233,7 +233,7 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
             data && data.regions.length > 0 ? (
               <span>Solid outlines: found by SAM 3.1. Dashed: text found by OCR and a detector. Hover, tap or tab to a region for its type.</span>
             ) : (
-              <span>Pick a sample or upload a fictional image, then mask it.</span>
+              <span>{src ? "Mask the image to see what the model would get." : "Pick a sample or upload a fictional image, then mask it."}</span>
             )
           }
         >

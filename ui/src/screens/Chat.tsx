@@ -103,6 +103,11 @@ export function Chat({ client, live, draft, replay }: Props) {
       { id, user: message, mode, status: "masking", thinking: false, maskedUser: null, maskedSystem: null, answer: "", maskedAnswer: null, masked: null, ms: null, error: null },
     ]);
     setText("");
+    // Keep the keyboard user in the composer; bring the new turn into view.
+    requestAnimationFrame(() => {
+      document.getElementById("chat-input")?.focus({ preventScroll: true });
+      document.getElementById(`turn-${id}`)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    });
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -165,7 +170,7 @@ export function Chat({ client, live, draft, replay }: Props) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">
-            Chat with a real model. It only ever sees placeholders.
+            {client.kind === "mock" ? "Chat through the guard. The model only ever sees placeholders." : "Chat with a real model. It only ever sees placeholders."}
           </h1>
           <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
             Your message goes through the pii-guard gateway, a drop-in for any OpenAI-compatible API. It is masked on the way out and the
@@ -175,7 +180,7 @@ export function Chat({ client, live, draft, replay }: Props) {
         <div role="group" aria-label="Chat view" className="flex rounded-lg border border-line bg-surface p-0.5 text-sm">
           {(
             [
-              ["chat", "Live chat"],
+              ["chat", client.kind === "mock" ? "Chat" : "Live chat"],
               ["replay", "Replay a document"],
             ] as const
           ).map(([id, label]) => (
@@ -295,7 +300,7 @@ function TurnView({
   const restored = marked || placeholdersInAnswer;
 
   return (
-    <article aria-label="Chat turn" className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-6">
+    <article id={`turn-${turn.id}`} aria-label="Chat turn" className="scroll-mt-24 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-6">
       {/* Row 1: what you wrote | what the model received */}
       <Bubble side="you" label="You wrote">
         <RestoredText segments={userSegments} activeKey={activeKey} onActivate={onActivate} outgoing />
@@ -394,7 +399,7 @@ function Bubble({ side, label, children, className = "" }: { side: "you" | "mode
         className,
       ].join(" ")}
     >
-      <p
+      <h3
         className={[
           "mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase",
           side === "model" ? "text-model" : "text-guard",
@@ -402,7 +407,7 @@ function Bubble({ side, label, children, className = "" }: { side: "you" | "mode
       >
         {side === "model" ? "Model side · " : "Your side · "}
         {label}
-      </p>
+      </h3>
       {children}
     </section>
   );

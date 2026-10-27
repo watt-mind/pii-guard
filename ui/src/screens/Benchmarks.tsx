@@ -239,7 +239,9 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
   const h = headline(index, set, lang);
   if (!h) return null;
   const docs = documentCount(index.fixture_sets[set], lang);
-  const scope = `${docs ?? "?"} fictional ${lang === "all" ? "" : `${languageName(lang)} `}documents (${set})`;
+  const info = index.fixture_sets[set];
+  const kind = info?.origin === "generated" ? "model-generated" : "hand-written";
+  const scope = `${docs ?? "?"} ${kind} fictional ${lang === "all" ? "" : `${languageName(lang)} `}documents`;
   const pct = (x: HeadlineSide) => <strong className="font-semibold tabular-nums text-ink">{formatPct(x.leak)}</strong>;
   const demo = index.snapshots.find((x) => x.fixture_set === set && /muse spark open/i.test(index.systems[x.system]?.label ?? ""));
   const demoLeak = demo ? pick(demo, lang)?.leak : null;
@@ -402,7 +404,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                     {sys?.short_label ?? s.system}
                     {sys?.default && (
                       <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-muted uppercase ring-1 ring-line">
-                        fast mode<span className="sr-only"> (Fast mode, rules only)</span>
+                        fast mode<span className="sr-only">, rules only</span>
                       </span>
                     )}
                   </span>
