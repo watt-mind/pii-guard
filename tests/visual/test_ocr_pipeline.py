@@ -119,7 +119,7 @@ def test_join_words_lines_and_offsets() -> None:
 
 
 def test_text_regions_with_rules_cover_taj_and_tax_id() -> None:
-    regions = text_regions(id_card_png(), [RuleDetector()], ocr=FakeOcr())
+    regions = text_regions(id_card_png(), [RuleDetector()], ocr=FakeOcr(), captions=False)
     by_type = {r.entity_type: r for r in regions}
     assert set(by_type) == {EntityType.NATIONAL_ID_HU_TAJ, EntityType.NATIONAL_ID_HU_TAX}
     assert by_type[EntityType.NATIONAL_ID_HU_TAJ].box == word_box(*FICTIONAL_TAJ.split())
@@ -200,6 +200,7 @@ def test_mask_visual_covers_face_and_text_pii() -> None:
         sam=sam_client(),
         ocr=FakeOcr(),
         detectors=[RuleDetector(), NameDetector()],
+        captions=False,
         padding=0,
     )
     types = sorted(r.entity_type.value for r in result.regions)

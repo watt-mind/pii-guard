@@ -713,45 +713,52 @@ _VISUAL_SETS = {
 
 
 def visual_recall(index: Mapping[str, Any]) -> str:
-    runs = index["visual"]
+    # The latest run of each system on each set: bars grouped by set, coloured by system.
+    latest: dict[tuple[str, str], Mapping[str, Any]] = {}
+    for r in index["visual"]:
+        latest[(str(r.get("fixture_set") or "specimens"), str(r["system"]))] = r
+    set_order = list(dict.fromkeys(key[0] for key in latest))
+    systems = list(dict.fromkeys(key[1] for key in latest))
+    runs = [latest[(fs, sk)] for fs in set_order for sk in systems if (fs, sk) in latest]
     region_types = []
     for r in runs:
         for k in r["by_region_type"]:
             if k not in region_types:
                 region_types.append(k)
     groups = [*region_types, "all"]
-    colors = ["#88CCEE", "#0072B2", "#332288", "#44AA99", "#CC6677"]
-    px0, py0, px1, py1 = 150, 210, 1540, 680
+    palette = ["#0072B2", "#332288", "#44AA99", "#CC6677", "#88CCEE", "#DDCC77", "#117733"]
+    color = {sk: palette[k % len(palette)] for k, sk in enumerate(systems)}
+    px0, py0, px1, py1 = 150, 230, 1540, 680
     gw = (px1 - px0) / max(len(groups), 1)
-    bw = min(90, (gw - 50) / max(len(runs), 1))
+    gap = 0.4  # bar widths between the sets inside a group
+    slots = len(runs) + gap * (len(set_order) - 1)
+    bw = min(90, (gw - 24) / max(slots, 1))
 
     def sy(v: float) -> float:
         return py1 - v * (py1 - py0)
+
+    def short(system: str) -> str:
+        return system.removeprefix("visual:").replace("sam-3.1+tesseract+", "").replace("+", " + ")
 
     body = [
         _text(
             56,
             112,
-            "Share of labelled image regions masked (IoU >= 0.5), by region type",
+            "Share of labelled image regions masked (IoU >= 0.5), by region type; in each group, "
+            + " | ".join(set_order),
             size=24,
             fill=MUTED,
         )
     ]
-    lx = 56
-    for k, r in enumerate(runs):
-        label = (
-            r["run_id"]
-            .removeprefix(r["date"] + "-")
-            .replace("visual-specimens-", "")
-            .replace("visual-", "")
-            .replace("-", " ")
-        )
-        body.append(
-            f'<rect x="{lx}" y="140" width="22" height="22" fill="{colors[k % len(colors)]}"/>'
-        )
-        txt = f"{label} ({r['date']}, {_short(r['commit'])})"
-        body.append(_text(lx + 30, 159, txt, size=21))
-        lx += 30 + text_width(txt, 21) + 36
+    lx, ly = 56, 140
+    for sk in systems:
+        txt = short(sk)
+        width = 30 + text_width(txt, 21) + 36
+        if lx + width > px1 + 40 and lx > 56:
+            lx, ly = 56, ly + 32
+        body.append(f'<rect x="{lx}" y="{ly}" width="22" height="22" fill="{color[sk]}"/>')
+        body.append(_text(lx + 30, ly + 19, txt, size=21))
+        lx += width
     for t in (0, 0.25, 0.5, 0.75, 1.0):
         body.append(
             f'<line x1="{px0}" y1="{_n(sy(t))}" x2="{px1}" y2="{_n(sy(t))}" stroke="{GRID}" '
@@ -761,7 +768,7 @@ def visual_recall(index: Mapping[str, Any]) -> str:
             _text(px0 - 16, sy(t) + 7, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="end")
         )
     for g, name in enumerate(groups):
-        gx = px0 + g * gw + (gw - bw * len(runs)) / 2
+        gx = px0 + g * gw + (gw - bw * slots) / 2
         ns: list[int] = []
         for k, r in enumerate(runs):
             block = r["overall"] if name == "all" else r["by_region_type"].get(name)
@@ -770,12 +777,17 @@ def visual_recall(index: Mapping[str, Any]) -> str:
             if block["regions"] not in ns:
                 ns.append(block["regions"])
             v = block["recall_iou50"] or 0
-            x = gx + k * bw
+            set_index = set_order.index(str(r.get("fixture_set") or "specimens"))
+            x = gx + (k + gap * set_index) * bw
             body.append(
                 f'<rect x="{_n(x + 3)}" y="{_n(sy(v))}" width="{_n(bw - 6)}" '
-                f'height="{_n(max(py1 - sy(v), 1))}" fill="{colors[k % len(colors)]}"/>'
+                f'height="{_n(max(py1 - sy(v), 1))}" fill="{color[str(r["system"])]}"/>'
             )
-            body.append(_text(x + bw / 2, sy(v) - 10, _pct(v, 0), size=19, anchor="middle"))
+            body.append(
+                _text(
+                    x + bw / 2, sy(v) - 10, _pct(v, 0), size=19 if bw >= 34 else 18, anchor="middle"
+                )
+            )
         body.append(
             _text(px0 + (g + 0.5) * gw, py1 + 34, name, size=21, anchor="middle", weight="600")
         )
@@ -801,8 +813,8 @@ def visual_recall(index: Mapping[str, Any]) -> str:
         for name, (n, c) in sets.items()
     ]
     caption += [
-        "SAM 3.1 + Tesseract OCR + rules: text and MRZ depend on OCR (rules only here), portraits "
-        "and signatures on SAM. Compare runs within a set; n = regions per set.",
+        "Latest run of each system per set. Text and MRZ: OCR + text detectors; portraits and "
+        "signatures: SAM 3.1. n = regions per set.",
         (
             f"Runs {_span([r['date'] for r in runs])} · commits "
             f"{', '.join(sorted({_short(r['commit']) for r in runs}))} · generated by `pii-guard "

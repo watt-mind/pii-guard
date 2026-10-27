@@ -2,9 +2,10 @@
 
 A :class:`LanguagePack` bundles the per-language parts that used to live in five registries:
 rules, the vault's inflection matcher, the LLM prompt notes and alignment profile, the eval
-surface forms and the lexicons. The components still own their logic (the rule detector
-runs rules, the vault masks, the scorer scores); they ask this registry for the pack of the
-text's language and fall back when there is none (see the table in ``docs/languages.md``).
+surface forms, the lexicons and the document field captions. The components still own their
+logic (the rule detector runs rules, the vault masks, the scorer scores); they ask this
+registry for the pack of the text's language and fall back when there is none (see the table
+in ``docs/languages.md``).
 
 Where packs come from, in order of precedence:
 
@@ -154,6 +155,12 @@ class LanguagePack:
 
     Lexicons
         ``lexicons``: a :class:`LexiconSpec`, or ``None`` for a language without lists.
+
+    Document field captions (``visual/captions``)
+        ``captions``: a ``captions.tsv`` resource (``caption<TAB>ENTITY_TYPE``, ``-`` for a
+        caption whose value is not personal data), so the value printed next to ``Név`` or
+        ``Date of birth`` on an ID card is masked; ``None``: this language's captions are not
+        recognised in images.
     """
 
     code: str
@@ -168,6 +175,7 @@ class LanguagePack:
     allow_suffix: bool = True
     word_boundary: bool = True
     lexicons: LexiconSpec | None = None
+    captions: Traversable | None = None
 
     def __repr__(self) -> str:
         return (

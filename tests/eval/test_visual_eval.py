@@ -300,3 +300,35 @@ def test_committed_labels_and_manifest_are_consistent() -> None:
             "id", "country", "doc_type", "side", "commons_title", "source_page", "url",
             "licence", "specimen_evidence", "retrieved", "sha256", "bytes", "file",
         }  # fmt: skip
+
+
+def test_pipeline_of_text_detectors_and_captions_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pii_guard import registry
+    from pii_guard.api.routes.image_masking import AnalyzerDetector
+    from pii_guard.visual import ocr as ocr_module
+
+    monkeypatch.setattr(ocr_module, "tesseract_available", lambda: True)
+    monkeypatch.setitem(registry._registry, "rules-copy", "pii_guard.detect.rules:RuleDetector")
+    parser = visual.build_parser()
+
+    engine, detector, name = visual._ocr_and_detector(parser.parse_args([]))
+    assert name == "rules+captions"
+    assert engine is not None and engine.upscale_to == visual.DEFAULT_UPSCALE_TO
+
+    args = parser.parse_args(["--detectors", "rules,rules-copy", "--no-captions"])
+    args.ocr_upscale = 0
+    engine, detector, name = visual._ocr_and_detector(args)
+    assert isinstance(detector, AnalyzerDetector) and name == "rules+rules-copy"
+    assert engine is not None and engine.upscale_to is None
+
+    with pytest.raises(visual.DetectionError, match="no-such-detector"):
+        visual._ocr_and_detector(parser.parse_args(["--detectors", "rules,no-such-detector"]))
+
+
+def test_report_says_whether_captions_ran(specimen_dir) -> None:
+    code = visual.main(_args(specimen_dir), inner_transport=httpx.MockTransport(FakeSam()))
+    assert code == 0
+    report = json.loads((specimen_dir["root"] / "out.json").read_text(encoding="utf-8"))
+    # Without OCR, neither captions nor upscaling can have run.
+    assert report["pipeline"]["captions"] is False
+    assert report["pipeline"]["ocr_upscale_to"] is None

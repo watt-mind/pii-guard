@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-visual-specimens-rules",
+  "kind": "visual",
+  "date": "2026-10-27",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard image masking (sam-3.1 + tesseract + rules) on specimens",
+  "notes": [
+    "LAB-1125 'before': the same commit with --no-captions --ocr-upscale 0, i.e. develop's behaviour."
+  ],
+  "code": {
+    "commit": "dbe5c8ea99f35ee716a6c534e9aa8d18461aee17",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": "LAB-1125 branch commit; the eval ran on a working tree with this commit's code"
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": null,
+    "detectors": [
+      {
+        "name": "sam",
+        "model": "sam-3.1",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "prompts": "{\"FACE\": [\"face\"], \"ID_PHOTO\": [\"photo of a person\"], \"SIGNATURE\": [\"signature\", \"squiggly line\"]}"
+        },
+        "serving": "Meta Model API"
+      },
+      {
+        "name": "ocr",
+        "model": "tesseract",
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      }
+    ],
+    "key": "visual:sam-3.1+tesseract+rules",
+    "label": "pii-guard image masking (sam-3.1 + tesseract + rules)"
+  },
+  "fixture_set": "specimens",
+  "fixtures": [
+    {
+      "path": "eval/visual/manifest.json",
+      "sha256": null,
+      "set": "specimens",
+      "language": null,
+      "origin": "specimens",
+      "generator": null,
+      "documents": 65
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote",
+    "platform": "darwin",
+    "machine": "arm64",
+    "cpu_count": null,
+    "accelerator": null,
+    "python": "3.12"
+  },
+  "cost": {
+    "usd": 0.65,
+    "estimated": true,
+    "gpu_minutes": null,
+    "model_calls": 260,
+    "tokens": null,
+    "shared_with": [],
+    "note": "SAM sam-3.1: 260 calls at $0.0025/call (planning estimate). Fetched live once for this ticket (the before run); every other run, and this re-run after rebasing on develop, was served from the response cache."
+  },
+  "metrics": {
+    "specimens": 65,
+    "overall": {
+      "regions": 406,
+      "recall_iou50": 0.2882,
+      "recall_cov90": 0.2266,
+      "mean_coverage": 0.2925
+    },
+    "by_region_type": {
+      "portrait": {
+        "regions": 65,
+        "recall_iou50": 0.9077,
+        "recall_cov90": 0.7231,
+        "mean_coverage": 0.8721
+      },
+      "signature": {
+        "regions": 37,
+        "recall_iou50": 0.8378,
+        "recall_cov90": 0.6486,
+        "mean_coverage": 0.8266
+      },
+      "mrz": {
+        "regions": 30,
+        "recall_iou50": 0.7667,
+        "recall_cov90": 0.6333,
+        "mean_coverage": 0.7206
+      },
+      "text": {
+        "regions": 274,
+        "recall_iou50": 0.0146,
+        "recall_cov90": 0.0073,
+        "mean_coverage": 0.0359
+      }
+    },
+    "by_doc_type": {
+      "driving_licence": {
+        "regions": 46,
+        "recall_iou50": 0.3043,
+        "recall_cov90": 0.3043,
+        "mean_coverage": 0.2989,
+        "specimens": 10
+      },
+      "id_card": {
+        "regions": 304,
+        "recall_iou50": 0.2895,
+        "recall_cov90": 0.2171,
+        "mean_coverage": 0.2903,
+        "specimens": 49
+      },
+      "passport": {
+        "regions": 56,
+        "recall_iou50": 0.2679,
+        "recall_cov90": 0.2143,
+        "mean_coverage": 0.2986,
+        "specimens": 6
+      }
+    },
+    "by_country": {
+      "AT": {
+        "regions": 27,
+        "recall_iou50": 0.2963,
+        "recall_cov90": 0.2593,
+        "mean_coverage": 0.284,
+        "specimens": 5
+      },
+      "BE": {
+        "regions": 9,
+        "recall_iou50": 0.4444,
+        "recall_cov90": 0.4444,
+        "mean_coverage": 0.4805,
+        "specimens": 2
+      },
+      "BG": {
+        "regions": 19,
+        "recall_iou50": 0.2105,
+        "recall_cov90": 0.1579,
+        "mean_coverage": 0.2004,
+        "specimens": 2
+      },
+      "CY": {
+        "regions": 13,
+        "recall_iou50": 0.2308,
+        "recall_cov90": 0.0769,
+        "mean_coverage": 0.1997,
+        "specimens": 2
+      },
+      "CZ": {
+        "regions": 12,
+        "recall_iou50": 0.25,
+        "recall_cov90": 0.25,
+        "mean_coverage": 0.3291,
+        "specimens": 2
+      },
+      "DE": {
+        "regions": 33,
+        "recall_iou50": 0.303,
+        "recall_cov90": 0.303,
+        "mean_coverage": 0.2978,
+        "specimens": 6
+      },
+      "EE": {
+        "regions": 11,
+        "recall_iou50": 0.2727,
+        "recall_cov90": 0.2727,
+        "mean_coverage": 0.2558,
+        "specimens": 2
+      },
+      "ES": {
+        "regions": 24,
+        "recall_iou50": 0.25,
+        "recall_cov90": 0.2083,
+        "mean_coverage": 0.2638,
+        "specimens": 3
+      },
+      "FI": {
+        "regions": 11,
+        "recall_iou50": 0.3636,
+        "recall_cov90": 0.1818,
+        "mean_coverage": 0.3174,
+        "specimens": 2
+      },
+      "FR": {
+        "regions": 29,
+        "recall_iou50": 0.2414,
+        "recall_cov90": 0.2069,
+        "mean_coverage": 0.3006,
+        "specimens": 4
+      },
+      "GR": {
+        "regions": 13,
+        "recall_iou50": 0.2308,
+        "recall_cov90": 0.1538,
+        "mean_coverage": 0.247,
+        "specimens": 2
+      },
+      "HR": {
+        "regions": 10,
+        "recall_iou50": 0.3,
+        "recall_cov90": 0.3,
+        "mean_coverage": 0.2898,
+        "specimens": 2
+      },
+      "HU": {
+        "regions": 42,
+        "recall_iou50": 0.2619,
+        "recall_cov90": 0.2143,
+        "mean_coverage": 0.3288,
+        "specimens": 6
+      },
+      "IT": {
+        "regions": 21,
+        "recall_iou50": 0.2381,
+        "recall_cov90": 0.1905,
+        "mean_coverage": 0.2197,
+        "specimens": 4
+      },
+      "LT": {
+        "regions": 11,
+        "recall_iou50": 0.3636,
+        "recall_cov90": 0.1818,
+        "mean_coverage": 0.3368,
+        "specimens": 2
+      },
+      "LU": {
+        "regions": 12,
+        "recall_iou50": 0.4167,
+        "recall_cov90": 0.25,
+        "mean_coverage": 0.4051,
+        "specimens": 2
+      },
+      "LV": {
+        "regions": 12,
+        "recall_iou50": 0.4167,
+        "recall_cov90": 0.3333,
+        "mean_coverage": 0.4404,
+        "specimens": 2
+      },
+      "MT": {
+        "regions": 5,
+        "recall_iou50": 0.4,
+        "recall_cov90": 0.2,
+        "mean_coverage": 0.3086,
+        "specimens": 1
+      },
+      "NL": {
+        "regions": 11,
+        "recall_iou50": 0.4545,
+        "recall_cov90": 0.1818,
+        "mean_coverage": 0.3734,
+        "specimens": 2
+      },
+      "PL": {
+        "regions": 34,
+        "recall_iou50": 0.2941,
+        "recall_cov90": 0.2647,
+        "mean_coverage": 0.2927,
+        "specimens": 5
+      },
+      "RO": {
+        "regions": 8,
+        "recall_iou50": 0.125,
+        "recall_cov90": 0.125,
+        "mean_coverage": 0.1424,
+        "specimens": 1
+      },
+      "SE": {
+        "regions": 10,
+        "recall_iou50": 0.2,
+        "recall_cov90": 0.2,
+        "mean_coverage": 0.1983,
+        "specimens": 2
+      },
+      "SI": {
+        "regions": 13,
+        "recall_iou50": 0.3846,
+        "recall_cov90": 0.1538,
+        "mean_coverage": 0.32,
+        "specimens": 2
+      },
+      "SK": {
+        "regions": 16,
+        "recall_iou50": 0.25,
+        "recall_cov90": 0.25,
+        "mean_coverage": 0.2467,
+        "specimens": 2
+      }
+    },
+    "over_masking_mean": 0.0259,
+    "errors": 0,
+    "latency_ms": {
+      "sam_call_p50": 1595.9,
+      "sam_call_p95": 3411.1,
+      "sam_per_image_p50": 6586.0,
+      "sam_per_image_p95": 11423.8,
+      "local_per_image_p50": 865.2,
+      "local_per_image_p95": 2044.2
+    }
+  }
+}

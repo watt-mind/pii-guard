@@ -38,12 +38,14 @@ def analyze_image(
     ocr: OcrEngine | None = None,
     detectors: Sequence[Detector] = (),
     language: str = "hu",
+    captions: bool = True,
 ) -> list[Region]:
     """Find personal data regions in ``image`` without masking.
 
     ``sam`` segments the visual ``entity_types`` (default ``FACE``, ``SIGNATURE``,
-    ``ID_PHOTO``); ``ocr`` + ``detectors`` find text personal data. At least one of the two
-    must be configured.
+    ``ID_PHOTO``); ``ocr`` + ``detectors`` find text personal data, and with ``captions``
+    the values next to known field captions (:mod:`pii_guard.visual.captions`). At least one
+    of SAM and OCR must be configured.
     """
     if sam is None and ocr is None:
         raise DetectionError("no visual detector configured (need SAM and/or OCR)")
@@ -59,7 +61,9 @@ def analyze_image(
         if sam is not None:
             regions.extend(sam.segment(image, entity_types))
         if ocr is not None:
-            regions.extend(text_regions(decoded, detectors, ocr=ocr, language=language))
+            regions.extend(
+                text_regions(decoded, detectors, ocr=ocr, language=language, captions=captions)
+            )
     except PiiGuardError:
         raise
     except Exception as exc:
@@ -75,6 +79,7 @@ def mask_visual(
     ocr: OcrEngine | None = None,
     detectors: Sequence[Detector] = (),
     language: str = "hu",
+    captions: bool = True,
     fill: tuple[int, int, int] = DEFAULT_FILL,
     padding: int = 2,
     image_format: str = "PNG",
@@ -87,6 +92,7 @@ def mask_visual(
         ocr=ocr,
         detectors=detectors,
         language=language,
+        captions=captions,
     )
     masked = mask_image(image, regions, fill=fill, padding=padding, image_format=image_format)
     return VisualResult(masked, regions)

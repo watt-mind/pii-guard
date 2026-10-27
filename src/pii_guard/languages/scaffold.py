@@ -70,6 +70,7 @@ def pack() -> LanguagePack:
         # allow_suffix=True,  # may a name run on into a longer word? (False for English)
         # word_boundary=True,  # False for scripts written without spaces between words
         # lexicons=LexiconSpec(...),  # name and place lists (see languages/hu/__init__.py)
+        # captions=files(__name__).joinpath("captions.tsv"),  # ID card field captions
     )
 '''
 

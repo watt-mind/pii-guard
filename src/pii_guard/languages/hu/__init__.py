@@ -60,4 +60,5 @@ def pack() -> LanguagePack:
                 "miskolc": "35",
             },
         ),
+        captions=files(__name__).joinpath("captions.tsv"),
     )

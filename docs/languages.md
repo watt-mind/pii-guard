@@ -28,6 +28,7 @@ guide, and every step below points at it.
 | Country-specific entity types | `country_entity_types` | the LLM prompt asks for them | generic types only |
 | Eval surface forms | `surface_forms` (`SurfaceForms`) | leak rate, corpus spans | exact matching, no stopwords |
 | Lexicons | `lexicons` (`LexiconSpec`) | `pii_guard.lang`, the corpus generator, rules | `LexiconUnavailable` |
+| Document field captions | `captions` (`captions.tsv`) | `visual/captions.py`: the value next to `Név` / `Date of birth` on an ID card is masked | captions in this language not recognised in images |
 
 The NER and LLM passes are multilingual: a new language needs no model change, only prompt
 notes and a measurement.
@@ -146,6 +147,14 @@ rate is not measured with the code it checks.
 `lexicons=LexiconSpec(directory=..., kinds=(...))`: name and place lists for the corpus
 generator and for validating addresses, from sources whose terms allow redistribution
 ([ADR 0009](decisions/0009-third-party-lexicons.md)). German has none yet.
+
+`captions=files(__name__).joinpath("captions.tsv")`: the field captions printed on the
+language's ID documents and forms, one `caption<TAB>ENTITY_TYPE` per line (`-` for a caption
+whose value is not personal data, such as `Sex` or `Expiry`: it is still recognised, so it
+bounds the neighbouring fields). Image masking pairs each caption with the value on its right
+or under it and masks that value ([visual/captions.py](../src/pii_guard/visual/captions.py)).
+Write captions as printed, with accents; matching ignores case, accents and punctuation and
+tolerates small OCR errors. The conformance suite checks that the file parses.
 
 ### 7. Check, measure, document
 

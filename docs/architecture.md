@@ -70,7 +70,10 @@ matcher, prompt notes, stopwords; the worked example of [languages.md](languages
 
 ### `visual`: images and scans
 
-- Text in images: OCR word boxes + `detect` → the boxes of detected spans are masked.
+- Text in images: OCR word boxes + `detect` → the boxes of detected spans are masked; the
+  value next to a known field caption (`Név`, `Date of birth`) is masked as well
+  (`visual/captions.py`, captions from the language packs), and machine-readable zones are
+  found by their layout (`visual/mrz.py`). Tesseract reads small images enlarged to 2000 px.
 - Non-text personal data: **SAM 3.1** segments faces, signatures, ID photos and stamps, which
   are masked as regions.
 - The output image is re-encoded from pixels (no layers, no original metadata; EXIF is
