@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # Images (POST /v1/mask/image and the gateway): "labels" prints each covered region's
     # session placeholder and returns a masked transcript + summary; "opaque": solid boxes.
     image_render: Literal["labels", "opaque"] = "labels"
+    # Who finds faces, ID photos and signatures in images (pii_guard.visual.segmenters,
+    # LAB-1245): "hybrid" = YuNet on the CPU for faces and ID photos, SAM 3.1 (Meta API) for
+    # signatures; "sam-api" = SAM 3.1 for everything (the previous default); "local" = YuNet
+    # only (refuses images while SIGNATURE is masked); "off" = refuse every image.
+    segmenter: Literal["hybrid", "sam-api", "local", "off"] = "hybrid"
     # Fail closed without OCR (ADR 0006): with no OCR engine (Tesseract) an image's text can't
     # be checked, so image parts are refused with 503 ocr_unavailable. False forwards them
     # masked by SAM only, with X-PII-Guard-Image-OCR: off (text in the image unchecked).

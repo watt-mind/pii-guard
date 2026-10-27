@@ -212,6 +212,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_LLM_DETECTOR_MAX_TOKENS` | `llm_detector_max_tokens` | `int \| None` (>= 256) | unset (detector default `4096`) |
 | `PII_GUARD_LLM_DETECTOR_TIMEOUT` | `llm_detector_timeout` | `float \| None` (> 0, seconds) | unset (detector default `60`) |
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
+| `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `hybrid` |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
 `PII_GUARD_DETECTORS` picks the REST API's detectors (`rules,llm` for the demo; the gateway
@@ -457,14 +458,14 @@ uploads are not accepted (they would need an extra dependency).
   "media_type": "image/png",
   "width": 720, "height": 450,
   "regions": [
-    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "sam", "detector": "sam", "score": null, "policy": "mask"},
-    {"entity_type": "NATIONAL_ID_HU_TAJ", "box": [310, 184, 437, 206], "source": "ocr", "detector": "rules", "score": 1.0, "policy": "mask"},
-    {"entity_type": "STAMP", "box": [392, 572, 548, 728], "source": "sam", "detector": "sam", "score": null, "policy": "keep"}
+    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "local", "detector": "yunet", "score": 0.93, "policy": "mask"},
+    {"entity_type": "SIGNATURE", "box": [402, 380, 560, 430], "source": "sam", "detector": "sam", "score": null, "policy": "mask"},
+    {"entity_type": "NATIONAL_ID_HU_TAJ", "box": [310, 184, 437, 206], "source": "ocr", "detector": "rules", "score": 1.0, "policy": "mask"}
   ],
-  "masked": [{"entity_type": "FACE", "count": 1}, {"entity_type": "NATIONAL_ID_HU_TAJ", "count": 1}],
-  "kept": [{"entity_type": "STAMP", "count": 1}],
+  "masked": [{"entity_type": "FACE", "count": 1}, {"entity_type": "SIGNATURE", "count": 1}, {"entity_type": "NATIONAL_ID_HU_TAJ", "count": 1}],
+  "kept": [],
   "analysis": {
-    "sam": {"model": "sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO", "STAMP"]},
+    "sam": {"model": "yunet-2023mar+sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO"]},
     "ocr": {"ran": true, "engine": "tesseract", "detectors": ["rules", "llm"], "models": {"llm": "muse-spark-1.3"}, "reason": null}
   }
 }
@@ -480,7 +481,7 @@ With `render: "labels"` (the default) the response also carries:
     {"entity_type": "PERSON", "box": [310, 92, 402, 112], "source": "ocr", "detector": "captions", "score": 0.8, "policy": "mask",
      "placeholder": "[[PERSON_a1b2c3]]", "label": "[[PERSON_a1b2c3]]", "match": "fuzzy", "match_confidence": 0.93,
      "cover_box": [308, 90, 452, 114]},
-    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "sam", "detector": "sam", "score": null, "policy": "mask",
+    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "local", "detector": "yunet", "score": 0.93, "policy": "mask",
      "placeholder": "[[PERSON_a1b2c3]]", "label": "PHOTO · [[PERSON_a1b2c3]]", "match": "fuzzy", "match_confidence": 0.93,
      "cover_box": [70, 114, 190, 264]}
   ],
@@ -526,10 +527,10 @@ With `render: "labels"` (the default) the response also carries:
   did not find stays in the transcript exactly as it stays visible in the image.
 
 - `box` is `[x1, y1, x2, y2]`, inclusive pixel corners in the image after EXIF orientation.
-  `source` is `sam` (SAM 3.1 segmentation) or `ocr` (OCR word boxes of a span a text detector
-  found); `detector` is `sam`, the text detector's registry name, or `captions` for a value
-  printed next to a known field caption (`Név`, `Date of birth`; score 0.8). SAM gives no
-  scores.
+  `source` is `sam` (SAM 3.1 segmentation), `local` (the on-device face detector, YuNet) or
+  `ocr` (OCR word boxes of a span a text detector found); `detector` is `sam`, `yunet`, the text
+  detector's registry name, or `captions` for a value printed next to a known field caption
+  (`Név`, `Date of birth`; score 0.8). SAM gives no scores; YuNet does.
 - `FACE` boxes are grown before masking (40% up, 10% on each side, 5% down, clamped to the
   image) because SAM's face box leaves hair and ears visible; the reported box is the grown
   one, i.e. the area covered.
@@ -539,21 +540,39 @@ With `render: "labels"` (the default) the response also carries:
   source are merged into their union (SAM's `signature` and `squiggly line` prompts).
 - Policies apply per region: `mask` regions are covered (plus 2 px; solid black with `opaque`,
   a neutral labelled box with `labels`), `keep` regions
-  (`STAMP` by default) are reported and left visible, any `block` region is
+  (`STAMP` by default) are reported and left visible (`STAMP` is only segmented with
+  `sam-api`, or when its policy is not `keep`), any `block` region is
   `422 blocked_entity` with no image.
 - Segmenters (`pii_guard.visual.segment.Segmenter`): anything with
   `segment(image: bytes, entity_types=None) -> list[Region]` that raises `DetectionError` on
-  any failure, including a requested type it cannot find. `SamClient` (SAM 3.1, Meta API) is
-  the one the API and gateway use. `LocalSegmenter` (YuNet on the CPU, `uv sync --extra
-  local-vision`, model via `python -m pii_guard.visual.segment fetch` into
-  `PII_GUARD_MODEL_DIR`, default `~/.cache/pii-guard/models`) finds `FACE` and `ID_PHOTO` only
-  (`source: "yunet"`, with scores) and raises for `SIGNATURE`; a missing OpenCV, a missing model
-  or one whose SHA-256 differs from the pinned value raises too. It is not wired into the API
-  (LAB-1229: no local signature detector is close enough to SAM; see
-  [models.md](models.md#local-segmentation)).
-- SAM segments every visual type it has a prompt for (one Meta API request per prompt:
-  `face`, `signature`, `squiggly line`, `photo of a person`, `stamp`). It needs `META_API_KEY` (or
-  `PII_GUARD_SAM_API_KEY`); without one every call is `503 detection_failed`.
+  any failure, including a requested type it cannot find. The API and the gateway build theirs
+  from `PII_GUARD_SEGMENTER` (`pii_guard.visual.segmenters.build_segmenter`, LAB-1245):
+  - `hybrid` (default): `LocalSegmenter` (YuNet on the CPU) finds `FACE` and `ID_PHOTO`, SAM 3.1
+    on the Meta API finds `SIGNATURE` (and `STAMP` only when its policy is not `keep`): **2 Meta
+    API requests per image** (`signature`, `squiggly line`), run alongside YuNet. The image
+    still leaves the machine for those two requests. `analysis.sam.model` is
+    `yunet-2023mar+sam-3.1`; `analysis.sam.entity_types` lists the visual types asked for
+    (`["FACE", "SIGNATURE", "ID_PHOTO"]` with the default policies).
+  - `sam-api` (the default before LAB-1245): SAM segments every visual type it has a prompt for,
+    one request per prompt: `face`, `signature`, `squiggly line`, `photo of a person`, `stamp`
+    (**5 requests per image**; `keep` stamps are found and reported).
+  - `local`: YuNet only, nothing leaves the machine. It cannot find signatures, so while
+    `SIGNATURE` is `mask` or `block` every image is `503 detection_failed`; with
+    `PII_GUARD_POLICY_OVERRIDES=SIGNATURE=keep` images are accepted with signatures visible.
+  - `off`: every image is `503 detection_failed` (nothing is segmented, nothing is returned).
+  - Fallbacks, decided when the segmenter is first built: `hybrid` without OpenCV or the YuNet
+    model logs a warning and sends faces and ID photos to SAM too (4 requests; still masked);
+    without them **and** without a SAM API key it is `503 detection_failed`. `local` never
+    falls back to the API.
+  - `LocalSegmenter` needs `uv sync --extra local-vision` and the model (`python -m
+    pii_guard.visual.segment fetch` into `PII_GUARD_MODEL_DIR`, default
+    `~/.cache/pii-guard/models`; the Docker image ships both). A missing OpenCV, a missing
+    model or one whose SHA-256 differs from the pinned value raises.
+  - Every mode other than `sam-api` asks only for visual types whose policy is not
+    `keep` (a kept region stays visible anyway).
+- Region `source`: `sam` (SAM 3.1), `local` (on-device, `detector: "yunet"`, with a score) or
+  `ocr`. SAM needs `META_API_KEY` (or `PII_GUARD_SAM_API_KEY`); without one every SAM request
+  is `503 detection_failed`.
 - Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
   binary with `hun`/`eng` data; the Docker image ships both), OCR text goes through the API's
   detectors (`PII_GUARD_DETECTORS`, so names need `llm`). Without it the image is refused with

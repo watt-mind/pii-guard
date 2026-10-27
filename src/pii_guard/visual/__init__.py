@@ -23,19 +23,26 @@ from pii_guard.visual.ocr import (
 from pii_guard.visual.pipeline import VisualResult, analyze_image, mask_visual
 from pii_guard.visual.regions import Box, Region, SamMask
 from pii_guard.visual.sam import DEFAULT_PROMPTS, SamClient, parse_sam_output
+from pii_guard.visual.segment import LocalSegmenter, Segmenter
+from pii_guard.visual.segmenters import HybridSegmenter, OffSegmenter, build_segmenter
 
 __all__ = [
     "DEFAULT_FILL",
     "DEFAULT_PROMPTS",
     "Box",
+    "HybridSegmenter",
+    "LocalSegmenter",
     "OcrEngine",
     "OcrWord",
+    "OffSegmenter",
     "Region",
     "SamClient",
     "SamMask",
+    "Segmenter",
     "TesseractOcr",
     "VisualResult",
     "analyze_image",
+    "build_segmenter",
     "encode_image",
     "join_words",
     "load_image",

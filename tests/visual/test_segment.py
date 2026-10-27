@@ -243,7 +243,8 @@ def test_score_image_counts_leaks_and_precision() -> None:
 
 
 def test_candidates_and_parser() -> None:
-    assert set(CANDIDATES) == {"sam-api", "local", "small-detectors", "efficientsam"}
+    assert set(CANDIDATES) == {"hybrid", "sam-api", "local", "small-detectors", "efficientsam"}
+    assert CANDIDATES["hybrid"].size_bytes == YUNET.size
     assert CANDIDATES["local"].size_bytes == YUNET.size
     assert CANDIDATES["sam-api"].size_bytes is None
     args = build_parser().parse_args(["--candidate", "local", "--set", "fictional"])

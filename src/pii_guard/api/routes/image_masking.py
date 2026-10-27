@@ -5,8 +5,10 @@ imports it but mounts nothing.
 
 :class:`ImageMasker` runs the visual pipeline (:func:`pii_guard.visual.analyze_image`):
 
-1. **SAM 3.1** segments every visual type it has a prompt for (``FACE``, ``SIGNATURE``,
-   ``ID_PHOTO``, ``STAMP``), one request per concept prompt;
+1. the **segmenter** (``PII_GUARD_SEGMENTER``, :mod:`pii_guard.visual.segmenters`) finds the
+   visual types: by default YuNet on the CPU for ``FACE`` and ``ID_PHOTO`` and SAM 3.1 for
+   ``SIGNATURE`` (``hybrid``); with ``sam-api`` SAM 3.1 segments every type it has a prompt
+   for (``FACE``, ``SIGNATURE``, ``ID_PHOTO``, ``STAMP``), one request per concept prompt;
 2. **OCR** (Tesseract, when installed) + the configured **text detectors** find text personal
    data in the image (a TAJ number, a name), mapped back to word boxes;
 3. **policies** decide per region: ``mask`` regions are covered, ``keep`` regions (``STAMP``
@@ -68,7 +70,8 @@ from pii_guard.visual.ocr import (
 from pii_guard.visual.pipeline import ImageAnalysis, analyze_image_text
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.render import LabelBox, render_labels
-from pii_guard.visual.sam import SamClient
+from pii_guard.visual.segment import Segmenter
+from pii_guard.visual.segmenters import default_entity_types
 from pii_guard.visual.summary import ExpiryPolicy
 from pii_guard.workers import BoundedWorkers
 
@@ -106,7 +109,9 @@ SUPPORTED_MEDIA_TYPES: dict[str, tuple[bytes, ...]] = {
     "image/jpeg": (b"\xff\xd8\xff",),
 }
 
-Origin = Literal["sam", "ocr"]
+#: Where a region came from: SAM 3.1, the on-device segmenter (YuNet) or OCR + a text detector.
+Origin = Literal["sam", "local", "ocr"]
+_SEGMENTER_ORIGINS: dict[str, Origin] = {"sam": "sam", "yunet": "local"}
 #: ``labels``: placeholder-labelled boxes + transcript + summary; ``opaque``: solid boxes.
 Render = Literal["labels", "opaque"]
 RENDER_MODES: tuple[str, ...] = ("labels", "opaque")
@@ -264,22 +269,25 @@ def require_ocr(ocr: OcrEngine | None, *, required: bool) -> None:
 
 
 class ImageMasker:
-    """SAM 3.1 + optional OCR text detection + policies → a masked PNG.
+    """A segmenter + optional OCR text detection + policies → a masked PNG.
 
-    - ``sam``: required. Without an API key every call fails closed (``detection_failed``).
+    - ``sam``: the segmenter (:func:`pii_guard.visual.segmenters.build_segmenter`; a
+      :class:`~pii_guard.visual.sam.SamClient` without an API key fails every call closed).
     - ``ocr`` / ``text_detector``: both or neither. Without them only SAM runs, and the
       outcome says so (``ocr_engine is None``).
     - ``captions``: also mask the values next to known field captions on the OCR'd text
       (:mod:`pii_guard.visual.captions`; on by default).
-    - ``entity_types``: the visual types to segment; default every type ``sam`` has a prompt
-      for, so ``keep`` types (``STAMP``) are found and reported, not silently ignored.
+    - ``entity_types``: the visual types to segment; default
+      :func:`~pii_guard.visual.segmenters.default_entity_types`: for a ``SamClient`` every
+      type it has a prompt for (``keep`` types such as ``STAMP`` are found and reported), for
+      the other segmenters every visual type whose policy is not ``keep``.
     - ``max_pixels``: larger images are refused (413 ``payload_too_large``) before decoding.
     """
 
     def __init__(
         self,
         *,
-        sam: SamClient,
+        sam: Segmenter,
         policies: PolicySet,
         ocr: OcrEngine | None = None,
         text_detector: Detector | None = None,
@@ -299,7 +307,11 @@ class ImageMasker:
         self.text_detector_models = dict(text_detector_models or {})
         self.captions = captions
         self.max_pixels = max_pixels
-        self.entity_types = list(entity_types) if entity_types is not None else list(sam.prompts)
+        self.entity_types = (
+            list(entity_types)
+            if entity_types is not None
+            else default_entity_types(sam, policies.of)
+        )
         if not self.entity_types:
             raise ValueError("at least one visual entity type is needed")
 
@@ -424,7 +436,7 @@ class ImageMasker:
             width=width,
             height=height,
             regions=policed,
-            sam_model=self.sam.model,
+            sam_model=str(getattr(self.sam, "model", type(self.sam).__name__)),
             sam_types=list(self.entity_types),
             ocr_engine=getattr(self.ocr, "name", None) if self.ocr is not None else None,
             text_detectors=self.text_detector_names if self.ocr is not None else [],
@@ -436,7 +448,7 @@ class ImageMasker:
         )
 
     def _police(self, region: Region) -> PolicedRegion:
-        origin: Origin = "sam" if region.source == "sam" else "ocr"
+        origin: Origin = _SEGMENTER_ORIGINS.get(region.source, "ocr")
         return PolicedRegion(region, origin, self.policies.of(region.entity_type))
 
 

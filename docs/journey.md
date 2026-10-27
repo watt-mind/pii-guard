@@ -949,6 +949,32 @@ or the gateway changes.
 - **Cost:** $0. 356 SAM 3.1 calls on free Meta API credits (≈ $0.89 at the planning
   estimate); every local candidate ran on the CPU.
 
+### 34. Faces on the device by default, half the API calls per image (2026-10-27)
+
+LAB-1245. LAB-1229 showed YuNet finds faces and ID photos as well as SAM 3.1 but no signatures.
+The owner's call: make it the default for faces and keep SAM 3.1 for signatures only.
+`PII_GUARD_SEGMENTER=hybrid` (new default) runs YuNet on the CPU alongside two SAM 3.1 calls
+(`signature`, `squiggly line`); `sam-api` keeps the old behaviour, `local` and `off` never call
+the API and refuse images they can't fully check.
+
+| Fictional set, `POST /v1/mask/image` with OCR | SAM calls / image | p50 | p95 | Portrait leak | Signature recall |
+|---|---:|---:|---:|---:|---:|
+| `sam-api` (before) | 5 | 7.2 s | 8.1 s | 0.0 % | 100.0 % |
+| **`hybrid`** (now) | **2** | **3.8 s** | **5.0 s** | 0.0 % | 100.0 % |
+
+- **The call count was 5, not 4.** The served pipeline also asked SAM for `stamp`, whose regions
+  are `keep` (left visible). The hybrid mode only segments types whose policy is not `keep`.
+- **Measured fairly on a busy laptop:** both modes alternating per image, live SAM, 3 rounds,
+  medians. The image still leaves the machine for the signature prompts, so this is a latency
+  and cost win, not a privacy one.
+- **Fail closed:** without OpenCV or the model the hybrid mode warns and sends faces to SAM
+  (still masked); with no API key either, images are refused. The Docker image now ships OpenCV
+  headless and the pinned, checksum-verified YuNet file (+160 MB unpacked; the CI size budget
+  went from 375 to 525 MB).
+- **Not re-measured:** the 65 official specimens, whose images were no longer on the machine;
+  LAB-1229's runs on them have YuNet's portrait leak at 10.8 % against SAM's 47.7 %.
+- **Cost:** $0. About 620 SAM 3.1 calls on free Meta API credits.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
