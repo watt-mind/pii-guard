@@ -8,6 +8,7 @@ It writes:
   optional part commented and pointing at the German pack for a worked example;
 - ``<dest>/<code>/rules.py``: empty ``EVERYWHERE`` / ``RULES`` and a commented example rule;
 - ``<dest>/<code>/prompt.md``: generic LLM notes to replace with the language's own;
+- ``<dest>/<code>/cues.tsv``: cue words for context-cued numbers, commented examples only;
 - ``<fixtures>/<code>-smoke.jsonl.example``: one fictional document in the fixture format;
 - optionally ``<tests>/test_<code>_pack.py``: a test hook running the conformance suite (for
   a pack in its own distribution; inside this repository ``tests/languages`` already runs it
@@ -71,6 +72,7 @@ def pack() -> LanguagePack:
         # word_boundary=True,  # False for scripts written without spaces between words
         # lexicons=LexiconSpec(...),  # name and place lists (see languages/hu/__init__.py)
         # captions=files(__name__).joinpath("captions.tsv"),  # ID card field captions
+        # cues=files(__name__).joinpath("cues.tsv"),  # cue words before numbers (cues.tsv)
     )
 '''
 
@@ -122,6 +124,20 @@ def test_{ident}_pack_conforms() -> None:
 '''
 
 
+_CUES = """# Cue words for context-cued numbers (pii_guard/languages/cues.py; docs/languages.md).
+# cue <TAB> entity type of the number right after it (PHONE, BANK_ACCOUNT, ID_DOCUMENT ...),
+# or "-" for a cue naming a number that is not personal data (an order or invoice number):
+# it ends the window, so that number is never masked. Case and accents are ignored; a space
+# also matches a hyphen or nothing; a trailing "*" lets the word take suffixes. Uncomment
+# the pack's ``cues=`` line in __init__.py once there is a line here.
+# Examples (languages/de/cues.tsv is complete):
+# phone\tPHONE
+# credit card\tBANK_ACCOUNT
+# passport\tID_DOCUMENT
+# order number\t-
+"""
+
+
 def _example_line(code: str) -> str:
     text = "Example: write to Sample Person at sample.person@example.com."
     name, email = "Sample Person", "sample.person@example.com"
@@ -160,6 +176,7 @@ def new_pack(
         package / "__init__.py": _INIT.format(code=code, name=name),
         package / "rules.py": _RULES.format(code=code, name=name),
         package / "prompt.md": _PROMPT.format(name=name),
+        package / "cues.tsv": _CUES,
     }
     if fixtures_dir is not None:
         files[Path(fixtures_dir) / f"{code}-smoke.jsonl.example"] = _example_line(code)

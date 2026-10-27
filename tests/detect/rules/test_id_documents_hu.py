@@ -19,7 +19,9 @@ from pii_guard.types import EntityType as E
 
 @pytest.fixture(scope="module")
 def detector() -> RuleDetector:
-    return RuleDetector()
+    # The validated rules on their own: a cue word before a checksum-failing number masks it
+    # anyway (cued numbers, tests/languages/test_cues.py), which the look-alikes here exclude.
+    return RuleDetector(cued_numbers=False)
 
 
 def ids(detector: RuleDetector, text: str, language: str = "hu") -> list[tuple[str, float]]:

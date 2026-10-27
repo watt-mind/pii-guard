@@ -708,6 +708,57 @@ document number one character off). OCR words recorded from Tesseract, SAM off:
   `2026-10-27-demo-which-parties-{labels,opaque}-{live,mock}` in [benchmarks.md](benchmarks.md);
   the guide is [examples/README.md](../examples/README.md).
 
+### 28. Numbers after a cue word are masked even when their checksum fails (2026-10-27)
+
+PR [#51](https://github.com/watt-mind/pii-guard/pull/51), LAB-1170.
+
+Milestone 24 showed fast mode leaking 35–40 % on the public Ai4Privacy sample, mostly numbers:
+about 90 % of its card, tax and TAJ numbers fail their checksums and its phone numbers use
+plans that don't exist, while the rules validate both on purpose so that order numbers and
+amounts stay visible. Decision (owner's autonomy rule): keep validation, and add one rule
+that trusts the text when it says what a number is. Each language pack now ships a
+`cues.tsv` (`TAJ`, `adóazonosító`, `kártyaszám`, `passport`, `Steuer-ID`, `IBAN`, `telefon` ...)
+and a run of the cued type's shape right after a cue is masked at score 0.6, below every
+validated hit. `-` cues (`rendelésszám`, `invoice no.`, `Bestellnummer`, `and`) end the
+window, and a new negative set (`eval/fixtures/negative/`, 32 documents of order and invoice
+numbers, amounts, dates, postcodes and references without a cue) must stay unmasked.
+
+| Leak / over-masking, % (pooled) | Rules, before | after | Fast, before | after |
+|---|---:|---:|---:|---:|
+| Smoke (hu/en/de, 51 docs) | 41.6 / 0.0 | 41.6 / 0.0 | 0.6 / 0.6 | 0.6 / 0.6 |
+| Synth sample (hu/en, 30 docs) | 43.1 / 0.0 | 43.1 / 0.0 | 0.0 / 1.1 | 0.0 / 1.1 |
+| `hu-company-names` (44 docs) | 2.5 / 0.0 | 2.5 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+| **Ai4Privacy** (hu/en/de, 600 docs) | 73.5 / 0.2 | **63.7 / 0.1** | 38.0 / 14.1 | **28.2 / 12.6** |
+
+Fast mode on Ai4Privacy per language: `hu` 40.4 → 33.8 %, `en` 34.8 → 26.0 %, `de`
+39.2 → 24.4 %; F1 70.0 → 76.8. Per-type leak (same in both modes: the NER has no number types):
+
+| Ai4Privacy, leak % | `hu` | `en` | `de` |
+|---|---:|---:|---:|
+| `PHONE` | 73.9 → 45.5 | 41.2 → 15.3 | 45.3 → 20.3 |
+| `NATIONAL_ID_HU_TAX` | 97.6 → 75.6 | - | - |
+| `NATIONAL_ID_HU_TAJ` | 90.5 → 78.6 | - | - |
+| `BANK_ACCOUNT` | 93.1 → 86.2 | 97.6 → 78.0 | 88.4 → 51.2 |
+| `ID_DOCUMENT` | 51.0 → 44.2 | 83.4 → 61.5 | 94.9 → 55.8 |
+
+- **No new over-masking:** every smoke, synth and company-names scorecard is identical, and
+  on the public set every new span lands on a labelled value of the same type (over-masking
+  falls because the masked total grows). The 1-point budget the ticket set was not touched,
+  so `PII_GUARD_RULES_CUED_NUMBERS` defaults **on**.
+- **What is left is mostly uncued.** Most remaining misses stand in running text with
+  nothing naming them ("a 6232737036963178 és a 338 542 225"); masking those would mean
+  masking every long number, which is the order-number trade-off the rules exist to avoid.
+  Strict mode (the LLM pass) remains the answer there (3.9 %).
+- **Latency:** the cues compile into one trie-shaped pattern; rules-only p50 0.23 → 0.25 ms
+  on smoke. A first version, a plain alternation of the 148 cues, made the rules about 10×
+  slower (synth sample p50 1.4 → 14 ms); its after-runs showed it and were discarded.
+- **Adding a language:** a pack lists cue words only; value shapes are shared per type, the
+  conformance suite validates the file and the scaffold writes a template
+  ([languages.md](languages.md#3-rules)).
+- **Cost:** $0, local runs (NER on Apple MPS, machine under unrelated load). Source: run
+  records `2026-10-27-cued-numbers-{before,after}-{smoke,synth-sample,company-names,ai4privacy}-{rules,fast}`
+  in [benchmarks.md](benchmarks.md).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

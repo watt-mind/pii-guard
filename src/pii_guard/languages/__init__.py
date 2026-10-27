@@ -161,6 +161,11 @@ class LanguagePack:
         caption whose value is not personal data), so the value printed next to ``Név`` or
         ``Date of birth`` on an ID card is masked; ``None``: this language's captions are not
         recognised in images.
+
+    Cued numbers (``languages/cues.py``)
+        ``cues``: a ``cues.tsv`` resource (``cue<TAB>ENTITY_TYPE``, ``-`` for a cue that names
+        something else, such as an order number), so a number right after ``TAJ`` or
+        ``passport`` is masked even when its checksum fails; ``None``: no cue words.
     """
 
     code: str
@@ -176,6 +181,7 @@ class LanguagePack:
     word_boundary: bool = True
     lexicons: LexiconSpec | None = None
     captions: Traversable | None = None
+    cues: Traversable | None = None
 
     def __repr__(self) -> str:
         return (

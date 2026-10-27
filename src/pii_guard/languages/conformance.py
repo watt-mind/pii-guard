@@ -154,6 +154,7 @@ def check_structure(pack: LanguagePack) -> list[Finding]:
     findings += _check_surface_forms(pack)
     findings += _check_lexicons(pack)
     findings += _check_captions(pack)
+    findings += _check_cues(pack)
     if not pack.smoke_fixtures:
         findings.append(
             _error(
@@ -383,6 +384,35 @@ def _check_captions(pack: LanguagePack) -> list[Finding]:
         return [_error("structure.captions", f"captions.tsv is invalid: {exc}")]
     if not any(c.entity_type is not None for c in captions):
         return [_error("structure.captions", "captions.tsv has no personal-data caption")]
+    return []
+
+
+def _check_cues(pack: LanguagePack) -> list[Finding]:
+    if pack.cues is None:
+        return [
+            _info(
+                "structure.cues",
+                "no cue words (numbers that fail their checksum are masked only by the "
+                "other packs' cues and the model detectors)",
+            )
+        ]
+    if not isinstance(pack.cues, Traversable):
+        return [_error("structure.cues", "cues must be a resource (importlib.resources)")]
+    from pii_guard.languages.cues import load_cues
+
+    try:
+        cues = load_cues(pack.cues, pack.code)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        return [_error("structure.cues", f"cues.tsv is invalid: {exc}")]
+    if not any(c.entity_type is not None for c in cues):
+        return [_error("structure.cues", "cues.tsv has no cue for a personal-data type")]
+    if not any(c.entity_type is None for c in cues):
+        return [
+            _warning(
+                "structure.cues",
+                "cues.tsv has no '-' cue (order or invoice numbers that end a cue's window)",
+            )
+        ]
     return []
 
 

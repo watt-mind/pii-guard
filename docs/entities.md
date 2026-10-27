@@ -55,6 +55,16 @@ dates of birth come from the NER and LLM passes in every language.
 
 Payment cards use `BANK_ACCOUNT` until the taxonomy has a card type of its own.
 
+**Cued numbers** (all scopes, `PII_GUARD_RULES_CUED_NUMBERS`, default on). A digit or
+alphanumeric run right after a strong cue word from a pack's `cues.tsv` (`TAJ`,
+`adóazonosító`, `kártyaszám`, `passport`, `Steuer-ID`, `IBAN`, `telefon` ...) is masked as the
+cued type even when its checksum fails or its phone numbering plan is unknown, at score 0.6
+(validated hits score 0.7–0.99 and win any overlap). The value must have the type's shape
+(phone 7–15 digits, card or account 12–34 characters, tax ID 10–11 digits, TAJ 9 digits,
+document numbers 6–20 letters and digits with at least two digits); dates, amounts and
+numbers after an order, invoice or reference cue are never masked
+([languages.md](languages.md#3-rules)). Measured in [journey.md](journey.md) (milestone 28).
+
 ### Hungarian (`hu`)
 
 | Identifier | Type | Validation | Scope |

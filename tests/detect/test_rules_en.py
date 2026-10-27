@@ -43,7 +43,9 @@ AMEX = make_card("37000000000000")  # 15 digits
 
 @pytest.fixture(scope="module")
 def detector() -> RuleDetector:
-    return RuleDetector()
+    # The validated rules on their own: a cue word before a checksum-failing number masks it
+    # anyway (cued numbers, tests/languages/test_cues.py), which the look-alikes here exclude.
+    return RuleDetector(cued_numbers=False)
 
 
 def found(detector: RuleDetector, text: str, language: str = "en") -> list[tuple[EntityType, str]]:
