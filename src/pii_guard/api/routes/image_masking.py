@@ -27,8 +27,9 @@ hair and ears visible. The reported box is the grown one, the area actually cove
 Overlapping regions of the same type and source (SAM's ``signature`` and ``squiggly line``
 prompts can find the same scribble) are merged into their union, which is never smaller.
 
-Fail closed (ADR 0006): a SAM, OCR or detector failure raises
-:class:`~pii_guard.types.DetectionError`; a masking failure raises
+Fail closed (ADR 0006): no OCR engine refuses the image (:func:`require_ocr`, 503
+``ocr_unavailable``) unless ``PII_GUARD_IMAGE_REQUIRE_OCR=false``; a SAM, OCR or detector
+failure raises :class:`~pii_guard.types.DetectionError`; a masking failure raises
 :class:`~pii_guard.types.MaskingError`. The original image is never returned, and the masked
 one is re-encoded from pixels (no metadata). Errors and logs carry types and counts only.
 """
@@ -62,11 +63,13 @@ __all__ = [
     "ImageMaskOutcome",
     "ImageMasker",
     "InvalidImageError",
+    "OcrUnavailableError",
     "PolicedRegion",
     "Render",
     "UnsupportedImageError",
     "decode_base64_image",
     "default_ocr_engine",
+    "require_ocr",
     "sniff_media_type",
 ]
 
@@ -102,6 +105,13 @@ class InvalidImageError(PiiGuardError):
 
     code = "invalid_image"
     status_code = 422
+
+
+class OcrUnavailableError(PiiGuardError):
+    """No OCR engine, so the text in an image can't be checked (``image_require_ocr``)."""
+
+    code = "ocr_unavailable"
+    status_code = 503
 
 
 def sniff_media_type(data: bytes) -> str:
@@ -215,6 +225,20 @@ class AnalyzerDetector:
 def default_ocr_engine() -> OcrEngine | None:
     """Tesseract (``hun+eng``) if ``pytesseract`` and the binary are installed, else ``None``."""
     return TesseractOcr() if tesseract_available() else None
+
+
+def require_ocr(ocr: OcrEngine | None, *, required: bool) -> None:
+    """Fail closed (ADR 0006) when OCR is required but there is no engine: without one the
+    text in an image (a TAJ, a name) would reach the upstream unchecked.
+
+    Raises :class:`OcrUnavailableError` (503 ``ocr_unavailable``). ``required=False``
+    (``PII_GUARD_IMAGE_REQUIRE_OCR=false``) accepts SAM-only masking."""
+    if required and ocr is None:
+        raise OcrUnavailableError(
+            "OCR is unavailable (Tesseract is not installed), so text in the image can't be "
+            "checked; install it (docs/operations.md) or set PII_GUARD_IMAGE_REQUIRE_OCR=false "
+            "to mask images with SAM only"
+        )
 
 
 class ImageMasker:

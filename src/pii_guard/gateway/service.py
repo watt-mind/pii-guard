@@ -43,7 +43,12 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
 from pii_guard.api.deps import PayloadTooLargeError
-from pii_guard.api.routes.image_masking import ImageMasker, ImageMaskOutcome, default_ocr_engine
+from pii_guard.api.routes.image_masking import (
+    ImageMasker,
+    ImageMaskOutcome,
+    default_ocr_engine,
+    require_ocr,
+)
 from pii_guard.config import Settings
 from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.gateway.cache import DetectionCache
@@ -474,6 +479,8 @@ class Gateway:
         placeholder labels, also add each image's transcript and summary after it."""
         masker = self.image_masker(detector)
         stats.image_ocr = masker.ocr is not None
+        # No OCR: refuse (503 ocr_unavailable) unless explicitly opted out; nothing is sent.
+        require_ocr(masker.ocr, required=self.settings.image_require_ocr)
         render = self.settings.image_render
         started = time.perf_counter()
 

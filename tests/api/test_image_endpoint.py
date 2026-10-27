@@ -135,9 +135,14 @@ def make_app(
     sam: SamStub | None = None,
     ocr: object = "fake",
     policy_overrides: str | None = None,
+    require_ocr: bool = True,
     **state: Any,
 ) -> FastAPI:
-    settings = Settings(tenant_key=TEST_TENANT_KEY, policy_overrides=policy_overrides)
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY,
+        policy_overrides=policy_overrides,
+        image_require_ocr=require_ocr,
+    )
     app = create_app(settings)
     app.state.sam_client = (sam or SamStub()).client()
     app.state.ocr_engine = FakeOcr() if ocr == "fake" else ocr
@@ -273,8 +278,26 @@ def test_output_is_reencoded_without_metadata(client: TestClient) -> None:
     assert b"fictional-secret-marker" not in base64.b64decode(response.json()["image"])
 
 
-def test_without_ocr_only_sam_runs_and_the_response_says_so() -> None:
-    with TestClient(make_app(ocr=None)) as http:
+def test_without_ocr_the_image_is_refused_by_default() -> None:
+    """Fail closed (ADR 0006, LAB-1209): no Tesseract means the TAJ on the card can't be
+    found, so the image is refused before SAM runs, not returned with its text visible."""
+    sam = SamStub()
+    with TestClient(make_app(sam=sam, ocr=None)) as http:
+        response = post_png(http)
+    assert response.status_code == 503, response.text
+    body = response.json()
+    assert body["error"]["code"] == "ocr_unavailable"
+    assert "PII_GUARD_IMAGE_REQUIRE_OCR" in body["error"]["message"]
+    assert "image" not in body
+    assert sam.prompts == []
+
+
+def test_require_ocr_is_on_by_default() -> None:
+    assert Settings(tenant_key=TEST_TENANT_KEY).image_require_ocr is True
+
+
+def test_without_ocr_and_opted_out_only_sam_runs_and_the_response_says_so() -> None:
+    with TestClient(make_app(ocr=None, require_ocr=False)) as http:
         body = post_png(http).json()
     assert body["analysis"]["ocr"] == {
         "ran": False,

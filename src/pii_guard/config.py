@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     # Images (POST /v1/mask/image and the gateway): "labels" prints each covered region's
     # session placeholder and returns a masked transcript + summary; "opaque": solid boxes.
     image_render: Literal["labels", "opaque"] = "labels"
+    # Fail closed without OCR (ADR 0006): with no OCR engine (Tesseract) an image's text can't
+    # be checked, so image parts are refused with 503 ocr_unavailable. False forwards them
+    # masked by SAM only, with X-PII-Guard-Image-OCR: off (text in the image unchecked).
+    image_require_ocr: bool = True
 
     # Model endpoints.
     llm_detector_url: str | None = None

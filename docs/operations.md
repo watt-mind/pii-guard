@@ -107,6 +107,18 @@ starts the same stack in containers: `mock-upstream`, `demo-api` on
 server binds `0.0.0.0`, so the traffic log can only be `masked` there (see below). Send the demo
 traffic with `uv run python scripts/demo_traffic.py --url http://127.0.0.1:8788`.
 
+**OCR.** The image installs Tesseract with the Hungarian, English and German data
+(`tesseract-ocr-hun`/`-eng`/`-deu`/`-osd`) and the `ocr` extra (`pytesseract`), so the text in
+inline images (a TAJ, a name) is read and masked. That adds about 115 MB (the apt layer; the
+image grew from about 269 MB to 429 MB in `docker image ls` on arm64). Without an OCR engine,
+image parts are refused with `503 ocr_unavailable` (fail closed, ADR 0006): set
+`PII_GUARD_IMAGE_REQUIRE_OCR=false` only if SAM-only masking is acceptable, which leaves text in
+images unchecked (`X-PII-Guard-Image-OCR: off`). The container healthcheck checks `/healthz`
+and OCR availability, and prints `ocr on|off` (`docker inspect --format
+'{{json .State.Health}}' <container>`). For `make demo` outside Docker: `brew install
+tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
+`uv sync --extra ocr`; the banner says whether OCR is on.
+
 ## Traffic log
 
 Every call to `POST /v1/chat/completions` produces one event, kept **in memory only**, when the

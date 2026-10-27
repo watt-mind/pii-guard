@@ -63,6 +63,7 @@ from pii_guard.api.routes.image_masking import (
     UnsupportedImageError,
     decode_base64_image,
     default_ocr_engine,
+    require_ocr,
 )
 from pii_guard.policy import BlockedEntityError, Policy
 from pii_guard.types import PiiGuardError
@@ -319,6 +320,7 @@ async def mask_image_endpoint(
     if len(data) > max_image_bytes(request):
         raise PayloadTooLargeError(f"image is larger than {max_image_bytes(request)} bytes")
     masker = get_image_masker(request)
+    require_ocr(masker.ocr, required=request.app.state.settings.image_require_ocr)
     lang = get_language(request, options.language or language)
     render, vault = _render_and_vault(request, options.render)
     session: VaultSession | None = None
