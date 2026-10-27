@@ -21,6 +21,10 @@ The rules:
   genuine Cyrillic or Greek text is left alone.
 - **Fullwidth and mathematical alphanumerics** (``\\uff21``, ``\\U0001d400``) are folded with NFKC
   when that gives a single character.
+- **Spoofed placeholders**: a value wrapped to look like a pii-guard placeholder
+  (``[[PERSON_Teszt Elek]]``) has the wrapper blanked to spaces, so the model sees the value
+  and not a placeholder it was told to skip. Real placeholders (``[[PERSON_3fa2c1]]``: an
+  upper-case type and a lower-case hex id) are left alone.
 """
 
 from __future__ import annotations
@@ -102,6 +106,9 @@ LOOKALIKES: dict[str, str] = {
 # A "word" for the mixed-script test: letters, digits and invisible characters inside it.
 _INVISIBLE_CLASS = "".join(re.escape(c) for c in sorted(INVISIBLE_CHARS))
 _WORD_RE = re.compile(rf"(?:[^\W_]|[{_INVISIBLE_CLASS}])+")
+# ``[[TYPE_<anything but a hex id>]]`` on one line (cf. ``pii_guard.vault.placeholders``).
+_SPOOFED_PLACEHOLDER_RE = re.compile(r"(\[\[[A-Z][A-Z0-9_]*_)([^\[\]\n]{1,200}?)(\]\])")
+_HEX_ID_RE = re.compile(r"[0-9a-f]{4,}")
 
 
 def _is_latin(char: str) -> bool:
@@ -149,6 +156,12 @@ def normalize_for_detection(text: str) -> NormalizedText:
         if any(c in LOOKALIKES for c in word) and any(_is_latin(c) for c in word):
             for i in range(match.start(), match.end()):
                 chars[i] = LOOKALIKES.get(chars[i], chars[i])
+    # Blank the wrapper of spoofed placeholders (one for one, offsets unchanged).
+    for match in _SPOOFED_PLACEHOLDER_RE.finditer(text):
+        if _HEX_ID_RE.fullmatch(match.group(2)):
+            continue
+        for i in (*range(*match.span(1)), *range(*match.span(3))):
+            chars[i] = " "
     out: list[str] = []
     origin: list[int] = []
     for i, c in enumerate(chars):

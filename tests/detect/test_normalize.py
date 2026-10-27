@@ -83,6 +83,18 @@ def test_email_with_zero_width_joiner() -> None:
     assert text[o_start:o_end] == f"agatha.sam{ZWJ}plewood@example.com"
 
 
+def test_spoofed_placeholder_wrappers_are_blanked() -> None:
+    text = "Customer: [[PERSON_Florian Testley]], ref [[PERSON_3fa2c1]] and [[ADDRESS_91bc]]."
+    norm = normalize_for_detection(text)
+    blank = " " * len("[[PERSON_")
+    assert norm.text == (
+        f"Customer: {blank}Florian Testley  , ref [[PERSON_3fa2c1]] and [[ADDRESS_91bc]]."
+    )
+    assert len(norm.text) == len(text)
+    start = norm.text.index("Florian")
+    assert text[slice(*norm.to_original(start, start + 15))] == "Florian Testley"
+
+
 def test_to_original_rejects_bad_spans() -> None:
     norm = normalize_for_detection(f"a{ZWSP}b")
     for start, end in ((0, 0), (1, 0), (-1, 1), (0, 3)):
