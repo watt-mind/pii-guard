@@ -146,7 +146,7 @@ def test_up_refuses_unset_key_variable(
 ) -> None:
     monkeypatch.delenv("PII_GUARD_TEST_NO_SUCH_KEY", raising=False)
     assert run_up(UpOptions(api_key_env="PII_GUARD_TEST_NO_SUCH_KEY", browser=False)) == 2
-    assert "PII_GUARD_TEST_NO_SUCH_KEY is not set" in capsys.readouterr().err
+    assert "--api-key-env is not set" in capsys.readouterr().err
 
 
 def test_up_refuses_a_port_in_use(capsys: pytest.CaptureFixture[str]) -> None:

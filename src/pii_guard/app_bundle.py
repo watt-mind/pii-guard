@@ -407,7 +407,8 @@ def run_up(opts: UpOptions) -> int:
     if opts.api_key_env:
         key = os.environ.get(opts.api_key_env)
         if not key:
-            print(f"pii-guard up: ${opts.api_key_env} is not set", file=sys.stderr)
+            # Not echoed back: the user just typed it, and nothing key-related is ever printed.
+            print("pii-guard up: the variable named by --api-key-env is not set", file=sys.stderr)
             return 2
         env["PII_GUARD_UPSTREAM_API_KEY"] = key
 
