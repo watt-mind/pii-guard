@@ -7,6 +7,8 @@ export interface InspectorInfo {
   detector?: string;
   score?: number;
   occurrences?: number;
+  /** False when the value was masked even though no placeholder could be linked to it. */
+  kept?: boolean;
 }
 
 interface Props {
@@ -24,9 +26,9 @@ export function Inspector({ info, hint }: Props) {
             <span aria-hidden="true" className={["size-2 rounded-full", metaFor(info.entityType).swatch].join(" ")} />
             {metaFor(info.entityType).label}
           </span>
-          <span>{info.placeholder ? <>masked as <code className="font-mono text-ink">{info.placeholder}</code></> : "kept (policy: keep)"}</span>
+          <span>{info.placeholder ? <>masked as <code className="font-mono text-ink">{info.placeholder}</code></> : info.kept === false ? "masked" : "kept (policy: keep)"}</span>
           {info.detector && <span>found by {detectorLabel(info.detector, { types: info.entityType ? [info.entityType] : [] })}</span>}
-          {info.score !== undefined && (
+          {info.score !== undefined && info.detector !== "demo" && (
             <span className="inline-flex items-center gap-1.5">
               confidence
               <span aria-hidden="true" className="inline-block h-1.5 w-12 overflow-hidden rounded-full bg-line">

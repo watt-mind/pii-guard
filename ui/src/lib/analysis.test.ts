@@ -53,3 +53,14 @@ describe("genericAnswer", () => {
     expect(text).toContain("Which of these should I look into?");
   });
 });
+
+describe("attachPlaceholders with a trimmed title", () => {
+  it("links the placeholder by overlap and keeps a mask-policy span masked", async () => {
+    const { attachPlaceholders, isKept } = await import("./analysis");
+    const span = { start: 0, end: 17, entityType: "PERSON" as const, score: 0.9, detector: "llm", placeholder: null, policy: "mask" as const };
+    const [linked] = attachPlaceholders([span], [{ placeholder: "[[PERSON_ab12]]", entityType: "PERSON", start: 4, end: 17 }]);
+    expect(linked!.placeholder).toBe("[[PERSON_ab12]]");
+    expect(isKept({ ...span })).toBe(false);
+    expect(isKept({ ...span, policy: undefined })).toBe(true);
+  });
+});

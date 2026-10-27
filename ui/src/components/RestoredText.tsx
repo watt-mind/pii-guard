@@ -8,10 +8,12 @@ interface Props {
   onActivate?: (key: string | null, anchor?: HTMLElement | null) => void;
   /** Index from which segments are new (animated) in a streaming run. */
   freshFrom?: number;
+  /** Outgoing text (your own message): its marks were masked, not restored. */
+  outgoing?: boolean;
 }
 
 /** What you got back: the model's answer with the real values put back, each restored value marked. */
-export function RestoredText({ segments, activeKey = null, onActivate, freshFrom = 0 }: Props) {
+export function RestoredText({ segments, activeKey = null, onActivate, freshFrom = 0, outgoing = false }: Props) {
   return (
     <div className="doc text-ink" data-testid="restored-text">
       {segments.map((seg, i) => {
@@ -40,7 +42,7 @@ export function RestoredText({ segments, activeKey = null, onActivate, freshFrom
             ].join(" ")}
           >
             {seg.text}
-            <span className="sr-only"> ({meta.label}, restored from {seg.placeholder})</span>
+            <span className="sr-only"> ({meta.label}, {outgoing ? "masked as" : "restored from"} {seg.placeholder})</span>
           </mark>
         );
       })}

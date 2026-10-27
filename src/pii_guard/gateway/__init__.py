@@ -14,6 +14,7 @@ from pii_guard.gateway.request import (
     collect_texts,
 )
 from pii_guard.gateway.service import (
+    ECHO_HEADER,
     LANGUAGE_HEADER,
     MODE_HEADER,
     REQUEST_ID_HEADER,
@@ -25,6 +26,7 @@ from pii_guard.gateway.service import (
 from pii_guard.gateway.stream import SseRestorer
 
 __all__ = [
+    "ECHO_HEADER",
     "LANGUAGE_HEADER",
     "MODE_HEADER",
     "REQUEST_ID_HEADER",

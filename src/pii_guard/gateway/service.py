@@ -51,7 +51,7 @@ from pii_guard.gateway.request import (
     collect_texts,
 )
 from pii_guard.gateway.restore import restore_completion, restore_text
-from pii_guard.gateway.stream import SseRestorer, error_event, iter_sse_data, sse_event
+from pii_guard.gateway.stream import DONE, SseRestorer, error_event, iter_sse_data, sse_event
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
@@ -62,6 +62,7 @@ from pii_guard.visual.ocr import OcrEngine
 from pii_guard.visual.sam import SamClient
 
 __all__ = [
+    "ECHO_HEADER",
     "LANGUAGE_HEADER",
     "MODE_HEADER",
     "REQUEST_ID_HEADER",
@@ -77,6 +78,9 @@ SESSION_HEADER = "X-PII-Guard-Session"
 REQUEST_ID_HEADER = "X-PII-Guard-Request-Id"
 MODE_HEADER = "X-PII-Guard-Mode"
 LANGUAGE_HEADER = "X-PII-Guard-Language"
+# Opt-in: "masked" echoes back what the upstream saw (the masked messages) and said (its
+# masked answer), for UIs that show the boundary. Masked text only, never the values.
+ECHO_HEADER = "X-PII-Guard-Echo"
 
 _SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _LANGUAGE_RE = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})?$")
@@ -251,6 +255,14 @@ class Gateway:
         if not _LANGUAGE_RE.match(raw.strip()):
             raise InvalidChatRequestError(f"{LANGUAGE_HEADER} must be a language tag like 'hu'")
         return raw.strip()
+
+    def _echo(self, headers: Mapping[str, str]) -> bool:
+        raw = headers.get(ECHO_HEADER)
+        if raw is None or raw.strip() == "":
+            return False
+        if raw.strip().lower() != "masked":
+            raise InvalidChatRequestError(f"{ECHO_HEADER} must be 'masked'")
+        return True
 
     def _session(self, headers: Mapping[str, str]) -> tuple[VaultSession, bool]:
         raw = headers.get(SESSION_HEADER)
@@ -493,6 +505,7 @@ class Gateway:
         mode = self._mode(headers)
         language = self._language(headers)
         trace.mode, trace.language = mode.value, language
+        echo = self._echo(headers)
         stats = RequestStats(mode=mode)
         trace.stats = stats
         collected = collect_texts(body)
@@ -538,6 +551,7 @@ class Gateway:
         payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
         if trace.payloads:
             trace.masked_request = payload
+        masked_messages = _masked_messages(body) if echo else None
         client = httpx.AsyncClient(
             timeout=httpx.Timeout(self.config.upstream_timeout, connect=10.0),
             transport=self._transport,
@@ -592,10 +606,16 @@ class Gateway:
                 raise UpstreamError("upstream returned a body that is not JSON") from None
             if not isinstance(answer, dict):
                 raise UpstreamError("upstream returned a body that is not a JSON object")
+            masked_answer = _masked_answer(answer) if echo else None
             report = restore_completion(session, answer)
             stats.unresolved = len(report.unresolved)
             self._seed_cache(session, language, detector, report.restored_spans, stats)
             out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
+            if echo:
+                answer["pii_guard"] = {
+                    "masked_messages": masked_messages,
+                    "masked_answer": masked_answer,
+                }
             stats.log("ok")
             if trace.full:
                 trace.answer = answer
@@ -626,7 +646,30 @@ class Gateway:
 
         async def events() -> AsyncIterator[bytes]:
             outcome = "ok"
+            echoed_answer = False
+
+            def answer_event() -> bytes:
+                content = restorer.masked_content()
+                return sse_event(
+                    json.dumps(
+                        {
+                            "object": "pii_guard.masked_answer",
+                            "choices": [
+                                {"index": i, "content": content[i]} for i in sorted(content)
+                            ],
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+
             try:
+                if echo:
+                    yield sse_event(
+                        json.dumps(
+                            {"object": "pii_guard.masked_request", "messages": masked_messages},
+                            ensure_ascii=False,
+                        )
+                    )
                 async for data in iter_sse_data(timed_lines()):
                     unmasking = time.perf_counter()
                     outs = restorer.process(data)
@@ -634,12 +677,18 @@ class Gateway:
                     trace.scan_usage(data)
                     for out in outs:
                         timer.mark_first_event()
+                        if out == DONE and echo and not echoed_answer:
+                            echoed_answer = True
+                            yield answer_event()
                         yield sse_event(out)
                 unmasking = time.perf_counter()
                 outs = restorer.finish()
                 timer.add("unmask", time.perf_counter() - unmasking)
                 for out in outs:
                     yield sse_event(out)
+                if echo and not echoed_answer:
+                    echoed_answer = True
+                    yield answer_event()
             except Exception as exc:
                 # Fail closed: stop the stream with an error event, no exception text.
                 outcome = f"stream_error:{type(exc).__name__}"
@@ -670,6 +719,48 @@ class Gateway:
             StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),
             stats,
         )
+
+
+def _flatten(content: object) -> str:
+    """A message's text content; non-text parts (masked images) as a short marker."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        out = []
+        for part in content:
+            if isinstance(part, dict) and part.get("type") == "text":
+                out.append(str(part.get("text", "")))
+            elif isinstance(part, dict):
+                out.append(f"[{part.get('type', 'part')}]")
+        return "\n".join(out)
+    return ""
+
+
+def _masked_messages(body: Mapping[str, Any]) -> list[dict[str, str]]:
+    """The forwarded (masked) messages, role and text only, for :data:`ECHO_HEADER`."""
+    out = []
+    for message in body.get("messages") or []:
+        if isinstance(message, dict):
+            out.append(
+                {"role": str(message.get("role", "")), "content": _flatten(message.get("content"))}
+            )
+    return out
+
+
+def _masked_answer(answer: Mapping[str, Any]) -> list[dict[str, object]]:
+    """The upstream's answer before restoring, per choice, for :data:`ECHO_HEADER`."""
+    out: list[dict[str, object]] = []
+    for position, choice in enumerate(answer.get("choices") or []):
+        if isinstance(choice, dict):
+            message = choice.get("message")
+            content = message.get("content") if isinstance(message, dict) else None
+            out.append(
+                {
+                    "index": choice.get("index", position),
+                    "content": content if isinstance(content, str) else "",
+                }
+            )
+    return out
 
 
 async def _read_limited(response: httpx.Response) -> bytes:

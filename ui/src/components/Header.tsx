@@ -2,11 +2,11 @@ import type { KeyboardEvent } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 
-export type Screen = "playground" | "roundtrip" | "images" | "benchmarks";
+export type Screen = "playground" | "chat" | "images" | "benchmarks";
 
 const SCREENS: { id: Screen; step: string; label: string }[] = [
-  { id: "playground", step: "1", label: "Playground" },
-  { id: "roundtrip", step: "2", label: "Round trip" },
+  { id: "playground", step: "1", label: "Mask" },
+  { id: "chat", step: "2", label: "Chat" },
   { id: "images", step: "3", label: "Images" },
   { id: "benchmarks", step: "4", label: "Benchmarks" },
 ];
@@ -106,7 +106,13 @@ function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine:
   const reason = engineReason(state);
   const status = state.status;
   const apiLabel =
-    status.state === "online" ? `API v${status.version}` : status.state === "checking" ? "API …" : "API offline";
+    status.state === "online"
+      ? engine === "mock"
+        ? `API v${status.version} · not in use`
+        : `API v${status.version}`
+      : status.state === "checking"
+        ? "API …"
+        : "API offline";
   const dot =
     status.state === "online" ? "bg-guard" : status.state === "checking" ? "bg-faint animate-pulse" : "bg-danger";
 

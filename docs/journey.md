@@ -545,6 +545,16 @@ below what it reads, so before this it returned no caption to pair with.
   `--no-captions --ocr-upscale 0`. Source: run records `2026-10-27-visual-{fictional,specimens}-rules{,-llm}{,-captions}`
   in [benchmarks.md](benchmarks.md) and the reports in `eval/results/visual/*-captions*.md`.
 
+### 23. The demo UI, polished by critique rounds (2026-10-27)
+
+LAB-1151 (with LAB-1135, LAB-1132, LAB-1154, LAB-1155, LAB-1159).
+
+The demo became four steps: Mask (with a language choice and pre-loaded known values), Chat
+through the real gateway (a new opt-in `X-PII-Guard-Echo: masked` header returns what the
+model saw and said, masked), Images and Benchmarks (a one-sentence headline). Five rounds of an
+end-user critic at 375 and 1280 px, light and dark, found 10 major issues, all fixed in the
+UI; backend findings were filed as tickets. Screenshots: [docs/assets/demo](assets/demo/).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

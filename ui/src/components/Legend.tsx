@@ -7,10 +7,12 @@ interface Props {
   kept?: ReadonlySet<EntityType>;
   /** Highlight a type (e.g. the one under the cursor). */
   activeType?: EntityType | null;
+  /** How many spans came from pre-loaded known values. */
+  known?: number;
 }
 
 /** Entity types present in the current document, with their colour and policy. */
-export function Legend({ counts, kept: keptTypes, activeType = null }: Props) {
+export function Legend({ counts, kept: keptTypes, activeType = null, known = 0 }: Props) {
   const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   if (entries.length === 0) return null;
   return (
@@ -41,6 +43,13 @@ export function Legend({ counts, kept: keptTypes, activeType = null }: Props) {
           </li>
         );
       })}
+      {known > 0 && (
+        <li className="inline-flex items-center gap-1.5 rounded-full border border-guard/40 bg-guard-soft px-2.5 py-1 text-xs text-guard-ink">
+          <span className="rounded bg-surface px-1 text-[10px] font-semibold tracking-wide uppercase ring-1 ring-guard/40">known</span>
+          <span className="font-medium">from your known values</span>
+          <span className="tabular-nums">{known}</span>
+        </li>
+      )}
     </ul>
   );
 }

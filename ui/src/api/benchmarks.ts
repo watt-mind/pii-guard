@@ -210,3 +210,37 @@ export function documentCount(info: FixtureSetInfo | undefined, lang: LanguageFi
   if (lang !== "all") return info.documents[lang] ?? null;
   return Object.values(info.documents).reduce((a, b) => a + b, 0);
 }
+
+export interface HeadlineSide {
+  system: string;
+  label: string;
+  leak: number;
+  p50: number | null;
+  hardware: string | null;
+}
+
+/**
+ * The one-sentence result for a set and language: the lowest-leak pii-guard configuration
+ * against the lowest-leak open-source tool (ties go to the faster one). Null when either side
+ * has no result.
+ */
+export function headline(index: BenchmarkIndex, set: string, lang: LanguageFilter): { ours: HeadlineSide; theirs: HeadlineSide } | null {
+  const best = (family: Family): HeadlineSide | null => {
+    let out: HeadlineSide | null = null;
+    for (const s of index.snapshots) {
+      const sys = index.systems[s.system];
+      if (s.fixture_set !== set || sys?.family !== family) continue;
+      const m = pick(s, lang);
+      if (!m || m.leak === null) continue;
+      const p50 = m.detect_p50_ms;
+      const better = !out || m.leak < out.leak || (m.leak === out.leak && (p50 ?? Infinity) < (out.p50 ?? Infinity));
+      if (!better) continue;
+      const run = index.runs.find((r) => s.run_ids.includes(r.run_id) && r.hardware);
+      out = { system: s.system, label: sys.short_label || sys.label, leak: m.leak, p50, hardware: run?.hardware ?? null };
+    }
+    return out;
+  };
+  const ours = best("pii-guard");
+  const theirs = best("comparison");
+  return ours && theirs ? { ours, theirs } : null;
+}

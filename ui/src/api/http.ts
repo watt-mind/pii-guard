@@ -6,6 +6,8 @@ import type {
   HealthResponse,
   ImageMaskRequest,
   ImageMaskResponse,
+  KnownValue,
+  KnownValuesResponse,
   MaskRequest,
   MaskResponse,
   UnmaskRequest,
@@ -119,6 +121,9 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpGuardClie
     analyze: (req: AnalyzeRequest) => request<AnalyzeResponse>("POST", "/v1/analyze", req),
     mask: (req: MaskRequest) => request<MaskResponse>("POST", "/v1/mask", req),
     unmask: (req: UnmaskRequest) => request<UnmaskResponse>("POST", "/v1/unmask", req),
+    createSession: (known_values: KnownValue[]) => request<KnownValuesResponse>("POST", "/v1/sessions", { known_values }),
+    addKnownValues: (session_id: string, known_values: KnownValue[]) =>
+      request<KnownValuesResponse>("POST", `/v1/sessions/${encodeURIComponent(session_id)}/known-values`, { known_values }),
     maskImage: (req: ImageMaskRequest) =>
       request<ImageMaskResponse>(
         "POST",

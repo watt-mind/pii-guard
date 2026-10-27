@@ -38,9 +38,14 @@ function useWidth(fallback = 720) {
   return [ref, width] as const;
 }
 
+// Palette colours too dark to tell apart on the dark canvas get a theme variable (index.css).
+const DARK_ADJUSTED = new Set(["#882255", "#332288"]);
+
 /** Comparison tools are drawn in the theme's muted ink (hollow), pii-guard in its own colour. */
 function colorOf(info: SystemInfo | undefined): string {
-  return !info || info.family === "comparison" ? "var(--muted)" : info.color;
+  if (!info || info.family === "comparison") return "var(--muted)";
+  const c = info.color.toUpperCase();
+  return DARK_ADJUSTED.has(c) ? `var(--sys-${c.slice(1).toLowerCase()}, ${c})` : info.color;
 }
 
 export function Marker({ info, x = 0, y = 0, r = 6 }: { info: SystemInfo | undefined; x?: number; y?: number; r?: number }) {
@@ -140,7 +145,10 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
       rank(a) - rank(b) ||
       (a.metrics.detect_p50_ms ?? 0) - (b.metrics.detect_p50_ms ?? 0),
   );
+  // Dense charts label only the featured systems in the plot; the legend below names the rest.
+  const dense = pts.length > 7;
   const labels = byLeak.map((p) => {
+    if (dense && !p.info?.featured && !p.info?.default) return null;
     const text = `${p.info?.short_label ?? p.key} ${formatPct(p.metrics.leak)}`;
     const x = sx(p.metrics.detect_p50_ms!);
     const y = sy(p.metrics.leak ?? 0);
@@ -238,7 +246,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
           (l, i) =>
             l && (
               <g key={byLeak[i]!.key}>
-                {Math.abs(l.y - l.py) > 20 && <line x1={l.px} y1={l.py - 8} x2={l.x} y2={l.y + 3} stroke="var(--muted)" strokeWidth={1} />}
+                {Math.hypot(l.x - l.px, l.y - l.py) > 22 && <line x1={l.px} y1={l.py - 8} x2={l.x} y2={l.y + 3} stroke="var(--muted)" strokeWidth={1} />}
                 <text x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={600} fill="var(--ink)">
                   {l.text}
                 </text>
@@ -246,6 +254,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
             ),
         )}
       </svg>
+      {dense && <p className="mt-2 text-xs text-muted">Many systems: only the featured ones are labelled in the chart. Hover a marker, or see the list below.</p>}
       <ul className="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
         {pts.map((p) => (
           <li key={p.key} className="flex items-center gap-1.5">
@@ -405,7 +414,7 @@ export function LanguageBars({
                           {v !== null && (
                             <div
                               className={["h-full rounded-sm", LANG_BG[i % LANG_BG.length]].join(" ")}
-                              style={{ width: `${Math.max(v * 100, 0.8)}%` }}
+                              style={{ width: v > 0 ? `${Math.max(v * 100, 0.8)}%` : "0%" }}
                             />
                           )}
                         </div>

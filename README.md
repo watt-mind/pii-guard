@@ -207,6 +207,26 @@ and `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=minimal`. Which endpoint may see re
 Run the benchmark: `uv run pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --detectors rules`.
 Docker: `docker compose up --build`. All settings: [.env.example](.env.example).
 
+### Demo
+
+Four steps, all on fictional data (the UI runs at `http://localhost:5173`; tabs are deep
+links: `#mask`, `#chat`, `#images`, `#benchmarks`):
+
+1. **Mask.** Your document with every detected value highlighted, and what the model would
+   see. Pre-load **known values** (a customer record) and they are masked in any inflected form.
+2. **Chat.** The same document sent through the gateway to a real model (Muse Spark Open):
+   what you wrote, what the model received, what it answered, and what you got back.
+3. **Images.** Faces, signatures and ID numbers covered before the image leaves.
+4. **Benchmarks.** How many personal values each tool lets through, on the same documents.
+
+| Mask | Chat |
+|---|---|
+| ![Mask: a Hungarian contract with every personal value highlighted, and the placeholders the model sees](docs/assets/demo/1-mask.webp) | ![Chat: the contract sent through the gateway; the model received and answered with placeholders, the answer came back restored](docs/assets/demo/2-chat.webp) |
+| **Images** | **Benchmarks** |
+| ![Images: a fictional ID card with the face, signature and ID numbers blacked out](docs/assets/demo/3-images.webp) | ![Benchmarks: share of personal values let through, pii-guard against open-source tools](docs/assets/demo/4-benchmarks.webp) |
+
+At phone width: [Mask at 375 px](docs/assets/demo/5-mask-mobile.webp).
+
 ### Gateway: drop-in for any OpenAI-compatible client
 
 Point any OpenAI-compatible client at pii-guard instead of the provider. Every message is
@@ -266,6 +286,7 @@ for chunk in stream:
 | `X-PII-Guard-Session` | both | The conversation. Omit it to start one; the response carries it. Same session = same placeholders, and history is not detected again. Unknown or expired → 404. |
 | `X-PII-Guard-Mode` | request | `strict` (rules + LLM detector, the default) or `fast` (rules only, no model call). |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
+| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
 | `X-PII-Guard-Request-Id` | response | The call's id in the traffic log; with `PII_GUARD_SERVER_TIMING=true` a `Server-Timing` header gives the per-stage latency ([operations.md](docs/operations.md#timing)). |
 

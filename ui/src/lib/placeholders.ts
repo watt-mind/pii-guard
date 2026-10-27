@@ -150,3 +150,49 @@ export function alignRestored(
   }
   return cursor === unmasked.length ? segments : null;
 }
+
+/**
+ * Like {@link alignRestored}, for restored text whose seams may differ from the masked text:
+ * the gateway can re-inflect a suffix after a value (Hungarian vowel harmony), so a literal
+ * run may not survive byte for byte. Each placeholder's value runs up to the next literal
+ * run, found by its tail (its first few characters may have changed). Returns null only when
+ * a run can't be found at all.
+ */
+export function alignLoose(masked: string, unmasked: string): RestoredSegment[] | null {
+  const tokens = tokenize(masked);
+  const segments: RestoredSegment[] = [];
+  let cursor = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]!;
+    if (token.kind === "text") {
+      if (unmasked.startsWith(token.text, cursor)) {
+        segments.push({ kind: "text", text: token.text });
+        cursor += token.text.length;
+        continue;
+      }
+      return null;
+    }
+    // Swallow any directly following placeholders into this value (they can't be told apart).
+    let j = i + 1;
+    while (tokens[j]?.kind === "placeholder") j++;
+    const next = tokens[j];
+    let end: number;
+    if (next === undefined) {
+      end = unmasked.length;
+    } else {
+      const text = next.text;
+      // The suffix glued to the value (its leading letters) may have been re-inflected.
+      const suffix = /^\p{L}{0,6}/u.exec(text)?.[0].length ?? 0;
+      const anchorFrom = suffix < text.length ? suffix : 0;
+      const at = unmasked.indexOf(text.slice(anchorFrom), cursor);
+      if (at < 0) return null;
+      end = at;
+      // The changed head of the next run belongs to this value's suffix.
+      tokens[j] = { kind: "text", text: text.slice(anchorFrom) };
+    }
+    segments.push({ kind: "restored", text: unmasked.slice(cursor, end), placeholder: token.text, entityType: token.entityType });
+    cursor = end;
+    i = j - 1;
+  }
+  return cursor === unmasked.length ? segments : null;
+}

@@ -49,7 +49,7 @@ describe("Images screen", () => {
   it("is the third tab and reachable with the arrow keys", async () => {
     const user = userEvent.setup();
     render(<App api={offlineApi()} mock={createMockClient()} loadImage={loadImage} />);
-    await user.click(screen.getByRole("tab", { name: /round trip/i }));
+    await user.click(screen.getByRole("tab", { name: /chat/i }));
     await user.keyboard("{ArrowRight}");
     expect(screen.getByRole("tab", { name: /images/i })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel", { name: /images/i })).toBeVisible();
@@ -82,7 +82,7 @@ describe("Images screen", () => {
   it("tells a user who chose the demo engine with the API up to switch to Live API", async () => {
     localStorage.setItem("pii-guard:mode", "mock");
     const { user, panel } = await openImages(liveApi(vi.fn()));
-    await screen.findByText("API v0.1.0");
+    await screen.findByText(/^API v0.1.0/);
     const input = panel.querySelector<HTMLInputElement>("#image-upload")!;
     await user.upload(input, new File([new Uint8Array([0x89, 0x50])], "mine.png", { type: "image/png" }));
     expect(within(panel).getByText("Nothing has been sent yet")).toBeInTheDocument();
