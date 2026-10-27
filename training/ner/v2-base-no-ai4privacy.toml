@@ -1,0 +1,29 @@
+# NER v2 (LAB-1150): ablation, xlm-roberta-base trained without any Ai4Privacy rows. Wider label set (train.py TYPES_V2: v1 + EMAIL, PHONE,
+# ID_DOCUMENT, NATIONAL_ID_HU_TAX, NATIONAL_ID_HU_TAJ, BANK_ACCOUNT); spans of other types are
+# left out of the loss. Data: distillation corpus s11 (LAB-1128) + s13 (lexicon packs, written
+# and labelled by Muse Glimmer on Modal). Fictional / public synthetic data only.
+#   modal run training/distill/modal_train.py --config training/ner/v2-base-no-ai4privacy.toml --gpu A10G
+base_model = "FacebookAI/xlm-roberta-base"   # MIT licence
+train = [
+  "eval/generated/distill-s11/labelled/hu-distill-train.jsonl",
+  "eval/generated/distill-s11/labelled/en-distill-train.jsonl",
+  "eval/generated/distill-s13/labelled/hu-distill-train.jsonl",
+  "eval/generated/distill-s13/labelled/en-distill-train.jsonl",
+]
+dev = [
+  "eval/generated/distill-s13/labelled/hu-distill-dev.jsonl",
+  "eval/generated/distill-s13/labelled/en-distill-dev.jsonl",
+]
+out = "models/ner/pii-guard-ner-xlmr-base-v2-no-ai4privacy"
+teacher = "none"
+epochs = 4
+batch_size = 16
+lr = 5e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"
+other_types = "ignore"

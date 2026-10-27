@@ -63,16 +63,28 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 51 | 100.0% | 54.1% | 70.2% | 41.6% | 6.4% | 0.0% | 100.0% | 0.56 ms | 2026-10-27 | `484b7f1` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 51 | 98.5% | 98.5% | 98.5% | 0.6% | 2.9% | 0.6% | 100.0% | 72 ms | 2026-10-27 | `484b7f1` |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 51 | 98.5% | 98.5% | 98.5% | 0.6% | 2.9% | 0.6% | 100.0% | 26 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + Muse Spark Open (Baseten) † | 41 | 98.1% | 99.4% | 98.7% | 0.7% | 1.5% | 0.0% | 100.0% | 1.5 s* | 2026-10-27 | `9fad0fa` |
 | pii-guard rules + Muse Glimmer (low) † | 10 | 100.0% | 100.0% | 100.0% | 0.0% | 3.3% | 0.0% | 100.0% | 7.6 s | 2026-10-27 | `c759b54` |
 | pii-guard Muse Glimmer (low) † | 10 | 97.1% | 97.1% | 97.1% | 0.0% | 3.3% | 0.0% | 100.0% | 7.7 s | 2026-10-27 | `c759b54` |
 | pii-guard Muse Glimmer (medium) † | 10 | 84.6% | 97.1% | 90.4% | 0.0% | 3.3% | 11.8% | 100.0% | 13.1 s | 2026-10-27 | `c759b54` |
 | pii-guard rules + Muse Spark 1.3 † | 10 | 94.4% | 100.0% | 97.1% | 0.0% | 3.3% | 3.2% | 100.0% | 7.0 s | 2026-10-26 | `62b64fc` |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 51 | 94.4% | 92.8% | 93.6% | 8.1% | 4.6% | 5.7% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + NER (distilled base) † | 10 | 100.0% | 97.1% | 98.5% | 3.3% | 3.3% | 0.0% | 100.0% | 35 ms | 2026-10-27 | `c611f99` |
 | pii-guard rules + NER (fine-tuned) † | 10 | 80.0% | 94.1% | 86.5% | 3.3% | 6.7% | 16.2% | 100.0% | 14 ms | 2026-10-26 | `0ba3c1a` |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 51 | 88.7% | 90.7% | 89.7% | 1.2% | 1.7% | 6.2% | 100.0% | 16 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 51 | 90.0% | 96.4% | 93.1% | 0.0% | 2.3% | 7.2% | 100.0% | 81 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 51 | 98.0% | 98.5% | 98.2% | 1.2% | 2.9% | 1.1% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 51 | 89.0% | 92.3% | 90.6% | 1.2% | 2.9% | 5.9% | 100.0% | 14 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 51 | 97.0% | 99.5% | 98.2% | 0.6% | 1.2% | 1.1% | 100.0% | 1.9 s* | 2026-10-27 | `4f84c6a` |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 51 | 90.5% | 91.8% | 91.1% | 0.0% | 0.6% | 4.8% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 51 | 92.8% | 90.7% | 91.7% | 0.0% | 0.6% | 1.1% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 51 | 97.0% | 97.4% | 97.2% | 0.0% | 2.3% | 0.6% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 51 | 91.6% | 92.8% | 92.2% | 1.2% | 2.3% | 3.7% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + NER (zero-shot) † | 10 | 90.2% | 91.2% | 90.7% | 10.0% | 13.3% | 10.8% | 100.0% | 45 ms | 2026-10-26 | `0ba3c1a` |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 51 | 84.7% | 93.8% | 89.0% | 0.6% | 2.3% | 11.5% | 100.0% | 69 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 51 | 92.7% | 95.9% | 94.2% | 3.5% | 4.6% | 7.0% | 100.0% | 72 ms* | 2026-10-27 | `910a6a2` |
 | Presidio ‡ | 51 | 62.5% | 67.5% | 64.9% | 24.3% | 12.1% | 27.5% | — | 88 ms* | 2026-10-27 | `8944f96` |
 | LLM Guard ‡ | 51 | 61.5% | 46.9% | 53.2% | 45.1% | 8.1% | 36.7% | 100.0% | 110 ms* | 2026-10-27 | `8944f96` |
 | PrivAiTe ‡ | 51 | 51.2% | 59.8% | 55.2% | 12.7% | 9.8% | 25.8% | 98.0% | 170 ms* | 2026-10-27 | `8944f96` |
@@ -87,16 +99,28 @@ By language:
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 68.8% | 64.0% | 72.3% | 43.2% | 46.7% | 39.6% |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 100.0% | 98.5% | 97.9% | 0.0% | 0.0% | 0.9% |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 100.0% | 98.5% | 97.9% | 0.0% | 0.0% | 0.9% |
 | pii-guard rules + Muse Spark Open (Baseten) | — | 100.0% | 98.4% | — | 0.0% | 0.9% |
 | pii-guard rules + Muse Glimmer (low) | — | 100.0% | — | — | 0.0% | — |
 | pii-guard Muse Glimmer (low) | — | 97.1% | — | — | 0.0% | — |
 | pii-guard Muse Glimmer (medium) | — | 90.4% | — | — | 0.0% | — |
 | pii-guard rules + Muse Spark 1.3 | — | 97.1% | — | — | 0.0% | — |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 96.1% | 90.7% | 93.7% | 8.1% | 10.0% | 7.5% |
 | pii-guard rules + NER (distilled base) | — | 98.5% | — | — | 3.3% | — |
 | pii-guard rules + NER (fine-tuned) | — | 86.5% | — | — | 3.3% | — |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 91.7% | 88.8% | 89.3% | 0.0% | 0.0% | 1.9% |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 97.4% | 94.2% | 93.3% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 95.3% | 94.3% | 91.9% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 98.8% | 98.6% | 97.9% | 0.0% | 0.0% | 1.9% |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 94.0% | 87.3% | 90.4% | 0.0% | 0.0% | 1.9% |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 100.0% | 100.0% | 97.2% | 0.0% | 0.0% | 0.9% |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 93.9% | 91.3% | 90.1% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 96.2% | 91.0% | 90.4% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 95.1% | 100.0% | 97.1% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 95.1% | 94.4% | 90.6% | 0.0% | 0.0% | 1.9% |
 | pii-guard rules + NER (zero-shot) | — | 90.7% | — | — | 10.0% | — |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 95.3% | 88.0% | 87.1% | 0.0% | 0.0% | 0.9% |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 91.6% | 94.4% | 95.1% | 5.4% | 3.3% | 2.8% |
 | Presidio | 55.4% | 68.4% | 67.6% | 10.8% | 10.0% | 33.0% |
 | LLM Guard | 66.0% | 76.4% | 46.7% | 43.2% | 30.0% | 50.0% |
 | PrivAiTe | 66.0% | 74.8% | 46.5% | 8.1% | 0.0% | 17.9% |
@@ -122,8 +146,20 @@ mixed; documents: de 200 + en 200 + hu 200.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 600 | 98.5% | 36.3% | 53.1% | 63.1% | 1.6% | 0.1% | 100.0% | 0.65 ms | 2026-10-27 | `484b7f1` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 600 | 92.8% | 71.7% | 80.9% | 27.6% | 1.9% | 2.4% | 100.0% | 68 ms | 2026-10-27 | `484b7f1` |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 600 | 92.8% | 71.7% | 80.9% | 27.6% | 1.9% | 2.4% | 100.0% | 68 ms | 2026-10-27 | `484b7f1` |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 600 | 84.9% | 70.3% | 76.9% | 28.7% | 4.4% | 10.3% | 100.0% | 22 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 600 | 98.4% | 99.0% | 98.7% | 0.4% | 0.1% | 0.9% | 100.0% | 16 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 600 | 97.9% | 99.0% | 98.4% | 0.4% | 0.1% | 1.4% | 100.0% | 18 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 600 | 86.6% | 98.7% | 92.2% | 0.4% | 0.1% | 5.4% | 100.0% | 136 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 600 | 86.7% | 79.3% | 82.8% | 13.8% | 1.7% | 2.6% | 100.0% | 18 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 600 | 97.5% | 98.5% | 98.0% | 0.5% | 0.2% | 1.0% | 100.0% | 17 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) ‡ | 600 | 92.5% | 93.9% | 93.2% | 3.9% | 0.1% | 2.4% | 100.0% | 2.1 s* | 2026-10-27 | `4f84c6a` |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 600 | 98.8% | 99.0% | 98.9% | 0.3% | 0.1% | 0.3% | 100.0% | 29 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 600 | 98.5% | 98.6% | 98.6% | 0.4% | 0.1% | 0.2% | 100.0% | 35 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 600 | 90.0% | 81.9% | 85.8% | 12.5% | 1.8% | 1.7% | 100.0% | 29 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 600 | 98.2% | 98.6% | 98.4% | 0.4% | 0.2% | 0.5% | 100.0% | 29 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 600 | 95.7% | 96.5% | 96.1% | 0.7% | 0.1% | 0.7% | 100.0% | 133 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 600 | 79.6% | 72.5% | 75.9% | 22.5% | 4.3% | 5.7% | 100.0% | 111 ms* | 2026-10-27 | `b6e7bac` |
 | Presidio ‡ | 600 | 38.6% | 49.5% | 43.4% | 29.6% | 7.8% | 49.1% | — | 36 ms* | 2026-10-27 | `8944f96` |
 | LLM Guard ‡ | 600 | 79.3% | 53.7% | 64.0% | 43.8% | 1.8% | 18.2% | 100.0% | 66 ms* | 2026-10-27 | `8944f96` |
 | PrivAiTe ‡ | 600 | 64.8% | 65.4% | 65.1% | 9.5% | 2.5% | 9.6% | 98.0% | 111 ms* | 2026-10-27 | `8944f96` |
@@ -136,8 +172,20 @@ By language:
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 59.0% | 49.8% | 51.4% | 57.5% | 65.2% | 65.4% |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 84.5% | 81.8% | 76.7% | 23.4% | 25.3% | 33.6% |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 84.5% | 81.8% | 76.7% | 23.4% | 25.3% | 33.6% |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 80.4% | 77.6% | 73.1% | 24.5% | 26.8% | 34.3% |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 98.6% | 98.0% | 99.4% | 0.5% | 0.2% | 0.4% |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 98.3% | 97.7% | 99.3% | 0.3% | 0.2% | 0.5% |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 92.5% | 90.8% | 93.5% | 0.3% | 0.2% | 0.5% |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 82.1% | 79.5% | 86.9% | 13.5% | 15.0% | 12.6% |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 97.7% | 97.2% | 99.0% | 0.6% | 0.5% | 0.4% |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 94.5% | 92.1% | 93.3% | 4.8% | 3.5% | 3.7% |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 98.9% | 98.4% | 99.5% | 0.5% | 0.0% | 0.4% |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 98.7% | 97.5% | 99.6% | 0.5% | 0.2% | 0.4% |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 86.5% | 82.3% | 88.8% | 10.8% | 14.3% | 12.1% |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 98.8% | 97.3% | 99.3% | 0.5% | 0.2% | 0.4% |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 96.3% | 94.5% | 97.6% | 0.8% | 0.8% | 0.5% |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 76.9% | 77.1% | 73.6% | 18.8% | 21.7% | 26.3% |
 | Presidio | 32.5% | 52.3% | 51.3% | 18.9% | 22.5% | 46.1% |
 | LLM Guard | 70.9% | 67.2% | 56.3% | 39.8% | 46.1% | 44.7% |
 | PrivAiTe | 66.7% | 69.2% | 59.6% | 6.5% | 7.7% | 14.0% |
@@ -150,8 +198,20 @@ By language:
 | System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 63.1% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 71.1% (907/1276) |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 27.6% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 10.4% (133/1276) |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 27.6% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 10.4% (133/1276) |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 28.7% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 12.3% (157/1276) |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 0.6% (8/1276) |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 0.6% (8/1276) |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 0.4% | 99.4% (165/166) | 0.0% (0/166) | 97.7% (726/743) | 0.0% (0/743) | 0.6% (8/1276) |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 13.8% | 98.2% (163/166) | 0.0% (0/166) | 61.2% (455/743) | 20.3% (151/743) | 11.8% (150/1276) |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 0.5% | 100.0% (166/166) | 0.0% (0/166) | 97.3% (723/743) | 0.0% (0/743) | 0.9% (11/1276) |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) § | 3.9% | 100.0% (166/166) | 0.0% (0/166) | 87.8% (652/743) | 6.5% (48/743) | 2.8% (36/1276) |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 0.3% | 100.0% (166/166) | 0.0% (0/166) | 98.1% (729/743) | 0.0% (0/743) | 0.5% (6/1276) |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 96.9% (720/743) | 0.0% (0/743) | 0.6% (8/1276) |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 12.5% | 99.4% (165/166) | 0.0% (0/166) | 64.5% (479/743) | 19.8% (147/743) | 10.0% (127/1276) |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 97.2% (722/743) | 0.0% (0/743) | 0.6% (8/1276) |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 0.7% | 100.0% (166/166) | 0.0% (0/166) | 91.9% (683/743) | 0.3% (2/743) | 1.0% (13/1276) |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 22.5% | 99.4% (165/166) | 0.0% (0/166) | 41.0% (305/743) | 45.8% (340/743) | 11.8% (151/1276) |
 | Presidio | 29.6% | 28.9% (48/166) | 48.2% (80/166) | 28.8% (214/743) | 40.2% (299/743) | 21.0% (268/1276) |
 | LLM Guard | 43.8% | 73.5% (122/166) | 25.9% (43/166) | 23.3% (173/743) | 70.8% (526/743) | 30.4% (388/1276) |
 | PrivAiTe | 9.5% | 68.1% (113/166) | 4.2% (7/166) | 33.8% (251/743) | 3.0% (22/743) | 14.0% (179/1276) |
@@ -167,7 +227,19 @@ hand-written; documents: hu 44.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 44 | 100.0% | 61.3% | 76.0% | 2.5% | 5.0% | 0.0% | 100.0% | 0.30 ms | 2026-10-27 | `7337ffa` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 27 ms | 2026-10-27 | `7337ffa` |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 21 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 44 | 70.5% | 97.9% | 82.0% | 0.0% | 2.5% | 1.6% | 100.0% | 15 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 44 | 78.8% | 95.7% | 86.4% | 0.0% | 2.5% | 5.6% | 100.0% | 28 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 44 | 74.4% | 96.8% | 84.1% | 0.0% | 2.5% | 5.7% | 100.0% | 28 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 44 | 64.4% | 98.9% | 78.0% | 0.0% | 2.5% | 12.0% | 100.0% | 57 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 13 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 44 | 71.5% | 100.0% | 83.4% | 0.0% | 2.5% | 7.3% | 100.0% | 16 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 44 | 83.2% | 78.5% | 80.8% | 0.0% | 2.5% | 4.5% | 97.7% | 21 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 44 | 77.0% | 72.0% | 74.4% | 0.0% | 2.5% | 4.5% | 97.7% | 21 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 3.1% | 100.0% | 21 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 44 | 76.5% | 92.5% | 83.7% | 0.0% | 0.0% | 4.5% | 100.0% | 21 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 44 | 73.0% | 98.9% | 84.0% | 0.0% | 2.5% | 0.0% | 100.0% | 47 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 44 | 68.7% | 98.9% | 81.1% | 0.0% | 2.5% | 7.3% | 100.0% | 46 ms | 2026-10-27 | `910a6a2` |
 
 
 By language:
@@ -175,7 +247,19 @@ By language:
 | System | hu F1 | hu leak |
 |---|---:|---:|
 | **pii-guard rules** | 76.0% | 2.5% |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 84.2% | 0.0% |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 84.2% | 0.0% |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 82.0% | 0.0% |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 86.4% | 0.0% |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 84.1% | 0.0% |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 78.0% | 0.0% |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 84.2% | 0.0% |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 83.4% | 0.0% |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 80.8% | 0.0% |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 74.4% | 0.0% |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 84.2% | 0.0% |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 83.7% | 0.0% |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 84.0% | 0.0% |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 81.1% | 0.0% |
 
 
 ### `demo-which-parties`
@@ -202,23 +286,53 @@ By language:
 
 ### `distill-dev`
 
-generated; documents: en 373 + hu 368.
+generated by muse-spark-1.3-contributor; documents: en 373 + hu 368.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 741 | 99.9% | 42.3% | 59.4% | 47.2% | 22.1% | 0.0% | 100.0% | 0.67 ms* | 2026-10-27 | `c611f99` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 741 | 97.8% | 97.9% | 97.9% | 2.9% | 0.6% | 2.1% | 99.6% | 126 ms* | 2026-10-27 | `c611f99` |
-| pii-guard rules + NER (distilled base) | 741 | 98.9% | 97.9% | 98.4% | 2.9% | 0.6% | 0.9% | 99.9% | 43 ms* | 2026-10-27 | `c611f99` |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 741 | 98.8% | 99.5% | 99.2% | 0.5% | 0.6% | 1.2% | 99.7% | 76 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 741 | 95.2% | 94.2% | 94.7% | 7.5% | 4.1% | 3.0% | 99.1% | 28 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 741 | 97.7% | 97.8% | 97.8% | 0.1% | 0.6% | 0.1% | 99.9% | 24 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 741 | 97.7% | 97.8% | 97.8% | 0.1% | 0.6% | 0.1% | 99.9% | 27 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 741 | 77.8% | 97.9% | 86.7% | 0.1% | 0.6% | 19.7% | 86.8% | 145 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 741 | 98.1% | 98.0% | 98.1% | 0.1% | 0.6% | 0.1% | 99.9% | 24 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 741 | 97.9% | 97.9% | 97.9% | 0.2% | 0.6% | 0.1% | 99.9% | 25 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 741 | 97.6% | 97.7% | 97.7% | 0.1% | 0.6% | 0.1% | 99.9% | 73 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 741 | 97.9% | 98.1% | 98.0% | 0.2% | 0.6% | 0.1% | 100.0% | 77 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 741 | 97.9% | 97.9% | 97.9% | 0.2% | 0.6% | 0.2% | 99.9% | 81 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 741 | 97.7% | 97.7% | 97.7% | 0.2% | 0.6% | 0.1% | 99.9% | 66 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 741 | 94.3% | 97.9% | 96.1% | 0.1% | 0.6% | 3.7% | 99.9% | 134 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 741 | 79.0% | 91.5% | 84.8% | 7.7% | 14.1% | 20.3% | 86.8% | 148 ms* | 2026-10-27 | `910a6a2` |
 
 
 By language:
 
 | System | en F1 | hu F1 | en leak | hu leak |
 |---|---:|---:|---:|---:|
-| **pii-guard rules** | 60.2% | 58.8% | 44.8% | 49.1% |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 98.2% | 97.5% | 0.1% | 5.2% |
-| pii-guard rules + NER (distilled base) | 99.3% | 97.7% | 0.1% | 5.2% |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 98.6% | 99.6% | 0.5% | 0.5% |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 94.2% | 95.1% | 7.2% | 7.7% |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 99.5% | 96.3% | 0.2% | 0.0% |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 99.5% | 96.4% | 0.2% | 0.0% |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 87.1% | 86.4% | 0.2% | 0.0% |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 99.6% | 96.9% | 0.3% | 0.0% |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 99.5% | 96.6% | 0.3% | 0.1% |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 99.5% | 96.2% | 0.3% | 0.0% |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 99.5% | 96.8% | 0.4% | 0.0% |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 99.4% | 96.8% | 0.4% | 0.1% |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 99.6% | 96.2% | 0.4% | 0.0% |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 97.0% | 95.4% | 0.2% | 0.1% |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 83.3% | 86.0% | 7.8% | 7.6% |
 
+
+
+On an earlier version of a fixture file (current: en `b13f9983ca99`, hu `f6dca4b60ca8`). These ran on other documents, so they stay out of the table above and the charts:
+
+| System | Lang | Fixture | Docs | F1 | Leak | Run |
+|---|---|---|---:|---:|---:|---|
+| **pii-guard rules** | en | `52844202fd84` | 373 | 60.2% | 44.8% | 2026-10-27 |
+| **pii-guard rules** | hu | `cf04e3fb4e47` | 368 | 58.8% | 49.1% | 2026-10-27 |
+| pii-guard rules + NER (distilled base) | en | `52844202fd84` | 373 | 99.3% | 0.1% | 2026-10-27 |
+| pii-guard rules + NER (distilled base) | hu | `cf04e3fb4e47` | 368 | 97.7% | 5.2% | 2026-10-27 |
 
 ### `injection`
 
@@ -267,11 +381,23 @@ generated by muse-spark-1.3-contributor; documents: en 10 + hu 20.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 30 | 100.0% | 43.5% | 60.6% | 43.1% | 8.7% | 0.0% | 100.0% | 3.8 ms | 2026-10-27 | `3d9eb8b` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 248 ms | 2026-10-27 | `3d9eb8b` |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 72 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + Muse Spark Open (Baseten) | 30 | 100.0% | 99.5% | 99.7% | 0.8% | 2.0% | 0.0% | 100.0% | 2.1 s* | 2026-10-27 | `5dd3c23` |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 30 | 96.9% | 93.9% | 95.3% | 9.1% | 0.0% | 3.2% | 100.0% | 28 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + NER (fine-tuned) | 30 | 99.2% | 96.2% | 97.7% | 5.9% | 1.2% | 0.6% | 100.0% | 28 ms* | 2026-10-26 | `0ba3c1a` |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 30 | 96.2% | 96.2% | 96.2% | 0.0% | 1.2% | 0.0% | 100.0% | 30 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 30 | 96.4% | 96.4% | 96.4% | 0.0% | 1.2% | 0.0% | 100.0% | 28 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 30 | 74.5% | 96.4% | 84.1% | 0.0% | 1.2% | 23.3% | 63.3% | 298 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 30 | 97.2% | 97.2% | 97.2% | 0.0% | 1.2% | 0.0% | 100.0% | 26 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 30 | 96.4% | 96.4% | 96.4% | 0.0% | 1.2% | 0.0% | 100.0% | 26 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 2.0 s* | 2026-10-27 | `4f84c6a` |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 30 | 95.9% | 95.9% | 95.9% | 0.0% | 1.2% | 0.0% | 100.0% | 60 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 30 | 96.9% | 96.9% | 96.9% | 0.0% | 1.2% | 0.0% | 100.0% | 63 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 30 | 97.4% | 97.4% | 97.4% | 0.0% | 1.2% | 0.0% | 100.0% | 60 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 30 | 96.4% | 96.4% | 96.4% | 0.0% | 1.2% | 0.0% | 100.0% | 56 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + NER (zero-shot) | 30 | 97.3% | 90.0% | 93.5% | 15.0% | 0.0% | 2.7% | 100.0% | 123 ms* | 2026-10-26 | `0ba3c1a` |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 30 | 95.4% | 96.4% | 95.9% | 0.0% | 1.2% | 1.1% | 100.0% | 286 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 30 | 77.0% | 94.9% | 85.0% | 5.1% | 11.1% | 24.1% | 63.3% | 236 ms* | 2026-10-27 | `910a6a2` |
 | Presidio ‡ | 30 | 69.4% | 74.7% | 71.9% | 23.3% | 24.1% | 24.4% | — | 361 ms* | 2026-10-27 | `8944f96` |
 | LLM Guard ‡ | 30 | 62.7% | 41.4% | 49.9% | 56.5% | 10.7% | 34.4% | 100.0% | 581 ms* | 2026-10-27 | `8944f96` |
 | PrivAiTe ‡ | 30 | 58.5% | 59.1% | 58.8% | 19.0% | 9.1% | 24.1% | 83.3% | 388 ms* | 2026-10-27 | `8944f96` |
@@ -284,11 +410,23 @@ By language:
 | System | en F1 | hu F1 | en leak | hu leak |
 |---|---:|---:|---:|---:|
 | **pii-guard rules** | 54.5% | 63.1% | 46.2% | 41.6% |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 98.8% | 99.8% | 0.0% | 0.0% |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 98.8% | 99.8% | 0.0% | 0.0% |
 | pii-guard rules + Muse Spark Open (Baseten) | 99.2% | 100.0% | 2.5% | 0.0% |
+| pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 96.8% | 94.6% | 7.5% | 9.8% |
 | pii-guard rules + NER (fine-tuned) | 100.0% | 96.6% | 0.0% | 8.7% |
+| pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 100.0% | 94.5% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 100.0% | 94.8% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 82.2% | 85.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 100.0% | 95.9% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 100.0% | 94.8% | 0.0% | 0.0% |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 98.8% | 99.8% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 100.0% | 94.1% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 100.0% | 95.6% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 100.0% | 96.3% | 0.0% | 0.0% |
+| pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | 100.0% | 94.8% | 0.0% | 0.0% |
 | pii-guard rules + NER (zero-shot) | 96.8% | 92.0% | 7.5% | 18.5% |
+| pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | 100.0% | 94.1% | 0.0% | 0.0% |
+| pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | 80.0% | 87.5% | 7.5% | 4.0% |
 | Presidio | 62.9% | 76.5% | 11.2% | 28.9% |
 | LLM Guard | 63.3% | 46.8% | 48.8% | 60.1% |
 | PrivAiTe | 76.8% | 50.6% | 7.5% | 24.3% |
@@ -301,7 +439,7 @@ hand-written; documents: de 11 + en 13 + hu 14.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 38 | — | — | — | — | — | — | 100.0% | 0.15 ms | 2026-10-27 | `484b7f1` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 38 | — | — | — | — | — | — | 100.0% | 30 ms | 2026-10-27 | `484b7f1` |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | 38 | — | — | — | — | — | — | 100.0% | 30 ms | 2026-10-27 | `484b7f1` |
 
 
 By language:
@@ -309,7 +447,7 @@ By language:
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | — | — | — | — | — | — |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | — | — | — | — | — | — |
+| pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | — | — | — | — | — | — |
 
 
 ### `visual-placeholders`
@@ -352,7 +490,7 @@ By language:
 
 Featured systems run on every language of the current fixture files, pooled (micro-averaged).
 
-| Type | Gold | rules | rules + ner (xlmr-large-distilled-glimmer) | Presidio | LLM Guard | PrivAiTe |
+| Type | Gold | rules | fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | Presidio | LLM Guard | PrivAiTe |
 |---|---:|---:|---:|---:|---:|---:|
 | `PERSON` | 61 | 1.6% | 98.4% | 93.4% | 88.5% | 75.4% |
 | `ADDRESS` | 22 | 90.9% | 100.0% | 86.4% | 0.0% | 100.0% |
@@ -439,73 +577,216 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
-| 2026-10-27 | `2026-10-27-ascii-formats-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 10.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 9.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 8.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 8.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 10.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 8.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 8.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 8.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 8.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 10.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 9.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 9.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 7.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 7.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 7.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 8.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 6.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 16.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 19.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 17.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 17.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | smoke | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-distill-dev-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | distill-dev | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-distill-dev-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | distill-dev | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | company-names | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | synth-sample | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | synth-sample | hu | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | smoke | de | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | smoke | en | recorded | `910a6a2` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | smoke | hu | recorded | `910a6a2` | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-base-v2-hn-gliner-union` | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ascii-formats-after-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 13.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 13.3 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-ascii-formats-after-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-ascii-formats-after-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ascii-formats-after-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-ascii-formats-after-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-ascii-formats-after-negative-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | uncued-numbers | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ascii-formats-after-negative-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | uncued-numbers | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-ascii-formats-after-negative-rules` | pii-guard rules | uncued-numbers | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-ascii-formats-before-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-gliner-multi-v2` | pii-guard fast, GLiNER multi fine-tuned (LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 14.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 20.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 24.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-gliner-multi-zero-shot` | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; load average 22.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 25.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 27.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-davlan-xlmr-base-zero-shot` | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 26.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ascii-formats-before-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 29.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 28.7 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-ascii-formats-before-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-ascii-formats-before-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ascii-formats-before-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-large-v1` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 27.4 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-ascii-formats-before-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-ascii-formats-before-negative-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | uncued-numbers | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ascii-formats-before-negative-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | uncued-numbers | de, en, hu | recorded | `484b7f1` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-ascii-formats-before-negative-rules` | pii-guard rules | uncued-numbers | de, en, hu | recorded | `484b7f1` | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-keep-vs-mask-after-company-names-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 23.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 23.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-large-v2-hn` | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 20.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 23.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 23.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 25.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 21.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-large-v2-openpii-1k` | pii-guard fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-base-v2-openpii-1k` | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-base-v2-no-ai4privacy` | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 16.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 17.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-large-v2-no-ai4privacy` | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-large-v2` | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | ai4privacy | de | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | ai4privacy | en | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-xlmr-base-v2` | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | ai4privacy | hu | recorded | `b6e7bac` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-company-names-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-keep-vs-mask-after-company-names-rules` | pii-guard rules | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-keep-vs-mask-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-keep-vs-mask-after-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-keep-vs-mask-after-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-keep-vs-mask-after-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-keep-vs-mask-before-company-names-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-keep-vs-mask-before-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-keep-vs-mask-before-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-company-names-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-keep-vs-mask-before-company-names-rules` | pii-guard rules | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-keep-vs-mask-before-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-keep-vs-mask-before-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `7337ffa` | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-rules-resolve-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-rules-resolve-after-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-rules-resolve-after-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-rules-resolve-before-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-rules-resolve-before-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-rules-resolve-before-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-rules-resolve-after-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `dd35916` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-rules-resolve-after-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `dd35916` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-rules-resolve-after-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `dd35916` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-rules-resolve-before-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `dd35916` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-rules-resolve-before-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `dd35916` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-visual-placeholders-exact-noisy` | pii-guard image placeholders (exact matching) | visual-placeholders-noisy | de, en, hu | recorded | `fa1fb6f` | local CPU; OCR words from the cache | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-visual-placeholders-exact-clean` | pii-guard image placeholders (exact matching) | visual-placeholders | de, en, hu | recorded | `fa1fb6f` | local CPU; OCR words from the cache | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-visual-placeholders-fuzzy-noisy` | pii-guard image placeholders (fuzzy matching) | visual-placeholders-noisy | de, en, hu | recorded | `fa1fb6f` | local CPU; OCR words from the cache | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-visual-placeholders-fuzzy-clean` | pii-guard image placeholders (fuzzy matching) | visual-placeholders | de, en, hu | recorded | `fa1fb6f` | local CPU; OCR words from the cache | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-rules-resolve-before-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `dd35916` | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-unicode-normaliser-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-unicode-normaliser-after-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-unicode-normaliser-after-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-unicode-normaliser-after-synth-sample-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | synth-sample | en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-unicode-normaliser-after-synth-sample-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | synth-sample | en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-unicode-normaliser-after-synth-sample-rules` | pii-guard rules | synth-sample | en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-unicode-normaliser-after-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-unicode-normaliser-after-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-unicode-normaliser-after-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-unicode-normaliser-before-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-unicode-normaliser-before-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-unicode-normaliser-before-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-unicode-normaliser-before-synth-sample-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | synth-sample | en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-unicode-normaliser-before-synth-sample-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | synth-sample | en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-unicode-normaliser-before-synth-sample-rules` | pii-guard rules | synth-sample | en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
-| 2026-10-27 | `2026-10-27-unicode-normaliser-before-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-unicode-normaliser-before-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `3d9eb8b` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-unicode-normaliser-before-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `3d9eb8b` | arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-demo-which-parties-opaque-mock` | pii-guard gateway, opaque images, mock upstream | demo-which-parties | hu | recorded | `8b57e15` | local CPU; OCR words from the cache | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-demo-which-parties-labels-mock` | pii-guard gateway, labels images, mock upstream | demo-which-parties | hu | recorded | `8b57e15` | local CPU; OCR words from the cache | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-demo-which-parties-opaque-live` | pii-guard gateway, opaque images, Muse Spark Open (Baseten) | demo-which-parties | hu | recorded | `8b57e15` | local CPU; OCR words from the cache | ≈ $0.01 |
 | 2026-10-27 | `2026-10-27-demo-which-parties-labels-live` | pii-guard gateway, labels images, Muse Spark Open (Baseten) | demo-which-parties | hu | recorded | `8b57e15` | local CPU; OCR words from the cache | ≈ $0.01 |
-| 2026-10-27 | `2026-10-27-cued-numbers-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 11.90 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-cued-numbers-after-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 11.90 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-cued-numbers-after-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 11.90 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-cued-numbers-after-company-names-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | company-names | hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 13.06 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-cued-numbers-after-company-names-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | company-names | hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 13.06 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-cued-numbers-after-company-names-rules` | pii-guard rules | company-names | hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 13.06 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-cued-numbers-after-synth-sample-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | synth-sample | en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 12.96 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-cued-numbers-after-synth-sample-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | synth-sample | en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 12.96 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-cued-numbers-after-synth-sample-rules` | pii-guard rules | synth-sample | en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 12.96 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-cued-numbers-after-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 12.16 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-cued-numbers-after-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 12.16 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-cued-numbers-after-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `9d133c0` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 12.16 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-cued-numbers-before-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 9.78 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-cued-numbers-before-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de, en, hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 9.78 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-cued-numbers-before-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 9.78 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-cued-numbers-before-company-names-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | company-names | hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 10.40 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-cued-numbers-before-company-names-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | company-names | hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 10.40 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-cued-numbers-before-company-names-rules` | pii-guard rules | company-names | hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 10.40 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-cued-numbers-before-synth-sample-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | synth-sample | en, hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 9.18 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-cued-numbers-before-synth-sample-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | synth-sample | en, hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 9.18 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-cued-numbers-before-synth-sample-rules` | pii-guard rules | synth-sample | en, hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 9.18 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-cued-numbers-before-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 10.40 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-cued-numbers-before-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de, en, hu | recorded | `9ca003f` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 10.40 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-cued-numbers-before-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `9ca003f` | arm64, 10 CPUs, macOS; NER on PyTorch device auto; load average 10.40 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-privaite` | PrivAiTe | ai4privacy | de | recorded | `8944f96` (dirty) | arm64, 10 CPUs, CPU only | — |
 | 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-presidio` | Presidio | ai4privacy | de | recorded | `8944f96` (dirty) | arm64, 10 CPUs, CPU only | — |
@@ -550,14 +831,14 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-comparison-de-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 13.3 at start (machine not idle) | ≈ $0.02 |
 | 2026-10-27 | `2026-10-27-comparison-en-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 13.4 at start (machine not idle) | ≈ $0.02 |
 | 2026-10-27 | `2026-10-27-comparison-hu-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 16.6 at start (machine not idle) | ≈ $0.08 |
-| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.9 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.1 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 19.9 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | synth-sample | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 21.4 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | synth-sample | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 16.0 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-comparison-de-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-comparison-en-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
-| 2026-10-27 | `2026-10-27-comparison-hu-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | hu | recorded | `4f84c6a` | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | ai4privacy | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 19.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | synth-sample | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 21.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | synth-sample | hu | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 16.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-de-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | de | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-en-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | en | recorded | `4f84c6a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-smoke-fast` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | hu | recorded | `4f84c6a` | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.1 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-injection-spark-open-after-normalise` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | recorded | `fb1502e` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.15 |
 | 2026-10-27 | `2026-10-27-injection-rules-after-normalise` | pii-guard rules | injection | en, hu | recorded | `fb1502e` | Apple Silicon arm64, macOS 26.5, 10 CPUs, CPU only | — |
 | 2026-10-27 | `2026-10-27-injection-spark-open-before-normalise` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | recorded | `7e328ad` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.15 |
@@ -573,10 +854,10 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-baseten-spark-open-hu-synth-sample` | pii-guard rules + Muse Spark Open (Baseten) | synth-sample | hu | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.07 |
 | 2026-10-27 | `2026-10-27-baseten-spark-open-en-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | en | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.02 |
 | 2026-10-27 | `2026-10-27-baseten-spark-open-hu-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | hu | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.08 |
-| 2026-10-27 | `2026-10-27-distilled-large-en-distill-dev` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
-| 2026-10-27 | `2026-10-27-distilled-large-hu-distill-dev` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
-| 2026-10-27 | `2026-10-27-distilled-large-en-smoke` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
-| 2026-10-27 | `2026-10-27-distilled-large-hu-smoke` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-en-distill-dev` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-hu-distill-dev` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-en-smoke` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-hu-smoke` | pii-guard fast, NER v1 (xlm-roberta-large distilled, LAB-1128) | smoke | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-distilled-base-en-distill-dev` | pii-guard rules + NER (distilled base) | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-distilled-base-hu-distill-dev` | pii-guard rules + NER (distilled base) | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-distilled-base-en-smoke` | pii-guard rules + NER (distilled base) | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |

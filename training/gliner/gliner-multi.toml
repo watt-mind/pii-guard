@@ -1,0 +1,24 @@
+# GLiNER multi v2.1 fine-tuned on the LAB-1150 data (training/gliner/train_gliner.py).
+# Same train files as training/ner/v2-large.toml; Apache-2.0 base model. Train on a GPU:
+#   modal run training/gliner/modal_train_gliner.py --config training/gliner/gliner-multi.toml
+base_model = "urchade/gliner_multi-v2.1"
+base_revision = "443d26d654e0324125a96bebd8e796c14ff2efe6"
+train = [
+  "eval/generated/distill-s11/labelled/hu-distill-train.jsonl",
+  "eval/generated/distill-s11/labelled/en-distill-train.jsonl",
+  "eval/generated/distill-s13/labelled/hu-distill-train.jsonl",
+  "eval/generated/distill-s13/labelled/en-distill-train.jsonl",
+  "eval/generated/openpii-train/hu-openpii-train.jsonl",
+  "eval/generated/openpii-train/en-openpii-train.jsonl",
+  "eval/generated/openpii-train/de-openpii-train.jsonl",
+]
+dev = [
+  "eval/generated/distill-s13/labelled/hu-distill-dev.jsonl",
+  "eval/generated/openpii-train/hu-openpii-dev.jsonl",
+]
+out = "models/ner/pii-guard-gliner-multi-v2"
+epochs = 1.5
+batch_size = 8
+lr = 5e-6
+others_lr = 1e-5
+seed = 13

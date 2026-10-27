@@ -1,0 +1,138 @@
+{
+  "dataset": "ai4privacy/pii-masking-openpii-1m",
+  "url": "https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m",
+  "revision": "ecfdc547f4a0955600cfe6ab98ba2a162207fcc0",
+  "file": "data/train.jsonl",
+  "file_sha256": "f167e4290bc8dc9d92866e1e7be57821e3847f0dc4b02140a9a5540fb9151743",
+  "license": "CC-BY-4.0",
+  "attribution": "Ai4Privacy / Ai Suisse SA",
+  "rows_committed": false,
+  "seed": 1150,
+  "requested": {
+    "train": {
+      "hu": 5000,
+      "en": 5000,
+      "de": 5000
+    },
+    "dev": {
+      "hu": 150,
+      "en": 150,
+      "de": 150
+    }
+  },
+  "sample_rule": "per language, usable rows ordered by sha256('<seed>:<uid>'): the first n_dev are dev, the next n_train are train",
+  "filters": {
+    "max_chars": 1500,
+    "hu_english_dates": "Hungarian rows with an English month name"
+  },
+  "loss_ignore": "every DATE span (birth dates are not marked in the dataset)",
+  "eval_holdout": {
+    "manifest": "eval/fixtures/public/ai4privacy-openpii-1m.json",
+    "rule": "no uid of the eval manifest and no text of the eval fixtures",
+    "disjoint": true
+  },
+  "languages": {
+    "hu": {
+      "rows_in_split": 36332,
+      "eval_overlap_skipped": 0,
+      "filtered": {
+        "hu_english_dates": 13732
+      },
+      "unconvertible": 0,
+      "train": {
+        "documents": 5000,
+        "gold_spans": {
+          "ADDRESS": 3064,
+          "BANK_ACCOUNT": 1237,
+          "EMAIL": 2237,
+          "ID_DOCUMENT": 2650,
+          "NATIONAL_ID_HU_TAJ": 966,
+          "NATIONAL_ID_HU_TAX": 1001,
+          "PERSON": 4072,
+          "PHONE": 1706
+        },
+        "loss_ignore_regions": 2791,
+        "uids_sha256": "593c395e0dd912d83080d4ac9082fb2258d3e9dfd1da94d8e394591df92e1343"
+      },
+      "dev": {
+        "documents": 150,
+        "gold_spans": {
+          "ADDRESS": 94,
+          "BANK_ACCOUNT": 35,
+          "EMAIL": 70,
+          "ID_DOCUMENT": 75,
+          "NATIONAL_ID_HU_TAJ": 28,
+          "NATIONAL_ID_HU_TAX": 30,
+          "PERSON": 103,
+          "PHONE": 55
+        },
+        "loss_ignore_regions": 84,
+        "uids_sha256": "46e9a0429334de1cb655a08ef7706455601a6f85e3daab7f01e7678a4c68956b"
+      }
+    },
+    "en": {
+      "rows_in_split": 143515,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 5000,
+        "gold_spans": {
+          "ADDRESS": 3441,
+          "BANK_ACCOUNT": 1201,
+          "EMAIL": 2802,
+          "ID_DOCUMENT": 4608,
+          "PERSON": 4998,
+          "PHONE": 2033
+        },
+        "loss_ignore_regions": 4644,
+        "uids_sha256": "76c3ff5090a9c42d11b282d8916d29fdbcf2eedaf4b580afa2beb59f947f87db"
+      },
+      "dev": {
+        "documents": 150,
+        "gold_spans": {
+          "ADDRESS": 101,
+          "BANK_ACCOUNT": 37,
+          "EMAIL": 78,
+          "ID_DOCUMENT": 140,
+          "PERSON": 154,
+          "PHONE": 64
+        },
+        "loss_ignore_regions": 145,
+        "uids_sha256": "3fc21a82b7c224c69f429847ddb28231899d4e78f2c55bc43e99cf1c134d41f1"
+      }
+    },
+    "de": {
+      "rows_in_split": 96179,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 5000,
+        "gold_spans": {
+          "ADDRESS": 2738,
+          "BANK_ACCOUNT": 1132,
+          "EMAIL": 2498,
+          "ID_DOCUMENT": 4360,
+          "PERSON": 4401,
+          "PHONE": 1917
+        },
+        "loss_ignore_regions": 4225,
+        "uids_sha256": "a4a036632989e3cb3e3877e65f7cadd6f3895a3f336b4c3df34b82d5e1c389a5"
+      },
+      "dev": {
+        "documents": 150,
+        "gold_spans": {
+          "ADDRESS": 99,
+          "BANK_ACCOUNT": 33,
+          "EMAIL": 84,
+          "ID_DOCUMENT": 130,
+          "PERSON": 139,
+          "PHONE": 63
+        },
+        "loss_ignore_regions": 123,
+        "uids_sha256": "56c2e4f9890fdfc7bedeb17dc9e9cf78492b74c69d4b500e0cb1599fb680d463"
+      }
+    }
+  }
+}

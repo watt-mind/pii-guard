@@ -59,6 +59,15 @@ ner = [
     "torch>=2.14.1",
     "transformers>=5.21.0",
 ]
+# GLiNER (LAB-1150 comparison, docs/models.md): gliner 0.2.29 needs transformers < 5.17, so
+# it conflicts with `ner`; use its own environment (UV_PROJECT_ENVIRONMENT=.venv-gliner).
+gliner = [
+    "gliner==0.2.29",
+    "protobuf>=7.36.2",
+    "sentencepiece>=0.2.2",
+    "torch>=2.14.1",
+    "transformers>=4.51.3,<5.17",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -138,6 +147,7 @@ strict_equality = true
 # Optional extras (ner, ocr, baselines, local segmentation) and comparison tools without stubs.
 module = [
     "cv2.*",
+    "gliner.*",
     "numpy.*",
     "onnxruntime.*",
     "presidio_analyzer.*",
@@ -153,7 +163,11 @@ ignore_missing_imports = true
 [tool.uv]
 # presidio-analyzer caps numpy below 2.5; resolve the baselines extra on its own so it never
 # holds back another extra's numpy.
-conflicts = [[{ extra = "baselines" }, { extra = "ner" }]]
+conflicts = [
+    [{ extra = "baselines" }, { extra = "ner" }],
+    [{ extra = "gliner" }, { extra = "ner" }],
+    [{ extra = "gliner" }, { extra = "baselines" }],
+]
 
 [tool.uv.sources]
 en-core-web-lg = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" }

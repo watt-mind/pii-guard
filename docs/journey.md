@@ -21,23 +21,24 @@ leak 52.6 % (Hungarian) and 46.7 % (English) of labelled values. Rules plus Muse
 Baseten leak 0.9 % and 0.0 %, at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. A
 fast mode with no LLM call (rules plus a small NER model distilled from Muse Glimmer) gets
 Hungarian down to 0.9 % and English to 0.0 % at tens of milliseconds per message. On a public benchmark
-(Ai4Privacy OpenPII, 600 documents, milestone 24) strict mode leaks 3.9 % and fast mode 38.0 %:
-fast mode suits text like ours, not unfamiliar number formats.
+(Ai4Privacy OpenPII, 600 documents, milestone 24) strict mode leaks 3.9 %. Fast mode leaked
+38.0 % there, and 27.6 % after the cue-word and detection fixes (milestones 28–31). With NER v2 (milestone 36),
+fast mode leaks 0.4 %, a result measured in-distribution. A v2 model that never saw an
+Ai4Privacy row leaks 12.5 %.
 
 | Language | Mode | Best configuration | Leak | F1 (overlap) | p50 latency | $ / 1k msgs | Source |
 |---|---|---|---:|---:|---:|---:|---|
 | Hungarian | strict | rules + Muse Spark Open (Baseten, `low`) | **0.9 %** | 98.4 | 1.8 s | 2.42 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md), `hu-smoke` (31 docs) |
 | English | strict | rules + Muse Spark Open (Baseten, `low`) | **0.0 %** | 97.1 | 1.2 s | 1.99 | same, `en-smoke` (10 docs) |
-| Hungarian | fast | rules (with ID/parcel rules) + distilled NER, large | **0.9 %** | 97.9 | 28 ms (MPS)¹ | no API call | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md), `hu-smoke` (31 docs) |
-| English | fast | rules + distilled NER, large | **0.0 %** | 98.5 | 36 ms (MPS) | no API call | [distilled/large/en-smoke.md](../eval/results/ner/distilled/large/en-smoke.md), [latency-large.json](../eval/results/ner/distilled/latency-large.json) |
+| Hungarian | fast | rules + NER v2 base + hard negatives (milestone 36) | **0.0 %** | 93.3 | 18 ms (MPS), 44 ms (CPU) | no API call | [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md), `hu-smoke` (31 docs) |
+| English | fast | same | **0.0 %** | 94.2 | 14 ms (MPS) | no API call | same, `en-smoke` (10 docs) |
 | either | none | rules only (baseline) | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [distilled/rules/](../eval/results/ner/distilled/rules/) `hu-smoke.md`, `en-smoke.md` |
 
-¹ Measured in the 2026-10-27 comparison (milestone 24), which confirmed the 0.9 % figure
-that milestone 14 had only stated in docs/models.md: 1 of 106 labelled values, F1 97.9. That
-run's machine was under unrelated load too (load average about 15 on 10 cores), so read
-the latency as relative. On the public Ai4Privacy set the same fast mode leaks 35–40 %
-(milestone 24); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
-you train them yourself (see [models.md](models.md#ner-detector)).
+The fast-mode MPS figures are per document, taken from the scorecards. The CPU figure is for
+NER only, from `training/ner/bench_latency.py`. Both were measured on an M1 Max under unrelated
+load. The previous fast default, the distilled large NER of milestone 14, leaked 0.9 % / 0.0 %
+on these sets, at a CPU p95 of 147 ms. The v2 weights are not published yet: you train them
+yourself (see [models.md](models.md#ner-v2-wider-labels-openpii-train-split-hard-negatives)).
 
 Leak = share of labelled values that still appear, in any surface form, in the text the
 model would receive ([evaluation.md](evaluation.md#leak-rate-in-practice)). The smoke sets
@@ -64,6 +65,7 @@ documents with LAB-1127; rows after that use the 31-document set where marked.
 | 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | fast: rules + distilled NER, large | 0.9 % | 0.0 % | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) |
 | 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | strict: rules + NER + Muse Spark Open | 0.9 % | 0.0 % | same |
 | 10-27 | [#45](https://github.com/watt-mind/pii-guard/pull/45) | *Presidio / LLM Guard / PrivAiTe* | *33.0 / 50.0 / 17.9 %* | *10.0 / 30.0 / 0.0 %* | same |
+| 10-27 | [#80](https://github.com/watt-mind/pii-guard/pull/80) | fast: rules + NER v2 base + hard negatives (new default) | 0.0 % | 0.0 % | [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md) |
 
 The same history as charts, generated from the run records in
 [`eval/results/runs/`](../eval/results/runs/) by `pii-guard eval report` (all runs, tables and
@@ -75,7 +77,7 @@ the run log: [benchmarks.md](benchmarks.md)). The table above is their text vers
 
 ### Spend so far
 
-About **$17** of compute for everything measured here.
+About **$22** of compute for everything measured here.
 
 | What | Where | Cost | Source |
 |---|---|---:|---|
@@ -86,6 +88,7 @@ About **$17** of compute for everything measured here.
 | Production detector: four eval runs + tests | Baseten Model APIs | ~$0.84 of the $100 credit | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md#spend) |
 | Re-identification red team (four runs + pilots) | Baseten Model APIs; Meta Model API | ~$1.9 Baseten; 343k Meta API tokens (price not published to us) | [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md#spend) |
 | Fresh comparison: strict mode on 8 fixture sets incl. 600 public documents | Baseten Model APIs | ≤ $4.50 | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md#spend) |
+| NER v2: Glimmer corpus + labels, 9 trainings, T4 latency bench | Modal (H100, A10G, L40S, T4) | $4.85 (metered) | [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md#spend) |
 
 Early development calls to the Meta Model API (the first corpus samples, live tests) were not
 metered separately and are not included.
@@ -999,6 +1002,60 @@ client's contact details.
   API, which the gateway doesn't serve ([integrations/muse-code.md](integrations/muse-code.md)).
 - New: `GET /v1/models` and [docs/integrations/](integrations/README.md).
 - **Cost:** $0. About 20 requests over three runs on free Meta API credits; the rest ran locally.
+
+### 36. NER v2: fast mode stops leaking numbers (2026-10-27)
+
+PR [#80](https://github.com/watt-mind/pii-guard/pull/80), LAB-1150. After milestones 28–31, fast mode still leaked 27.6 % on the public Ai4Privacy sample.
+The cause was mostly the identifiers the rules can't validate, and the NER had no number types
+at all.
+
+NER v2 widens the label set from 4 to 10 types: it adds `EMAIL`, `PHONE`, `ID_DOCUMENT`,
+`NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ` and `BANK_ACCOUNT`. It trains on three sources:
+- the two distillation corpora: s11, and s13, written from the lexicon packs and labelled by
+  Muse Glimmer on Modal;
+- 5,000 rows per language from the OpenPII **train** split. The build script asserts these are
+  disjoint from the evaluated validation rows;
+- seeded hard negatives: order, invoice and tracking numbers, and amounts.
+
+The comparison covered XLM-R base and large, GLiNER multi (zero-shot and fine-tuned), and a
+union of the two encoders.
+
+| rules + NER, % | ai4privacy leak, pooled | smoke leak, max | smoke over-masking, max | CPU p95 (M1) |
+|---|---:|---:|---:|---:|
+| before: v1 large (LAB-1128) | 27.6 | 0.9 | 0.9 | 147 ms |
+| v2 base, OpenPII without negatives | 0.4 | 1.9 | 9.3 | 52 ms |
+| **after: v2 base + hard negatives** | **0.4** | **0.0** | 3.0 | **50 ms** |
+| v2 large, no Ai4Privacy rows (held-out) | 12.5 | 0.0 | 0.9 | 149 ms |
+| GLiNER multi v2.1, zero-shot | 22.5 | 5.4 | 10.0 | 126 ms |
+
+- **Read 0.4 % as in-distribution.** Its training saw OpenPII rows. The honest number for
+  unseen text of that style is the ablation's **12.5 %**, which is still under the ticket's
+  15 % target.
+- **OpenPII alone over-masked.** It taught the model that every number is personal, so
+  smoke over-masking rose to 6–11 %, with order numbers masked at confidence above 0.99. A
+  threshold sweep and a 1k-row cut didn't help. 2,000 template negatives per language did.
+  Some of their cue words also appear in the smoke sets, which is disclosed in the results
+  README. The remaining 3.0 % is one en-smoke span, a street name standing alone. OpenPII
+  labels those as addresses and our policy doesn't (filed as LAB-1220). It means the ≤ 2 %
+  criterion is missed by one span.
+- **The default is base, not large.** The owner's rule is leak first, with CPU p95 ≤ ~150 ms.
+  Base and large tie on leak. Large is borderline on the M1 CPU and over 290 ms p95 on a
+  4-vCPU T4 container. Base takes 50 ms (M1) and 85 ms (T4 CPU); on CUDA it's 16 ms and on
+  MPS 22 ms.
+- **GLiNER is not adopted as the default.**
+  - Zero-shot it leaks more and over-masks more.
+  - Fine-tuned it matches the leak but over-masks 21 % on en-smoke.
+  - It is 2–5× slower.
+  - The union adds over-masking, not recall.
+  - It ships as an opt-in `ner_gliner` detector (`PII_GUARD_NER_BACKEND=gliner`).
+  - It is the best licence-clean **public fallback** for `make demo` (LAB-1192): Apache-2.0,
+    22.5 % vs 28.7 % leak for the current Davlan zero-shot model.
+- **The LLM** stays the teacher. No LLM call runs in fast mode.
+- **Cost:** $4.85 of Modal (metered).
+- **Weights:** none are published. The owner decides. Model card:
+  [training/ner/model-card.md](../training/ner/model-card.md).
+- **Source:** run records `2026-10-27-ner-v2-<fixture>-<candidate>` (13 candidates × 11
+  fixtures) and [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md).
 
 ## How pii-guard uses Meta's models
 
