@@ -68,8 +68,19 @@ Unicode input. Warm the cache with `uv run --extra ner python -m pii_guard.detec
 | hu-synth dev split (seed 7) | 60.7 / 50.0 | 91.5 / 18.0 | 96.9 / 8.6 |
 | en-synth dev split (seed 7) | 55.9 / 46.8 | 94.8 / 8.1 | 99.5 / 0.5 |
 
-What's left in the Hungarian leak is ID document and parcel numbers, which are out of scope for
-the NER detector. On the hand-written English smoke set the fine-tuned model over-masks more
+The figures above were measured on 2026-10-26 on the 28-document `hu-smoke`, before the
+Hungarian ID document and parcel number rules (LAB-1127). `hu-smoke` has 31 documents now, and
+the current numbers per configuration are in the leak-history table in
+[journey.md](journey.md#leak-rate-over-time).
+
+What was left in the Hungarian leak at that point was ID document and parcel numbers. The NER
+detector doesn't label them (`LABEL_MAP` in `src/pii_guard/detect/ner.py` maps no label to
+them); the Hungarian rule pack does, and rules run alongside the NER in every mode (see
+`ID_DOCUMENT` and `PARCEL_NUMBER_HU` in [entities.md](entities.md)). With those rules on, the
+distilled models below leave far less of the Hungarian leak (see
+[Distilled from Muse Glimmer](#distilled-from-muse-glimmer)).
+
+On the hand-written English smoke set the fine-tuned model over-masks more
 (16 % vs 11 %) and loses some person precision: the synthetic training data is narrow, so this
 is the set to watch.
 
