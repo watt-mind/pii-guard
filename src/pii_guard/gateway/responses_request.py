@@ -102,8 +102,16 @@ _REASONING_PARTS = {"summary": "summary_text", "content": "reasoning_text"}
 _TOOL_TYPES = frozenset({"function", "namespace", "custom"})
 _NAMESPACE_KEYS = frozenset({"type", "name", "description", "tools"})
 _TEXT_KEYS = frozenset({"format", "verbosity"})
-#: A line-number gutter, as Muse Code's ``read_file`` prints file lines (``12|Jane ...``).
-_GUTTER_RE = re.compile(r"[ \t]*\d{1,7}\|")
+#: A line-number gutter, as Muse Code's ``read_file`` prints file lines (``12|Jane ...``),
+#: after the line's leading spaces/tabs (stripped first: no backtracking over them).
+_GUTTER_RE = re.compile(r"\d{1,7}\|")
+
+
+def _gutter(line: str) -> str:
+    """The line's gutter (indentation, number and ``|``), or ``""``."""
+    indent = len(line) - len(line.lstrip(" \t"))
+    match = _GUTTER_RE.match(line, indent)
+    return line[: match.end()] if match else ""
 
 
 def collect_response_texts(body: object) -> CollectedTexts:
@@ -264,7 +272,7 @@ def _text_slot(holder: dict[str, Any], key: str, kind: str) -> TextSlot:
     """
     text: str = holder[key]
     lines = text.split("\n")
-    gutters = {i: m.group(0) for i, line in enumerate(lines) if (m := _GUTTER_RE.match(line))}
+    gutters = {i: g for i, line in enumerate(lines) if (g := _gutter(line))}
     if not gutters:
         return TextSlot(text, _setter(holder, key), kind)
     hidden = "\n".join(
