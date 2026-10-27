@@ -1,6 +1,7 @@
 """LLM detector. HTTP is mocked with ``httpx.MockTransport``; recorded responses come from the
-Meta Model API (``muse-spark-1.3``) on fictional text only (ADR 0005). The ``live`` test calls
-the real API and is skipped without ``META_API_KEY``."""
+Meta Model API (``muse-spark-1.3``) and Baseten Model APIs (``meta-models/muse-spark-open-1026``)
+on fictional text only (ADR 0005). The ``live`` tests call the real APIs and are skipped without
+``META_API_KEY`` / ``BASETEN_API_KEY``."""
 
 from __future__ import annotations
 
@@ -36,8 +37,14 @@ E = EntityType
 FIXTURES = json.loads(
     (Path(__file__).parent / "fixtures" / "muse_spark_recorded.json").read_text("utf-8")
 )
+BASETEN_FIXTURES = json.loads(
+    (Path(__file__).parent / "fixtures" / "muse_spark_open_baseten_recorded.json").read_text(
+        "utf-8"
+    )
+)
 # Read at import time: the autouse ``clean_env`` fixture removes it from the environment.
 LIVE_KEY = os.environ.get("META_API_KEY")
+BASETEN_KEY = os.environ.get("BASETEN_API_KEY")
 
 
 def completion(content: str, finish_reason: str = "stop") -> dict[str, Any]:
@@ -141,6 +148,67 @@ def test_recorded_english_letter() -> None:
     system = rec.payloads()[0]["messages"][0]["content"]
     assert "English" in system
     assert "_HU" not in system
+
+
+# Muse Spark Open on Baseten, reasoning_effort "low". The message carries ``reasoning_content``
+# next to ``content``; only ``content`` is parsed.
+BASETEN_EXPECTED: dict[str, list[tuple[str, str]]] = {
+    "contract_hu": [
+        ("PERSON", "Teszt Elek"),
+        ("PERSON", "Teszt Eleknek"),
+        ("PERSON", "Példa Ágnesnek"),
+        ("PERSON", "Minta Mária"),
+        ("DATE_OF_BIRTH", "1985. április 12."),
+        ("ADDRESS", "6720 Szeged, Kárász utca 7."),
+        ("EMAIL", "pelda.agnes@example.com"),
+        ("PHONE", "+36 30 123 4567"),
+        ("BANK_ACCOUNT", "HU42 1177 3016 1111 1018 0000 0000"),
+        ("PARCEL_NUMBER_HU", "12345/6"),
+    ],
+    "prose_hu": [
+        ("PERSON", "Kovácsné Próba Zsuzsanna"),
+        ("PERSON", "Próba Zsuzsannának"),
+        ("ID_DOCUMENT", "123456AB"),
+        ("VEHICLE_PLATE", "ABC-123"),
+    ],
+    "letter_en": [
+        ("PERSON", "Jonathan Fakename"),
+        ("PERSON", "Riley"),
+        ("DATE_OF_BIRTH", "14 March 1979"),
+        ("ADDRESS", "Flat 3, 27 Example Road, Testington TE5 7XY"),
+        ("ID_DOCUMENT", "123456789"),
+        ("PHONE", "+44 7700 900123"),
+        ("EMAIL", "j.fakename@example.org"),
+        ("ORGANIZATION", "Placeholder Widgets Ltd"),
+    ],
+}
+
+
+@pytest.mark.parametrize("name", sorted(BASETEN_EXPECTED))
+def test_recorded_baseten_muse_spark_open(name: str) -> None:
+    fx = BASETEN_FIXTURES[name]
+    assert fx["model"] == DEFAULT_MODEL
+    assert "reasoning_content" in fx["response"]["choices"][0]["message"]
+    text = fx["text"]
+    rec = Recorder(fx["response"])
+    det = make(rec, reasoning_effort="low")
+    found = pairs(text, det.detect(text, language=fx["language"]))
+    for expected in BASETEN_EXPECTED[name]:
+        assert expected in found
+    usage = fx["response"]["usage"]
+    assert det.usage["requests"] == 1
+    assert det.usage["prompt_tokens"] == usage["prompt_tokens"]
+    assert det.usage["completion_tokens"] == usage["completion_tokens"]
+    assert det.usage["reasoning_tokens"] == usage["completion_tokens_details"]["reasoning_tokens"]
+    assert det.usage["invalid_outputs"] == det.usage["refusals"] == 0
+
+
+def test_baseten_fixture_has_no_credentials() -> None:
+    raw = (Path(__file__).parent / "fixtures" / "muse_spark_open_baseten_recorded.json").read_text(
+        "utf-8"
+    )
+    assert "authorization" not in raw.lower()
+    assert "bearer" not in raw.lower()
 
 
 # --- Languages -------------------------------------------------------------------
@@ -260,6 +328,60 @@ def test_settings_and_env_configure_the_endpoint(monkeypatch: pytest.MonkeyPatch
     assert rec.requests[0].headers["authorization"] == "Bearer from-env"
     assert rec.payloads()[0]["model"] == "my-org/muse-spark-open-ft"
     assert "from-env" not in repr(det)
+
+
+def test_reasoning_effort_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PII_GUARD_LLM_DETECTOR_REASONING_EFFORT", "low")
+    rec = Recorder(completion(entities_json()))
+    make(rec).detect("Szia!")
+    assert rec.payloads()[0]["reasoning_effort"] == "low"
+    # An explicit keyword wins over the environment.
+    rec = Recorder(completion(entities_json()))
+    make(rec, reasoning_effort="minimal").detect("Szia!")
+    assert rec.payloads()[0]["reasoning_effort"] == "minimal"
+
+
+def test_registry_detector_reads_reasoning_effort_from_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The eval CLI creates ``llm`` with no keywords; the env setting must still apply."""
+    monkeypatch.setenv("PII_GUARD_LLM_DETECTOR_REASONING_EFFORT", "low")
+    det = registry.create_detector("llm")
+    assert isinstance(det, LlmDetector)
+    assert det.reasoning_effort == "low"
+
+
+def test_usage_counts_tokens_invalid_outputs_and_refusals() -> None:
+    ok = completion(entities_json(("PERSON", "Teszt Elek")))
+    ok["usage"] = {
+        "prompt_tokens": 900,
+        "completion_tokens": 120,
+        "prompt_tokens_details": {"cached_tokens": 512},
+        "completion_tokens_details": {"reasoning_tokens": 80},
+    }
+    rec = Recorder(completion("not json"), ok)
+    det = make(rec)
+    det.detect("Teszt Elek írt.")
+    assert det.usage == {
+        "requests": 2,
+        "prompt_tokens": 900,
+        "cached_tokens": 512,
+        "completion_tokens": 120,
+        "reasoning_tokens": 80,
+        "invalid_outputs": 1,
+        "refusals": 0,
+    }
+
+    refusal = completion("I can't help with that.")
+    refusal["choices"][0]["message"]["refusal"] = "I can't help with that."
+    det = make(Recorder(refusal))
+    with pytest.raises(DetectionError) as excinfo:
+        det.detect("Teszt Elek írt.")
+    assert "refused" in excinfo.value.message
+    assert "Teszt" not in excinfo.value.message
+    assert det.usage["refusals"] == 2
+    assert det.usage["invalid_outputs"] == 2
+    assert det.usage["requests"] == 2
 
 
 def test_empty_text_makes_no_request() -> None:
@@ -522,6 +644,35 @@ def test_live_meta_model_api(language: str, text: str, name: str) -> None:
     found = {(s.entity_type, s.text) for s in det.detect(text, language=language)}
     assert (E.PERSON, name) in found
     assert (E.EMAIL, "teszt.elek@example.com") in found
+
+
+@pytest.mark.live
+@pytest.mark.skipif(not BASETEN_KEY, reason="BASETEN_API_KEY not set")
+@pytest.mark.parametrize(
+    ("language", "text", "name"),
+    [
+        (
+            "hu",
+            "Alulírott Teszt Elek (e-mail: teszt.elek@example.com) 6720 Szeged, Kárász utca 7.",
+            "Teszt Elek",
+        ),
+        (
+            "en",
+            "Please call Ms Jane Placeholder (teszt.elek@example.com) about 12 Example Road.",
+            "Jane Placeholder",
+        ),
+    ],
+)
+def test_live_baseten_muse_spark_open(language: str, text: str, name: str) -> None:
+    """The production default: Muse Spark Open on Baseten Model APIs. Fictional text only."""
+    det = LlmDetector(api_key=BASETEN_KEY, reasoning_effort="low", settings=Settings())
+    assert det.model == "meta-models/muse-spark-open-1026"
+    assert det.url == "https://inference.baseten.co/v1/chat/completions"
+    found = {(s.entity_type, s.text) for s in det.detect(text, language=language)}
+    assert (E.PERSON, name) in found
+    assert (E.EMAIL, "teszt.elek@example.com") in found
+    assert det.usage["refusals"] == 0
+    assert det.usage["completion_tokens"] > 0
 
 
 # --- stem-changed forms (LAB-1115) -------------------------------------------------------

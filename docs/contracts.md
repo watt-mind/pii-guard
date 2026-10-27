@@ -133,7 +133,8 @@ unset. Secrets are `SecretStr`.
 has its own per-mode set). `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
 settings load: an unknown type or policy stops startup. The LLM detector also reads
 `PII_GUARD_LLM_DETECTOR_MODEL` and `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT` from the
-environment; folding those, the text size limit and the gateway settings into `Settings` is
+environment (`LlmDetector` falls back to both itself, so the registry and `pii-guard eval`
+honour them too; Muse Spark Open on Baseten needs `REASONING_EFFORT=low`); folding those, the text size limit and the gateway settings into `Settings` is
 LAB-1095.
 
 `settings.tenant_key_bytes() -> bytes | None` decodes the hex tenant key (raises

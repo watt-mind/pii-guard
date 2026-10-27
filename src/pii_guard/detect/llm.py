@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import re
+import threading
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -55,6 +56,18 @@ logger = logging.getLogger(__name__)
 DEFAULT_MODEL = "meta-models/muse-spark-open-1026"
 DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
 MODEL_ENV_VAR = "PII_GUARD_LLM_DETECTOR_MODEL"
+#: Fallback for ``reasoning_effort`` when the caller passes none (the eval CLI, the registry).
+REASONING_EFFORT_ENV_VAR = "PII_GUARD_LLM_DETECTOR_REASONING_EFFORT"
+#: Counters in :attr:`LlmDetector.usage` (token counts as the endpoint reports them).
+USAGE_KEYS = (
+    "requests",
+    "prompt_tokens",
+    "cached_tokens",
+    "completion_tokens",
+    "reasoning_tokens",
+    "invalid_outputs",
+    "refusals",
+)
 
 #: What the prompt tells the model about each text entity type.
 ENTITY_DESCRIPTIONS: dict[EntityType, str] = {
@@ -363,8 +376,11 @@ class LlmDetector:
     ``PII_GUARD_LLM_DETECTOR_MODEL``, then the Baseten Muse Spark Open defaults.
 
     - ``base_url``: the API root (``.../v1``) or the full ``.../chat/completions`` URL.
-    - ``reasoning_effort``: sent only when set. Muse Spark always reasons and rejects
-      ``"none"``; use ``"minimal"`` or ``"low"`` for detection.
+    - ``reasoning_effort``: sent only when set (default
+      ``PII_GUARD_LLM_DETECTOR_REASONING_EFFORT``). Muse Spark always reasons and rejects
+      ``"none"``; use ``"minimal"`` or ``"low"`` for detection. Muse Spark Open on Baseten
+      needs ``"low"``: at its default effort the reasoning uses up ``max_tokens`` and the
+      content comes back empty.
     - ``reasoning_strength``: sent as ``chat_template_kwargs: {"reasoning_strength": ...}``
       when set (default ``PII_GUARD_LLM_DETECTOR_REASONING_STRENGTH``). Muse Glimmer served by
       vLLM ignores ``reasoning_effort`` and reasons at ``high`` unless this says otherwise;
@@ -375,6 +391,9 @@ class LlmDetector:
     - ``max_retries``: extra attempts after a timeout, a transport error, a retryable HTTP
       status (429, 5xx) or output that is not valid JSON.
     - ``transport``: an ``httpx.BaseTransport`` (tests use ``httpx.MockTransport``).
+
+    :attr:`usage` counts requests, reported tokens, invalid outputs and refusals for this
+    instance (counts only, never text), for cost and refusal reporting.
     """
 
     name = "llm"
@@ -417,7 +436,7 @@ class LlmDetector:
         self.timeout = timeout
         self.max_retries = max_retries
         self.temperature = temperature
-        self.reasoning_effort = reasoning_effort
+        self.reasoning_effort = reasoning_effort or os.environ.get(REASONING_EFFORT_ENV_VAR) or None
         self.reasoning_strength = reasoning_strength or settings.llm_detector_reasoning_strength
         self.json_mode = json_mode
         self.max_tokens = max_tokens
@@ -425,6 +444,8 @@ class LlmDetector:
         self.chunk_overlap = chunk_overlap
         self.score = score
         self._transport = transport
+        self.usage: dict[str, int] = dict.fromkeys(USAGE_KEYS, 0)
+        self._usage_lock = threading.Lock()
 
     def __repr__(self) -> str:  # never the key
         return f"LlmDetector(url={self.url!r}, model={self.model!r})"
@@ -518,7 +539,10 @@ class LlmDetector:
             try:
                 content = self._complete(client, payload)
                 return parse_entities(content)
-            except (_Retryable, _InvalidOutput) as exc:
+            except _InvalidOutput as exc:
+                self._count(invalid_outputs=1)
+                last_error = str(exc)
+            except _Retryable as exc:
                 last_error = str(exc)
             logger.warning(
                 "llm detector attempt %d/%d failed: %s",
@@ -546,6 +570,10 @@ class LlmDetector:
             message = choice["message"]
         except (ValueError, KeyError, IndexError, TypeError):
             raise _InvalidOutput("malformed completion response") from None
+        self._record_usage(data.get("usage"))
+        if isinstance(message, dict) and message.get("refusal"):
+            self._count(refusals=1)
+            raise _InvalidOutput("model refused")
         if choice.get("finish_reason") == "length":
             raise _InvalidOutput("completion truncated (finish_reason=length)")
         content = message.get("content") if isinstance(message, dict) else None
@@ -554,6 +582,27 @@ class LlmDetector:
         if not isinstance(content, str) or not content.strip():
             raise _InvalidOutput("empty completion content")
         return content
+
+    def _count(self, **deltas: int) -> None:
+        with self._usage_lock:
+            for key, delta in deltas.items():
+                self.usage[key] += delta
+
+    def _record_usage(self, usage: object) -> None:
+        """Add one response's ``usage`` block (OpenAI shape) to :attr:`usage`."""
+        deltas = {"requests": 1}
+        if isinstance(usage, dict):
+            for key in ("prompt_tokens", "completion_tokens"):
+                if isinstance(usage.get(key), int):
+                    deltas[key] = usage[key]
+            for details, key, out in (
+                ("prompt_tokens_details", "cached_tokens", "cached_tokens"),
+                ("completion_tokens_details", "reasoning_tokens", "reasoning_tokens"),
+            ):
+                value = (usage.get(details) or {}).get(key)
+                if isinstance(value, int):
+                    deltas[out] = value
+        self._count(**deltas)
 
 
 DETECTOR_CLASS = LlmDetector
