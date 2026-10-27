@@ -3,7 +3,7 @@
   "run_id": "2026-10-27-comparison-de-smoke-fast",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:06:10+00:00",
+  "recorded_at": "2026-10-27T10:39:20+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules + ner (xlmr-large-distilled-glimmer) on smoke",
@@ -11,10 +11,10 @@
     "One warm-up call before timing; wall time 0.4 s."
   ],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 4f84c6a of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "pii-guard",
@@ -57,7 +57,7 @@
     "de"
   ],
   "hardware": {
-    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.3 at start (machine not idle)",
+    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle)",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
     "machine": "arm64",
     "cpu_count": 10,
@@ -116,12 +116,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 24.387,
-          "p95": 43.169
+          "p50": 23.874,
+          "p95": 39.125
         },
         "mask": {
-          "p50": 0.494,
-          "p95": 0.833
+          "p50": 0.48,
+          "p95": 0.834
         }
       },
       "per_type": {
@@ -307,12 +307,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 24.387,
-            "p95": 43.169
+            "p50": 23.874,
+            "p95": 39.125
           },
           "mask": {
-            "p50": 0.494,
-            "p95": 0.833
+            "p50": 0.48,
+            "p95": 0.834
           }
         },
         "per_type": {

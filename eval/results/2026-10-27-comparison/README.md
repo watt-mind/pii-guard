@@ -39,109 +39,112 @@ Round trip is n/a for Presidio (its default operator can't be undone).
 
 | Fixture | System | Docs | P | R | F1 | F1 exact | Leak | Partial leak | Over-masking | Round trip | p50 ms | p95 ms | $ / 1k msgs |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `hu-smoke` | pii-guard rules | 31 | 100.0 | 55.8 | 71.7 | 71.7 | 40.6 | 3.8 | 0.0 | 100.0 | 0.2 | 0.4 | - |
-| `hu-smoke` | pii-guard fast | 31 | 97.5 | 98.3 | 97.9 | 93.8 | 0.9 | 1.9 | 0.9 | 100.0 | 28.3 | 38.4 | - |
-| `hu-smoke` | pii-guard strict | 31 | 94.5 | 99.2 | 96.8 | 89.9 | 0.9 | 0.9 | 1.8 | 100.0 | 2,191 | 4,220 | 2.40 |
-| `hu-smoke` | presidio | 31 | 74.8 | 61.7 | 67.6 | 46.8 | 33.0 | 12.3 | 17.4 | n/a | 78.7 | 135 | - |
-| `hu-smoke` | llm-guard | 31 | 53.0 | 41.7 | 46.7 | 4.5 | 50.0 | 5.7 | 45.2 | 100.0 | 71.9 | 110 | - |
-| `hu-smoke` | privaite | 31 | 42.8 | 50.8 | 46.5 | 22.2 | 17.9 | 9.4 | 28.3 | 96.8 | 73.5 | 109 | - |
-| `en-smoke` | pii-guard rules | 10 | 100.0 | 47.1 | 64.0 | 56.0 | 46.7 | 13.3 | 0.0 | 100.0 | 0.2 | 0.2 | - |
-| `en-smoke` | pii-guard fast | 10 | 100.0 | 97.1 | 98.5 | 85.3 | 0.0 | 6.7 | 0.0 | 100.0 | 25.1 | 37.9 | - |
-| `en-smoke` | pii-guard strict | 10 | 87.2 | 100.0 | 93.2 | 90.4 | 0.0 | 3.3 | 11.8 | 100.0 | 2,076 | 7,895 | 2.77 |
-| `en-smoke` | presidio | 10 | 61.9 | 76.5 | 68.4 | 65.8 | 10.0 | 13.3 | 26.2 | n/a | 7.3 | 23.1 | - |
-| `en-smoke` | llm-guard | 10 | 100.0 | 61.8 | 76.4 | 31.7 | 30.0 | 13.3 | 0.0 | 100.0 | 60.2 | 83.9 | - |
-| `en-smoke` | privaite | 10 | 70.7 | 79.4 | 74.8 | 61.3 | 0.0 | 13.3 | 22.0 | 100.0 | 56.7 | 63.9 | - |
-| `de-smoke` | pii-guard rules | 10 | 100.0 | 52.5 | 68.9 | 64.5 | 43.2 | 8.1 | 0.0 | 100.0 | 0.2 | 0.3 | - |
-| `de-smoke` | pii-guard fast | 10 | 100.0 | 100.0 | 100.0 | 91.4 | 0.0 | 2.7 | 0.0 | 100.0 | 24.4 | 43.2 | - |
-| `de-smoke` | pii-guard strict | 10 | 100.0 | 100.0 | 100.0 | 97.5 | 0.0 | 0.0 | 0.0 | 100.0 | 1,663 | 3,124 | 1.99 |
-| `de-smoke` | presidio | 10 | 43.1 | 77.5 | 55.4 | 39.3 | 10.8 | 10.8 | 44.4 | n/a | 7.0 | 18.1 | - |
-| `de-smoke` | llm-guard | 10 | 97.1 | 50.0 | 66.0 | 16.0 | 43.2 | 10.8 | 0.0 | 100.0 | 68.3 | 107 | - |
-| `de-smoke` | privaite | 10 | 62.5 | 70.0 | 66.0 | 47.7 | 8.1 | 8.1 | 20.8 | 100.0 | 52.8 | 71.7 | - |
-| `hu-synth-sample` | pii-guard rules | 20 | 100.0 | 46.1 | 63.1 | 63.1 | 41.6 | 1.2 | 0.0 | 100.0 | 0.9 | 2.4 | - |
-| `hu-synth-sample` | pii-guard fast | 20 | 99.6 | 100.0 | 99.8 | 98.9 | 0.0 | 0.0 | 0.4 | 100.0 | 66.6 | 159 | - |
-| `hu-synth-sample` | pii-guard strict | 20 | 99.6 | 100.0 | 99.8 | 98.0 | 0.0 | 0.0 | 0.4 | 100.0 | 2,324 | 3,187 | 3.85 |
-| `hu-synth-sample` | presidio | 20 | 83.1 | 70.8 | 76.5 | 54.3 | 28.9 | 23.1 | 9.7 | n/a | 300 | 655 | - |
-| `hu-synth-sample` | llm-guard | 20 | 58.1 | 39.1 | 46.8 | 5.6 | 60.1 | 9.2 | 38.6 | 100.0 | 220 | 941 | - |
-| `hu-synth-sample` | privaite | 20 | 51.7 | 49.4 | 50.6 | 31.7 | 24.3 | 11.6 | 25.2 | 75.0 | 267 | 730 | - |
-| `en-synth-sample` | pii-guard rules | 10 | 100.0 | 37.5 | 54.5 | 33.9 | 46.2 | 25.0 | 0.0 | 100.0 | 1.7 | 12.2 | - |
-| `en-synth-sample` | pii-guard fast | 10 | 97.6 | 100.0 | 98.8 | 98.8 | 0.0 | 3.8 | 2.7 | 100.0 | 62.6 | 176 | - |
-| `en-synth-sample` | pii-guard strict | 10 | 97.6 | 100.0 | 98.8 | 98.8 | 0.0 | 3.8 | 2.7 | 100.0 | 2,099 | 4,749 | 3.01 |
-| `en-synth-sample` | presidio | 10 | 50.5 | 83.3 | 62.9 | 47.2 | 11.2 | 26.2 | 44.6 | n/a | 32.1 | 80.2 | - |
-| `en-synth-sample` | llm-guard | 10 | 98.4 | 46.7 | 63.3 | 36.3 | 48.8 | 13.8 | 1.6 | 100.0 | 108 | 307 | - |
-| `en-synth-sample` | privaite | 10 | 73.1 | 80.8 | 76.8 | 66.1 | 7.5 | 3.8 | 21.6 | 100.0 | 158 | 331 | - |
+| `hu-smoke` | pii-guard rules | 31 | 100.0 | 56.7 | 72.3 | 72.3 | 39.6 | 3.8 | 0.0 | 100.0 | 0.4 | 5.5 | - |
+| `hu-smoke` | pii-guard fast | 31 | 97.5 | 98.3 | 97.9 | 93.8 | 0.9 | 1.9 | 0.9 | 100.0 | 28.5 | 43.4 | - |
+| `hu-smoke` | pii-guard strict | 31 | 95.2 | 99.2 | 97.2 | 89.4 | 0.9 | 0.9 | 1.8 | 100.0 | 1,949 | 3,793 | 2.49 |
+| `hu-smoke` | presidio | 31 | 74.8 | 61.7 | 67.6 | 46.8 | 33.0 | 12.3 | 17.4 | n/a | 136 | 284 | - |
+| `hu-smoke` | llm-guard | 31 | 53.0 | 41.7 | 46.7 | 4.5 | 50.0 | 5.7 | 45.2 | 100.0 | 103 | 180 | - |
+| `hu-smoke` | privaite | 31 | 42.8 | 50.8 | 46.5 | 22.2 | 17.9 | 9.4 | 28.3 | 96.8 | 182 | 389 | - |
+| `en-smoke` | pii-guard rules | 10 | 100.0 | 47.1 | 64.0 | 56.0 | 46.7 | 13.3 | 0.0 | 100.0 | 0.3 | 0.4 | - |
+| `en-smoke` | pii-guard fast | 10 | 100.0 | 97.1 | 98.5 | 85.3 | 0.0 | 6.7 | 0.0 | 100.0 | 24.8 | 39.5 | - |
+| `en-smoke` | pii-guard strict | 10 | 100.0 | 100.0 | 100.0 | 97.1 | 0.0 | 3.3 | 0.0 | 100.0 | 1,894 | 4,862 | 2.43 |
+| `en-smoke` | presidio | 10 | 61.9 | 76.5 | 68.4 | 65.8 | 10.0 | 13.3 | 26.2 | n/a | 12.6 | 35.7 | - |
+| `en-smoke` | llm-guard | 10 | 100.0 | 61.8 | 76.4 | 31.7 | 30.0 | 13.3 | 0.0 | 100.0 | 133 | 191 | - |
+| `en-smoke` | privaite | 10 | 70.7 | 79.4 | 74.8 | 61.3 | 0.0 | 13.3 | 22.0 | 100.0 | 136 | 162 | - |
+| `de-smoke` | pii-guard rules | 10 | 100.0 | 52.5 | 68.9 | 64.5 | 43.2 | 8.1 | 0.0 | 100.0 | 0.4 | 0.6 | - |
+| `de-smoke` | pii-guard fast | 10 | 100.0 | 100.0 | 100.0 | 91.4 | 0.0 | 2.7 | 0.0 | 100.0 | 23.9 | 39.1 | - |
+| `de-smoke` | pii-guard strict | 10 | 100.0 | 100.0 | 100.0 | 97.5 | 0.0 | 0.0 | 0.0 | 100.0 | 1,814 | 3,071 | 2.03 |
+| `de-smoke` | presidio | 10 | 43.1 | 77.5 | 55.4 | 39.3 | 10.8 | 10.8 | 44.4 | n/a | 15.7 | 43.6 | - |
+| `de-smoke` | llm-guard | 10 | 97.1 | 50.0 | 66.0 | 16.0 | 43.2 | 10.8 | 0.0 | 100.0 | 107 | 140 | - |
+| `de-smoke` | privaite | 10 | 62.5 | 70.0 | 66.0 | 47.7 | 8.1 | 8.1 | 20.8 | 100.0 | 167 | 253 | - |
+| `hu-synth-sample` | pii-guard rules | 20 | 100.0 | 46.1 | 63.1 | 63.1 | 41.6 | 1.2 | 0.0 | 100.0 | 1.6 | 5.2 | - |
+| `hu-synth-sample` | pii-guard fast | 20 | 99.6 | 100.0 | 99.8 | 98.9 | 0.0 | 0.0 | 0.4 | 100.0 | 65.2 | 150 | - |
+| `hu-synth-sample` | pii-guard strict | 20 | 99.6 | 100.0 | 99.8 | 99.1 | 0.0 | 0.0 | 0.4 | 100.0 | 2,041 | 2,639 | 3.62 |
+| `hu-synth-sample` | presidio | 20 | 83.1 | 70.8 | 76.5 | 54.3 | 28.9 | 23.1 | 9.7 | n/a | 528 | 1,317 | - |
+| `hu-synth-sample` | llm-guard | 20 | 58.1 | 39.1 | 46.8 | 5.6 | 60.1 | 9.2 | 38.6 | 100.0 | 818 | 3,604 | - |
+| `hu-synth-sample` | privaite | 20 | 51.7 | 49.4 | 50.6 | 31.7 | 24.3 | 11.6 | 25.2 | 75.0 | 473 | 1,323 | - |
+| `en-synth-sample` | pii-guard rules | 10 | 100.0 | 37.5 | 54.5 | 33.9 | 46.2 | 25.0 | 0.0 | 100.0 | 0.9 | 2.1 | - |
+| `en-synth-sample` | pii-guard fast | 10 | 97.6 | 100.0 | 98.8 | 98.8 | 0.0 | 3.8 | 2.7 | 100.0 | 56.0 | 164 | - |
+| `en-synth-sample` | pii-guard strict | 10 | 97.6 | 100.0 | 98.8 | 98.8 | 0.0 | 3.8 | 2.7 | 100.0 | 2,000 | 3,026 | 3.02 |
+| `en-synth-sample` | presidio | 10 | 50.5 | 83.3 | 62.9 | 47.2 | 11.2 | 26.2 | 44.6 | n/a | 28.2 | 71.0 | - |
+| `en-synth-sample` | llm-guard | 10 | 98.4 | 46.7 | 63.3 | 36.3 | 48.8 | 13.8 | 1.6 | 100.0 | 107 | 295 | - |
+| `en-synth-sample` | privaite | 10 | 73.1 | 80.8 | 76.8 | 66.1 | 7.5 | 3.8 | 21.6 | 100.0 | 217 | 549 | - |
 | `hu-ai4privacy` | pii-guard rules | 200 | 100.0 | 27.8 | 43.5 | 39.8 | 72.2 | 2.4 | 0.0 | 100.0 | 0.2 | 0.6 | - |
-| `hu-ai4privacy` | pii-guard fast | 200 | 79.4 | 59.3 | 67.9 | 50.2 | 40.4 | 1.7 | 14.7 | 100.0 | 29.8 | 46.1 | - |
-| `hu-ai4privacy` | pii-guard strict | 200 | 82.2 | 95.6 | 88.4 | 81.7 | 3.5 | 0.3 | 13.7 | 100.0 | 2,531 | 5,602 | 2.98 |
-| `hu-ai4privacy` | presidio | 200 | 54.1 | 44.9 | 49.1 | 29.3 | 46.1 | 5.7 | 35.1 | n/a | 86.2 | 202 | - |
-| `hu-ai4privacy` | llm-guard | 200 | 60.2 | 52.8 | 56.3 | 9.9 | 44.7 | 2.9 | 37.7 | 100.0 | 62.5 | 115 | - |
-| `hu-ai4privacy` | privaite | 200 | 48.4 | 59.8 | 53.5 | 35.1 | 14.0 | 3.5 | 29.0 | 98.0 | 74.9 | 188 | - |
+| `hu-ai4privacy` | pii-guard fast | 200 | 79.4 | 59.3 | 67.9 | 50.2 | 40.4 | 1.7 | 14.7 | 100.0 | 30.5 | 46.7 | - |
+| `hu-ai4privacy` | pii-guard strict | 200 | 82.1 | 95.2 | 88.1 | 81.3 | 3.7 | 0.1 | 14.1 | 100.0 | 2,299 | 5,002 | 2.95 |
+| `hu-ai4privacy` | presidio | 200 | 54.1 | 44.9 | 49.1 | 29.3 | 46.1 | 5.7 | 35.1 | n/a | 90.6 | 209 | - |
+| `hu-ai4privacy` | llm-guard | 200 | 60.2 | 52.8 | 56.3 | 9.9 | 44.7 | 2.9 | 37.7 | 100.0 | 68.0 | 162 | - |
+| `hu-ai4privacy` | privaite | 200 | 48.4 | 59.8 | 53.5 | 35.1 | 14.0 | 3.5 | 29.0 | 98.0 | 109 | 253 | - |
 | `en-ai4privacy` | pii-guard rules | 200 | 95.6 | 24.1 | 38.5 | 38.3 | 74.7 | 0.4 | 0.5 | 100.0 | 0.3 | 0.8 | - |
-| `en-ai4privacy` | pii-guard fast | 200 | 82.7 | 64.1 | 72.2 | 55.9 | 34.8 | 1.9 | 12.8 | 100.0 | 30.4 | 52.6 | - |
-| `en-ai4privacy` | pii-guard strict | 200 | 83.0 | 92.8 | 87.6 | 79.3 | 3.7 | 0.2 | 11.1 | 100.0 | 1,905 | 3,561 | 2.65 |
-| `en-ai4privacy` | presidio | 200 | 38.5 | 48.3 | 42.8 | 33.0 | 22.5 | 9.9 | 37.2 | n/a | 9.4 | 24.5 | - |
-| `en-ai4privacy` | llm-guard | 200 | 96.5 | 51.6 | 67.2 | 15.9 | 46.1 | 1.0 | 1.1 | 100.0 | 59.0 | 112 | - |
-| `en-ai4privacy` | privaite | 200 | 57.1 | 68.6 | 62.3 | 39.4 | 7.7 | 1.1 | 22.7 | 99.5 | 83.0 | 212 | - |
+| `en-ai4privacy` | pii-guard fast | 200 | 82.7 | 64.1 | 72.2 | 55.9 | 34.8 | 1.9 | 12.8 | 100.0 | 28.8 | 46.1 | - |
+| `en-ai4privacy` | pii-guard strict | 200 | 83.5 | 93.0 | 88.0 | 80.0 | 3.5 | 0.1 | 10.5 | 100.0 | 1,988 | 3,682 | 2.70 |
+| `en-ai4privacy` | presidio | 200 | 38.5 | 48.3 | 42.8 | 33.0 | 22.5 | 9.9 | 37.2 | n/a | 9.3 | 25.1 | - |
+| `en-ai4privacy` | llm-guard | 200 | 96.5 | 51.6 | 67.2 | 15.9 | 46.1 | 1.0 | 1.1 | 100.0 | 61.3 | 124 | - |
+| `en-ai4privacy` | privaite | 200 | 57.1 | 68.6 | 62.3 | 39.4 | 7.7 | 1.1 | 22.7 | 99.5 | 132 | 294 | - |
 | `de-ai4privacy` | pii-guard rules | 200 | 98.2 | 26.1 | 41.3 | 39.0 | 73.4 | 1.4 | 0.0 | 100.0 | 0.2 | 0.6 | - |
-| `de-ai4privacy` | pii-guard fast | 200 | 82.5 | 60.2 | 69.6 | 53.1 | 39.2 | 1.8 | 14.9 | 100.0 | 28.6 | 43.6 | - |
-| `de-ai4privacy` | pii-guard strict | 200 | 84.8 | 93.5 | 88.9 | 79.9 | 4.3 | 0.0 | 11.5 | 100.0 | 1,881 | 3,776 | 2.58 |
-| `de-ai4privacy` | presidio | 200 | 20.3 | 56.5 | 29.8 | 18.8 | 18.9 | 7.6 | 70.2 | n/a | 7.4 | 17.6 | - |
-| `de-ai4privacy` | llm-guard | 200 | 92.4 | 57.5 | 70.9 | 14.7 | 39.8 | 1.6 | 4.6 | 100.0 | 58.3 | 98.8 | - |
-| `de-ai4privacy` | privaite | 200 | 52.3 | 68.0 | 59.1 | 37.0 | 6.5 | 3.2 | 28.1 | 96.5 | 81.0 | 165 | - |
+| `de-ai4privacy` | pii-guard fast | 200 | 82.5 | 60.2 | 69.6 | 53.1 | 39.2 | 1.8 | 14.9 | 100.0 | 25.8 | 38.6 | - |
+| `de-ai4privacy` | pii-guard strict | 200 | 85.3 | 93.5 | 89.2 | 80.1 | 4.8 | 0.0 | 11.5 | 100.0 | 2,012 | 4,326 | 2.56 |
+| `de-ai4privacy` | presidio | 200 | 20.3 | 56.5 | 29.8 | 18.8 | 18.9 | 7.6 | 70.2 | n/a | 7.6 | 17.1 | - |
+| `de-ai4privacy` | llm-guard | 200 | 92.4 | 57.5 | 70.9 | 14.7 | 39.8 | 1.6 | 4.6 | 100.0 | 67.5 | 209 | - |
+| `de-ai4privacy` | privaite | 200 | 52.3 | 68.0 | 59.1 | 37.0 | 6.5 | 3.2 | 28.1 | 96.5 | 92.7 | 204 | - |
 
 ### Reading it
 
-- **Our fixtures.** Fast mode leaks 0.9 % on `hu-smoke` (one value of 106) and 0.0 % on
-  `en-smoke` and `de-smoke`, at 24–28 ms p50; strict mode is the same on leak (0.9 / 0.0 /
-  0.0 %) at about 2 s and $2–2.80 per 1,000 messages. On the hand-written sets the best
-  comparison tool leaks 17.9 % (`hu`, PrivAiTe), 0.0 % (`en`, PrivAiTe) and 8.1 % (`de`,
-  PrivAiTe).
-- **Strict is not more precise than fast on our sets.** Adding the LLM to rules + NER found
-  one more Hungarian value but masked more harmless spans (`en-smoke` over-masking 11.8 %
-  vs 0.0 % for fast; precision 87.2 vs 100). On these small hand-written sets fast mode is the
-  better trade-off; strict earns its cost on unfamiliar text (below).
-- **Public set.** Strict mode leaks 3.5 % (`hu`), 3.7 % (`en`) and 4.3 % (`de`), the lowest of
+- **Our fixtures.** Fast mode leaks 0.9 % on `hu-smoke` (1 of 106 labelled values) and 0.0 %
+  on `en-smoke` and `de-smoke`, at 24–29 ms p50. Strict mode leaks the same (0.9 / 0.0 /
+  0.0 %) at about 1.8–1.9 s and $2.03–2.49 per 1,000 messages. The best comparison tool on
+  the hand-written sets is PrivAiTe: 17.9 % (`hu`), 0.0 % (`en`), 8.1 % (`de`).
+- **On our sets strict buys nothing over fast.** Same leak, F1 within a point (`hu-smoke`
+  97.2 strict vs 97.9 fast), about 70× the latency plus an API bill. Strict earns its cost on
+  unfamiliar text (below). Strict's precision also varies between runs: an earlier strict
+  run today at `e394a06` (superseded, not committed) masked 11.8 % harmless spans on
+  `en-smoke`, this one 0.0 %.
+- **Public set.** Strict mode leaks 3.7 % (`hu`), 3.5 % (`en`) and 4.8 % (`de`), the lowest of
   every system; the best comparison tool is PrivAiTe at 14.0 / 7.7 / 6.5 %. **Fast mode
-  leaks 35–40 % here, worse than PrivAiTe and Presidio on leak.** Most of what it misses is
-  numbers: only about 10 % of the set's card, tax and TAJ numbers pass their checksums, and
-  phone numbers use formats no numbering plan has, while pii-guard's rules validate both on
-  purpose. Its NER isn't trained to find unvalidated numbers. The LLM pass catches them.
+  leaks 35–40 % here, more than PrivAiTe and Presidio.** Most of what it misses is numbers:
+  only about 10 % of the set's card, tax and TAJ numbers pass their checksums, and phone
+  numbers use formats no numbering plan has, while pii-guard's rules validate both on
+  purpose, and the NER isn't trained on number types. The LLM pass catches them (LAB-1170
+  tracks the fast-mode gap).
 - **Over-masking on the public set** is inflated for every system that masks dates or towns:
   those labels are policy-excluded (not in the gold spans), so masking them counts against
   the system.
 - **LLM Guard** was fine-tuned on an earlier Ai4Privacy release: its public-set numbers are
   probably optimistic (it still leaks 40–46 %). PrivAiTe's training data isn't documented.
+- **Presidio on German** uses its English pipeline (it ships nothing for `de` and the harness
+  has no German spaCy model yet, LAB-1172), so its `de` rows understate it.
 
 ### Run conditions
 
-- **The machine was not idle.** Other jobs were running throughout (one-minute load average
-  9–34 on 10 cores at the start of each run, briefly over 100 during the English public
-  strict run; each run record has its load). Latency is relative, not a benchmark of the
-  hardware. Apple Silicon arm64, macOS 26.5, Python 3.12.15; the comparison tools run CPU
-  only, the NER on MPS.
+- **The machine was not idle.** Other jobs ran throughout (one-minute load average 13–27 on
+  10 cores at the start of each run; each run record has its load). Latency is relative, not
+  a benchmark of the hardware, and the comparison tools' latency is higher than in
+  [2026-10-26-baselines](../2026-10-26-baselines/README.md) for that reason. Apple Silicon
+  arm64, macOS 26.5, Python 3.12.15; the comparison tools run CPU only, the NER on MPS.
 - Each pii-guard system gets one warm-up call before timing, like the comparison tools.
-- **Strict mode, availability:** 0 refusals and 0 invalid outputs in the 682 requests of the committed runs.
-  One run of `de-ai4privacy` aborted when the detector's completion was truncated twice
-  (`finish_reason=length`) on one document; the pipeline failed closed, as the gateway would
-  for that request. The re-run had 0 blocked documents (one empty answer was re-asked,
-  `empty_challenged: 1`). The driver now counts such documents as blocked instead of
-  aborting.
-- **Code.** Fast and the baselines ran at `e394a06` (this branch on develop `0ad202a`),
-  strict on our fixtures and on `de-ai4privacy` too; strict on `hu-` and `en-ai4privacy` ran at
-  `688b940`, this branch before its rebase (develop `f8727dc` plus the driver; detection code
-  identical). The only uncommitted change during the runs was prose in `docs/evaluation.md`,
-  so the scorecards say `dirty`.
+- **Strict mode, availability:** 0 refusals, 0 invalid outputs and 0 blocked documents in the
+  682 requests of the committed runs (one empty answer was re-asked, `empty_challenged: 1`).
+  Earlier today one `de-ai4privacy` run aborted when the detector's completion was truncated
+  twice (`finish_reason=length`) on one document; the pipeline failed closed, as the gateway
+  would for that request (LAB-1173). The driver now counts such documents as blocked instead
+  of aborting.
+- **Code.** Everything ran on this branch on develop `15bf502`, which includes LAB-1149
+  (person names inside Hungarian company names): pii-guard fast and strict at `4f84c6a`, the
+  comparison tools and the rules row at `8944f96` (the same code plus these scorecards). The
+  scorecards say `dirty` only because each run overwrote earlier scorecards in this
+  directory; no code was modified.
 
 ## Spend
 
-Baseten, all of LAB-1148: **about $2.60** of the $5 budget, metered from the token counts the
-endpoint reported, at list prices:
+Baseten, all of LAB-1148: **at most $4.50** of the $5 budget, metered from the token counts
+the endpoint reported, at list prices:
 
 | What | Cost |
 |---|---:|
-| The eight committed strict runs (682 requests, warm-up calls included) | $1.88 |
-| Five earlier strict runs on our fixtures, superseded by the re-runs at `e394a06` | $0.23 |
-| The aborted first `de-ai4privacy` run (not metered; estimated as the full re-run's cost) | ≤ $0.52 |
-| **Total** | **≤ $2.63** |
+| The eight committed strict runs on develop `15bf502` (682 requests, warm-up calls included) | $1.87 |
+| Earlier strict runs, superseded after LAB-1129 and then LAB-1149 merged (13 runs) | $2.11 |
+| One aborted `de-ai4privacy` run (not metered; estimated as a full run's cost) | ≤ $0.52 |
+| **Total** | **≤ $4.50** |
 
 ## Reproduce
 

@@ -1,6 +1,6 @@
 # pii-guard evaluation
 
-- commit: `e394a0636ca0 (dirty)`, pii-guard 0.1.0
+- commit: `8944f96f0da3 (dirty)`, pii-guard 0.1.0
 - detectors: `rules`
 - fixtures: `eval/fixtures/en-smoke.jsonl` sha256 `5983d84d8dfc9fe3`
 
@@ -8,8 +8,8 @@ All ratios in %. P/R/F1 are span-level micro averages; macro F1 is over entity t
 
 | Language | Docs | Gold | Pred | P exact | R exact | F1 exact | P overlap | R overlap | F1 overlap | Macro F1 | Leak | Partial leak | Over-masking | Round trip | Consistency | Detect p50 ms | Detect p95 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `en` | 10 | 34 | 16 | 87.5 | 41.2 | 56.0 | 100.0 | 47.1 | 64.0 | 66.7 | 46.7 | 13.3 | 0.0 | 100.0 | 53.3 | 0.17 | 0.24 |
-| **overall** | 10 | 34 | 16 | 87.5 | 41.2 | 56.0 | 100.0 | 47.1 | 64.0 | 66.7 | 46.7 | 13.3 | 0.0 | 100.0 | 53.3 | 0.17 | 0.24 |
+| `en` | 10 | 34 | 16 | 87.5 | 41.2 | 56.0 | 100.0 | 47.1 | 64.0 | 66.7 | 46.7 | 13.3 | 0.0 | 100.0 | 53.3 | 0.27 | 0.43 |
+| **overall** | 10 | 34 | 16 | 87.5 | 41.2 | 56.0 | 100.0 | 47.1 | 64.0 | 66.7 | 46.7 | 13.3 | 0.0 | 100.0 | 53.3 | 0.27 | 0.43 |
 
 ## Per entity type: `en`
 
@@ -34,16 +34,16 @@ All ratios in %. P/R/F1 are span-level micro averages over pii-guard's entity ty
 ## Fixtures: `en-smoke.jsonl`
 
 - fixture sha256: `en-smoke.jsonl` `5983d84d8dfc9fe3`
-- commit: `e394a0636ca0 (dirty)`
+- commit: `8944f96f0da3 (dirty)`
 
 ### `en`
 
 | System | Docs | P overlap | R overlap | F1 overlap | F1 exact | Leak | Partial leak | Over-masking | Round trip | Detect p50 ms | Detect p95 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pii-guard rules | 10 | 100.0 | 47.1 | 64.0 | 56.0 | 46.7 | 13.3 | 0.0 | 100.0 | 0.2 | 0.2 |
-| presidio | 10 | 61.9 | 76.5 | 68.4 | 65.8 | 10.0 | 13.3 | 26.2 | n/a | 7.3 | 23.1 |
-| llm-guard | 10 | 100.0 | 61.8 | 76.4 | 31.7 | 30.0 | 13.3 | 0.0 | 100.0 | 60.2 | 83.9 |
-| privaite | 10 | 70.7 | 79.4 | 74.8 | 61.3 | 0.0 | 13.3 | 22.0 | 100.0 | 56.7 | 63.9 |
+| pii-guard rules | 10 | 100.0 | 47.1 | 64.0 | 56.0 | 46.7 | 13.3 | 0.0 | 100.0 | 0.3 | 0.4 |
+| presidio | 10 | 61.9 | 76.5 | 68.4 | 65.8 | 10.0 | 13.3 | 26.2 | n/a | 12.6 | 35.7 |
+| llm-guard | 10 | 100.0 | 61.8 | 76.4 | 31.7 | 30.0 | 13.3 | 0.0 | 100.0 | 133.1 | 190.5 |
+| privaite | 10 | 70.7 | 79.4 | 74.8 | 61.3 | 0.0 | 13.3 | 22.0 | 100.0 | 136.1 | 162.1 |
 
 Per entity type, `en`: overlap recall / leak rate (leak only for mask-policy types).
 

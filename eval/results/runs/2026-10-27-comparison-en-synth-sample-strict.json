@@ -3,19 +3,19 @@
   "run_id": "2026-10-27-comparison-en-synth-sample-strict",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:19:46+00:00",
+  "recorded_at": "2026-10-27T10:44:26+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules + ner (xlmr-large-distilled-glimmer) + llm (muse-spark-open, reasoning_effort low) on synth-sample",
   "notes": [
-    "One warm-up call before timing; wall time 25.3 s.",
+    "One warm-up call before timing; wall time 21.5 s.",
     "Latency includes a remote API call per document, so it is not comparable with local detectors."
   ],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 4f84c6a of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "pii-guard",
@@ -68,7 +68,7 @@
     "en"
   ],
   "hardware": {
-    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 24.0 at start (machine not idle)",
+    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 15.8 at start (machine not idle)",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
     "machine": "arm64",
     "cpu_count": 10,
@@ -76,18 +76,18 @@
     "python": "3.12.15"
   },
   "cost": {
-    "usd": 0.0301,
+    "usd": 0.0302,
     "estimated": true,
     "gpu_minutes": null,
     "model_calls": 10,
     "tokens": {
-      "prompt": 13140,
+      "prompt": 13124,
       "cached": 7680,
-      "completion": 5199,
-      "reasoning": 3522
+      "completion": 5226,
+      "reasoning": 3576
     },
     "shared_with": [],
-    "note": "From the token counts the endpoint reported, at list prices ($3.01 per 1,000 messages; warm-up call excluded)."
+    "note": "From the token counts the endpoint reported, at list prices ($3.02 per 1,000 messages; warm-up call excluded)."
   },
   "metrics": {
     "overall": {
@@ -140,12 +140,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 2099.426,
-          "p95": 4748.903
+          "p50": 2000.392,
+          "p95": 3025.538
         },
         "mask": {
-          "p50": 0.999,
-          "p95": 1.433
+          "p50": 1.059,
+          "p95": 1.61
         }
       },
       "per_type": {
@@ -348,12 +348,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 2099.426,
-            "p95": 4748.903
+            "p50": 2000.392,
+            "p95": 3025.538
           },
           "mask": {
-            "p50": 0.999,
-            "p95": 1.433
+            "p50": 1.059,
+            "p95": 1.61
           }
         },
         "per_type": {

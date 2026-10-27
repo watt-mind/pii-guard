@@ -3,7 +3,7 @@
   "run_id": "2026-10-27-comparison-en-ai4privacy-presidio",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:24:05+00:00",
+  "recorded_at": "2026-10-27T11:15:23+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "Presidio (comparison) on ai4privacy",
@@ -13,10 +13,10 @@
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold spans), so masking them counts as over-masking. Most card, tax and TAJ numbers in the set fail their checksums, which pii-guard's rules require."
   ],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "8944f96f0da38a412793df6396623849d070feac",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 8944f96 of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "comparison",
@@ -164,12 +164,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 9.398,
-          "p95": 24.528
+          "p50": 9.338,
+          "p95": 25.076
         },
         "mask": {
           "p50": 0.085,
-          "p95": 0.142
+          "p95": 0.147
         }
       },
       "per_type": {
@@ -350,12 +350,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 9.398,
-            "p95": 24.528
+            "p50": 9.338,
+            "p95": 25.076
           },
           "mask": {
             "p50": 0.085,
-            "p95": 0.142
+            "p95": 0.147
           }
         },
         "per_type": {

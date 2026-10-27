@@ -21,7 +21,7 @@ leak 52.6 % (Hungarian) and 46.7 % (English) of labelled values. Rules plus Muse
 Baseten leak 0.9 % and 0.0 %, at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. A
 fast mode with no LLM call (rules plus a small NER model distilled from Muse Glimmer) gets
 Hungarian down to 0.9 % and English to 0.0 % at tens of milliseconds per message. On a public benchmark
-(Ai4Privacy OpenPII, 600 documents, milestone 20) strict mode leaks 3.8 % and fast mode 38.0 %:
+(Ai4Privacy OpenPII, 600 documents, milestone 20) strict mode leaks 3.9 % and fast mode 38.0 %:
 fast mode suits text like ours, not unfamiliar number formats.
 
 | Language | Mode | Best configuration | Leak | F1 (overlap) | p50 latency | $ / 1k msgs | Source |
@@ -34,9 +34,9 @@ fast mode suits text like ours, not unfamiliar number formats.
 
 ¹ Measured in the 2026-10-27 comparison (milestone 20), which confirmed the 0.9 % figure
 that milestone 14 had only stated in docs/models.md: 1 of 106 labelled values, F1 97.9. That
-run's machine was under unrelated load too (load average about 10 on 10 cores), so read
+run's machine was under unrelated load too (load average about 15 on 10 cores), so read
 the latency as relative. On the public Ai4Privacy set the same fast mode leaks 35–40 %
-(milestone 20); strict mode leaks 3.5–4.3 %. The distilled weights are not published yet:
+(milestone 20); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
 you train them yourself (see [models.md](models.md#ner-detector)).
 
 Leak = share of labelled values that still appear, in any surface form, in the text the
@@ -75,7 +75,7 @@ the run log: [benchmarks.md](benchmarks.md)). The table above is their text vers
 
 ### Spend so far
 
-About **$15** of compute for everything measured here.
+About **$17** of compute for everything measured here.
 
 | What | Where | Cost | Source |
 |---|---|---:|---|
@@ -85,7 +85,7 @@ About **$15** of compute for everything measured here.
 | Visual eval on specimen IDs (505 live SAM calls) | Meta Model API, SAM 3.1 | ~$1.26 | *(ticket comment, LAB-1120)* |
 | Production detector: four eval runs + tests | Baseten Model APIs | ~$0.84 of the $100 credit | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md#spend) |
 | Re-identification red team (four runs + pilots) | Baseten Model APIs; Meta Model API | ~$1.9 Baseten; 343k Meta API tokens (price not published to us) | [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md#spend) |
-| Fresh comparison: strict mode on 8 fixture sets incl. 600 public documents | Baseten Model APIs | ≤ $2.63 | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md#spend) |
+| Fresh comparison: strict mode on 8 fixture sets incl. 600 public documents | Baseten Model APIs | ≤ $4.50 | [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md#spend) |
 
 Early development calls to the Meta Model API (the first corpus samples, live tests) were not
 metered separately and are not included.
@@ -468,12 +468,12 @@ OpenPII 1M, CC-BY-4.0. Leak rate, pooled over languages (smoke: 51 documents):
 
 | System | Smoke leak | Ai4Privacy leak | Ai4Privacy F1 | p50 | $ / 1k msgs |
 |---|---:|---:|---:|---:|---:|
-| pii-guard rules | 42.2 % | 73.5 % | 41.0 | 0.2 ms | |
-| **pii-guard fast** (rules + distilled NER, large) | **0.6 %** | 38.0 % | 70.0 | 24–30 ms | |
-| **pii-guard strict** (+ Muse Spark Open, Baseten, `low`) | **0.6 %** | **3.8 %** | **88.3** | 1.7–2.5 s | 1.99–2.98 |
-| Presidio | 24.3 % | 29.6 % | 38.9 | 7–86 ms | |
-| LLM Guard | 45.1 % | 43.8 % | 64.0 | 58–72 ms | |
-| PrivAiTe | 12.7 % | 9.5 % | 58.3 | 53–83 ms | |
+| pii-guard rules | 41.6 % | 73.5 % | 41.0 | 0.2–0.4 ms | |
+| **pii-guard fast** (rules + distilled NER, large) | **0.6 %** | 38.0 % | 70.0 | 24–31 ms | |
+| **pii-guard strict** (+ Muse Spark Open, Baseten, `low`) | **0.6 %** | **3.9 %** | **88.4** | 1.8–2.3 s | 2.03–2.95 |
+| Presidio | 24.3 % | 29.6 % | 38.9 | 8–136 ms | |
+| LLM Guard | 45.1 % | 43.8 % | 64.0 | 61–133 ms | |
+| PrivAiTe | 12.7 % | 9.5 % | 58.3 | 93–182 ms | |
 
 Sources: [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md) (per-fixture table and run conditions),
 [benchmarks.md](benchmarks.md) (pooled rows, generated from the run records).
@@ -484,19 +484,21 @@ Sources: [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md
   than PrivAiTe (6.5–14.0 %) and Presidio. Most of the gap is numbers: about 90 % of the
   set's card, tax and TAJ numbers fail their checksums, and pii-guard's rules require valid
   ones on purpose. Strict mode, which adds the LLM pass, is the safest system on every set
-  (3.5–4.3 % on the public set).
-- **Strict isn't more precise on our small sets:** the LLM pass adds harmless spans
-  (`en-smoke` over-masking 11.8 % vs 0.0 % for fast), so fast mode is the better default
-  where its recall is enough.
+  (3.5–4.8 % on the public set). Follow-up: LAB-1170.
+- **On our own sets strict buys nothing over fast:** the same leak, F1 within a point, at
+  about 70× the latency plus the API bill. Fast mode is the better default where its recall
+  is enough.
 - **Caveats:** the public text is machine-generated and often unnatural in Hungarian;
   dates, ages, gender, titles and bare towns are policy-excluded, which raises everyone's
   over-masking; LLM Guard's model was fine-tuned on an earlier Ai4Privacy release, so its
   public numbers are probably optimistic. The machine was under unrelated load (load
-  average 9–34 on 10 cores), so latency is relative
+  average 13–27 on 10 cores), so latency is relative
   ([evaluation.md](evaluation.md#public-benchmark-ai4privacy-openpii-1m)).
-- **Cost:** ≤ $2.63 on Baseten for all strict runs, including an aborted one (one German
-  document's completion was truncated twice, so the pipeline failed closed; the re-run had
-  none). 0 refusals and 0 invalid outputs in 682 requests.
+- **Cost:** ≤ $4.50 on Baseten for every strict run of the ticket, $1.87 of it for the
+  committed runs (the rest: runs superseded when LAB-1129 and LAB-1149 merged, and one run
+  that aborted when one German document's completion was truncated twice, so the pipeline
+  failed closed). 0 refusals, 0 invalid outputs, 0 blocked documents in the 682 committed
+  requests. Ran on develop with LAB-1149 (company names) included.
 
 ## How pii-guard uses Meta's models
 

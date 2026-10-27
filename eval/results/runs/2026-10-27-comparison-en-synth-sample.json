@@ -3,16 +3,16 @@
   "run_id": "2026-10-27-comparison-en-synth-sample",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:22:11+00:00",
+  "recorded_at": "2026-10-27T11:13:26+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules on synth-sample",
   "notes": [],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "8944f96f0da38a412793df6396623849d070feac",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 8944f96 of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "pii-guard",
@@ -99,12 +99,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 1.691,
-          "p95": 12.218
+          "p50": 0.879,
+          "p95": 2.148
         },
         "mask": {
-          "p50": 0.495,
-          "p95": 6.734
+          "p50": 0.444,
+          "p95": 0.767
         }
       },
       "per_type": {
@@ -301,12 +301,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 1.691,
-            "p95": 12.218
+            "p50": 0.879,
+            "p95": 2.148
           },
           "mask": {
-            "p50": 0.495,
-            "p95": 6.734
+            "p50": 0.444,
+            "p95": 0.767
           }
         },
         "per_type": {

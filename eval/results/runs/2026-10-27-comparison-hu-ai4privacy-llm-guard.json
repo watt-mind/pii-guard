@@ -3,7 +3,7 @@
   "run_id": "2026-10-27-comparison-hu-ai4privacy-llm-guard",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:22:39+00:00",
+  "recorded_at": "2026-10-27T11:13:53+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "LLM Guard (comparison) on ai4privacy",
@@ -14,10 +14,10 @@
     "LLM Guard's default model was fine-tuned on an earlier Ai4Privacy release (possible train/test contamination): read its numbers as optimistic."
   ],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "8944f96f0da38a412793df6396623849d070feac",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 8944f96 of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "comparison",
@@ -155,12 +155,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 62.537,
-          "p95": 115.102
+          "p50": 67.962,
+          "p95": 162.446
         },
         "mask": {
-          "p50": 0.031,
-          "p95": 0.058
+          "p50": 0.036,
+          "p95": 0.082
         }
       },
       "per_type": {
@@ -341,12 +341,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 62.537,
-            "p95": 115.102
+            "p50": 67.962,
+            "p95": 162.446
           },
           "mask": {
-            "p50": 0.031,
-            "p95": 0.058
+            "p50": 0.036,
+            "p95": 0.082
           }
         },
         "per_type": {

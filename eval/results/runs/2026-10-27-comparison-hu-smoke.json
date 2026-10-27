@@ -3,16 +3,16 @@
   "run_id": "2026-10-27-comparison-hu-smoke",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:19:48+00:00",
+  "recorded_at": "2026-10-27T11:09:40+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules on smoke",
   "notes": [],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
-    "dirty": true,
+    "commit": "8944f96f0da38a412793df6396623849d070feac",
+    "dirty": false,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 8944f96 of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "pii-guard",
@@ -52,35 +52,35 @@
     "overall": {
       "documents": 31,
       "gold_spans": 120,
-      "predicted_spans": 67,
+      "predicted_spans": 68,
       "exact": {
         "gold": 120,
-        "pred": 67,
-        "tp_pred": 67,
-        "tp_gold": 67,
+        "pred": 68,
+        "tp_pred": 68,
+        "tp_gold": 68,
         "precision": 1.0,
-        "recall": 0.558333,
-        "f1": 0.716578
+        "recall": 0.566667,
+        "f1": 0.723404
       },
       "overlap": {
         "gold": 120,
-        "pred": 67,
-        "tp_pred": 67,
-        "tp_gold": 67,
+        "pred": 68,
+        "tp_pred": 68,
+        "tp_gold": 68,
         "precision": 1.0,
-        "recall": 0.558333,
-        "f1": 0.716578
+        "recall": 0.566667,
+        "f1": 0.723404
       },
-      "macro_f1_overlap": 0.769231,
+      "macro_f1_overlap": 0.773176,
       "leak": {
         "values": 106,
-        "leaked": 43,
+        "leaked": 42,
         "partial": 4,
-        "rate": 0.40566,
+        "rate": 0.396226,
         "partial_rate": 0.037736
       },
       "over_masking": {
-        "masked": 63,
+        "masked": 64,
         "over_masked": 0,
         "rate": 0.0
       },
@@ -91,36 +91,39 @@
       },
       "consistency": {
         "entities": 106,
-        "consistent": 63,
+        "consistent": 64,
         "multi_occurrence": 1,
         "multi_consistent": 0,
-        "rate": 0.59434,
+        "rate": 0.603774,
         "multi_rate": 0.0
       },
       "latency_ms": {
         "detect": {
-          "p50": 0.173,
-          "p95": 0.391
+          "p50": 0.44,
+          "p95": 5.483
         },
         "mask": {
-          "p50": 0.57,
-          "p95": 1.166
+          "p50": 1.347,
+          "p95": 3.257
         }
       },
       "per_type": {
         "PERSON": {
           "gold": 38,
-          "pred": 0,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
+          "pred": 1,
+          "exact_tp_gold": 1,
+          "exact_tp_pred": 1,
+          "overlap_tp_gold": 1,
+          "overlap_tp_pred": 1,
           "leak": {
             "values": 37,
-            "leaked": 37,
+            "leaked": 36,
             "partial": 0
           },
-          "over_masking": null
+          "over_masking": {
+            "masked": 1,
+            "over_masked": 0
+          }
         },
         "ADDRESS": {
           "gold": 13,
@@ -315,35 +318,35 @@
       "hu": {
         "documents": 31,
         "gold_spans": 120,
-        "predicted_spans": 67,
+        "predicted_spans": 68,
         "exact": {
           "gold": 120,
-          "pred": 67,
-          "tp_pred": 67,
-          "tp_gold": 67,
+          "pred": 68,
+          "tp_pred": 68,
+          "tp_gold": 68,
           "precision": 1.0,
-          "recall": 0.558333,
-          "f1": 0.716578
+          "recall": 0.566667,
+          "f1": 0.723404
         },
         "overlap": {
           "gold": 120,
-          "pred": 67,
-          "tp_pred": 67,
-          "tp_gold": 67,
+          "pred": 68,
+          "tp_pred": 68,
+          "tp_gold": 68,
           "precision": 1.0,
-          "recall": 0.558333,
-          "f1": 0.716578
+          "recall": 0.566667,
+          "f1": 0.723404
         },
-        "macro_f1_overlap": 0.769231,
+        "macro_f1_overlap": 0.773176,
         "leak": {
           "values": 106,
-          "leaked": 43,
+          "leaked": 42,
           "partial": 4,
-          "rate": 0.40566,
+          "rate": 0.396226,
           "partial_rate": 0.037736
         },
         "over_masking": {
-          "masked": 63,
+          "masked": 64,
           "over_masked": 0,
           "rate": 0.0
         },
@@ -354,36 +357,39 @@
         },
         "consistency": {
           "entities": 106,
-          "consistent": 63,
+          "consistent": 64,
           "multi_occurrence": 1,
           "multi_consistent": 0,
-          "rate": 0.59434,
+          "rate": 0.603774,
           "multi_rate": 0.0
         },
         "latency_ms": {
           "detect": {
-            "p50": 0.173,
-            "p95": 0.391
+            "p50": 0.44,
+            "p95": 5.483
           },
           "mask": {
-            "p50": 0.57,
-            "p95": 1.166
+            "p50": 1.347,
+            "p95": 3.257
           }
         },
         "per_type": {
           "PERSON": {
             "gold": 38,
-            "pred": 0,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
+            "pred": 1,
+            "exact_tp_gold": 1,
+            "exact_tp_pred": 1,
+            "overlap_tp_gold": 1,
+            "overlap_tp_pred": 1,
             "leak": {
               "values": 37,
-              "leaked": 37,
+              "leaked": 36,
               "partial": 0
             },
-            "over_masking": null
+            "over_masking": {
+              "masked": 1,
+              "over_masked": 0
+            }
           },
           "ADDRESS": {
             "gold": 13,

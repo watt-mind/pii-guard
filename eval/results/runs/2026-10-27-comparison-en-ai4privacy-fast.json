@@ -3,20 +3,20 @@
   "run_id": "2026-10-27-comparison-en-ai4privacy-fast",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:07:08+00:00",
+  "recorded_at": "2026-10-27T10:40:18+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules + ner (xlmr-large-distilled-glimmer) on ai4privacy",
   "notes": [
-    "One warm-up call before timing; wall time 6.8 s.",
+    "One warm-up call before timing; wall time 6.4 s.",
     "Public set: Ai4Privacy OpenPII 1M (CC-BY-4.0, Ai4Privacy / Ai Suisse SA), seeded sample of the validation split; see eval/fixtures/public/README.md.",
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold spans), so masking them counts as over-masking. Most card, tax and TAJ numbers in the set fail their checksums, which pii-guard's rules require."
   ],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 4f84c6a of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "pii-guard",
@@ -59,7 +59,7 @@
     "en"
   ],
   "hardware": {
-    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.3 at start (machine not idle)",
+    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.1 at start (machine not idle)",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
     "machine": "arm64",
     "cpu_count": 10,
@@ -118,12 +118,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 30.379,
-          "p95": 52.629
+          "p50": 28.823,
+          "p95": 46.145
         },
         "mask": {
-          "p50": 0.439,
-          "p95": 0.864
+          "p50": 0.43,
+          "p95": 0.869
         }
       },
       "per_type": {
@@ -318,12 +318,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 30.379,
-            "p95": 52.629
+            "p50": 28.823,
+            "p95": 46.145
           },
           "mask": {
-            "p50": 0.439,
-            "p95": 0.864
+            "p50": 0.43,
+            "p95": 0.869
           }
         },
         "per_type": {

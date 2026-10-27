@@ -3,19 +3,19 @@
   "run_id": "2026-10-27-comparison-hu-synth-sample-strict",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:19:09+00:00",
+  "recorded_at": "2026-10-27T10:43:54+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules + ner (xlmr-large-distilled-glimmer) + llm (muse-spark-open, reasoning_effort low) on synth-sample",
   "notes": [
-    "One warm-up call before timing; wall time 49.4 s.",
+    "One warm-up call before timing; wall time 41.9 s.",
     "Latency includes a remote API call per document, so it is not comparable with local detectors."
   ],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 4f84c6a of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "pii-guard",
@@ -68,7 +68,7 @@
     "hu"
   ],
   "hardware": {
-    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 47.9 at start (machine not idle)",
+    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 14.6 at start (machine not idle)",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
     "machine": "arm64",
     "cpu_count": 10,
@@ -76,18 +76,18 @@
     "python": "3.12.15"
   },
   "cost": {
-    "usd": 0.077,
+    "usd": 0.0724,
     "estimated": true,
     "gpu_minutes": null,
     "model_calls": 20,
     "tokens": {
-      "prompt": 32833,
+      "prompt": 32765,
       "cached": 17920,
-      "completion": 13110,
-      "reasoning": 8614
+      "completion": 12034,
+      "reasoning": 7526
     },
     "shared_with": [],
-    "note": "From the token counts the endpoint reported, at list prices ($3.85 per 1,000 messages; warm-up call excluded)."
+    "note": "From the token counts the endpoint reported, at list prices ($3.62 per 1,000 messages; warm-up call excluded)."
   },
   "metrics": {
     "overall": {
@@ -97,11 +97,11 @@
       "exact": {
         "gold": 271,
         "pred": 272,
-        "tp_pred": 266,
-        "tp_gold": 266,
-        "precision": 0.977941,
-        "recall": 0.98155,
-        "f1": 0.979742
+        "tp_pred": 269,
+        "tp_gold": 269,
+        "precision": 0.988971,
+        "recall": 0.99262,
+        "f1": 0.990792
       },
       "overlap": {
         "gold": 271,
@@ -140,12 +140,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 2324.491,
-          "p95": 3187.255
+          "p50": 2040.95,
+          "p95": 2639.109
         },
         "mask": {
-          "p50": 3.353,
-          "p95": 5.805
+          "p50": 3.805,
+          "p95": 5.899
         }
       },
       "per_type": {
@@ -169,8 +169,8 @@
         "ADDRESS": {
           "gold": 39,
           "pred": 40,
-          "exact_tp_gold": 37,
-          "exact_tp_pred": 37,
+          "exact_tp_gold": 39,
+          "exact_tp_pred": 39,
           "overlap_tp_gold": 39,
           "overlap_tp_pred": 39,
           "leak": {
@@ -325,8 +325,8 @@
         "PARCEL_NUMBER_HU": {
           "gold": 7,
           "pred": 7,
-          "exact_tp_gold": 6,
-          "exact_tp_pred": 6,
+          "exact_tp_gold": 7,
+          "exact_tp_pred": 7,
           "overlap_tp_gold": 7,
           "overlap_tp_pred": 7,
           "leak": {
@@ -366,11 +366,11 @@
         "exact": {
           "gold": 271,
           "pred": 272,
-          "tp_pred": 266,
-          "tp_gold": 266,
-          "precision": 0.977941,
-          "recall": 0.98155,
-          "f1": 0.979742
+          "tp_pred": 269,
+          "tp_gold": 269,
+          "precision": 0.988971,
+          "recall": 0.99262,
+          "f1": 0.990792
         },
         "overlap": {
           "gold": 271,
@@ -409,12 +409,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 2324.491,
-            "p95": 3187.255
+            "p50": 2040.95,
+            "p95": 2639.109
           },
           "mask": {
-            "p50": 3.353,
-            "p95": 5.805
+            "p50": 3.805,
+            "p95": 5.899
           }
         },
         "per_type": {
@@ -438,8 +438,8 @@
           "ADDRESS": {
             "gold": 39,
             "pred": 40,
-            "exact_tp_gold": 37,
-            "exact_tp_pred": 37,
+            "exact_tp_gold": 39,
+            "exact_tp_pred": 39,
             "overlap_tp_gold": 39,
             "overlap_tp_pred": 39,
             "leak": {
@@ -594,8 +594,8 @@
           "PARCEL_NUMBER_HU": {
             "gold": 7,
             "pred": 7,
-            "exact_tp_gold": 6,
-            "exact_tp_pred": 6,
+            "exact_tp_gold": 7,
+            "exact_tp_pred": 7,
             "overlap_tp_gold": 7,
             "overlap_tp_pred": 7,
             "leak": {

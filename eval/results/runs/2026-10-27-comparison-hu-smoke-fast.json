@@ -3,18 +3,18 @@
   "run_id": "2026-10-27-comparison-hu-smoke-fast",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T10:05:47+00:00",
+  "recorded_at": "2026-10-27T10:38:58+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules + ner (xlmr-large-distilled-glimmer) on smoke",
   "notes": [
-    "One warm-up call before timing; wall time 1.9 s."
+    "One warm-up call before timing; wall time 1.2 s."
   ],
   "code": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
-    "dirty": true,
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
+    "dirty": false,
     "pii_guard_version": "0.1.0",
-    "note": "Commit e394a06 of this branch (on develop 0ad202a); the only uncommitted change during the run was docs/evaluation.md (prose)."
+    "note": "Commit 4f84c6a of this branch, on develop 15bf502 (includes LAB-1149). The tree was dirty only because this run overwrote earlier scorecards in eval/results/2026-10-27-comparison/; no code was modified."
   },
   "system": {
     "family": "pii-guard",
@@ -57,7 +57,7 @@
     "hu"
   ],
   "hardware": {
-    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.9 at start (machine not idle)",
+    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 15.1 at start (machine not idle)",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
     "machine": "arm64",
     "cpu_count": 10,
@@ -116,12 +116,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 28.254,
-          "p95": 38.417
+          "p50": 28.456,
+          "p95": 43.396
         },
         "mask": {
-          "p50": 1.044,
-          "p95": 2.582
+          "p50": 1.042,
+          "p95": 3.04
         }
       },
       "per_type": {
@@ -385,12 +385,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 28.254,
-            "p95": 38.417
+            "p50": 28.456,
+            "p95": 43.396
           },
           "mask": {
-            "p50": 1.044,
-            "p95": 2.582
+            "p50": 1.042,
+            "p95": 3.04
           }
         },
         "per_type": {

@@ -375,16 +375,16 @@ Leak rate in %, pooled over languages, and detection p50:
 
 | System | Hand-written smoke (hu 31 + en 10 + de 10) | Ai4Privacy (hu + en + de, 600) | p50 | $ / 1k msgs |
 |---|---:|---:|---:|---:|
-| pii-guard rules | 42.2 | 73.5 | 0.2 ms | |
-| **pii-guard fast** (rules + distilled NER, large) | **0.6** | 38.0 | 24–30 ms (MPS) | |
-| **pii-guard strict** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.8** | 1.7–2.5 s | 1.99–2.98 |
-| Presidio | 24.3 | 29.6 | 7–86 ms | |
-| LLM Guard | 45.1 | 43.8 | 58–72 ms | |
-| PrivAiTe | 12.7 | 9.5 | 53–83 ms | |
+| pii-guard rules | 41.6 | 73.5 | 0.2–0.4 ms | |
+| **pii-guard fast** (rules + distilled NER, large) | **0.6** | 38.0 | 24–31 ms (MPS) | |
+| **pii-guard strict** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.9** | 1.8–2.3 s | 2.03–2.95 |
+| Presidio | 24.3 | 29.6 | 8–136 ms | |
+| LLM Guard | 45.1 | 43.8 | 61–133 ms | |
+| PrivAiTe | 12.7 | 9.5 | 93–182 ms | |
 
 Pooled figures are from [docs/benchmarks.md](benchmarks.md) (generated from the run records);
 p50 and cost ranges are over the per-fixture rows. The machine was under unrelated load during
-these runs (load average 9–34 on 10 cores), so latency is relative. Fast mode is as safe as
+these runs (load average 13–27 on 10 cores), so latency is relative. Fast mode is as safe as
 strict on the hand-written sets but leaks 35–40 % on the public set, mostly numbers that fail
 the checksums pii-guard's rules require (see the caveats below); strict mode is the safest
 system on both.
