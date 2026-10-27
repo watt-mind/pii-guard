@@ -242,7 +242,7 @@ def _mrz_check(field: str, digit: str) -> bool:
     # A field left empty may carry '<' as its check digit (optional data in TD3).
     if digit == "<":
         return set(field) <= {"<"}
-    return digit.isdigit() and mrz_check_digit(field) == int(digit)
+    return digit.isascii() and digit.isdigit() and mrz_check_digit(field) == int(digit)
 
 
 def _is_mrz_line(line: str, length: int) -> bool:

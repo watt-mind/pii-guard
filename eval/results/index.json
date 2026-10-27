@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "pii-guard eval report",
   "about": "Generated from eval/results/runs/*.json; do not edit. Rates are 0-1; latency in ms.",
-  "runs_digest": "8be1b41bb609abfc7c7fedfb7856b52d2af6a805443e0920cc1a8c66cb7397a2",
+  "runs_digest": "5065b887681e1ec7a4b4983511d19af9d54f2de8f5440153dec3136ccea40250",
   "languages": [
     "de",
     "en",
@@ -7105,6 +7105,443 @@
         "shared_with": []
       },
       "notes": [],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-smoke-rules",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:41:19+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules on smoke",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": false,
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 before: develop @ 3d9eb8b, normaliser folds invisible characters and mixed-script lookalikes only"
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-smoke-fast",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:41:38+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules + ner on smoke",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "ner",
+          "model": "xlmr-large-distilled-glimmer",
+          "model_ref": "local checkpoint pii-guard-ner-xlmr-large-distilled (LAB-1128, not published)",
+          "settings": {},
+          "serving": "local PyTorch"
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 before: develop @ 3d9eb8b, normaliser folds invisible characters and mixed-script lookalikes only"
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-synth-sample-rules",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:41:40+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules on synth-sample",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "languages": [
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 before: develop @ 3d9eb8b, normaliser folds invisible characters and mixed-script lookalikes only"
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-synth-sample-fast",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:41:54+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules + ner on synth-sample",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "languages": [
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "ner",
+          "model": "xlmr-large-distilled-glimmer",
+          "model_ref": "local checkpoint pii-guard-ner-xlmr-large-distilled (LAB-1128, not published)",
+          "settings": {},
+          "serving": "local PyTorch"
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 before: develop @ 3d9eb8b, normaliser folds invisible characters and mixed-script lookalikes only"
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-ai4privacy-rules",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:41:56+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules on ai4privacy",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 before: develop @ 3d9eb8b, normaliser folds invisible characters and mixed-script lookalikes only"
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-ai4privacy-fast",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:42:33+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules + ner on ai4privacy",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "ner",
+          "model": "xlmr-large-distilled-glimmer",
+          "model_ref": "local checkpoint pii-guard-ner-xlmr-large-distilled (LAB-1128, not published)",
+          "settings": {},
+          "serving": "local PyTorch"
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 before: develop @ 3d9eb8b, normaliser folds invisible characters and mixed-script lookalikes only"
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-smoke-rules",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:47:31+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules on smoke",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 after: normaliser folds Unicode spaces, dashes, digits and ideographic dots, composes NFC with an exact end map, drops marks left on ASCII letters and digits, joins numbers wrapped over a line break, folds lookalike-only identifiers; SV-number check ASCII-guarded",
+        "Detect latency here ran under heavier machine load than the before record; an interleaved A/B of the rules pipeline in one process (old vs new normaliser, best of 7) gives p50 smoke 0.283 -> 0.281 ms, synth sample 1.904 -> 2.030 ms (+6.6 %), ai4privacy 0.453 -> 0.446 ms."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-smoke-fast",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:48:00+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules + ner on smoke",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "ner",
+          "model": "xlmr-large-distilled-glimmer",
+          "model_ref": "local checkpoint pii-guard-ner-xlmr-large-distilled (LAB-1128, not published)",
+          "settings": {},
+          "serving": "local PyTorch"
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 after: normaliser folds Unicode spaces, dashes, digits and ideographic dots, composes NFC with an exact end map, drops marks left on ASCII letters and digits, joins numbers wrapped over a line break, folds lookalike-only identifiers; SV-number check ASCII-guarded"
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-synth-sample-rules",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:48:04+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules on synth-sample",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "languages": [
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 after: normaliser folds Unicode spaces, dashes, digits and ideographic dots, composes NFC with an exact end map, drops marks left on ASCII letters and digits, joins numbers wrapped over a line break, folds lookalike-only identifiers; SV-number check ASCII-guarded",
+        "Detect latency here ran under heavier machine load than the before record; an interleaved A/B of the rules pipeline in one process (old vs new normaliser, best of 7) gives p50 smoke 0.283 -> 0.281 ms, synth sample 1.904 -> 2.030 ms (+6.6 %), ai4privacy 0.453 -> 0.446 ms."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-synth-sample-fast",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:48:37+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules + ner on synth-sample",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "languages": [
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "ner",
+          "model": "xlmr-large-distilled-glimmer",
+          "model_ref": "local checkpoint pii-guard-ner-xlmr-large-distilled (LAB-1128, not published)",
+          "settings": {},
+          "serving": "local PyTorch"
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 after: normaliser folds Unicode spaces, dashes, digits and ideographic dots, composes NFC with an exact end map, drops marks left on ASCII letters and digits, joins numbers wrapped over a line break, folds lookalike-only identifiers; SV-number check ASCII-guarded"
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-ai4privacy-rules",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:48:41+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules on ai4privacy",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 after: normaliser folds Unicode spaces, dashes, digits and ideographic dots, composes NFC with an exact end map, drops marks left on ASCII letters and digits, joins numbers wrapped over a line break, folds lookalike-only identifiers; SV-number check ASCII-guarded",
+        "Detect latency here ran under heavier machine load than the before record; an interleaved A/B of the rules pipeline in one process (old vs new normaliser, best of 7) gives p50 smoke 0.283 -> 0.281 ms, synth sample 1.904 -> 2.030 ms (+6.6 %), ai4privacy 0.453 -> 0.446 ms."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-ai4privacy-fast",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T13:49:41+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules + ner on ai4privacy",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "dirty": true,
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "ner",
+          "model": "xlmr-large-distilled-glimmer",
+          "model_ref": "local checkpoint pii-guard-ner-xlmr-large-distilled (LAB-1128, not published)",
+          "settings": {},
+          "serving": "local PyTorch"
+        }
+      ],
+      "hardware": "arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs (load average 12-16 during the runs), so latency is not comparable between records",
+      "cost": null,
+      "notes": [
+        "LAB-1204 after: normaliser folds Unicode spaces, dashes, digits and ideographic dots, composes NFC with an exact end map, drops marks left on ASCII letters and digits, joins numbers wrapped over a line break, folds lookalike-only identifiers; SV-number check ASCII-guarded"
+      ],
       "imported_from": null
     }
   ],
@@ -24105,6 +24542,3122 @@
         "detect_p95_ms": null,
         "latency_pooled": false,
         "per_type": {}
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-smoke-rules",
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 40,
+        "pred": 22,
+        "precision": 1.0,
+        "recall": 0.525,
+        "f1": 0.6885,
+        "f1_exact": 0.6452,
+        "macro_f1": 0.625,
+        "leak": 0.4324,
+        "partial_leak": 0.0811,
+        "leak_values": 37,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5405,
+        "detect_p50_ms": 0.27,
+        "detect_p95_ms": 1.485,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 13,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 13
+          },
+          "ADDRESS": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "EMAIL": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "PHONE": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 3
+          },
+          "ID_DOCUMENT": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "BANK_ACCOUNT": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "ORGANIZATION": {
+            "gold": 3,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-smoke-rules",
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 34,
+        "pred": 16,
+        "precision": 1.0,
+        "recall": 0.4706,
+        "f1": 0.64,
+        "f1_exact": 0.56,
+        "macro_f1": 0.6667,
+        "leak": 0.4667,
+        "partial_leak": 0.1333,
+        "leak_values": 30,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5333,
+        "detect_p50_ms": 0.214,
+        "detect_p95_ms": 10.741,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 10,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 10
+          },
+          "ADDRESS": {
+            "gold": 4,
+            "recall": 0.5,
+            "precision": 1.0,
+            "leak": 0.5,
+            "leak_values": 4
+          },
+          "EMAIL": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "PHONE": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 2,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 2
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          },
+          "ID_DOCUMENT": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          },
+          "BANK_ACCOUNT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "ORGANIZATION": {
+            "gold": 4,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "VEHICLE_PLATE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-smoke-rules",
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 31,
+        "gold": 120,
+        "pred": 68,
+        "precision": 1.0,
+        "recall": 0.5667,
+        "f1": 0.7234,
+        "f1_exact": 0.7234,
+        "macro_f1": 0.7732,
+        "leak": 0.3962,
+        "partial_leak": 0.0377,
+        "leak_values": 106,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.6038,
+        "detect_p50_ms": 0.264,
+        "detect_p95_ms": 2.613,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 38,
+            "recall": 0.0263,
+            "precision": 1.0,
+            "leak": 0.973,
+            "leak_values": 37
+          },
+          "ADDRESS": {
+            "gold": 13,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 13
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "PHONE": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 6,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 6
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 10
+          },
+          "BANK_ACCOUNT": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "COMPANY_ID_HU": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 9,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "VEHICLE_PLATE": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-smoke-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 40,
+        "pred": 41,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 0.9136,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.027,
+        "leak_values": 37,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.973,
+        "detect_p50_ms": 31.154,
+        "detect_p95_ms": 39.168,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 13,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 13
+          },
+          "ADDRESS": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "EMAIL": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "PHONE": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "ID_DOCUMENT": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "BANK_ACCOUNT": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "ORGANIZATION": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-smoke-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 34,
+        "pred": 34,
+        "precision": 1.0,
+        "recall": 0.9706,
+        "f1": 0.9851,
+        "f1_exact": 0.8529,
+        "macro_f1": 0.9857,
+        "leak": 0.0,
+        "partial_leak": 0.0667,
+        "leak_values": 30,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.9667,
+        "detect_p50_ms": 30.384,
+        "detect_p95_ms": 46.489,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 10
+          },
+          "ADDRESS": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "EMAIL": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "PHONE": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          },
+          "ID_DOCUMENT": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          },
+          "BANK_ACCOUNT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "ORGANIZATION": {
+            "gold": 4,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "VEHICLE_PLATE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-smoke-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 31,
+        "gold": 120,
+        "pred": 121,
+        "precision": 0.9752,
+        "recall": 0.9833,
+        "f1": 0.9793,
+        "f1_exact": 0.9378,
+        "macro_f1": 0.9792,
+        "leak": 0.0094,
+        "partial_leak": 0.0189,
+        "leak_values": 106,
+        "over_masking": 0.0093,
+        "roundtrip": 1.0,
+        "consistency": 0.9906,
+        "detect_p50_ms": 27.245,
+        "detect_p95_ms": 68.443,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 38,
+            "recall": 0.9737,
+            "precision": 1.0,
+            "leak": 0.027,
+            "leak_values": 37
+          },
+          "ADDRESS": {
+            "gold": 13,
+            "recall": 1.0,
+            "precision": 0.9286,
+            "leak": 0.0,
+            "leak_values": 13
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "PHONE": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 0.8571,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 10
+          },
+          "BANK_ACCOUNT": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "COMPANY_ID_HU": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 9,
+            "recall": 1.0,
+            "precision": 0.9,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 6,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "VEHICLE_PLATE": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-synth-sample-rules",
+      "system": "rules",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 120,
+        "pred": 45,
+        "precision": 1.0,
+        "recall": 0.375,
+        "f1": 0.5455,
+        "f1_exact": 0.3394,
+        "macro_f1": 0.6667,
+        "leak": 0.4625,
+        "partial_leak": 0.25,
+        "leak_values": 80,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5375,
+        "detect_p50_ms": 1.633,
+        "detect_p95_ms": 4.041,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 59,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 31
+          },
+          "ADDRESS": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 17
+          },
+          "EMAIL": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "PHONE": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 6,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 6
+          },
+          "ID_DOCUMENT": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "BANK_ACCOUNT": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "ORGANIZATION": {
+            "gold": 10,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "VEHICLE_PLATE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-synth-sample-rules",
+      "system": "rules",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 20,
+        "gold": 271,
+        "pred": 125,
+        "precision": 1.0,
+        "recall": 0.4613,
+        "f1": 0.6313,
+        "f1_exact": 0.6313,
+        "macro_f1": 0.7692,
+        "leak": 0.4162,
+        "partial_leak": 0.0116,
+        "leak_values": 173,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5872,
+        "detect_p50_ms": 1.736,
+        "detect_p95_ms": 5.044,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 107,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 55
+          },
+          "ADDRESS": {
+            "gold": 39,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 39
+          },
+          "EMAIL": {
+            "gold": 9,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "PHONE": {
+            "gold": 14,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 11
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 17,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 17
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "BANK_ACCOUNT": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 12
+          },
+          "COMPANY_ID_HU": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 22,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "VEHICLE_PLATE": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-synth-sample-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 120,
+        "pred": 123,
+        "precision": 0.9756,
+        "recall": 1.0,
+        "f1": 0.9877,
+        "f1_exact": 0.9877,
+        "macro_f1": 0.991,
+        "leak": 0.0,
+        "partial_leak": 0.0375,
+        "leak_values": 80,
+        "over_masking": 0.0265,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": 83.617,
+        "detect_p95_ms": 429.707,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 59,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 31
+          },
+          "ADDRESS": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 0.85,
+            "leak": 0.0,
+            "leak_values": 17
+          },
+          "EMAIL": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "PHONE": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "ID_DOCUMENT": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "BANK_ACCOUNT": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "ORGANIZATION": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "VEHICLE_PLATE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-synth-sample-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 20,
+        "gold": 271,
+        "pred": 273,
+        "precision": 0.9963,
+        "recall": 1.0,
+        "f1": 0.9982,
+        "f1_exact": 0.989,
+        "macro_f1": 0.999,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 173,
+        "over_masking": 0.0041,
+        "roundtrip": 1.0,
+        "consistency": 0.9942,
+        "detect_p50_ms": 74.547,
+        "detect_p95_ms": 191.393,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 107,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 55
+          },
+          "ADDRESS": {
+            "gold": 39,
+            "recall": 1.0,
+            "precision": 0.975,
+            "leak": 0.0,
+            "leak_values": 39
+          },
+          "EMAIL": {
+            "gold": 9,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "PHONE": {
+            "gold": 14,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 11
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 17
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "BANK_ACCOUNT": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 12
+          },
+          "COMPANY_ID_HU": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 22,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "VEHICLE_PLATE": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-ai4privacy-rules",
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 628,
+        "pred": 260,
+        "precision": 0.9885,
+        "recall": 0.4092,
+        "f1": 0.5788,
+        "f1_exact": 0.545,
+        "macro_f1": 0.5833,
+        "leak": 0.586,
+        "partial_leak": 0.0207,
+        "leak_values": 628,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.414,
+        "detect_p50_ms": 0.294,
+        "detect_p95_ms": 0.868,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 182,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 182
+          },
+          "ADDRESS": {
+            "gold": 84,
+            "recall": 0.2381,
+            "precision": 1.0,
+            "leak": 0.7619,
+            "leak_values": 84
+          },
+          "EMAIL": {
+            "gold": 99,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 99
+          },
+          "PHONE": {
+            "gold": 64,
+            "recall": 0.7969,
+            "precision": 0.9444,
+            "leak": 0.2031,
+            "leak_values": 64
+          },
+          "ID_DOCUMENT": {
+            "gold": 156,
+            "recall": 0.4231,
+            "precision": 1.0,
+            "leak": 0.5577,
+            "leak_values": 156
+          },
+          "BANK_ACCOUNT": {
+            "gold": 43,
+            "recall": 0.4884,
+            "precision": 1.0,
+            "leak": 0.5116,
+            "leak_values": 43
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-ai4privacy-rules",
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 805,
+        "pred": 274,
+        "precision": 0.9672,
+        "recall": 0.3292,
+        "f1": 0.4912,
+        "f1_exact": 0.4856,
+        "macro_f1": 0.4064,
+        "leak": 0.6584,
+        "partial_leak": 0.0037,
+        "leak_values": 805,
+        "over_masking": 0.0037,
+        "roundtrip": 1.0,
+        "consistency": 0.3391,
+        "detect_p50_ms": 0.377,
+        "detect_p95_ms": 1.125,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 205,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 0.9902,
+            "leak_values": 205
+          },
+          "ADDRESS": {
+            "gold": 176,
+            "recall": 0.0511,
+            "precision": 0.9,
+            "leak": 0.9489,
+            "leak_values": 176
+          },
+          "EMAIL": {
+            "gold": 111,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 111
+          },
+          "PHONE": {
+            "gold": 85,
+            "recall": 0.8471,
+            "precision": 0.9114,
+            "leak": 0.1529,
+            "leak_values": 85
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 187,
+            "recall": 0.3422,
+            "precision": 1.0,
+            "leak": 0.615,
+            "leak_values": 187
+          },
+          "BANK_ACCOUNT": {
+            "gold": 41,
+            "recall": 0.2195,
+            "precision": 1.0,
+            "leak": 0.7805,
+            "leak_values": 41
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-ai4privacy-rules",
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 752,
+        "pred": 259,
+        "precision": 1.0,
+        "recall": 0.3444,
+        "f1": 0.5124,
+        "f1_exact": 0.4748,
+        "macro_f1": 0.4637,
+        "leak": 0.6556,
+        "partial_leak": 0.0239,
+        "leak_values": 752,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.3444,
+        "detect_p50_ms": 0.31,
+        "detect_p95_ms": 0.966,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 195,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 195
+          },
+          "ADDRESS": {
+            "gold": 119,
+            "recall": 0.1765,
+            "precision": 1.0,
+            "leak": 0.8235,
+            "leak_values": 119
+          },
+          "EMAIL": {
+            "gold": 105,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 105
+          },
+          "PHONE": {
+            "gold": 88,
+            "recall": 0.5455,
+            "precision": 1.0,
+            "leak": 0.4545,
+            "leak_values": 88
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 41,
+            "recall": 0.2439,
+            "precision": 1.0,
+            "leak": 0.7561,
+            "leak_values": 41
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 42,
+            "recall": 0.2143,
+            "precision": 1.0,
+            "leak": 0.7857,
+            "leak_values": 42
+          },
+          "ID_DOCUMENT": {
+            "gold": 104,
+            "recall": 0.5577,
+            "precision": 1.0,
+            "leak": 0.4423,
+            "leak_values": 104
+          },
+          "BANK_ACCOUNT": {
+            "gold": 58,
+            "recall": 0.1379,
+            "precision": 1.0,
+            "leak": 0.8621,
+            "leak_values": 58
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-ai4privacy-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 628,
+        "pred": 603,
+        "precision": 0.8524,
+        "recall": 0.75,
+        "f1": 0.7979,
+        "f1_exact": 0.632,
+        "macro_f1": 0.6055,
+        "leak": 0.2436,
+        "partial_leak": 0.0239,
+        "leak_values": 628,
+        "over_masking": 0.1258,
+        "roundtrip": 1.0,
+        "consistency": 0.6879,
+        "detect_p50_ms": 36.169,
+        "detect_p95_ms": 57.953,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 182,
+            "recall": 0.9835,
+            "precision": 0.96,
+            "leak": 0.0165,
+            "leak_values": 182
+          },
+          "ADDRESS": {
+            "gold": 84,
+            "recall": 0.6548,
+            "precision": 0.8971,
+            "leak": 0.3333,
+            "leak_values": 84
+          },
+          "EMAIL": {
+            "gold": 99,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 99
+          },
+          "PHONE": {
+            "gold": 64,
+            "recall": 0.7969,
+            "precision": 0.9444,
+            "leak": 0.2031,
+            "leak_values": 64
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 156,
+            "recall": 0.4231,
+            "precision": 1.0,
+            "leak": 0.5577,
+            "leak_values": 156
+          },
+          "BANK_ACCOUNT": {
+            "gold": 43,
+            "recall": 0.4884,
+            "precision": 1.0,
+            "leak": 0.5116,
+            "leak_values": 43
+          },
+          "ORGANIZATION": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-ai4privacy-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 805,
+        "pred": 737,
+        "precision": 0.844,
+        "recall": 0.7292,
+        "f1": 0.7824,
+        "f1_exact": 0.6226,
+        "macro_f1": 0.5022,
+        "leak": 0.2596,
+        "partial_leak": 0.0186,
+        "leak_values": 805,
+        "over_masking": 0.1158,
+        "roundtrip": 1.0,
+        "consistency": 0.6783,
+        "detect_p50_ms": 44.248,
+        "detect_p95_ms": 77.121,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 205,
+            "recall": 1.0,
+            "precision": 0.9557,
+            "leak": 0.0,
+            "leak_values": 205
+          },
+          "ADDRESS": {
+            "gold": 176,
+            "recall": 0.7159,
+            "precision": 0.8917,
+            "leak": 0.2784,
+            "leak_values": 176
+          },
+          "EMAIL": {
+            "gold": 111,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 111
+          },
+          "PHONE": {
+            "gold": 85,
+            "recall": 0.8471,
+            "precision": 0.9114,
+            "leak": 0.1529,
+            "leak_values": 85
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 187,
+            "recall": 0.3422,
+            "precision": 1.0,
+            "leak": 0.615,
+            "leak_values": 187
+          },
+          "BANK_ACCOUNT": {
+            "gold": 41,
+            "recall": 0.2195,
+            "precision": 1.0,
+            "leak": 0.7805,
+            "leak_values": 41
+          },
+          "ORGANIZATION": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-before-ai4privacy-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 752,
+        "pred": 697,
+        "precision": 0.8092,
+        "recall": 0.6596,
+        "f1": 0.7268,
+        "f1_exact": 0.5521,
+        "macro_f1": 0.5087,
+        "leak": 0.3378,
+        "partial_leak": 0.0173,
+        "leak_values": 752,
+        "over_masking": 0.136,
+        "roundtrip": 1.0,
+        "consistency": 0.5745,
+        "detect_p50_ms": 38.585,
+        "detect_p95_ms": 69.845,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 195,
+            "recall": 0.9692,
+            "precision": 0.9494,
+            "leak": 0.0308,
+            "leak_values": 195
+          },
+          "ADDRESS": {
+            "gold": 119,
+            "recall": 0.5798,
+            "precision": 0.9425,
+            "leak": 0.4034,
+            "leak_values": 119
+          },
+          "EMAIL": {
+            "gold": 105,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 105
+          },
+          "PHONE": {
+            "gold": 88,
+            "recall": 0.5455,
+            "precision": 1.0,
+            "leak": 0.4545,
+            "leak_values": 88
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 41,
+            "recall": 0.2439,
+            "precision": 1.0,
+            "leak": 0.7561,
+            "leak_values": 41
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 42,
+            "recall": 0.2143,
+            "precision": 1.0,
+            "leak": 0.7857,
+            "leak_values": 42
+          },
+          "ID_DOCUMENT": {
+            "gold": 104,
+            "recall": 0.5577,
+            "precision": 1.0,
+            "leak": 0.4423,
+            "leak_values": 104
+          },
+          "BANK_ACCOUNT": {
+            "gold": 58,
+            "recall": 0.1379,
+            "precision": 1.0,
+            "leak": 0.8621,
+            "leak_values": 58
+          },
+          "ORGANIZATION": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-smoke-rules",
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 40,
+        "pred": 22,
+        "precision": 1.0,
+        "recall": 0.525,
+        "f1": 0.6885,
+        "f1_exact": 0.6452,
+        "macro_f1": 0.625,
+        "leak": 0.4324,
+        "partial_leak": 0.0811,
+        "leak_values": 37,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5405,
+        "detect_p50_ms": 0.612,
+        "detect_p95_ms": 3.334,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 13,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 13
+          },
+          "ADDRESS": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "EMAIL": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "PHONE": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 3
+          },
+          "ID_DOCUMENT": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "BANK_ACCOUNT": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "ORGANIZATION": {
+            "gold": 3,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-smoke-rules",
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 34,
+        "pred": 16,
+        "precision": 1.0,
+        "recall": 0.4706,
+        "f1": 0.64,
+        "f1_exact": 0.56,
+        "macro_f1": 0.6667,
+        "leak": 0.4667,
+        "partial_leak": 0.1333,
+        "leak_values": 30,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5333,
+        "detect_p50_ms": 0.459,
+        "detect_p95_ms": 17.925,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 10,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 10
+          },
+          "ADDRESS": {
+            "gold": 4,
+            "recall": 0.5,
+            "precision": 1.0,
+            "leak": 0.5,
+            "leak_values": 4
+          },
+          "EMAIL": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "PHONE": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 2,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 2
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          },
+          "ID_DOCUMENT": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          },
+          "BANK_ACCOUNT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "ORGANIZATION": {
+            "gold": 4,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "VEHICLE_PLATE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-smoke-rules",
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 31,
+        "gold": 120,
+        "pred": 68,
+        "precision": 1.0,
+        "recall": 0.5667,
+        "f1": 0.7234,
+        "f1_exact": 0.7234,
+        "macro_f1": 0.7732,
+        "leak": 0.3962,
+        "partial_leak": 0.0377,
+        "leak_values": 106,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.6038,
+        "detect_p50_ms": 0.707,
+        "detect_p95_ms": 10.542,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 38,
+            "recall": 0.0263,
+            "precision": 1.0,
+            "leak": 0.973,
+            "leak_values": 37
+          },
+          "ADDRESS": {
+            "gold": 13,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 13
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "PHONE": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 6,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 6
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 10
+          },
+          "BANK_ACCOUNT": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "COMPANY_ID_HU": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 9,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "VEHICLE_PLATE": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-smoke-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 40,
+        "pred": 41,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 0.9136,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.027,
+        "leak_values": 37,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.973,
+        "detect_p50_ms": 62.861,
+        "detect_p95_ms": 98.075,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 13,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 13
+          },
+          "ADDRESS": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "EMAIL": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "PHONE": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "ID_DOCUMENT": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "BANK_ACCOUNT": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "ORGANIZATION": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-smoke-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 34,
+        "pred": 34,
+        "precision": 1.0,
+        "recall": 0.9706,
+        "f1": 0.9851,
+        "f1_exact": 0.8529,
+        "macro_f1": 0.9857,
+        "leak": 0.0,
+        "partial_leak": 0.0667,
+        "leak_values": 30,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.9667,
+        "detect_p50_ms": 59.523,
+        "detect_p95_ms": 95.13,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 10
+          },
+          "ADDRESS": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "EMAIL": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "PHONE": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          },
+          "ID_DOCUMENT": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          },
+          "BANK_ACCOUNT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          },
+          "ORGANIZATION": {
+            "gold": 4,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "VEHICLE_PLATE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 1
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-smoke-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 31,
+        "gold": 120,
+        "pred": 121,
+        "precision": 0.9752,
+        "recall": 0.9833,
+        "f1": 0.9793,
+        "f1_exact": 0.9378,
+        "macro_f1": 0.9792,
+        "leak": 0.0094,
+        "partial_leak": 0.0189,
+        "leak_values": 106,
+        "over_masking": 0.0093,
+        "roundtrip": 1.0,
+        "consistency": 0.9906,
+        "detect_p50_ms": 62.737,
+        "detect_p95_ms": 105.494,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 38,
+            "recall": 0.9737,
+            "precision": 1.0,
+            "leak": 0.027,
+            "leak_values": 37
+          },
+          "ADDRESS": {
+            "gold": 13,
+            "recall": 1.0,
+            "precision": 0.9286,
+            "leak": 0.0,
+            "leak_values": 13
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "PHONE": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 0.8571,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 10
+          },
+          "BANK_ACCOUNT": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "COMPANY_ID_HU": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 9,
+            "recall": 1.0,
+            "precision": 0.9,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 6,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "VEHICLE_PLATE": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-synth-sample-rules",
+      "system": "rules",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 120,
+        "pred": 45,
+        "precision": 1.0,
+        "recall": 0.375,
+        "f1": 0.5455,
+        "f1_exact": 0.3394,
+        "macro_f1": 0.6667,
+        "leak": 0.4625,
+        "partial_leak": 0.25,
+        "leak_values": 80,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5375,
+        "detect_p50_ms": 2.374,
+        "detect_p95_ms": 7.731,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 59,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 31
+          },
+          "ADDRESS": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 17
+          },
+          "EMAIL": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "PHONE": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 6,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 6
+          },
+          "ID_DOCUMENT": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "BANK_ACCOUNT": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "ORGANIZATION": {
+            "gold": 10,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "VEHICLE_PLATE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-synth-sample-rules",
+      "system": "rules",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 20,
+        "gold": 271,
+        "pred": 125,
+        "precision": 1.0,
+        "recall": 0.4613,
+        "f1": 0.6313,
+        "f1_exact": 0.6313,
+        "macro_f1": 0.7692,
+        "leak": 0.4162,
+        "partial_leak": 0.0116,
+        "leak_values": 173,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5872,
+        "detect_p50_ms": 4.007,
+        "detect_p95_ms": 12.352,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 107,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 55
+          },
+          "ADDRESS": {
+            "gold": 39,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 39
+          },
+          "EMAIL": {
+            "gold": 9,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "PHONE": {
+            "gold": 14,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 11
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 17,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 17
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "BANK_ACCOUNT": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 12
+          },
+          "COMPANY_ID_HU": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 22,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "VEHICLE_PLATE": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-synth-sample-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 10,
+        "gold": 120,
+        "pred": 123,
+        "precision": 0.9756,
+        "recall": 1.0,
+        "f1": 0.9877,
+        "f1_exact": 0.9877,
+        "macro_f1": 0.991,
+        "leak": 0.0,
+        "partial_leak": 0.0375,
+        "leak_values": 80,
+        "over_masking": 0.0265,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": 258.42,
+        "detect_p95_ms": 619.838,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 59,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 31
+          },
+          "ADDRESS": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 0.85,
+            "leak": 0.0,
+            "leak_values": 17
+          },
+          "EMAIL": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "PHONE": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "ID_DOCUMENT": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          },
+          "BANK_ACCOUNT": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "ORGANIZATION": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "VEHICLE_PLATE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 3
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-synth-sample-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 20,
+        "gold": 271,
+        "pred": 273,
+        "precision": 0.9963,
+        "recall": 1.0,
+        "f1": 0.9982,
+        "f1_exact": 0.989,
+        "macro_f1": 0.999,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 173,
+        "over_masking": 0.0041,
+        "roundtrip": 1.0,
+        "consistency": 0.9942,
+        "detect_p50_ms": 219.792,
+        "detect_p95_ms": 700.314,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 107,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 55
+          },
+          "ADDRESS": {
+            "gold": 39,
+            "recall": 1.0,
+            "precision": 0.975,
+            "leak": 0.0,
+            "leak_values": 39
+          },
+          "EMAIL": {
+            "gold": 9,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "PHONE": {
+            "gold": 14,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 11
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 17
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "BANK_ACCOUNT": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 12
+          },
+          "COMPANY_ID_HU": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 22,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "VEHICLE_PLATE": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 4
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-ai4privacy-rules",
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 628,
+        "pred": 266,
+        "precision": 0.9887,
+        "recall": 0.4204,
+        "f1": 0.5899,
+        "f1_exact": 0.5526,
+        "macro_f1": 0.5983,
+        "leak": 0.5748,
+        "partial_leak": 0.0207,
+        "leak_values": 628,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.4252,
+        "detect_p50_ms": 0.672,
+        "detect_p95_ms": 1.937,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 182,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 182
+          },
+          "ADDRESS": {
+            "gold": 84,
+            "recall": 0.2619,
+            "precision": 1.0,
+            "leak": 0.7381,
+            "leak_values": 84
+          },
+          "EMAIL": {
+            "gold": 99,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 99
+          },
+          "PHONE": {
+            "gold": 64,
+            "recall": 0.7969,
+            "precision": 0.9444,
+            "leak": 0.2031,
+            "leak_values": 64
+          },
+          "ID_DOCUMENT": {
+            "gold": 156,
+            "recall": 0.4423,
+            "precision": 1.0,
+            "leak": 0.5385,
+            "leak_values": 156
+          },
+          "BANK_ACCOUNT": {
+            "gold": 43,
+            "recall": 0.5349,
+            "precision": 1.0,
+            "leak": 0.4651,
+            "leak_values": 43
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-ai4privacy-rules",
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 805,
+        "pred": 279,
+        "precision": 0.9677,
+        "recall": 0.3354,
+        "f1": 0.4982,
+        "f1_exact": 0.4908,
+        "macro_f1": 0.4146,
+        "leak": 0.6522,
+        "partial_leak": 0.0037,
+        "leak_values": 805,
+        "over_masking": 0.0036,
+        "roundtrip": 1.0,
+        "consistency": 0.3453,
+        "detect_p50_ms": 0.887,
+        "detect_p95_ms": 3.146,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 205,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 0.9902,
+            "leak_values": 205
+          },
+          "ADDRESS": {
+            "gold": 176,
+            "recall": 0.0511,
+            "precision": 0.9,
+            "leak": 0.9489,
+            "leak_values": 176
+          },
+          "EMAIL": {
+            "gold": 111,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 111
+          },
+          "PHONE": {
+            "gold": 85,
+            "recall": 0.8706,
+            "precision": 0.9136,
+            "leak": 0.1294,
+            "leak_values": 85
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 187,
+            "recall": 0.3529,
+            "precision": 1.0,
+            "leak": 0.6043,
+            "leak_values": 187
+          },
+          "BANK_ACCOUNT": {
+            "gold": 41,
+            "recall": 0.2439,
+            "precision": 1.0,
+            "leak": 0.7561,
+            "leak_values": 41
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-ai4privacy-rules",
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 752,
+        "pred": 260,
+        "precision": 1.0,
+        "recall": 0.3457,
+        "f1": 0.5138,
+        "f1_exact": 0.4763,
+        "macro_f1": 0.4649,
+        "leak": 0.6543,
+        "partial_leak": 0.0239,
+        "leak_values": 752,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.3457,
+        "detect_p50_ms": 0.674,
+        "detect_p95_ms": 2.122,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 195,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 195
+          },
+          "ADDRESS": {
+            "gold": 119,
+            "recall": 0.1765,
+            "precision": 1.0,
+            "leak": 0.8235,
+            "leak_values": 119
+          },
+          "EMAIL": {
+            "gold": 105,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 105
+          },
+          "PHONE": {
+            "gold": 88,
+            "recall": 0.5568,
+            "precision": 1.0,
+            "leak": 0.4432,
+            "leak_values": 88
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 41,
+            "recall": 0.2439,
+            "precision": 1.0,
+            "leak": 0.7561,
+            "leak_values": 41
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 42,
+            "recall": 0.2143,
+            "precision": 1.0,
+            "leak": 0.7857,
+            "leak_values": 42
+          },
+          "ID_DOCUMENT": {
+            "gold": 104,
+            "recall": 0.5577,
+            "precision": 1.0,
+            "leak": 0.4423,
+            "leak_values": 104
+          },
+          "BANK_ACCOUNT": {
+            "gold": 58,
+            "recall": 0.1379,
+            "precision": 1.0,
+            "leak": 0.8621,
+            "leak_values": 58
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-ai4privacy-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 628,
+        "pred": 607,
+        "precision": 0.8534,
+        "recall": 0.7596,
+        "f1": 0.8037,
+        "f1_exact": 0.6364,
+        "macro_f1": 0.6148,
+        "leak": 0.2341,
+        "partial_leak": 0.0239,
+        "leak_values": 628,
+        "over_masking": 0.1235,
+        "roundtrip": 1.0,
+        "consistency": 0.699,
+        "detect_p50_ms": 42.098,
+        "detect_p95_ms": 67.201,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 182,
+            "recall": 0.978,
+            "precision": 0.9641,
+            "leak": 0.022,
+            "leak_values": 182
+          },
+          "ADDRESS": {
+            "gold": 84,
+            "recall": 0.6786,
+            "precision": 0.8971,
+            "leak": 0.3095,
+            "leak_values": 84
+          },
+          "EMAIL": {
+            "gold": 99,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 99
+          },
+          "PHONE": {
+            "gold": 64,
+            "recall": 0.7969,
+            "precision": 0.9444,
+            "leak": 0.2031,
+            "leak_values": 64
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 156,
+            "recall": 0.4423,
+            "precision": 1.0,
+            "leak": 0.5385,
+            "leak_values": 156
+          },
+          "BANK_ACCOUNT": {
+            "gold": 43,
+            "recall": 0.5349,
+            "precision": 1.0,
+            "leak": 0.4651,
+            "leak_values": 43
+          },
+          "ORGANIZATION": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-ai4privacy-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 805,
+        "pred": 741,
+        "precision": 0.8448,
+        "recall": 0.7354,
+        "f1": 0.7863,
+        "f1_exact": 0.6223,
+        "macro_f1": 0.5085,
+        "leak": 0.2534,
+        "partial_leak": 0.0174,
+        "leak_values": 805,
+        "over_masking": 0.1151,
+        "roundtrip": 1.0,
+        "consistency": 0.6845,
+        "detect_p50_ms": 48.079,
+        "detect_p95_ms": 86.625,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 205,
+            "recall": 1.0,
+            "precision": 0.9557,
+            "leak": 0.0,
+            "leak_values": 205
+          },
+          "ADDRESS": {
+            "gold": 176,
+            "recall": 0.7159,
+            "precision": 0.8908,
+            "leak": 0.2784,
+            "leak_values": 176
+          },
+          "EMAIL": {
+            "gold": 111,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 111
+          },
+          "PHONE": {
+            "gold": 85,
+            "recall": 0.8706,
+            "precision": 0.9136,
+            "leak": 0.1294,
+            "leak_values": 85
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 187,
+            "recall": 0.3529,
+            "precision": 1.0,
+            "leak": 0.6043,
+            "leak_values": 187
+          },
+          "BANK_ACCOUNT": {
+            "gold": 41,
+            "recall": 0.2439,
+            "precision": 1.0,
+            "leak": 0.7561,
+            "leak_values": 41
+          },
+          "ORGANIZATION": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-unicode-normaliser-after-ai4privacy-fast",
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "metrics": {
+        "documents": 200,
+        "gold": 752,
+        "pred": 698,
+        "precision": 0.808,
+        "recall": 0.6609,
+        "f1": 0.7271,
+        "f1_exact": 0.5531,
+        "macro_f1": 0.5096,
+        "leak": 0.3364,
+        "partial_leak": 0.0173,
+        "leak_values": 752,
+        "over_masking": 0.136,
+        "roundtrip": 1.0,
+        "consistency": 0.5771,
+        "detect_p50_ms": 78.557,
+        "detect_p95_ms": 163.511,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 195,
+            "recall": 0.9692,
+            "precision": 0.9492,
+            "leak": 0.0308,
+            "leak_values": 195
+          },
+          "ADDRESS": {
+            "gold": 119,
+            "recall": 0.5798,
+            "precision": 0.9425,
+            "leak": 0.4034,
+            "leak_values": 119
+          },
+          "EMAIL": {
+            "gold": 105,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 105
+          },
+          "PHONE": {
+            "gold": 88,
+            "recall": 0.5568,
+            "precision": 1.0,
+            "leak": 0.4432,
+            "leak_values": 88
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 41,
+            "recall": 0.2439,
+            "precision": 1.0,
+            "leak": 0.7561,
+            "leak_values": 41
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 42,
+            "recall": 0.2143,
+            "precision": 1.0,
+            "leak": 0.7857,
+            "leak_values": 42
+          },
+          "ID_DOCUMENT": {
+            "gold": 104,
+            "recall": 0.5577,
+            "precision": 1.0,
+            "leak": 0.4423,
+            "leak_values": 104
+          },
+          "BANK_ACCOUNT": {
+            "gold": 58,
+            "recall": 0.1379,
+            "precision": 1.0,
+            "leak": 0.8621,
+            "leak_values": 58
+          },
+          "ORGANIZATION": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
       }
     }
   ],
@@ -47965,6 +51518,2114 @@
         "latency_pooled": false,
         "per_type": {}
       }
+    },
+    {
+      "system": "rules",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "run_ids": [
+        "2026-10-27-unicode-normaliser-before-smoke-rules",
+        "2026-10-27-unicode-normaliser-after-smoke-rules"
+      ],
+      "languages": {
+        "de": {
+          "documents": 10,
+          "gold": 40,
+          "pred": 22,
+          "precision": 1.0,
+          "recall": 0.525,
+          "f1": 0.6885,
+          "f1_exact": 0.6452,
+          "macro_f1": 0.625,
+          "leak": 0.4324,
+          "partial_leak": 0.0811,
+          "leak_values": 37,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.5405,
+          "detect_p50_ms": 0.612,
+          "detect_p95_ms": 3.334,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 13,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 13
+            },
+            "ADDRESS": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "EMAIL": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            },
+            "PHONE": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 3,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 3
+            },
+            "ID_DOCUMENT": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "BANK_ACCOUNT": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 2
+            },
+            "ORGANIZATION": {
+              "gold": 3,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 10,
+          "gold": 34,
+          "pred": 16,
+          "precision": 1.0,
+          "recall": 0.4706,
+          "f1": 0.64,
+          "f1_exact": 0.56,
+          "macro_f1": 0.6667,
+          "leak": 0.4667,
+          "partial_leak": 0.1333,
+          "leak_values": 30,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.5333,
+          "detect_p50_ms": 0.459,
+          "detect_p95_ms": 17.925,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 10,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 10
+            },
+            "ADDRESS": {
+              "gold": 4,
+              "recall": 0.5,
+              "precision": 1.0,
+              "leak": 0.5,
+              "leak_values": 4
+            },
+            "EMAIL": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            },
+            "PHONE": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 4
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 2,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 2
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 1
+            },
+            "ID_DOCUMENT": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 1
+            },
+            "BANK_ACCOUNT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 4
+            },
+            "ORGANIZATION": {
+              "gold": 4,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "VEHICLE_PLATE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 1
+            }
+          }
+        },
+        "hu": {
+          "documents": 31,
+          "gold": 120,
+          "pred": 68,
+          "precision": 1.0,
+          "recall": 0.5667,
+          "f1": 0.7234,
+          "f1_exact": 0.7234,
+          "macro_f1": 0.7732,
+          "leak": 0.3962,
+          "partial_leak": 0.0377,
+          "leak_values": 106,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.6038,
+          "detect_p50_ms": 0.707,
+          "detect_p95_ms": 10.542,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 38,
+              "recall": 0.0263,
+              "precision": 1.0,
+              "leak": 0.973,
+              "leak_values": 37
+            },
+            "ADDRESS": {
+              "gold": 13,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 13
+            },
+            "EMAIL": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "PHONE": {
+              "gold": 7,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 6,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 6
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "ID_DOCUMENT": {
+              "gold": 10,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 10
+            },
+            "BANK_ACCOUNT": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "COMPANY_ID_HU": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ORGANIZATION": {
+              "gold": 9,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "PARCEL_NUMBER_HU": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "VEHICLE_PLATE": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 51,
+        "gold": 194,
+        "pred": 106,
+        "precision": 1.0,
+        "recall": 0.5412,
+        "f1": 0.7023,
+        "f1_exact": 0.68,
+        "macro_f1": 0.768,
+        "leak": 0.4162,
+        "partial_leak": 0.0636,
+        "leak_values": 173,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.578,
+        "detect_p50_ms": 0.595,
+        "detect_p95_ms": 10.542,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 61,
+            "recall": 0.0164,
+            "precision": 1.0,
+            "leak": 0.9833,
+            "leak_values": 60
+          },
+          "ADDRESS": {
+            "gold": 22,
+            "recall": 0.9091,
+            "precision": 1.0,
+            "leak": 0.0909,
+            "leak_values": 22
+          },
+          "EMAIL": {
+            "gold": 12,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 12
+          },
+          "PHONE": {
+            "gold": 16,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 16
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 11,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 11
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 17
+          },
+          "BANK_ACCOUNT": {
+            "gold": 12,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 12
+          },
+          "COMPANY_ID_HU": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 16,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "VEHICLE_PLATE": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          }
+        }
+      }
+    },
+    {
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "smoke",
+      "origin": "hand-written",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "run_ids": [
+        "2026-10-27-unicode-normaliser-before-smoke-fast",
+        "2026-10-27-unicode-normaliser-after-smoke-fast"
+      ],
+      "languages": {
+        "de": {
+          "documents": 10,
+          "gold": 40,
+          "pred": 41,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 0.9136,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.027,
+          "leak_values": 37,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.973,
+          "detect_p50_ms": 62.861,
+          "detect_p95_ms": 98.075,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 13,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 13
+            },
+            "ADDRESS": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "EMAIL": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            },
+            "PHONE": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            },
+            "ID_DOCUMENT": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "BANK_ACCOUNT": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 2
+            },
+            "ORGANIZATION": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 10,
+          "gold": 34,
+          "pred": 34,
+          "precision": 1.0,
+          "recall": 0.9706,
+          "f1": 0.9851,
+          "f1_exact": 0.8529,
+          "macro_f1": 0.9857,
+          "leak": 0.0,
+          "partial_leak": 0.0667,
+          "leak_values": 30,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.9667,
+          "detect_p50_ms": 59.523,
+          "detect_p95_ms": 95.13,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 10,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 10
+            },
+            "ADDRESS": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 4
+            },
+            "EMAIL": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            },
+            "PHONE": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 4
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 2
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 1
+            },
+            "ID_DOCUMENT": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 1
+            },
+            "BANK_ACCOUNT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 4
+            },
+            "ORGANIZATION": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "VEHICLE_PLATE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 1
+            }
+          }
+        },
+        "hu": {
+          "documents": 31,
+          "gold": 120,
+          "pred": 121,
+          "precision": 0.9752,
+          "recall": 0.9833,
+          "f1": 0.9793,
+          "f1_exact": 0.9378,
+          "macro_f1": 0.9792,
+          "leak": 0.0094,
+          "partial_leak": 0.0189,
+          "leak_values": 106,
+          "over_masking": 0.0093,
+          "roundtrip": 1.0,
+          "consistency": 0.9906,
+          "detect_p50_ms": 62.737,
+          "detect_p95_ms": 105.494,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 38,
+              "recall": 0.9737,
+              "precision": 1.0,
+              "leak": 0.027,
+              "leak_values": 37
+            },
+            "ADDRESS": {
+              "gold": 13,
+              "recall": 1.0,
+              "precision": 0.9286,
+              "leak": 0.0,
+              "leak_values": 13
+            },
+            "EMAIL": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "PHONE": {
+              "gold": 7,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 0.8571,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "ID_DOCUMENT": {
+              "gold": 10,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 10
+            },
+            "BANK_ACCOUNT": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "COMPANY_ID_HU": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ORGANIZATION": {
+              "gold": 9,
+              "recall": 1.0,
+              "precision": 0.9,
+              "leak": null,
+              "leak_values": null
+            },
+            "PARCEL_NUMBER_HU": {
+              "gold": 6,
+              "recall": 0.8333,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "VEHICLE_PLATE": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 51,
+        "gold": 194,
+        "pred": 196,
+        "precision": 0.9847,
+        "recall": 0.9845,
+        "f1": 0.9846,
+        "f1_exact": 0.9179,
+        "macro_f1": 0.9826,
+        "leak": 0.0058,
+        "partial_leak": 0.0289,
+        "leak_values": 173,
+        "over_masking": 0.0057,
+        "roundtrip": 1.0,
+        "consistency": 0.9827,
+        "detect_p50_ms": 62.861,
+        "detect_p95_ms": 98.075,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 61,
+            "recall": 0.9836,
+            "precision": 1.0,
+            "leak": 0.0167,
+            "leak_values": 60
+          },
+          "ADDRESS": {
+            "gold": 22,
+            "recall": 1.0,
+            "precision": 0.96,
+            "leak": 0.0,
+            "leak_values": 22
+          },
+          "EMAIL": {
+            "gold": 12,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 12
+          },
+          "PHONE": {
+            "gold": 16,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 16
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 11,
+            "recall": 1.0,
+            "precision": 0.9167,
+            "leak": 0.0,
+            "leak_values": 11
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 17,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 17
+          },
+          "BANK_ACCOUNT": {
+            "gold": 12,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 12
+          },
+          "COMPANY_ID_HU": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 16,
+            "recall": 0.9375,
+            "precision": 0.9375,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 6,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          },
+          "VEHICLE_PLATE": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 6
+          }
+        }
+      }
+    },
+    {
+      "system": "rules",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "run_ids": [
+        "2026-10-27-unicode-normaliser-before-synth-sample-rules",
+        "2026-10-27-unicode-normaliser-after-synth-sample-rules"
+      ],
+      "languages": {
+        "en": {
+          "documents": 10,
+          "gold": 120,
+          "pred": 45,
+          "precision": 1.0,
+          "recall": 0.375,
+          "f1": 0.5455,
+          "f1_exact": 0.3394,
+          "macro_f1": 0.6667,
+          "leak": 0.4625,
+          "partial_leak": 0.25,
+          "leak_values": 80,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.5375,
+          "detect_p50_ms": 2.374,
+          "detect_p95_ms": 7.731,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 59,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 31
+            },
+            "ADDRESS": {
+              "gold": 17,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 17
+            },
+            "EMAIL": {
+              "gold": 7,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "PHONE": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 6,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 6
+            },
+            "ID_DOCUMENT": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            },
+            "BANK_ACCOUNT": {
+              "gold": 7,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "ORGANIZATION": {
+              "gold": 10,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "VEHICLE_PLATE": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            }
+          }
+        },
+        "hu": {
+          "documents": 20,
+          "gold": 271,
+          "pred": 125,
+          "precision": 1.0,
+          "recall": 0.4613,
+          "f1": 0.6313,
+          "f1_exact": 0.6313,
+          "macro_f1": 0.7692,
+          "leak": 0.4162,
+          "partial_leak": 0.0116,
+          "leak_values": 173,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.5872,
+          "detect_p50_ms": 4.007,
+          "detect_p95_ms": 12.352,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 107,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 55
+            },
+            "ADDRESS": {
+              "gold": 39,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 39
+            },
+            "EMAIL": {
+              "gold": 9,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "PHONE": {
+              "gold": 14,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 11
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 17,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 17
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 8
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "ID_DOCUMENT": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 8
+            },
+            "BANK_ACCOUNT": {
+              "gold": 17,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 12
+            },
+            "COMPANY_ID_HU": {
+              "gold": 10,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ORGANIZATION": {
+              "gold": 22,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "PARCEL_NUMBER_HU": {
+              "gold": 7,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "VEHICLE_PLATE": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 4
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 30,
+        "gold": 391,
+        "pred": 170,
+        "precision": 1.0,
+        "recall": 0.4348,
+        "f1": 0.6061,
+        "f1_exact": 0.5455,
+        "macro_f1": 0.7692,
+        "leak": 0.4308,
+        "partial_leak": 0.087,
+        "leak_values": 253,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.5714,
+        "detect_p50_ms": 3.843,
+        "detect_p95_ms": 12.352,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 166,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 86
+          },
+          "ADDRESS": {
+            "gold": 56,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 56
+          },
+          "EMAIL": {
+            "gold": 16,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 13
+          },
+          "PHONE": {
+            "gold": 22,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 18
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 23,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 1.0,
+            "leak_values": 23
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 11,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 11
+          },
+          "BANK_ACCOUNT": {
+            "gold": 24,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 19
+          },
+          "COMPANY_ID_HU": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 32,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "VEHICLE_PLATE": {
+            "gold": 11,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          }
+        }
+      }
+    },
+    {
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "synth-sample",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "run_ids": [
+        "2026-10-27-unicode-normaliser-before-synth-sample-fast",
+        "2026-10-27-unicode-normaliser-after-synth-sample-fast"
+      ],
+      "languages": {
+        "en": {
+          "documents": 10,
+          "gold": 120,
+          "pred": 123,
+          "precision": 0.9756,
+          "recall": 1.0,
+          "f1": 0.9877,
+          "f1_exact": 0.9877,
+          "macro_f1": 0.991,
+          "leak": 0.0,
+          "partial_leak": 0.0375,
+          "leak_values": 80,
+          "over_masking": 0.0265,
+          "roundtrip": 1.0,
+          "consistency": 1.0,
+          "detect_p50_ms": 258.42,
+          "detect_p95_ms": 619.838,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 59,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 31
+            },
+            "ADDRESS": {
+              "gold": 17,
+              "recall": 1.0,
+              "precision": 0.85,
+              "leak": 0.0,
+              "leak_values": 17
+            },
+            "EMAIL": {
+              "gold": 7,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "PHONE": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 6,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 6
+            },
+            "ID_DOCUMENT": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            },
+            "BANK_ACCOUNT": {
+              "gold": 7,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "ORGANIZATION": {
+              "gold": 10,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "VEHICLE_PLATE": {
+              "gold": 3,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 3
+            }
+          }
+        },
+        "hu": {
+          "documents": 20,
+          "gold": 271,
+          "pred": 273,
+          "precision": 0.9963,
+          "recall": 1.0,
+          "f1": 0.9982,
+          "f1_exact": 0.989,
+          "macro_f1": 0.999,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 173,
+          "over_masking": 0.0041,
+          "roundtrip": 1.0,
+          "consistency": 0.9942,
+          "detect_p50_ms": 219.792,
+          "detect_p95_ms": 700.314,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 107,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 55
+            },
+            "ADDRESS": {
+              "gold": 39,
+              "recall": 1.0,
+              "precision": 0.975,
+              "leak": 0.0,
+              "leak_values": 39
+            },
+            "EMAIL": {
+              "gold": 9,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "PHONE": {
+              "gold": 14,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 11
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 17,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 17
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 8
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 5,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 5
+            },
+            "ID_DOCUMENT": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 8
+            },
+            "BANK_ACCOUNT": {
+              "gold": 17,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 12
+            },
+            "COMPANY_ID_HU": {
+              "gold": 10,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ORGANIZATION": {
+              "gold": 22,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PARCEL_NUMBER_HU": {
+              "gold": 7,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 7
+            },
+            "VEHICLE_PLATE": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 4
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 30,
+        "gold": 391,
+        "pred": 396,
+        "precision": 0.9899,
+        "recall": 1.0,
+        "f1": 0.9949,
+        "f1_exact": 0.9886,
+        "macro_f1": 0.9973,
+        "leak": 0.0,
+        "partial_leak": 0.0119,
+        "leak_values": 253,
+        "over_masking": 0.0113,
+        "roundtrip": 1.0,
+        "consistency": 0.996,
+        "detect_p50_ms": 248.341,
+        "detect_p95_ms": 700.314,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 166,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 86
+          },
+          "ADDRESS": {
+            "gold": 56,
+            "recall": 1.0,
+            "precision": 0.9333,
+            "leak": 0.0,
+            "leak_values": 56
+          },
+          "EMAIL": {
+            "gold": 16,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 13
+          },
+          "PHONE": {
+            "gold": 22,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 18
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 23,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 23
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 8
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 5
+          },
+          "ID_DOCUMENT": {
+            "gold": 11,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 11
+          },
+          "BANK_ACCOUNT": {
+            "gold": 24,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 19
+          },
+          "COMPANY_ID_HU": {
+            "gold": 10,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ORGANIZATION": {
+            "gold": 32,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 7,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          },
+          "VEHICLE_PLATE": {
+            "gold": 11,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 7
+          }
+        }
+      }
+    },
+    {
+      "system": "rules",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "run_ids": [
+        "2026-10-27-unicode-normaliser-before-ai4privacy-rules",
+        "2026-10-27-unicode-normaliser-after-ai4privacy-rules"
+      ],
+      "languages": {
+        "de": {
+          "documents": 200,
+          "gold": 628,
+          "pred": 266,
+          "precision": 0.9887,
+          "recall": 0.4204,
+          "f1": 0.5899,
+          "f1_exact": 0.5526,
+          "macro_f1": 0.5983,
+          "leak": 0.5748,
+          "partial_leak": 0.0207,
+          "leak_values": 628,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.4252,
+          "detect_p50_ms": 0.672,
+          "detect_p95_ms": 1.937,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 182,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 182
+            },
+            "ADDRESS": {
+              "gold": 84,
+              "recall": 0.2619,
+              "precision": 1.0,
+              "leak": 0.7381,
+              "leak_values": 84
+            },
+            "EMAIL": {
+              "gold": 99,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 99
+            },
+            "PHONE": {
+              "gold": 64,
+              "recall": 0.7969,
+              "precision": 0.9444,
+              "leak": 0.2031,
+              "leak_values": 64
+            },
+            "ID_DOCUMENT": {
+              "gold": 156,
+              "recall": 0.4423,
+              "precision": 1.0,
+              "leak": 0.5385,
+              "leak_values": 156
+            },
+            "BANK_ACCOUNT": {
+              "gold": 43,
+              "recall": 0.5349,
+              "precision": 1.0,
+              "leak": 0.4651,
+              "leak_values": 43
+            }
+          }
+        },
+        "en": {
+          "documents": 200,
+          "gold": 805,
+          "pred": 279,
+          "precision": 0.9677,
+          "recall": 0.3354,
+          "f1": 0.4982,
+          "f1_exact": 0.4908,
+          "macro_f1": 0.4146,
+          "leak": 0.6522,
+          "partial_leak": 0.0037,
+          "leak_values": 805,
+          "over_masking": 0.0036,
+          "roundtrip": 1.0,
+          "consistency": 0.3453,
+          "detect_p50_ms": 0.887,
+          "detect_p95_ms": 3.146,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 205,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 0.9902,
+              "leak_values": 205
+            },
+            "ADDRESS": {
+              "gold": 176,
+              "recall": 0.0511,
+              "precision": 0.9,
+              "leak": 0.9489,
+              "leak_values": 176
+            },
+            "EMAIL": {
+              "gold": 111,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 111
+            },
+            "PHONE": {
+              "gold": 85,
+              "recall": 0.8706,
+              "precision": 0.9136,
+              "leak": 0.1294,
+              "leak_values": 85
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 0,
+              "recall": null,
+              "precision": 0.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 187,
+              "recall": 0.3529,
+              "precision": 1.0,
+              "leak": 0.6043,
+              "leak_values": 187
+            },
+            "BANK_ACCOUNT": {
+              "gold": 41,
+              "recall": 0.2439,
+              "precision": 1.0,
+              "leak": 0.7561,
+              "leak_values": 41
+            }
+          }
+        },
+        "hu": {
+          "documents": 200,
+          "gold": 752,
+          "pred": 260,
+          "precision": 1.0,
+          "recall": 0.3457,
+          "f1": 0.5138,
+          "f1_exact": 0.4763,
+          "macro_f1": 0.4649,
+          "leak": 0.6543,
+          "partial_leak": 0.0239,
+          "leak_values": 752,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 0.3457,
+          "detect_p50_ms": 0.674,
+          "detect_p95_ms": 2.122,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 195,
+              "recall": 0.0,
+              "precision": null,
+              "leak": 1.0,
+              "leak_values": 195
+            },
+            "ADDRESS": {
+              "gold": 119,
+              "recall": 0.1765,
+              "precision": 1.0,
+              "leak": 0.8235,
+              "leak_values": 119
+            },
+            "EMAIL": {
+              "gold": 105,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 105
+            },
+            "PHONE": {
+              "gold": 88,
+              "recall": 0.5568,
+              "precision": 1.0,
+              "leak": 0.4432,
+              "leak_values": 88
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 41,
+              "recall": 0.2439,
+              "precision": 1.0,
+              "leak": 0.7561,
+              "leak_values": 41
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 42,
+              "recall": 0.2143,
+              "precision": 1.0,
+              "leak": 0.7857,
+              "leak_values": 42
+            },
+            "ID_DOCUMENT": {
+              "gold": 104,
+              "recall": 0.5577,
+              "precision": 1.0,
+              "leak": 0.4423,
+              "leak_values": 104
+            },
+            "BANK_ACCOUNT": {
+              "gold": 58,
+              "recall": 0.1379,
+              "precision": 1.0,
+              "leak": 0.8621,
+              "leak_values": 58
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 600,
+        "gold": 2185,
+        "pred": 805,
+        "precision": 0.9851,
+        "recall": 0.3634,
+        "f1": 0.5309,
+        "f1_exact": 0.5043,
+        "macro_f1": 0.482,
+        "leak": 0.6307,
+        "partial_leak": 0.0156,
+        "leak_values": 2185,
+        "over_masking": 0.0012,
+        "roundtrip": 1.0,
+        "consistency": 0.3684,
+        "detect_p50_ms": 0.754,
+        "detect_p95_ms": 2.537,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 582,
+            "recall": 0.0,
+            "precision": null,
+            "leak": 0.9966,
+            "leak_values": 582
+          },
+          "ADDRESS": {
+            "gold": 379,
+            "recall": 0.1372,
+            "precision": 0.9808,
+            "leak": 0.8628,
+            "leak_values": 379
+          },
+          "EMAIL": {
+            "gold": 315,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 315
+          },
+          "PHONE": {
+            "gold": 237,
+            "recall": 0.7342,
+            "precision": 0.9457,
+            "leak": 0.2658,
+            "leak_values": 237
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 41,
+            "recall": 0.2439,
+            "precision": 0.9091,
+            "leak": 0.7561,
+            "leak_values": 41
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 42,
+            "recall": 0.2143,
+            "precision": 1.0,
+            "leak": 0.7857,
+            "leak_values": 42
+          },
+          "ID_DOCUMENT": {
+            "gold": 447,
+            "recall": 0.4318,
+            "precision": 1.0,
+            "leak": 0.5436,
+            "leak_values": 447
+          },
+          "BANK_ACCOUNT": {
+            "gold": 142,
+            "recall": 0.2887,
+            "precision": 1.0,
+            "leak": 0.7113,
+            "leak_values": 142
+          }
+        }
+      }
+    },
+    {
+      "system": "rules+ner:xlmr-large-distilled-glimmer",
+      "fixture_set": "ai4privacy",
+      "origin": "hand-written",
+      "date": "2026-10-27",
+      "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
+      "run_ids": [
+        "2026-10-27-unicode-normaliser-before-ai4privacy-fast",
+        "2026-10-27-unicode-normaliser-after-ai4privacy-fast"
+      ],
+      "languages": {
+        "de": {
+          "documents": 200,
+          "gold": 628,
+          "pred": 607,
+          "precision": 0.8534,
+          "recall": 0.7596,
+          "f1": 0.8037,
+          "f1_exact": 0.6364,
+          "macro_f1": 0.6148,
+          "leak": 0.2341,
+          "partial_leak": 0.0239,
+          "leak_values": 628,
+          "over_masking": 0.1235,
+          "roundtrip": 1.0,
+          "consistency": 0.699,
+          "detect_p50_ms": 42.098,
+          "detect_p95_ms": 67.201,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 182,
+              "recall": 0.978,
+              "precision": 0.9641,
+              "leak": 0.022,
+              "leak_values": 182
+            },
+            "ADDRESS": {
+              "gold": 84,
+              "recall": 0.6786,
+              "precision": 0.8971,
+              "leak": 0.3095,
+              "leak_values": 84
+            },
+            "EMAIL": {
+              "gold": 99,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 99
+            },
+            "PHONE": {
+              "gold": 64,
+              "recall": 0.7969,
+              "precision": 0.9444,
+              "leak": 0.2031,
+              "leak_values": 64
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 0,
+              "recall": null,
+              "precision": 0.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 156,
+              "recall": 0.4423,
+              "precision": 1.0,
+              "leak": 0.5385,
+              "leak_values": 156
+            },
+            "BANK_ACCOUNT": {
+              "gold": 43,
+              "recall": 0.5349,
+              "precision": 1.0,
+              "leak": 0.4651,
+              "leak_values": 43
+            },
+            "ORGANIZATION": {
+              "gold": 0,
+              "recall": null,
+              "precision": 0.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 200,
+          "gold": 805,
+          "pred": 741,
+          "precision": 0.8448,
+          "recall": 0.7354,
+          "f1": 0.7863,
+          "f1_exact": 0.6223,
+          "macro_f1": 0.5085,
+          "leak": 0.2534,
+          "partial_leak": 0.0174,
+          "leak_values": 805,
+          "over_masking": 0.1151,
+          "roundtrip": 1.0,
+          "consistency": 0.6845,
+          "detect_p50_ms": 48.079,
+          "detect_p95_ms": 86.625,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 205,
+              "recall": 1.0,
+              "precision": 0.9557,
+              "leak": 0.0,
+              "leak_values": 205
+            },
+            "ADDRESS": {
+              "gold": 176,
+              "recall": 0.7159,
+              "precision": 0.8908,
+              "leak": 0.2784,
+              "leak_values": 176
+            },
+            "EMAIL": {
+              "gold": 111,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 111
+            },
+            "PHONE": {
+              "gold": 85,
+              "recall": 0.8706,
+              "precision": 0.9136,
+              "leak": 0.1294,
+              "leak_values": 85
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 0,
+              "recall": null,
+              "precision": 0.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 0,
+              "recall": null,
+              "precision": 0.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 187,
+              "recall": 0.3529,
+              "precision": 1.0,
+              "leak": 0.6043,
+              "leak_values": 187
+            },
+            "BANK_ACCOUNT": {
+              "gold": 41,
+              "recall": 0.2439,
+              "precision": 1.0,
+              "leak": 0.7561,
+              "leak_values": 41
+            },
+            "ORGANIZATION": {
+              "gold": 0,
+              "recall": null,
+              "precision": 0.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 200,
+          "gold": 752,
+          "pred": 698,
+          "precision": 0.808,
+          "recall": 0.6609,
+          "f1": 0.7271,
+          "f1_exact": 0.5531,
+          "macro_f1": 0.5096,
+          "leak": 0.3364,
+          "partial_leak": 0.0173,
+          "leak_values": 752,
+          "over_masking": 0.136,
+          "roundtrip": 1.0,
+          "consistency": 0.5771,
+          "detect_p50_ms": 78.557,
+          "detect_p95_ms": 163.511,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 195,
+              "recall": 0.9692,
+              "precision": 0.9492,
+              "leak": 0.0308,
+              "leak_values": 195
+            },
+            "ADDRESS": {
+              "gold": 119,
+              "recall": 0.5798,
+              "precision": 0.9425,
+              "leak": 0.4034,
+              "leak_values": 119
+            },
+            "EMAIL": {
+              "gold": 105,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 105
+            },
+            "PHONE": {
+              "gold": 88,
+              "recall": 0.5568,
+              "precision": 1.0,
+              "leak": 0.4432,
+              "leak_values": 88
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 0,
+              "recall": null,
+              "precision": 0.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 41,
+              "recall": 0.2439,
+              "precision": 1.0,
+              "leak": 0.7561,
+              "leak_values": 41
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 42,
+              "recall": 0.2143,
+              "precision": 1.0,
+              "leak": 0.7857,
+              "leak_values": 42
+            },
+            "ID_DOCUMENT": {
+              "gold": 104,
+              "recall": 0.5577,
+              "precision": 1.0,
+              "leak": 0.4423,
+              "leak_values": 104
+            },
+            "BANK_ACCOUNT": {
+              "gold": 58,
+              "recall": 0.1379,
+              "precision": 1.0,
+              "leak": 0.8621,
+              "leak_values": 58
+            },
+            "ORGANIZATION": {
+              "gold": 0,
+              "recall": null,
+              "precision": 0.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 600,
+        "gold": 2185,
+        "pred": 2046,
+        "precision": 0.8348,
+        "recall": 0.7167,
+        "f1": 0.7713,
+        "f1_exact": 0.6027,
+        "macro_f1": 0.5353,
+        "leak": 0.2764,
+        "partial_leak": 0.0192,
+        "leak_values": 2185,
+        "over_masking": 0.1246,
+        "roundtrip": 1.0,
+        "consistency": 0.6517,
+        "detect_p50_ms": 51.769,
+        "detect_p95_ms": 116.463,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 582,
+            "recall": 0.9828,
+            "precision": 0.956,
+            "leak": 0.0172,
+            "leak_values": 582
+          },
+          "ADDRESS": {
+            "gold": 379,
+            "recall": 0.6649,
+            "precision": 0.9088,
+            "leak": 0.3245,
+            "leak_values": 379
+          },
+          "EMAIL": {
+            "gold": 315,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 315
+          },
+          "PHONE": {
+            "gold": 237,
+            "recall": 0.7342,
+            "precision": 0.9457,
+            "leak": 0.2658,
+            "leak_values": 237
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 41,
+            "recall": 0.2439,
+            "precision": 0.9091,
+            "leak": 0.7561,
+            "leak_values": 41
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 42,
+            "recall": 0.2143,
+            "precision": 1.0,
+            "leak": 0.7857,
+            "leak_values": 42
+          },
+          "ID_DOCUMENT": {
+            "gold": 447,
+            "recall": 0.4318,
+            "precision": 1.0,
+            "leak": 0.5436,
+            "leak_values": 447
+          },
+          "BANK_ACCOUNT": {
+            "gold": 142,
+            "recall": 0.2887,
+            "precision": 1.0,
+            "leak": 0.7113,
+            "leak_values": 142
+          },
+          "ORGANIZATION": {
+            "gold": 0,
+            "recall": null,
+            "precision": 0.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
     }
   ],
   "snapshots": [
@@ -48951,32 +54612,32 @@
       "system": "rules",
       "origin": "hand-written",
       "run_ids": [
-        "2026-10-27-cued-numbers-after-ai4privacy-rules"
+        "2026-10-27-unicode-normaliser-after-ai4privacy-rules"
       ],
       "dates": [
         "2026-10-27"
       ],
       "commits": [
-        "9d133c0ba29e2ad9a219a46e050d32873a2a0cb9"
+        "3d9eb8b2bb14d26a2943786cf656638fd2032027"
       ],
       "languages": {
         "de": {
           "documents": 200,
           "gold": 628,
-          "pred": 260,
-          "precision": 0.9885,
-          "recall": 0.4092,
-          "f1": 0.5788,
-          "f1_exact": 0.545,
-          "macro_f1": 0.5833,
-          "leak": 0.586,
+          "pred": 266,
+          "precision": 0.9887,
+          "recall": 0.4204,
+          "f1": 0.5899,
+          "f1_exact": 0.5526,
+          "macro_f1": 0.5983,
+          "leak": 0.5748,
           "partial_leak": 0.0207,
           "leak_values": 628,
           "over_masking": 0.0,
           "roundtrip": 1.0,
-          "consistency": 0.414,
-          "detect_p50_ms": 0.305,
-          "detect_p95_ms": 0.928,
+          "consistency": 0.4252,
+          "detect_p50_ms": 0.672,
+          "detect_p95_ms": 1.937,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -48988,9 +54649,9 @@
             },
             "ADDRESS": {
               "gold": 84,
-              "recall": 0.2381,
+              "recall": 0.2619,
               "precision": 1.0,
-              "leak": 0.7619,
+              "leak": 0.7381,
               "leak_values": 84
             },
             "EMAIL": {
@@ -49009,16 +54670,16 @@
             },
             "ID_DOCUMENT": {
               "gold": 156,
-              "recall": 0.4231,
+              "recall": 0.4423,
               "precision": 1.0,
-              "leak": 0.5577,
+              "leak": 0.5385,
               "leak_values": 156
             },
             "BANK_ACCOUNT": {
               "gold": 43,
-              "recall": 0.4884,
+              "recall": 0.5349,
               "precision": 1.0,
-              "leak": 0.5116,
+              "leak": 0.4651,
               "leak_values": 43
             }
           }
@@ -49026,20 +54687,20 @@
         "en": {
           "documents": 200,
           "gold": 805,
-          "pred": 274,
-          "precision": 0.9672,
-          "recall": 0.3292,
-          "f1": 0.4912,
-          "f1_exact": 0.4856,
-          "macro_f1": 0.4064,
-          "leak": 0.6584,
+          "pred": 279,
+          "precision": 0.9677,
+          "recall": 0.3354,
+          "f1": 0.4982,
+          "f1_exact": 0.4908,
+          "macro_f1": 0.4146,
+          "leak": 0.6522,
           "partial_leak": 0.0037,
           "leak_values": 805,
-          "over_masking": 0.0037,
+          "over_masking": 0.0036,
           "roundtrip": 1.0,
-          "consistency": 0.3391,
-          "detect_p50_ms": 0.368,
-          "detect_p95_ms": 1.191,
+          "consistency": 0.3453,
+          "detect_p50_ms": 0.887,
+          "detect_p95_ms": 3.146,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -49065,9 +54726,9 @@
             },
             "PHONE": {
               "gold": 85,
-              "recall": 0.8471,
-              "precision": 0.9114,
-              "leak": 0.1529,
+              "recall": 0.8706,
+              "precision": 0.9136,
+              "leak": 0.1294,
               "leak_values": 85
             },
             "NATIONAL_ID_HU_TAX": {
@@ -49079,16 +54740,16 @@
             },
             "ID_DOCUMENT": {
               "gold": 187,
-              "recall": 0.3422,
+              "recall": 0.3529,
               "precision": 1.0,
-              "leak": 0.615,
+              "leak": 0.6043,
               "leak_values": 187
             },
             "BANK_ACCOUNT": {
               "gold": 41,
-              "recall": 0.2195,
+              "recall": 0.2439,
               "precision": 1.0,
-              "leak": 0.7805,
+              "leak": 0.7561,
               "leak_values": 41
             }
           }
@@ -49096,20 +54757,20 @@
         "hu": {
           "documents": 200,
           "gold": 752,
-          "pred": 259,
+          "pred": 260,
           "precision": 1.0,
-          "recall": 0.3444,
-          "f1": 0.5124,
-          "f1_exact": 0.4748,
-          "macro_f1": 0.4637,
-          "leak": 0.6556,
+          "recall": 0.3457,
+          "f1": 0.5138,
+          "f1_exact": 0.4763,
+          "macro_f1": 0.4649,
+          "leak": 0.6543,
           "partial_leak": 0.0239,
           "leak_values": 752,
           "over_masking": 0.0,
           "roundtrip": 1.0,
-          "consistency": 0.3444,
-          "detect_p50_ms": 0.316,
-          "detect_p95_ms": 0.958,
+          "consistency": 0.3457,
+          "detect_p50_ms": 0.674,
+          "detect_p95_ms": 2.122,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -49135,9 +54796,9 @@
             },
             "PHONE": {
               "gold": 88,
-              "recall": 0.5455,
+              "recall": 0.5568,
               "precision": 1.0,
-              "leak": 0.4545,
+              "leak": 0.4432,
               "leak_values": 88
             },
             "NATIONAL_ID_HU_TAX": {
@@ -49174,20 +54835,20 @@
       "all": {
         "documents": 600,
         "gold": 2185,
-        "pred": 793,
-        "precision": 0.9849,
-        "recall": 0.3574,
-        "f1": 0.5245,
-        "f1_exact": 0.4997,
-        "macro_f1": 0.4753,
-        "leak": 0.6366,
+        "pred": 805,
+        "precision": 0.9851,
+        "recall": 0.3634,
+        "f1": 0.5309,
+        "f1_exact": 0.5043,
+        "macro_f1": 0.482,
+        "leak": 0.6307,
         "partial_leak": 0.0156,
         "leak_values": 2185,
-        "over_masking": 0.0013,
+        "over_masking": 0.0012,
         "roundtrip": 1.0,
-        "consistency": 0.3625,
-        "detect_p50_ms": 0.33,
-        "detect_p95_ms": 1.068,
+        "consistency": 0.3684,
+        "detect_p50_ms": 0.754,
+        "detect_p95_ms": 2.537,
         "latency_pooled": false,
         "per_type": {
           "PERSON": {
@@ -49199,9 +54860,9 @@
           },
           "ADDRESS": {
             "gold": 379,
-            "recall": 0.1319,
-            "precision": 0.9804,
-            "leak": 0.8681,
+            "recall": 0.1372,
+            "precision": 0.9808,
+            "leak": 0.8628,
             "leak_values": 379
           },
           "EMAIL": {
@@ -49213,9 +54874,9 @@
           },
           "PHONE": {
             "gold": 237,
-            "recall": 0.7215,
-            "precision": 0.9448,
-            "leak": 0.2785,
+            "recall": 0.7342,
+            "precision": 0.9457,
+            "leak": 0.2658,
             "leak_values": 237
           },
           "NATIONAL_ID_HU_TAX": {
@@ -49234,16 +54895,16 @@
           },
           "ID_DOCUMENT": {
             "gold": 447,
-            "recall": 0.4206,
+            "recall": 0.4318,
             "precision": 1.0,
-            "leak": 0.5548,
+            "leak": 0.5436,
             "leak_values": 447
           },
           "BANK_ACCOUNT": {
             "gold": 142,
-            "recall": 0.2676,
+            "recall": 0.2887,
             "precision": 1.0,
-            "leak": 0.7324,
+            "leak": 0.7113,
             "leak_values": 142
           }
         }
@@ -49254,46 +54915,46 @@
       "system": "rules+ner:xlmr-large-distilled-glimmer",
       "origin": "hand-written",
       "run_ids": [
-        "2026-10-27-cued-numbers-after-ai4privacy-fast"
+        "2026-10-27-unicode-normaliser-after-ai4privacy-fast"
       ],
       "dates": [
         "2026-10-27"
       ],
       "commits": [
-        "9d133c0ba29e2ad9a219a46e050d32873a2a0cb9"
+        "3d9eb8b2bb14d26a2943786cf656638fd2032027"
       ],
       "languages": {
         "de": {
           "documents": 200,
           "gold": 628,
-          "pred": 603,
-          "precision": 0.8524,
-          "recall": 0.75,
-          "f1": 0.7979,
-          "f1_exact": 0.632,
-          "macro_f1": 0.6055,
-          "leak": 0.2436,
+          "pred": 607,
+          "precision": 0.8534,
+          "recall": 0.7596,
+          "f1": 0.8037,
+          "f1_exact": 0.6364,
+          "macro_f1": 0.6148,
+          "leak": 0.2341,
           "partial_leak": 0.0239,
           "leak_values": 628,
-          "over_masking": 0.1258,
+          "over_masking": 0.1235,
           "roundtrip": 1.0,
-          "consistency": 0.6879,
-          "detect_p50_ms": 33.858,
-          "detect_p95_ms": 53.913,
+          "consistency": 0.699,
+          "detect_p50_ms": 42.098,
+          "detect_p95_ms": 67.201,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
               "gold": 182,
-              "recall": 0.9835,
-              "precision": 0.96,
-              "leak": 0.0165,
+              "recall": 0.978,
+              "precision": 0.9641,
+              "leak": 0.022,
               "leak_values": 182
             },
             "ADDRESS": {
               "gold": 84,
-              "recall": 0.6548,
+              "recall": 0.6786,
               "precision": 0.8971,
-              "leak": 0.3333,
+              "leak": 0.3095,
               "leak_values": 84
             },
             "EMAIL": {
@@ -49319,16 +54980,16 @@
             },
             "ID_DOCUMENT": {
               "gold": 156,
-              "recall": 0.4231,
+              "recall": 0.4423,
               "precision": 1.0,
-              "leak": 0.5577,
+              "leak": 0.5385,
               "leak_values": 156
             },
             "BANK_ACCOUNT": {
               "gold": 43,
-              "recall": 0.4884,
+              "recall": 0.5349,
               "precision": 1.0,
-              "leak": 0.5116,
+              "leak": 0.4651,
               "leak_values": 43
             },
             "ORGANIZATION": {
@@ -49343,20 +55004,20 @@
         "en": {
           "documents": 200,
           "gold": 805,
-          "pred": 737,
-          "precision": 0.844,
-          "recall": 0.7292,
-          "f1": 0.7824,
-          "f1_exact": 0.6226,
-          "macro_f1": 0.5022,
-          "leak": 0.2596,
-          "partial_leak": 0.0186,
+          "pred": 741,
+          "precision": 0.8448,
+          "recall": 0.7354,
+          "f1": 0.7863,
+          "f1_exact": 0.6223,
+          "macro_f1": 0.5085,
+          "leak": 0.2534,
+          "partial_leak": 0.0174,
           "leak_values": 805,
-          "over_masking": 0.1158,
+          "over_masking": 0.1151,
           "roundtrip": 1.0,
-          "consistency": 0.6783,
-          "detect_p50_ms": 38.171,
-          "detect_p95_ms": 64.6,
+          "consistency": 0.6845,
+          "detect_p50_ms": 48.079,
+          "detect_p95_ms": 86.625,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -49369,7 +55030,7 @@
             "ADDRESS": {
               "gold": 176,
               "recall": 0.7159,
-              "precision": 0.8917,
+              "precision": 0.8908,
               "leak": 0.2784,
               "leak_values": 176
             },
@@ -49382,9 +55043,9 @@
             },
             "PHONE": {
               "gold": 85,
-              "recall": 0.8471,
-              "precision": 0.9114,
-              "leak": 0.1529,
+              "recall": 0.8706,
+              "precision": 0.9136,
+              "leak": 0.1294,
               "leak_values": 85
             },
             "DATE_OF_BIRTH": {
@@ -49403,16 +55064,16 @@
             },
             "ID_DOCUMENT": {
               "gold": 187,
-              "recall": 0.3422,
+              "recall": 0.3529,
               "precision": 1.0,
-              "leak": 0.615,
+              "leak": 0.6043,
               "leak_values": 187
             },
             "BANK_ACCOUNT": {
               "gold": 41,
-              "recall": 0.2195,
+              "recall": 0.2439,
               "precision": 1.0,
-              "leak": 0.7805,
+              "leak": 0.7561,
               "leak_values": 41
             },
             "ORGANIZATION": {
@@ -49427,26 +55088,26 @@
         "hu": {
           "documents": 200,
           "gold": 752,
-          "pred": 697,
-          "precision": 0.8092,
-          "recall": 0.6596,
-          "f1": 0.7268,
-          "f1_exact": 0.5521,
-          "macro_f1": 0.5087,
-          "leak": 0.3378,
+          "pred": 698,
+          "precision": 0.808,
+          "recall": 0.6609,
+          "f1": 0.7271,
+          "f1_exact": 0.5531,
+          "macro_f1": 0.5096,
+          "leak": 0.3364,
           "partial_leak": 0.0173,
           "leak_values": 752,
           "over_masking": 0.136,
           "roundtrip": 1.0,
-          "consistency": 0.5745,
-          "detect_p50_ms": 34.423,
-          "detect_p95_ms": 59.724,
+          "consistency": 0.5771,
+          "detect_p50_ms": 78.557,
+          "detect_p95_ms": 163.511,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
               "gold": 195,
               "recall": 0.9692,
-              "precision": 0.9494,
+              "precision": 0.9492,
               "leak": 0.0308,
               "leak_values": 195
             },
@@ -49466,9 +55127,9 @@
             },
             "PHONE": {
               "gold": 88,
-              "recall": 0.5455,
+              "recall": 0.5568,
               "precision": 1.0,
-              "leak": 0.4545,
+              "leak": 0.4432,
               "leak_values": 88
             },
             "DATE_OF_BIRTH": {
@@ -49519,34 +55180,34 @@
       "all": {
         "documents": 600,
         "gold": 2185,
-        "pred": 2037,
-        "precision": 0.8346,
-        "recall": 0.7112,
-        "f1": 0.768,
-        "f1_exact": 0.6011,
-        "macro_f1": 0.5304,
-        "leak": 0.2819,
-        "partial_leak": 0.0197,
+        "pred": 2046,
+        "precision": 0.8348,
+        "recall": 0.7167,
+        "f1": 0.7713,
+        "f1_exact": 0.6027,
+        "macro_f1": 0.5353,
+        "leak": 0.2764,
+        "partial_leak": 0.0192,
         "leak_values": 2185,
-        "over_masking": 0.1256,
+        "over_masking": 0.1246,
         "roundtrip": 1.0,
-        "consistency": 0.6453,
-        "detect_p50_ms": 35.603,
-        "detect_p95_ms": 60.025,
+        "consistency": 0.6517,
+        "detect_p50_ms": 51.769,
+        "detect_p95_ms": 116.463,
         "latency_pooled": false,
         "per_type": {
           "PERSON": {
             "gold": 582,
-            "recall": 0.9845,
-            "precision": 0.9548,
-            "leak": 0.0155,
+            "recall": 0.9828,
+            "precision": 0.956,
+            "leak": 0.0172,
             "leak_values": 582
           },
           "ADDRESS": {
             "gold": 379,
-            "recall": 0.6596,
-            "precision": 0.9091,
-            "leak": 0.3298,
+            "recall": 0.6649,
+            "precision": 0.9088,
+            "leak": 0.3245,
             "leak_values": 379
           },
           "EMAIL": {
@@ -49558,9 +55219,9 @@
           },
           "PHONE": {
             "gold": 237,
-            "recall": 0.7215,
-            "precision": 0.9448,
-            "leak": 0.2785,
+            "recall": 0.7342,
+            "precision": 0.9457,
+            "leak": 0.2658,
             "leak_values": 237
           },
           "DATE_OF_BIRTH": {
@@ -49586,16 +55247,16 @@
           },
           "ID_DOCUMENT": {
             "gold": 447,
-            "recall": 0.4206,
+            "recall": 0.4318,
             "precision": 1.0,
-            "leak": 0.5548,
+            "leak": 0.5436,
             "leak_values": 447
           },
           "BANK_ACCOUNT": {
             "gold": 142,
-            "recall": 0.2676,
+            "recall": 0.2887,
             "precision": 1.0,
-            "leak": 0.7324,
+            "leak": 0.7113,
             "leak_values": 142
           },
           "ORGANIZATION": {
@@ -54055,13 +59716,13 @@
       "system": "rules",
       "origin": "hand-written",
       "run_ids": [
-        "2026-10-27-cued-numbers-after-smoke-rules"
+        "2026-10-27-unicode-normaliser-after-smoke-rules"
       ],
       "dates": [
         "2026-10-27"
       ],
       "commits": [
-        "9d133c0ba29e2ad9a219a46e050d32873a2a0cb9"
+        "3d9eb8b2bb14d26a2943786cf656638fd2032027"
       ],
       "languages": {
         "de": {
@@ -54079,8 +59740,8 @@
           "over_masking": 0.0,
           "roundtrip": 1.0,
           "consistency": 0.5405,
-          "detect_p50_ms": 0.274,
-          "detect_p95_ms": 10.61,
+          "detect_p50_ms": 0.612,
+          "detect_p95_ms": 3.334,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -54156,8 +59817,8 @@
           "over_masking": 0.0,
           "roundtrip": 1.0,
           "consistency": 0.5333,
-          "detect_p50_ms": 0.211,
-          "detect_p95_ms": 2.076,
+          "detect_p50_ms": 0.459,
+          "detect_p95_ms": 17.925,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -54247,8 +59908,8 @@
           "over_masking": 0.0,
           "roundtrip": 1.0,
           "consistency": 0.6038,
-          "detect_p50_ms": 0.275,
-          "detect_p95_ms": 1.934,
+          "detect_p50_ms": 0.707,
+          "detect_p95_ms": 10.542,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -54360,8 +60021,8 @@
         "over_masking": 0.0,
         "roundtrip": 1.0,
         "consistency": 0.578,
-        "detect_p50_ms": 0.251,
-        "detect_p95_ms": 2.076,
+        "detect_p50_ms": 0.595,
+        "detect_p95_ms": 10.542,
         "latency_pooled": false,
         "per_type": {
           "PERSON": {
@@ -56122,13 +61783,13 @@
       "system": "rules+ner:xlmr-large-distilled-glimmer",
       "origin": "hand-written",
       "run_ids": [
-        "2026-10-27-cued-numbers-after-smoke-fast"
+        "2026-10-27-unicode-normaliser-after-smoke-fast"
       ],
       "dates": [
         "2026-10-27"
       ],
       "commits": [
-        "9d133c0ba29e2ad9a219a46e050d32873a2a0cb9"
+        "3d9eb8b2bb14d26a2943786cf656638fd2032027"
       ],
       "languages": {
         "de": {
@@ -56146,8 +61807,8 @@
           "over_masking": 0.0,
           "roundtrip": 1.0,
           "consistency": 0.973,
-          "detect_p50_ms": 25.634,
-          "detect_p95_ms": 28.156,
+          "detect_p50_ms": 62.861,
+          "detect_p95_ms": 98.075,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -56223,8 +61884,8 @@
           "over_masking": 0.0,
           "roundtrip": 1.0,
           "consistency": 0.9667,
-          "detect_p50_ms": 23.303,
-          "detect_p95_ms": 29.397,
+          "detect_p50_ms": 59.523,
+          "detect_p95_ms": 95.13,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -56314,8 +61975,8 @@
           "over_masking": 0.0093,
           "roundtrip": 1.0,
           "consistency": 0.9906,
-          "detect_p50_ms": 27.1,
-          "detect_p95_ms": 37.206,
+          "detect_p50_ms": 62.737,
+          "detect_p95_ms": 105.494,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -56427,8 +62088,8 @@
         "over_masking": 0.0057,
         "roundtrip": 1.0,
         "consistency": 0.9827,
-        "detect_p50_ms": 26.487,
-        "detect_p95_ms": 34.638,
+        "detect_p50_ms": 62.861,
+        "detect_p95_ms": 98.075,
         "latency_pooled": false,
         "per_type": {
           "PERSON": {
@@ -59243,13 +64904,13 @@
       "system": "rules",
       "origin": "generated",
       "run_ids": [
-        "2026-10-27-cued-numbers-after-synth-sample-rules"
+        "2026-10-27-unicode-normaliser-after-synth-sample-rules"
       ],
       "dates": [
         "2026-10-27"
       ],
       "commits": [
-        "9d133c0ba29e2ad9a219a46e050d32873a2a0cb9"
+        "3d9eb8b2bb14d26a2943786cf656638fd2032027"
       ],
       "languages": {
         "en": {
@@ -59267,8 +64928,8 @@
           "over_masking": 0.0,
           "roundtrip": 1.0,
           "consistency": 0.5375,
-          "detect_p50_ms": 1.307,
-          "detect_p95_ms": 4.239,
+          "detect_p50_ms": 2.374,
+          "detect_p95_ms": 7.731,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -59351,8 +65012,8 @@
           "over_masking": 0.0,
           "roundtrip": 1.0,
           "consistency": 0.5872,
-          "detect_p50_ms": 1.51,
-          "detect_p95_ms": 4.917,
+          "detect_p50_ms": 4.007,
+          "detect_p95_ms": 12.352,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -59464,8 +65125,8 @@
         "over_masking": 0.0,
         "roundtrip": 1.0,
         "consistency": 0.5714,
-        "detect_p50_ms": 1.383,
-        "detect_p95_ms": 4.917,
+        "detect_p50_ms": 3.843,
+        "detect_p95_ms": 12.352,
         "latency_pooled": false,
         "per_type": {
           "PERSON": {
@@ -60217,13 +65878,13 @@
       "system": "rules+ner:xlmr-large-distilled-glimmer",
       "origin": "generated",
       "run_ids": [
-        "2026-10-27-cued-numbers-after-synth-sample-fast"
+        "2026-10-27-unicode-normaliser-after-synth-sample-fast"
       ],
       "dates": [
         "2026-10-27"
       ],
       "commits": [
-        "9d133c0ba29e2ad9a219a46e050d32873a2a0cb9"
+        "3d9eb8b2bb14d26a2943786cf656638fd2032027"
       ],
       "languages": {
         "en": {
@@ -60241,8 +65902,8 @@
           "over_masking": 0.0265,
           "roundtrip": 1.0,
           "consistency": 1.0,
-          "detect_p50_ms": 52.984,
-          "detect_p95_ms": 147.226,
+          "detect_p50_ms": 258.42,
+          "detect_p95_ms": 619.838,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -60325,8 +65986,8 @@
           "over_masking": 0.0041,
           "roundtrip": 1.0,
           "consistency": 0.9942,
-          "detect_p50_ms": 62.093,
-          "detect_p95_ms": 150.311,
+          "detect_p50_ms": 219.792,
+          "detect_p95_ms": 700.314,
           "latency_pooled": false,
           "per_type": {
             "PERSON": {
@@ -60438,8 +66099,8 @@
         "over_masking": 0.0113,
         "roundtrip": 1.0,
         "consistency": 0.996,
-        "detect_p50_ms": 61.773,
-        "detect_p95_ms": 150.311,
+        "detect_p50_ms": 248.341,
+        "detect_p95_ms": 700.314,
         "latency_pooled": false,
         "per_type": {
           "PERSON": {

@@ -18,44 +18,48 @@
 <text x="134" y="265.3" font-size="20" fill="#4A4A52" text-anchor="end">50%</text>
 <line x1="150" y1="170" x2="1180" y2="170" stroke="#E3E3E8" stroke-width="2"/>
 <text x="134" y="177" font-size="20" fill="#4A4A52" text-anchor="end">60%</text>
-<text x="201.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-26</text>
-<text x="201.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">0ba3c1a</text>
-<text x="304.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-26</text>
-<text x="304.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">62b64fc</text>
-<text x="407.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="407.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">c759b54</text>
-<text x="510.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="510.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">c611f99</text>
-<text x="613.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="613.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">5dd3c23</text>
-<text x="716.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="716.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">9fad0fa</text>
-<text x="819.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="819.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">4f84c6a</text>
-<text x="922.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="922.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">8944f96</text>
-<text x="1025.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="1025.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">9ca003f</text>
-<text x="1128.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="1128.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">9d133c0</text>
+<text x="196.8" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-26</text>
+<text x="196.8" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">0ba3c1a</text>
+<text x="290.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-26</text>
+<text x="290.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">62b64fc</text>
+<text x="384.1" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="384.1" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">c759b54</text>
+<text x="477.7" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="477.7" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">c611f99</text>
+<text x="571.4" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="571.4" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">5dd3c23</text>
+<text x="665" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="665" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">9fad0fa</text>
+<text x="758.6" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="758.6" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">4f84c6a</text>
+<text x="852.3" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="852.3" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">8944f96</text>
+<text x="945.9" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="945.9" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">9ca003f</text>
+<text x="1039.5" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="1039.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">9d133c0</text>
+<text x="1133.2" y="734" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="1133.2" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">3d9eb8b</text>
 <line x1="150" y1="700" x2="1180" y2="700" stroke="#8A8A93" stroke-width="2"/>
-<path d="M161.5,247.9H264.5V247.9H367.5V700H470.5V700H573.5V700H676.5V700H779.5V700H882.5V700H985.5V700H1088.5V700H1168.5" fill="none" stroke="#1B1B1F" stroke-width="3" stroke-dasharray="10 7"/>
-<path d="M201.5,247.9L304.5,247.9L510.5,247.9L922.5,332.4L1025.5,332.4L1128.5,332.4" fill="none" stroke="#0072B2" stroke-width="4"/>
-<circle cx="201.5" cy="247.9" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="304.5" cy="247.9" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="510.5" cy="247.9" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="922.5" cy="332.4" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1025.5" cy="332.4" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1128.5" cy="332.4" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<path d="M510.5,630.5L819.5,694.9L1025.5,694.9L1128.5,694.9" fill="none" stroke="#009E73" stroke-width="4"/>
-<circle cx="510.5" cy="630.5" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="819.5" cy="694.9" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1025.5" cy="694.9" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1128.5" cy="694.9" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<path d="M613.5,693.5L716.5,693.5" fill="none" stroke="#D55E00" stroke-width="4"/>
-<circle cx="613.5" cy="693.5" r="11" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="716.5" cy="693.5" r="11" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="407.5" cy="700" r="11" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<path d="M156.8,247.9H250.5V247.9H344.1V700H437.7V700H531.4V700H625V700H718.6V700H812.3V700H905.9V700H999.5V700H1093.2V700H1173.2" fill="none" stroke="#1B1B1F" stroke-width="3" stroke-dasharray="10 7"/>
+<path d="M196.8,247.9L290.5,247.9L477.7,247.9L852.3,332.4L945.9,332.4L1039.5,332.4L1133.2,332.4" fill="none" stroke="#0072B2" stroke-width="4"/>
+<circle cx="196.8" cy="247.9" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="290.5" cy="247.9" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="477.7" cy="247.9" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="852.3" cy="332.4" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="945.9" cy="332.4" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1039.5" cy="332.4" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1133.2" cy="332.4" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<path d="M477.7,630.5L758.6,694.9L945.9,694.9L1039.5,694.9L1133.2,694.9" fill="none" stroke="#009E73" stroke-width="4"/>
+<circle cx="477.7" cy="630.5" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="758.6" cy="694.9" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="945.9" cy="694.9" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1039.5" cy="694.9" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1133.2" cy="694.9" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<path d="M571.4,693.5L665,693.5" fill="none" stroke="#D55E00" stroke-width="4"/>
+<circle cx="571.4" cy="693.5" r="11" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="665" cy="693.5" r="11" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="384.1" cy="700" r="11" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
 <circle cx="1230" cy="180" r="10" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
 <text x="1250" y="187" font-size="20" fill="#1B1B1F" font-weight="600">rules (default)</text>
 <text x="1250" y="213" font-size="19" fill="#4A4A52">latest 41.6% leak</text>
@@ -72,5 +76,5 @@
 <text x="1250" y="467" font-size="20" fill="#1B1B1F" font-weight="600">best of any configuration so far</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs), hu + en pooled; runs of one configuration at one commit are merged.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">The default pipeline (rules only) finds no names by design; names come from the NER and LLM stages.</text>
-<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-26 to 2026-10-27 · commits 0ba3c1a, 4f84c6a, 5dd3c23, 62b64fc, 8944f96, 9ca003f, 9d133c0, 9fad0fa, c611f99, c759b54 · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-26 to 2026-10-27 · commits 0ba3c1a, 3d9eb8b, 4f84c6a, 5dd3c23, 62b64fc, 8944f96, 9ca003f, 9d133c0, 9fad0fa, c611f99, c759b54 · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>

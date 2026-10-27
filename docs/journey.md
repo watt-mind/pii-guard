@@ -759,6 +759,55 @@ Fast mode on Ai4Privacy per language: `hu` 40.4 → 33.8 %, `en` 34.8 → 26.0 %
   records `2026-10-27-cued-numbers-{before,after}-{smoke,synth-sample,company-names,ai4privacy}-{rules,fast}`
   in [benchmarks.md](benchmarks.md).
 
+### 29. Unicode spaces, dashes, digits and accents no longer hide identifiers (2026-10-27)
+
+LAB-1204.
+
+A code review of `develop` found that milestone 20's normaliser handled invisible characters
+and mixed-script lookalikes but nothing else, while the rules accept only ASCII spaces,
+hyphens and digits. A no-break space (what Word and Office put inside numbers), a narrow
+no-break or thin space, an en dash, a non-breaking hyphen or a minus sign inside a TAJ, phone,
+card, IBAN, giro or Steuer-ID number hid it completely. So did a phone or IBAN wrapped over a
+line break, Arabic-Indic digits and an identifier written only in Cyrillic or Greek lookalike
+letters (`АВС-123`, `ΒΕ68 5390 ...`). Decomposed accents (NFD, as macOS and some keyboards
+produce) cut e-mail addresses down to the part after the last accent, a combining mark inside
+a phone number left its last digits unmasked, and an Arabic-Indic Versicherungsnummer made a
+German checksum helper raise, so the rules detector failed and the request was refused.
+
+The normaliser now folds every Unicode space, dash, digit and ideographic full stop one for
+one, composes NFC with an end offset per character so a span still ends after the marks it
+covers, drops marks left on ASCII letters and digits, reads a line break inside a wrapped
+number as a space (not between the lines of a list or a column of numbers), and folds
+lookalike-only words shaped like identifiers. The checksum helpers require ASCII digits
+before any arithmetic.
+
+- **Probes:** 36 inputs of the reviewers' three probe scripts that were missed or cut short
+  are now found whole, over their exact original spans, and the Arabic-Indic SV number no
+  longer fails the request (without a cue it stays unmasked, as its ASCII form does). The 8
+  still missed are ASCII formats the rules don't accept (a lower-case IBAN, a dotted TAJ, a
+  giro in groups of four, `[at]` ...), filed as LAB-1216.
+- **Fuzz test:** every rules hit in the smoke and synth-sample fixtures (81 documents) is
+  found again, at the same offsets, after the document is rewritten with each of five Unicode
+  spaces, five dashes, four other digit sets, or NFD; the vault round trip stays exact.
+
+| Leak / over-masking, % (pooled) | Rules, before | after | Fast, before | after |
+|---|---:|---:|---:|---:|
+| Smoke (hu/en/de, 51 docs) | 41.6 / 0.0 | 41.6 / 0.0 | 0.6 / 0.6 | 0.6 / 0.6 |
+| Synth sample (hu/en, 30 docs) | 43.1 / 0.0 | 43.1 / 0.0 | 0.0 / 1.1 | 0.0 / 1.1 |
+| **Ai4Privacy** (hu/en/de, 600 docs) | 63.7 / 0.1 | **63.1 / 0.1** | 28.2 / 12.6 | **27.6 / 12.5** |
+
+- **No regression:** the smoke and synth scorecards are identical. On Ai4Privacy, whose text
+  has narrow no-break spaces and non-breaking hyphens, 13 more values are masked whole in
+  both modes (ID documents, bank accounts, phones and addresses); in fast mode one German
+  person name went from partial to leaked and another from leaked to whole.
+- **Latency:** the run records' latencies were taken on a machine shared with parallel agent
+  runs and are not comparable. An interleaved A/B of the rules pipeline in one process (old vs
+  new normaliser, best of 7 per document) gives p50 smoke 0.283 → 0.281 ms, synth sample
+  1.904 → 2.030 ms (+6.6 %), Ai4Privacy 0.453 → 0.446 ms; ASCII text takes a fast path.
+- **Cost:** $0, local runs (NER on Apple MPS). Source: run records
+  `2026-10-27-unicode-normaliser-{before,after}-{smoke,synth-sample,ai4privacy}-{rules,fast}`
+  in [benchmarks.md](benchmarks.md).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
