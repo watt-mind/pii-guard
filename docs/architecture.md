@@ -127,6 +127,38 @@ The synthetic corpus generator, the scorer, and the end-to-end leak test. Descri
   on their own machines.
 - Configuration through environment variables only; `.env.example` lists them.
 
+## Engineering choices
+
+Moved here from the README.
+
+- **Fail closed, everywhere** ([ADR 0006](decisions/0006-fail-closed.md)). A detector
+  timeout, a model error or a malformed answer blocks the request; nothing is sent unmasked.
+- **Keyed, reversible pseudonyms** ([ADR 0007](decisions/0007-keyed-pseudonyms.md)).
+  HMAC-derived placeholders, the same within a conversation, unlinkable across sessions and
+  tenants. The mapping lives only in pii-guard's session vault, with a TTL.
+- **Streaming-safe restore.** Placeholders split across chunks (`[[PERS` + `ON_7f3a]]`) are
+  held back until complete, in content and in tool-call arguments.
+- **Layered detection with one resolver:** rules with checksums (Hungarian tax and TAJ
+  numbers, IBAN, giro accounts, company IDs, US SSN, UK NINO, payment cards…), the NER model
+  (fast mode), the LLM detector (strict mode), merged by one deterministic resolver.
+- **The LLM never rewrites your text.** It only names spans; pii-guard finds them in the
+  original, drops anything the model invented, and lets checksum-validated rules win on
+  structured IDs. A hallucination can't add text, and a disagreement can't unmask anything.
+- **Grammar-aware placeholders.** Hungarian case endings stay outside the placeholder
+  (`[[PERSON_x]]nek`), so the model still writes grammatical answers and restoration is exact.
+- **Language packs** ([languages.md](languages.md)): Hungarian, English and German today. A
+  language is one plugin unit (an entry point for separate distributions) with a conformance
+  suite that says what is missing: `pii-guard lang new <code>` to start.
+- **Entity policies:** mask, keep (organisations stay readable so the model can reason) or
+  block (refuse the request).
+- **Per-message detection cache.** Chat clients resend the whole history every turn; only the
+  new message is detected.
+- **Synthetic data only** ([ADR 0005](decisions/0005-synthetic-data-only.md)). No real
+  personal data in the repo, in tests or in prompts to hosted models; CI on every change.
+
+Which Meta model does which job: [why-pii-guard.md](why-pii-guard.md#3-built-on-metas-models-end-to-end).
+Using the gateway from a client: [architecture-gateway.md](architecture-gateway.md).
+
 ## Open questions
 
 - Which multilingual NER model gives the best Hungarian baseline at acceptable latency?
