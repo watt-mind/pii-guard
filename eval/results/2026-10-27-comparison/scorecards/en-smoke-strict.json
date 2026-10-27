@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "meta": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "generated_at": "2026-10-27T10:17:37+00:00",
+    "generated_at": "2026-10-27T10:42:30+00:00",
     "detectors": [
       "rules",
       "ner",
@@ -22,27 +22,27 @@
   "overall": {
     "documents": 10,
     "gold_spans": 34,
-    "predicted_spans": 39,
+    "predicted_spans": 34,
     "detection": {
       "exact": {
         "per_type": {
           "PERSON": {
             "gold": 10,
-            "pred": 13,
+            "pred": 10,
             "tp_pred": 9,
             "tp_gold": 9,
-            "precision": 0.6923076923076923,
+            "precision": 0.9,
             "recall": 0.9,
-            "f1": 0.7826086956521738
+            "f1": 0.9
           },
           "ADDRESS": {
             "gold": 4,
-            "pred": 5,
+            "pred": 4,
             "tp_pred": 4,
             "tp_gold": 4,
-            "precision": 0.8,
+            "precision": 1.0,
             "recall": 1.0,
-            "f1": 0.888888888888889
+            "f1": 1.0
           },
           "EMAIL": {
             "gold": 3,
@@ -100,12 +100,12 @@
           },
           "ORGANIZATION": {
             "gold": 4,
-            "pred": 5,
+            "pred": 4,
             "tp_pred": 4,
             "tp_gold": 4,
-            "precision": 0.8,
+            "precision": 1.0,
             "recall": 1.0,
-            "f1": 0.888888888888889
+            "f1": 1.0
           },
           "VEHICLE_PLATE": {
             "gold": 1,
@@ -119,38 +119,38 @@
         },
         "micro": {
           "gold": 34,
-          "pred": 39,
+          "pred": 34,
           "tp_pred": 33,
           "tp_gold": 33,
-          "precision": 0.8461538461538461,
+          "precision": 0.9705882352941176,
           "recall": 0.9705882352941176,
-          "f1": 0.9041095890410958
+          "f1": 0.9705882352941176
         },
         "macro": {
-          "precision": 0.9292307692307693,
+          "precision": 0.99,
           "recall": 0.99,
-          "f1": 0.9560386473429953
+          "f1": 0.99
         }
       },
       "overlap": {
         "per_type": {
           "PERSON": {
             "gold": 10,
-            "pred": 13,
+            "pred": 10,
             "tp_pred": 10,
             "tp_gold": 10,
-            "precision": 0.7692307692307693,
+            "precision": 1.0,
             "recall": 1.0,
-            "f1": 0.8695652173913044
+            "f1": 1.0
           },
           "ADDRESS": {
             "gold": 4,
-            "pred": 5,
+            "pred": 4,
             "tp_pred": 4,
             "tp_gold": 4,
-            "precision": 0.8,
+            "precision": 1.0,
             "recall": 1.0,
-            "f1": 0.888888888888889
+            "f1": 1.0
           },
           "EMAIL": {
             "gold": 3,
@@ -208,12 +208,12 @@
           },
           "ORGANIZATION": {
             "gold": 4,
-            "pred": 5,
+            "pred": 4,
             "tp_pred": 4,
             "tp_gold": 4,
-            "precision": 0.8,
+            "precision": 1.0,
             "recall": 1.0,
-            "f1": 0.888888888888889
+            "f1": 1.0
           },
           "VEHICLE_PLATE": {
             "gold": 1,
@@ -227,17 +227,17 @@
         },
         "micro": {
           "gold": 34,
-          "pred": 39,
+          "pred": 34,
           "tp_pred": 34,
           "tp_gold": 34,
-          "precision": 0.8717948717948718,
+          "precision": 1.0,
           "recall": 1.0,
-          "f1": 0.9315068493150686
+          "f1": 1.0
         },
         "macro": {
-          "precision": 0.936923076923077,
+          "precision": 1.0,
           "recall": 1.0,
-          "f1": 0.9647342995169084
+          "f1": 1.0
         }
       }
     },
@@ -314,19 +314,19 @@
       }
     },
     "over_masking": {
-      "masked": 34,
-      "over_masked": 4,
-      "rate": 0.11764705882352941,
+      "masked": 30,
+      "over_masked": 0,
+      "rate": 0.0,
       "per_type": {
         "PERSON": {
-          "masked": 13,
-          "over_masked": 3,
-          "rate": 0.23076923076923078
+          "masked": 10,
+          "over_masked": 0,
+          "rate": 0.0
         },
         "ADDRESS": {
-          "masked": 5,
-          "over_masked": 1,
-          "rate": 0.2
+          "masked": 4,
+          "over_masked": 0,
+          "rate": 0.0
         },
         "EMAIL": {
           "masked": 3,
@@ -454,12 +454,12 @@
     },
     "latency_ms": {
       "detect": {
-        "p50": 2075.6146661005914,
-        "p95": 7895.068041980267
+        "p50": 1894.2105420865119,
+        "p95": 4862.396750133485
       },
       "mask": {
-        "p50": 0.4527089186012745,
-        "p95": 0.6902078166604042
+        "p50": 0.45250006951391697,
+        "p95": 1.1413339525461197
       }
     }
   },
@@ -467,27 +467,27 @@
     "en": {
       "documents": 10,
       "gold_spans": 34,
-      "predicted_spans": 39,
+      "predicted_spans": 34,
       "detection": {
         "exact": {
           "per_type": {
             "PERSON": {
               "gold": 10,
-              "pred": 13,
+              "pred": 10,
               "tp_pred": 9,
               "tp_gold": 9,
-              "precision": 0.6923076923076923,
+              "precision": 0.9,
               "recall": 0.9,
-              "f1": 0.7826086956521738
+              "f1": 0.9
             },
             "ADDRESS": {
               "gold": 4,
-              "pred": 5,
+              "pred": 4,
               "tp_pred": 4,
               "tp_gold": 4,
-              "precision": 0.8,
+              "precision": 1.0,
               "recall": 1.0,
-              "f1": 0.888888888888889
+              "f1": 1.0
             },
             "EMAIL": {
               "gold": 3,
@@ -545,12 +545,12 @@
             },
             "ORGANIZATION": {
               "gold": 4,
-              "pred": 5,
+              "pred": 4,
               "tp_pred": 4,
               "tp_gold": 4,
-              "precision": 0.8,
+              "precision": 1.0,
               "recall": 1.0,
-              "f1": 0.888888888888889
+              "f1": 1.0
             },
             "VEHICLE_PLATE": {
               "gold": 1,
@@ -564,38 +564,38 @@
           },
           "micro": {
             "gold": 34,
-            "pred": 39,
+            "pred": 34,
             "tp_pred": 33,
             "tp_gold": 33,
-            "precision": 0.8461538461538461,
+            "precision": 0.9705882352941176,
             "recall": 0.9705882352941176,
-            "f1": 0.9041095890410958
+            "f1": 0.9705882352941176
           },
           "macro": {
-            "precision": 0.9292307692307693,
+            "precision": 0.99,
             "recall": 0.99,
-            "f1": 0.9560386473429953
+            "f1": 0.99
           }
         },
         "overlap": {
           "per_type": {
             "PERSON": {
               "gold": 10,
-              "pred": 13,
+              "pred": 10,
               "tp_pred": 10,
               "tp_gold": 10,
-              "precision": 0.7692307692307693,
+              "precision": 1.0,
               "recall": 1.0,
-              "f1": 0.8695652173913044
+              "f1": 1.0
             },
             "ADDRESS": {
               "gold": 4,
-              "pred": 5,
+              "pred": 4,
               "tp_pred": 4,
               "tp_gold": 4,
-              "precision": 0.8,
+              "precision": 1.0,
               "recall": 1.0,
-              "f1": 0.888888888888889
+              "f1": 1.0
             },
             "EMAIL": {
               "gold": 3,
@@ -653,12 +653,12 @@
             },
             "ORGANIZATION": {
               "gold": 4,
-              "pred": 5,
+              "pred": 4,
               "tp_pred": 4,
               "tp_gold": 4,
-              "precision": 0.8,
+              "precision": 1.0,
               "recall": 1.0,
-              "f1": 0.888888888888889
+              "f1": 1.0
             },
             "VEHICLE_PLATE": {
               "gold": 1,
@@ -672,17 +672,17 @@
           },
           "micro": {
             "gold": 34,
-            "pred": 39,
+            "pred": 34,
             "tp_pred": 34,
             "tp_gold": 34,
-            "precision": 0.8717948717948718,
+            "precision": 1.0,
             "recall": 1.0,
-            "f1": 0.9315068493150686
+            "f1": 1.0
           },
           "macro": {
-            "precision": 0.936923076923077,
+            "precision": 1.0,
             "recall": 1.0,
-            "f1": 0.9647342995169084
+            "f1": 1.0
           }
         }
       },
@@ -759,19 +759,19 @@
         }
       },
       "over_masking": {
-        "masked": 34,
-        "over_masked": 4,
-        "rate": 0.11764705882352941,
+        "masked": 30,
+        "over_masked": 0,
+        "rate": 0.0,
         "per_type": {
           "PERSON": {
-            "masked": 13,
-            "over_masked": 3,
-            "rate": 0.23076923076923078
+            "masked": 10,
+            "over_masked": 0,
+            "rate": 0.0
           },
           "ADDRESS": {
-            "masked": 5,
-            "over_masked": 1,
-            "rate": 0.2
+            "masked": 4,
+            "over_masked": 0,
+            "rate": 0.0
           },
           "EMAIL": {
             "masked": 3,
@@ -899,12 +899,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 2075.6146661005914,
-          "p95": 7895.068041980267
+          "p50": 1894.2105420865119,
+          "p95": 4862.396750133485
         },
         "mask": {
-          "p50": 0.4527089186012745,
-          "p95": 0.6902078166604042
+          "p50": 0.45250006951391697,
+          "p95": 1.1413339525461197
         }
       }
     }
@@ -917,16 +917,16 @@
       "llm"
     ],
     "documents": 10,
-    "wall_s": 35.9,
+    "wall_s": 24.1,
     "load_average_start": [
-      57.77,
-      33.4,
-      25.29
+      13.44,
+      15.01,
+      18.18
     ],
     "load_average_end": [
-      81.67,
-      42.23,
-      28.88
+      13.74,
+      14.95,
+      18.06
     ],
     "host": {
       "platform": "macOS-26.5.2-arm64-arm-64bit",
@@ -952,20 +952,20 @@
       "reasoning_effort": "low",
       "usage": {
         "requests": 10,
-        "prompt_tokens": 9976,
+        "prompt_tokens": 9996,
         "cached_tokens": 7680,
-        "completion_tokens": 5574,
-        "reasoning_tokens": 4741,
+        "completion_tokens": 4758,
+        "reasoning_tokens": 3992,
         "invalid_outputs": 0,
         "refusals": 0,
         "empty_challenged": 0
       },
       "usage_incl_warmup": {
         "requests": 11,
-        "prompt_tokens": 10927,
+        "prompt_tokens": 10947,
         "cached_tokens": 8448,
-        "completion_tokens": 5669,
-        "reasoning_tokens": 4822,
+        "completion_tokens": 4815,
+        "reasoning_tokens": 4034,
         "invalid_outputs": 0,
         "refusals": 0,
         "empty_challenged": 0
@@ -975,9 +975,9 @@
         "cached_input": 0.15,
         "output": 4.25
       },
-      "cost_usd": 0.0277,
-      "cost_usd_incl_warmup": 0.0285,
-      "usd_per_1k_messages": 2.77,
+      "cost_usd": 0.0243,
+      "cost_usd_incl_warmup": 0.0249,
+      "usd_per_1k_messages": 2.43,
       "refusal_rate": 0.0,
       "invalid_output_rate": 0.0
     }

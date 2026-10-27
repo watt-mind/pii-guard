@@ -1,6 +1,6 @@
 # pii-guard evaluation
 
-- commit: `e394a0636ca0 (dirty)`, pii-guard 0.1.0
+- commit: `4f84c6adc9ba (dirty)`, pii-guard 0.1.0
 - detectors: `rules`, `ner`
 - fixtures: `eval/fixtures/public/hu-ai4privacy.jsonl` sha256 `bd1901745c33316d`
 
@@ -8,8 +8,8 @@ All ratios in %. P/R/F1 are span-level micro averages; macro F1 is over entity t
 
 | Language | Docs | Gold | Pred | P exact | R exact | F1 exact | P overlap | R overlap | F1 overlap | Macro F1 | Leak | Partial leak | Over-masking | Round trip | Consistency | Detect p50 ms | Detect p95 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `hu` | 200 | 752 | 647 | 54.3 | 46.7 | 50.2 | 79.4 | 59.3 | 67.9 | 41.0 | 40.4 | 1.7 | 14.7 | 100.0 | 50.8 | 29.76 | 46.06 |
-| **overall** | 200 | 752 | 647 | 54.3 | 46.7 | 50.2 | 79.4 | 59.3 | 67.9 | 41.0 | 40.4 | 1.7 | 14.7 | 100.0 | 50.8 | 29.76 | 46.06 |
+| `hu` | 200 | 752 | 647 | 54.3 | 46.7 | 50.2 | 79.4 | 59.3 | 67.9 | 41.0 | 40.4 | 1.7 | 14.7 | 100.0 | 50.8 | 30.48 | 46.73 |
+| **overall** | 200 | 752 | 647 | 54.3 | 46.7 | 50.2 | 79.4 | 59.3 | 67.9 | 41.0 | 40.4 | 1.7 | 14.7 | 100.0 | 50.8 | 30.48 | 46.73 |
 
 ## Per entity type: `hu`
 

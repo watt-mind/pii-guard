@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "meta": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "generated_at": "2026-10-27T10:16:46+00:00",
+    "generated_at": "2026-10-27T10:41:56+00:00",
     "detectors": [
       "rules",
       "ner",
@@ -22,18 +22,18 @@
   "overall": {
     "documents": 31,
     "gold_spans": 120,
-    "predicted_spans": 127,
+    "predicted_spans": 126,
     "detection": {
       "exact": {
         "per_type": {
           "PERSON": {
             "gold": 38,
-            "pred": 39,
+            "pred": 38,
             "tp_pred": 35,
             "tp_gold": 35,
-            "precision": 0.8974358974358975,
+            "precision": 0.9210526315789473,
             "recall": 0.9210526315789473,
-            "f1": 0.9090909090909091
+            "f1": 0.9210526315789473
           },
           "ADDRESS": {
             "gold": 13,
@@ -65,11 +65,11 @@
           "DATE_OF_BIRTH": {
             "gold": 6,
             "pred": 8,
-            "tp_pred": 6,
-            "tp_gold": 6,
-            "precision": 0.75,
-            "recall": 1.0,
-            "f1": 0.8571428571428571
+            "tp_pred": 5,
+            "tp_gold": 5,
+            "precision": 0.625,
+            "recall": 0.8333333333333334,
+            "f1": 0.7142857142857143
           },
           "NATIONAL_ID_HU_TAX": {
             "gold": 5,
@@ -146,29 +146,29 @@
         },
         "micro": {
           "gold": 120,
-          "pred": 127,
-          "tp_pred": 111,
-          "tp_gold": 111,
-          "precision": 0.8740157480314961,
-          "recall": 0.925,
-          "f1": 0.8987854251012146
+          "pred": 126,
+          "tp_pred": 110,
+          "tp_gold": 110,
+          "precision": 0.873015873015873,
+          "recall": 0.9166666666666666,
+          "f1": 0.894308943089431
         },
         "macro": {
-          "precision": 0.8866991982376597,
-          "recall": 0.9410671649538046,
-          "f1": 0.911221332273964
+          "precision": 0.8789004854794329,
+          "recall": 0.9282466521332918,
+          "f1": 0.9011524537840327
         }
       },
       "overlap": {
         "per_type": {
           "PERSON": {
             "gold": 38,
-            "pred": 39,
+            "pred": 38,
             "tp_pred": 37,
             "tp_gold": 37,
-            "precision": 0.9487179487179487,
+            "precision": 0.9736842105263158,
             "recall": 0.9736842105263158,
-            "f1": 0.9610389610389611
+            "f1": 0.9736842105263158
           },
           "ADDRESS": {
             "gold": 13,
@@ -281,17 +281,17 @@
         },
         "micro": {
           "gold": 120,
-          "pred": 127,
+          "pred": 126,
           "tp_pred": 120,
           "tp_gold": 119,
-          "precision": 0.9448818897637795,
+          "precision": 0.9523809523809523,
           "recall": 0.9916666666666667,
-          "f1": 0.9677091451224883
+          "f1": 0.9716268626250255
         },
         "macro": {
-          "precision": 0.9482530290222597,
+          "precision": 0.9501735106998266,
           "recall": 0.9979757085020242,
-          "f1": 0.9705693916220232
+          "f1": 0.9715421031210505
         }
       }
     },
@@ -382,12 +382,12 @@
       }
     },
     "over_masking": {
-      "masked": 112,
+      "masked": 111,
       "over_masked": 2,
-      "rate": 0.017857142857142856,
+      "rate": 0.018018018018018018,
       "per_type": {
         "PERSON": {
-          "masked": 39,
+          "masked": 38,
           "over_masked": 0,
           "rate": 0.0
         },
@@ -548,12 +548,12 @@
     },
     "latency_ms": {
       "detect": {
-        "p50": 2191.1318751517683,
-        "p95": 4219.664291013032
+        "p50": 1948.7842498347163,
+        "p95": 3793.3482080698013
       },
       "mask": {
-        "p50": 1.1285410728305578,
-        "p95": 3.756833029910922
+        "p50": 1.2448341585695744,
+        "p95": 4.034582991153002
       }
     }
   },
@@ -561,18 +561,18 @@
     "hu": {
       "documents": 31,
       "gold_spans": 120,
-      "predicted_spans": 127,
+      "predicted_spans": 126,
       "detection": {
         "exact": {
           "per_type": {
             "PERSON": {
               "gold": 38,
-              "pred": 39,
+              "pred": 38,
               "tp_pred": 35,
               "tp_gold": 35,
-              "precision": 0.8974358974358975,
+              "precision": 0.9210526315789473,
               "recall": 0.9210526315789473,
-              "f1": 0.9090909090909091
+              "f1": 0.9210526315789473
             },
             "ADDRESS": {
               "gold": 13,
@@ -604,11 +604,11 @@
             "DATE_OF_BIRTH": {
               "gold": 6,
               "pred": 8,
-              "tp_pred": 6,
-              "tp_gold": 6,
-              "precision": 0.75,
-              "recall": 1.0,
-              "f1": 0.8571428571428571
+              "tp_pred": 5,
+              "tp_gold": 5,
+              "precision": 0.625,
+              "recall": 0.8333333333333334,
+              "f1": 0.7142857142857143
             },
             "NATIONAL_ID_HU_TAX": {
               "gold": 5,
@@ -685,29 +685,29 @@
           },
           "micro": {
             "gold": 120,
-            "pred": 127,
-            "tp_pred": 111,
-            "tp_gold": 111,
-            "precision": 0.8740157480314961,
-            "recall": 0.925,
-            "f1": 0.8987854251012146
+            "pred": 126,
+            "tp_pred": 110,
+            "tp_gold": 110,
+            "precision": 0.873015873015873,
+            "recall": 0.9166666666666666,
+            "f1": 0.894308943089431
           },
           "macro": {
-            "precision": 0.8866991982376597,
-            "recall": 0.9410671649538046,
-            "f1": 0.911221332273964
+            "precision": 0.8789004854794329,
+            "recall": 0.9282466521332918,
+            "f1": 0.9011524537840327
           }
         },
         "overlap": {
           "per_type": {
             "PERSON": {
               "gold": 38,
-              "pred": 39,
+              "pred": 38,
               "tp_pred": 37,
               "tp_gold": 37,
-              "precision": 0.9487179487179487,
+              "precision": 0.9736842105263158,
               "recall": 0.9736842105263158,
-              "f1": 0.9610389610389611
+              "f1": 0.9736842105263158
             },
             "ADDRESS": {
               "gold": 13,
@@ -820,17 +820,17 @@
           },
           "micro": {
             "gold": 120,
-            "pred": 127,
+            "pred": 126,
             "tp_pred": 120,
             "tp_gold": 119,
-            "precision": 0.9448818897637795,
+            "precision": 0.9523809523809523,
             "recall": 0.9916666666666667,
-            "f1": 0.9677091451224883
+            "f1": 0.9716268626250255
           },
           "macro": {
-            "precision": 0.9482530290222597,
+            "precision": 0.9501735106998266,
             "recall": 0.9979757085020242,
-            "f1": 0.9705693916220232
+            "f1": 0.9715421031210505
           }
         }
       },
@@ -921,12 +921,12 @@
         }
       },
       "over_masking": {
-        "masked": 112,
+        "masked": 111,
         "over_masked": 2,
-        "rate": 0.017857142857142856,
+        "rate": 0.018018018018018018,
         "per_type": {
           "PERSON": {
-            "masked": 39,
+            "masked": 38,
             "over_masked": 0,
             "rate": 0.0
           },
@@ -1087,12 +1087,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 2191.1318751517683,
-          "p95": 4219.664291013032
+          "p50": 1948.7842498347163,
+          "p95": 3793.3482080698013
         },
         "mask": {
-          "p50": 1.1285410728305578,
-          "p95": 3.756833029910922
+          "p50": 1.2448341585695744,
+          "p95": 4.034582991153002
         }
       }
     }
@@ -1105,16 +1105,16 @@
       "llm"
     ],
     "documents": 31,
-    "wall_s": 78.1,
+    "wall_s": 71.6,
     "load_average_start": [
-      27.23,
-      24.89,
-      21.87
+      16.64,
+      16.03,
+      18.83
     ],
     "load_average_end": [
-      49.7,
-      30.57,
-      24.17
+      12.94,
+      14.96,
+      18.2
     ],
     "host": {
       "platform": "macOS-26.5.2-arm64-arm-64bit",
@@ -1140,20 +1140,20 @@
       "reasoning_effort": "low",
       "usage": {
         "requests": 31,
-        "prompt_tokens": 35514,
+        "prompt_tokens": 35518,
         "cached_tokens": 27776,
-        "completion_tokens": 14276,
-        "reasoning_tokens": 11337,
+        "completion_tokens": 14900,
+        "reasoning_tokens": 11969,
         "invalid_outputs": 0,
         "refusals": 0,
         "empty_challenged": 0
       },
       "usage_incl_warmup": {
         "requests": 32,
-        "prompt_tokens": 36461,
+        "prompt_tokens": 36485,
         "cached_tokens": 28544,
-        "completion_tokens": 14334,
-        "reasoning_tokens": 11380,
+        "completion_tokens": 15003,
+        "reasoning_tokens": 12057,
         "invalid_outputs": 0,
         "refusals": 0,
         "empty_challenged": 0
@@ -1163,9 +1163,9 @@
         "cached_input": 0.15,
         "output": 4.25
       },
-      "cost_usd": 0.0745,
-      "cost_usd_incl_warmup": 0.0751,
-      "usd_per_1k_messages": 2.4,
+      "cost_usd": 0.0772,
+      "cost_usd_incl_warmup": 0.078,
+      "usd_per_1k_messages": 2.49,
       "refusal_rate": 0.0,
       "invalid_output_rate": 0.0
     }

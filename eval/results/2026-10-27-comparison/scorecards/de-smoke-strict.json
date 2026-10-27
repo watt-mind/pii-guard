@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "meta": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "generated_at": "2026-10-27T10:18:10+00:00",
+    "generated_at": "2026-10-27T10:43:02+00:00",
     "detectors": [
       "rules",
       "ner",
@@ -378,12 +378,12 @@
     },
     "latency_ms": {
       "detect": {
-        "p50": 1663.0626660771668,
-        "p95": 3123.817208921537
+        "p50": 1813.8891248963773,
+        "p95": 3070.9014169406146
       },
       "mask": {
-        "p50": 0.45070797204971313,
-        "p95": 0.5827909335494041
+        "p50": 0.44499989598989487,
+        "p95": 0.6038339342921972
       }
     }
   },
@@ -747,12 +747,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 1663.0626660771668,
-          "p95": 3123.817208921537
+          "p50": 1813.8891248963773,
+          "p95": 3070.9014169406146
         },
         "mask": {
-          "p50": 0.45070797204971313,
-          "p95": 0.5827909335494041
+          "p50": 0.44499989598989487,
+          "p95": 0.6038339342921972
         }
       }
     }
@@ -767,14 +767,14 @@
     "documents": 10,
     "wall_s": 20.9,
     "load_average_start": [
-      72.28,
-      41.51,
-      28.78
+      13.33,
+      14.82,
+      17.98
     ],
     "load_average_end": [
-      54.5,
-      39.45,
-      28.33
+      13.74,
+      14.81,
+      17.9
     ],
     "host": {
       "platform": "macOS-26.5.2-arm64-arm-64bit",
@@ -800,20 +800,20 @@
       "reasoning_effort": "low",
       "usage": {
         "requests": 10,
-        "prompt_tokens": 11037,
+        "prompt_tokens": 11057,
         "cached_tokens": 8960,
-        "completion_tokens": 3750,
-        "reasoning_tokens": 2891,
+        "completion_tokens": 3850,
+        "reasoning_tokens": 2991,
         "invalid_outputs": 0,
         "refusals": 0,
         "empty_challenged": 0
       },
       "usage_incl_warmup": {
         "requests": 11,
-        "prompt_tokens": 11992,
+        "prompt_tokens": 12008,
         "cached_tokens": 9728,
-        "completion_tokens": 3806,
-        "reasoning_tokens": 2932,
+        "completion_tokens": 3945,
+        "reasoning_tokens": 3072,
         "invalid_outputs": 0,
         "refusals": 0,
         "empty_challenged": 0
@@ -823,9 +823,9 @@
         "cached_input": 0.15,
         "output": 4.25
       },
-      "cost_usd": 0.0199,
-      "cost_usd_incl_warmup": 0.0205,
-      "usd_per_1k_messages": 1.99,
+      "cost_usd": 0.0203,
+      "cost_usd_incl_warmup": 0.0211,
+      "usd_per_1k_messages": 2.03,
       "refusal_rate": 0.0,
       "invalid_output_rate": 0.0
     }

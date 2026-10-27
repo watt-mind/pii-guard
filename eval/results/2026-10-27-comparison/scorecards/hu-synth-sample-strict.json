@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "meta": {
-    "commit": "e394a0636ca0cd48933b7965de375e10ad4eb3a0",
+    "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
     "pii_guard_version": "0.1.0",
-    "generated_at": "2026-10-27T10:19:09+00:00",
+    "generated_at": "2026-10-27T10:43:54+00:00",
     "detectors": [
       "rules",
       "ner",
@@ -38,11 +38,11 @@
           "ADDRESS": {
             "gold": 39,
             "pred": 40,
-            "tp_pred": 37,
-            "tp_gold": 37,
-            "precision": 0.925,
-            "recall": 0.9487179487179487,
-            "f1": 0.9367088607594937
+            "tp_pred": 39,
+            "tp_gold": 39,
+            "precision": 0.975,
+            "recall": 1.0,
+            "f1": 0.9873417721518987
           },
           "EMAIL": {
             "gold": 9,
@@ -128,11 +128,11 @@
           "PARCEL_NUMBER_HU": {
             "gold": 7,
             "pred": 7,
-            "tp_pred": 6,
-            "tp_gold": 6,
-            "precision": 0.8571428571428571,
-            "recall": 0.8571428571428571,
-            "f1": 0.8571428571428571
+            "tp_pred": 7,
+            "tp_gold": 7,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
           },
           "VEHICLE_PLATE": {
             "gold": 8,
@@ -147,16 +147,16 @@
         "micro": {
           "gold": 271,
           "pred": 272,
-          "tp_pred": 266,
-          "tp_gold": 266,
-          "precision": 0.9779411764705882,
-          "recall": 0.981549815498155,
-          "f1": 0.9797421731123388
+          "tp_pred": 269,
+          "tp_gold": 269,
+          "precision": 0.9889705882352942,
+          "recall": 0.992619926199262,
+          "f1": 0.990791896869245
         },
         "macro": {
-          "precision": 0.9818039437198316,
-          "recall": 0.9836284013135199,
-          "f1": 0.9827046253167157
+          "precision": 0.9966391085549964,
+          "recall": 0.9985621854780734,
+          "f1": 0.9975884756436041
         }
       },
       "overlap": {
@@ -548,12 +548,12 @@
     },
     "latency_ms": {
       "detect": {
-        "p50": 2324.491250095889,
-        "p95": 3187.2551671694964
+        "p50": 2040.9500419627875,
+        "p95": 2639.1094578430057
       },
       "mask": {
-        "p50": 3.352792002260685,
-        "p95": 5.805457942187786
+        "p50": 3.805292071774602,
+        "p95": 5.898666102439165
       }
     }
   },
@@ -577,11 +577,11 @@
             "ADDRESS": {
               "gold": 39,
               "pred": 40,
-              "tp_pred": 37,
-              "tp_gold": 37,
-              "precision": 0.925,
-              "recall": 0.9487179487179487,
-              "f1": 0.9367088607594937
+              "tp_pred": 39,
+              "tp_gold": 39,
+              "precision": 0.975,
+              "recall": 1.0,
+              "f1": 0.9873417721518987
             },
             "EMAIL": {
               "gold": 9,
@@ -667,11 +667,11 @@
             "PARCEL_NUMBER_HU": {
               "gold": 7,
               "pred": 7,
-              "tp_pred": 6,
-              "tp_gold": 6,
-              "precision": 0.8571428571428571,
-              "recall": 0.8571428571428571,
-              "f1": 0.8571428571428571
+              "tp_pred": 7,
+              "tp_gold": 7,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
             },
             "VEHICLE_PLATE": {
               "gold": 8,
@@ -686,16 +686,16 @@
           "micro": {
             "gold": 271,
             "pred": 272,
-            "tp_pred": 266,
-            "tp_gold": 266,
-            "precision": 0.9779411764705882,
-            "recall": 0.981549815498155,
-            "f1": 0.9797421731123388
+            "tp_pred": 269,
+            "tp_gold": 269,
+            "precision": 0.9889705882352942,
+            "recall": 0.992619926199262,
+            "f1": 0.990791896869245
           },
           "macro": {
-            "precision": 0.9818039437198316,
-            "recall": 0.9836284013135199,
-            "f1": 0.9827046253167157
+            "precision": 0.9966391085549964,
+            "recall": 0.9985621854780734,
+            "f1": 0.9975884756436041
           }
         },
         "overlap": {
@@ -1087,12 +1087,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 2324.491250095889,
-          "p95": 3187.2551671694964
+          "p50": 2040.9500419627875,
+          "p95": 2639.1094578430057
         },
         "mask": {
-          "p50": 3.352792002260685,
-          "p95": 5.805457942187786
+          "p50": 3.805292071774602,
+          "p95": 5.898666102439165
         }
       }
     }
@@ -1105,16 +1105,16 @@
       "llm"
     ],
     "documents": 20,
-    "wall_s": 49.4,
+    "wall_s": 41.9,
     "load_average_start": [
-      47.85,
-      38.53,
-      28.14
+      14.57,
+      14.94,
+      17.91
     ],
     "load_average_end": [
-      25.98,
-      33.89,
-      27.01
+      15.06,
+      14.98,
+      17.77
     ],
     "host": {
       "platform": "macOS-26.5.2-arm64-arm-64bit",
@@ -1140,20 +1140,20 @@
       "reasoning_effort": "low",
       "usage": {
         "requests": 20,
-        "prompt_tokens": 32833,
+        "prompt_tokens": 32765,
         "cached_tokens": 17920,
-        "completion_tokens": 13110,
-        "reasoning_tokens": 8614,
+        "completion_tokens": 12034,
+        "reasoning_tokens": 7526,
         "invalid_outputs": 0,
         "refusals": 0,
         "empty_challenged": 0
       },
       "usage_incl_warmup": {
         "requests": 21,
-        "prompt_tokens": 33788,
+        "prompt_tokens": 33716,
         "cached_tokens": 18688,
-        "completion_tokens": 13173,
-        "reasoning_tokens": 8662,
+        "completion_tokens": 12090,
+        "reasoning_tokens": 7567,
         "invalid_outputs": 0,
         "refusals": 0,
         "empty_challenged": 0
@@ -1163,9 +1163,9 @@
         "cached_input": 0.15,
         "output": 4.25
       },
-      "cost_usd": 0.077,
-      "cost_usd_incl_warmup": 0.0777,
-      "usd_per_1k_messages": 3.85,
+      "cost_usd": 0.0724,
+      "cost_usd_incl_warmup": 0.073,
+      "usd_per_1k_messages": 3.62,
       "refusal_rate": 0.0,
       "invalid_output_rate": 0.0
     }

@@ -1,6 +1,6 @@
 # pii-guard evaluation
 
-- commit: `e394a0636ca0 (dirty)`, pii-guard 0.1.0
+- commit: `4f84c6adc9ba (dirty)`, pii-guard 0.1.0
 - detectors: `rules`, `ner`, `llm`
 - fixtures: `eval/fixtures/en-synth-sample.jsonl` sha256 `2c7ab3d12880065d`
 
@@ -8,8 +8,8 @@ All ratios in %. P/R/F1 are span-level micro averages; macro F1 is over entity t
 
 | Language | Docs | Gold | Pred | P exact | R exact | F1 exact | P overlap | R overlap | F1 overlap | Macro F1 | Leak | Partial leak | Over-masking | Round trip | Consistency | Detect p50 ms | Detect p95 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `en` | 10 | 120 | 123 | 97.6 | 100.0 | 98.8 | 97.6 | 100.0 | 98.8 | 99.1 | 0.0 | 3.8 | 2.7 | 100.0 | 100.0 | 2099.43 | 4748.90 |
-| **overall** | 10 | 120 | 123 | 97.6 | 100.0 | 98.8 | 97.6 | 100.0 | 98.8 | 99.1 | 0.0 | 3.8 | 2.7 | 100.0 | 100.0 | 2099.43 | 4748.90 |
+| `en` | 10 | 120 | 123 | 97.6 | 100.0 | 98.8 | 97.6 | 100.0 | 98.8 | 99.1 | 0.0 | 3.8 | 2.7 | 100.0 | 100.0 | 2000.39 | 3025.54 |
+| **overall** | 10 | 120 | 123 | 97.6 | 100.0 | 98.8 | 97.6 | 100.0 | 98.8 | 99.1 | 0.0 | 3.8 | 2.7 | 100.0 | 100.0 | 2000.39 | 3025.54 |
 
 ## Per entity type: `en`
 
