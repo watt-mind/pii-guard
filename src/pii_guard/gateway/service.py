@@ -263,6 +263,11 @@ class Gateway:
         self._detectors = dict(detectors) if detectors is not None else None
         self.cache = cache or DetectionCache(self.config.cache_size)
         self._transport = transport
+        # One upstream client per gateway, created on first use (LAB-1176): building one is
+        # ~4.5 ms of blocking TLS and proxy setup on the event loop, and only a shared pool
+        # keeps connections to the upstream alive between calls.
+        self._client: httpx.AsyncClient | None = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
         # Blocking detector calls run on one bounded pool per mode (LAB-1207): a slot stays
         # taken until the thread finishes, so a hung audit-mode detector can't starve fast.
         self._detect_workers: dict[Mode, BoundedWorkers] = {}
@@ -272,6 +277,41 @@ class Gateway:
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
+
+    # --- the upstream client ------------------------------------------------------------
+
+    def upstream_timeout(self) -> httpx.Timeout:
+        """The timeout of one upstream call (set per request on the shared client)."""
+        return httpx.Timeout(self.config.upstream_timeout, connect=10.0)
+
+    def upstream_client(self) -> httpx.AsyncClient:
+        """The shared upstream client of this gateway, created on first use.
+
+        A new one is built when the running event loop changes (pooled connections belong to
+        the loop that opened them: test clients may run each request on a new loop; a server
+        has one). Callers close the *response*, never this client; :meth:`aclose` closes it on
+        app shutdown."""
+        loop = asyncio.get_running_loop()
+        client = self._client
+        if client is None or client.is_closed or self._client_loop is not loop:
+            config = self.config
+            client = httpx.AsyncClient(
+                timeout=self.upstream_timeout(),
+                transport=self._transport,
+                limits=httpx.Limits(
+                    max_connections=config.upstream_max_connections,
+                    max_keepalive_connections=config.upstream_max_keepalive,
+                    keepalive_expiry=config.upstream_keepalive_expiry,
+                ),
+            )
+            self._client, self._client_loop = client, loop
+        return client
+
+    async def aclose(self) -> None:
+        """Close the upstream client and its pooled connections (the next call opens a new one)."""
+        client, self._client, self._client_loop = self._client, None, None
+        if client is not None:
+            await client.aclose()
 
     @property
     def detectors(self) -> dict[Mode, ModeDetector]:
@@ -636,12 +676,13 @@ class Gateway:
         if trace.payloads:
             trace.masked_request = payload
         masked_messages = _masked_messages(body) if echo else None
-        client = httpx.AsyncClient(
-            timeout=httpx.Timeout(self.config.upstream_timeout, connect=10.0),
-            transport=self._transport,
-        )
+        client = self.upstream_client()
         request = client.build_request(
-            "POST", url, content=payload, headers=self._upstream_headers(headers)
+            "POST",
+            url,
+            content=payload,
+            headers=self._upstream_headers(headers),
+            timeout=self.upstream_timeout(),
         )
         started = time.perf_counter()
         timer.add("forward", started - forwarding)
@@ -649,7 +690,6 @@ class Gateway:
         try:
             response = await client.send(request, stream=True)
         except httpx.HTTPError as exc:
-            await client.aclose()
             timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")
             raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
@@ -663,7 +703,6 @@ class Gateway:
                 raw = await _read_limited(response)
             finally:
                 await response.aclose()
-                await client.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
             timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
             stats.log("upstream_error")
@@ -677,7 +716,6 @@ class Gateway:
                 raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
             finally:
                 await response.aclose()
-                await client.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
             timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
             if trace.payloads:
@@ -802,7 +840,6 @@ class Gateway:
             finally:
                 await source.aclose()
                 await response.aclose()
-                await client.aclose()
                 stats.upstream_ms = timer.stages["upstream"] * 1000
                 stats.unresolved = len(restorer.unresolved)
                 if outcome == "ok":
