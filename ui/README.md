@@ -111,7 +111,7 @@ pnpm build         # production build into dist/
 pnpm preview       # serve dist/ on :4173 with the same proxy
 ```
 
-CI runs the same commands (`.github/workflows/ui.yml`) on changes under `ui/`:
+CI runs the same commands (the `ui` job in `.github/workflows/ci.yml`) on changes under `ui/`:
 
 ```bash
 pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test --run && pnpm build
