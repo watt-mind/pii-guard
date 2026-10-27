@@ -43,6 +43,7 @@ class EntityType(StrEnum):
     ORGANIZATION = "ORGANIZATION"
     PARCEL_NUMBER_HU = "PARCEL_NUMBER_HU"
     VEHICLE_PLATE = "VEHICLE_PLATE"
+    SECRET = "SECRET"  # noqa: S105 - the type name, not a credential
 
     # Visual entities (image regions, not text spans)
     FACE = "FACE"
@@ -76,6 +77,11 @@ class Span:
     ``forced_by`` is debugging metadata set by the resolver: the detector whose masked type
     replaced a kept type on this span (fail closed, LAB-1228). It does not take part in
     equality or hashing and is not in :meth:`to_public_dict`.
+
+    ``subtype`` refines the type where one type covers several shapes: a ``SECRET`` span says
+    which rule found it (``"github_token"``, ``"url_password"``, ``"assignment"``, see
+    ``docs/contracts.md``). It does not take part in equality or hashing; :meth:`to_public_dict`
+    includes it only when it is set.
     """
 
     start: int
@@ -85,6 +91,7 @@ class Span:
     score: float
     detector: str
     forced_by: str | None = field(default=None, compare=False)
+    subtype: str | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.entity_type, EntityType):
@@ -108,6 +115,7 @@ class Span:
             f"entity_type={self.entity_type.value}, score={self.score:.3f}, "
             f"detector={self.detector!r}, "
             + (f"forced_by={self.forced_by!r}, " if self.forced_by else "")
+            + (f"subtype={self.subtype!r}, " if self.subtype else "")
             + "text=<redacted>)"
         )
 
@@ -123,13 +131,16 @@ class Span:
 
     def to_public_dict(self) -> dict[str, object]:
         """The span without its raw value, as returned by ``POST /v1/analyze``."""
-        return {
+        out: dict[str, object] = {
             "start": self.start,
             "end": self.end,
             "entity_type": self.entity_type.value,
             "score": self.score,
             "detector": self.detector,
         }
+        if self.subtype:
+            out["subtype"] = self.subtype
+        return out
 
 
 @runtime_checkable

@@ -1160,6 +1160,32 @@ the same fictional mini-repo and task as pi in milestone 35:
 - **Cost:** $0. About 10 requests on free Meta API credits (one live run and `--check`); the
   rest ran locally.
 
+### 40. API keys and passwords no longer reach the model (2026-10-27)
+
+LAB-1257. Entry 35 found that every fake key in the mini-repo's `.env` reached the model. There
+is now a `SECRET` type, masked by default. Language-independent rules
+(`detect/rules/secrets.py`) find three things: provider key shapes (AWS, GitHub, Slack,
+Stripe, `sk-` keys, Google, JWTs, PEM private keys), passwords in URLs, and values assigned to
+a secret-ish key (`API_KEY=`, `password:`, `"client_secret":`, `Authorization: Bearer`). Each
+span names the rule that found it as a subtype. Restore works as for every other type, so the
+agent's files get the real values back.
+
+| Check (rules only) | Before | After |
+|---|---:|---:|
+| pi + scripted mock: `.env` secrets upstream | 3 of 3 | **0 of 3** |
+| pi + scripted mock: gold values restored in the written file | 11 of 11 | 14 of 14 |
+| New `secrets` gate suite (17 docs, 5 hard negatives): leak / over-masking | n/a | 0 / 0 |
+| Over-masking check: mini-repo, 6 repo files, `uv.lock`, `ui/pnpm-lock.yaml` (431k chars): `SECRET` spans that aren't secrets | n/a | 0 |
+
+- **Code stays readable.** A value must look like a literal, not code. So `api_key=api_key`,
+  `password: str`, `os.environ[...]`, `${DB_PASSWORD}`, `<your API key>` and `****` are left
+  alone. Lockfile hashes, git SHAs and UUIDs are masked only when they're assigned to a
+  secret-ish key. A generic `*_KEY` name (`STORAGE_KEY`) needs a value that looks generated.
+- **`PASSWORD=changeme` is masked.** A weak password in a config file is still a password.
+- **Found on the way:** the existing number rules mask 14 integrity-hash fragments in
+  `uv.lock` as TAJ or ID numbers, which isn't new. It's a follow-up ticket.
+- **Cost:** $0, all local.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

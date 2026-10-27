@@ -354,6 +354,22 @@ By language:
 | pii-guard rules + Muse Spark 1.3 | 100.0% | 100.0% | 0.0% | 0.0% |
 
 
+### `secrets`
+
+hand-written; documents: en 17.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 17 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 0.35 ms | 2026-10-27 | `72bcc27` |
+
+
+By language:
+
+| System | en F1 | en leak |
+|---|---:|---:|
+| **pii-guard rules** | 100.0% | 0.0% |
+
+
 ### `synth-dev`
 
 generated; documents: en 24 + hu 24.
@@ -578,6 +594,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-secrets-rules` | pii-guard rules | secrets | en | recorded | `72bcc27` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-negative-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | uncued-numbers | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-negative-rules` | pii-guard rules | uncued-numbers | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |

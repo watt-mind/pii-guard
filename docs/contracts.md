@@ -17,7 +17,7 @@ A `StrEnum` whose values equal their names, one member per row of
 
 | Group | Members |
 |---|---|
-| Text | `PERSON`, `ADDRESS`, `EMAIL`, `PHONE`, `DATE_OF_BIRTH`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `BANK_ACCOUNT`, `COMPANY_ID_HU`, `ORGANIZATION`, `PARCEL_NUMBER_HU`, `VEHICLE_PLATE` |
+| Text | `PERSON`, `ADDRESS`, `EMAIL`, `PHONE`, `DATE_OF_BIRTH`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `BANK_ACCOUNT`, `COMPANY_ID_HU`, `ORGANIZATION`, `PARCEL_NUMBER_HU`, `VEHICLE_PLATE`, `SECRET` |
 | Visual | `FACE`, `SIGNATURE`, `ID_PHOTO`, `STAMP` |
 
 `TEXT_ENTITY_TYPES` and `VISUAL_ENTITY_TYPES` are `frozenset`s of the two groups;
@@ -36,10 +36,11 @@ class Span:
     score: float              # detector confidence in [0, 1]
     detector: str             # registry name of the detector, e.g. "rules"
     forced_by: str | None = None  # resolver debug metadata, see "Policies"; not compared
+    subtype: str | None = None    # which shape of the type, e.g. SECRET "github_token"; not compared
 
     length: int               # property, end - start
     def overlaps(self, other: Span) -> bool
-    def to_public_dict(self) -> dict  # {start, end, entity_type, score, detector}, no text
+    def to_public_dict(self) -> dict  # {start, end, entity_type, score, detector[, subtype]}, no text
 ```
 
 - Construction validates: `0 <= start < end`, `len(text) == end - start`,
@@ -47,6 +48,12 @@ class Span:
   `ValueError`.
 - `forced_by` is set only by the resolver (below) and is left out of equality, hashing and
   `to_public_dict()`.
+- `subtype` is set by the rule that found the span and kept by the resolver. It is left out
+  of equality and hashing; `to_public_dict()` (and so `POST /v1/analyze`) includes it only
+  when set. Today only `SECRET` spans carry one: `aws_access_key_id`, `github_token`,
+  `slack_token`, `stripe_key`, `api_key` (`sk-` style), `google_api_key`, `jwt`, `private_key`,
+  `url_password`, `url_user`, `bearer_token`, `assignment`
+  (`pii_guard.detect.rules.secrets.SUBTYPES`). A subtype names a rule, never a value.
 - `repr()` / `str()` **omit `text`** (`text=<redacted>`), so spans can be logged or appear in
   assertion messages without leaking the value. Spans are hashable and compare by value.
 - Offsets are Python `str` indices (code points), not bytes or UTF-16 units.
@@ -132,8 +139,8 @@ register_rule_pack(pack: RulePack) -> None   # replaces the rules of pack.langua
 rule_packs() -> dict[str, RulePack]          # the language packs' rules, with overrides applied
 ```
 
-- **Scopes.** The language-independent rules (`pii_guard.detect.rules.common`) run for every
-  text. A language pack ([ADR 0008](decisions/0008-language-packs.md), `languages/<lang>/rules.py`)
+- **Scopes.** The language-independent rules (`pii_guard.detect.rules.common` and
+  `pii_guard.detect.rules.secrets`) run for every text. A language pack ([ADR 0008](decisions/0008-language-packs.md), `languages/<lang>/rules.py`)
   contributes `everywhere` rules (identifiers with a checksum or a distinctive validated format,
   run whatever the text's language: a Hungarian tax ID in an English e-mail is still personal
   data) and `rules` (formats that are only unambiguous in that language, such as postcodes,
@@ -152,6 +159,7 @@ label, a consistent postcode and settlement, or valid check digits:
 | Scope | Entity types | Scores |
 |---|---|---|
 | all | `BANK_ACCOUNT` (IBAN, mod 97; payment card, issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
+| all | `SECRET` (provider key shapes, PEM private keys, `scheme://user:password@host`, values assigned to a secret-ish key, `Authorization: Bearer/Basic`; [entities.md](entities.md#language-independent)) | provider shape 0.9-0.97, private key 0.99, URL password 0.9 / user 0.85, bearer 0.9, assignment 0.85 |
 | `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labelled ID card / passport / licence / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
 | `hu`, language | `ADDRESS` (postcode, address with settlement and street), `VEHICLE_PLATE`, bare `ID_DOCUMENT` card number, `PERSON` inside a company name with a legal form | postcode 0.75-0.9, address 0.75 / 0.85 / 0.97 (postcode and settlement agree), plate 0.85 / 0.8, bare ID card 0.7, company-name person 0.7-0.9 (`languages/hu/companies.py`) |
 | `en`, everywhere | `ID_DOCUMENT` (US SSN, UK NINO) | SSN 0.95 / 0.85, NINO 0.95 / 0.9 |

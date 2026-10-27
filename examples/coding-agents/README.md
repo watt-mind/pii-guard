@@ -12,7 +12,7 @@ and textbook IBANs. The keys in `env.fake` are fake.
 | `mini-repo/customers.csv` | Three customers: name, e-mail, phone and IBAN per row (en, hu, de) |
 | `mini-repo/env.fake` | Fake keys, a fake password and a support address. The harness copies it in as `.env` |
 | `mini-repo/src/notify.py` | Ordinary code: identifiers, a path and a URL that must *not* be masked |
-| `gold.json` | The values that must never reach the model, and the known gaps (secrets, CSV names) |
+| `gold.json` | The values that must never reach the model (the `.env` secrets too, `SECRET` type) and the known gaps (CSV names) |
 
 The task the agent gets: read the letter, the CSV and `.env`, then write `reply.md` with the
 client's IBAN, e-mail and phone, plus every customer's e-mail. The model only ever sees
