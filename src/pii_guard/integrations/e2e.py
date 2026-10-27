@@ -4,6 +4,7 @@ gateway. Two clients: **pi** (Chat Completions) and **Muse Code** (Responses API
 ```
 uv run python -m pii_guard.integrations.e2e                       # pi, scripted mock (CI)
 uv run python -m pii_guard.integrations.e2e --client muse-code    # Muse Code, scripted mock
+uv run python -m pii_guard.integrations.e2e --client muse-code --session per-request  # before
 uv run python -m pii_guard.integrations.e2e --client muse-code --upstream https://api.meta.ai/v1 \\
     --model muse-spark-1.3 --key-env META_API_KEY --record examples/coding-agents/runs/<name>.json
 ```
@@ -28,6 +29,14 @@ The result (:class:`RunResult`) says whether any gold value (``examples/coding-a
 reached the upstream, whether the gateway refused a request, and what the agent wrote: the files
 hold the real values again, because tool-call arguments come back restored. Values pii-guard
 does not cover yet (API keys, names inside CSV rows) are counted separately as known gaps.
+
+Sticky sessions (LAB-1286): ``--session`` picks how the client lands in a vault session.
+``path`` (default) is what ``pii-guard connect`` writes, a ``/s/<session>/v1`` base URL;
+``auto`` is the plain URL (the gateway uses the ``prompt_cache_key``, else the client's default
+session); ``per-request`` gives every request a new session, the behaviour before LAB-1286. The
+result counts the sessions and their sources (``X-PII-Guard-Session-Source``) and, from the
+gateway's vault, how many gold values were masked under more than one placeholder
+(``gold_unstable``: 0 means the same value had the same placeholder in every turn).
 """
 
 from __future__ import annotations
@@ -57,7 +66,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from pii_guard.integrations.muse_code import MUSE_VERSION_CHECKED
-from pii_guard.vault.placeholders import PLACEHOLDER_RE
+from pii_guard.vault import SessionNotFoundError
+from pii_guard.vault.placeholders import PLACEHOLDER_RE, normalize_value
 
 __all__ = [
     "EXAMPLE_DIR",
@@ -551,11 +561,21 @@ def serve(app: Any, port: int | None = None) -> Iterator[str]:
 
 
 _COUNTED = ("/v1/chat/completions", "/v1/responses")
+SESSIONS = ("path", "auto", "per-request")
 
 
-def gateway_app(upstream_url: str, statuses: list[int], *, mode: str | None = None) -> FastAPI:
+def gateway_app(
+    upstream_url: str,
+    statuses: list[int],
+    *,
+    mode: str | None = None,
+    calls: list[tuple[str, str]] | None = None,
+    per_request_sessions: bool = False,
+) -> FastAPI:
     """The gateway in front of ``upstream_url``; ``mode`` sets its default mode (Muse Code
-    can't send ``X-PII-Guard-Mode``)."""
+    can't send ``X-PII-Guard-Mode``). ``calls`` collects ``(session, session source)`` per
+    counted call; ``per_request_sessions`` sends every call to a new session (the gateway
+    before LAB-1286)."""
     from pydantic import SecretStr
 
     from pii_guard.api.app import create_app
@@ -573,9 +593,21 @@ def gateway_app(upstream_url: str, statuses: list[int], *, mode: str | None = No
 
     @app.middleware("http")
     async def count(request: Request, call_next: Any) -> Response:
+        # The path before SessionPathMiddleware: /s/<session>/v1/... counts too (LAB-1286).
+        counted = re.sub(r"^/s/[^/]+", "", request.url.path) in _COUNTED
+        if counted and per_request_sessions:
+            path = f"/s/e2e_{secrets.token_hex(8)}{request.scope['path']}"
+            request.scope["path"], request.scope["raw_path"] = path, path.encode()
         response = await call_next(request)
-        if request.url.path in _COUNTED:
+        if counted:
             statuses.append(response.status_code)
+            if calls is not None:
+                calls.append(
+                    (
+                        response.headers.get("x-pii-guard-session", ""),
+                        response.headers.get("x-pii-guard-session-source", ""),
+                    )
+                )
         return response
 
     return app
@@ -609,6 +641,14 @@ class RunResult:
     #: Multi-word gold values (names) not upstream whole, but with a word of them upstream
     #: (a partly masked name). Reported, not part of :attr:`ok` (the whole-value check).
     gold_partial_upstream: list[str] = field(default_factory=list)
+    #: How the client reached a vault session (``--session``) and what the gateway reported.
+    session: str = "path"
+    sessions: int = 0
+    session_sources: dict[str, int] = field(default_factory=dict)
+    #: Gold values the upstream saw under more than one placeholder (0: stable across turns),
+    #: and the most placeholders one gold value had.
+    gold_unstable: int = 0
+    gold_max_placeholders: int = 0
 
     @property
     def ok(self) -> bool:
@@ -618,6 +658,9 @@ class RunResult:
             and not self.gold_upstream
             and self.placeholders_upstream > 0
             and self.placeholders_in_files == 0
+            # One session from the connect path URL: one placeholder per value. The other
+            # modes split a task over several sessions (Muse: one per prompt_cache_key).
+            and (self.gold_unstable == 0 or self.session != "path")
         )
 
 
@@ -721,6 +764,9 @@ def _result(
     gold: dict[str, Any],
     ner: bool,
     started: float,
+    app: FastAPI,
+    calls: list[tuple[str, str]],
+    session: str,
 ) -> RunResult:
     checked = list(gold["rules"]) + (list(gold["ner"]) if ner else [])
     gaps = {kind: list(values) for kind, values in gold["known_gaps"].items()}
@@ -750,7 +796,43 @@ def _result(
         request_keys=_request_keys(recorder.bodies) if recorder.bodies else {},
         seconds=round(time.monotonic() - started, 1),
         gold_partial_upstream=_partial(checked, upstream_text),
+        session=session,
+        **_stability(app, calls, upstream_text, checked),
     )
+
+
+def _stability(
+    app: FastAPI, calls: list[tuple[str, str]], upstream_text: str, checked: list[str]
+) -> dict[str, Any]:
+    """Sessions, their sources and per gold value the placeholders the upstream saw.
+
+    Each placeholder is looked up in the sessions the gateway reported (only the session
+    that issued it knows it), in this process; only counts leave this function.
+    """
+    sources: dict[str, int] = {}
+    for _, source in calls:
+        sources[source or "-"] = sources.get(source or "-", 0) + 1
+    session_ids = sorted({sid for sid, _ in calls if sid})
+    gateway = getattr(app.state, "gateway", None)
+    tokens = sorted({m.group(0) for m in PLACEHOLDER_RE.finditer(upstream_text)})
+    by_value: dict[str, set[str]] = {}
+    for sid in session_ids if gateway is not None else []:
+        try:
+            session = gateway.vault.session(sid)
+        except SessionNotFoundError:
+            continue
+        # One unmask per session: the other sessions' tokens stay as they are.
+        restored = session.unmask_with_report("\n".join(tokens)).text.split("\n")
+        for token, original in zip(tokens, restored, strict=True):
+            if original != token:
+                by_value.setdefault(normalize_value(original), set()).add(token)
+    counts = [len(by_value.get(normalize_value(v), ())) for v in checked]
+    return {
+        "sessions": len(session_ids),
+        "session_sources": dict(sorted(sources.items())),
+        "gold_unstable": sum(1 for n in counts if n > 1),
+        "gold_max_placeholders": max(counts, default=0),
+    }
 
 
 def _connect(args: list[str]) -> None:
@@ -770,6 +852,7 @@ def run(
     example_dir: Path = EXAMPLE_DIR,
     prompt: str = PROMPT,
     timeout: float = 900,
+    session: str = "path",
 ) -> RunResult:
     """pi through the gateway (Chat Completions)."""
     gold = load_gold(example_dir)
@@ -777,13 +860,20 @@ def run(
     started = time.monotonic()
     recorder = Recorder(upstream, key)
     statuses: list[int] = []
+    calls: list[tuple[str, str]] = []
     with _workspace(example_dir, "pii-guard-pi-e2e-") as (root, work, before):
         agent_dir = root / "agent"
+        fresh = session == "per-request"
         with (
             serve(recorder.app) as recorder_url,
-            serve(gateway_app(recorder_url + "/v1", statuses)) as gateway_url,
+            serve(
+                app := gateway_app(
+                    recorder_url + "/v1", statuses, calls=calls, per_request_sessions=fresh
+                )
+            ) as gateway_url,
         ):
             args = ["pi", "--gateway", gateway_url + "/v1", "--agent-dir", str(agent_dir)]
+            args += [] if session == "path" else ["--no-session-path"]
             _connect(args + (["--model", model] if model else []))
             env = {
                 "PATH": os.environ.get("PATH", ""),
@@ -811,6 +901,9 @@ def run(
         gold=gold,
         ner=ner,
         started=started,
+        app=app,
+        calls=calls,
+        session=session,
     )
 
 
@@ -827,6 +920,7 @@ def run_muse(
     prompt: str = PROMPT,
     timeout: float = 900,
     reasoning_effort: str = "low",
+    session: str = "path",
 ) -> RunResult:
     """Muse Code through the gateway (Responses API), the gateway in fast mode."""
     gold = load_gold(example_dir)
@@ -834,15 +928,26 @@ def run_muse(
     started = time.monotonic()
     recorder = Recorder(upstream, key)
     statuses: list[int] = []
+    calls: list[tuple[str, str]] = []
     with _workspace(example_dir, "pii-guard-muse-e2e-") as (root, work, before):
         home = root / "home"
         config = home / ".config"
+        fresh = session == "per-request"
         with (
             serve(recorder.app) as recorder_url,
-            serve(gateway_app(recorder_url + "/v1", statuses, mode="fast")) as gateway_url,
+            serve(
+                app := gateway_app(
+                    recorder_url + "/v1",
+                    statuses,
+                    mode="fast",
+                    calls=calls,
+                    per_request_sessions=fresh,
+                )
+            ) as gateway_url,
         ):
             muse_dir = str(config / "muse")  # Muse reads $XDG_CONFIG_HOME/muse/settings.json
-            _connect(["muse-code", "--gateway", gateway_url + "/v1", "--muse-dir", muse_dir])
+            args = ["muse-code", "--gateway", gateway_url + "/v1", "--muse-dir", muse_dir]
+            _connect(args + ([] if session == "path" else ["--no-session-path"]))
             env = {
                 "PATH": os.environ.get("PATH", ""),
                 "HOME": str(home),
@@ -869,6 +974,9 @@ def run_muse(
         gold=gold,
         ner=ner,
         started=started,
+        app=app,
+        calls=calls,
+        session=session,
     )
 
 
@@ -908,6 +1016,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--muse-home", default=None, help="throwaway HOME for the Muse Code install (default: temp)"
     )
+    parser.add_argument(
+        "--session",
+        choices=SESSIONS,
+        default="path",
+        help="how the client reaches a vault session: the connect path URL (default), the "
+        "plain URL (prompt_cache_key / default session), or a new one per request (before)",
+    )
     parser.add_argument("--record", default=None, help="write a run record JSON here")
     parser.add_argument("--timeout", type=float, default=900, help="the client's time limit (s)")
     args = parser.parse_args(argv)
@@ -930,6 +1045,7 @@ def main(argv: list[str] | None = None) -> int:
             key=key,
             model=args.model,
             timeout=args.timeout,
+            session=args.session,
         )
     else:
         prefix = (
@@ -941,6 +1057,7 @@ def main(argv: list[str] | None = None) -> int:
             key=key,
             model=args.model,
             timeout=args.timeout,
+            session=args.session,
         )
     summary = asdict(result)
     summary["gold_upstream"] = len(result.gold_upstream)  # counts only: never print values

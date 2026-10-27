@@ -2,6 +2,10 @@
 
 - :func:`default_gateway_url`: ``http://127.0.0.1:<PII_GUARD_PORT>/v1`` (a wildcard bind such
   as ``0.0.0.0`` is reached on loopback).
+- :func:`session_url`: that URL with a stable vault session in its path,
+  ``http://127.0.0.1:8787/s/<session>/v1`` (LAB-1286), so a client that can't send
+  ``X-PII-Guard-Session`` keeps its placeholders across turns; the session already in the
+  client's config is kept, so ``connect`` stays idempotent.
 - :func:`fetch_models`: the ids from the gateway's ``GET /v1/models``.
 - :func:`write_json`: write a client's config file, with a timestamped backup of the old one,
   and only when it changes (so ``connect`` is idempotent); :func:`json_diff` for ``--dry-run``.
@@ -16,12 +20,15 @@ from __future__ import annotations
 
 import difflib
 import json
+import re
+import secrets
 import shutil
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
@@ -31,6 +38,7 @@ __all__ = [
     "CANARY_PROMPT",
     "CANARY_VALUES",
     "DASHBOARD_URL",
+    "NOT_THE_GATEWAY",
     "CheckResult",
     "ConnectError",
     "default_gateway_url",
@@ -38,6 +46,8 @@ __all__ = [
     "json_diff",
     "render_json",
     "run_check",
+    "session_of",
+    "session_url",
     "write_json",
 ]
 
@@ -56,6 +66,7 @@ CANARY_PROMPT = (
 )
 
 _TIMEOUT = httpx.Timeout(120.0, connect=5.0)
+_SESSION_PATH_RE = re.compile(r"^(.*?)/s/([A-Za-z0-9_-]{1,128})(/.*)?$")
 
 
 class ConnectError(Exception):
@@ -72,6 +83,37 @@ def default_gateway_url() -> str:
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"
     return f"http://{host}:{settings.port}/v1"
+
+
+def session_of(url: str) -> str | None:
+    """The vault session in a ``.../s/<session>/v1`` gateway URL, if it has one."""
+    match = _SESSION_PATH_RE.match(urlsplit(url).path)
+    return match.group(2) if match else None
+
+
+def _without_session(url: str) -> str:
+    parts = urlsplit(url.rstrip("/"))
+    match = _SESSION_PATH_RE.match(parts.path)
+    path = (match.group(1) + (match.group(3) or "")) if match else parts.path
+    return urlunsplit(parts._replace(path=path))
+
+
+def session_url(gateway_url: str, existing: str | None = None) -> str:
+    """``gateway_url`` with a vault session in its path: ``{root}/s/<session>{path}``.
+
+    ``gateway_url`` may already name one (kept). Otherwise the session of ``existing`` (the
+    client's current base URL) is kept when it points at the same gateway, else a new random
+    one (``c_`` + 32 hex) is made. The gateway creates the session on first use.
+    """
+    gateway_url = gateway_url.rstrip("/")
+    if session_of(gateway_url) is not None:
+        return gateway_url
+    session = None
+    if existing and _without_session(existing) == gateway_url:
+        session = session_of(existing)
+    session = session or f"c_{secrets.token_hex(16)}"
+    parts = urlsplit(gateway_url)
+    return urlunsplit(parts._replace(path=f"/s/{session}{parts.path}"))
 
 
 def _auth(token: str | None) -> dict[str, str]:
@@ -143,6 +185,17 @@ def write_json(path: Path, new: str, *, now: datetime | None = None) -> Path | N
     return backup
 
 
+#: A non-200 answer without pii-guard's headers: the URL is something else (the model itself).
+NOT_THE_GATEWAY = "no pii-guard headers: is this URL the pii-guard gateway, not the model?"
+
+_SOURCE_NOTES = {
+    "header": "X-PII-Guard-Session",
+    "path": "the session in the base URL: placeholders stay the same across conversations",
+    "prompt_cache_key": "one session per conversation, from its prompt_cache_key",
+    "default": "this client's default session",
+}
+
+
 @dataclass
 class CheckResult:
     """One canary round trip (``--check``)."""
@@ -157,6 +210,8 @@ class CheckResult:
     request_id: str = ""
     error: str = ""
     leaked: list[str] = field(default_factory=list)
+    #: ``X-PII-Guard-Session-Source``: which step chose the vault session (LAB-1286).
+    session_source: str = ""
 
     @property
     def masked(self) -> int:
@@ -181,6 +236,9 @@ class CheckResult:
             f"you got back : {self.received}",
             f"request id   : {self.request_id}",
         ]
+        if self.session_source:
+            note = _SOURCE_NOTES.get(self.session_source, "")
+            out.append(f"session      : {self.session_source} ({note})")
         if self.leaked:
             out.append(f"LEAK         : {len(self.leaked)} canary value(s) reached the model")
         elif self.masked == 0:
@@ -220,6 +278,10 @@ def run_check(
             client.close()
     result.status = response.status_code
     result.request_id = response.headers.get("x-pii-guard-request-id", "")
+    result.session_source = response.headers.get("x-pii-guard-session-source", "")
+    if response.status_code != 200 and not result.request_id:
+        result.error = NOT_THE_GATEWAY
+        return result
     try:
         answer = response.json()
     except ValueError:

@@ -155,12 +155,18 @@ class ResponsesGateway:
         *,
         max_text_chars: int | None = None,
         received_at: float | None = None,
+        path_session: str | None = None,
     ) -> tuple[Response, RequestStats]:
         timer = RequestTimer(received_at)
         trace = CallTrace(self.gateway.observability, timer, body)
         try:
             response, stats = await self._responses(
-                body, headers, max_text_chars=max_text_chars, timer=timer, trace=trace
+                body,
+                headers,
+                max_text_chars=max_text_chars,
+                timer=timer,
+                trace=trace,
+                path_session=path_session,
             )
         except BaseException as exc:
             trace.fail(exc)
@@ -181,6 +187,7 @@ class ResponsesGateway:
         max_text_chars: int | None,
         timer: RequestTimer,
         trace: CallTrace,
+        path_session: str | None = None,
     ) -> tuple[Response, RequestStats]:
         gw = self.gateway
         url = self._upstream_url()
@@ -202,8 +209,7 @@ class ResponsesGateway:
         ):
             raise PayloadTooLargeError(f"a text is longer than {max_text_chars} characters")
         detector = gw.detectors[mode]
-        session, created = gw._session(headers)
-        trace.session_id, trace.session_new = session.session_id, created
+        session, created = gw._session(headers, body, path_session, stats, trace)
         stats.stream = stream
         stats.texts = len(collected.slots)
         timer.add("parse", time.perf_counter() - timer.started)

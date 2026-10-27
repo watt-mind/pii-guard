@@ -246,7 +246,7 @@ Both answer `404 traffic_log_disabled` while the log is off.
 | `outcome` | `ok`, `blocked` (a `block` policy), `refused` (any other error before or at the upstream), `upstream_error` (upstream HTTP >= 400), `stream_error`, `client_disconnected` (the client went away mid-stream; the partial answer does not seed the detection cache), `error` |
 | `error` | `{"code", "status"}` and, for `blocked`, `entity_types` (counts) |
 | `mode`, `language`, `stream`, `model` | As requested |
-| `session_ref`, `session_new` | Hashed session (see above); whether the call started the conversation |
+| `session_ref`, `session_new`, `session_source` | Hashed session (see above); whether the call started the conversation; which step chose it: `header`, `path`, `prompt_cache_key` or `default` ([architecture-gateway.md](architecture-gateway.md#sessions)) |
 | `detectors` | Detectors that ran (`rules`, `ner`, `llm`, `known`, `visual`) |
 | `entities` | `detected` and `masked` counts per entity type, number of texts; `images` (count, regions masked / kept, OCR) |
 | `cache` | Detection cache `hits`, `misses`, `seeded` |

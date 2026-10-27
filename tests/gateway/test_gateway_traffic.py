@@ -113,6 +113,7 @@ def test_event_never_holds_keys_headers_or_the_raw_session_id() -> None:
     assert session not in dumped
     assert first["session_ref"] == follow["session_ref"]  # same conversation, same ref
     assert first["session_new"] and not follow["session_new"]
+    assert (first["session_source"], follow["session_source"]) == ("default", "header")
 
 
 def test_full_event_has_originals_side_by_side() -> None:

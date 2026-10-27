@@ -209,6 +209,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_KNOWN_VALUES_MAX` | `known_values_max` | `int` (known values per session) | `1000` |
 | `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` | `known_values_max_length` | `int` (characters per value) | `256` |
 | `PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS` | `vault_case_sensitive_placeholders` | `bool` | `false` |
+| `PII_GUARD_VAULT_MAX_ENTRIES` | `vault_max_entries` | `int` (≥ 1): most placeholders in one get-or-create session before it starts a new generation | `10000` |
 | `PII_GUARD_LLM_DETECTOR_URL` | `llm_detector_url` | `str \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_API_KEY` | `llm_detector_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_MODEL` | `llm_detector_model` | `str \| None` | unset (detector default `meta-models/muse-spark-open-1026`) |
@@ -611,6 +612,24 @@ masked; …]`, its document summary (JSON) and its masked transcript. The model'
 unmasked as usual. Responses to requests with images carry `X-PII-Guard-Images`,
 `X-PII-Guard-Image-Regions-Masked` and `X-PII-Guard-Image-OCR: on|off`.
 
+## Gateway sessions (implemented)
+
+Every gateway call (`/v1/chat/completions`, `/v1/responses`) uses one vault session, chosen in
+this order (`pii_guard.gateway.sessions`, LAB-1286; details in
+[architecture-gateway.md](architecture-gateway.md#sessions)):
+
+| Step | `X-PII-Guard-Session-Source` | Session | Missing |
+|---|---|---|---|
+| 1 | `header` | `X-PII-Guard-Session` | `404 not_found` (malformed: `400 invalid_request`) |
+| 2 | `path` | the id in a `/s/<session>/v1/...` or `/s/<session>/muse-code/...` URL, same grammar as the header | created (malformed: `400 invalid_request`) |
+| 3 | `prompt_cache_key` | `HMAC(tenant key, "pck:" + identity + ":" + prompt_cache_key)` | created |
+| 4 | `default` | `HMAC(tenant key, "default:" + identity)` | created |
+
+`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous`. Every
+response carries `X-PII-Guard-Session` (the id used, including a derived `d_…` one) and
+`X-PII-Guard-Session-Source`; the traffic record has `session_source` next to `session_ref`.
+Steps 2-4 go through `Vault.session_or_create` and its `PII_GUARD_VAULT_MAX_ENTRIES` cap.
+
 ## Gateway request fields (implemented)
 
 `POST /v1/chat/completions` walks the whole body against an allow-list
@@ -668,7 +687,7 @@ Treatments:
 `POST /v1/responses` is the gateway for clients that speak the OpenAI **Responses API**, such
 as Muse Code (docs/integrations/muse-code.md). It gives the same guarantees as
 `/v1/chat/completions` and uses the same headers (`X-PII-Guard-Mode`, `-Language`, `-Session`,
-`-Echo`), detectors, cache and vault (`pii_guard.gateway.responses`). The masked body goes to
+`-Echo`), session resolution, detectors, cache and vault (`pii_guard.gateway.responses`). The masked body goes to
 the upstream's own `{PII_GUARD_UPSTREAM_BASE_URL}/responses` (a `/chat/completions` suffix is
 dropped first). Nothing is translated to Chat Completions: an upstream that answers that path
 with 404 or 405 gets **`501 responses_unsupported`**. Other upstream errors keep their status
@@ -757,6 +776,14 @@ class Vault:
 
     # None -> a new session with a fresh random id ("s_" + 32 hex); an existing id -> that session.
     def session(self, session_id: str | None = None) -> VaultSession: ...
+
+    # Get-or-create (LAB-1286): never SessionNotFoundError. -> (session, created). Once the
+    # session holds max_entries placeholders (PII_GUARD_VAULT_MAX_ENTRIES), the id moves on to a
+    # new, empty generation with a derived id; the returned session_id is then not session_id.
+    def session_or_create(self, session_id: str) -> tuple[VaultSession, bool]: ...
+
+    # "d_" + 32 hex of HMAC-SHA256(tenant key, material): stable per deployment, keyed.
+    def derive_session_id(self, material: str) -> str: ...
 
     def drop(self, session_id: str) -> None: ...  # close and forget now; no error if gone
     def purge_expired(self) -> int: ...  # drop every expired session, return how many

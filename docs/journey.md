@@ -1160,6 +1160,46 @@ the same fictional mini-repo and task as pi in milestone 35:
 - **Cost:** $0. About 10 requests on free Meta API credits (one live run and `--check`); the
   rest ran locally.
 
+### 40. One value, one placeholder, every turn: sticky sessions without headers (2026-10-27)
+
+LAB-1286, the follow-up of milestone 39. Placeholders are stable only inside one vault session,
+and the gateway used to open a new session for every request without `X-PII-Guard-Session`.
+Neither Muse Code nor pi can send that header, so every turn masked the same value under a new
+placeholder. The gateway now picks a session for every request: the header, else a session
+in the URL path (`/s/<session>/v1`, which `pii-guard connect` now writes), else one per
+`prompt_cache_key`, else one default session per client key. The derived ids are keyed with
+the tenant key, and `X-PII-Guard-Session-Source` reports which step matched.
+
+Same fictional mini-repo and task as milestones 35 and 39, fast mode (rules + NER), Muse Code
+1.4.14 (the installer's current release; the harness pin is still 1.4.13, LAB-1299).
+"Before" is the harness's `--session per-request`, which reproduces the old behaviour:
+
+| Run | Requests | Vault sessions | Distinct placeholders upstream | Gold values under >1 placeholder (most for one) | Gold values upstream |
+|---|---:|---:|---:|---:|---:|
+| Muse, scripted, before | 10 | 10 | 144 | 13 of 13 (8) | 0 of 13 |
+| Muse, scripted, `connect` path URL | 10 | 1 | 23 | 0 of 13 (1) | 0 of 13 |
+| Muse, Meta Model API `muse-spark-1.3`, before | 10 | 10 | 155 | 13 of 13 (8) | 0 of 13 |
+| Muse, Meta Model API `muse-spark-1.3`, path URL | 8 | 1 | 21 | 0 of 13 (1) | 0 of 13 |
+| pi 1.4.0, scripted, before | 5 | 5 | 52 | 13 of 13 (4) | 0 of 13 |
+| pi 1.4.0, scripted, path URL | 5 | 1 | 17 | 0 of 13 (1) | 0 of 13 |
+
+- **Restore across turns.** With one session, a placeholder the model saw in turn 1 is
+  restored in turn 5 even when that turn's request no longer carries the value (a gateway
+  test covers it). Before, it only worked because both clients resend their whole history.
+- **No 404 surprises.** The header keeps its strict 404 for an unknown session. The path,
+  `prompt_cache_key` and default sessions are created on first use.
+- **`prompt_cache_key` alone is not enough for Muse.** On the plain URL, Muse's main
+  conversation and each of its three reminder observers send different keys, so a task spans 4
+  sessions and a value gets up to 4 placeholders (all restored). The path URL keeps them in one,
+  which is why `connect` writes it (LAB-1300).
+- **Bounded.** A long-lived path or default session moves to a new, empty generation after
+  `PII_GUARD_VAULT_MAX_ENTRIES` (10 000) placeholders instead of growing forever.
+- **Latency:** session resolution is one HMAC and a dict lookup. The latency bench's mask stage
+  (fast, concurrency 1, 200 requests, two runs each) was p50 0.44/0.25 ms before and 0.34/0.30 ms
+  after, which is noise.
+- **Cost:** $0. Two live Muse runs (18 requests) on free Meta API credits; everything else ran
+  locally.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

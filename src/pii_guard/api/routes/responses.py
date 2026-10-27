@@ -40,6 +40,7 @@ from pii_guard.api.routes.models import ModelsConfig, list_models
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses import ResponsesGateway
 from pii_guard.gateway.service import UpstreamError
+from pii_guard.gateway.sessions import path_session
 
 __all__ = ["DEFAULT_MUSE_METADATA", "get_responses_gateway", "muse_catalog_url", "router"]
 
@@ -92,6 +93,7 @@ async def responses(request: Request) -> Response:
         request.headers,
         max_text_chars=get_max_text_chars(request),
         received_at=received_at,
+        path_session=path_session(request.scope),
     )
     log_extra(request, **stats.log_fields())
     return response
