@@ -17,6 +17,14 @@ The rules:
 - **Invisible characters** are dropped: zero-width space / non-joiner / joiner, word joiner,
   BOM, soft hyphen, combining grapheme joiner, Mongolian vowel separator, invisible math
   operators and the bidirectional controls (embeddings, overrides, isolates).
+- **Zero-width separators** (zero-width space, word joiner, a BOM inside the text) are read
+  as a space where they stand for one: between a lower-case letter and an upper-case one
+  (``Teszt\\u200bElek`` reads ``Teszt Elek``). Anywhere else they are dropped like the other
+  invisible characters, so one inside a word (``Te\\u200bszt``) still reads ``Teszt``. A
+  separator between two words of the same case (``teszt\\u200belek``) cannot be told from one
+  inside a word and is dropped; the vault searches both readings
+  (:func:`~pii_guard.vault.fold.fold_views`). The non-joiner and joiner are never read as a
+  space: they shape text in Arabic, Persian and Indic scripts.
 - **Combining marks** are composed (NFC) with the character before them, so a decomposed
   ``e\\u0301`` reads as ``\\u00e9`` and the composed character's span ends after its marks. Marks
   NFC cannot compose onto an ASCII letter or digit (``5\\u0333``, keycap ``8\\u20e3``) are
@@ -52,6 +60,7 @@ __all__ = [
     "DOTS",
     "INVISIBLE_CHARS",
     "LOOKALIKES",
+    "ZERO_WIDTH_SEPARATORS",
     "NormalizedText",
     "normalize_for_detection",
 ]
@@ -68,6 +77,10 @@ INVISIBLE_CHARS: frozenset[str] = frozenset(
     "⁦⁧⁨⁩"  # bidi isolates
     "﻿"  # zero-width no-break space (BOM)
 )
+
+#: Invisible characters that can stand for a space between two words: zero-width space, word
+#: joiner and zero-width no-break space (BOM). Not the non-joiner or joiner, which shape text.
+ZERO_WIDTH_SEPARATORS: frozenset[str] = frozenset("\u200b\u2060\ufeff")
 
 #: Cyrillic and Greek letters that look like a Latin letter, mapped to it.
 LOOKALIKES: dict[str, str] = {
@@ -155,6 +168,26 @@ def _is_mark(char: str) -> bool:
     return unicodedata.combining(char) != 0 or unicodedata.category(char) in ("Mn", "Me")
 
 
+def _next_visible(text: str, k: int) -> str:
+    """The first character at or after ``k`` that is not invisible (``""`` at the end)."""
+    n = len(text)
+    while k < n and text[k] in INVISIBLE_CHARS:
+        k += 1
+    return text[k] if k < n else ""
+
+
+def _reads_as_space(text: str, k: int, before: str) -> bool:
+    """Whether the zero-width separator ``text[k]``, after the letter ``before``, is a space.
+
+    It is between a lower-case and an upper-case letter (``Teszt\\u200bElek``): a word
+    boundary. Between letters of one case it cannot be told from a separator put inside a word
+    to break matching (``Te\\u200bszt``), so it is dropped like the other invisible characters.
+    """
+    if text[k] not in ZERO_WIDTH_SEPARATORS or not before.islower():
+        return False
+    return _next_visible(text, k + 1).isupper()
+
+
 def _fold_char(char: str) -> str:
     """The one-for-one fold of a non-ASCII character (itself if nothing applies)."""
     code = ord(char)
@@ -222,12 +255,19 @@ def _compose(text: str) -> tuple[list[str], list[int], list[int]]:
             i += 1
             continue
         if c in INVISIBLE_CHARS:
+            if chars and _reads_as_space(text, i, chars[-1]):
+                chars.append(" ")
+                starts.append(i)
+                ends.append(i + 1)
             i += 1
             continue
         c_fold = c if c < "\x80" else _fold_char(c)
-        # The marks after a base character (invisible characters between them are dropped).
+        # The marks after a base character (invisible characters between them are dropped,
+        # up to a zero-width separator that reads as a space after it).
         j = i + 1
         while j < n and (text[j] in INVISIBLE_CHARS or (text[j] >= "\x80" and _is_mark(text[j]))):
+            if _reads_as_space(text, j, c_fold):
+                break
             j += 1
         if j == i + 1:
             chars.append(c_fold)

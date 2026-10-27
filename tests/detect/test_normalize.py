@@ -9,6 +9,7 @@ from hypothesis import strategies as st
 from pii_guard.detect.normalize import (
     INVISIBLE_CHARS,
     LOOKALIKES,
+    ZERO_WIDTH_SEPARATORS,
     NormalizedText,
     normalize_for_detection,
 )
@@ -119,12 +120,68 @@ def test_mapping_invariants(text: str) -> None:
     assert len(norm.origin) == len(norm.text) <= len(text)
     assert list(norm.origin) == sorted(set(norm.origin))
     assert not set(norm.text) & INVISIBLE_CHARS
+    as_space: set[int] = set()
     for i, c in enumerate(norm.text):
         original = text[norm.origin[i]]
+        if original in ZERO_WIDTH_SEPARATORS:  # a separator read as a space (LAB-1233)
+            assert c == " "
+            as_space.add(norm.origin[i])
+            continue
         assert c == original or LOOKALIKES.get(original) == c
     for start in range(len(norm.text)):
         for end in range(start + 1, len(norm.text) + 1):
             o_start, o_end = norm.to_original(start, end)
             # Every visible character of the original span is in the normalised span.
-            visible = [c for c in text[o_start:o_end] if c not in INVISIBLE_CHARS]
+            visible = [
+                k for k in range(o_start, o_end) if text[k] not in INVISIBLE_CHARS or k in as_space
+            ]
             assert len(visible) == end - start
+
+
+# --- zero-width separators between two words (LAB-1233) ------------------------------------
+
+WJ = "\u2060"
+
+
+@pytest.mark.parametrize("sep", [ZWSP, WJ, BOM])
+def test_zero_width_separator_between_words_reads_as_a_space(sep: str) -> None:
+    text = f"Később Teszt{sep}Elek is."
+    norm = normalize_for_detection(text)
+    assert norm.text == "Később Teszt Elek is."
+    start = norm.text.index("Teszt")
+    o_start, o_end = norm.to_original(start, start + len("Teszt Elek"))
+    assert text[o_start:o_end] == f"Teszt{sep}Elek"
+    space = norm.text.index(" ", start)
+    assert norm.to_original(space, space + 1) == (text.index(sep), text.index(sep) + 1)
+
+
+def test_separator_run_reads_as_one_space() -> None:
+    text = f"Teszt{ZWSP}{SHY}{WJ}Elek"
+    assert normalize_for_detection(text).text == "Teszt Elek"
+
+
+def test_separator_after_an_accent_reads_as_a_space() -> None:
+    assert normalize_for_detection(f"Kovács{ZWSP}Béla").text == "Kovács Béla"
+    assert normalize_for_detection(f"Kova\u0301cs{ZWSP}Béla").text == "Kovács Béla"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (f"Te{ZWSP}szt Elek", "Teszt Elek"),  # inside a word: dropped, as before
+        (f"T{ZWSP}eszt", "Teszt"),  # upper then lower: inside a word
+        (f"teszt{ZWSP}elek", "tesztelek"),  # one case: ambiguous, dropped
+        (f"TESZT{ZWSP}ELEK", "TESZTELEK"),
+        (f"{BOM}Teszt Elek", "Teszt Elek"),  # a leading BOM is not a space
+        (f"Teszt {ZWSP}Elek", "Teszt Elek"),  # beside a space: no second space
+        (f"Teszt{ZWSP}", "Teszt"),
+        (f"12{ZWSP}Ab", "12Ab"),  # not after a letter
+    ],
+)
+def test_separator_elsewhere_is_dropped(text: str, expected: str) -> None:
+    assert normalize_for_detection(text).text == expected
+
+
+@pytest.mark.parametrize("joiner", [ZWJ, "\u200c"])
+def test_joiners_are_never_read_as_a_space(joiner: str) -> None:
+    assert normalize_for_detection(f"Teszt{joiner}Elek").text == "TesztElek"

@@ -120,6 +120,16 @@ def test_detectors_see_normalised_text_and_spans_map_back() -> None:
     assert spans[0].detector == "stub"
 
 
+def test_zero_width_space_between_words_is_seen_as_a_space() -> None:
+    # LAB-1233: ``Teszt\u200bElek`` used to reach detectors as ``TesztElek``.
+    text = f"Kedves Teszt{ZWSP}Elek!"
+    stub = Recording("stub", {"Teszt Elek": E.PERSON})
+    spans = DetectionPipeline([stub]).detect(text, "hu")
+    assert stub.seen == ["Kedves Teszt Elek!"]
+    assert [sp.text for sp in spans] == [f"Teszt{ZWSP}Elek"]
+    assert_fits(text, spans)
+
+
 def test_clean_text_is_passed_through_identically() -> None:
     text = "Kedves Teszt Elek!"
     stub = Recording("stub", {"Teszt Elek": E.PERSON})

@@ -68,6 +68,7 @@ packages = ["src/pii_guard"]
 [dependency-groups]
 dev = [
     "hypothesis>=6.170.12",
+    "mypy>=2.4.0",
     "openai>=3.39.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
@@ -111,9 +112,41 @@ branch = true
 omit = ["*/pytest-of-*/*"]
 
 [tool.coverage.report]
+# Floor: the total when the gate was added (92.25 % in CI, LAB-1232) minus about 1 point. Raise it as
+# coverage grows; never lower it to make a PR pass.
+fail_under = 91
 show_missing = true
 skip_covered = false
 exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
+
+[tool.mypy]
+# Type checking for src/ (CI job "types"). Errors that existed when it was introduced are in
+# scripts/ci/mypy-baseline.txt; scripts/ci/mypy_baseline.py fails on any error not listed there.
+python_version = "3.12"
+files = ["src"]
+# Baseline workers run in their own virtualenvs with sibling-module imports (ADR 0004).
+exclude = ["src/pii_guard/eval/baselines/workers/"]
+warn_unused_configs = true
+warn_redundant_casts = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+# Optional extras (ner, ocr, baselines, local segmentation) and comparison tools without stubs.
+module = [
+    "cv2.*",
+    "numpy.*",
+    "onnxruntime.*",
+    "presidio_analyzer.*",
+    "presidio_anonymizer.*",
+    "pytesseract.*",
+    "spacy.*",
+    "tldextract.*",
+    "torch.*",
+    "transformers.*",
+]
+ignore_missing_imports = true
 
 [tool.uv]
 # presidio-analyzer caps numpy below 2.5; resolve the baselines extra on its own so it never
