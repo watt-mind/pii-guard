@@ -9,9 +9,10 @@ faces or signatures.
 
 The one choice we make is the spaCy model per language, because Presidio ships only English
 by default: ``en_core_web_lg`` (its default), ``de_core_news_lg`` and huSpaCy's
-``hu_core_news_lg`` (as in the text baseline, LAB-1098). Each document is analysed in its own
-language when there is a model for it, else in English. Two optional settings, both off by
-default and recorded in ``info``:
+``hu_core_news_lg`` (as in the text baseline, LAB-1098; not in the requirements, it is loaded
+from the directory ``--hu-model`` names, see ``pii_guard.eval.baselines.models``). Each
+document is analysed in its own language when there is a model for it, else in English. Two
+optional settings, both off by default and recorded in ``info``:
 
 - ``--ocr-lang hun+eng``: Tesseract's language list, passed through ``ocr_kwargs``
   (Presidio's documented hook); default: Tesseract's own default, ``eng``;
@@ -22,7 +23,11 @@ default and recorded in ``info``:
 from __future__ import annotations
 
 import argparse
+import importlib
+import json
+import sys
 from importlib.metadata import version
+from pathlib import Path
 from typing import Any
 
 # The script's own directory is on sys.path, so the sibling protocol module imports.
@@ -31,10 +36,20 @@ from _image_protocol import clamp_box, protocol_stdout, quiet_logging, serve
 SPACY_MODELS = {"en": "en_core_web_lg", "de": "de_core_news_lg", "hu": "hu_core_news_lg"}
 
 
+def _unpacked_model(root: Path, package: str) -> tuple[str, str]:
+    """Import an unpacked spaCy model package; its data directory and version."""
+    sys.path.insert(0, str(root))
+    importlib.import_module(package)  # registers the package's custom components
+    meta = json.loads((root / package / "meta.json").read_text(encoding="utf-8"))
+    data_dir = root / package / f"{package}-{meta['version']}"
+    return str(data_dir), meta["version"]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ocr-lang", default=None)
     parser.add_argument("--upscale-to", type=int, default=0)
+    parser.add_argument("--hu-model", type=Path, required=True, metavar="DIR")
     args = parser.parse_args(argv)
     out = protocol_stdout()
     quiet_logging()
@@ -51,11 +66,13 @@ def main(argv: list[str] | None = None) -> int:
     except ImportError:  # pragma: no cover
         pass
 
+    hu_path, hu_version = _unpacked_model(args.hu_model, SPACY_MODELS["hu"])
+    model_names = {**SPACY_MODELS, "hu": hu_path}
     languages = sorted(SPACY_MODELS)
     nlp_engine = NlpEngineProvider(
         nlp_configuration={
             "nlp_engine_name": "spacy",
-            "models": [{"lang_code": lang, "model_name": SPACY_MODELS[lang]} for lang in languages],
+            "models": [{"lang_code": lang, "model_name": model_names[lang]} for lang in languages],
         }
     ).create_engine()
     registry = RecognizerRegistry(supported_languages=languages)
@@ -111,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         "models": [
             f"en_core_web_lg {version('en-core-web-lg')} (en)",
             f"de_core_news_lg {version('de-core-news-lg')} (de)",
-            f"hu_core_news_lg {version('hu-core-news-lg')} (hu, huSpaCy)",
+            f"hu_core_news_lg {hu_version} (hu, huSpaCy)",
         ],
         "config": {
             "engine": "ImageAnalyzerEngine(AnalyzerEngine, TesseractOCR), the analysis "

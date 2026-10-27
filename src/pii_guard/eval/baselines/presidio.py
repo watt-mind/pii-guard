@@ -9,7 +9,8 @@ because Presidio ships none for Hungarian:
 - ``hu``: ``hu_core_news_lg`` (huSpaCy), the strongest spaCy pipeline for Hungarian. The
   predefined recognizers that Presidio registers for a non-English language are the
   language-independent ones (email, IBAN, phone, IP, URL, date, crypto, ...); the
-  US-specific ones are English only.
+  US-specific ones are English only. It is not a package dependency: ``pii-guard baselines
+  download`` fetches the pinned wheel once (:mod:`pii_guard.eval.baselines.models`, LAB-1249).
 
 Any other language falls back to the English pipeline.
 """
@@ -23,6 +24,7 @@ from typing import Any
 
 from pii_guard.eval.baselines.base import BaselineOutput, BaselineUnavailable
 from pii_guard.eval.baselines.mapping import to_spans
+from pii_guard.eval.baselines.models import HU_CORE_NEWS_LG, import_model
 
 __all__ = ["SPACY_MODELS", "PresidioBaseline"]
 
@@ -50,11 +52,12 @@ class PresidioBaseline:
             from presidio_anonymizer import AnonymizerEngine
         except ImportError:
             raise BaselineUnavailable(f"presidio is not installed ({_EXTRA_HINT})") from None
-        missing = [m for m in SPACY_MODELS.values() if not spacy.util.is_package(m)]
-        if missing:
+        if not spacy.util.is_package(SPACY_MODELS["en"]):
             raise BaselineUnavailable(
-                f"spaCy model(s) {', '.join(missing)} not installed ({_EXTRA_HINT})"
+                f"spaCy model {SPACY_MODELS['en']} not installed ({_EXTRA_HINT})"
             )
+        # huSpaCy loads from its unpacked, pinned wheel, by path (LAB-1249).
+        model_paths = {"en": SPACY_MODELS["en"], "hu": str(import_model(HU_CORE_NEWS_LG))}
         _no_suffix_list_download()
 
         languages = sorted(SPACY_MODELS)
@@ -62,7 +65,7 @@ class PresidioBaseline:
             nlp_configuration={
                 "nlp_engine_name": "spacy",
                 "models": [
-                    {"lang_code": lang, "model_name": SPACY_MODELS[lang]} for lang in languages
+                    {"lang_code": lang, "model_name": model_paths[lang]} for lang in languages
                 ],
             }
         ).create_engine()
@@ -80,7 +83,7 @@ class PresidioBaseline:
             },
             "models": [
                 f"{SPACY_MODELS['en']} {_version('en-core-web-lg')} (en)",
-                f"{SPACY_MODELS['hu']} {_version('hu-core-news-lg')} (hu, huSpaCy)",
+                f"{SPACY_MODELS['hu']} {HU_CORE_NEWS_LG.version} (hu, huSpaCy)",
             ],
             "config": {
                 "analyzer": "AnalyzerEngine, predefined recognizers, default score threshold",

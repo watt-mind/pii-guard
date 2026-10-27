@@ -31,6 +31,7 @@ from typing import Any
 
 from pii_guard.eval.baselines.base import BaselineUnavailable
 from pii_guard.eval.baselines.mapping import map_label
+from pii_guard.eval.baselines.models import DOWNLOAD_HINT, HU_CORE_NEWS_LG
 from pii_guard.eval.baselines.worker import ENVS_DIR, WORKERS_DIR, uv_command, worker_env
 from pii_guard.types import DetectionError, EntityType
 from pii_guard.visual.regions import Box, Region
@@ -238,13 +239,26 @@ def _worker(name: str, env: str, script: str, *args: str) -> ImageWorkerBaseline
     )
 
 
+def _presidio_image(name: str, *args: str) -> ImageWorkerBaseline:
+    # huSpaCy is not in the worker's requirements: its Hugging Face URL is uncacheable for uv,
+    # so the worker loads the copy `pii-guard baselines download` unpacked (LAB-1249).
+    if not HU_CORE_NEWS_LG.is_ready():
+        raise BaselineUnavailable(
+            f"spaCy model {HU_CORE_NEWS_LG.package} not downloaded ({DOWNLOAD_HINT})"
+        )
+    return _worker(
+        name,
+        "presidio-image",
+        "presidio_image_worker.py",
+        "--hu-model",
+        str(HU_CORE_NEWS_LG.root()),
+        *args,
+    )
+
+
 IMAGE_BASELINES: dict[str, Callable[[], ImageWorkerBaseline]] = {
-    "presidio-image": lambda: _worker(
-        "presidio-image", "presidio-image", "presidio_image_worker.py"
-    ),
-    "presidio-image-tuned": lambda: _worker(
-        "presidio-image-tuned", "presidio-image", "presidio_image_worker.py", *TUNED_ARGS
-    ),
+    "presidio-image": lambda: _presidio_image("presidio-image"),
+    "presidio-image-tuned": lambda: _presidio_image("presidio-image-tuned", *TUNED_ARGS),
     "eka": lambda: _worker("eka", "eka", "eka_worker.py"),
     "eka-tuned": lambda: _worker("eka-tuned", "eka", "eka_worker.py", *TUNED_ARGS),
 }

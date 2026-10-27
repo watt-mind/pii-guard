@@ -515,20 +515,6 @@ wheels = [
 ]
 
 [[package]]
-name = "hu-core-news-lg"
-version = "3.8.1"
-source = { url = "https://huggingface.co/huspacy/hu_core_news_lg/resolve/9160ba69dbbcfe1a2346f3c7c2d72831f8250219/hu_core_news_lg-3.8.1-py3-none-any.whl" }
-dependencies = [
-    { name = "spacy" },
-]
-wheels = [
-    { url = "https://huggingface.co/huspacy/hu_core_news_lg/resolve/9160ba69dbbcfe1a2346f3c7c2d72831f8250219/hu_core_news_lg-3.8.1-py3-none-any.whl", hash = "sha256:e8cd6a5478419a8cdf3af1c3e3447565a49b8c60228acf76fdbd4c5ae3611cf1" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "spacy", specifier = ">=3.8.0,<3.9.0" }]
-
-[[package]]
 name = "huggingface-hub"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1090,7 +1076,7 @@ dependencies = [
 [package.optional-dependencies]
 baselines = [
     { name = "en-core-web-lg" },
-    { name = "hu-core-news-lg" },
+    { name = "huggingface-hub" },
     { name = "presidio-analyzer" },
     { name = "presidio-anonymizer" },
     { name = "spacy" },
@@ -1123,7 +1109,7 @@ requires-dist = [
     { name = "en-core-web-lg", marker = "extra == 'baselines'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
     { name = "fastapi", specifier = ">=0.162.0" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "hu-core-news-lg", marker = "extra == 'baselines'", url = "https://huggingface.co/huspacy/hu_core_news_lg/resolve/9160ba69dbbcfe1a2346f3c7c2d72831f8250219/hu_core_news_lg-3.8.1-py3-none-any.whl" },
+    { name = "huggingface-hub", marker = "extra == 'baselines'", specifier = ">=0.30" },
     { name = "opencv-python-headless", marker = "extra == 'local-vision'", specifier = ">=4.10" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "presidio-analyzer", marker = "extra == 'baselines'", specifier = "==2.2.365" },
