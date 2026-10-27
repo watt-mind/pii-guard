@@ -40,6 +40,10 @@ export interface TrafficHandle {
   showFixture: () => void;
   /** Leave the fixture and connect to the API again. */
   retryApi: () => void;
+  /** The recorded traffic has played once and stopped (fixture source only). */
+  replayDone: boolean;
+  /** Play the recorded traffic again from the start, on an emptied list. */
+  replay: () => void;
 }
 
 export function useTraffic({ forceFixture = false, connect = connectTraffic, fixtureIntervalMs }: TrafficOptions = {}): TrafficHandle {
@@ -72,6 +76,7 @@ export function useTraffic({ forceFixture = false, connect = connectTraffic, fix
       }),
     [key],
   );
+  const [doneKey, setDoneKey] = useState<string | null>(null);
   const onStatus = useCallback(
     (status: TrafficStatus) =>
       setStore((prev) => (prev.key === key ? { ...prev, status } : { key, events: [], held: [], status })),
@@ -80,12 +85,18 @@ export function useTraffic({ forceFixture = false, connect = connectTraffic, fix
 
   useEffect(() => {
     if (source === "fixture") {
-      const feed = startFixtureFeed(FIXTURE_EVENTS, ingest, { intervalMs: fixtureIntervalMs });
+      // Plays once: a finite recording that loops would repeat calls and inflate the counters.
+      const feed = startFixtureFeed(FIXTURE_EVENTS, ingest, {
+        intervalMs: fixtureIntervalMs,
+        onDone: () => setDoneKey(key),
+        // Paused, the replay waits instead of queueing calls, so "finished" is never early.
+        paused: () => pausedRef.current,
+      });
       return () => feed.close();
     }
     const conn = connect({ onEvents: ingest, onStatus });
     return () => conn.close();
-  }, [source, connect, ingest, onStatus, fixtureIntervalMs]);
+  }, [source, key, connect, ingest, onStatus, fixtureIntervalMs]);
 
   const apiStatus: TrafficStatus = source === "api" ? current.status : { state: "offline", message: "" };
   // Offline on first contact: fall back to the recorded traffic, as the other screens fall
@@ -130,5 +141,12 @@ export function useTraffic({ forceFixture = false, connect = connectTraffic, fix
       setChosenFixture(false);
       setAttempt((a) => a + 1);
     }, []),
+    replayDone: source === "fixture" && doneKey === key,
+    // A new key empties the list and restarts the feed: counters show one pass, never more.
+    // Replaying also resumes, so the new pass is seen playing.
+    replay: useCallback(() => {
+      setPaused(false);
+      setAttempt((a) => a + 1);
+    }, [setPaused]),
   };
 }
