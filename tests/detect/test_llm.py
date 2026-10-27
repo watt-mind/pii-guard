@@ -229,7 +229,7 @@ def test_language_selects_notes_and_entity_types() -> None:
         assert "PERSON" in content
 
 
-@pytest.mark.parametrize("language", ["de", "pl-PL", "", "xx"])
+@pytest.mark.parametrize("language", ["fi", "pl-PL", "", "xx"])  # "de" has a pack now
 def test_unknown_language_falls_back(language: str) -> None:
     system, _ = llm.build_messages("Text", language)
     assert "any language" in system["content"]

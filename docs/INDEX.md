@@ -7,6 +7,7 @@
 | [privacy-model.md](privacy-model.md) | Threat model, what pii-guard guarantees and what it does not |
 | [entities.md](entities.md) | The entity taxonomy: what counts as personal data, per language |
 | [evaluation.md](evaluation.md) | Synthetic benchmark, metrics, baselines, how results are reported |
+| [languages.md](languages.md) | Adding a language: the language pack, the conformance suite, what "done" means |
 | [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [roadmap.md](roadmap.md) | The 9-day hackathon plan, day-1 checks, what comes after |
@@ -25,3 +26,4 @@
 | [0007](decisions/0007-keyed-pseudonyms.md) | Keyed, reversible pseudonyms instead of one-way redaction |
 | [0008](decisions/0008-language-packs.md) | Language packs: per-language rules, inflection, prompts and eval forms, with fallbacks |
 | [0009](decisions/0009-third-party-lexicons.md) | Third-party lexicons: committed only where terms allow, used by the generator and the address rule |
+| [0010](decisions/0010-language-pack-plugins.md) | Language packs as one plugin unit: one `LanguagePack`, entry-point discovery, a conformance suite |

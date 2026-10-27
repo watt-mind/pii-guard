@@ -5,18 +5,21 @@ finds candidates with a regular expression and keeps only those that pass valida
 (checksums, known prefixes and area codes, address context), so precision is high and the
 output is fully reproducible.
 
-Rules are organised by language pack (ADR 0008):
+Rules are organised by language pack (ADR 0008, ADR 0010):
 
 - :mod:`.common`: language-independent rules (IBAN, email, international phone numbers,
   payment cards), run for every text;
-- one module per language (:mod:`.hu`, :mod:`.en`), registered as a :class:`RulePack` with
+- each language pack (:mod:`pii_guard.languages`, e.g. ``languages/hu/rules.py``) contributes
   ``everywhere`` rules (identifiers with a checksum or a distinctive validated format, run for
   every language: a Hungarian tax ID in an English e-mail is still personal data) and
   ``rules`` (formats that are only unambiguous in that language's texts, such as postcodes,
   plates and national phone formats, run only when ``language`` matches).
 
 A language without a pack gets the language-independent rules and every pack's
-``everywhere`` rules. Register another pack with :func:`register_rule_pack`.
+``everywhere`` rules. Add a language with a :class:`~pii_guard.languages.LanguagePack`
+(``docs/languages.md``); :func:`register_rule_pack` still overrides the rules of one language.
+``pii_guard.detect.rules.hu`` and ``.en`` are aliases of the packs' rule modules, kept for one
+release.
 
 Look-alikes are rejected on purpose: wrong check digits, digits that are part of a longer
 digit run (``12345678901`` contains no 10-digit tax ID), and dates.
@@ -26,8 +29,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pii_guard.detect.rules import common, en, hu
+from pii_guard.detect.rules import common
 from pii_guard.detect.rules._base import Rule, _Hit
+from pii_guard.languages import packs, primary_language
 from pii_guard.types import DetectionError, Span
 
 __all__ = [
@@ -55,15 +59,8 @@ class RulePack:
     rules: tuple[Rule, ...] = ()
 
 
-_PACKS: dict[str, RulePack] = {
-    "hu": RulePack("hu", everywhere=hu.EVERYWHERE, rules=hu.RULES),
-    "en": RulePack("en", everywhere=en.EVERYWHERE, rules=en.RULES),
-}
-
-
-def primary_language(language: str) -> str:
-    """``"en-GB"`` / ``"EN_us"`` → ``"en"``; blank → ``"und"``."""
-    return (language or "").strip().lower().replace("_", "-").split("-")[0] or "und"
+#: Packs registered with :func:`register_rule_pack`; they replace a language pack's rules.
+_PACKS: dict[str, RulePack] = {}
 
 
 def register_rule_pack(pack: RulePack) -> None:
@@ -75,8 +72,13 @@ def register_rule_pack(pack: RulePack) -> None:
 
 
 def rule_packs() -> dict[str, RulePack]:
-    """The registered packs by language (a copy)."""
-    return dict(_PACKS)
+    """The rules of every language pack by language, with :func:`register_rule_pack`
+    overrides applied (a copy)."""
+    found = {
+        code: RulePack(code, everywhere=pack.everywhere, rules=pack.rules)
+        for code, pack in packs().items()
+    }
+    return {**found, **_PACKS}
 
 
 def _drop_contained(hits: list[_Hit]) -> list[_Hit]:

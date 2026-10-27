@@ -22,16 +22,18 @@ import os
 import re
 import threading
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from functools import cache
 from importlib.resources import files
+from importlib.resources.abc import Traversable
 from typing import Any
 
 import httpx
 from pydantic import SecretStr
 
 from pii_guard.config import Settings, get_settings
+from pii_guard.languages import LanguagePack, get_pack, packs, primary_language
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, EntityType, Span
 from pii_guard.vault.inflection import inflection_for, variant_stems
 
@@ -48,6 +50,7 @@ __all__ = [
     "chunk_text",
     "find_occurrences",
     "language_profile",
+    "pack_profile",
     "parse_entities",
 ]
 
@@ -153,7 +156,8 @@ GENERIC_ENTITY_TYPES: tuple[EntityType, ...] = tuple(
 class LanguageProfile:
     """How the detector prompts for and aligns one language.
 
-    - ``notes``: file under ``prompts/languages/`` with language-specific instructions.
+    - ``notes``: language-specific instructions: the language pack's prompt resource, or a
+      file name under ``prompts/languages/`` (``default.md`` for languages without a pack).
     - ``entity_types``: the types the prompt asks for.
     - ``allow_suffix``: a value may run on into a longer word (agglutinative languages such as
       Hungarian: "Teszt Elek" matches inside "Teszt Eleknek"). Otherwise the match must end at
@@ -164,18 +168,43 @@ class LanguageProfile:
 
     code: str
     name: str
-    notes: str = "default.md"
+    notes: str | Traversable = "default.md"
     entity_types: tuple[EntityType, ...] = GENERIC_ENTITY_TYPES
     allow_suffix: bool = True
     word_boundary: bool = True
 
 
-LANGUAGES: dict[str, LanguageProfile] = {
-    "hu": LanguageProfile(
-        "hu", "Hungarian", "hu.md", tuple(ENTITY_DESCRIPTIONS), allow_suffix=True
-    ),
-    "en": LanguageProfile("en", "English", "en.md", allow_suffix=False),
-}
+def pack_profile(pack: LanguagePack) -> LanguageProfile:
+    """A language pack's prompt notes, requested types and alignment (ADR 0010)."""
+    extra = frozenset(pack.country_entity_types)
+    return LanguageProfile(
+        pack.code,
+        pack.name,
+        pack.prompt if pack.prompt is not None else "default.md",
+        tuple(t for t in ENTITY_DESCRIPTIONS if t in GENERIC_ENTITY_TYPES or t in extra),
+        allow_suffix=pack.allow_suffix,
+        word_boundary=pack.word_boundary,
+    )
+
+
+class _PackProfiles(Mapping[str, LanguageProfile]):
+    """The profiles of the registered language packs, by code (read-only, always current)."""
+
+    def __getitem__(self, code: str) -> LanguageProfile:
+        pack = get_pack(code) if code == primary_language(code) else None
+        if pack is None:
+            raise KeyError(code)
+        return pack_profile(pack)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(packs())
+
+    def __len__(self) -> int:
+        return len(packs())
+
+
+#: Profiles of the languages that have a pack (kept for compatibility; see ``languages``).
+LANGUAGES: Mapping[str, LanguageProfile] = _PackProfiles()
 # Fallback alignment for languages without a profile yet. Languages that rarely inflect the
 # end of a name require matches to end at a word boundary; all others (Finnish, Turkish,
 # Slavic languages, ...) tolerate a suffix, which favours recall. Scripts written without
@@ -190,9 +219,10 @@ def language_profile(language: str) -> LanguageProfile:
     Unknown languages get a generic profile rather than an error: generic entity types,
     language-neutral notes, and alignment that tolerates suffixes (recall first).
     """
-    code = (language or "").strip().lower().replace("_", "-").split("-")[0] or "und"
-    if code in LANGUAGES:
-        return LANGUAGES[code]
+    code = primary_language(language)
+    pack = get_pack(code)
+    if pack is not None:
+        return pack_profile(pack)
     return LanguageProfile(
         code,
         code,
@@ -209,19 +239,28 @@ def _template(*parts: str) -> str:
     return files("pii_guard.detect").joinpath("prompts", *parts).read_text(encoding="utf-8")
 
 
-def build_messages(text: str, language: str) -> list[dict[str, str]]:
+def _notes(notes: str | Traversable) -> str:
+    if isinstance(notes, str):
+        return _template("languages", notes)
+    return notes.read_text(encoding="utf-8")
+
+
+def build_messages(
+    text: str, language: str, *, profile: LanguageProfile | None = None
+) -> list[dict[str, str]]:
     """The chat messages for one chunk, for ``language`` (see :func:`language_profile`).
 
-    Placeholders are substituted with ``str.replace`` so braces in the input or in the JSON
-    example are never interpreted.
+    ``profile`` overrides the looked-up profile (the conformance suite renders an
+    unregistered pack's prompt this way). Placeholders are substituted with ``str.replace``
+    so braces in the input or in the JSON example are never interpreted.
     """
-    profile = language_profile(language)
+    profile = profile if profile is not None else language_profile(language)
     types = "\n".join(f"- {t.value}: {ENTITY_DESCRIPTIONS[t]}" for t in profile.entity_types)
     system = (
         _template("system.md")
         .replace("{entity_types}", types)
         .replace("{language_name}", profile.name)
-        .replace("{language_notes}", _template("languages", profile.notes).strip())
+        .replace("{language_notes}", _notes(profile.notes).strip())
     )
     user = _template("user.md").replace("{language}", profile.code).replace("{text}", text)
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]

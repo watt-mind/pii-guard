@@ -15,7 +15,8 @@ Kinds (:data:`LEXICON_KINDS`): ``given_names_m``, ``given_names_f``, ``surnames`
 (Hungarian: ``recent_given_names_m/f``, ``common_word_surnames``). A pack that doesn't provide
 a kind raises :class:`LexiconUnavailable`; English is minimal on purpose (street types only).
 
-The lists ship with the package (``pii_guard/lang/data/<code>/<kind>.tsv``) and are built by
+Each language pack declares the lexicons it ships (:class:`pii_guard.languages.LexiconSpec`);
+the built-in lists live in ``pii_guard/lang/data/<code>/<kind>.tsv`` and are built by
 ``data/lexicons/fetch.py`` from public sources whose terms allow redistribution
 (``data/lexicons/MANIFEST.md``). ``PII_GUARD_LEXICON_DIR`` points at a directory of local
 overrides with the same layout (``<dir>/<code>/<kind>.tsv`` or ``<dir>/<kind>.tsv``), such as
@@ -35,8 +36,9 @@ import random
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import cache
-from importlib.resources import files
 from pathlib import Path
+
+from pii_guard.languages import LexiconSpec, get_pack, on_change
 
 __all__ = [
     "LEXICON_KINDS",
@@ -158,37 +160,10 @@ def _structural_match(prefix: str, code: str) -> bool:
 # --- Loading ---------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True, slots=True)
-class _PackSpec:
-    kinds: tuple[str, ...]
-    #: kind -> files merged into it (later files add weight to earlier entries)
-    merges: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
-    structural: Mapping[str, str] = field(default_factory=dict)
-
-
-_PACKS: dict[str, _PackSpec] = {
-    "hu": _PackSpec(
-        kinds=(
-            *LEXICON_KINDS,
-            "recent_given_names_m",
-            "recent_given_names_f",
-            "common_word_surnames",
-        ),
-        merges={
-            "given_names_m": ("given_names_m", "recent_given_names_m"),
-            "given_names_f": ("given_names_f", "recent_given_names_f"),
-        },
-        structural={
-            "budapest": "1",
-            "debrecen": "40",
-            "szeged": "67",
-            "pécs": "76",
-            "győr": "90",
-            "miskolc": "35",
-        },
-    ),
-    "en": _PackSpec(kinds=("street_types",)),
-}
+def _spec(language: str) -> LexiconSpec | None:
+    """The lexicons ``language``'s pack ships (:class:`pii_guard.languages.LexiconSpec`)."""
+    pack = get_pack(language) if language else None
+    return pack.lexicons if pack is not None else None
 
 
 def _primary(language: str) -> str:
@@ -197,7 +172,7 @@ def _primary(language: str) -> str:
 
 def available_kinds(language: str) -> tuple[str, ...]:
     """The kinds ``language``'s pack provides (empty for a language without a pack)."""
-    spec = _PACKS.get(_primary(language))
+    spec = _spec(_primary(language))
     return spec.kinds if spec else ()
 
 
@@ -215,7 +190,10 @@ def _read_lines(
                 return candidate.read_text(encoding="utf-8").splitlines(), str(candidate)
     if not package:
         return [], "missing"
-    resource = files("pii_guard.lang").joinpath("data", language, f"{name}.tsv")
+    spec = _spec(language)
+    if spec is None:
+        return [], "missing"
+    resource = spec.directory.joinpath(f"{name}.tsv")
     try:
         return resource.read_text(encoding="utf-8").splitlines(), "package"
     except FileNotFoundError:
@@ -239,7 +217,7 @@ def _weight(row: tuple[str, ...], kind: str) -> float:
 
 @cache
 def _load(language: str, kind: str, override: str) -> Lexicon:
-    spec = _PACKS.get(language)
+    spec = _spec(language)
     if spec is None or kind not in spec.kinds:
         raise LexiconUnavailable(f"no {kind!r} lexicon for language {language!r}")
     weights: dict[str, float] = {}
@@ -287,11 +265,11 @@ def _index(language: str, override: str) -> PostcodeIndex:
         code, settlement = row[0], row[1]
         by_code.setdefault(code, set()).add(settlement)
         by_settlement.setdefault(settlement.casefold(), set()).add(code)
-    spec = _PACKS[language]
+    spec = _spec(language)
     return PostcodeIndex(
         by_code={k: frozenset(v) for k, v in by_code.items()},
         by_settlement={k: frozenset(v) for k, v in by_settlement.items()},
-        structural=dict(spec.structural),
+        structural=dict(spec.structural) if spec is not None else {},
     )
 
 
@@ -315,3 +293,6 @@ def clear_cache() -> None:
     """Forget loaded lexicons (after changing ``PII_GUARD_LEXICON_DIR``)."""
     _load.cache_clear()
     _index.cache_clear()
+
+
+on_change(clear_cache)

@@ -77,8 +77,9 @@ What we think goes beyond a basic integration:
 - **Layered detection with one resolver:** rules with checksums (Hungarian tax and TAJ
   numbers, IBAN, giro accounts, company IDs, US SSN, UK NINO, payment cards…), an optional NER
   model, the LLM detector, merged by one deterministic resolver.
-- **Language packs** ([ADR 0008](docs/decisions/0008-language-packs.md)): Hungarian and English
-  today; a new language is a checklist, not a rewrite.
+- **Language packs** ([docs/languages.md](docs/languages.md)): Hungarian, English and German
+  today. A language is one plugin unit (an entry point for separate distributions) with a
+  conformance suite that says what is missing: `pii-guard lang new <code>` to start.
 - **Entity policies:** mask, keep (organisations stay readable so the model can reason) or block
   (refuse the request).
 - **Per-message detection cache.** Chat clients resend the whole history every turn; only the

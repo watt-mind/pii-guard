@@ -87,7 +87,7 @@ def test_language_scoped_rules_only_run_for_their_language(detector: RuleDetecto
     en_only = set(detector.rules_for("en")) - set(detector.rules_for("hu"))
     assert hu_only and en_only
     # An unknown language gets exactly the shared rules.
-    assert set(detector.rules_for("de")) == set(detector.rules_for("hu")) - hu_only
+    assert set(detector.rules_for("fi")) == set(detector.rules_for("hu")) - hu_only
 
 
 def test_register_rule_pack(monkeypatch: pytest.MonkeyPatch) -> None:

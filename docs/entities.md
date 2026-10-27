@@ -1,6 +1,6 @@
 # Entity taxonomy
 
-> Status: proposed. Built-in languages: Hungarian (`hu`) and English (`en`). The entity types
+> Status: proposed. Built-in languages: Hungarian (`hu`), English (`en`) and German (`de`). The entity types
 > below are shared by every language; the per-language tables say which identifiers each
 > language pack's rules find and which type they map to ([ADR 0008](decisions/0008-language-packs.md)).
 
@@ -95,6 +95,22 @@ and consonant or digraph doubling (`Teszt Elekkel` → `[[PERSON_7f3a]]kel`, `Ko
 Vault inflection: possessives kept outside the placeholder (`Smith's` → `[[PERSON_7f3a]]'s`,
 `James'`); plurals are not matched.
 
+### German (`de`)
+
+German IBANs and `+49` phone numbers are found by the language-independent rules.
+
+| Identifier | Type | Validation | Scope |
+|---|---|---|---|
+| Sozialversicherungsnummer (`12 150885 M 01 2`, compact or spaced) | `ID_DOCUMENT` | area 02–89, date `DDMMYY`, letter, weighted check digit | everywhere |
+| Steuer-ID (`12 345 678 901`) next to `Steuer-ID` / `Steueridentifikationsnummer` / `IdNr` | `ID_DOCUMENT` | ISO 7064 MOD 11,10 + one repeated digit + label | everywhere |
+| Steuer-ID without a label | `ID_DOCUMENT` | as above (scores lower) | language |
+| National phone number (`030 12345678`, `(0221) 4567890`, `0171/2345678`) | `PHONE` | trunk `0`, 9–12 digits, not an amount | language |
+| Street address (`Musterstraße 12[, 10115 Berlin]`, `Am Beispielweg 3a`) | `ADDRESS` | street-type word + house number | language |
+| Postcode and place at the start of an address line (`50667 Köln`) | `ADDRESS` | 5 digits, line start or after a comma, not an amount | language |
+
+Vault inflection: the genitive kept outside the placeholder (`Annas` → `[[PERSON_7f3a]]s`,
+`Hans'`, colloquial `Anna's`).
+
 ## Visual entities
 
 | Type | Examples | Detected by | Default |
@@ -107,8 +123,8 @@ Vault inflection: possessives kept outside the placeholder (`Smith's` → `[[PER
 
 ## Adding a language
 
-See [ADR 0008](decisions/0008-language-packs.md). A language pack contributes rules
-(`detect/rules/<code>.py`), a vault inflection matcher if the language inflects names, LLM
-prompt notes, eval surface forms if it has stem changes, a synthetic fixture set, and a table
-in this file. Every piece is optional and falls back to language-independent behaviour; the
+See [languages.md](languages.md) and [ADR 0010](decisions/0010-language-pack-plugins.md).
+A language pack (`src/pii_guard/languages/<code>/`) contributes rules, a vault inflection
+matcher if the language inflects names, LLM prompt notes, eval surface forms if it has stem
+changes, a smoke fixture set, and a table in this file. Every piece is optional and falls back to language-independent behaviour; the
 NER and LLM passes are multilingual and are re-measured, not rewritten.

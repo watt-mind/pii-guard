@@ -29,6 +29,12 @@ Repository = "https://github.com/watt-mind/pii-guard"
 [project.scripts]
 pii-guard = "pii_guard.cli:main"
 
+# Language packs (docs/languages.md). A separate distribution adds a language the same way.
+[project.entry-points."pii_guard.languages"]
+de = "pii_guard.languages.de:pack"
+en = "pii_guard.languages.en:pack"
+hu = "pii_guard.languages.hu:pack"
+
 [project.optional-dependencies]
 ocr = [
     "pytesseract>=0.3.13",

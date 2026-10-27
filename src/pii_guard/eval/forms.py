@@ -24,6 +24,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
+from pii_guard.languages import SurfaceForms, get_pack, on_change, primary_language
 from pii_guard.types import EntityType
 from pii_guard.vault.inflection import inflection_for
 
@@ -31,6 +32,7 @@ __all__ = [
     "CODE_ENTITY_TYPES",
     "HungarianForms",
     "LanguageForms",
+    "PackForms",
     "find_surface_forms",
     "language_forms",
     "register_language_forms",
@@ -52,7 +54,6 @@ CODE_ENTITY_TYPES: frozenset[EntityType] = frozenset(
 )
 
 _SEP = r"[\s\-./()]*"
-_MONTHS_EN = "january february march april may june july august september october november december"
 
 
 class LanguageForms:
@@ -78,124 +79,64 @@ class LanguageForms:
         return []
 
 
-_HU_LENGTHENED_SUFFIXES = (
-    "nak", "nek", "ban", "ben", "ba", "be", "ból", "ből", "hoz", "hez", "höz", "nál", "nél",
-    "tól", "től", "ra", "re", "ról", "ről", "n", "ig", "ért", "ként", "t", "val", "vel", "vá",
-    "vé", "é", "ék", "éi", "i", "k",
-)  # fmt: skip
-_HU_DIGRAPHS = ("cs", "dz", "gy", "ly", "ny", "sz", "ty", "zs")
-_HU_STOPWORDS = frozenset(
-    [
-        "utca",
-        "u",
-        "út",
-        "útja",
-        "tér",
-        "tere",
-        "körút",
-        "krt",
-        "köz",
-        "sor",
-        "sétány",
-        "fasor",
-        "rakpart",
-        "lakótelep",
-        "emelet",
-        "em",
-        "ajtó",
-        "hrsz",
-        "szám",
-        "kerület",
-        "ker",
-        "fszt",
-        "földszint",
-        "lph",
-        "lépcsőház",
-        "január",
-        "február",
-        "március",
-        "április",
-        "május",
-        "június",
-        "július",
-        "augusztus",
-        "szeptember",
-        "október",
-        "november",
-        "december",
-        "jan",
-        "febr",
-        "márc",
-        "ápr",
-        "máj",
-        "jún",
-        "júl",
-        "aug",
-        "szept",
-        "okt",
-        "nov",
-        "dec",
-        "kft",
-        "zrt",
-        "nyrt",
-        "bt",
-    ]
-)
-_EN_STOPWORDS = frozenset(
-    (
-        "street st road rd avenue ave lane ln drive dr close court ct place pl square flat apt "
-        "apartment floor suite unit house the and of ltd llc inc plc " + _MONTHS_EN
-    ).split()
-)
-
-
 def _words(value: str) -> str:
     return r"\s+".join(re.escape(token) for token in value.split())
 
 
-class HungarianForms(LanguageForms):
-    """Hungarian: the vault's case suffixes plus stem-changing forms.
+class PackForms(LanguageForms):
+    """Surface forms from a language pack's :class:`~pii_guard.languages.SurfaceForms`."""
 
-    - final ``a``/``e`` lengthens before most suffixes: ``Anna`` -> ``Annának``;
-    - a final digraph doubles before ``-val``/``-vá``: ``Kovács`` -> ``Kováccsal``.
-    """
-
-    def __init__(self) -> None:
-        super().__init__("hu", _HU_STOPWORDS)
+    def __init__(self, language: str, forms: SurfaceForms) -> None:
+        super().__init__(language, forms.stopwords)
+        self._forms = forms
 
     def stem_variants(self, value: str, entity_type: EntityType) -> list[str]:
-        value = value.strip()
-        if not value or not value[-1].isalpha():
-            return []
-        variants: list[str] = []
-        last = value[-1].casefold()
-        suffixes = "|".join(sorted(_HU_LENGTHENED_SUFFIXES, key=len, reverse=True))
-        if last in {"a", "e"}:
-            long_vowel = "á" if last == "a" else "é"
-            variants.append(_words(value[:-1]) + long_vowel + f"(?:{suffixes})")
-        for digraph in _HU_DIGRAPHS:
-            if value.casefold().endswith(digraph):
-                doubled = value[:-2] + digraph[0] + value[-2:]
-                variants.append(_words(doubled) + "(?:al|el|á|é)")
-                break
-        return variants
+        return self._forms.stem_variants(value, entity_type)
 
 
-_FORMS: dict[str, LanguageForms] = {
-    "hu": HungarianForms(),
-    "en": LanguageForms("en", _EN_STOPWORDS),
-}
+class HungarianForms(PackForms):
+    """Hungarian surface forms (kept for compatibility; they live in the ``hu`` pack)."""
+
+    def __init__(self) -> None:
+        from pii_guard.languages.hu.forms import HungarianSurfaceForms
+
+        super().__init__("hu", HungarianSurfaceForms())
+
+
+#: Hooks registered with :func:`register_language_forms`; they take precedence over packs.
+_FORMS: dict[str, LanguageForms] = {}
+
+
+def _clear() -> None:
+    surface_pattern.cache_clear()
+    _pack_forms.cache_clear()
 
 
 def register_language_forms(forms: LanguageForms) -> None:
     """Use ``forms`` for ``forms.language``, replacing any existing hook."""
     _FORMS[forms.language] = forms
-    surface_pattern.cache_clear()
+    _clear()
+
+
+@lru_cache(maxsize=64)
+def _pack_forms(code: str) -> LanguageForms | None:
+    pack = get_pack(code)
+    if pack is None:
+        return None
+    if pack.surface_forms is None:
+        return LanguageForms(pack.code)
+    return PackForms(pack.code, pack.surface_forms)
 
 
 def language_forms(language: str) -> LanguageForms:
-    """The hook for ``language`` (``"en-GB"`` falls back to ``"en"``), or the default."""
+    """The hook for ``language`` (``"en-GB"`` falls back to ``"en"``), or the default.
+
+    A hook registered with :func:`register_language_forms` first, then the language pack's
+    surface forms (:mod:`pii_guard.languages`), then exact matching plus the vault's suffixes.
+    """
     forms = _FORMS.get(language) or _FORMS.get(language.split("-", 1)[0])
+    if forms is None:
+        forms = _pack_forms(primary_language(language))
     return forms if forms is not None else LanguageForms(language)
 
 
@@ -279,3 +220,6 @@ def find_surface_forms(
     """Non-overlapping ``(start, end)`` offsets of every surface form of ``value`` in ``text``."""
     pattern = surface_pattern(value, EntityType(entity_type), language)
     return [m.span() for m in pattern.finditer(text) if m.end() > m.start()]
+
+
+on_change(_clear)
