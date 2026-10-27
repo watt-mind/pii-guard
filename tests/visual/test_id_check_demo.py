@@ -68,6 +68,12 @@ def test_score_demo_answer() -> None:
     answer = "- Fiktív Mária: valid ID card\n- Fiktív Márta: no ID provided"
     score = score_demo_answer(answer, expected)
     assert score["correct"] == 2 and score["statuses"] == ["present", "missing"]
+    # The verdict line under the party's heading, not a later detail or the summary.
+    answer = (
+        "**1. Eladó: Fiktív Mária**\n* **ID present / expired**\n* `expired: true`\n\n"
+        "**2. Kezes: Fiktív Márta**\n* **HIÁNYZIK**\n\nÖsszegzés: egy okmány lejárt."
+    )
+    assert score_demo_answer(answer, expected)["statuses"] == ["expired", "missing"]
 
 
 @pytest.mark.parametrize(

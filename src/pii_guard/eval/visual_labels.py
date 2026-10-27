@@ -716,38 +716,39 @@ def _names(line: str, party: str) -> bool:
     return all(token in line for token in party.split())
 
 
-def _first_status(text: str) -> str | None:
-    """The status whose word comes first in ``text`` (``not valid`` before ``valid``)."""
-    lowered = text.lower()
-    best: tuple[int, int, str] | None = None
+def _line_status(line: str) -> str | None:
+    """The status a line states: ``expired`` over ``missing`` over ``present`` (``ID present
+    / expired`` is expired)."""
+    lowered = line.lower()
     for name, words in _STATUS_WORDS:
-        for word in words:
-            at = lowered.find(word)
-            if at >= 0 and (best is None or (at, -len(word)) < best[:2]):
-                best = (at, -len(word), name)
-    return best[2] if best is not None else None
+        if any(word in lowered for word in words):
+            return name
+    return None
 
 
 def score_demo_answer(answer: str, expected: dict[str, str]) -> dict[str, Any]:
-    """Per party: the status the (unmasked) answer gives in the part about it (from the
-    first line naming it to the next line naming another party), and whether it is the
-    expected one: the status word that comes first there. Counts only; the names stay in
-    the caller."""
+    """Per party: the status the (unmasked) answer gives in the part about it, and whether
+    it is the expected one. The part runs from the first line naming the party to a blank
+    line or a line naming another party; its status is that of the first line in it that
+    states one (a later ``expired: false`` detail is not the verdict). Counts only; the
+    names stay in the caller. Lines naming the party alone are read before lines naming
+    several parties."""
     found: dict[str, str | None] = {}
     lines = answer.splitlines()
     for party in expected:
         status = None
         others = [p for p in expected if p != party]
-        for index, line in enumerate(lines):
-            if not _names(line, party):
-                continue
-            block = [line]
+        naming = [i for i, line in enumerate(lines) if _names(line, party)]
+        alone = [i for i in naming if not any(_names(lines[i], o) for o in others)]
+        for index in alone + [i for i in naming if i not in alone]:
+            block = [lines[index]]
             for following in lines[index + 1 :]:
-                if any(_names(following, other) for other in others):
+                if not following.strip() or any(_names(following, o) for o in others):
                     break
                 block.append(following)
-            status = _first_status("\n".join(block))
-            break
+            status = next((s for s in map(_line_status, block) if s is not None), None)
+            if status is not None:
+                break
         found[party] = status
     correct = sum(found[p] == s for p, s in expected.items())
     return {
