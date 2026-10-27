@@ -12,6 +12,16 @@ export interface LocalSpan {
   detector: string;
   /** The placeholder that replaced it in the masked text, if it was masked. */
   placeholder: string | null;
+  /** The type's effective policy from `/v1/analyze`, when the API reports it. */
+  policy?: "mask" | "keep" | "block";
+}
+
+/**
+ * Kept by policy: the API says so, or (older APIs and the demo engine, which send no policy)
+ * no placeholder replaced it. A `mask` span whose placeholder couldn't be linked is still masked.
+ */
+export function isKept(span: LocalSpan): boolean {
+  return span.policy ? span.policy === "keep" : span.placeholder === null;
 }
 
 /** Where each placeholder occurrence in the masked text came from in the input (UTF-16). */
@@ -29,7 +39,7 @@ export function toLocalSpans(text: string, spans: readonly PublicSpan[]): LocalS
     const start = map[s.start];
     const end = map[s.end];
     if (start === undefined || end === undefined || start >= end) continue;
-    out.push({ start, end, entityType: s.entity_type, score: s.score, detector: s.detector, placeholder: null });
+    out.push({ start, end, entityType: s.entity_type, score: s.score, detector: s.detector, placeholder: null, ...(s.policy ? { policy: s.policy } : {}) });
   }
   return out.sort((a, b) => a.start - b.start);
 }
@@ -63,7 +73,22 @@ export function linkPlaceholders(
 export function attachPlaceholders(spans: LocalSpan[], links: readonly PlaceholderLink[] | null): LocalSpan[] {
   if (!links) return spans;
   const byRange = new Map(links.map((l) => [`${l.start}:${l.end}`, l.placeholder]));
-  return spans.map((s) => ({ ...s, placeholder: byRange.get(`${s.start}:${s.end}`) ?? null }));
+  // Exact range first; otherwise the placeholder that overlaps the span most (the mask may
+  // have trimmed a title such as "Dr." that analyze kept inside the span).
+  return spans.map((s) => {
+    const exact = byRange.get(`${s.start}:${s.end}`);
+    if (exact) return { ...s, placeholder: exact };
+    let best: PlaceholderLink | null = null;
+    let bestOverlap = 0;
+    for (const l of links) {
+      const overlap = Math.min(s.end, l.end) - Math.max(s.start, l.start);
+      if (overlap > bestOverlap) {
+        best = l;
+        bestOverlap = overlap;
+      }
+    }
+    return { ...s, placeholder: best?.placeholder ?? null };
+  });
 }
 
 export interface Summary {
@@ -75,13 +100,13 @@ export interface Summary {
 }
 
 export function summarize(spans: readonly LocalSpan[], mask: MaskResponse | null): Summary {
-  const masked = spans.filter((s) => s.placeholder !== null).length;
+  const masked = spans.filter((s) => !isKept(s)).length;
   const typeSet = new Set<EntityType>(spans.map((s) => s.entityType));
   mask?.entities.forEach((e) => typeSet.add(e.entity_type));
   return {
     detected: spans.length,
     masked: mask ? mask.entities.reduce((n, e) => n + e.count, 0) || masked : masked,
-    kept: spans.filter((s) => s.placeholder === null).length,
+    kept: spans.filter(isKept).length,
     distinctPlaceholders: mask?.entities.length ?? 0,
     types: [...typeSet],
   };
@@ -151,7 +176,7 @@ export function spanKey(span: LocalSpan): string {
 export function describeSpan(span: LocalSpan): string {
   const meta = metaFor(span.entityType);
   const detector = detectorLabel(span.detector, { types: [span.entityType] });
-  const action = span.placeholder ? `masked as ${span.placeholder}` : "kept by policy";
+  const action = span.placeholder ? `masked as ${span.placeholder}` : isKept(span) ? "kept by policy" : "masked";
   const confidence = span.detector === "demo" ? "" : `, confidence ${Math.round(span.score * 100)}%`;
   return `${meta.label}, ${action}, found by ${detector}${confidence}`;
 }

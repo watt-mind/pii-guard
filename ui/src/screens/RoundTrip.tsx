@@ -144,7 +144,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
           <span>
             <span className="block text-[11px] font-semibold tracking-[0.08em] text-model uppercase">Sent to the model</span>
             <span className="block text-sm font-semibold text-ink">
-              What the model saw{sample ? ` · ${sample.subtitle.toLowerCase()}` : ""}
+              What the model saw{sample ? ` · ${sample.subtitle}` : ""}
             </span>
           </span>
           <span className="text-xs text-muted">

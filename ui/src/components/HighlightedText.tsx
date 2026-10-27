@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { describeSpan, spanKey, type LocalSpan } from "../lib/analysis";
+import { describeSpan, isKept, spanKey, type LocalSpan } from "../lib/analysis";
 import { metaFor } from "../lib/entities";
 
 interface Props {
@@ -19,7 +19,7 @@ export function HighlightedText({ text, spans, activeKey, onActivate }: Props) {
     const meta = metaFor(span.entityType);
     const key = spanKey(span);
     const active = key === activeKey;
-    const kept = span.placeholder === null;
+    const kept = isKept(span);
     parts.push(
       <mark
         key={`${span.start}-${i}`}

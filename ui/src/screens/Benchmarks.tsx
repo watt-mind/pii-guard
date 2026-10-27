@@ -404,7 +404,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                     {sys?.short_label ?? s.system}
                     {sys?.default && (
                       <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-muted uppercase ring-1 ring-line">
-                        fast mode<span className="sr-only">, rules only</span>
+                        fast mode
                       </span>
                     )}
                   </span>

@@ -12,7 +12,7 @@ import { Pane } from "../components/Pane";
 import { Popover } from "../components/Popover";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
 import { SAMPLES, sampleBehind, type Sample } from "../content/samples";
-import { detectorsUsed, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
+import { detectorsUsed, isKept, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
 import type { RunError, RunResult } from "../lib/run";
 
 interface Props {
@@ -54,7 +54,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
     return m;
   }, [result]);
   const keptTypes = useMemo(
-    () => new Set<EntityType>(result?.spans.filter((s) => s.placeholder === null).map((s) => s.entityType) ?? []),
+    () => new Set<EntityType>(result?.spans.filter(isKept).map((s) => s.entityType) ?? []),
     [result],
   );
 
@@ -67,6 +67,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
     return {
       entityType: first?.entityType ?? entity?.entity_type ?? null,
       placeholder: first?.placeholder ?? entity?.placeholder ?? null,
+      kept: first ? isKept(first) : false,
       detector: first?.detector,
       score: own.length ? Math.max(...own.map((s) => s.score)) : undefined,
       occurrences: entity?.count ?? own.length,
