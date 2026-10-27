@@ -648,6 +648,8 @@ def test_alias_entry_created_mid_scan_is_newer_than_the_text(vault: Vault) -> No
         ("nak", "Kiss Eleknak írt.", "Kiss Elek"),
         # With an invisible character in between, the same.
         ("Placeholder", "Hívd: 555 0101\u200bPlaceholder.", "555 0101"),
+        # An alias ("Minta Kende" of the unsplit "Minta Kendét") after one.
+        ("Minta Kendét", "Hívd: 555 0101Minta Kende írt.", "555 0101"),
     ],
 )
 def test_remask_since_finds_matches_a_placeholder_boundary_opened(
@@ -669,3 +671,28 @@ def test_remask_since_finds_matches_a_placeholder_boundary_opened(
             vault_module._REMASK_SINCE = True
     assert outputs[0] == outputs[1]
     assert outputs[1][0] != outputs[1][1]  # the full pass found more
+
+
+def test_edges_next_to_input_tokens_or_marks(vault: Vault) -> None:
+    session = vault.session()
+    text = "Teszt Elek írt."
+    result = session.mask_with_report(text, [span_of(text, NAME, "PERSON")])
+    placeholder = result.text.split()[0]
+    gen = session.generation
+    # A placeholder-shaped token from the input: its neighbourhood is as written.
+    assert session._edges_unchanged("[[PERSON_ffffff]]nak", gen, "hu")
+    # A combining mark after or before an issued placeholder: scan every entry.
+    assert not session._edges_unchanged(f"{placeholder}\u0301 x", gen, "hu")
+    assert not session._edges_unchanged(f"x\u0301{placeholder}", gen, "hu")
+    # A suffix no entry starts with: nothing new to find.
+    assert session._edges_unchanged(f"{placeholder}nek írt.", gen, "hu")
+
+
+def test_folded_index_of_a_dropped_character() -> None:
+    from pii_guard.vault.fold import fold_text
+
+    view = fold_text("a\u200bb")  # the zero-width space has no folded character
+    assert vault_module._folded_index(view, 0) == 0
+    assert vault_module._folded_index(view, 1) is None
+    assert vault_module._folded_index(view, 2) == 1
+    assert vault_module._folded_index(fold_text("ab"), 5) is None

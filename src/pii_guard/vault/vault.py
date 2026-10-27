@@ -716,11 +716,10 @@ class VaultSession:
         # alias's own entry) is newer, so a remask since this generation still scans it.
         generation = self._generation
         # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
-        entries = sorted(
-            (e for e in self._by_key.values() if since is None or e.changed > since),
-            key=lambda e: len(e.normalized),
-            reverse=True,
-        )
+        pool: Iterable[_Entry] = self._by_key.values()
+        if since is not None:
+            pool = [e for e in pool if e.changed > since]
+        entries = sorted(pool, key=lambda e: len(e.normalized), reverse=True)
         self.entries_scanned += len(entries)
         for entry in entries:
             pattern = entry.pattern(language)
