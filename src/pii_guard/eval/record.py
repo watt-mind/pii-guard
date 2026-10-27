@@ -156,6 +156,22 @@ def text_metrics(block: Mapping[str, Any], *, reversible: bool = True) -> dict[s
             "mask": None if not mask else {"p50": _r(mask["p50"], 3), "p95": _r(mask["p95"], 3)},
         },
         "per_type": per_type,
+        **({"validity": _validity(block["validity"])} if block.get("validity") else {}),
+    }
+
+
+def _validity(block: Mapping[str, Any]) -> dict[str, Any]:
+    """A scorecard's number-validity block (:mod:`pii_guard.eval.validity`), counts only."""
+    keys = ("gold", "found", "values", "leaked")
+    return {
+        "valid": _counts(block["valid"], keys),
+        "invalid": _counts(block["invalid"], keys),
+        "excluding_number_types": _counts(block["excluding_number_types"], keys),
+        "per_type": {
+            name: {cls: _counts(row[cls], keys) for cls in ("valid", "invalid")}
+            for name, row in block.get("per_type", {}).items()
+        },
+        "source": block.get("source"),
     }
 
 
@@ -751,9 +767,13 @@ def validate(record: Mapping[str, Any], schema: Mapping[str, Any] | None = None)
     if not str(record["run_id"]).startswith(record["date"]):
         errors.append("$.run_id: must start with the run date")
     if kind == "text" and "languages" in metrics:
+        from pii_guard.eval.validity import validity_errors
+
         errors += rate_errors(metrics["overall"], "$.metrics.overall")
+        errors += validity_errors(metrics["overall"], "$.metrics.overall")
         for lang, block in metrics["languages"].items():
             errors += rate_errors(block, f"$.metrics.languages.{lang}")
+            errors += validity_errors(block, f"$.metrics.languages.{lang}")
     return errors
 
 

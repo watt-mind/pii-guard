@@ -259,6 +259,64 @@
           "type": "object",
           "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]*$"},
           "additionalProperties": {"$ref": "#/$defs/type_metrics"}
+        },
+        "validity": {
+          "$ref": "#/$defs/validity",
+          "description": "Optional (public sets). Recall and leak split by whether a structured identifier passes the language packs' validators; the headline counts are unchanged. See docs/evaluation.md#number-validity."
+        }
+      }
+    },
+    "validity_counts": {
+      "type": "object",
+      "required": ["gold", "found", "values", "leaked"],
+      "additionalProperties": false,
+      "properties": {
+        "gold": {"$ref": "#/$defs/count", "description": "Gold spans."},
+        "found": {"$ref": "#/$defs/count", "description": "Gold spans overlapped by a prediction of the same type (overlap recall)."},
+        "values": {"$ref": "#/$defs/count", "description": "Distinct labelled values (the leak rate's denominator)."},
+        "leaked": {"$ref": "#/$defs/count", "description": "Values that survive masking."}
+      }
+    },
+    "validity": {
+      "type": "object",
+      "required": ["valid", "invalid", "excluding_number_types", "per_type", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "valid": {"$ref": "#/$defs/validity_counts", "description": "Number-type values a validated rule of their type recognises."},
+        "invalid": {"$ref": "#/$defs/validity_counts", "description": "Number-type values no validated rule recognises (a failed checksum, an unknown numbering plan)."},
+        "excluding_number_types": {"$ref": "#/$defs/validity_counts", "description": "Every value that is not a number type (names, addresses, e-mail)."},
+        "per_type": {
+          "type": "object",
+          "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]*$"},
+          "additionalProperties": {
+            "type": "object",
+            "required": ["valid", "invalid"],
+            "additionalProperties": false,
+            "properties": {"valid": {"$ref": "#/$defs/validity_counts"}, "invalid": {"$ref": "#/$defs/validity_counts"}}
+          }
+        },
+        "source": {
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "required": ["by", "method", "commit", "date", "matches_headline", "rerun_headline", "note"],
+              "additionalProperties": false,
+              "properties": {
+                "by": {"type": "string", "minLength": 1, "description": "The change that added the breakdown (a ticket id)."},
+                "method": {"enum": ["rerun"], "description": "rerun: the run kept no per-document predictions, so the system was run again to classify them."},
+                "commit": {"type": "string", "pattern": "^([0-9a-f]{7,40}|unknown)$"},
+                "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+                "matches_headline": {"type": "boolean", "description": "The re-run reproduced the record's leak and recall counts exactly."},
+                "rerun_headline": {
+                  "anyOf": [{"type": "null"}, {"$ref": "#/$defs/validity_counts"}],
+                  "description": "The re-run's own totals when they differ from the record's (the breakdown adds up to these)."
+                },
+                "note": {"type": "string", "minLength": 1}
+              }
+            }
+          ],
+          "description": "null when the breakdown was computed in the run itself."
         }
       }
     },

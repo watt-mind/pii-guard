@@ -289,6 +289,107 @@
             "over_masked": 0
           }
         }
+      },
+      "validity": {
+        "valid": {
+          "gold": 69,
+          "found": 27,
+          "values": 69,
+          "leaked": 41
+        },
+        "invalid": {
+          "gold": 264,
+          "found": 80,
+          "values": 264,
+          "leaked": 171
+        },
+        "excluding_number_types": {
+          "gold": 419,
+          "found": 290,
+          "values": 419,
+          "leaked": 124
+        },
+        "per_type": {
+          "PHONE": {
+            "valid": {
+              "gold": 23,
+              "found": 23,
+              "values": 23,
+              "leaked": 0
+            },
+            "invalid": {
+              "gold": 65,
+              "found": 65,
+              "values": 65,
+              "leaked": 0
+            }
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "valid": {
+              "gold": 1,
+              "found": 0,
+              "values": 1,
+              "leaked": 0
+            },
+            "invalid": {
+              "gold": 40,
+              "found": 0,
+              "values": 40,
+              "leaked": 38
+            }
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "valid": {
+              "gold": 4,
+              "found": 0,
+              "values": 4,
+              "leaked": 4
+            },
+            "invalid": {
+              "gold": 38,
+              "found": 0,
+              "values": 38,
+              "leaked": 28
+            }
+          },
+          "ID_DOCUMENT": {
+            "valid": {
+              "gold": 37,
+              "found": 0,
+              "values": 37,
+              "leaked": 37
+            },
+            "invalid": {
+              "gold": 67,
+              "found": 0,
+              "values": 67,
+              "leaked": 67
+            }
+          },
+          "BANK_ACCOUNT": {
+            "valid": {
+              "gold": 4,
+              "found": 4,
+              "values": 4,
+              "leaked": 0
+            },
+            "invalid": {
+              "gold": 54,
+              "found": 15,
+              "values": 54,
+              "leaked": 38
+            }
+          }
+        },
+        "source": {
+          "by": "LAB-1201",
+          "method": "rerun",
+          "commit": "80e63e8",
+          "date": "2026-10-27",
+          "matches_headline": true,
+          "rerun_headline": null,
+          "note": "The run kept no per-document predictions; the tool was run again (same pinned version and configuration) on develop at the commit above to classify them."
+        }
       }
     },
     "languages": {
@@ -467,6 +568,107 @@
               "masked": 20,
               "over_masked": 0
             }
+          }
+        },
+        "validity": {
+          "valid": {
+            "gold": 69,
+            "found": 27,
+            "values": 69,
+            "leaked": 41
+          },
+          "invalid": {
+            "gold": 264,
+            "found": 80,
+            "values": 264,
+            "leaked": 171
+          },
+          "excluding_number_types": {
+            "gold": 419,
+            "found": 290,
+            "values": 419,
+            "leaked": 124
+          },
+          "per_type": {
+            "PHONE": {
+              "valid": {
+                "gold": 23,
+                "found": 23,
+                "values": 23,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 65,
+                "found": 65,
+                "values": 65,
+                "leaked": 0
+              }
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "valid": {
+                "gold": 1,
+                "found": 0,
+                "values": 1,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 40,
+                "found": 0,
+                "values": 40,
+                "leaked": 38
+              }
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "valid": {
+                "gold": 4,
+                "found": 0,
+                "values": 4,
+                "leaked": 4
+              },
+              "invalid": {
+                "gold": 38,
+                "found": 0,
+                "values": 38,
+                "leaked": 28
+              }
+            },
+            "ID_DOCUMENT": {
+              "valid": {
+                "gold": 37,
+                "found": 0,
+                "values": 37,
+                "leaked": 37
+              },
+              "invalid": {
+                "gold": 67,
+                "found": 0,
+                "values": 67,
+                "leaked": 67
+              }
+            },
+            "BANK_ACCOUNT": {
+              "valid": {
+                "gold": 4,
+                "found": 4,
+                "values": 4,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 54,
+                "found": 15,
+                "values": 54,
+                "leaked": 38
+              }
+            }
+          },
+          "source": {
+            "by": "LAB-1201",
+            "method": "rerun",
+            "commit": "80e63e8",
+            "date": "2026-10-27",
+            "matches_headline": true,
+            "rerun_headline": null,
+            "note": "The run kept no per-document predictions; the tool was run again (same pinned version and configuration) on develop at the commit above to classify them."
           }
         }
       }
