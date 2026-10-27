@@ -101,6 +101,7 @@ def make_app(
         upstream_base_url=UPSTREAM_URL,
         upstream_api_key=UPSTREAM_KEY,
         policy_overrides=policy_overrides,
+        image_render="opaque",  # solid boxes; labels: tests/visual/test_labelled_images.py
     )
     config = config or GatewayConfig()
     app = create_app(settings)

@@ -4,7 +4,17 @@ Two request forms, both answered with JSON:
 
 - **raw upload**: the image bytes as the body, ``Content-Type: image/png`` or ``image/jpeg``
   (``curl --data-binary @card.png -H 'Content-Type: image/png'``); ``?language=hu`` optional;
-- **JSON**: ``{"image": "<base64 or data:image/png;base64,...>", "language": "hu"}``.
+- **JSON**: ``{"image": "<base64 or data:image/png;base64,...>", "language": "hu",
+  "session_id": "s_...", "render": "labels", "expiry": "reduce"}`` (all but ``image``
+  optional; the raw form takes the same as query parameters).
+
+**Rendering** (``render``, default ``PII_GUARD_IMAGE_RENDER``, ``labels``): ``labels`` prints
+each covered region's vault placeholder on it and also returns ``transcript`` (the OCR text
+with placeholders) and ``summary`` (the document summary), with values registered in the vault
+session ``session_id`` (a new one when omitted; its id is returned), so an ID card and a
+contract masked in one session share placeholders. ``opaque`` covers regions with solid
+boxes and returns neither. Without a configured vault (``PII_GUARD_TENANT_KEY``) the default
+falls back to ``opaque``; an explicit ``labels`` is then ``500 vault_not_configured``.
 
 The format is sniffed from the bytes (PNG or JPEG only; anything else is ``415``). The
 response carries the masked image as base64 PNG (``image``), re-encoded from pixels with no
@@ -40,10 +50,12 @@ from pii_guard.api.deps import (
     get_analyzer,
     get_language,
     get_policies,
+    get_vault,
 )
 from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
 from pii_guard.api.routes.image_masking import (
     DEFAULT_MAX_IMAGE_BYTES,
+    RENDER_MODES,
     AnalyzerDetector,
     ImageMasker,
     ImageMaskOutcome,
@@ -53,6 +65,9 @@ from pii_guard.api.routes.image_masking import (
     default_ocr_engine,
 )
 from pii_guard.policy import BlockedEntityError, Policy
+from pii_guard.types import PiiGuardError
+from pii_guard.vault import Vault, VaultSession
+from pii_guard.visual.labels import VaultMatcher
 from pii_guard.visual.ocr import OcrEngine
 from pii_guard.visual.sam import SamClient
 
@@ -62,6 +77,7 @@ _RAW_TYPES = frozenset({"image/png", "image/jpeg", "image/jpg"})
 _JSON_OVERHEAD_BYTES = 16_384
 _lock = threading.Lock()
 _UNSET = object()
+_EXPIRY_MODES = ("reduce", "keep")
 
 
 def max_image_bytes(request: Request) -> int:
@@ -91,6 +107,12 @@ class ImageRegionOut(BaseModel):
     detector: str
     score: float | None
     policy: str
+    #: ``render="labels"`` only: the session placeholder, the printed label and the match.
+    placeholder: str | None = None
+    label: str | None = None
+    match: str | None = None
+    match_confidence: float | None = None
+    cover_box: list[int] | None = None
 
 
 class TypeCount(BaseModel):
@@ -125,6 +147,21 @@ class ImageMaskResponse(BaseModel):
     masked: list[TypeCount]
     kept: list[TypeCount]
     analysis: Analysis
+    render: str = "opaque"
+    #: The vault session the placeholders belong to (``render="labels"``).
+    session_id: str | None = None
+    transcript: str | None = None
+    summary: dict[str, Any] | None = None
+    matches: dict[str, int] = {}
+
+
+class ImageOptions(BaseModel):
+    """Per-request options (JSON body fields or query parameters)."""
+
+    language: str | None = None
+    session_id: str | None = None
+    render: str | None = None
+    expiry: str = "reduce"
 
 
 def _sam_client(request: Request) -> SamClient:
@@ -178,11 +215,27 @@ async def _read_body(request: Request, limit: int) -> bytes:
     return bytes(data)
 
 
-async def _image_from_request(request: Request) -> tuple[bytes, str | None]:
+def _option(value: object, name: str, allowed: tuple[str, ...] | None = None) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not 1 <= len(value) <= 128:
+        raise InvalidImageError(f"{name} must be a short string")
+    if allowed is not None and value not in allowed:
+        raise InvalidImageError(f"{name} must be one of: {', '.join(allowed)}")
+    return value
+
+
+async def _image_from_request(request: Request) -> tuple[bytes, ImageOptions]:
     content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
     image_limit = max_image_bytes(request)
+    query = request.query_params
+    options = ImageOptions(
+        session_id=_option(query.get("session_id"), "session_id"),
+        render=_option(query.get("render"), "render", RENDER_MODES),
+        expiry=_option(query.get("expiry"), "expiry", _EXPIRY_MODES) or "reduce",
+    )
     if content_type in _RAW_TYPES:
-        return await _read_body(request, image_limit), None
+        return await _read_body(request, image_limit), options
     if content_type == "application/json":
         raw = await _read_body(request, _body_limit(request))
         try:
@@ -194,7 +247,11 @@ async def _image_from_request(request: Request) -> tuple[bytes, str | None]:
         language = body.get("language")
         if language is not None and not (isinstance(language, str) and 1 <= len(language) <= 16):
             raise InvalidImageError("language must be a short language tag")
-        return decode_base64_image(body["image"]), language
+        options.language = language
+        options.session_id = _option(body.get("session_id"), "session_id") or options.session_id
+        options.render = _option(body.get("render"), "render", RENDER_MODES) or options.render
+        options.expiry = _option(body.get("expiry"), "expiry", _EXPIRY_MODES) or options.expiry
+        return decode_base64_image(body["image"]), options
     raise UnsupportedImageError(
         "send the image as the body (Content-Type: image/png or image/jpeg) "
         'or as JSON {"image": "<base64>"}'
@@ -205,7 +262,7 @@ def _counts(counts: dict[Any, int]) -> list[TypeCount]:
     return [TypeCount(entity_type=t.value, count=n) for t, n in counts.items()]
 
 
-def _response(outcome: ImageMaskOutcome) -> ImageMaskResponse:
+def _response(outcome: ImageMaskOutcome, session_id: str | None = None) -> ImageMaskResponse:
     ocr_ran = outcome.ocr_engine is not None
     return ImageMaskResponse(
         image=base64.b64encode(outcome.image).decode("ascii"),
@@ -225,25 +282,64 @@ def _response(outcome: ImageMaskOutcome) -> ImageMaskResponse:
                 reason=None if ocr_ran else "tesseract_unavailable",
             ),
         ),
+        render=outcome.render,
+        session_id=session_id,
+        transcript=outcome.transcript,
+        summary=outcome.summary,
+        matches=outcome.matches,
     )
 
 
-@router.post("/v1/mask/image", response_model=ImageMaskResponse)
+def _render_and_vault(request: Request, requested: str | None) -> tuple[str, Vault | None]:
+    """The render mode and, for ``labels``, the vault. The default falls back to ``opaque``
+    when no vault is configured; an explicit ``labels`` fails closed instead."""
+    state = request.app.state
+    default = getattr(state, "image_render", None) or getattr(
+        state.settings, "image_render", "labels"
+    )
+    render = requested or default
+    if render != "labels":
+        return "opaque", None
+    try:
+        return "labels", get_vault(request)
+    except PiiGuardError:
+        if requested == "labels":
+            raise
+        return "opaque", None
+
+
+@router.post("/v1/mask/image", response_model=ImageMaskResponse, response_model_exclude_unset=True)
 async def mask_image_endpoint(
     request: Request,
     language: Annotated[str | None, Query(min_length=2, max_length=16)] = None,
 ) -> ImageMaskResponse:
-    data, body_language = await _image_from_request(request)
+    data, options = await _image_from_request(request)
     if not data:
         raise InvalidImageError("image is empty")
     if len(data) > max_image_bytes(request):
         raise PayloadTooLargeError(f"image is larger than {max_image_bytes(request)} bytes")
     masker = get_image_masker(request)
-    lang = get_language(request, body_language or language)
+    lang = get_language(request, options.language or language)
+    render, vault = _render_and_vault(request, options.render)
+    session: VaultSession | None = None
+    if vault is not None:
+        # Unknown or expired id -> 404 session_not_found, before any detection.
+        session = vault.session(options.session_id)
     try:
-        outcome = await run_in_threadpool(masker.mask, data, lang)
-    except BlockedEntityError as exc:
-        log_extra(request, blocked=",".join(f"{t.value}:{n}" for t, n in exc.counts.items()))
+        matcher = VaultMatcher(session, lang) if session is not None else None
+        outcome = await run_in_threadpool(
+            masker.mask,
+            data,
+            lang,
+            render=render,  # type: ignore[arg-type]
+            matcher=matcher,
+            expiry=options.expiry,  # type: ignore[arg-type]
+        )
+    except BaseException as exc:
+        if session is not None and vault is not None and options.session_id is None:
+            vault.drop(session.session_id)  # a refused image leaves nothing in the vault
+        if isinstance(exc, BlockedEntityError):
+            log_extra(request, blocked=",".join(f"{t.value}:{n}" for t, n in exc.counts.items()))
         raise
     log_extra(
         request,
@@ -251,5 +347,6 @@ async def mask_image_endpoint(
         masked=sum(outcome.counts(Policy.MASK).values()),
         kept=sum(outcome.counts(Policy.KEEP).values()),
         ocr=outcome.ocr_engine or "off",
+        render=outcome.render,
     )
-    return _response(outcome)
+    return _response(outcome, session.session_id if session is not None else None)

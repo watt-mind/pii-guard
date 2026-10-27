@@ -1,0 +1,497 @@
+"""Placeholder-labelled image masking with a shared vault session (LAB-1156).
+
+Synthetic card from :mod:`visual_helpers` (fictional values), a perfect fake OCR engine and a
+fake SAM client, so everything runs in CI without Tesseract or network.
+"""
+
+from __future__ import annotations
+
+import base64
+import io
+import json
+from typing import Any, ClassVar
+
+import httpx
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from PIL import Image, ImageDraw
+from visual_helpers import (
+    FACE_BOX,
+    FICTIONAL_NAME,
+    FICTIONAL_TAJ,
+    FICTIONAL_TAX_ID,
+    SIGNATURE_BOX,
+    FakeOcr,
+    card_words,
+    id_card_png,
+    png_bytes,
+)
+
+from pii_guard.api.app import create_app
+from pii_guard.api.routes.image_masking import ImageMasker
+from pii_guard.config import Settings
+from pii_guard.detect.rules import RuleDetector
+from pii_guard.gateway import Gateway, GatewayConfig
+from pii_guard.gateway.detection import build_mode_detectors
+from pii_guard.policy import Policy, PolicySet
+from pii_guard.types import EntityType, MaskingError, Span
+from pii_guard.vault import PLACEHOLDER_RE, Vault, VaultSession
+from pii_guard.visual import labels as labels_module
+from pii_guard.visual.image import load_image
+from pii_guard.visual.labels import VaultMatcher
+from pii_guard.visual.ocr import OcrWord
+from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.render import LABEL_FILL, LabelBox, render_labels
+
+TENANT_KEY = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"
+GOLD = (FICTIONAL_NAME, FICTIONAL_TAJ, FICTIONAL_TAJ.replace(" ", ""), FICTIONAL_TAX_ID)
+
+
+class FakeSam:
+    """Finds the drawn face and signature of the synthetic card."""
+
+    model = "fake-sam"
+    prompts: ClassVar[dict[EntityType, tuple[str, ...]]] = {
+        EntityType.FACE: ("face",),
+        EntityType.SIGNATURE: ("signature",),
+    }
+
+    def segment(self, image: bytes, entity_types: object = None) -> list[Region]:
+        return [
+            Region(EntityType.FACE, FACE_BOX, None, "sam"),
+            Region(EntityType.SIGNATURE, SIGNATURE_BOX, None, "sam"),
+        ]
+
+
+def masker(words: list[OcrWord] | None = None, **kwargs: Any) -> ImageMasker:
+    return ImageMasker(
+        sam=FakeSam(),  # type: ignore[arg-type]
+        policies=kwargs.pop("policies", PolicySet()),
+        ocr=FakeOcr(words),
+        text_detector=RuleDetector(),
+        **kwargs,
+    )
+
+
+def seeded(session: VaultSession, value: str, entity_type: EntityType = EntityType.PERSON) -> str:
+    """Mask a contract sentence naming ``value`` in ``session``; return its placeholder."""
+    text = f"A szerződő fél: {value}, aki aláírja."
+    start = text.index(value)
+    span = Span(start, start + len(value), entity_type, value, 1.0, "test")
+    masked = session.mask(text, [span])
+    return PLACEHOLDER_RE.search(masked).group(0)  # type: ignore[union-attr]
+
+
+def caps_words() -> list[OcrWord]:
+    """The card's words with the name in capitals and surname-first, as on a real card."""
+    out = []
+    for word in card_words():
+        text = {"Teszt": "TESZT", "Elek": "ELEK"}.get(word.text, word.text)
+        out.append(OcrWord(text, word.box, word.line))
+    return out
+
+
+def all_text(outcome: Any) -> str:
+    return (outcome.transcript or "") + json.dumps(outcome.summary or {}, ensure_ascii=False)
+
+
+def assert_no_gold(text: str) -> None:
+    for value in GOLD:
+        assert value not in text, value
+
+
+# --- the shared vault ---------------------------------------------------------------------------
+
+
+def test_a_card_name_gets_the_placeholder_of_the_same_person_in_text() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    in_text = seeded(session, "Teszt Elek")
+    outcome = masker(caps_words()).mask(
+        id_card_png(), render="labels", matcher=VaultMatcher(session)
+    )
+    names = [r for r in outcome.regions if r.entity_type is EntityType.PERSON]
+    assert names and all(r.label is not None for r in names)
+    assert {r.label.placeholder for r in names if r.label} == {in_text}
+    assert names[0].label is not None and names[0].label.match in ("exact", "fuzzy")
+    assert in_text in (outcome.transcript or "")
+    # Faces and signatures are labelled with their kind only (no holder on this card type).
+    face = next(r for r in outcome.regions if r.entity_type is EntityType.FACE)
+    assert face.label is not None and face.label.label == "PHOTO"
+    # The upstream answer unmasks with the session as usual.
+    assert session.unmask(f"{in_text} aláírta.") == "Teszt Elek aláírta."
+
+
+def test_values_first_seen_in_an_image_join_the_session() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    outcome = masker().mask(id_card_png(), render="labels", matcher=VaultMatcher(session))
+    taj = next(r for r in outcome.regions if r.entity_type is EntityType.NATIONAL_ID_HU_TAJ)
+    assert taj.label is not None and taj.label.match == "new"
+    # The same value later in text gets the image's placeholder.
+    masked = session.mask(f"TAJ-szám: {FICTIONAL_TAJ}.", [])
+    assert taj.label.placeholder in masked
+
+
+def test_near_namesake_in_text_is_flagged_uncertain_not_merged() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    other = seeded(session, "Teszt Elak")  # a different person, one real letter apart
+    outcome = masker().mask(id_card_png(), render="labels", matcher=VaultMatcher(session))
+    name = next(r for r in outcome.regions if r.entity_type is EntityType.PERSON)
+    assert name.label is not None
+    assert name.label.placeholder != other
+    assert name.label.match == "uncertain"
+    assert name.label.confidence is not None and name.label.confidence < 0.85
+
+
+def test_known_values_are_matched_and_registered() -> None:
+    from pii_guard.vault.known import KnownValue
+
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    session.known_values.add([KnownValue("Teszt Elek", EntityType.PERSON)])
+    outcome = masker(caps_words()).mask(
+        id_card_png(), render="labels", matcher=VaultMatcher(session)
+    )
+    name = next(r for r in outcome.regions if r.entity_type is EntityType.PERSON)
+    assert name.label is not None and name.label.placeholder
+    assert session.mask("Teszt Elek fizet.", []) == f"{name.label.placeholder} fizet."
+
+
+def test_keep_policy_values_are_not_registered() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    policies = PolicySet({EntityType.NATIONAL_ID_HU_TAJ: Policy.KEEP})
+    masker(policies=policies).mask(id_card_png(), render="labels", matcher=VaultMatcher(session))
+    assert all(t is not EntityType.NATIONAL_ID_HU_TAJ for _, t, _ in session.entities())
+
+
+# --- transcript, summary, fail closed -------------------------------------------------------
+
+
+def test_transcript_and_summary_hold_no_raw_values() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    seeded(session, "Teszt Elek")
+    outcome = masker().mask(id_card_png(), render="labels", matcher=VaultMatcher(session))
+    assert outcome.transcript is not None and outcome.summary is not None
+    assert_no_gold(all_text(outcome))
+    assert_no_gold(json.dumps([r.to_public_dict() for r in outcome.regions]))
+    assert "SAMPLE ID CARD" not in outcome.transcript  # heading not read by the fake OCR
+    assert "TAJ:" in outcome.transcript  # captions stay, values go
+    # Every placeholder in the transcript resolves in the session.
+    assert not session.unmask_with_report(outcome.transcript).unresolved
+
+
+def test_the_session_sweep_masks_a_value_the_transcript_let_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    monkeypatch.setattr(labels_module, "_transcript", lambda words, covered: FICTIONAL_TAJ)
+    outcome = masker().mask(id_card_png(), render="labels", matcher=VaultMatcher(session))
+    assert outcome.transcript is not None and FICTIONAL_TAJ not in outcome.transcript
+
+
+def test_a_transcript_that_would_leak_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    monkeypatch.setattr(labels_module, "_transcript", lambda words, covered: FICTIONAL_TAJ)
+    # Without both sweeps too (a defect in every layer), the leak check still stops it.
+    monkeypatch.setattr(VaultSession, "mask", lambda self, text, *args, **kwargs: text)
+    monkeypatch.setattr(VaultMatcher, "sweep", lambda self, text, *args: text)
+    with pytest.raises(MaskingError):
+        masker().mask(id_card_png(), render="labels", matcher=VaultMatcher(session))
+
+
+def test_sweep_masks_values_the_conversation_named_but_no_detector_found() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    signer = seeded(session, "Próba Ottó")
+    matcher = VaultMatcher(session)
+    swept = matcher.sweep("Tisztelettel:\nPRÓBA OTTÓ, TAJ 123-456-788.\nPróbaidő")
+    assert swept.startswith(f"Tisztelettel:\n{signer},")
+    assert "Próbaidő" in swept  # a word merely starting like a value stays
+    assert matcher.sweep(signer) == signer
+
+
+def badge_words() -> list[OcrWord]:
+    """A visitor badge: the name has no caption, so no detector finds it."""
+
+    def word(text: str, x: int, line: int) -> OcrWord:
+        x += 300  # clear of the fake face and signature
+        return OcrWord(text, Box(x, 40 * line + 10, x + 12 * len(text), 40 * line + 30), (line,))
+
+    return [
+        word("VISITOR", 20, 0),
+        word("TESZT", 20, 1),
+        word("ELEK", 100, 1),
+        word("Teszt", 20, 2),  # a lone surname on a line of its own: not the person
+        word("minta", 100, 2),
+    ]
+
+
+def test_find_covers_values_the_conversation_named() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    person = seeded(session, "Teszt Elek")
+    seeded(session, "Teszt Elak")  # a near-namesake must never be the one found
+    outcome = masker(badge_words()).mask(
+        id_card_png(), render="labels", matcher=VaultMatcher(session)
+    )
+    found = [r for r in outcome.regions if r.region.source == "vault"]
+    assert len(found) == 1
+    assert found[0].label is not None and found[0].label.placeholder == person
+    assert found[0].region.box == Box(320, 50, 448, 70)
+    assert outcome.transcript is not None and "TESZT" not in outcome.transcript
+    assert "\nTeszt minta" in outcome.transcript
+
+
+def test_find_never_covers_an_uncertain_match() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    seeded(session, "Teszt Elemér")
+    outcome = masker(badge_words()).mask(
+        id_card_png(), render="labels", matcher=VaultMatcher(session)
+    )
+    assert not [r for r in outcome.regions if r.region.source == "vault"]
+
+
+def test_leak_check_scope() -> None:
+    assert labels_module._leaks("TAJ 123-456-788", ["123 456 788"])
+    assert labels_module._leaks("szerződő: TESZT ELEK", ["Teszt Elek"])
+    assert not labels_module._leaks("Fiktív kiadás", ["Fiktív"])  # one word, no digit
+    assert not labels_module._leaks("TAJ [[NATIONAL_ID_HU_TAJ_a1b2c3]]", ["123 456 788"])
+
+
+def test_labels_need_a_matcher_and_a_known_mode() -> None:
+    with pytest.raises(ValueError, match="matcher"):
+        masker().mask(id_card_png(), render="labels")
+    with pytest.raises(ValueError, match="render"):
+        masker().mask(id_card_png(), render="blur")  # type: ignore[arg-type]
+
+
+def test_opaque_mode_returns_no_transcript_or_summary() -> None:
+    outcome = masker().mask(id_card_png())
+    assert outcome.render == "opaque"
+    assert outcome.transcript is None and outcome.summary is None
+    assert all(r.label is None for r in outcome.regions)
+    assert "placeholder" not in outcome.regions[0].to_public_dict()
+
+
+# --- rendering -------------------------------------------------------------------------------
+
+
+def magenta_png(size: tuple[int, int] = (400, 200)) -> bytes:
+    image = Image.new("RGB", size, (255, 0, 255))
+    return png_bytes(image)
+
+
+def test_labelled_cover_leaves_no_original_pixel_and_covers_what_opaque_covers() -> None:
+    boxes = [Box(10, 10, 60, 30), Box(100, 100, 380, 160), Box(300, 10, 302, 12)]
+    out = render_labels(
+        magenta_png(),
+        [
+            LabelBox(boxes[0], "[[PERSON_a1b2c3]]"),
+            LabelBox(boxes[1], "PHOTO · [[PERSON_a1b2c3]]"),
+            LabelBox(boxes[2], "[[PERSON_a1b2c3]]"),
+        ],
+    )
+    image = load_image(out.image)
+    for box in boxes:
+        for x in range(max(0, box.x1 - 2), box.x2 + 3):
+            for y in range(max(0, box.y1 - 2), box.y2 + 3):
+                assert image.getpixel((x, y)) != (255, 0, 255), (x, y)
+    for box, covered in zip(boxes, out.boxes, strict=True):
+        assert covered is not None
+        assert covered.x1 <= box.x1 - 2 and covered.x2 >= box.x2 + 2  # never smaller
+    # A narrow box is extended into free space so its label stays legible.
+    assert out.boxes[0] is not None and out.boxes[0].x2 > boxes[0].x2 + 2
+    # The big box shows ink (a label), the 3x3 one has no room for any.
+    big = image.crop((100, 100, 381, 161))
+    assert big.getextrema()[0][0] < 100
+
+
+def test_extension_stops_before_visible_words() -> None:
+    box, obstacle = Box(10, 10, 40, 30), Box(60, 12, 90, 28)
+    out = render_labels(magenta_png(), [LabelBox(box, "[[PERSON_a1b2c3]]")], obstacles=[obstacle])
+    assert out.boxes[0] is not None and out.boxes[0].x2 < obstacle.x1
+    image = load_image(out.image)
+    assert image.getpixel((obstacle.x1, 20)) == (255, 0, 255)
+
+
+def test_label_fill_is_neutral_and_output_has_no_metadata() -> None:
+    out = render_labels(magenta_png(), [LabelBox(Box(0, 0, 399, 199), None)])
+    image = Image.open(io.BytesIO(out.image))
+    assert image.convert("RGB").getpixel((200, 100)) == LABEL_FILL
+    assert not image.info.get("exif")
+
+
+def test_both_modes_report_the_same_detected_boxes() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    opaque = masker().mask(id_card_png())
+    labelled = masker().mask(id_card_png(), render="labels", matcher=VaultMatcher(session))
+    assert [r.region.box for r in opaque.regions] == [r.region.box for r in labelled.regions]
+    for r in labelled.regions:
+        if r.policy is Policy.MASK:
+            assert r.cover_box is not None
+            assert r.cover_box.x1 <= r.region.box.x1 and r.cover_box.x2 >= r.region.box.x2
+
+
+# --- REST API --------------------------------------------------------------------------------
+
+
+def make_app(tenant_key: str | None = TENANT_KEY, **state: Any) -> FastAPI:
+    app = create_app(Settings(tenant_key=tenant_key))
+    app.state.sam_client = FakeSam()
+    app.state.ocr_engine = FakeOcr(caps_words())
+    for key, value in state.items():
+        setattr(app.state, key, value)
+    return app
+
+
+def post_card(http: TestClient, **fields: Any) -> httpx.Response:
+    data = base64.b64encode(id_card_png()).decode()
+    return http.post("/v1/mask/image", json={"image": data, **fields})
+
+
+def test_api_default_is_labels_in_a_session_shared_with_text() -> None:
+    with TestClient(make_app()) as http:
+        text = http.post("/v1/mask", json={"text": "Az ügyfél neve Teszt Elek."}).json()
+        # The rules detector does not find names: pre-load it as a known value instead.
+        session_id = text["session_id"]
+        http.post(
+            f"/v1/sessions/{session_id}/known-values",
+            json={"known_values": [{"value": "Teszt Elek", "entity_type": "PERSON"}]},
+        ).raise_for_status()
+        masked_text = http.post(
+            "/v1/mask", json={"text": "Az ügyfél neve Teszt Elek.", "session_id": session_id}
+        ).json()["masked_text"]
+        body = post_card(http, session_id=session_id).json()
+    assert body["render"] == "labels"
+    assert body["session_id"] == session_id
+    placeholder = PLACEHOLDER_RE.search(masked_text).group(0)  # type: ignore[union-attr]
+    names = [r for r in body["regions"] if r["entity_type"] == "PERSON"]
+    assert names and {r["placeholder"] for r in names} == {placeholder}
+    assert placeholder in body["transcript"]
+    assert body["summary"]["document_type"] is None  # the synthetic card has no title
+    assert_no_gold(json.dumps(body, ensure_ascii=False).replace(body["image"], ""))
+
+
+def test_api_new_session_and_opaque_flag() -> None:
+    with TestClient(make_app()) as http:
+        labelled = post_card(http).json()
+        opaque = http.post(
+            "/v1/mask/image?render=opaque",
+            content=id_card_png(),
+            headers={"Content-Type": "image/png"},
+        ).json()
+    assert labelled["session_id"] and labelled["render"] == "labels"
+    assert opaque["render"] == "opaque" and opaque["session_id"] is None
+    assert opaque["transcript"] is None and "placeholder" not in opaque["regions"][0]
+
+
+def test_api_without_vault_falls_back_to_opaque_unless_labels_is_asked() -> None:
+    with TestClient(make_app(tenant_key=None), raise_server_exceptions=False) as http:
+        default = post_card(http)
+        explicit = post_card(http, render="labels")
+    assert default.status_code == 200 and default.json()["render"] == "opaque"
+    assert explicit.status_code == 500  # like every vault endpoint without a key
+    assert explicit.json()["error"]["code"] == "vault_not_configured"
+
+
+def test_api_rejects_unknown_session_and_bad_options() -> None:
+    with TestClient(make_app(), raise_server_exceptions=False) as http:
+        unknown = post_card(http, session_id="s_" + "0" * 32)
+        bad = post_card(http, render="blur")
+    assert unknown.status_code == 404
+    assert bad.status_code == 422
+
+
+# --- gateway ---------------------------------------------------------------------------------
+
+
+def test_gateway_sends_labelled_image_with_transcript_and_masks_text_seen_in_the_image() -> None:
+    forwarded: list[dict[str, Any]] = []
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        forwarded.append(body)
+        names = [m.group(0) for m in PLACEHOLDER_RE.finditer(json.dumps(body))]
+        answer = f"Ez a kártya: {names[0]}" if names else "?"
+        return httpx.Response(
+            200,
+            json={"choices": [{"index": 0, "message": {"role": "assistant", "content": answer}}]},
+        )
+
+    settings = Settings(
+        tenant_key=TENANT_KEY, upstream_base_url="http://up.invalid/v1", upstream_api_key="k"
+    )
+    config = GatewayConfig(mode="fast")
+    app = create_app(settings)
+    app.state.gateway = Gateway(
+        settings=settings,
+        vault=Vault.from_settings(settings),
+        config=config,
+        detectors=build_mode_detectors(settings, config),
+        transport=httpx.MockTransport(upstream),
+        sam=FakeSam(),  # type: ignore[arg-type]
+        ocr=FakeOcr(caps_words()),
+    )
+    url = "data:image/png;base64," + base64.b64encode(id_card_png()).decode()
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Kié ez a kártya? Teszt Elek küldte."},
+                {"type": "image_url", "image_url": {"url": url}},
+            ],
+        }
+    ]
+    with TestClient(app) as http:
+        response = http.post("/v1/chat/completions", json={"model": "m", "messages": messages})
+    assert response.status_code == 200, response.text
+    parts = forwarded[0]["messages"][0]["content"]
+    assert [p["type"] for p in parts] == ["text", "image_url", "text"]
+    annotation = parts[2]["text"]
+    assert "Document summary:" in annotation and "Masked transcript:" in annotation
+    raw = json.dumps(forwarded[0], ensure_ascii=False)
+    assert "Teszt Elek" not in raw and "TESZT" not in raw and FICTIONAL_TAJ not in raw
+    # The name was first found on the card; the text's mention got the same placeholder.
+    text_placeholder = PLACEHOLDER_RE.search(parts[0]["text"]).group(0)  # type: ignore[union-attr]
+    assert text_placeholder in annotation
+    # The answer is restored on the way back.
+    assert "TESZT ELEK" in response.json()["choices"][0]["message"]["content"].upper()
+
+
+def test_gateway_opaque_setting_sends_no_annotation() -> None:
+    forwarded: list[dict[str, Any]] = []
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        forwarded.append(json.loads(request.content))
+        return httpx.Response(
+            200, json={"choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}}]}
+        )
+
+    settings = Settings(
+        tenant_key=TENANT_KEY,
+        upstream_base_url="http://up.invalid/v1",
+        upstream_api_key="k",
+        image_render="opaque",
+    )
+    config = GatewayConfig(mode="fast")
+    app = create_app(settings)
+    app.state.gateway = Gateway(
+        settings=settings,
+        vault=Vault.from_settings(settings),
+        config=config,
+        detectors=build_mode_detectors(settings, config),
+        transport=httpx.MockTransport(upstream),
+        sam=FakeSam(),  # type: ignore[arg-type]
+        ocr=FakeOcr(),
+    )
+    url = "data:image/png;base64," + base64.b64encode(id_card_png()).decode()
+    messages = [{"role": "user", "content": [{"type": "image_url", "image_url": url}]}]
+    with TestClient(app) as http:
+        assert http.post(
+            "/v1/chat/completions", json={"model": "m", "messages": messages}
+        ).is_success
+    assert [p["type"] for p in forwarded[0]["messages"][0]["content"]] == ["image_url"]
+
+
+def test_draw_helper_is_fictional() -> None:
+    # Guard: the synthetic card stays fictional and small.
+    image = Image.open(io.BytesIO(id_card_png()))
+    ImageDraw.Draw(image)
+    assert image.size == (640, 400)

@@ -141,6 +141,8 @@ def make_app(
     app = create_app(settings)
     app.state.sam_client = (sam or SamStub()).client()
     app.state.ocr_engine = FakeOcr() if ocr == "fake" else ocr
+    # These tests check solid boxes; placeholder labels: tests/visual/test_labelled_images.py.
+    app.state.image_render = "opaque"
     for key, value in state.items():
         setattr(app.state, key, value)
     return app

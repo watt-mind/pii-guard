@@ -7,7 +7,7 @@ appear in ``repr()`` or logs. Empty values (``PII_GUARD_SAM_URL=``) count as uns
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     # Vault: give each casing of a value (ALL CAPS, lower case) its own placeholder, so
     # unmask restores the casing exactly. Off: one placeholder, restored as first written.
     vault_case_sensitive_placeholders: bool = False
+
+    # Images (POST /v1/mask/image and the gateway): "labels" prints each covered region's
+    # session placeholder and returns a masked transcript + summary; "opaque": solid boxes.
+    image_render: Literal["labels", "opaque"] = "labels"
 
     # Model endpoints.
     llm_detector_url: str | None = None

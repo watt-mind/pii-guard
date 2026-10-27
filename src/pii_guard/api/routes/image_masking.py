@@ -9,9 +9,16 @@ imports it but mounts nothing.
    ``ID_PHOTO``, ``STAMP``), one request per concept prompt;
 2. **OCR** (Tesseract, when installed) + the configured **text detectors** find text personal
    data in the image (a TAJ number, a name), mapped back to word boxes;
-3. **policies** decide per region: ``mask`` regions are covered with a solid fill, ``keep``
-   regions (``STAMP`` by default) are reported but left visible, any ``block`` region refuses
-   the image (:class:`~pii_guard.policy.BlockedEntityError`).
+3. **policies** decide per region: ``mask`` regions are covered, ``keep`` regions (``STAMP``
+   by default) are reported but left visible, any ``block`` region refuses the image
+   (:class:`~pii_guard.policy.BlockedEntityError`).
+
+**Rendering** (``render``): ``"labels"`` (with a vault session, see
+:mod:`pii_guard.visual.labels`) covers each region with a neutral box printed with the
+session placeholder of its value (``[[PERSON_a1b2c3]]``, ``PHOTO · [[PERSON_a1b2c3]]``) and
+returns a masked **transcript** and a document **summary** that use the same placeholders as
+the text of the session; ``"opaque"`` covers each region with a solid fill and returns
+neither. Both cover exactly the same pixels.
 
 ``FACE`` boxes are grown before masking (:data:`FACE_PADDING`: up, sides, down, as fractions of
 the box, clamped to the image): SAM's face box runs from the brows to the chin, which leaves
@@ -30,19 +37,23 @@ from __future__ import annotations
 
 import base64
 import binascii
+import datetime as dt
 import logging
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 from pii_guard.policy import BlockedEntityError, Policy, PolicySet
 from pii_guard.types import Detector, EntityType, PiiGuardError, Span
 from pii_guard.visual.image import load_image, mask_image
-from pii_guard.visual.ocr import OcrEngine, TesseractOcr, tesseract_available
-from pii_guard.visual.pipeline import analyze_image
+from pii_guard.visual.labels import RegionLabel, VaultMatcher, label_image
+from pii_guard.visual.ocr import OcrEngine, OcrText, TesseractOcr, tesseract_available
+from pii_guard.visual.pipeline import ImageAnalysis, analyze_image_text
 from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.render import LabelBox, render_labels
 from pii_guard.visual.sam import SamClient
+from pii_guard.visual.summary import ExpiryPolicy
 
 __all__ = [
     "DEFAULT_MAX_IMAGE_BYTES",
@@ -52,6 +63,7 @@ __all__ = [
     "ImageMasker",
     "InvalidImageError",
     "PolicedRegion",
+    "Render",
     "UnsupportedImageError",
     "decode_base64_image",
     "default_ocr_engine",
@@ -70,6 +82,9 @@ SUPPORTED_MEDIA_TYPES: dict[str, tuple[bytes, ...]] = {
 }
 
 Origin = Literal["sam", "ocr"]
+#: ``labels``: placeholder-labelled boxes + transcript + summary; ``opaque``: solid boxes.
+Render = Literal["labels", "opaque"]
+RENDER_MODES: tuple[str, ...] = ("labels", "opaque")
 
 #: How far a ``FACE`` box is grown before masking: (up, sides, down), fractions of its size.
 FACE_PADDING: tuple[float, float, float] = (0.40, 0.10, 0.05)
@@ -117,14 +132,20 @@ class PolicedRegion:
     region: Region
     origin: Origin
     policy: Policy
+    #: The placeholder label printed on it (``render="labels"`` only).
+    label: RegionLabel | None = None
+    #: The area the labelled cover takes (``render="labels"`` only): the box grown by the
+    #: padding and, for a legible label, extended to the right into free space.
+    cover_box: Box | None = None
 
     @property
     def entity_type(self) -> EntityType:
         return self.region.entity_type
 
     def to_public_dict(self) -> dict[str, object]:
-        """``{entity_type, box, source, detector, score, policy}``. Never a value."""
-        return {
+        """``{entity_type, box, source, detector, score, policy}``, plus ``{placeholder,
+        label, match, match_confidence, cover_box}`` when labelled. Never a value."""
+        out: dict[str, object] = {
             "entity_type": self.region.entity_type.value,
             "box": self.region.box.to_list(),
             "source": self.origin,
@@ -132,6 +153,15 @@ class PolicedRegion:
             "score": self.region.score,
             "policy": self.policy.value,
         }
+        if self.label is not None:
+            out.update(
+                placeholder=self.label.placeholder,
+                label=self.label.label,
+                match=self.label.match,
+                match_confidence=self.label.confidence,
+                cover_box=self.cover_box.to_list() if self.cover_box is not None else None,
+            )
+        return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +178,13 @@ class ImageMaskOutcome:
     text_detectors: list[str] = field(default_factory=list)
     #: Model id per model-backed text detector (``{"llm": "muse-spark-1.3"}``), for labels.
     detector_models: dict[str, str] = field(default_factory=dict)
+    render: Render = "opaque"
+    #: The OCR text with placeholders (``render="labels"`` with OCR only).
+    transcript: str | None = None
+    #: The document summary (``render="labels"`` only; see :mod:`pii_guard.visual.summary`).
+    summary: dict[str, Any] | None = None
+    #: Vault matches of the image's values: ``{"exact": 2, "fuzzy": 1, "new": 3, ...}``.
+    matches: dict[str, int] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         return (
@@ -221,7 +258,23 @@ class ImageMasker:
         ocr = getattr(self.ocr, "name", None)
         return f"ImageMasker(sam={self.sam!r}, ocr={ocr!r}, types={len(self.entity_types)})"
 
-    def mask(self, data: bytes, language: str = "hu") -> ImageMaskOutcome:
+    def mask(
+        self,
+        data: bytes,
+        language: str = "hu",
+        *,
+        render: Render = "opaque",
+        matcher: VaultMatcher | None = None,
+        expiry: ExpiryPolicy = "reduce",
+        today: dt.date | None = None,
+    ) -> ImageMaskOutcome:
+        """Detect, police and cover. ``render="labels"`` needs ``matcher`` (the request's
+        :class:`~pii_guard.visual.labels.VaultMatcher`); values are registered in its
+        session only once the image passed the policies (a refused image stores nothing)."""
+        if render not in RENDER_MODES:
+            raise ValueError(f"render must be one of {RENDER_MODES}")
+        if render == "labels" and matcher is None:
+            raise ValueError("render='labels' needs a vault matcher")
         sniff_media_type(data)
         try:
             decoded = load_image(data)
@@ -229,7 +282,7 @@ class ImageMasker:
             raise InvalidImageError("image could not be decoded") from None
         width, height = decoded.size
 
-        regions = analyze_image(
+        analysis = analyze_image_text(
             data,
             sam=self.sam,
             entity_types=self.entity_types,
@@ -238,12 +291,57 @@ class ImageMasker:
             language=language,
             captions=self.captions,
         )
-        regions = [_grow_face(r, width, height) for r in regions]
+        masked_types = frozenset(t for t in EntityType if self.policies.of(t) is Policy.MASK)
+        if render == "labels" and matcher is not None and analysis.ocr is not None:
+            # Values the conversation already named, printed where no detector found them.
+            found = matcher.find(analysis.ocr, masked_types)
+            if found:
+                ocr_text = analysis.ocr
+                analysis = ImageAnalysis(
+                    analysis.regions + [f.region for f in found],
+                    OcrText(
+                        ocr_text.words, ocr_text.findings + found, ocr_text.zones, ocr_text.fields
+                    ),
+                )
+        regions = [_grow_face(r, width, height) for r in analysis.regions]
         policed = _merge([self._police(r) for r in regions])
         blocked = Counter(r.entity_type for r in policed if r.policy is Policy.BLOCK)
         if blocked:
             raise BlockedEntityError(dict(blocked))
-        masked = mask_image(data, [r.region for r in policed if r.policy is Policy.MASK])
+        transcript: str | None = None
+        summary: dict[str, Any] | None = None
+        matches: dict[str, int] = {}
+        if render == "labels" and matcher is not None:
+            labels = label_image(
+                analysis.ocr,
+                [(r.region, r.policy) for r in policed],
+                matcher,
+                expiry=expiry,
+                today=today,
+                masked_types=masked_types,
+            )
+            policed = [
+                PolicedRegion(
+                    r.region, r.origin, r.policy, label if r.policy is Policy.MASK else None
+                )
+                for r, label in zip(policed, labels.labels, strict=True)
+            ]
+            masked_regions = [r for r in policed if r.policy is Policy.MASK]
+            rendered = render_labels(
+                data,
+                [
+                    LabelBox(r.region.box, r.label.label if r.label else None)
+                    for r in masked_regions
+                ],
+                obstacles=_visible_words(analysis, masked_regions),
+            )
+            masked = rendered.image
+            grown = dict(zip(map(id, masked_regions), rendered.boxes, strict=True))
+            policed = [_with_box(r, grown.get(id(r))) for r in policed]
+            transcript = labels.transcript if analysis.ocr is not None else None
+            summary, matches = labels.summary, labels.matches
+        else:
+            masked = mask_image(data, [r.region for r in policed if r.policy is Policy.MASK])
         logger.debug(
             "image: %dx%d, %d region(s), ocr=%s",
             width,
@@ -261,11 +359,43 @@ class ImageMasker:
             ocr_engine=getattr(self.ocr, "name", None) if self.ocr is not None else None,
             text_detectors=self.text_detector_names if self.ocr is not None else [],
             detector_models=self.text_detector_models if self.ocr is not None else {},
+            render=render,
+            transcript=transcript,
+            summary=summary,
+            matches=matches,
         )
 
     def _police(self, region: Region) -> PolicedRegion:
         origin: Origin = "sam" if region.source == "sam" else "ocr"
         return PolicedRegion(region, origin, self.policies.of(region.entity_type))
+
+
+def _visible_words(analysis: ImageAnalysis, covered: list[PolicedRegion]) -> list[Box]:
+    """The boxes of OCR words no covered region hides: a label never extends over them."""
+    if analysis.ocr is None:
+        return []
+    out: list[Box] = []
+    for word in analysis.ocr.words:
+        area = word.box.width * word.box.height
+        hidden = any(_intersection(word.box, r.region.box) >= 0.3 * area for r in covered)
+        if not hidden:
+            out.append(word.box)
+    return out
+
+
+def _intersection(a: Box, b: Box) -> int:
+    ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
+    iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
+    return ix * iy if ix > 0 and iy > 0 else 0
+
+
+def _with_box(item: PolicedRegion, box: Box | None) -> PolicedRegion:
+    """``item`` carrying ``box``, the area its labelled cover actually takes (grown by the
+    padding and any extension for the label). ``region.box`` stays the detected box, so
+    visual recall is scored the same in both render modes."""
+    if box is None:
+        return item
+    return PolicedRegion(item.region, item.origin, item.policy, item.label, box)
 
 
 def _grow_face(region: Region, width: int, height: int) -> Region:
@@ -308,7 +438,9 @@ def _merge(regions: list[PolicedRegion], threshold: float = 0.5) -> list[Policed
                     a.source,
                     mask=a.mask,
                 )
-                out[index] = PolicedRegion(merged, other.origin, other.policy)
+                out[index] = PolicedRegion(
+                    merged, other.origin, other.policy, other.label, other.cover_box
+                )
                 break
         else:
             out.append(item)
