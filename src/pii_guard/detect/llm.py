@@ -306,21 +306,54 @@ def build_messages(
 # --- Parsing ----------------------------------------------------------------
 
 
+_JSON_START = re.compile(r"[{\[]")
+
+
+def _json_values(content: str) -> Iterator[dict[str, Any] | list[Any]]:
+    """Every top-level JSON object or array in ``content``, in order (values nested in one
+    are not yielded separately)."""
+    decoder = json.JSONDecoder()
+    position = 0
+    while (match := _JSON_START.search(content, position)) is not None:
+        try:
+            value, end = decoder.raw_decode(content, match.start())
+        except json.JSONDecodeError:
+            position = match.start() + 1
+            continue
+        yield value
+        position = end
+
+
 def _extract_json(content: str) -> Any:
-    """The first JSON value in ``content``, ignoring reasoning blocks and code fences."""
+    """The answer in ``content``, ignoring reasoning blocks and code fences.
+
+    Prose around the answer may contain other JSON (``Types I checked: ["PERSON"]``), so the
+    first value is not necessarily the answer (LAB-1215). In order of preference: the first
+    object with an ``entities`` list, the first non-empty list of objects, the first value.
+    """
     content = _THINK_RE.sub("", content)
     # An unterminated reasoning block ("...</think>" with the opening tag stripped upstream).
     for closing in ("</think>", "</thinking>", "</reasoning>"):
         if closing in content:
             content = content.rsplit(closing, 1)[1]
-    decoder = json.JSONDecoder()
-    for match in re.finditer(r"[{\[]", content):
-        try:
-            value, _ = decoder.raw_decode(content, match.start())
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict | list):
+    first: Any = None
+    object_list: list[Any] | None = None
+    for value in _json_values(content):
+        if isinstance(value, dict) and isinstance(value.get("entities"), list):
             return value
+        if (
+            object_list is None
+            and isinstance(value, list)
+            and value
+            and all(isinstance(item, dict) for item in value)
+        ):
+            object_list = value
+        if first is None:
+            first = value
+    if object_list is not None:
+        return object_list
+    if first is not None:
+        return first
     raise _InvalidOutput("no JSON value in model output")
 
 
@@ -342,21 +375,30 @@ def parse_entities(content: str) -> list[LlmEntity]:
 
     Accepts ``{"entities": [...]}`` or a bare list. Each item needs a ``type`` (alias
     ``entity_type``) and a non-empty ``text`` (alias ``value``). Items with an unknown type or
-    no text are dropped. Raises ``_InvalidOutput`` when there is no usable JSON structure.
+    no text are dropped. Raises ``_InvalidOutput`` when there is no usable JSON structure, and
+    when nothing is kept from a non-empty list that has malformed items in it (not an object,
+    no type string, no text): that is not an answer in our format, so it is retried rather
+    than read as "no personal data". A list of only unknown, well-formed types is an answer.
     """
     data = _extract_json(content)
     items = data.get("entities") if isinstance(data, dict) else data
     if not isinstance(items, list):
         raise _InvalidOutput("model output has no entities list")
     entities: list[LlmEntity] = []
-    dropped = 0
+    dropped = malformed = 0
     for item in items:
         if not isinstance(item, dict):
             dropped += 1
+            malformed += 1
             continue
-        entity_type = _to_entity_type(item.get("type", item.get("entity_type")))
+        raw_type = item.get("type", item.get("entity_type"))
+        entity_type = _to_entity_type(raw_type)
         value = item.get("text", item.get("value"))
-        if entity_type is None or not isinstance(value, str) or not value.strip():
+        if not isinstance(raw_type, str) or not isinstance(value, str) or not value.strip():
+            dropped += 1
+            malformed += 1
+            continue
+        if entity_type is None:
             dropped += 1
             continue
         occurrence = item.get("occurrence")
@@ -366,6 +408,8 @@ def parse_entities(content: str) -> list[LlmEntity]:
         entities.append(LlmEntity(entity_type, value.strip(), occurrence))
     if dropped:
         logger.debug("llm detector dropped %d malformed or unknown-type entities", dropped)
+    if not entities and malformed:
+        raise _InvalidOutput(f"no usable entity in model output ({malformed} malformed)")
     return entities
 
 
@@ -428,6 +472,78 @@ def find_occurrences(
             pattern = _pattern(form, word_boundary, allow_suffix, line_breaks=True)
             found.update(m.span() for m in pattern.finditer(text))
     return sorted(found)
+
+
+# Fallback alignment (LAB-1215): a model "corrects" the surface form it reports (letter case,
+# typographic apostrophes and dashes, phone and date separators). Only used for a value with
+# no verbatim match, so it never changes what an exact answer aligns to.
+_APOSTROPHES = "'\u2019\u2018\u02bc\u0060\u00b4"
+_DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2212"
+_APOSTROPHE_CLASS = "[" + re.escape(_APOSTROPHES) + "]"
+_DASH_CLASS = "[" + re.escape(_DASHES) + "]"
+# What may sit between two characters of a number: spaces, dashes, dots, slashes, brackets.
+_NUMBER_SEPARATORS = "[\\s" + re.escape(_DASHES + "./()") + "]*"
+_MIN_SEPARATED_DIGITS = 4
+
+
+def _loose_char(c: str) -> str:
+    if c in _APOSTROPHES:
+        return _APOSTROPHE_CLASS
+    if c in _DASHES:
+        return _DASH_CLASS
+    return re.escape(c)
+
+
+@cache
+def _loose_pattern(
+    value: str, word_boundary: bool, allow_suffix: bool, separators: bool
+) -> re.Pattern[str] | None:
+    """Case-insensitive, apostrophe- and dash-insensitive match of ``value``. With
+    ``separators``, only the letters, digits and ``+`` of ``value`` must match, with any run of
+    number separators between them (``+36 30 123 4567`` matches ``+36-30-123-4567``)."""
+    if separators:
+        chars = [c for c in value if c.isalnum() or c == "+"]
+        if not chars:
+            return None
+        body = _NUMBER_SEPARATORS.join(re.escape(c) for c in chars)
+        first, last = chars[0], chars[-1]
+    else:
+        body = r"\s+".join("".join(_loose_char(c) for c in p) for p in value.split())
+        first, last = value[0], value[-1]
+    prefix = r"(?<!\w)" if word_boundary and first.isalnum() else ""
+    if last.isdigit():
+        suffix = r"(?!\d)"
+    elif last.isalnum() and word_boundary and not allow_suffix:
+        suffix = r"(?!\w)"
+    else:
+        suffix = ""
+    return re.compile(prefix + body + suffix, re.IGNORECASE)
+
+
+def _loose_occurrences(
+    text: str, value: str, *, word_boundary: bool = True, allow_suffix: bool = True
+) -> list[tuple[int, int]]:
+    """Where ``value`` occurs in ``text`` up to letter case, apostrophe and dash style, then
+    (for a value with at least four digits) up to number separators. ``[]`` if nowhere."""
+    value = value.strip()
+    if not value:
+        return []
+    forms = dict.fromkeys(
+        (value, unicodedata.normalize("NFC", value), unicodedata.normalize("NFD", value))
+    )
+    stages = [False]
+    if sum(c.isdigit() for c in value) >= _MIN_SEPARATED_DIGITS:
+        stages.append(True)
+    for separators in stages:
+        found: set[tuple[int, int]] = set()
+        for form in forms:
+            pattern = _loose_pattern(form, word_boundary, allow_suffix, separators)
+            if pattern is not None:
+                found.update(m.span() for m in pattern.finditer(text))
+        found = {(start, end) for start, end in found if start < end}
+        if found:
+            return sorted(found)
+    return []
 
 
 # --- Chunking ---------------------------------------------------------------
@@ -608,7 +724,12 @@ class LlmDetector:
         return sorted(mapped, key=lambda s: (s.start, s.end, s.entity_type.value))
 
     def align(self, text: str, entities: Iterable[LlmEntity], language: str = "hu") -> list[Span]:
-        """Map entities to spans over ``text``; values not found verbatim are dropped.
+        """Map entities to spans over ``text``; values not found in it are dropped.
+
+        A value is searched verbatim first. Only when that finds nothing (nor an inflected
+        stem, below) is it searched up to letter case, apostrophe and dash style, then number
+        separators (``KOVÁCS JÁNOS`` for ``Kovács János``, ``+36-30-123-4567`` for
+        ``+36 30 123 4567``; LAB-1215).
 
         Where the language changes a value's stem before a suffix (Hungarian ``Zsuzsanna`` ->
         ``Zsuzsannának``, ``Kovács`` -> ``Kováccsal``), the changed stem is found too, when an
@@ -618,7 +739,7 @@ class LlmDetector:
         profile = language_profile(language)
         matcher = inflection_for(language)
         spans: set[Span] = set()
-        hallucinated = 0
+        hallucinated = loose = 0
         for entity in dict.fromkeys(entities):
             hits = find_occurrences(
                 text,
@@ -637,6 +758,15 @@ class LlmDetector:
                         if follows.match(text, end)
                     ]
             if not hits:
+                hits = _loose_occurrences(
+                    text,
+                    entity.text,
+                    word_boundary=profile.word_boundary,
+                    allow_suffix=profile.allow_suffix,
+                )
+                if hits:
+                    loose += 1
+            if not hits:
                 hallucinated += 1
                 continue
             # Every occurrence is masked, whatever the model's "occurrence" hint says: a value
@@ -645,6 +775,8 @@ class LlmDetector:
                 spans.add(
                     Span(start, end, entity.entity_type, text[start:end], self.score, self.name)
                 )
+        if loose:
+            logger.debug("llm detector aligned %d values only up to case or format", loose)
         if hallucinated:
             logger.info("llm detector dropped %d values not found in the input", hallucinated)
         return sorted(spans, key=lambda s: (s.start, s.end, s.entity_type.value))
