@@ -374,6 +374,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         id2label=dict(enumerate(LABELS)),
         label2id=LABEL2ID,
         ignore_mismatched_sizes=True,
+        use_safetensors=True,  # never unpickle pytorch_model.bin (LAB-1304)
     ).to(device)
     no_decay = ("bias", "LayerNorm.weight", "layer_norm")
     groups = [

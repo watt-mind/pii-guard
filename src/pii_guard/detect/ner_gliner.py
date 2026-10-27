@@ -20,7 +20,8 @@ Needs the ``gliner`` extra, which conflicts with ``ner`` (gliner 0.2.29 pins
 ``transformers < 5.17``): ``UV_PROJECT_ENVIRONMENT=.venv-gliner uv sync --extra gliner``.
 Without it the module imports but defines no ``DETECTOR_CLASS``. Fail closed, as the NER
 detector: load and inference errors raise :class:`~pii_guard.types.DetectionError` with the
-exception type only.
+exception type only. Only ``model.safetensors`` weights are loaded (:func:`safetensors_checkpoint`,
+LAB-1304): a pickled ``pytorch_model.bin`` is never downloaded or unpickled.
 """
 
 from __future__ import annotations
@@ -31,7 +32,6 @@ import re
 import threading
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
 
 from pii_guard.detect.ner import (
     WARM_UP_TEXT,
@@ -50,6 +50,7 @@ __all__ = [
     "GlinerDetector",
     "dependencies_available",
     "is_gliner_checkpoint",
+    "safetensors_checkpoint",
     "word_windows",
 ]
 
@@ -84,6 +85,38 @@ def dependencies_available() -> bool:
 def is_gliner_checkpoint(model: str) -> bool:
     """A local directory holding a GLiNER checkpoint (``gliner_config.json``)."""
     return (Path(model) / "gliner_config.json").is_file()
+
+
+#: Weight files that are unpickled on load (code execution from a tampered checkpoint).
+PICKLE_PATTERNS = ("*.bin", "*.pt", "*.pth", "*.pkl", "*.pickle", "*.ckpt")
+
+
+def safetensors_checkpoint(
+    model: str, *, revision: str | None = None, local_files_only: bool = False
+) -> str:
+    """The local directory of GLiNER checkpoint ``model``, refusing pickled weights.
+
+    ``GLiNER.from_pretrained`` has no ``use_safetensors`` switch: it downloads every file of a
+    hub repo and, without a ``model.safetensors``, unpickles ``pytorch_model.bin``. So a hub id
+    is fetched here at ``revision`` without :data:`PICKLE_PATTERNS`, and the directory (fetched
+    or local) must hold ``model.safetensors``; the caller loads that directory. Raises
+    :class:`DetectionError` otherwise.
+    """
+    path = Path(model)
+    if not path.exists():
+        from huggingface_hub import snapshot_download
+
+        path = Path(
+            snapshot_download(
+                model,
+                revision=revision,
+                local_files_only=local_files_only,
+                ignore_patterns=list(PICKLE_PATTERNS),
+            )
+        )
+    if not (path / "model.safetensors").is_file():
+        raise DetectionError("gliner checkpoint has no model.safetensors (pickled weights refused)")
+    return str(path)
 
 
 def word_windows(text: str, size: int = 160, overlap: int = 32) -> list[tuple[int, int]]:
@@ -121,10 +154,9 @@ class GlinerBackend:
         from gliner import GLiNER
 
         self.device = select_device(device)
-        kwargs: dict[str, Any] = {"local_files_only": local_files_only}
-        if revision:
-            kwargs["revision"] = revision
-        self.model = GLiNER.from_pretrained(model, **kwargs)
+        # safetensors only: a local directory, so GLiNER fetches nothing and finds no pickle.
+        local = safetensors_checkpoint(model, revision=revision, local_files_only=local_files_only)
+        self.model = GLiNER.from_pretrained(local, local_files_only=local_files_only)
         self.model.to(self.device)
         self.model.eval()
         self.labels = dict(labels or GLINER_LABELS)

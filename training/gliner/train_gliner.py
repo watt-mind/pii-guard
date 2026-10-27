@@ -33,7 +33,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from pii_guard.detect.ner_gliner import GLINER_LABELS
+from pii_guard.detect.ner_gliner import GLINER_LABELS, safetensors_checkpoint
 from pii_guard.eval.fixtures import Document, load_fixtures
 
 WINDOW = 200
@@ -110,7 +110,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"train examples {len(train)} (windows dropped {dropped}), dev {len(dev)}", flush=True)
 
     started = time.perf_counter()
-    model = GLiNER.from_pretrained(cfg["base_model"], revision=cfg.get("base_revision"))
+    # safetensors only (LAB-1304): load the checkpoint directory fetched without pickles.
+    base = safetensors_checkpoint(cfg["base_model"], revision=cfg.get("base_revision"))
+    model = GLiNER.from_pretrained(base)
     use_cuda = torch.cuda.is_available() and cfg["device"] in ("auto", "cuda")
     steps = int(cfg["epochs"] * len(train) / cfg["batch_size"])
     model.train_model(
