@@ -67,7 +67,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "meta-models/muse-spark-open-1026"
 DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
-MODEL_ENV_VAR = "PII_GUARD_LLM_DETECTOR_MODEL"
 #: Fallback for ``reasoning_effort`` when the caller passes none (the eval CLI, the registry).
 REASONING_EFFORT_ENV_VAR = "PII_GUARD_LLM_DETECTOR_REASONING_EFFORT"
 #: Counters in :attr:`LlmDetector.usage` (token counts as the endpoint reports them).
@@ -507,12 +506,7 @@ class LlmDetector:
         self.url = url if url.endswith("/chat/completions") else url + "/chat/completions"
         key = api_key if api_key is not None else settings.llm_detector_api_key
         self._api_key = key.get_secret_value() if isinstance(key, SecretStr) else key
-        self.model = (
-            model
-            or getattr(settings, "llm_detector_model", None)
-            or os.environ.get(MODEL_ENV_VAR)
-            or DEFAULT_MODEL
-        )
+        self.model = model or settings.llm_detector_model or DEFAULT_MODEL
         if max_retries < 0:
             raise ValueError("max_retries must be >= 0")
         if not 0.0 <= score <= 1.0:

@@ -126,16 +126,18 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` | `known_values_max_length` | `int` (characters per value) | `256` |
 | `PII_GUARD_LLM_DETECTOR_URL` | `llm_detector_url` | `str \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_API_KEY` | `llm_detector_api_key` | `SecretStr \| None` | unset |
+| `PII_GUARD_LLM_DETECTOR_MODEL` | `llm_detector_model` | `str \| None` | unset (detector default `meta-models/muse-spark-open-1026`) |
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
 `PII_GUARD_DETECTORS` picks the REST API's detectors (`rules,llm` for the demo; the gateway
 has its own per-mode set). `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
-settings load: an unknown type or policy stops startup. The LLM detector also reads
-`PII_GUARD_LLM_DETECTOR_MODEL` and `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT` from the
-environment (`LlmDetector` falls back to both itself, so the registry and `pii-guard eval`
-honour them too; Muse Spark Open on Baseten needs `REASONING_EFFORT=low`); folding those, the text size limit and the gateway settings into `Settings` is
-LAB-1095.
+settings load: an unknown type or policy stops startup. `LlmDetector` resolves its model as
+the `model` argument, then `llm_detector_model` (environment or `.env`), then its built-in
+default, so the registry and `pii-guard eval` honour it too. It also reads
+`PII_GUARD_LLM_DETECTOR_REASONING_EFFORT` from the process environment itself (Muse Spark
+Open on Baseten needs `REASONING_EFFORT=low`); folding that, the text size limit and the
+gateway settings into `Settings` is LAB-1095.
 
 `settings.tenant_key_bytes() -> bytes | None` decodes the hex tenant key (raises
 `ValueError`, without echoing the key, if it isn't hex). A new key goes into `Settings`,
