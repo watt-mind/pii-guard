@@ -34,7 +34,12 @@ committed_report = pytest.mark.skipif(
 
 
 def _copy_repo(tmp_path: Path) -> Path:
-    for rel in ("eval/results/runs", "eval/results/schema", "docs/benchmarks"):
+    for rel in (
+        "eval/results/runs",
+        "eval/results/schema",
+        "docs/benchmarks",
+        "eval/datasets/results",  # per-dataset CIs (LAB-1226)
+    ):
         shutil.copytree(REPO_ROOT / rel, tmp_path / rel)
     for rel in ("docs/benchmarks.md",):  # the index is a build output, not committed
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)

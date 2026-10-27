@@ -296,7 +296,8 @@ def test_committed_ai4privacy_records_carry_the_breakdown() -> None:
     for s in snaps:
         for lang in ("hu", "en", "de"):
             assert s["languages"][lang].get("validity"), (s["system"], lang)
-    assert validity_sets(index) == ["ai4privacy"]
+    # Every public set gets the breakdown (LAB-1226 added gretel-finance, nemotron-pii, ...).
+    assert "ai4privacy" in validity_sets(index)
     page = render_page(index, headline_set="smoke", featured=index["featured"])
     assert "Number validity" in page and "validity-ai4privacy.svg" in page
     svg = charts.number_validity(index, fixture_set="ai4privacy")
