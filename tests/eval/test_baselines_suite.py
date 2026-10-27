@@ -134,3 +134,24 @@ def test_bad_fixture_path_exits_2(tmp_path):
         ]
     )
     assert code == 2
+
+
+def test_a_failing_document_is_blocked_not_fatal(tmp_path, monkeypatch):
+    from pii_guard.types import DetectionError
+
+    calls = {"n": 0}
+
+    class Analyzer(DetectorAnalyzer):
+        def analyze(self, text, language):
+            calls["n"] += 1
+            if calls["n"] == 3:  # the warm-up is call 1
+                raise DetectionError("llm detector failed: completion truncated")
+            return super().analyze(text, language)
+
+    monkeypatch.setattr(suite, "DetectorAnalyzer", Analyzer)
+    out = tmp_path / "card.json"
+    assert suite.main(["--system", "rules", "--fixtures", str(EN_SMOKE), "--json", str(out)]) == 0
+    card = json.loads(out.read_text(encoding="utf-8"))
+    assert card["run"]["blocked"] == 1
+    assert card["run"]["blocked_documents"][0]["error"].startswith("llm detector failed")
+    assert card["overall"]["documents"] == card["run"]["documents"] - 1

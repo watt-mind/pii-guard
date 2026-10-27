@@ -14,7 +14,9 @@ gateway's modes are built) and adds a ``run`` block to the scorecard:
   ``model.safetensors``) and the LLM endpoint, model and reasoning effort (never the key);
 - the LLM detector's token usage, the cost at :data:`BASETEN_PRICE_USD_PER_1M` and the cost
   per 1,000 messages (one fixture document = one message);
-- wall time and the host's load average at start and end, since latency depends on it.
+- wall time and the host's load average at start and end, since latency depends on it;
+- documents a detector failed on (the pipeline fails closed, so the gateway would have
+  refused that request): counted in ``run.blocked``, left out of the scores.
 
 Nothing in the output contains a document text or a labelled value.
 """
@@ -33,8 +35,9 @@ from typing import Any
 
 from pii_guard.eval.baselines.base import host_info
 from pii_guard.eval.fixtures import FixtureError, load_fixtures
+from pii_guard.eval.injection import run_injection
 from pii_guard.eval.report import build_scorecard, render_markdown
-from pii_guard.eval.scorer import DetectorAnalyzer, run_documents
+from pii_guard.eval.scorer import DetectorAnalyzer
 from pii_guard.types import PiiGuardError
 
 __all__ = ["BASETEN_PRICE_USD_PER_1M", "SYSTEMS", "cost_usd", "main", "ner_identity"]
@@ -120,7 +123,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         analyzer.analyze(*_WARMUP)
         warm = {d.name: dict(getattr(d, "usage", {}) or {}) for d in analyzer.detectors}
-        results = run_documents(documents, analyzer)
+        # One document at a time: a detector failure (fail closed) blocks that document only,
+        # as the gateway would refuse that one request; it is counted, not scored.
+        results, blocked = run_injection(documents, analyzer)
     except PiiGuardError as exc:
         print(f"suite: run failed: {exc.code}: {exc.message}", file=sys.stderr)
         return 1
@@ -136,6 +141,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "load_average_end": _load(),
         "host": host_info(),
         "warmup_calls": 1,
+        "blocked": len(blocked),
+        "blocked_documents": [{"id": d.id, "error": err} for d, err in blocked],
     }
     if "ner" in names:
         run["ner"] = ner_identity()
