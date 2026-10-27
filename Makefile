@@ -1,4 +1,4 @@
-.PHONY: help setup lint format test types gate serve check docker docker-smoke audit licences \
+.PHONY: help setup lint format test test-all types gate serve check docker docker-smoke audit licences \
 	pii-diff gitleaks links baselines demo demo-traffic smoke bench
 
 help: ## list targets
@@ -16,8 +16,18 @@ format: ## apply ruff fixes and formatting
 	uv run ruff check --fix .
 	uv run ruff format .
 
-test: ## run the test suite with coverage
-	uv run pytest
+# The fast suite (pull requests) skips the tests marked slow and measures line coverage with the
+# sys.monitoring core (about twice as fast as branch coverage on Python 3.12), so it has its own
+# floor on its own measure. The full run keeps branch coverage and fail_under from pyproject.toml
+# (LAB-1267).
+FAST_COV_FLOOR := 90
+
+test: ## fast suite as pull-request CI runs it: parallel, no slow tests, line coverage, its floor
+	COVERAGE_CORE=sysmon COVERAGE_BRANCH=false \
+		uv run pytest -n auto --dist worksteal -m "not slow" --cov-fail-under=$(FAST_COV_FLOOR)
+
+test-all: ## every test, as develop, main and nightly CI run it: parallel, full coverage floor
+	uv run pytest -n auto --dist worksteal
 
 serve: ## run the API on http://127.0.0.1:8787
 	uv run pii-guard serve --reload

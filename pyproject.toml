@@ -83,6 +83,7 @@ dev = [
     "openai>=3.39.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.17.2",
 ]
 
@@ -110,7 +111,10 @@ select = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-ra", "--strict-markers", "--cov=pii_guard", "--cov-report=term-missing"]
-markers = ["live: calls a real model endpoint; skipped unless its credentials are set"]
+markers = [
+    "live: calls a real model endpoint; skipped unless its credentials are set",
+    "slow: heavy test (seconds each); pull-request CI skips it, develop/main/nightly run it (make test-all)",
+]
 filterwarnings = [
     "error",
     # Starlette's TestClient nudges towards httpx2; httpx is still supported.
@@ -119,7 +123,9 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["pii_guard"]
-branch = true
+# Branch coverage, except in the fast pull-request suite (`make test` sets COVERAGE_BRANCH=false
+# and the faster sys.monitoring core, which on Python 3.12 measures lines only; LAB-1267).
+branch = "${COVERAGE_BRANCH-true}"
 omit = ["*/pytest-of-*/*"]
 
 [tool.coverage.report]

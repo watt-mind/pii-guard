@@ -64,6 +64,7 @@ def test_audit_card_gets_detectors_cost_and_hardware(tmp_path, system):
     assert rec["fixtures"][0]["origin"] == "hand-written"
 
 
+@pytest.mark.slow
 def test_public_fixture_is_marked_generated_with_notes(tmp_path):
     card = _card(tmp_path, HU_PUBLIC)
     card["baselines"] = {

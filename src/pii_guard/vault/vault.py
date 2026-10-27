@@ -16,8 +16,8 @@ import secrets
 import threading
 import time
 import unicodedata
-from collections import Counter
-from collections.abc import Callable, Sequence
+from collections import Counter, OrderedDict
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -150,6 +150,7 @@ class _Entry:
         "count",
         "entity_type",
         "language",
+        "needles",
         "normalized",
         "original",
         "patterns",
@@ -175,7 +176,9 @@ class _Entry:
         self.language = language
         self.count = 0
         self.patterns: dict[str, re.Pattern[str]] = {}
-        self.alias_patterns: dict[str, list[tuple[str, re.Pattern[str]]]] = {}
+        # Per language, the literal prefilter of :meth:`pattern` (see :func:`_needles`).
+        self.needles: dict[str, tuple[str, ...] | None] = {}
+        self.alias_patterns: dict[str, list[tuple[str, re.Pattern[str], _Needles]]] = {}
         self.surfaces: dict[str, None] = {}
         self.aliases: dict[str, None] = {}
         self.seen: dict[str, str] = {}
@@ -190,6 +193,7 @@ class _Entry:
         if surface != self.original and surface not in self.surfaces:
             self.surfaces[surface] = None
             self.patterns.clear()
+            self.needles.clear()
 
     def add_alias(self, lemma: str) -> None:
         if lemma != self.original and lemma not in self.aliases:
@@ -212,25 +216,78 @@ class _Entry:
         pattern = self.patterns.get(language)
         if pattern is None:
             matcher = inflection_for(language)
-            alternatives = _forms(matcher, fold_value(self.original), self.entity_type)
-            alternatives += [
-                _occurrence(matcher, fold_value(s), self.entity_type) for s in self.surfaces
+            forms = _literal_forms(matcher, fold_value(self.original), self.entity_type)
+            forms += [
+                (_occurrence(matcher, folded, self.entity_type), folded)
+                for folded in map(fold_value, self.surfaces)
             ]
-            pattern = _compile(alternatives)
+            pattern = _compile([alternative for alternative, _ in forms])
             self.patterns[language] = pattern
+            self.needles[language] = _needles(literal for _, literal in forms)
         return pattern
 
-    def alias_pattern_list(self, language: str) -> list[tuple[str, re.Pattern[str]]]:
-        """``(alias, pattern of its forms)`` per alias, like :meth:`pattern`."""
+    def prefilter(self, language: str) -> _Needles:
+        """The literal prefilter of :meth:`pattern` (call that first): see :func:`_needles`."""
+        return self.needles.get(language)
+
+    def alias_pattern_list(self, language: str) -> list[tuple[str, re.Pattern[str], _Needles]]:
+        """``(alias, pattern of its forms, its prefilter)`` per alias, like :meth:`pattern`."""
         cached = self.alias_patterns.get(language)
         if cached is None:
             matcher = inflection_for(language)
-            cached = [
-                (alias, _compile(_forms(matcher, fold_value(alias), self.entity_type)))
-                for alias in self.aliases
-            ]
+            cached = []
+            for alias in self.aliases:
+                forms = _literal_forms(matcher, fold_value(alias), self.entity_type)
+                pattern = _compile([alternative for alternative, _ in forms])
+                cached.append((alias, pattern, _needles(literal for _, literal in forms)))
             self.alias_patterns[language] = cached
         return cached
+
+
+#: Literal substrings, one of which every match of a pattern contains; ``None``: no filter.
+_Needles = tuple[str, ...] | None
+
+#: Characters ``re.IGNORECASE`` matches to another case-folded character: dotted and dotless
+#: ``i`` (``re._casefix``). Every other case-folded character matches only itself there, so
+#: a needle is cut at these (``test_needle_alphabet_is_closed_under_ignorecase``).
+_CASE_AMBIGUOUS = re.compile("[i\u0131]")
+
+
+def _needles(literals: Iterable[str]) -> _Needles:
+    """The prefilter of a pattern compiled from the folded ``literals``, one per alternative.
+
+    An alternative is its literal's whitespace-separated tokens joined by ``\\s+`` (lookarounds
+    aside; an inflectional suffix is a lookahead and never part of the match), so every token,
+    and every substring of one, is in any text it matches. The needle of an alternative is
+    its longest such substring free of :data:`_CASE_AMBIGUOUS`: it is case-folded and the text
+    searched is too, so ``needle in view.text`` holds wherever the alternative matches. A text
+    holding none of the needles has no match and need not be scanned. ``None`` (always scan)
+    if an alternative has no such substring.
+    """
+    found: dict[str, None] = {}
+    for literal in literals:
+        pieces = [p for token in literal.split() for p in _CASE_AMBIGUOUS.split(token)]
+        needle = max(pieces, key=len, default="")
+        if not needle:
+            return None
+        found[needle] = None
+    return tuple(found)
+
+
+def _absent(needles: _Needles, views: tuple[FoldedText, ...]) -> bool:
+    """No needle is in any view, so the pattern they filter cannot match there."""
+    if needles is None or not _PREFILTER:
+        return False
+    return not any(needle in view.text for view in views for needle in needles)
+
+
+#: Off only in tests, to check the prefilter changes no output.
+_PREFILTER = True
+
+#: Bounds of a session's fold memo: texts, and their characters in all. A folded view keeps
+#: an offset map per character, so the character bound is what caps the memory.
+_FOLD_MEMO_ENTRIES = 1024
+_FOLD_MEMO_CHARS = 512_000
 
 
 def _compile(alternatives: list[str]) -> re.Pattern[str]:
@@ -248,10 +305,17 @@ def _forms(matcher: InflectionMatcher, value: str, entity_type: EntityType) -> l
     ``value`` is folded (:func:`~pii_guard.vault.fold.fold_value`) and the patterns run over
     folded text.
     """
-    forms = [_occurrence(matcher, value, entity_type)]
+    return [alternative for alternative, _ in _literal_forms(matcher, value, entity_type)]
+
+
+def _literal_forms(
+    matcher: InflectionMatcher, value: str, entity_type: EntityType
+) -> list[tuple[str, str]]:
+    """:func:`_forms` as ``(pattern, literal)``: the pattern matches the literal's tokens."""
+    forms = [(_occurrence(matcher, value, entity_type), value)]
     for stem, suffix in variant_stems(matcher, value, entity_type):
         left = r"(?<!\w)" if _is_word_char(stem[0]) else ""
-        forms.append(f"{left}{_body(stem)}(?=(?:{suffix})(?!\\w))")
+        forms.append((f"{left}{_body(stem)}(?=(?:{suffix})(?!\\w))", stem))
     return forms
 
 
@@ -314,6 +378,10 @@ class VaultSession:
         # A fork (:meth:`fork`) records its successful writes here, for :meth:`commit`.
         self._journal: list[tuple[str, tuple[Span, ...], str, bool, str]] | None = None
         self._parent: VaultSession | None = None
+        # fold_views() of recently masked texts: a request re-masks the whole history, so the
+        # same texts come back every turn (LAB-1277). Bounded; forgotten with the session.
+        self._folds: OrderedDict[str, tuple[FoldedText, ...]] = OrderedDict()
+        self._folded_chars = 0
 
     def __repr__(self) -> str:
         return (
@@ -337,6 +405,8 @@ class VaultSession:
             self._by_placeholder.clear()
             self._reserved.clear()
             self._known.clear()
+            self._folds.clear()
+            self._folded_chars = 0
 
     @property
     def known_values(self) -> KnownValues:
@@ -500,20 +570,26 @@ class VaultSession:
                 entry.add_alias(alias)
             replacements.append((span.start, end, self._cased(entry, text[span.start : end])))
             taken[span.start : end] = b"\x01" * (end - span.start)
-        folded = fold_views(text)
+        folded = self._fold_views(text)
         # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
         entries = sorted(self._by_key.values(), key=lambda e: len(e.normalized), reverse=True)
         for entry in entries:
-            for start, end in _occurrences(entry.pattern(language), folded):
-                if any(taken[start:end]):
-                    continue
-                replacements.append((start, end, self._cased(entry, text[start:end])))
-                taken[start:end] = b"\x01" * (end - start)
+            pattern = entry.pattern(language)
+            # Skipping a scan that can find nothing changes no output, only its cost: each
+            # request re-masks the whole history against every value of the session (LAB-1277).
+            if not _absent(entry.prefilter(language), folded):
+                for start, end in _occurrences(pattern, folded):
+                    if any(taken[start:end]):
+                        continue
+                    replacements.append((start, end, self._cased(entry, text[start:end])))
+                    taken[start:end] = b"\x01" * (end - start)
             # Forms of an alias share the entry's placeholder; with a suffix, unmask restores
             # them from ``seen``. A bare alias ("Minta Kende" after a "Minta Kendét" span) would
             # come back as the span's surface: it gets the alias's own entry instead.
-            for alias, pattern in entry.alias_pattern_list(language):
-                for start, end in _occurrences(pattern, folded):
+            for alias, alias_pattern, needles in entry.alias_pattern_list(language):
+                if _absent(needles, folded):
+                    continue
+                for start, end in _occurrences(alias_pattern, folded):
                     if any(taken[start:end]):
                         continue
                     written = text[start:end]
@@ -546,6 +622,21 @@ class VaultSession:
             "".join(parts),
             tuple((start, end, entry.placeholder) for start, end, entry in replacements),
         )
+
+    def _fold_views(self, text: str) -> tuple[FoldedText, ...]:
+        """:func:`fold_views` of ``text``, from the session's bounded memo when it has it."""
+        views = self._folds.get(text)
+        if views is not None:
+            self._folds.move_to_end(text)
+            return views
+        views = fold_views(text)
+        if len(text) <= _FOLD_MEMO_CHARS:
+            self._folds[text] = views
+            self._folded_chars += len(text)
+            while len(self._folds) > _FOLD_MEMO_ENTRIES or self._folded_chars > _FOLD_MEMO_CHARS:
+                evicted, _ = self._folds.popitem(last=False)
+                self._folded_chars -= len(evicted)
+        return views
 
     def _plans(self, text: str, ordered: Sequence[Span], matcher: InflectionMatcher) -> list[_Plan]:
         """The lemma and stem of every span (see :class:`~pii_guard.vault.inflection.Split`).

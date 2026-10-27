@@ -960,10 +960,12 @@ The owner's call: make it the default for faces and keep SAM 3.1 for signatures 
 (`signature`, `squiggly line`); `sam-api` keeps the old behaviour, `local` and `off` never call
 the API and refuse images they can't fully check.
 
-| Fictional set, `POST /v1/mask/image` with OCR | SAM calls / image | p50 | p95 | Portrait leak | Signature recall |
+| `POST /v1/mask/image` with OCR | SAM calls / image | p50 | p95 | Portrait leak | Signature recall |
 |---|---:|---:|---:|---:|---:|
-| `sam-api` (before) | 5 | 7.2 s | 8.1 s | 0.0 % | 100.0 % |
-| **`hybrid`** (now) | **2** | **3.8 s** | **5.0 s** | 0.0 % | 100.0 % |
+| 65 official specimens, `sam-api` (before) | 5 | 7.9 s | 11.6 s | 47.7 % | 83.8 % |
+| 65 official specimens, **`hybrid`** (now) | **2** | **4.1 s** | **6.1 s** | **10.8 %** | 83.8 % |
+| 24 fictional documents, `sam-api` | 5 | 7.2 s | 8.1 s | 0.0 % | 100.0 % |
+| 24 fictional documents, **`hybrid`** | **2** | **3.8 s** | **5.0 s** | 0.0 % | 100.0 % |
 
 - **The call count was 5, not 4.** The served pipeline also asked SAM for `stamp`, whose regions
   are `keep` (left visible). The hybrid mode only segments types whose policy is not `keep`.
@@ -974,9 +976,13 @@ the API and refuse images they can't fully check.
   (still masked); with no API key either, images are refused. The Docker image now ships OpenCV
   headless and the pinned, checksum-verified YuNet file (+160 MB unpacked; the CI size budget
   went from 375 to 525 MB).
-- **Not re-measured:** the 65 official specimens, whose images were no longer on the machine;
-  LAB-1229's runs on them have YuNet's portrait leak at 10.8 % against SAM's 47.7 %.
-- **Cost:** $0. About 620 SAM 3.1 calls on free Meta API credits.
+- **Acceptance met on both sets:** portrait leak at or below SAM's (a quarter of it on real
+  specimens), signatures from the same SAM prompts and the same boxes, 2 calls instead of 5,
+  the median image about 47 % faster.
+- **The specimens went missing once:** they lived in a worktree's `data/` and were deleted with
+  it. They were re-fetched (SHA-256 checked) into `PII_GUARD_SPECIMENS_DIR`, a new setting that
+  keeps them, and the SAM cache (`PII_GUARD_VISUAL_CACHE`), outside every worktree.
+- **Cost:** $0. About 2,250 SAM 3.1 calls on free Meta API credits.
 
 ### 35. A coding agent works through the gateway (2026-10-27)
 
@@ -1088,7 +1094,99 @@ union of the two encoders.
 - **Source:** run records `2026-10-27-ner-v2-<fixture>-<candidate>` (13 candidates × 11
   fixtures) and [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md).
 
-### 38. Strict mode becomes audit mode, and fast is the default (2026-10-27)
+### 38. Long sessions mask 5x faster (2026-10-27)
+
+LAB-1277, from the LAB-1268 performance audit. **In a long gateway session the mask stage
+was almost all of pii-guard's overhead** (763 ms per request at turn 120, against 2.8 ms of
+cached detection): every request re-masks the whole history, and the vault ran every
+confirmed value's occurrence regex over every text, twice. Almost all of those scans found
+nothing.
+
+Now each value carries a few literal needles, the longest piece of a word of each form its
+pattern matches. A text that holds none of them can't match and isn't scanned
+(`needle in text` is a C-speed search). The vault also keeps each session's folded views of
+recent texts, so the history isn't folded again on every turn. Output is unchanged: a new
+test masks a multi-turn session (smoke and inflection fixtures with gold spans, e-mail and
+phone turns, later mentions in other casings, NFD, zero-width and dotless i) with both
+changes on and off, and compares the masked and unmasked text.
+
+| Texts per request | Confirmed values | Regex scans, before → after | Mask ms, before → after | Speed-up |
+|---:|---:|---:|---:|---:|
+| 20 | 40 | 1,600 → 40 | 13.0 → 1.9 | 6.8x |
+| 40 | 80 | 6,400 → 80 | 37.2 → 6.4 | 5.8x |
+| 80 | 160 | 25,600 → 160 | 120.7 → 23.1 | 5.2x |
+| 120 | 240 | 57,600 → 242 | 251.5 → 50.0 | 5.0x |
+
+- **Measured** with the ticket's bench (rules only, mask then remask per text, as the gateway
+  does), alternating base and fix runs three times on a loaded machine; medians of the three
+  runs' medians. Read the ratios, not the absolute times.
+- **Still quadratic:** each request still masks the whole history twice. LAB-1278 skips the
+  remask pass for texts with nothing new.
+- **Cost:** $0. Local runs only.
+
+### 39. Muse Code works through the gateway: the Responses API (2026-10-27)
+
+LAB-1256, the follow-up of milestone 35. Muse Code, Meta's terminal coding agent, speaks the
+OpenAI **Responses API**, not Chat Completions. The gateway now serves it natively:
+`POST /v1/responses` (streamed and not) and the `GET /muse-code/models` catalog Muse reads
+first. `pii-guard connect muse-code` points Muse's `settings.json` at the gateway
+(`endpoint_transport.base_url`, `auth: "bearer"`), with a backup, `--dry-run` and `--check`.
+
+A real Muse Code 1.4.13, installed with the official installer into a throwaway `HOME`, got
+the same fictional mini-repo and task as pi in milestone 35:
+
+| Run (fast mode, rules + NER) | Requests | Refused | Gold values upstream | Real values in `reply.md` | Placeholders left |
+|---|---:|---:|---:|---:|---:|
+| Scripted mock model (also in CI when Muse is installed) | 10 | 0 | 0 of 13 | 13 of 13 | 0 |
+| Meta Model API, `muse-spark-1.3` | 7 | 0 | 0 of 13 | 6 | 0 |
+
+- **Fail-closed, field by field.** The request walker masks `instructions`, every `input`
+  item (messages, `function_call` arguments, `function_call_output`, reasoning summaries) and
+  the tool definitions, and refuses any field or item type it doesn't know. Hosted tools,
+  media parts and server-side state (`previous_response_id`, `conversation`) get a 400.
+  `reasoning.encrypted_content` passes through untouched both ways.
+- **Streaming restore per delta stream.** Output text, refusals, reasoning summaries and
+  function-call arguments each get their own unmasker, so a placeholder split across deltas
+  is held back until it's complete; `sequence_number` is renumbered for the extra deltas.
+- **Line-number gutters broke names.** Muse's `read_file` prints `12|Jane Placeholder`. Glued
+  to the gutter, the name detector masked only the surname. The walker now hides gutters from
+  the detectors and puts them back in the forwarded text.
+- **What's left:** in 1–2 places per run a first name glued to a CSV comma (`1,Jane`) still
+  reaches the model while the surname is masked (LAB-1258, LAB-1284). Image inputs are refused
+  for now (LAB-1285), and each Muse turn gets its own vault session because Muse can't send
+  headers (LAB-1286).
+- **Mode:** Muse can't send `X-PII-Guard-Mode`, so a gateway for Muse runs with
+  `PII_GUARD_GATEWAY_MODE=fast`; `connect` says so.
+- **Cost:** $0. About 10 requests on free Meta API credits (one live run and `--check`); the
+  rest ran locally.
+
+### 40. API keys and passwords no longer reach the model (2026-10-27)
+
+LAB-1257. Entry 35 found that every fake key in the mini-repo's `.env` reached the model. There
+is now a `SECRET` type, masked by default. Language-independent rules
+(`detect/rules/secrets.py`) find three things: provider key shapes (AWS, GitHub, Slack,
+Stripe, `sk-` keys, Google, JWTs, PEM private keys), passwords in URLs, and values assigned to
+a secret-ish key (`API_KEY=`, `password:`, `"client_secret":`, `Authorization: Bearer`). Each
+span names the rule that found it as a subtype. Restore works as for every other type, so the
+agent's files get the real values back.
+
+| Check (rules only) | Before | After |
+|---|---:|---:|
+| pi + scripted mock: `.env` secrets upstream | 3 of 3 | **0 of 3** |
+| pi + scripted mock: gold values restored in the written file | 11 of 11 | 14 of 14 |
+| New `secrets` gate suite (17 docs, 5 hard negatives): leak / over-masking | n/a | 0 / 0 |
+| Over-masking check: mini-repo, 6 repo files, `uv.lock`, `ui/pnpm-lock.yaml` (431k chars): `SECRET` spans that aren't secrets | n/a | 0 |
+
+- **Code stays readable.** A value must look like a literal, not code. So `api_key=api_key`,
+  `password: str`, `os.environ[...]`, `${DB_PASSWORD}`, `<your API key>` and `****` are left
+  alone. Lockfile hashes, git SHAs and UUIDs are masked only when they're assigned to a
+  secret-ish key. A generic `*_KEY` name (`STORAGE_KEY`) needs a value that looks generated.
+- **`PASSWORD=changeme` is masked.** A weak password in a config file is still a password.
+- **Found on the way:** the existing number rules mask 14 integrity-hash fragments in
+  `uv.lock` as TAJ or ID numbers, which isn't new. It's a follow-up ticket.
+- **Cost:** $0, all local.
+
+### 41. Strict mode becomes audit mode, and fast is the default (2026-10-27)
 
 LAB-1186. The gateway's two modes were `fast` (rules + NER) and `strict` (+ an LLM detector),
 and `strict` was the code default. The name read as the safer, more careful choice, so a

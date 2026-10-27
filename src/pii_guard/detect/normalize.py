@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 __all__ = [
@@ -211,6 +212,8 @@ def _fold_char(char: str) -> str:
 class NormalizedText:
     """``text`` with ``origin[i]`` = index in ``original`` of ``text[i]``.
 
+    ``origin`` is a tuple, or ``range(len(text))`` when nothing changed (no map is built).
+
     ``ends[i]`` is the index just after the original characters ``text[i]`` stands for: more
     than ``origin[i] + 1`` when it was composed from a base character and combining marks.
     Empty when every character stands for exactly one.
@@ -218,7 +221,7 @@ class NormalizedText:
 
     original: str
     text: str
-    origin: tuple[int, ...]
+    origin: Sequence[int]
     ends: tuple[int, ...] = ()
 
     @property
@@ -371,17 +374,79 @@ def _join_wrapped_numbers(chars: list[str]) -> list[int]:
     return drop
 
 
+def _one_for_one_fold(text: str) -> tuple[dict[int, str], bool] | None:
+    """How ``text`` folds when every character folds one for one, else ``None``.
+
+    That holds when ``text`` has no invisible character and no combining mark: :func:`_compose`
+    then maps each character to :func:`_fold_char` of it, with the identity offset map. Returns
+    the translation table and whether the folded text has a lookalike letter in it (when it has
+    none, :func:`_fold_lookalikes` has nothing to do). Only the distinct characters are looked
+    at, so this costs a fraction of :func:`_compose`.
+    """
+    table: dict[int, str] = {}
+    lookalike = False
+    for char in set(text):
+        if char < "\x80":
+            continue
+        if char in INVISIBLE_CHARS or _is_mark(char):
+            return None
+        folded = _fold_char(char)
+        if folded != char:
+            table[ord(char)] = folded
+        # A mathematical Greek letter folds (NFKC) to a Greek lookalike.
+        lookalike = lookalike or folded in LOOKALIKES
+    return table, lookalike
+
+
 def normalize_for_detection(text: str) -> NormalizedText:
     """Clean ``text`` for detection with an exact offset map back; see the module docstring."""
+    return _normalize(text, fast=True)
+
+
+def _normalize_reference(text: str) -> NormalizedText:
+    """:func:`normalize_for_detection` without the one-for-one fast path (tests compare them)."""
+    return _normalize(text, fast=False)
+
+
+def _translate(text: str, table: dict[int, str]) -> str:
+    """``text.translate(table)``, by ``str.replace`` when that is the same and faster.
+
+    A table is a handful of characters (a no-break space, an en dash); one ``replace`` per
+    entry beats ``translate`` looking every character up. It is the same when no replacement
+    is itself a key, which :func:`_fold_char` guarantees, but the check is cheap.
+    """
+    if len(table) > 8 or any(ord(v) in table for v in table.values()):
+        return text.translate(table)
+    for code, folded in table.items():
+        text = text.replace(chr(code), folded)
+    return text
+
+
+def _normalize(text: str, *, fast: bool) -> NormalizedText:
     if not text:
         return NormalizedText(text, text, ())
+    starts: list[int] | range = range(len(text))
+    ends: list[int] | None = None
+    folded: str | None = None  # the text so far, when every character was folded one for one
     if text.isascii():
-        chars = list(text)
-        starts: list[int] | range = range(len(text))
-        ends: list[int] | None = None
+        folded = text
+    elif fast and (one_for_one := _one_for_one_fold(text)) is not None:
+        table, lookalike = one_for_one
+        folded = _translate(text, table) if table else text
+        if lookalike:
+            chars = list(folded)
+            _fold_lookalikes(chars)
+            folded = "".join(chars)
     else:
         chars, starts, ends = _compose(text)
         _fold_lookalikes(chars)
+    if fast and folded is not None and "[[" not in folded and not _WRAPPED_NUMBER_RE.search(folded):
+        # No placeholder to blank and no wrapped number to join: the fold is final.
+        if folded == text:
+            return NormalizedText(text, text, starts)
+        return NormalizedText(text, folded, tuple(starts))
+    if folded is not None:
+        chars = list(folded)
     _blank_spoofed_placeholders(chars)
     drop = _join_wrapped_numbers(chars)
     if drop:
@@ -392,7 +457,7 @@ def normalize_for_detection(text: str) -> NormalizedText:
         ends = [ends[k] for k in keep] if ends is not None else None
     out = "".join(chars)
     if out == text:
-        return NormalizedText(text, text, tuple(range(len(text))))
+        return NormalizedText(text, text, range(len(text)) if fast else tuple(range(len(text))))
     origin = tuple(starts)
     end_map: tuple[int, ...] = ()
     if ends is not None and any(e != s + 1 for s, e in zip(starts, ends, strict=True)):

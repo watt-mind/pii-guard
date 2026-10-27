@@ -185,6 +185,7 @@ ADVERSARIAL = {
 
 
 @pytest.mark.parametrize("name", ADVERSARIAL)
+@pytest.mark.slow
 def test_adversarial_100kb_resolves_in_linear_time(name: str) -> None:
     language, text = ADVERSARIAL[name]
     assert len(text) >= 95_000
@@ -202,6 +203,7 @@ def test_adversarial_100kb_resolves_in_linear_time(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", ADVERSARIAL)
+@pytest.mark.slow
 def test_adversarial_100kb_rules_pipeline_is_fast(name: str) -> None:
     language, text = ADVERSARIAL[name]
     detector = DetectionPipeline([RuleDetector()])

@@ -54,6 +54,7 @@ def test_committed_report_is_up_to_date(monkeypatch: pytest.MonkeyPatch) -> None
     assert cli.main(["eval", "report", "--check"]) == 0
 
 
+@pytest.mark.slow
 def test_check_flags_stale_and_missing_outputs_and_a_rebuild_fixes_them(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -188,6 +189,7 @@ def test_page_has_method_notes_tables_and_every_run(index: dict[str, Any]) -> No
         assert run["run_id"] in page
 
 
+@pytest.mark.slow
 def test_outputs_include_the_ui_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(_copy_repo(tmp_path))
     outputs = build_outputs()

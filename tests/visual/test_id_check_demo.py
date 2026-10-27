@@ -80,6 +80,7 @@ def test_score_demo_answer() -> None:
     ("noise", "accuracy"),
     [(0.0, 0.95), (0.05, 0.85)],
 )
+@pytest.mark.slow
 def test_fuzzy_matching_meets_the_acceptance_bar(noise: float, accuracy: float) -> None:
     report = evaluate(matcher="fuzzy", noise=noise)["overall"]
     assert report["match_accuracy"] >= accuracy, report
@@ -87,12 +88,14 @@ def test_fuzzy_matching_meets_the_acceptance_bar(noise: float, accuracy: float) 
     assert report["leaked"] == 0, report
 
 
+@pytest.mark.slow
 def test_fuzzy_beats_exact_matching() -> None:
     fuzzy = evaluate(matcher="fuzzy")["overall"]["matched"]
     exact = evaluate(matcher="exact")["overall"]["matched"]
     assert fuzzy > exact
 
 
+@pytest.mark.slow
 def test_labels_cover_at_least_what_opaque_boxes_cover() -> None:
     report = coverage()
     for key in ("recall_iou50", "recall_cov90", "gold_pixels_overwritten"):

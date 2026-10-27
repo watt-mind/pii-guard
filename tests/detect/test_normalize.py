@@ -22,7 +22,7 @@ def test_plain_text_is_unchanged() -> None:
     norm = normalize_for_detection("Teszt Elek, 1051 Budapest")
     assert not norm.changed
     assert norm.text == norm.original
-    assert norm.origin == tuple(range(len(norm.text)))
+    assert tuple(norm.origin) == tuple(range(len(norm.text)))
 
 
 def test_empty_text() -> None:

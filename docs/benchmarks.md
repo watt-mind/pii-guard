@@ -354,6 +354,22 @@ By language:
 | pii-guard rules + Muse Spark 1.3 | 100.0% | 100.0% | 0.0% | 0.0% |
 
 
+### `secrets`
+
+hand-written; documents: en 17.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 17 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 0.35 ms | 2026-10-27 | `72bcc27` |
+
+
+By language:
+
+| System | en F1 | en leak |
+|---|---:|---:|
+| **pii-guard rules** | 100.0% | 0.0% |
+
+
 ### `synth-dev`
 
 generated; documents: en 24 + hu 24.
@@ -545,6 +561,7 @@ Portraits and signatures only, no OCR (`python -m pii_guard.visual.segment_eval`
 | `2026-10-27-segment-efficientsam-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 0.0% | 13.3% | 4.7% | 1.5 s | 4.4 s |
 | `2026-10-27-segment-efficientsam-specimens` | `specimens` | 65 | 92.3% | 87.7% | 0.0% | 8.1% | 6.3% | 2.2 s | 3.3 s |
 | `2026-10-27-segment-hybrid-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 100.0% | 100.0% | 7.8% | 2.3 s | 3.0 s |
+| `2026-10-27-segment-hybrid-specimens` | `specimens` | 65 | 92.3% | 90.8% | 83.8% | 73.0% | 10.8% | 2.5 s | 4.1 s |
 | `2026-10-27-segment-local-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 0.0% | 6.7% | 7.7% | 176 ms | 238 ms |
 | `2026-10-27-segment-local-specimens` | `specimens` | 65 | 92.3% | 90.8% | 0.0% | 8.1% | 10.3% | 116 ms | 348 ms |
 | `2026-10-27-segment-sam-api-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 100.0% | 100.0% | 0.7% | 5.1 s | 6.9 s |
@@ -577,6 +594,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-secrets-rules` | pii-guard rules | secrets | en | recorded | `72bcc27` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-negative-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | uncued-numbers | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-negative-rules` | pii-guard rules | uncued-numbers | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-reference-cues-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `752ff9a` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
@@ -898,6 +916,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-segment-sam-api-fictional` | segmenter sam-3.1 (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 17 (shared with other jobs) | ≈ $0.24 |
 | 2026-10-27 | `2026-10-27-segment-local-specimens` | segmenter yunet-2023mar (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 16 (shared with other jobs) | $0.00 |
 | 2026-10-27 | `2026-10-27-segment-local-fictional` | segmenter yunet-2023mar (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 16 (shared with other jobs) | $0.00 |
+| 2026-10-27 | `2026-10-27-segment-hybrid-specimens` | segmenter yunet-2023mar+sam-3.1 (no OCR) | specimens | — | recorded | `f8b36d3` (dirty) | arm64 CPU, one process; host load average 13 (shared with other jobs) | ≈ $0.33 |
 | 2026-10-27 | `2026-10-27-segment-hybrid-fictional` | segmenter yunet-2023mar+sam-3.1 (no OCR) | fictional-specimens | — | recorded | `df2d70d` (dirty) | arm64 CPU, one process; host load average 14 (shared with other jobs) | ≈ $0.12 |
 | 2026-10-27 | `2026-10-27-segment-efficientsam-specimens` | segmenter yunet-2023mar+efficientsam-vitt (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 19 (shared with other jobs) | $0.00 |
 | 2026-10-27 | `2026-10-27-segment-efficientsam-fictional` | segmenter yunet-2023mar+efficientsam-vitt (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 23 (shared with other jobs) | $0.00 |
