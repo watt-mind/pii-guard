@@ -1,0 +1,118 @@
+# Extra document kinds for the distillation corpus (training/distill/corpus.py), added to the
+# generator's own templates (src/pii_guard/eval/templates/hu.toml). Same schema. Fictional data
+# only. Kinds whose id starts with "negative-" have no parties: they contain no personal data
+# and teach the student what *not* to mask.
+
+[[kinds]]
+id = "tool-output"
+title = "Egy ügyfélkezelő eszköz JSON-válasza (CRM tool output)"
+brief = "The raw JSON an AI agent got back from a Hungarian customer-relationship tool (ugyfel_lekerdezes): one customer record with nested contact details (keys may be Hungarian, e.g. nev, lakcim, telefon), a few ticket objects with ids, statuses, ISO timestamps and short Hungarian free-text notes by the support staff, in which the customer's name may appear inflected. Pretty-printed JSON only."
+register = "machine output (JSON) with Hungarian notes"
+length = "60-150"
+weight = 2
+parties = [
+  { role = "customer", label = "Ügyfél (customer record)", kind = "person", fields = ["name", "email", "phone", "address"] },
+  { role = "agent", label = "a megjegyzést író munkatárs (staff member)", kind = "person", fields = ["name"] },
+]
+
+[[kinds]]
+id = "form"
+title = "Beküldött online űrlap (submitted online form)"
+brief = "A plain-text export of a submitted Hungarian online form (sportklub tagság, iskolai kirándulás hozzájárulás, kárbejelentő): 'Mező: érték' lines, a few checkbox answers like [x] or [ ], a casual free-text comment from the applicant, and a submission timestamp."
+register = "form fields plus a casual Hungarian comment"
+length = "80-160"
+weight = 2
+parties = [
+  { role = "applicant", label = "Kérelmező (applicant)", kind = "person", fields = ["name", "date_of_birth", "address", "phone", "taj"] },
+]
+
+[[kinds]]
+id = "log"
+title = "Alkalmazásnapló részlet (application log)"
+brief = "Ten to fifteen lines from a web application's log: ISO timestamps, log levels, module names, request ids, HTTP paths and status codes, latencies in ms; a few messages are in Hungarian (e.g. 'sikertelen fizetés', 'jelszó-visszaállítás') and leak a user record. Most lines contain no personal data."
+register = "machine log, partly Hungarian"
+length = "80-180"
+weight = 2
+parties = [
+  { role = "user", label = "Felhasználó (user)", kind = "person", fields = ["name", "email", "phone"] },
+]
+
+[[kinds]]
+id = "csv"
+title = "Táblázat export (CSV)"
+brief = "A small CSV export from a Hungarian club or delivery spreadsheet, semicolon-separated: a Hungarian header row and three data rows, one per person, with a status column (pl. 'fizetve', 'függőben') and a date column. The second and third people appear only in their rows."
+register = "CSV data"
+length = "40-100"
+weight = 1
+parties = [
+  { role = "row1", label = "1. sor", kind = "person", fields = ["name", "email", "address"] },
+  { role = "row2", label = "2. sor", kind = "person", fields = ["name", "phone"] },
+  { role = "row3", label = "3. sor", kind = "person", fields = ["name", "tax_id"] },
+]
+
+[[kinds]]
+id = "support-chat"
+title = "Ügyfélszolgálati chat (support chat transcript)"
+brief = "A live-chat transcript between a support agent (given name only) and a customer about a delivery or a refund. Lines start with '[óó:pp] Ügyintéző:' or '[óó:pp] Ügyfél:'. The customer gives their details when asked; the agent confirms them back, addressing the customer with the name in the right case (e.g. 'Köszönöm, ...!')."
+register = "polite Hungarian chat (magázódás)"
+length = "100-200"
+weight = 2
+typos = true
+parties = [
+  { role = "customer", label = "Ügyfél (customer)", kind = "person", fields = ["name", "address", "phone", "email"], informal = true },
+]
+
+[[kinds]]
+id = "sms"
+title = "SMS"
+brief = "One or two short text messages, lower case, often without accents, no greeting, about meeting up, picking up keys or paying back money."
+register = "very informal Hungarian texting"
+length = "15-45"
+weight = 2
+typos = true
+parties = [
+  { role = "sender", label = "az üzenet írója (sender)", kind = "person", fields = ["name", "phone"], informal = true },
+  { role = "place", label = "a találkozó helye (meeting place)", kind = "property", fields = ["address"] },
+]
+
+[[kinds]]
+id = "meeting-notes"
+title = "Emlékeztető (meeting notes)"
+brief = "Bullet-point notes from a small team meeting at a Hungarian company: jelenlévők, döntések, feladatok felelőssel és határidővel. Attendees are first given by full name, later by given name, initials or inflected surname (pl. 'Kovácsnak', 'Szabóéknál')."
+register = "terse Hungarian internal notes"
+length = "100-200"
+weight = 1
+parties = [
+  { role = "company", label = "a cég (company)", kind = "company", fields = ["org_name"] },
+  { role = "chair", label = "Levezető (chair)", kind = "person", fields = ["name"] },
+  { role = "member", label = "Csapattag (team member)", kind = "person", fields = ["name", "email"] },
+]
+
+[[kinds]]
+id = "mixed-confusables"
+title = "Üzenet megtévesztő szavakkal (message with look-alike words)"
+brief = "A friendly message to a neighbour about a village fair or a school event that uses many Hungarian words which are also surnames or given names, but as ordinary words in lower case or at the start of a sentence (nagy, kis, fehér, arany, rózsa, sas, farkas, takács, juhász, varga, hegedűs, erdős, liliom, május), names of shops and restaurants (pl. 'az Arany Sas vendéglő'), product names and room numbers, and also gives the sender's own name and phone number once."
+register = "chatty Hungarian"
+length = "80-150"
+weight = 2
+parties = [
+  { role = "sender", label = "Feladó (sender)", kind = "person", fields = ["name", "phone"] },
+]
+
+[[kinds]]
+id = "negative-prose"
+title = "Rövid hétköznapi szöveg (everyday prose)"
+brief = "A short Hungarian paragraph (naplóbejegyzés, falusi hírlevél, receptbevezető, kerti jegyzet) that uses words which are also Hungarian surnames or given names, but only as ordinary words: occupations (pék, juhász, takács, szűcs, kertész), colours and adjectives (fehér, nagy, kis, barna, szőke), animals (sas, farkas, holló, csóka), flowers and virtues (rózsa, viola, ibolya, remény), months and times of day. Restaurant and shop names are fine. No people's names, no addresses, no contact details."
+register = "plain Hungarian"
+length = "50-120"
+weight = 2
+parties = []
+
+[[kinds]]
+id = "negative-ops"
+title = "Működési szöveg személyes adat nélkül (operational text)"
+brief = "A Hungarian shipping notice, release note, server status report, meeting-room booking or IT ticket that is full of numbers that are not personal data: rendelésszám, csomagszám, cikkszám, verziószám, határozatszám (pl. 12/2026. (X. 5.)), terem- és épületszám, árak forintban, dátumok, nyitvatartás, generic department names (Pénzügy, Üzemeltetés). No people, no addresses of people, no contact details."
+register = "terse business Hungarian"
+length = "50-130"
+weight = 2
+parties = []

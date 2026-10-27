@@ -365,6 +365,10 @@ class LlmDetector:
     - ``base_url``: the API root (``.../v1``) or the full ``.../chat/completions`` URL.
     - ``reasoning_effort``: sent only when set. Muse Spark always reasons and rejects
       ``"none"``; use ``"minimal"`` or ``"low"`` for detection.
+    - ``reasoning_strength``: sent as ``chat_template_kwargs: {"reasoning_strength": ...}``
+      when set (default ``PII_GUARD_LLM_DETECTOR_REASONING_STRENGTH``). Muse Glimmer served by
+      vLLM ignores ``reasoning_effort`` and reasons at ``high`` unless this says otherwise;
+      ``"low"`` is the detection setting.
     - ``json_mode``: send ``response_format: {"type": "json_object"}``.
     - ``chunk_size`` / ``chunk_overlap``: in code points; long inputs are split and each chunk
       is a separate request. Values are then searched in the whole text.
@@ -385,6 +389,7 @@ class LlmDetector:
         max_retries: int = 1,
         temperature: float = 0.0,
         reasoning_effort: str | None = None,
+        reasoning_strength: str | None = None,
         json_mode: bool = True,
         max_tokens: int | None = 4096,
         chunk_size: int = 6000,
@@ -413,6 +418,7 @@ class LlmDetector:
         self.max_retries = max_retries
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
+        self.reasoning_strength = reasoning_strength or settings.llm_detector_reasoning_strength
         self.json_mode = json_mode
         self.max_tokens = max_tokens
         self.chunk_size = chunk_size
@@ -499,6 +505,8 @@ class LlmDetector:
             payload["max_tokens"] = self.max_tokens
         if self.reasoning_effort is not None:
             payload["reasoning_effort"] = self.reasoning_effort
+        if self.reasoning_strength:
+            payload["chat_template_kwargs"] = {"reasoning_strength": self.reasoning_strength}
         if self.json_mode:
             payload["response_format"] = {"type": "json_object"}
         return payload

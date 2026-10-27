@@ -18,7 +18,12 @@ Labelling: every sub-token that overlaps a gold span by at least half of its cha
 outside. The generator labels only the values it supplied, so other names the writing model
 added are unlabelled; with ``teacher`` set, tokens that the teacher model (a generic NER
 checkpoint) tags as an entity outside every gold span are excluded from the loss instead of
-being learned as ``O``.
+being learned as ``O``. Documents may also carry their own excluded regions in
+``meta.loss_ignore`` (``[[start, end], ...]``): the distillation corpus
+(``training/distill/label.py``) marks where Muse Glimmer and the planted gold disagree.
+
+``precision = "bf16"`` runs the forward pass under CUDA bf16 autocast (weights and optimiser
+stay fp32); ``"fp32"`` (default) everywhere else.
 """
 
 # Seeded shuffling, not cryptography.
@@ -69,6 +74,7 @@ DEFAULTS: dict[str, Any] = {
     "stride": 128,
     "seed": 13,
     "device": "auto",
+    "precision": "fp32",
 }
 
 
@@ -138,6 +144,7 @@ def encode(tokenizer, docs: Sequence[Document], cfg: dict[str, Any], teacher=Non
             (s.start, s.end, s.entity_type.value) for s in doc.spans if s.entity_type.value in TYPES
         ]
         ignore = teacher_regions(teacher, doc, cfg["teacher_threshold"])
+        ignore += [(int(s), int(e)) for s, e in doc.meta.get("loss_ignore", ())]
         ignored += len(ignore)
         enc = tokenizer(
             doc.text,
@@ -257,6 +264,7 @@ def load_config(argv: Sequence[str] | None) -> dict[str, Any]:
     parser.add_argument("--lr", type=float)
     parser.add_argument("--device")
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--precision", choices=("fp32", "bf16"))
     args = parser.parse_args(argv)
     cfg = dict(DEFAULTS)
     if args.config:
@@ -322,11 +330,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     out = Path(cfg["out"])
     best: dict[str, Any] | None = None
     history = []
+    autocast = cfg["precision"] == "bf16" and device == "cuda"
     model.train()
     for epoch in range(1, cfg["epochs"] + 1):
         total, n = 0.0, 0
         for batch in batches(train_features, cfg["batch_size"], tokenizer.pad_token_id, rng):
-            loss = model(**{k: v.to(device) for k, v in batch.items()}).loss
+            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=autocast):
+                loss = model(**{k: v.to(device) for k, v in batch.items()}).loss
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -369,6 +379,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "stride",
                 "seed",
                 "teacher_threshold",
+                "precision",
             )
         },
         "device": device,
