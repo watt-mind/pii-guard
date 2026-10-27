@@ -6,7 +6,7 @@ import { RestoredText } from "../components/RestoredText";
 import { BlockedNotice, Button } from "../components/ui";
 import { CHAT_SAMPLES } from "../content/chatSamples";
 import { metaFor } from "../lib/entities";
-import { alignRestored, tokenize, type RestoredSegment } from "../lib/placeholders";
+import { alignLoose, alignRestored, tokenize, type RestoredSegment } from "../lib/placeholders";
 import { toRunError, type RunError } from "../lib/run";
 
 export interface ChatDraft {
@@ -41,7 +41,7 @@ interface Props {
 
 const MODES: { id: ChatMode; label: string; hint: string }[] = [
   { id: "strict", label: "Strict", hint: "Rules + an AI detector (Muse Spark Open). Finds names too; adds a few seconds." },
-  { id: "fast", label: "Fast", hint: "Rules only, no model call. Structured data (emails, phones, IDs, IBANs) only." },
+  { id: "fast", label: "Fast", hint: "Rules only, no AI detector call. Finds structured data (emails, phones, IDs, IBANs), not names." },
 ];
 
 export function Chat({ client, live, draft, replay }: Props) {
@@ -225,7 +225,7 @@ export function Chat({ client, live, draft, replay }: Props) {
               </div>
             )}
             {turns.map((t, i) => (
-              <TurnView key={t.id} turn={t} first={i === 0} activeKey={activeKey} onActivate={activate} />
+              <TurnView key={t.id} turn={t} first={i === 0} simulated={client.kind === "mock"} activeKey={activeKey} onActivate={activate} />
             ))}
           </section>
 
@@ -270,24 +270,29 @@ function PlaceholderInfo({ placeholder }: { placeholder: string }) {
 /** Original text with the values that were masked marked, by lining it up with the masked text. */
 function segmentsFor(masked: string | null, original: string): RestoredSegment[] {
   if (!masked) return [{ kind: "text", text: original }];
-  return alignRestored(masked, original) ?? [{ kind: "text", text: original }];
+  return alignRestored(masked, original) ?? alignLoose(masked, original) ?? [{ kind: "text", text: original }];
 }
 
 function TurnView({
   turn,
   first,
+  simulated,
   activeKey,
   onActivate,
 }: {
   turn: Turn;
   first: boolean;
+  simulated: boolean;
   activeKey: string | null;
   onActivate: (key: string | null, el?: HTMLElement | null) => void;
 }) {
   const userSegments = segmentsFor(turn.maskedUser, turn.user);
   const maskedValues = userSegments.filter((s) => s.kind === "restored").length;
   const answerSegments = turn.status === "done" ? segmentsFor(turn.maskedAnswer, turn.answer) : null;
-  const restored = answerSegments?.filter((s) => s.kind === "restored").length ?? 0;
+  const marked = answerSegments?.filter((s) => s.kind === "restored").length ?? 0;
+  const placeholdersInAnswer = turn.maskedAnswer ? tokenize(turn.maskedAnswer).filter((t) => t.kind === "placeholder").length : 0;
+  // If the answer can't be lined up for highlighting, still count what was restored.
+  const restored = marked || placeholdersInAnswer;
 
   return (
     <article aria-label="Chat turn" className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-6">
@@ -298,7 +303,7 @@ function TurnView({
           <p className="mt-2 text-xs text-muted">
             {maskedValues === 0
               ? "Nothing was detected in this message, so it was sent as written."
-              : `${maskedValues} ${maskedValues === 1 ? "value" : "values"} masked before sending (${turn.mode} mode). Unmarked text was sent as written.`}
+              : `${maskedValues} ${maskedValues === 1 ? "value" : "values"} masked before sending (${simulated ? "demo engine" : `${turn.mode} mode`}). Unmarked text was sent as written.`}
           </p>
         )}
       </Bubble>
@@ -306,7 +311,9 @@ function TurnView({
         {turn.status === "error" && turn.maskedUser === null ? (
           <p className="text-sm text-muted">Nothing was sent.</p>
         ) : turn.maskedUser === null ? (
-          <Pending label={turn.mode === "strict" ? "Detecting personal data (rules + AI detector)…" : "Detecting personal data (rules)…"} />
+          <Pending
+            label={simulated ? "Masking in your browser…" : turn.mode === "strict" ? "Detecting personal data (rules + AI detector)…" : "Detecting personal data (rules)…"}
+          />
         ) : (
           <>
             <MaskedText text={turn.maskedUser} activeKey={activeKey} onActivate={onActivate} />
@@ -356,8 +363,10 @@ function TurnView({
             </div>
             {turn.status === "done" && (
               <p className="mt-2 text-xs text-muted">
-                {restored} {restored === 1 ? "value" : "values"} restored{turn.ms !== null ? ` · ${(turn.ms / 1000).toFixed(1)} s` : ""}. Marked
-                values were placeholders in the model's answer.
+                {restored} {restored === 1 ? "value" : "values"} restored{turn.ms !== null ? ` · ${(turn.ms / 1000).toFixed(1)} s` : ""}.{" "}
+                {marked > 0 || restored === 0
+                  ? "Marked values were placeholders in the model's answer."
+                  : "Compare with the model's answer to see where they were (this answer couldn't be lined up for highlighting)."}
               </p>
             )}
           </Bubble>
@@ -426,7 +435,9 @@ interface ComposerProps {
 }
 
 function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, onLanguage, model, onModel, mock, sessionId, onReset }: ComposerProps) {
-  const modeHint = MODES.find((m) => m.id === mode)!.hint;
+  const modeHint = mock
+    ? "The demo engine runs a small rule set in your browser in both modes; the AI detector and the real model need the live API."
+    : MODES.find((m) => m.id === mode)!.hint;
   return (
     <section aria-label="New message" className="space-y-3 rounded-2xl border border-line bg-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -489,7 +500,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
             <option value="en">English</option>
           </select>
         </label>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {onReset && (
             <Button variant="ghost" onClick={onReset} disabled={busy}>
               New conversation
@@ -507,7 +518,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
         </div>
       </div>
       <p className="text-xs text-muted">
-        <span className="font-semibold text-ink">{MODES.find((m) => m.id === mode)!.label} mode:</span> {modeHint}{" "}
+        <span className="font-semibold text-ink">{mock ? "Demo engine" : `${MODES.find((m) => m.id === mode)!.label} mode`}:</span> {modeHint}{" "}
         <kbd className="rounded border border-line px-1 font-mono text-[10px]">⌘/Ctrl ↵</kbd> sends.
       </p>
       <details className="text-xs text-muted">

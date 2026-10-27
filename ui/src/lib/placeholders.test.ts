@@ -84,3 +84,16 @@ describe("alignRestored", () => {
     expect(alignRestored("Hello [[PERSON_7f3a]]!", "Goodbye Teszt Elek!")).toBeNull();
   });
 });
+
+describe("alignLoose", () => {
+  it("marks restored values when the gateway re-inflected a suffix", async () => {
+    const { alignLoose, alignRestored } = await import("./placeholders");
+    const masked = "Kedves [[PERSON_ab12]]nak, üdv [[PERSON_cd34]]!";
+    const restored = "Kedves Kerekes Ottónak, üdv Minta Máriá!";
+    expect(alignRestored(masked, "Kedves Kerekes Ottónek, üdv Minta Máriá!")).toBeNull();
+    const segs = alignLoose(masked, "Kedves Kerekes Ottónek, üdv Minta Máriá!")!;
+    expect(segs.filter((s) => s.kind === "restored").map((s) => s.text)).toEqual(["Kerekes Ottónek", "Minta Máriá"]);
+    expect(segs.map((s) => s.text).join("")).toBe("Kedves Kerekes Ottónek, üdv Minta Máriá!");
+    expect(alignLoose(masked, restored)).not.toBeNull();
+  });
+});
