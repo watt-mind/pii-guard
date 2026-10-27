@@ -92,7 +92,8 @@ def test_index_has_every_run_and_derived_vocabularies(
     index: dict[str, Any], records: list[dict[str, Any]]
 ) -> None:
     assert {r["run_id"] for r in index["runs"]} == {r["run_id"] for r in records}
-    assert index["languages"] == ["en", "hu"]
+    assert {"en", "hu"} <= set(index["languages"])  # the committed runs add more over time
+    assert index["languages"] == sorted(index["languages"])
     assert {"smoke", "synth-sample", "synth-dev", "specimens"} <= set(index["fixture_sets"])
     assert index["fixture_sets"]["smoke"]["origin"] == "hand-written"
     assert index["fixture_sets"]["synth-sample"]["origin"] == "generated"

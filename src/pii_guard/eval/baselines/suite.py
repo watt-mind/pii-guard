@@ -79,6 +79,7 @@ def ner_identity() -> dict[str, Any]:
     model = os.environ.get("PII_GUARD_NER_MODEL")
     out: dict[str, Any] = {"model": model or "default (see docs/models.md)"}
     if model and Path(model).is_dir():
+        out["model"] = Path(model).name  # a local directory: its name, not the user's path
         weights = sorted(Path(model).glob("*.safetensors"))
         out["safetensors_sha256"] = {w.name: _sha256(w) for w in weights}
         meta = Path(model) / "training_meta.json"

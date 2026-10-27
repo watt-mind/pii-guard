@@ -4,7 +4,7 @@
 
 Every evaluation run of pii-guard and of the open-source tools it is compared with, on fictional data only. Each run is one JSON record in [`eval/results/runs/`](../eval/results/runs/) (format: [evaluation.md](evaluation.md#run-records)); this page, the charts and [`eval/results/index.json`](../eval/results/index.json) are generated from them. The same data is browsable in the UI's **Benchmarks** tab.
 
-Headline fixture set: **smoke** (hand-written; documents: en 10 + hu 31). Default pipeline in **bold**.
+Headline fixture set: **smoke** (hand-written; documents: de 10 + en 10 + hu 31). Default pipeline in **bold**.
 
 ![Leak rate vs latency](benchmarks/leak-vs-latency.svg)
 
@@ -48,12 +48,12 @@ Latest run of each system on each set; `all` pools every language exactly.
 
 ### `smoke`
 
-hand-written; documents: en 10 + hu 31.
+hand-written; documents: de 10 + en 10 + hu 31.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 38 | 100.0% | 45.5% | 62.6% | 51.2% | 15.0% | 0.0% | 100.0% | 0.18 ms* | 2026-10-27 |
-| pii-guard rules + NER (distilled large) | 38 | 97.8% | 91.7% | 94.7% | 7.9% | 3.1% | 1.6% | 100.0% | 53 ms* | 2026-10-27 |
+| **pii-guard rules** | 51 | 100.0% | 53.6% | 69.8% | 42.2% | 6.4% | 0.0% | 100.0% | 0.17 ms* | 2026-10-27 |
+| pii-guard fast (rules + NER distilled large) | 51 | 98.5% | 98.5% | 98.5% | 0.6% | 2.9% | 0.6% | 100.0% | 27 ms* | 2026-10-27 |
 | pii-guard rules + Muse Spark Open (Baseten) | 41 | 98.1% | 99.4% | 98.7% | 0.7% | 1.5% | 0.0% | 100.0% | 1.5 s* | 2026-10-27 |
 | pii-guard rules + Muse Glimmer (low) | 38 | 98.7% | 100.0% | 99.3% | 0.0% | 1.6% | 0.8% | 100.0% | 9.4 s | 2026-10-27 |
 | pii-guard Muse Glimmer (low) | 38 | 98.0% | 98.6% | 98.3% | 0.0% | 1.6% | 0.0% | 100.0% | 9.4 s | 2026-10-27 |
@@ -61,29 +61,56 @@ hand-written; documents: en 10 + hu 31.
 | pii-guard rules + Muse Spark 1.3 | 38 | 97.3% | 98.6% | 98.0% | 0.8% | 1.6% | 0.8% | 100.0% | 9.6 s* | 2026-10-26 |
 | pii-guard rules + NER (distilled base) | 38 | 98.5% | 90.3% | 94.2% | 11.0% | 2.4% | 0.9% | 100.0% | 24 ms* | 2026-10-27 |
 | pii-guard rules + NER (fine-tuned) | 38 | 94.3% | 90.3% | 92.3% | 10.2% | 4.7% | 4.8% | 100.0% | 15 ms* | 2026-10-26 |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 51 | 94.2% | 99.5% | 96.8% | 0.6% | 1.2% | 3.3% | 100.0% | 2.1 s* | 2026-10-27 |
 | pii-guard rules + NER (zero-shot) | 38 | 94.0% | 86.2% | 89.9% | 15.8% | 4.7% | 6.0% | 100.0% | 52 ms* | 2026-10-26 |
-| Presidio | 38 | 72.4% | 67.6% | 69.9% | 24.4% | 12.6% | 18.4% | — | 70 ms | 2026-10-26 |
-| LLM Guard | 38 | 61.6% | 47.6% | 53.7% | 44.9% | 6.3% | 37.3% | 100.0% | 60 ms | 2026-10-26 |
-| PrivAiTe | 38 | 52.8% | 59.3% | 55.9% | 15.0% | 11.0% | 25.6% | 100.0% | 59 ms | 2026-10-26 |
+| Presidio | 51 | 62.5% | 67.5% | 64.9% | 24.3% | 12.1% | 27.5% | — | 51 ms* | 2026-10-27 |
+| LLM Guard | 51 | 61.5% | 46.9% | 53.2% | 45.1% | 8.1% | 36.7% | 100.0% | 69 ms* | 2026-10-27 |
+| PrivAiTe | 51 | 51.2% | 59.8% | 55.2% | 12.7% | 9.8% | 25.8% | 98.0% | 66 ms* | 2026-10-27 |
 
 
 By language:
 
-| System | en F1 | hu F1 | en leak | hu leak |
-|---|---:|---:|---:|---:|
-| **pii-guard rules** | 64.0% | 62.1% | 46.7% | 52.6% |
-| pii-guard rules + NER (distilled large) | 98.5% | 93.5% | 0.0% | 10.3% |
-| pii-guard rules + Muse Spark Open (Baseten) | 100.0% | 98.4% | 0.0% | 0.9% |
-| pii-guard rules + Muse Glimmer (low) | 100.0% | 99.1% | 0.0% | 0.0% |
-| pii-guard Muse Glimmer (low) | 97.1% | 98.7% | 0.0% | 0.0% |
-| pii-guard Muse Glimmer (medium) | 90.4% | 99.1% | 0.0% | 0.0% |
-| pii-guard rules + Muse Spark 1.3 | 97.1% | 98.2% | 0.0% | 1.0% |
-| pii-guard rules + NER (distilled base) | 98.5% | 92.9% | 3.3% | 13.4% |
-| pii-guard rules + NER (fine-tuned) | 86.5% | 94.3% | 3.3% | 12.4% |
-| pii-guard rules + NER (zero-shot) | 90.7% | 89.6% | 10.0% | 17.5% |
-| Presidio | 68.4% | 70.2% | 10.0% | 28.9% |
-| LLM Guard | 76.4% | 49.2% | 30.0% | 49.5% |
-| PrivAiTe | 74.8% | 50.2% | 0.0% | 19.6% |
+| System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
+|---|---:|---:|---:|---:|---:|---:|
+| **pii-guard rules** | 68.8% | 64.0% | 71.7% | 43.2% | 46.7% | 40.6% |
+| pii-guard fast (rules + NER distilled large) | 100.0% | 98.5% | 97.9% | 0.0% | 0.0% | 0.9% |
+| pii-guard rules + Muse Spark Open (Baseten) | — | 100.0% | 98.4% | — | 0.0% | 0.9% |
+| pii-guard rules + Muse Glimmer (low) | — | 100.0% | 99.1% | — | 0.0% | 0.0% |
+| pii-guard Muse Glimmer (low) | — | 97.1% | 98.7% | — | 0.0% | 0.0% |
+| pii-guard Muse Glimmer (medium) | — | 90.4% | 99.1% | — | 0.0% | 0.0% |
+| pii-guard rules + Muse Spark 1.3 | — | 97.1% | 98.2% | — | 0.0% | 1.0% |
+| pii-guard rules + NER (distilled base) | — | 98.5% | 92.9% | — | 3.3% | 13.4% |
+| pii-guard rules + NER (fine-tuned) | — | 86.5% | 94.3% | — | 3.3% | 12.4% |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 100.0% | 93.2% | 96.8% | 0.0% | 0.0% | 0.9% |
+| pii-guard rules + NER (zero-shot) | — | 90.7% | 89.6% | — | 10.0% | 17.5% |
+| Presidio | 55.4% | 68.4% | 67.6% | 10.8% | 10.0% | 33.0% |
+| LLM Guard | 66.0% | 76.4% | 46.7% | 43.2% | 30.0% | 50.0% |
+| PrivAiTe | 66.0% | 74.8% | 46.5% | 8.1% | 0.0% | 17.9% |
+
+### `ai4privacy`
+
+generated by ai4privacy/pii-masking-openpii-1m (not Muse); documents: de 200 + en 200 + hu 200.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| **pii-guard rules** | 600 | 97.9% | 25.9% | 41.0% | 73.5% | 1.4% | 0.2% | 100.0% | 0.22 ms* | 2026-10-27 |
+| pii-guard fast (rules + NER distilled large) | 600 | 81.5% | 61.3% | 70.0% | 38.0% | 1.8% | 14.1% | 100.0% | 30 ms* | 2026-10-27 |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 600 | 83.2% | 94.0% | 88.3% | 3.8% | 0.2% | 12.2% | 100.0% | 2.1 s* | 2026-10-27 |
+| Presidio | 600 | 32.1% | 49.5% | 38.9% | 29.6% | 7.8% | 53.9% | — | 34 ms* | 2026-10-27 |
+| LLM Guard | 600 | 79.3% | 53.7% | 64.0% | 43.8% | 1.8% | 18.2% | 100.0% | 60 ms* | 2026-10-27 |
+| PrivAiTe | 600 | 52.6% | 65.4% | 58.3% | 9.5% | 2.5% | 26.6% | 98.0% | 80 ms* | 2026-10-27 |
+
+
+By language:
+
+| System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
+|---|---:|---:|---:|---:|---:|---:|
+| **pii-guard rules** | 41.3% | 38.5% | 43.5% | 73.4% | 74.7% | 72.2% |
+| pii-guard fast (rules + NER distilled large) | 69.6% | 72.2% | 67.9% | 39.2% | 34.8% | 40.4% |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 88.9% | 87.6% | 88.4% | 4.3% | 3.7% | 3.5% |
+| Presidio | 29.8% | 42.8% | 49.1% | 18.9% | 22.5% | 46.1% |
+| LLM Guard | 70.9% | 67.2% | 56.3% | 39.8% | 46.1% | 44.7% |
+| PrivAiTe | 59.1% | 62.3% | 53.5% | 6.5% | 7.7% | 14.0% |
 
 ### `distill-dev`
 
@@ -92,7 +119,7 @@ generated; documents: en 373 + hu 368.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | **pii-guard rules** | 741 | 99.9% | 42.3% | 59.4% | 47.2% | 22.1% | 0.0% | 100.0% | 0.67 ms* | 2026-10-27 |
-| pii-guard rules + NER (distilled large) | 741 | 97.8% | 97.9% | 97.9% | 2.9% | 0.6% | 2.1% | 99.6% | 126 ms* | 2026-10-27 |
+| pii-guard fast (rules + NER distilled large) | 741 | 97.8% | 97.9% | 97.9% | 2.9% | 0.6% | 2.1% | 99.6% | 126 ms* | 2026-10-27 |
 | pii-guard rules + NER (distilled base) | 741 | 98.9% | 97.9% | 98.4% | 2.9% | 0.6% | 0.9% | 99.9% | 43 ms* | 2026-10-27 |
 
 
@@ -101,7 +128,7 @@ By language:
 | System | en F1 | hu F1 | en leak | hu leak |
 |---|---:|---:|---:|---:|
 | **pii-guard rules** | 60.2% | 58.8% | 44.8% | 49.1% |
-| pii-guard rules + NER (distilled large) | 98.2% | 97.5% | 0.1% | 5.2% |
+| pii-guard fast (rules + NER distilled large) | 98.2% | 97.5% | 0.1% | 5.2% |
 | pii-guard rules + NER (distilled base) | 99.3% | 97.7% | 0.1% | 5.2% |
 
 ### `injection`
@@ -148,22 +175,26 @@ generated by muse-spark-1.3-contributor; documents: en 10 + hu 20.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 30 | 100.0% | 39.6% | 56.8% | 49.0% | 23.3% | 0.0% | 100.0% | 0.66 ms | 2026-10-26 |
+| **pii-guard rules** | 30 | 100.0% | 43.5% | 60.6% | 43.1% | 8.7% | 0.0% | 100.0% | 1.2 ms* | 2026-10-27 |
+| pii-guard fast (rules + NER distilled large) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 65 ms* | 2026-10-27 |
 | pii-guard rules + Muse Spark Open (Baseten) | 30 | 100.0% | 99.5% | 99.7% | 0.8% | 2.0% | 0.0% | 100.0% | 2.1 s* | 2026-10-27 |
 | pii-guard rules + NER (fine-tuned) | 30 | 99.2% | 96.2% | 97.7% | 5.9% | 1.2% | 0.6% | 100.0% | 28 ms* | 2026-10-26 |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 2.2 s* | 2026-10-27 |
 | pii-guard rules + NER (zero-shot) | 30 | 97.3% | 90.0% | 93.5% | 15.0% | 0.0% | 2.7% | 100.0% | 123 ms* | 2026-10-26 |
-| Presidio | 30 | 69.4% | 74.7% | 71.9% | 23.3% | 24.1% | 24.4% | — | 276 ms | 2026-10-26 |
-| LLM Guard | 30 | 62.7% | 41.4% | 49.9% | 56.5% | 10.7% | 34.4% | 100.0% | 217 ms | 2026-10-26 |
-| PrivAiTe | 30 | 58.5% | 59.1% | 58.8% | 19.0% | 9.1% | 24.1% | 83.3% | 292 ms | 2026-10-26 |
+| Presidio | 30 | 69.4% | 74.7% | 71.9% | 23.3% | 24.1% | 24.4% | — | 211 ms* | 2026-10-27 |
+| LLM Guard | 30 | 62.7% | 41.4% | 49.9% | 56.5% | 10.7% | 34.4% | 100.0% | 183 ms* | 2026-10-27 |
+| PrivAiTe | 30 | 58.5% | 59.1% | 58.8% | 19.0% | 9.1% | 24.1% | 83.3% | 231 ms* | 2026-10-27 |
 
 
 By language:
 
 | System | en F1 | hu F1 | en leak | hu leak |
 |---|---:|---:|---:|---:|
-| **pii-guard rules** | 54.5% | 57.7% | 46.2% | 50.3% |
+| **pii-guard rules** | 54.5% | 63.1% | 46.2% | 41.6% |
+| pii-guard fast (rules + NER distilled large) | 98.8% | 99.8% | 0.0% | 0.0% |
 | pii-guard rules + Muse Spark Open (Baseten) | 99.2% | 100.0% | 2.5% | 0.0% |
 | pii-guard rules + NER (fine-tuned) | 100.0% | 96.6% | 0.0% | 8.7% |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 98.8% | 99.8% | 0.0% | 0.0% |
 | pii-guard rules + NER (zero-shot) | 96.8% | 92.0% | 7.5% | 18.5% |
 | Presidio | 62.9% | 76.5% | 11.2% | 28.9% |
 | LLM Guard | 63.3% | 46.8% | 48.8% | 60.1% |
@@ -171,20 +202,20 @@ By language:
 
 ## Recall per entity type (`smoke`)
 
-| Type | Gold | rules | rules + NER (distilled large) | rules + Muse Spark Open (Baseten) | rules + Muse Glimmer (low) | Presidio | LLM Guard | PrivAiTe |
+| Type | Gold | rules | fast (rules + NER distilled large) | rules + Muse Spark Open (Baseten) | rules + Muse Glimmer (low) | Presidio | LLM Guard | PrivAiTe |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| `PERSON` | 48 | 0.0% | 95.7% | 97.9% | 100.0% | 95.7% | 91.3% | 73.9% |
-| `ADDRESS` | 17 | 82.3% | 100.0% | 100.0% | 100.0% | 82.3% | 0.0% | 100.0% |
-| `EMAIL` | 9 | 100.0% | 100.0% | 100.0% | 100.0% | 88.9% | 100.0% | 100.0% |
-| `PHONE` | 11 | 100.0% | 100.0% | 100.0% | 100.0% | 90.9% | 100.0% | 100.0% |
-| `DATE_OF_BIRTH` | 8 | 0.0% | 100.0% | 100.0% | 100.0% | 25.0% | 0.0% | 62.5% |
+| `PERSON` | 61 | 0.0% | 98.4% | 97.9% | 100.0% | 93.4% | 88.5% | 75.4% |
+| `ADDRESS` | 22 | 90.9% | 100.0% | 100.0% | 100.0% | 86.4% | 0.0% | 100.0% |
+| `EMAIL` | 12 | 100.0% | 100.0% | 100.0% | 100.0% | 91.7% | 100.0% | 100.0% |
+| `PHONE` | 16 | 100.0% | 100.0% | 100.0% | 100.0% | 87.5% | 100.0% | 100.0% |
+| `DATE_OF_BIRTH` | 11 | 0.0% | 100.0% | 100.0% | 100.0% | 45.5% | 0.0% | 72.7% |
 | `NATIONAL_ID_HU_TAX` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 | `NATIONAL_ID_HU_TAJ` | 5 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
-| `ID_DOCUMENT` | 11 | 16.7% | 16.7% | 100.0% | 100.0% | 16.7% | 0.0% | 0.0% |
-| `BANK_ACCOUNT` | 10 | 100.0% | 100.0% | 100.0% | 100.0% | 70.0% | 70.0% | 100.0% |
+| `ID_DOCUMENT` | 17 | 100.0% | 100.0% | 100.0% | 100.0% | 11.8% | 0.0% | 0.0% |
+| `BANK_ACCOUNT` | 12 | 100.0% | 100.0% | 100.0% | 100.0% | 75.0% | 75.0% | 100.0% |
 | `COMPANY_ID_HU` | 4 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
-| `ORGANIZATION` | 13 | 0.0% | 92.3% | 100.0% | 100.0% | 92.3% | 0.0% | 0.0% |
-| `PARCEL_NUMBER_HU` | 6 | 0.0% | 0.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
+| `ORGANIZATION` | 16 | 0.0% | 93.8% | 100.0% | 100.0% | 87.5% | 0.0% | 0.0% |
+| `PARCEL_NUMBER_HU` | 6 | 100.0% | 83.3% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 | `VEHICLE_PLATE` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 
 ## Image masking
@@ -203,6 +234,54 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-privaite` | PrivAiTe | ai4privacy | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-presidio` | Presidio | ai4privacy | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-llm-guard` | LLM Guard | ai4privacy | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy` | pii-guard rules | ai4privacy | de | recorded | `e394a06` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-privaite` | PrivAiTe | ai4privacy | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-presidio` | Presidio | ai4privacy | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-llm-guard` | LLM Guard | ai4privacy | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy` | pii-guard rules | ai4privacy | en | recorded | `e394a06` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-privaite` | PrivAiTe | ai4privacy | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-presidio` | Presidio | ai4privacy | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-llm-guard` | LLM Guard | ai4privacy | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy` | pii-guard rules | ai4privacy | hu | recorded | `e394a06` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-privaite` | PrivAiTe | synth-sample | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-presidio` | Presidio | synth-sample | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-llm-guard` | LLM Guard | synth-sample | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-synth-sample` | pii-guard rules | synth-sample | en | recorded | `e394a06` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-privaite` | PrivAiTe | synth-sample | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-presidio` | Presidio | synth-sample | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-llm-guard` | LLM Guard | synth-sample | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample` | pii-guard rules | synth-sample | hu | recorded | `e394a06` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-comparison-de-smoke-privaite` | PrivAiTe | smoke | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-de-smoke-presidio` | Presidio | smoke | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-de-smoke-llm-guard` | LLM Guard | smoke | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-de-smoke` | pii-guard rules | smoke | de | recorded | `e394a06` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-comparison-en-smoke-privaite` | PrivAiTe | smoke | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-smoke-presidio` | Presidio | smoke | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-smoke-llm-guard` | LLM Guard | smoke | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-en-smoke` | pii-guard rules | smoke | en | recorded | `e394a06` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-smoke-privaite` | PrivAiTe | smoke | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-smoke-presidio` | Presidio | smoke | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-smoke-llm-guard` | LLM Guard | smoke | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-smoke` | pii-guard rules | smoke | hu | recorded | `e394a06` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | synth-sample | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 24.0 at start (machine not idle) | ≈ $0.03 |
+| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | synth-sample | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 47.9 at start (machine not idle) | ≈ $0.08 |
+| 2026-10-27 | `2026-10-27-comparison-de-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 72.3 at start (machine not idle) | ≈ $0.02 |
+| 2026-10-27 | `2026-10-27-comparison-en-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 57.8 at start (machine not idle) | ≈ $0.03 |
+| 2026-10-27 | `2026-10-27-comparison-hu-smoke-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | smoke | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 27.2 at start (machine not idle) | ≈ $0.07 |
+| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | ai4privacy | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 11.3 at start (machine not idle) | ≈ $0.52 |
+| 2026-10-27 | `2026-10-27-comparison-de-ai4privacy-fast` | pii-guard fast (rules + NER distilled large) | ai4privacy | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-fast` | pii-guard fast (rules + NER distilled large) | ai4privacy | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-fast` | pii-guard fast (rules + NER distilled large) | ai4privacy | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-en-synth-sample-fast` | pii-guard fast (rules + NER distilled large) | synth-sample | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-synth-sample-fast` | pii-guard fast (rules + NER distilled large) | synth-sample | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-de-smoke-fast` | pii-guard fast (rules + NER distilled large) | smoke | de | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-en-smoke-fast` | pii-guard fast (rules + NER distilled large) | smoke | en | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-hu-smoke-fast` | pii-guard fast (rules + NER distilled large) | smoke | hu | recorded | `e394a06` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-comparison-en-ai4privacy-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | ai4privacy | en | recorded | `688b940` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 115.0 at start (machine not idle) | ≈ $0.53 |
+| 2026-10-27 | `2026-10-27-comparison-hu-ai4privacy-strict` | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | ai4privacy | hu | recorded | `688b940` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; LLM detector remote (Baseten Model APIs), one request at a time; load average 11.6 at start (machine not idle) | ≈ $0.60 |
 | 2026-10-27 | `2026-10-27-baseten-spark-open-hardened-en-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | en | imported | `9fad0fa` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.02 |
 | 2026-10-27 | `2026-10-27-baseten-spark-open-hardened-hu-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | hu | imported | `9fad0fa` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.08 |
 | 2026-10-27 | `2026-10-27-injection-spark-1.3` | pii-guard rules + Muse Spark 1.3 | injection | en, hu | imported | `9fad0fa` | local harness; the LLM detector is a remote API call | ≈ $0.02 |
@@ -214,10 +293,10 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-baseten-spark-open-hu-synth-sample` | pii-guard rules + Muse Spark Open (Baseten) | synth-sample | hu | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.07 |
 | 2026-10-27 | `2026-10-27-baseten-spark-open-en-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | en | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.02 |
 | 2026-10-27 | `2026-10-27-baseten-spark-open-hu-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | hu | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.08 |
-| 2026-10-27 | `2026-10-27-distilled-large-en-distill-dev` | pii-guard rules + NER (distilled large) | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
-| 2026-10-27 | `2026-10-27-distilled-large-hu-distill-dev` | pii-guard rules + NER (distilled large) | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
-| 2026-10-27 | `2026-10-27-distilled-large-en-smoke` | pii-guard rules + NER (distilled large) | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
-| 2026-10-27 | `2026-10-27-distilled-large-hu-smoke` | pii-guard rules + NER (distilled large) | smoke | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-en-distill-dev` | pii-guard fast (rules + NER distilled large) | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-hu-distill-dev` | pii-guard fast (rules + NER distilled large) | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-en-smoke` | pii-guard fast (rules + NER distilled large) | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-hu-smoke` | pii-guard fast (rules + NER distilled large) | smoke | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-distilled-base-en-distill-dev` | pii-guard rules + NER (distilled base) | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-distilled-base-hu-distill-dev` | pii-guard rules + NER (distilled base) | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-distilled-base-en-smoke` | pii-guard rules + NER (distilled base) | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
