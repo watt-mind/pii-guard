@@ -1,5 +1,5 @@
 {
-  "model": "/Users/hdkiller/Develop/.worktrees/pii-guard/LAB-1128/models/ner/pii-guard-ner-xlmr-large-distilled",
+  "model": "models/ner/pii-guard-ner-xlmr-large-distilled",
   "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
   "processor": "arm",
   "torch": "2.14.1",

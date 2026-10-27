@@ -1208,7 +1208,36 @@ teacher data for the NER, and the benchmark upper bound.
 - **Numbers:** none changed; this is a rename and a default.
 - **Cost:** $0.
 
-### 42. Turned, skewed and small-text images get masked (2026-10-27)
+### 42. A name found whole repairs the same name found in part (2026-10-27)
+
+LAB-1284, from milestone 39. When NER found only part of a name (`Placeholder` in the CSV
+row `1,Jane Placeholder`), the gateway sent `1,Jane [[PERSON_x]]` upstream, even when the same
+request had `Jane Placeholder` whole in the client letter. The second-pass sweep couldn't
+repair it: once the surname was a placeholder, the full name no longer matched.
+
+Now, before masking, a full name the gateway already knows widens the partial span. That's a
+name found elsewhere in the same request, confirmed earlier in the session, or pre-loaded. It
+has to occur around the span, matched the way the vault matches (word boundaries, any casing
+or Unicode form, Hungarian suffixes outside), and the longest name wins. Several fragments
+(`Jane` + `Placeholder`) become one span. A name is never widened into another span, so
+`Mark Jane Placeholder` with `Mark Jane` detected stays two values. Surname-first Hungarian
+(`Minta Jánosnak`) widens like English.
+
+| e2e harness, scripted mock, fast mode | Before | After |
+|---|---:|---:|
+| pi, NER v1 checkpoint: `gold_partial_upstream` | 1 | **0** |
+| Muse Code, NER v1 checkpoint: `gold_partial_upstream` | 2 | **0** |
+| pi / Muse Code, NER v2 (base + hard negatives): `gold_partial_upstream` | 0 / 0 | 0 / 0 |
+| Gold values upstream (all four runs) | 0 of 13 | 0 of 13 |
+| Gate suites: over-masking | unchanged | unchanged |
+
+- **NER v2 already finds these names whole** on the mini-repo, so the repair matters most
+  with weaker or other-language checkpoints. It's a guarantee rather than a model property.
+- **Muse Code:** the official installer now ships 1.4.14, but the harness is pinned to
+  1.4.13. These runs used 1.4.14 without changing the pin.
+- **Cost:** $0, all local.
+
+### 43. Turned, skewed and small-text images get masked (2026-10-27)
 
 LAB-1210, from the 2026-10-27 code review. **A document photographed sideways, upside down or
 at an angle went upstream with its text unmasked:** Tesseract read it in the default page mode,

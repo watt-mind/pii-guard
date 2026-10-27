@@ -9,7 +9,13 @@ import logging
 
 import pytest
 
-from pii_guard.detect.known import KNOWN_DETECTOR, KnownValuesDetector, merge_known
+from pii_guard.detect.known import (
+    KNOWN_DETECTOR,
+    KnownValuesDetector,
+    merge_known,
+    widen_request,
+    widen_to_known,
+)
 from pii_guard.detect.pipeline import DetectionPipeline, resolve_spans
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, Vault
@@ -303,3 +309,108 @@ def test_eval_known_values_uplift(tmp_path, capsys: pytest.CaptureFixture[str]) 
     assert json.dumps(known_card) != json.dumps(base)
     assert known_card["leak"]["rate"] == 0.0
     assert base["leak"]["rate"] > 0.5
+
+
+# --- LAB-1284: a known full value widens a partly detected name ------------------------------
+
+
+def _span(text: str, value: str, entity_type: EntityType = EntityType.PERSON, nth: int = 0) -> Span:
+    start = -1
+    for _ in range(nth + 1):
+        start = text.index(value, start + 1)
+    return Span(start, start + len(value), entity_type, value, 0.8, "ner")
+
+
+def test_csv_row_surname_widens_to_the_known_full_name() -> None:
+    text = "id,name,email\n1,Jane Placeholder,jane.placeholder@example.net"
+    email = _span(text, "jane.placeholder@example.net", EntityType.EMAIL)
+    out = widen_to_known(text, [_span(text, "Placeholder"), email], ["Jane Placeholder"], "en")
+    assert texts(out) == ["Jane Placeholder", "jane.placeholder@example.net"]
+    assert out[0].entity_type is EntityType.PERSON
+    assert out[0].detector == "ner"
+
+
+def test_list_item_first_name_widens_to_the_known_full_name() -> None:
+    text = "Attendees:\n- John Sample\n- Jane Placeholder"
+    out = widen_to_known(text, [_span(text, "John")], ["John Sample", "Jane Placeholder"], "en")
+    assert texts(out) == ["John Sample"]
+
+
+def test_fragments_of_one_name_become_one_span() -> None:
+    text = "Signed: Jane Placeholder."
+    spans = [_span(text, "Jane"), _span(text, "Placeholder")]
+    assert texts(widen_to_known(text, spans, ["Jane Placeholder"], "en")) == ["Jane Placeholder"]
+
+
+def test_hungarian_surname_first_and_inflected() -> None:
+    text = "Minta Jánosnak írtunk; Minta János válaszolt, MINTA JÁNOS aláírta."
+    spans = [_span(text, "Jánosnak"), _span(text, "János", nth=1), _span(text, "JÁNOS")]
+    out = widen_to_known(text, spans, ["Minta János"], "hu")
+    # The suffix stays in the span: the vault splits it off.
+    assert texts(out) == ["Minta Jánosnak", "Minta János", "MINTA JÁNOS"]
+
+
+def test_no_widening_across_a_different_person() -> None:
+    text = "Mark Jane Placeholder"
+    spans = [_span(text, "Mark Jane"), _span(text, "Placeholder")]
+    assert widen_to_known(text, spans, ["Jane Placeholder"], "en") == spans
+
+
+def test_neighbouring_known_people_stay_apart() -> None:
+    text = "John Sample, Jane Placeholder"
+    spans = [_span(text, "Sample"), _span(text, "Jane")]
+    out = widen_to_known(text, spans, ["John Sample", "Jane Placeholder"], "en")
+    assert texts(out) == ["John Sample", "Jane Placeholder"]
+
+
+def test_the_matching_full_value_wins_not_another_with_the_same_first_name() -> None:
+    text = "Jane Doe called."
+    out = widen_to_known(text, [_span(text, "Jane")], ["Jane Placeholder", "Jane Doe"], "en")
+    assert texts(out) == ["Jane Doe"]
+
+
+def test_no_widening_without_an_occurrence_or_into_other_types() -> None:
+    text = "Ms Placeholder and Jane at Placeholder Ltd."
+    org = _span(text, "Placeholder Ltd", EntityType.ORGANIZATION)
+    spans = [_span(text, "Placeholder"), _span(text, "Jane"), org]
+    assert widen_to_known(text, spans, ["Jane Placeholder"], "en") == spans
+    # Only PERSON spans widen; a one-word value widens nothing.
+    text = "1,Jane Placeholder"
+    org_only = [_span(text, "Placeholder", EntityType.ORGANIZATION)]
+    assert widen_to_known(text, org_only, ["Jane Placeholder"], "en") == org_only
+    assert widen_to_known(text, [_span(text, "Jane")], ["Jane"], "en") == [_span(text, "Jane")]
+
+
+def test_longest_known_value_wins() -> None:
+    text = "1,Jane Ann Placeholder"
+    out = widen_to_known(
+        text, [_span(text, "Placeholder")], ["Ann Placeholder", "Jane Ann Placeholder"], "en"
+    )
+    assert texts(out) == ["Jane Ann Placeholder"]
+
+
+def test_widen_request_uses_full_values_from_the_other_texts() -> None:
+    row, letter = "1,Jane Placeholder,x", "Dear Jane Placeholder,"
+    out = widen_request(
+        [row, letter], [[_span(row, "Placeholder")], [_span(letter, "Jane Placeholder")]], (), "en"
+    )
+    assert [texts(spans) for spans in out] == [["Jane Placeholder"], ["Jane Placeholder"]]
+
+
+def test_session_values_lists_confirmed_and_preloaded_values() -> None:
+    session = Vault(tenant_key=KEY).session()
+    session.mask("Jane Placeholder", [Span(0, 16, EntityType.PERSON, "Jane Placeholder", 1, "x")])
+    session.known_values.add(known(("Minta János", "PERSON"), ("ACME Kft.", "ORGANIZATION")))
+    assert session.confirmed_values([EntityType.PERSON]) == ["Jane Placeholder", "Minta János"]
+
+
+def test_vault_masks_the_widened_row_with_one_placeholder() -> None:
+    session = Vault(tenant_key=KEY).session()
+    row, letter = "1,Jane Placeholder,x", "Dear Jane Placeholder,"
+    spans = widen_request(
+        [row, letter], [[_span(row, "Placeholder")], [_span(letter, "Jane Placeholder")]], (), "en"
+    )
+    masked = [session.mask(t, s, language="en") for t, s in zip([row, letter], spans, strict=True)]
+    tokens = [PLACEHOLDER_RE.search(m).group(0) for m in masked]
+    assert masked[0] == f"1,{tokens[0]},x"
+    assert tokens[0] == tokens[1]
