@@ -1,26 +1,16 @@
 import type { EntityType, ImageAnalysis, ImageRegion } from "../api/types";
 import { DETECTOR_TYPES, detectorLabel, metaFor } from "./entities";
 
-/** Outline colour per type, matching the swatches in ENTITY_META (Tailwind 500/400). */
-export const REGION_COLOR: Record<EntityType, string> = {
-  PERSON: "#8b5cf6",
-  ADDRESS: "#f59e0b",
-  EMAIL: "#0ea5e9",
-  PHONE: "#14b8a6",
-  DATE_OF_BIRTH: "#f43f5e",
-  NATIONAL_ID_HU_TAX: "#6366f1",
-  NATIONAL_ID_HU_TAJ: "#d946ef",
-  ID_DOCUMENT: "#f97316",
-  BANK_ACCOUNT: "#10b981",
-  COMPANY_ID_HU: "#94a3b8",
-  ORGANIZATION: "#a8a29e",
-  PARCEL_NUMBER_HU: "#84cc16",
-  VEHICLE_PLATE: "#06b6d4",
-  FACE: "#ec4899",
-  SIGNATURE: "#a855f7",
-  ID_PHOTO: "#ef4444",
-  STAMP: "#a1a1aa",
-};
+/**
+ * Outline colour of a region box, by what happened to it (not by type: the type is written on
+ * the box). Drawn over the image itself, which is a light document in either theme, so these
+ * tokens are the same in both themes.
+ */
+export function regionColor(region: Pick<ImageRegion, "policy">): string {
+  return region.policy === "mask" ? "var(--region-mask)" : "var(--region-kept)";
+}
+
+export const tint = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
 /** The server grows every filled box by this many pixels; the demo drawing does the same. */
 export const MASK_PADDING = 2;

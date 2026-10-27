@@ -1,6 +1,6 @@
 import type { EntityType, MaskResponse, PublicSpan } from "../api/types";
 import { codePointIndex } from "./codepoints";
-import { detectorLabel, metaFor } from "./entities";
+import { CHECKSUM_TYPES, detectorLabel, metaFor } from "./entities";
 import { alignRestored, tokenize } from "./placeholders";
 
 /** A detected span in UTF-16 indices, ready to slice a JS string. */
@@ -186,7 +186,14 @@ export function describeSpan(span: LocalSpan): string {
 export function detectorsUsed(spans: readonly LocalSpan[]): string[] {
   const byDetector = new Map<string, EntityType[]>();
   for (const s of spans) byDetector.set(s.detector, [...(byDetector.get(s.detector) ?? []), s.entityType]);
-  return [...byDetector].map(([detector, types]) => detectorLabel(detector, { types }));
+  return [...byDetector].map(([detector, types]) => {
+    // "Rules + checksum" for nine values when three were checksum-validated overstates it.
+    if (detector === "rules") {
+      const checked = types.filter((t) => CHECKSUM_TYPES.has(t)).length;
+      if (checked > 0 && checked < types.length) return `Rules (${checked} checksum-validated)`;
+    }
+    return detectorLabel(detector, { types });
+  });
 }
 
 export function joinList(items: readonly string[]): string {

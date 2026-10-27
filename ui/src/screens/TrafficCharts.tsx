@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { TrafficEvent } from "../api/traffic";
 import type { EntityType } from "../api/types";
-import { metaFor } from "../lib/entities";
+import { ENTITY_GROUPS, groupOf, metaFor } from "../lib/entities";
 import {
   OWN_STAGES,
   STAGE_HINT,
@@ -36,6 +36,10 @@ const STAGE_COLOR: Record<OwnStage | "upstream" | "other", string> = {
   other: "var(--stage-other)",
 };
 
+// The waterfall labels every row, so pii-guard's own stages share one neutral bar and only the
+// model's time (hatched) stands apart: no hue here that could be read as masked or restored.
+const OWN_BAR = "color-mix(in oklab, var(--ink) 58%, var(--surface))";
+
 function niceCeil(v: number): number {
   if (!(v > 0)) return 1;
   const p = 10 ** Math.floor(Math.log10(v));
@@ -65,14 +69,13 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
         {w.rows.map((r) => (
           <li key={r.key} className="grid grid-cols-[5.5rem_1fr_4.25rem] items-center gap-2 text-xs sm:grid-cols-[8.5rem_1fr_5rem]">
             <span className="flex min-w-0 items-center gap-1.5 text-ink">
-              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm" style={{ background: STAGE_COLOR[r.key] }} />
               <span className="truncate" title={STAGE_HINT[r.key]}>
                 {r.label}
               </span>
             </span>
-            <span aria-hidden="true" className="relative h-4 rounded-sm bg-surface-2 ring-1 ring-line ring-inset">
+            <span aria-hidden="true" className="relative h-3.5 rounded-sm bg-surface-2">
               <span
-                className="absolute inset-y-0.5 min-w-[3px] rounded-[3px]"
+                className="absolute inset-y-0.5 min-w-[3px] rounded-sm"
                 title={`${r.label}: ${formatMsShort(r.ms)}, from ${formatMsShort(r.start)}`}
                 style={{
                   left: pct(r.start),
@@ -82,7 +85,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
                       ? `repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink) 22%, transparent) 0 3px, transparent 3px 6px), ${STAGE_COLOR.upstream}`
                       : r.kind === "other"
                         ? `repeating-linear-gradient(45deg, ${STAGE_COLOR.other} 0 2px, transparent 2px 5px)`
-                        : STAGE_COLOR[r.key],
+                        : OWN_BAR,
                 }}
               />
               {r.kind === "upstream" && r.ttfbMs ? (
@@ -125,7 +128,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
 function Figure({ label, value, strong, testId }: { label: string; value: string; strong?: boolean; testId?: string }) {
   return (
     <div className="flex flex-col-reverse">
-      <dt className="mt-0.5 text-[11px] tracking-wide text-faint uppercase">{label}</dt>
+      <dt className="mt-0.5 text-2xs text-muted">{label}</dt>
       <dd data-testid={testId} className={["text-lg leading-none font-semibold tabular-nums", strong ? "text-guard" : "text-ink"].join(" ")}>
         {value}
       </dd>
@@ -219,7 +222,7 @@ export function OverheadChart({ events }: { events: TrafficEvent[] }) {
       {h && hover !== null && (
         <div
           role="presentation"
-          className="pointer-events-none absolute top-0 z-10 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs shadow-md"
+          className="pointer-events-none absolute top-0 z-10 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs"
           style={{ left: Math.min(Math.max(sx(hover) - 70, 0), width - 150) }}
         >
           <p className="font-semibold text-ink tabular-nums">This call {formatMsShort(h.overhead)}</p>
@@ -340,7 +343,16 @@ export function EntitiesChart({ events, now }: { events: TrafficEvent[]; now: nu
   const total = buckets.reduce((s, b) => s + b.total, 0);
   if (!total) return <ChartEmpty>No values masked in the last 10 minutes.</ChartEmpty>;
   const max = niceCeil(Math.max(...buckets.map((b) => b.total)));
-  const types = [...new Set(buckets.flatMap((b) => Object.keys(b.counts) as EntityType[]))].sort();
+  // Seventeen entity types fold into five fixed families, so each keeps one categorical slot.
+  const byGroup = (counts: Partial<Record<EntityType, number>>) => {
+    const out = new Map<string, number>();
+    for (const [t, n] of Object.entries(counts) as [EntityType, number][]) {
+      if (n) out.set(groupOf(t).id, (out.get(groupOf(t).id) ?? 0) + n);
+    }
+    return out;
+  };
+  const present = new Set(buckets.flatMap((b) => [...byGroup(b.counts).keys()]));
+  const groups = ENTITY_GROUPS.filter((g) => present.has(g.id));
   const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return (
     <div>
@@ -349,23 +361,25 @@ export function EntitiesChart({ events, now }: { events: TrafficEvent[]; now: nu
           <span>{max}</span>
           <span>0</span>
         </div>
-        <ol aria-label={`Values masked per minute by type, last 10 minutes: ${total} in total`} className="flex h-40 flex-1 items-end gap-1 border-b border-line">
+        <ol aria-label={`Values masked per minute by kind, last 10 minutes: ${total} in total`} className="flex h-40 flex-1 items-end gap-0.5 border-b border-line-strong">
           {buckets.map((b) => {
-            const label = b.total
-              ? types
-                  .filter((t) => b.counts[t])
-                  .map((t) => `${metaFor(t).label} ${b.counts[t]}`)
-                  .join(", ")
-              : "none";
+            const g = byGroup(b.counts);
+            const types = (Object.keys(b.counts) as EntityType[]).filter((t) => b.counts[t]).sort();
+            const label = b.total ? types.map((t) => `${metaFor(t).label} ${b.counts[t]}`).join(", ") : "none";
             return (
-              <li key={b.minute} className="flex h-full min-w-0 flex-1 flex-col-reverse gap-px" title={`${hhmm(b.minute)}: ${label}`}>
+              <li key={b.minute} className="flex h-full min-w-0 flex-1 flex-col-reverse gap-0.5" title={`${hhmm(b.minute)}: ${label}`}>
                 <span className="sr-only">
                   {hhmm(b.minute)}: {label}
                 </span>
-                {types
-                  .filter((t) => b.counts[t])
-                  .map((t) => (
-                    <span key={t} aria-hidden="true" className={["w-full shrink-0 last:rounded-t-[3px]", metaFor(t).swatch].join(" ")} style={{ height: `${((b.counts[t] ?? 0) / max) * 100}%` }} />
+                {groups
+                  .filter((grp) => g.get(grp.id))
+                  .map((grp) => (
+                    <span
+                      key={grp.id}
+                      aria-hidden="true"
+                      className="w-full shrink-0 last:rounded-t-sm"
+                      style={{ height: `${((g.get(grp.id) ?? 0) / max) * 100}%`, background: grp.color }}
+                    />
                   ))}
               </li>
             );
@@ -376,11 +390,11 @@ export function EntitiesChart({ events, now }: { events: TrafficEvent[]; now: nu
         <span>{hhmm(buckets[0]!.minute)}</span>
         <span>{hhmm(buckets[buckets.length - 1]!.minute)}</span>
       </div>
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-label="Entity types">
-        {types.map((t) => (
-          <li key={t} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className={["size-2.5 rounded-sm", metaFor(t).swatch].join(" ")} />
-            {metaFor(t).label}
+      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-label="Kinds of value">
+        {groups.map((grp) => (
+          <li key={grp.id} className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="size-2.5 rounded-sm" style={{ background: grp.color }} />
+            {grp.label}
           </li>
         ))}
       </ul>

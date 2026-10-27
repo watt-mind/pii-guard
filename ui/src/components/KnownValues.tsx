@@ -26,18 +26,21 @@ export function KnownValues({ rows, onRows, counts, error, onTry, found }: Props
   const set = (id: number, patch: Partial<KnownRow>) => onRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
   return (
-    <details className="group rounded-2xl border border-line bg-surface" open={rows.length > 0 || undefined}>
+    <details className="group rounded-xl border border-line bg-surface" open={rows.length > 0 || undefined}>
       <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden">
         <span>
-          <span className="block text-sm font-semibold text-ink">
+          <span className="block text-sm font-medium text-ink">
             Known values{used.length > 0 && <span className="ml-1.5 font-normal text-muted">({used.length})</span>}
           </span>
           <span className="block text-xs text-muted">
             Tell the guard about values you already know are sensitive (a customer record). They are masked in any inflected form, even when no detector finds them.
           </span>
         </span>
-        <span aria-hidden="true" className="text-xs text-muted">
-          <span className="group-open:hidden">Show</span>
+        <span aria-hidden="true" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-medium text-ink group-hover:border-line-strong">
+          <svg viewBox="0 0 16 16" className="size-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+          <span className="group-open:hidden">Add values</span>
           <span className="hidden group-open:inline">Hide</span>
         </span>
       </summary>

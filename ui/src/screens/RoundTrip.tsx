@@ -139,10 +139,10 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
     <div className="space-y-6">
       <RoundTripIntro live={result.engine === "api"} />
 
-      <details className="group rounded-2xl border border-model/25 bg-surface">
+      <details className="group rounded-xl border border-model/25 bg-surface">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden">
           <span>
-            <span className="block text-[11px] font-semibold tracking-[0.08em] text-model uppercase">Sent to the model</span>
+            <span className="block font-mono text-2xs text-model">Sent to the model</span>
             <span className="block text-sm font-semibold text-ink">
               What the model saw{sample ? ` · ${sample.subtitle}` : ""}
             </span>
@@ -379,13 +379,13 @@ function ChunkStream({ chunks, held }: { chunks: readonly string[]; held: string
       {chunks.map((c, i) => (
         <span
           key={i}
-          className="animate-chunk rounded-[3px] px-px text-ink odd:bg-model-soft even:bg-surface-2 [box-shadow:inset_-1px_0_0_var(--line-strong)]"
+          className="animate-chunk rounded-sm px-px text-ink odd:bg-model-soft even:bg-surface-2 [box-shadow:inset_-1px_0_0_var(--line-strong)]"
         >
           {c}
         </span>
       ))}
       {held && (
-        <span className="ml-1 inline-flex translate-y-[-1px] items-center gap-1 rounded bg-warn-soft px-1.5 font-sans text-[11px] font-semibold text-warn ring-1 ring-warn/40">
+        <span className="ml-1 inline-flex translate-y-[-1px] items-center gap-1 rounded bg-warn-soft px-1.5 font-sans text-2xs font-semibold text-warn ring-1 ring-warn/40">
           held back
         </span>
       )}
