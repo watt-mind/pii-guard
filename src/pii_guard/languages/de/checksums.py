@@ -68,7 +68,11 @@ def is_valid_sv_number(value: str) -> bool:
     must be 02-89.
     """
     value = value.replace(" ", "")
-    if len(value) != 12 or not value[:8].isdigit() or not value[9:].isdigit():
+    # ``isdigit()`` alone accepts any script's digits (and superscripts), which the arithmetic
+    # below rejects: only ASCII digits are a Versicherungsnummer, and this never raises.
+    if len(value) != 12 or not value.isascii():
+        return False
+    if not value[:8].isdigit() or not value[9:].isdigit():
         return False
     if not ("A" <= value[8] <= "Z"):
         return False
