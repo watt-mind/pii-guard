@@ -21,8 +21,8 @@ export interface Sample {
 export const SAMPLES: Sample[] = [
   {
     id: "contract",
-    title: "Adásvételi szerződés",
-    subtitle: "Property sale contract",
+    title: "Property sale contract",
+    subtitle: "Hungarian · Adásvételi szerződés",
     language: "hu",
     task: "Summarise the parties and the payment terms in English.",
     text: `ADÁSVÉTELI SZERZŐDÉS
@@ -47,8 +47,8 @@ Next step: {{Somogyi Ádám}} countersigns. You can reach him on {{+36 30 555 01
   },
   {
     id: "claim",
-    title: "Kárbejelentő e-mail",
-    subtitle: "Insurance claim email",
+    title: "Insurance claim email",
+    subtitle: "Hungarian · Kárbejelentő e-mail",
     language: "hu",
     task: "Turn this into a structured claim summary for the insurer.",
     text: `Tárgy: Kárbejelentés – AAB-123 rendszámú gépjármű
@@ -71,8 +71,8 @@ Policyholder {{Takács Gábor}} reports that the car {{AAB-123}} was damaged on 
   },
   {
     id: "referral",
-    title: "Beutaló",
-    subtitle: "Medical referral",
+    title: "Medical referral",
+    subtitle: "Hungarian · Beutaló",
     language: "hu",
     task: "Write a short English handover note for the cardiology desk.",
     text: `BEUTALÓ – kardiológiai szakrendelésre

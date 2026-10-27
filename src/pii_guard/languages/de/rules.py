@@ -31,7 +31,14 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 
-from pii_guard.detect.rules._base import NUM_END, NUM_START, Rule, _Hit, context_before
+from pii_guard.detect.rules._base import (
+    NUM_END,
+    NUM_START,
+    Rule,
+    _Hit,
+    context_before,
+    legal_form_after,
+)
 from pii_guard.languages.de.checksums import is_valid_steuer_id, is_valid_sv_number
 from pii_guard.types import EntityType
 
@@ -146,6 +153,8 @@ def _find_postcode(text: str) -> Iterator[_Hit]:
     for m in _POSTCODE_RE.finditer(text):
         if m.group("line").split()[-1].casefold() in _NOT_PLACES:
             continue
+        if legal_form_after(text, m.end("line")):
+            continue  # "10115 Berlin GmbH": a company name, not an address line (LAB-1227)
         yield _Hit(m.start("line"), m.end("line"), EntityType.ADDRESS, 0.7)
 
 

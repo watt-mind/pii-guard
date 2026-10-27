@@ -21,7 +21,7 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
       aria-labelledby={headingId}
       data-side={side}
       className={[
-        "flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-surface shadow-[0_1px_0_rgb(0_0_0/0.03),0_12px_32px_-16px_rgb(0_0_0/0.18)]",
+        "flex min-w-0 flex-col overflow-hidden rounded-xl border bg-surface",
         side === "model" ? "border-model/25" : "border-line",
         className,
       ].join(" ")}
@@ -35,14 +35,14 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
         <div className="min-w-[11rem] flex-1">
           <p
             className={[
-              "flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase",
+              "flex items-center gap-1.5 font-mono text-2xs",
               side === "model" ? "text-model" : "text-guard",
             ].join(" ")}
           >
             <SideIcon side={side} />
             {eyebrow}
           </p>
-          <h2 id={headingId} className="text-base font-semibold tracking-tight text-balance text-ink">
+          <h2 id={headingId} className="mt-0.5 text-base font-semibold tracking-tight text-balance text-ink">
             {title}
           </h2>
         </div>

@@ -17,13 +17,13 @@ export function Boundary({ direction, label, children }: Props) {
       className="boundary-rail relative flex items-center justify-center py-2 lg:w-28 lg:flex-col lg:py-0"
     >
       <div className="relative z-10 flex flex-col items-center gap-2 bg-canvas px-2 py-2 text-center">
-        <span className="grid size-10 place-items-center rounded-full border border-guard/40 bg-guard-soft text-guard shadow-sm">
+        <span className="grid size-9 place-items-center rounded-full border border-guard/40 bg-guard-soft text-guard">
           <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
             <path d="M12 3 5 6v5.2c0 4.3 2.9 8 7 9.3 4.1-1.3 7-5 7-9.3V6l-7-3Z" />
             <path d="M8.8 12h6.4" strokeLinecap="round" />
           </svg>
         </span>
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-guard uppercase">pii-guard</span>
+        <span className="font-mono text-2xs font-medium text-guard">pii-guard</span>
         <span aria-hidden="true" className="text-lg leading-none text-faint">
           <span className="lg:hidden">↓</span>
           <span className="hidden lg:inline">→</span>

@@ -157,7 +157,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
               )
             ) : (
               <>
-                Start the API with <code className="rounded bg-surface px-1 font-mono text-xs">uv run pii-guard serve</code> for the real pipeline.
+                Start the API with <code className="rounded-sm bg-surface px-1 font-mono text-xs">uv run pii-guard serve</code> for the real pipeline.
               </>
             )}
           </p>
@@ -214,7 +214,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
           />
         </div>
         <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={screen !== "images"}>
-          <Images client={engine.client} engineState={engine.state} loadImage={loadImage} />
+          <Images client={engine.client} engineState={engine.state} loadImage={loadImage} onUseDemo={() => engine.setPreference("mock")} />
         </div>
         <div id="panel-benchmarks" role="tabpanel" aria-labelledby="tab-benchmarks" hidden={screen !== "benchmarks"}>
           {benchmarksOpened && <Benchmarks load={loadBenchmarks} />}
@@ -225,7 +225,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
       </main>
 
       <footer className="mx-auto max-w-[1440px] px-4 pb-10 text-xs text-faint sm:px-6">
-        All sample data is fictional. This page only talks to pii-guard and never calls a model provider itself (SAM 3.1 is called by the pii-guard server); on the Chat screen the model is real only when the API runs with an upstream; the document replay and demo mode use a simulated answer.
+        All sample data is fictional. This page talks only to pii-guard, never to a model provider: SAM 3.1 is called by the pii-guard server. The Chat model is real only when the API runs with an upstream; the document replay and demo mode use a simulated answer.
       </footer>
     </div>
   );

@@ -22,7 +22,7 @@ Baseten leak 0.9 % and 0.0 %, at a median 1.2–1.8 s and about $2–2.50 per 1,
 fast mode with no LLM call (rules plus a small NER model distilled from Muse Glimmer) gets
 Hungarian down to 0.9 % and English to 0.0 % at tens of milliseconds per message. On a public benchmark
 (Ai4Privacy OpenPII, 600 documents, milestone 24) strict mode leaks 3.9 %. Fast mode leaked
-38.0 % there, and 27.6 % after the cue-word and detection fixes (milestones 28–31). With NER v2 (milestone 36),
+38.0 % there, and 27.6 % after the cue-word and detection fixes (milestones 28–31). With NER v2 (milestone 37),
 fast mode leaks 0.4 %, a result measured in-distribution. A v2 model that never saw an
 Ai4Privacy row leaks 12.5 %.
 
@@ -30,7 +30,7 @@ Ai4Privacy row leaks 12.5 %.
 |---|---|---|---:|---:|---:|---:|---|
 | Hungarian | strict | rules + Muse Spark Open (Baseten, `low`) | **0.9 %** | 98.4 | 1.8 s | 2.42 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md), `hu-smoke` (31 docs) |
 | English | strict | rules + Muse Spark Open (Baseten, `low`) | **0.0 %** | 97.1 | 1.2 s | 1.99 | same, `en-smoke` (10 docs) |
-| Hungarian | fast | rules + NER v2 base + hard negatives (milestone 36) | **0.0 %** | 93.3 | 18 ms (MPS), 44 ms (CPU) | no API call | [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md), `hu-smoke` (31 docs) |
+| Hungarian | fast | rules + NER v2 base + hard negatives (milestone 37) | **0.0 %** | 93.3 | 18 ms (MPS), 44 ms (CPU) | no API call | [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md), `hu-smoke` (31 docs) |
 | English | fast | same | **0.0 %** | 94.2 | 14 ms (MPS) | no API call | same, `en-smoke` (10 docs) |
 | either | none | rules only (baseline) | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [distilled/rules/](../eval/results/ner/distilled/rules/) `hu-smoke.md`, `en-smoke.md` |
 
@@ -1003,7 +1003,38 @@ client's contact details.
 - New: `GET /v1/models` and [docs/integrations/](integrations/README.md).
 - **Cost:** $0. About 20 requests over three runs on free Meta API credits; the rest ran locally.
 
-### 36. NER v2: fast mode stops leaking numbers (2026-10-27)
+### 36. Ticket numbers, SKUs and company names are not tax IDs, cards or postcodes (2026-10-27)
+
+LAB-1227, the follow-up of milestone 31. LAB-1205 stopped a context-free TAJ from firing
+right after an order or invoice label, an ID prefix or a currency, but other checksum rules
+still did: a valid ten-digit number after `ticket` came out as a Hungarian tax ID (mod 11
+and a leading 8), `SKU 4111111111111111` as a card (a Luhn check passes for 1 in 10 numbers)
+and the `1999` of `1999 Budapest Kft.` as a postcode, although the settlement is part of a
+company name.
+
+The same guard now covers a context-free tax ID, a payment card without a card or account cue
+nearby (`card`, `kártya`, `Visa`, `számlaszám` ...) and a Hungarian postcode after a reference
+label; a postcode followed by its settlement and a legal form (`Kft.`, `Zrt.`, `Bt.`, `GmbH`,
+`Ltd`, with up to two more words of the name in between) is not a postcode, and neither is a
+German address line before `GmbH`. Only the context-free hit is dropped: a cued value
+(`adóazonosító`, `irányítószám`, `H-1999`, a card cue in the window) always wins, and
+a tax ID after a name and a comma, with no label, is still masked.
+
+- **Probe:** the three cases of the reviewers' `probe3.py` now come out empty; the other 16
+  inputs are unchanged.
+- **Look-alikes:** 38 new regression texts of ticket, tracking, SKU and invoice numbers and
+  company names (en, hu, de). The rules masked 36 of them before and none now; 34 more tests
+  pin down that cued values and plain postcodes are still found, and test the legal-form
+  matcher.
+- **No regression:** the smoke, Ai4Privacy and negative-set scorecards are identical before
+  and after, in rules and fast mode (local NER checkpoint): fast-mode leak 0.6 % on smoke and
+  27.6 % on Ai4Privacy, 0 false positives on the 38 negative documents. Run records
+  `2026-10-27-reference-cues-{before,after}-{smoke,ai4privacy,negative}-{rules,fast}`.
+- **Not changed:** a valid 16-digit giro number (two mod-10 checks, 1 in 100) after a
+  reference label is still masked, as is a company tax number after `Ügyszám`.
+- **Cost:** $0; everything ran locally.
+
+### 37. NER v2: fast mode stops leaking numbers (2026-10-27)
 
 PR [#80](https://github.com/watt-mind/pii-guard/pull/80), LAB-1150. After milestones 28–31, fast mode still leaked 27.6 % on the public Ai4Privacy sample.
 The cause was mostly the identifiers the rules can't validate, and the NER had no number types

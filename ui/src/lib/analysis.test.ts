@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMockClient } from "../api/mock";
 import { SAMPLES } from "../content/samples";
-import { fillAnswerTemplate, genericAnswer, linkPlaceholders, toLocalSpans, type PlaceholderLink } from "./analysis";
+import { detectorsUsed, fillAnswerTemplate, genericAnswer, linkPlaceholders, toLocalSpans, type LocalSpan, type PlaceholderLink } from "./analysis";
 
 /** Every original value that was masked must be absent from the simulated answer. */
 function maskedValues(input: string, links: readonly PlaceholderLink[]): string[] {
@@ -62,5 +62,14 @@ describe("attachPlaceholders with a trimmed title", () => {
     expect(linked!.placeholder).toBe("[[PERSON_ab12]]");
     expect(isKept({ ...span })).toBe(false);
     expect(isKept({ ...span, policy: undefined })).toBe(true);
+  });
+});
+
+describe("detectorsUsed", () => {
+  const span = (entityType: LocalSpan["entityType"], detector = "rules"): LocalSpan => ({ start: 0, end: 1, entityType, score: 0.9, detector, placeholder: null });
+  it("says how many rule hits were checksum-validated instead of labelling them all", () => {
+    expect(detectorsUsed([span("EMAIL"), span("PHONE"), span("BANK_ACCOUNT")])).toEqual(["Rules (1 checksum-validated)"]);
+    expect(detectorsUsed([span("BANK_ACCOUNT"), span("NATIONAL_ID_HU_TAX")])).toEqual(["Rules + checksum"]);
+    expect(detectorsUsed([span("EMAIL"), span("PERSON", "ner")])).toEqual(["Rules", "Multilingual NER"]);
   });
 });
