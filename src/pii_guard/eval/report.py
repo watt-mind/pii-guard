@@ -120,7 +120,7 @@ def _summary_row(name: str, block: dict[str, Any]) -> str:
         _pct(leak["partial_rate"]),
         _pct(over["rate"]),
         _pct(block["roundtrip"]["rate"]),
-        _pct(block.get("consistency", {}).get("rate")),
+        _pct((block.get("consistency") or {}).get("rate")),
         _ms(block["latency_ms"]["detect"]["p50"]),
         _ms(block["latency_ms"]["detect"]["p95"]),
     ]

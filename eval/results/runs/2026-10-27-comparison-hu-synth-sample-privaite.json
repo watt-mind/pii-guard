@@ -10,6 +10,11 @@
   "notes": [
     "unmapped tool labels: SECRET"
   ],
+  "rescored": {
+    "by": "LAB-1213",
+    "method": "no-consistency",
+    "note": "Placeholder consistency set to null: the tool doesn't report its replacements, so the 0.0 it had was a placeholder, not a measurement."
+  },
   "code": {
     "commit": "8944f96f0da38a412793df6396623849d070feac",
     "dirty": true,
@@ -141,14 +146,7 @@
         "exact": 15,
         "rate": 0.75
       },
-      "consistency": {
-        "entities": 172,
-        "consistent": 0,
-        "multi_occurrence": 33,
-        "multi_consistent": 0,
-        "rate": 0.0,
-        "multi_rate": 0.0
-      },
+      "consistency": null,
       "latency_ms": {
         "detect": {
           "p50": 472.91,
@@ -398,14 +396,7 @@
           "exact": 15,
           "rate": 0.75
         },
-        "consistency": {
-          "entities": 172,
-          "consistent": 0,
-          "multi_occurrence": 33,
-          "multi_consistent": 0,
-          "rate": 0.0,
-          "multi_rate": 0.0
-        },
+        "consistency": null,
         "latency_ms": {
           "detect": {
             "p50": 472.91,

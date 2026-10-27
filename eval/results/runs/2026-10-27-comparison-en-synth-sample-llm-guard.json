@@ -8,6 +8,11 @@
   "imported_from": null,
   "title": "LLM Guard (comparison) on synth-sample",
   "notes": [],
+  "rescored": {
+    "by": "LAB-1213",
+    "method": "no-consistency",
+    "note": "Placeholder consistency set to null: the tool doesn't report its replacements, so the 0.0 it had was a placeholder, not a measurement."
+  },
   "code": {
     "commit": "8944f96f0da38a412793df6396623849d070feac",
     "dirty": true,
@@ -140,14 +145,7 @@
         "exact": 10,
         "rate": 1.0
       },
-      "consistency": {
-        "entities": 80,
-        "consistent": 0,
-        "multi_occurrence": 15,
-        "multi_consistent": 0,
-        "rate": 0.0,
-        "multi_rate": 0.0
-      },
+      "consistency": null,
       "latency_ms": {
         "detect": {
           "p50": 106.502,
@@ -336,14 +334,7 @@
           "exact": 10,
           "rate": 1.0
         },
-        "consistency": {
-          "entities": 80,
-          "consistent": 0,
-          "multi_occurrence": 15,
-          "multi_consistent": 0,
-          "rate": 0.0,
-          "multi_rate": 0.0
-        },
+        "consistency": null,
         "latency_ms": {
           "detect": {
             "p50": 106.502,

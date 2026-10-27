@@ -8,6 +8,15 @@ public benchmark nobody here wrote. Every number below is in `scorecards/` and i
 records `eval/results/runs/2026-10-27-comparison-*.json`
 ([benchmarks.md](../../../docs/benchmarks.md) and its charts are generated from them).
 
+> **Re-scored (LAB-1213).** The tables below are the scorecards as the runs wrote them. The
+> run records were later re-scored from their own counts, a change of scoring method and not
+> a new run: on `*-ai4privacy`, `DATE_OF_BIRTH` predictions are no longer scored (the set
+> labels every date `DATE`, which pii-guard's policy excludes), which raises precision and
+> lowers over-masking for fast, strict, Presidio and PrivAiTe (these fast runs pooled: precision 81.5 →
+> 91.8 %, over-masking 14.1 → 2.8 %); and the tools' placeholder consistency is `null`
+> instead of a placeholder 0.0. Leak and recall are unchanged.
+> [benchmarks.md](../../../docs/benchmarks.md) has the re-scored numbers.
+
 ## Systems
 
 | System | What runs |

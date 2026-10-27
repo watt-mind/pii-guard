@@ -3,7 +3,7 @@
 ```
 python -m pii_guard.eval.public.ai4privacy fetch [--sample en=200,hu=200,de=200] [--seed 2026]
     [--out data/public/ai4privacy] [--manifest eval/fixtures/public/ai4privacy-openpii-1m.json]
-python -m pii_guard.eval.public.ai4privacy fetch --check   # rebuild and compare with the manifest
+python -m pii_guard.eval.public.ai4privacy fetch --check   # rebuild and compare, write nothing
 ```
 
 `ai4privacy/pii-masking-openpii-1m <https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m>`_
@@ -20,7 +20,10 @@ first *n* that convert cleanly are taken, so the sample doesn't depend on file o
 **Labels.** :data:`LABEL_MAP` maps the dataset's 19 labels to pii-guard types. Labels that
 pii-guard's policy doesn't mask (any date, age, gender, sex, title, and a city on its own) are
 *policy-excluded*: left out of the gold spans, so they are neither leaks nor recall, and
-counted per label in the manifest. Adjacent spans of the same mapped type separated only by
+counted per label in the manifest. Each one is kept as an *ignore region* (``meta.ignore``:
+offsets and dataset label, no value), so a prediction on it that matches no gold span is
+neither credited nor charged in precision and over-masking
+(:func:`pii_guard.eval.scorer.unscored`). Adjacent spans of the same mapped type separated only by
 spaces or a comma (a given name and a surname; a street and a building number) are merged
 into one span, as pii-guard labels a whole name or address. Documents are never printed;
 errors name the row id only.
@@ -34,6 +37,7 @@ import heapq
 import json
 import re
 import sys
+import tempfile
 import urllib.request
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -55,6 +59,7 @@ __all__ = [
     "LABEL_MAP",
     "REVISION",
     "ConversionError",
+    "check_sample",
     "convert_row",
     "main",
     "sample_rows",
@@ -156,6 +161,7 @@ def convert_row(row: Mapping[str, Any]) -> Converted:
     unknown: Counter[str] = Counter()
     # (start, end, type, dataset labels merged into it)
     spans: list[tuple[int, int, EntityType, frozenset[str]]] = []
+    ignore: list[tuple[int, int, str]] = []
     for raw in sorted(row.get("privacy_mask") or (), key=lambda s: (s["start"], s["end"])):
         start, end, label = int(raw["start"]), int(raw["end"]), str(raw["label"])
         if text[start:end] != raw.get("value"):
@@ -164,13 +170,15 @@ def convert_row(row: Mapping[str, Any]) -> Converted:
             unknown[label] += 1
             continue
         entity_type = _map(label, language)
-        if entity_type is None:
-            dropped[label] += 1
-            continue
         # Trim whitespace the annotation may include; fixtures don't allow it.
         value = text[start:end]
         start += len(value) - len(value.lstrip())
         end -= len(value) - len(value.rstrip())
+        if entity_type is None:
+            dropped[label] += 1
+            if start < end:
+                ignore.append((start, end, label))
+            continue
         if start >= end:
             continue
         if spans:
@@ -189,6 +197,7 @@ def convert_row(row: Mapping[str, Any]) -> Converted:
     for s, e, t, labels in spans:
         if labels == {"CITY"}:  # a town on its own: pii-guard keeps it on purpose
             dropped["CITY (on its own)"] += 1
+            ignore.append((s, e, "CITY"))
             continue
         kept.append((s, e, t))
     record = {
@@ -202,6 +211,7 @@ def convert_row(row: Mapping[str, Any]) -> Converted:
             "uid": uid,
             "region": row.get("region"),
             "kind": "public-ai4privacy",
+            "ignore": [{"start": s, "end": e, "label": lab} for s, e, lab in sorted(ignore)],
         },
     }
     try:
@@ -381,7 +391,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--source-file", type=Path, help="a local copy of the split instead of downloading"
     )
     fetch.add_argument(
-        "--check", action="store_true", help="fail unless the sample matches the manifest"
+        "--check",
+        action="store_true",
+        help="write nothing; fail unless the committed sample and manifest match the rebuild",
     )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
@@ -394,25 +406,71 @@ def main(argv: Sequence[str] | None = None) -> int:
     chosen, seen = sample_rows(rows, args.sample, args.seed)
     manifest = build_manifest(chosen, seen, args.sample, args.seed)
     if args.check:
-        committed = json.loads(args.manifest.read_text(encoding="utf-8"))
-        for lang, block in manifest["languages"].items():
-            if committed["languages"].get(lang, {}).get("uids") != block["uids"]:
-                print(
-                    f"ai4privacy: sample for {lang!r} differs from {args.manifest}", file=sys.stderr
-                )
-                return 1
+        problems = check_sample(chosen, manifest, out=args.out, manifest_path=args.manifest)
+        for problem in problems:
+            print(f"ai4privacy: {problem}", file=sys.stderr)
+        if problems:
+            return 1
+        print("ai4privacy: the committed sample and manifest match the source", file=sys.stderr)
+        return 0
     args.out.mkdir(parents=True, exist_ok=True)
     for lang, items in chosen.items():
         path = args.out / f"{lang}-ai4privacy.jsonl"
         write_fixtures(path, [c.document for c in items])
         print(f"ai4privacy: {len(items)} {lang} documents -> {path}", file=sys.stderr)
-    if not args.check:
-        args.manifest.parent.mkdir(parents=True, exist_ok=True)
-        args.manifest.write_text(
-            json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
-        print(f"ai4privacy: manifest -> {args.manifest}", file=sys.stderr)
+    args.manifest.parent.mkdir(parents=True, exist_ok=True)
+    args.manifest.write_text(_dump_manifest(manifest), encoding="utf-8")
+    print(f"ai4privacy: manifest -> {args.manifest}", file=sys.stderr)
     return 0
+
+
+def _dump_manifest(manifest: Mapping[str, Any]) -> str:
+    return json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
+
+
+def check_sample(
+    chosen: Mapping[str, Sequence[Converted]],
+    manifest: Mapping[str, Any],
+    *,
+    out: Path,
+    manifest_path: Path,
+) -> list[str]:
+    """Differences between a rebuilt sample and the committed one; writes nothing.
+
+    Compares the whole manifest (sample ids, label counts, mapping, revision, seed) and every
+    fixture file byte for byte, so a hand-edited document or label count is caught, not only
+    a changed id list. Messages name files and fields, never a document's text.
+    """
+    problems: list[str] = []
+    try:
+        committed = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"{manifest_path}: unreadable ({exc.__class__.__name__})"]
+    for key in sorted(set(manifest) | set(committed)):
+        if key == "languages":
+            continue
+        if manifest.get(key) != committed.get(key):
+            problems.append(f"{manifest_path}: {key!r} differs")
+    for lang in sorted(set(manifest["languages"]) | set(committed.get("languages", {}))):
+        mine = manifest["languages"].get(lang)
+        theirs = committed.get("languages", {}).get(lang)
+        if mine is None or theirs is None:
+            problems.append(f"{manifest_path}: language {lang!r} is only on one side")
+            continue
+        for field in sorted(set(mine) | set(theirs)):
+            if mine.get(field) != theirs.get(field):
+                problems.append(f"{manifest_path}: languages.{lang}.{field} differs")
+    with tempfile.TemporaryDirectory() as tmp:
+        for lang, items in chosen.items():
+            name = f"{lang}-ai4privacy.jsonl"
+            rebuilt = Path(tmp) / name
+            write_fixtures(rebuilt, [c.document for c in items])
+            path = out / name
+            if not path.is_file():
+                problems.append(f"{path}: missing")
+            elif path.read_bytes() != rebuilt.read_bytes():
+                problems.append(f"{path}: differs from the rebuilt sample")
+    return problems
 
 
 if __name__ == "__main__":  # pragma: no cover

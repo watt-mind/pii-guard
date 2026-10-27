@@ -33,6 +33,23 @@
     },
     "title": {"type": "string", "minLength": 1},
     "notes": {"type": "array", "items": {"type": "string"}, "description": "Caveats a reader needs (remote latency, small n, patched settings)."},
+    "rescored": {
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["by", "method", "note"],
+          "additionalProperties": false,
+          "properties": {
+            "by": {"type": "string", "minLength": 1, "description": "The change that re-scored the record (a ticket id)."},
+            "method": {"type": "string", "minLength": 1, "description": "Name of the re-scoring rule (unscored-types, no-consistency)."},
+            "note": {"type": "string", "minLength": 1, "description": "What changed, and what could not be re-scored from the stored counts."},
+            "unscored_types": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}}
+          }
+        }
+      ],
+      "description": "Optional. Set when the metrics were recomputed from the record's own counts after the run: a change of scoring method, not a new run."
+    },
     "code": {
       "type": "object",
       "required": ["commit", "dirty", "pii_guard_version", "note"],
@@ -189,6 +206,7 @@
         "documents": {"$ref": "#/$defs/count"},
         "gold_spans": {"$ref": "#/$defs/count"},
         "predicted_spans": {"$ref": "#/$defs/count"},
+        "unscored_predictions": {"$ref": "#/$defs/count", "description": "Optional. Predictions left out of precision and over-masking: they overlap an ignore region (or, on an older sample, are of a type the set can't score) and match no gold span."},
         "exact": {"$ref": "#/$defs/match"},
         "overlap": {"$ref": "#/$defs/match"},
         "macro_f1_overlap": {"$ref": "#/$defs/rate"},

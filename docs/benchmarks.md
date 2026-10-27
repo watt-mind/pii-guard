@@ -28,9 +28,11 @@ Headline fixture set: **smoke** (hand-written; documents: de 10 + en 10 + hu 31)
   postcode alone was masked). Details: [evaluation.md](evaluation.md#leak-rate-in-practice).
 - **Precision, recall, F1** are span-level with overlap matching (a prediction counts if it
   overlaps a gold span of the same type); the run records also keep exact-match numbers.
-  **Over-masking** is the share of masked characters outside any gold span. **Round trip** is
-  the share of documents that unmask back to the original text exactly (comparison tools that
-  can't unmask show —).
+  **Over-masking** is the share of masked spans that overlap no gold span of any type (spans,
+  not characters). A prediction on text the set labels but pii-guard's policy doesn't score
+  (Ai4Privacy's dates, titles and bare towns) is left out of precision and over-masking.
+  **Round trip** is the share of documents that unmask back to the original text exactly
+  (comparison tools that can't unmask show —).
 - **Hand-written vs generated sets.** `smoke` is written by hand with inline labels and has
   adversarial look-alikes; `synth-*` sets are written by a Meta Muse model around fictional
   identities and labelled automatically. **Generated sets flatter Muse-based detectors**: the
@@ -40,34 +42,42 @@ Headline fixture set: **smoke** (hand-written; documents: de 10 + en 10 + hu 31)
   are noise. Every number below says which set, which run date and which commit it came from.
 - **Latency** is detection time per document (p50) on the hardware in the run log; it is not
   comparable across machines. `*` marks a value averaged over several runs (percentiles
-  can't be pooled exactly). Every count-based metric is pooled exactly over languages.
+  can't be pooled exactly).
+- **Pooling.** Every count-based metric is pooled exactly over languages by summing counts,
+  so `all` is **micro-averaged**: each span or value weighs the same, and a language with
+  more documents weighs more. Only runs on the current version of each fixture file are
+  pooled or charted; results on an earlier version are listed separately under their set.
 - `rules` is the rules-only pass with no name detection; names and addresses come from the
   NER and LLM passes. Compare it with the other tools on structured identifiers.
 
 ## Results by fixture set
 
-Latest run of each system on each set; `all` pools every language exactly.
+Latest run of each system on each set, on the current version of each fixture file; `all` pools the languages (micro-averaged).
 
 ### `smoke`
 
 hand-written; documents: de 10 + en 10 + hu 31.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 51 | 100.0% | 54.1% | 70.2% | 41.6% | 6.4% | 0.0% | 100.0% | 0.59 ms | 2026-10-27 |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 51 | 98.5% | 98.5% | 98.5% | 0.6% | 2.9% | 0.6% | 100.0% | 63 ms | 2026-10-27 |
-| pii-guard rules + Muse Spark Open (Baseten) | 41 | 98.1% | 99.4% | 98.7% | 0.7% | 1.5% | 0.0% | 100.0% | 1.5 s* | 2026-10-27 |
-| pii-guard rules + Muse Glimmer (low) | 38 | 98.7% | 100.0% | 99.3% | 0.0% | 1.6% | 0.8% | 100.0% | 9.4 s | 2026-10-27 |
-| pii-guard Muse Glimmer (low) | 38 | 98.0% | 98.6% | 98.3% | 0.0% | 1.6% | 0.0% | 100.0% | 9.4 s | 2026-10-27 |
-| pii-guard Muse Glimmer (medium) | 38 | 94.8% | 99.3% | 97.0% | 0.0% | 1.6% | 3.7% | 100.0% | 14.6 s | 2026-10-27 |
-| pii-guard rules + Muse Spark 1.3 | 38 | 97.3% | 98.6% | 98.0% | 0.8% | 1.6% | 0.8% | 100.0% | 9.6 s* | 2026-10-26 |
-| pii-guard rules + NER (distilled base) | 38 | 98.5% | 90.3% | 94.2% | 11.0% | 2.4% | 0.9% | 100.0% | 24 ms* | 2026-10-27 |
-| pii-guard rules + NER (fine-tuned) | 38 | 94.3% | 90.3% | 92.3% | 10.2% | 4.7% | 4.8% | 100.0% | 15 ms* | 2026-10-26 |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 51 | 97.0% | 99.5% | 98.2% | 0.6% | 1.2% | 1.1% | 100.0% | 1.9 s* | 2026-10-27 |
-| pii-guard rules + NER (zero-shot) | 38 | 94.0% | 86.2% | 89.9% | 15.8% | 4.7% | 6.0% | 100.0% | 52 ms* | 2026-10-26 |
-| Presidio | 51 | 62.5% | 67.5% | 64.9% | 24.3% | 12.1% | 27.5% | — | 88 ms* | 2026-10-27 |
-| LLM Guard | 51 | 61.5% | 46.9% | 53.2% | 45.1% | 8.1% | 36.7% | 100.0% | 110 ms* | 2026-10-27 |
-| PrivAiTe | 51 | 51.2% | 59.8% | 55.2% | 12.7% | 9.8% | 25.8% | 98.0% | 170 ms* | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 51 | 100.0% | 54.1% | 70.2% | 41.6% | 6.4% | 0.0% | 100.0% | 0.59 ms | 2026-10-27 | `3d9eb8b` |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 51 | 98.5% | 98.5% | 98.5% | 0.6% | 2.9% | 0.6% | 100.0% | 63 ms | 2026-10-27 | `3d9eb8b` |
+| pii-guard rules + Muse Spark Open (Baseten) † | 41 | 98.1% | 99.4% | 98.7% | 0.7% | 1.5% | 0.0% | 100.0% | 1.5 s* | 2026-10-27 | `9fad0fa` |
+| pii-guard rules + Muse Glimmer (low) † | 10 | 100.0% | 100.0% | 100.0% | 0.0% | 3.3% | 0.0% | 100.0% | 7.6 s | 2026-10-27 | `c759b54` |
+| pii-guard Muse Glimmer (low) † | 10 | 97.1% | 97.1% | 97.1% | 0.0% | 3.3% | 0.0% | 100.0% | 7.7 s | 2026-10-27 | `c759b54` |
+| pii-guard Muse Glimmer (medium) † | 10 | 84.6% | 97.1% | 90.4% | 0.0% | 3.3% | 11.8% | 100.0% | 13.1 s | 2026-10-27 | `c759b54` |
+| pii-guard rules + Muse Spark 1.3 † | 10 | 94.4% | 100.0% | 97.1% | 0.0% | 3.3% | 3.2% | 100.0% | 7.0 s | 2026-10-26 | `62b64fc` |
+| pii-guard rules + NER (distilled base) † | 10 | 100.0% | 97.1% | 98.5% | 3.3% | 3.3% | 0.0% | 100.0% | 35 ms | 2026-10-27 | `c611f99` |
+| pii-guard rules + NER (fine-tuned) † | 10 | 80.0% | 94.1% | 86.5% | 3.3% | 6.7% | 16.2% | 100.0% | 14 ms | 2026-10-26 | `0ba3c1a` |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 51 | 97.0% | 99.5% | 98.2% | 0.6% | 1.2% | 1.1% | 100.0% | 1.9 s* | 2026-10-27 | `4f84c6a` |
+| pii-guard rules + NER (zero-shot) † | 10 | 90.2% | 91.2% | 90.7% | 10.0% | 13.3% | 10.8% | 100.0% | 45 ms | 2026-10-26 | `0ba3c1a` |
+| Presidio ‡ | 51 | 62.5% | 67.5% | 64.9% | 24.3% | 12.1% | 27.5% | — | 88 ms* | 2026-10-27 | `8944f96` |
+| LLM Guard ‡ | 51 | 61.5% | 46.9% | 53.2% | 45.1% | 8.1% | 36.7% | 100.0% | 110 ms* | 2026-10-27 | `8944f96` |
+| PrivAiTe ‡ | 51 | 51.2% | 59.8% | 55.2% | 12.7% | 9.8% | 25.8% | 98.0% | 170 ms* | 2026-10-27 | `8944f96` |
+
+† Not run on every language of the current fixture files (de + en + hu): its `all` pools fewer documents, so compare it by language, not with the other rows. rules + Muse Spark Open (Baseten) (no de); rules + Muse Glimmer (low) (no de, hu); Muse Glimmer (low) (no de, hu); Muse Glimmer (medium) (no de, hu); rules + Muse Spark 1.3 (no de, hu); rules + NER (distilled base) (no de, hu); rules + NER (fine-tuned) (no de, hu); rules + NER (zero-shot) (no de, hu).
+
+‡ Re-scored from the record's own counts after the run (LAB-1213): a change of scoring method, not a new run and not a better model. The comparison tools' placeholder consistency is null (they don't report their replacements; it was a placeholder 0.0).
 
 
 By language:
@@ -77,30 +87,45 @@ By language:
 | **pii-guard rules** | 68.8% | 64.0% | 72.3% | 43.2% | 46.7% | 39.6% |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 100.0% | 98.5% | 97.9% | 0.0% | 0.0% | 0.9% |
 | pii-guard rules + Muse Spark Open (Baseten) | — | 100.0% | 98.4% | — | 0.0% | 0.9% |
-| pii-guard rules + Muse Glimmer (low) | — | 100.0% | 99.1% | — | 0.0% | 0.0% |
-| pii-guard Muse Glimmer (low) | — | 97.1% | 98.7% | — | 0.0% | 0.0% |
-| pii-guard Muse Glimmer (medium) | — | 90.4% | 99.1% | — | 0.0% | 0.0% |
-| pii-guard rules + Muse Spark 1.3 | — | 97.1% | 98.2% | — | 0.0% | 1.0% |
-| pii-guard rules + NER (distilled base) | — | 98.5% | 92.9% | — | 3.3% | 13.4% |
-| pii-guard rules + NER (fine-tuned) | — | 86.5% | 94.3% | — | 3.3% | 12.4% |
+| pii-guard rules + Muse Glimmer (low) | — | 100.0% | — | — | 0.0% | — |
+| pii-guard Muse Glimmer (low) | — | 97.1% | — | — | 0.0% | — |
+| pii-guard Muse Glimmer (medium) | — | 90.4% | — | — | 0.0% | — |
+| pii-guard rules + Muse Spark 1.3 | — | 97.1% | — | — | 0.0% | — |
+| pii-guard rules + NER (distilled base) | — | 98.5% | — | — | 3.3% | — |
+| pii-guard rules + NER (fine-tuned) | — | 86.5% | — | — | 3.3% | — |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 100.0% | 100.0% | 97.2% | 0.0% | 0.0% | 0.9% |
-| pii-guard rules + NER (zero-shot) | — | 90.7% | 89.6% | — | 10.0% | 17.5% |
+| pii-guard rules + NER (zero-shot) | — | 90.7% | — | — | 10.0% | — |
 | Presidio | 55.4% | 68.4% | 67.6% | 10.8% | 10.0% | 33.0% |
 | LLM Guard | 66.0% | 76.4% | 46.7% | 43.2% | 30.0% | 50.0% |
 | PrivAiTe | 66.0% | 74.8% | 46.5% | 8.1% | 0.0% | 17.9% |
+
+
+On an earlier version of a fixture file (current: de `b623ca3b33af`, en `5983d84d8dfc`, hu `3766a651708e`). These ran on other documents, so they stay out of the table above and the charts:
+
+| System | Lang | Fixture | Docs | F1 | Leak | Run |
+|---|---|---|---:|---:|---:|---|
+| pii-guard rules + Muse Glimmer (low) | hu | `292c687941f2` | 28 | 99.1% | 0.0% | 2026-10-27 |
+| pii-guard Muse Glimmer (low) | hu | `292c687941f2` | 28 | 98.7% | 0.0% | 2026-10-27 |
+| pii-guard Muse Glimmer (medium) | hu | `292c687941f2` | 28 | 99.1% | 0.0% | 2026-10-27 |
+| pii-guard rules + Muse Spark 1.3 | hu | `292c687941f2` | 28 | 98.2% | 1.0% | 2026-10-26 |
+| pii-guard rules + NER (distilled base) | hu | `292c687941f2` | 28 | 92.9% | 13.4% | 2026-10-27 |
+| pii-guard rules + NER (fine-tuned) | hu | `292c687941f2` | 28 | 94.3% | 12.4% | 2026-10-26 |
+| pii-guard rules + NER (zero-shot) | hu | `292c687941f2` | 28 | 89.6% | 17.5% | 2026-10-26 |
 
 ### `ai4privacy`
 
 mixed; documents: de 200 + en 200 + hu 200.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 600 | 98.5% | 36.3% | 53.1% | 63.1% | 1.6% | 0.1% | 100.0% | 0.75 ms | 2026-10-27 |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 600 | 83.5% | 71.7% | 77.1% | 27.6% | 1.9% | 12.5% | 100.0% | 52 ms | 2026-10-27 |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 600 | 83.5% | 93.9% | 88.4% | 3.9% | 0.1% | 12.1% | 100.0% | 2.1 s* | 2026-10-27 |
-| Presidio | 600 | 32.1% | 49.5% | 38.9% | 29.6% | 7.8% | 53.9% | — | 36 ms* | 2026-10-27 |
-| LLM Guard | 600 | 79.3% | 53.7% | 64.0% | 43.8% | 1.8% | 18.2% | 100.0% | 66 ms* | 2026-10-27 |
-| PrivAiTe | 600 | 52.6% | 65.4% | 58.3% | 9.5% | 2.5% | 26.6% | 98.0% | 111 ms* | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** ‡ | 600 | 98.5% | 36.3% | 53.1% | 63.1% | 1.6% | 0.1% | 100.0% | 0.75 ms | 2026-10-27 | `3d9eb8b` |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) ‡ | 600 | 92.8% | 71.7% | 80.9% | 27.6% | 1.9% | 2.4% | 100.0% | 52 ms | 2026-10-27 | `3d9eb8b` |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) ‡ | 600 | 92.5% | 93.9% | 93.2% | 3.9% | 0.1% | 2.4% | 100.0% | 2.1 s* | 2026-10-27 | `4f84c6a` |
+| Presidio ‡ | 600 | 38.6% | 49.5% | 43.4% | 29.6% | 7.8% | 49.1% | — | 36 ms* | 2026-10-27 | `8944f96` |
+| LLM Guard ‡ | 600 | 79.3% | 53.7% | 64.0% | 43.8% | 1.8% | 18.2% | 100.0% | 66 ms* | 2026-10-27 | `8944f96` |
+| PrivAiTe ‡ | 600 | 64.8% | 65.4% | 65.1% | 9.5% | 2.5% | 9.6% | 98.0% | 111 ms* | 2026-10-27 | `8944f96` |
+
+‡ Re-scored from the record's own counts after the run (LAB-1213): a change of scoring method, not a new run and not a better model. `DATE_OF_BIRTH` predictions are left out of precision and over-masking, since the set labels every date `DATE`, which pii-guard's policy excludes; a masked title or bare town still counts against precision and over-masking, because these runs kept no per-document predictions to apply ignore regions to; the comparison tools' placeholder consistency is null (they don't report their replacements; it was a placeholder 0.0).
 
 
 By language:
@@ -108,20 +133,20 @@ By language:
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 59.0% | 49.8% | 51.4% | 57.5% | 65.2% | 65.4% |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 80.4% | 78.6% | 72.7% | 23.4% | 25.3% | 33.6% |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 89.2% | 88.0% | 88.1% | 4.8% | 3.5% | 3.7% |
-| Presidio | 29.8% | 42.8% | 49.1% | 18.9% | 22.5% | 46.1% |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 84.5% | 81.8% | 76.7% | 23.4% | 25.3% | 33.6% |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 94.5% | 92.1% | 93.3% | 4.8% | 3.5% | 3.7% |
+| Presidio | 32.5% | 52.3% | 51.3% | 18.9% | 22.5% | 46.1% |
 | LLM Guard | 70.9% | 67.2% | 56.3% | 39.8% | 46.1% | 44.7% |
-| PrivAiTe | 59.1% | 62.3% | 53.5% | 6.5% | 7.7% | 14.0% |
+| PrivAiTe | 66.7% | 69.2% | 59.6% | 6.5% | 7.7% | 14.0% |
 
 ### `company-names`
 
 hand-written; documents: hu 44.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 44 | 100.0% | 61.3% | 76.0% | 2.5% | 5.0% | 0.0% | 100.0% | 0.16 ms | 2026-10-27 |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 22 ms | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 44 | 100.0% | 61.3% | 76.0% | 2.5% | 5.0% | 0.0% | 100.0% | 0.16 ms | 2026-10-27 | `9d133c0` |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 22 ms | 2026-10-27 | `9d133c0` |
 
 
 By language:
@@ -135,12 +160,12 @@ By language:
 
 generated by muse-image; documents: all 1 + hu 1.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| pii-guard gateway, labels images, Muse Spark Open (Baseten) | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | — | — | — | 2026-10-27 |
-| pii-guard gateway, labels images, mock upstream | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | — | — | — | 2026-10-27 |
-| pii-guard gateway, opaque images, Muse Spark Open (Baseten) | 1 | 33.3% | 33.3% | 33.3% | 0.0% | 0.0% | — | — | — | 2026-10-27 |
-| pii-guard gateway, opaque images, mock upstream | 1 | 33.3% | 33.3% | 33.3% | 0.0% | 0.0% | — | — | — | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| pii-guard gateway, labels images, Muse Spark Open (Baseten) | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | — | — | — | 2026-10-27 | `8b57e15` |
+| pii-guard gateway, labels images, mock upstream | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | — | — | — | 2026-10-27 | `8b57e15` |
+| pii-guard gateway, opaque images, Muse Spark Open (Baseten) | 1 | 33.3% | 33.3% | 33.3% | 0.0% | 0.0% | — | — | — | 2026-10-27 | `8b57e15` |
+| pii-guard gateway, opaque images, mock upstream | 1 | 33.3% | 33.3% | 33.3% | 0.0% | 0.0% | — | — | — | 2026-10-27 | `8b57e15` |
 
 
 By language:
@@ -156,11 +181,11 @@ By language:
 
 generated; documents: en 373 + hu 368.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 741 | 99.9% | 42.3% | 59.4% | 47.2% | 22.1% | 0.0% | 100.0% | 0.67 ms* | 2026-10-27 |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 741 | 97.8% | 97.9% | 97.9% | 2.9% | 0.6% | 2.1% | 99.6% | 126 ms* | 2026-10-27 |
-| pii-guard rules + NER (distilled base) | 741 | 98.9% | 97.9% | 98.4% | 2.9% | 0.6% | 0.9% | 99.9% | 43 ms* | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 741 | 99.9% | 42.3% | 59.4% | 47.2% | 22.1% | 0.0% | 100.0% | 0.67 ms* | 2026-10-27 | `c611f99` |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 741 | 97.8% | 97.9% | 97.9% | 2.9% | 0.6% | 2.1% | 99.6% | 126 ms* | 2026-10-27 | `c611f99` |
+| pii-guard rules + NER (distilled base) | 741 | 98.9% | 97.9% | 98.4% | 2.9% | 0.6% | 0.9% | 99.9% | 43 ms* | 2026-10-27 | `c611f99` |
 
 
 By language:
@@ -175,11 +200,11 @@ By language:
 
 hand-written; documents: en 31 + hu 31.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 62 | 100.0% | 44.6% | 61.7% | 54.3% | 21.1% | 0.0% | 100.0% | 0.29 ms | 2026-10-27 |
-| pii-guard rules + Muse Spark Open (Baseten) | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 1.9 s | 2026-10-27 |
-| pii-guard rules + Muse Spark 1.3 | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 1.7% | 0.0% | 100.0% | 3.3 s | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 62 | 100.0% | 44.6% | 61.7% | 54.3% | 21.1% | 0.0% | 100.0% | 0.29 ms | 2026-10-27 | `fb1502e` |
+| pii-guard rules + Muse Spark Open (Baseten) | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 1.9 s | 2026-10-27 | `fb1502e` |
+| pii-guard rules + Muse Spark 1.3 | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 1.7% | 0.0% | 100.0% | 3.3 s | 2026-10-27 | `9fad0fa` |
 
 
 By language:
@@ -194,11 +219,11 @@ By language:
 
 generated; documents: en 24 + hu 24.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 48 | 99.6% | 41.4% | 58.5% | 48.5% | 21.8% | 0.0% | 100.0% | 0.84 ms* | 2026-10-26 |
-| pii-guard rules + NER (fine-tuned) | 48 | 99.8% | 96.5% | 98.1% | 4.9% | 1.2% | 0.0% | 100.0% | 27 ms* | 2026-10-26 |
-| pii-guard rules + NER (zero-shot) | 48 | 96.7% | 89.7% | 93.1% | 13.5% | 0.0% | 2.5% | 97.9% | 450 ms* | 2026-10-26 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 48 | 99.6% | 41.4% | 58.5% | 48.5% | 21.8% | 0.0% | 100.0% | 0.84 ms* | 2026-10-26 | `0ba3c1a` |
+| pii-guard rules + NER (fine-tuned) | 48 | 99.8% | 96.5% | 98.1% | 4.9% | 1.2% | 0.0% | 100.0% | 27 ms* | 2026-10-26 | `0ba3c1a` |
+| pii-guard rules + NER (zero-shot) | 48 | 96.7% | 89.7% | 93.1% | 13.5% | 0.0% | 2.5% | 97.9% | 450 ms* | 2026-10-26 | `0ba3c1a` |
 
 
 By language:
@@ -213,17 +238,19 @@ By language:
 
 generated by muse-spark-1.3-contributor; documents: en 10 + hu 20.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 30 | 100.0% | 43.5% | 60.6% | 43.1% | 8.7% | 0.0% | 100.0% | 3.8 ms | 2026-10-27 |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 248 ms | 2026-10-27 |
-| pii-guard rules + Muse Spark Open (Baseten) | 30 | 100.0% | 99.5% | 99.7% | 0.8% | 2.0% | 0.0% | 100.0% | 2.1 s* | 2026-10-27 |
-| pii-guard rules + NER (fine-tuned) | 30 | 99.2% | 96.2% | 97.7% | 5.9% | 1.2% | 0.6% | 100.0% | 28 ms* | 2026-10-26 |
-| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 2.0 s* | 2026-10-27 |
-| pii-guard rules + NER (zero-shot) | 30 | 97.3% | 90.0% | 93.5% | 15.0% | 0.0% | 2.7% | 100.0% | 123 ms* | 2026-10-26 |
-| Presidio | 30 | 69.4% | 74.7% | 71.9% | 23.3% | 24.1% | 24.4% | — | 361 ms* | 2026-10-27 |
-| LLM Guard | 30 | 62.7% | 41.4% | 49.9% | 56.5% | 10.7% | 34.4% | 100.0% | 581 ms* | 2026-10-27 |
-| PrivAiTe | 30 | 58.5% | 59.1% | 58.8% | 19.0% | 9.1% | 24.1% | 83.3% | 388 ms* | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 30 | 100.0% | 43.5% | 60.6% | 43.1% | 8.7% | 0.0% | 100.0% | 3.8 ms | 2026-10-27 | `3d9eb8b` |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 248 ms | 2026-10-27 | `3d9eb8b` |
+| pii-guard rules + Muse Spark Open (Baseten) | 30 | 100.0% | 99.5% | 99.7% | 0.8% | 2.0% | 0.0% | 100.0% | 2.1 s* | 2026-10-27 | `5dd3c23` |
+| pii-guard rules + NER (fine-tuned) | 30 | 99.2% | 96.2% | 97.7% | 5.9% | 1.2% | 0.6% | 100.0% | 28 ms* | 2026-10-26 | `0ba3c1a` |
+| pii-guard strict (rules + NER + Muse Spark Open, Baseten) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 2.0 s* | 2026-10-27 | `4f84c6a` |
+| pii-guard rules + NER (zero-shot) | 30 | 97.3% | 90.0% | 93.5% | 15.0% | 0.0% | 2.7% | 100.0% | 123 ms* | 2026-10-26 | `0ba3c1a` |
+| Presidio ‡ | 30 | 69.4% | 74.7% | 71.9% | 23.3% | 24.1% | 24.4% | — | 361 ms* | 2026-10-27 | `8944f96` |
+| LLM Guard ‡ | 30 | 62.7% | 41.4% | 49.9% | 56.5% | 10.7% | 34.4% | 100.0% | 581 ms* | 2026-10-27 | `8944f96` |
+| PrivAiTe ‡ | 30 | 58.5% | 59.1% | 58.8% | 19.0% | 9.1% | 24.1% | 83.3% | 388 ms* | 2026-10-27 | `8944f96` |
+
+‡ Re-scored from the record's own counts after the run (LAB-1213): a change of scoring method, not a new run and not a better model. The comparison tools' placeholder consistency is null (they don't report their replacements; it was a placeholder 0.0).
 
 
 By language:
@@ -244,10 +271,10 @@ By language:
 
 generated by muse-image; documents: all 24 + de 8 + en 8 + hu 8.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| pii-guard image placeholders (exact matching) | 24 | 100.0% | 70.6% | 82.8% | 0.0% | 0.0% | 0.0% | 100.0% | — | 2026-10-27 |
-| pii-guard image placeholders (fuzzy matching) | 24 | 100.0% | 98.0% | 99.0% | 0.0% | 0.0% | 0.0% | 100.0% | — | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| pii-guard image placeholders (exact matching) | 24 | 100.0% | 70.6% | 82.8% | 0.0% | 0.0% | 0.0% | 100.0% | — | 2026-10-27 | `6d2cf04` |
+| pii-guard image placeholders (fuzzy matching) | 24 | 100.0% | 98.0% | 99.0% | 0.0% | 0.0% | 0.0% | 100.0% | — | 2026-10-27 | `6d2cf04` |
 
 
 By language:
@@ -261,10 +288,10 @@ By language:
 
 generated by muse-image; documents: all 24 + de 8 + en 8 + hu 8.
 
-| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| pii-guard image placeholders (exact matching) | 24 | 100.0% | 52.9% | 69.2% | 0.0% | 0.0% | 0.0% | 100.0% | — | 2026-10-27 |
-| pii-guard image placeholders (fuzzy matching) | 24 | 100.0% | 96.1% | 98.0% | 0.0% | 0.0% | 0.0% | 100.0% | — | 2026-10-27 |
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| pii-guard image placeholders (exact matching) | 24 | 100.0% | 52.9% | 69.2% | 0.0% | 0.0% | 0.0% | 100.0% | — | 2026-10-27 | `6d2cf04` |
+| pii-guard image placeholders (fuzzy matching) | 24 | 100.0% | 96.1% | 98.0% | 0.0% | 0.0% | 0.0% | 100.0% | — | 2026-10-27 | `6d2cf04` |
 
 
 By language:
@@ -276,21 +303,23 @@ By language:
 
 ## Recall per entity type (`smoke`)
 
-| Type | Gold | rules | rules + ner (xlmr-large-distilled-glimmer) | rules + Muse Spark Open (Baseten) | rules + Muse Glimmer (low) | Presidio | LLM Guard | PrivAiTe |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| `PERSON` | 61 | 1.6% | 98.4% | 97.9% | 100.0% | 93.4% | 88.5% | 75.4% |
-| `ADDRESS` | 22 | 90.9% | 100.0% | 100.0% | 100.0% | 86.4% | 0.0% | 100.0% |
-| `EMAIL` | 12 | 100.0% | 100.0% | 100.0% | 100.0% | 91.7% | 100.0% | 100.0% |
-| `PHONE` | 16 | 100.0% | 100.0% | 100.0% | 100.0% | 87.5% | 100.0% | 100.0% |
-| `DATE_OF_BIRTH` | 11 | 0.0% | 100.0% | 100.0% | 100.0% | 45.5% | 0.0% | 72.7% |
-| `NATIONAL_ID_HU_TAX` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
-| `NATIONAL_ID_HU_TAJ` | 5 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
-| `ID_DOCUMENT` | 17 | 100.0% | 100.0% | 100.0% | 100.0% | 11.8% | 0.0% | 0.0% |
-| `BANK_ACCOUNT` | 12 | 100.0% | 100.0% | 100.0% | 100.0% | 75.0% | 75.0% | 100.0% |
-| `COMPANY_ID_HU` | 4 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
-| `ORGANIZATION` | 16 | 0.0% | 93.8% | 100.0% | 100.0% | 87.5% | 0.0% | 0.0% |
-| `PARCEL_NUMBER_HU` | 6 | 100.0% | 83.3% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
-| `VEHICLE_PLATE` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
+Featured systems run on every language of the current fixture files, pooled (micro-averaged).
+
+| Type | Gold | rules | rules + ner (xlmr-large-distilled-glimmer) | Presidio | LLM Guard | PrivAiTe |
+|---|---:|---:|---:|---:|---:|---:|
+| `PERSON` | 61 | 1.6% | 98.4% | 93.4% | 88.5% | 75.4% |
+| `ADDRESS` | 22 | 90.9% | 100.0% | 86.4% | 0.0% | 100.0% |
+| `EMAIL` | 12 | 100.0% | 100.0% | 91.7% | 100.0% | 100.0% |
+| `PHONE` | 16 | 100.0% | 100.0% | 87.5% | 100.0% | 100.0% |
+| `DATE_OF_BIRTH` | 11 | 0.0% | 100.0% | 45.5% | 0.0% | 72.7% |
+| `NATIONAL_ID_HU_TAX` | 6 | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
+| `NATIONAL_ID_HU_TAJ` | 5 | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
+| `ID_DOCUMENT` | 17 | 100.0% | 100.0% | 11.8% | 0.0% | 0.0% |
+| `BANK_ACCOUNT` | 12 | 100.0% | 100.0% | 75.0% | 75.0% | 100.0% |
+| `COMPANY_ID_HU` | 4 | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
+| `ORGANIZATION` | 16 | 0.0% | 93.8% | 87.5% | 0.0% | 0.0% |
+| `PARCEL_NUMBER_HU` | 6 | 100.0% | 83.3% | 0.0% | 0.0% | 0.0% |
+| `VEHICLE_PLATE` | 6 | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 
 ## Image masking
 

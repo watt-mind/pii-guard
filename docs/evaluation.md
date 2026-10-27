@@ -44,11 +44,23 @@ The test split is never used for training or prompt tuning.
 |---|---|
 | **Precision / recall / F1, per entity type** | Span-level, exact match and overlap match |
 | **Leak rate (end to end)** | Share of labelled values that appear, in any surface form, in the request the gateway sends upstream. This is the number that matters most. |
-| **Over-masking rate** | Share of masked spans that weren't personal data (hurts answer quality) |
+| **Over-masking rate** | Share of masked spans (spans, not characters) that overlap no gold span: not personal data (hurts answer quality). Predictions on an *ignore region* are left out (below). |
 | **Re-identification accuracy** | Share of placeholders in responses restored to the correct, correctly inflected value |
 | **Placeholder consistency** | Share of gold entities (per document; the gold spans of one type that are surface forms of each other, `Minta Anna` / `Minta Annának`) whose occurrences are all masked by one and the same placeholder. An unmasked occurrence counts as inconsistent. Also reported over entities with 2+ occurrences (`multi_rate`). |
 | **Visual recall** | Share of labelled image regions covered by a mask (IoU threshold) |
 | **Latency** | p50 / p95 per request, per pipeline stage |
+
+**Ignore regions.** A fixture document may list text its source labelled but pii-guard's
+policy doesn't score (`meta.ignore`: offsets and the source's label, never the value), such as
+every date in a public dataset. A prediction that overlaps one and matches no gold span is
+neither credited nor charged: it is left out of precision and over-masking and counted as
+`unscored_predictions`. Recall and leak rate don't change. A sample converted before ignore
+regions existed falls back to a per-type rule (`scorer.LEGACY_UNSCORED_TYPES`:
+`DATE_OF_BIRTH` on Ai4Privacy).
+
+**Pooling** over languages or runs sums the counts and then divides, so every pooled rate is
+**micro-averaged**: each span, value or document weighs the same and a language with more
+documents weighs more. Macro F1 (the mean over entity types) is reported separately.
 
 ## Baselines
 
@@ -113,7 +125,20 @@ validated in the tests. A record says:
   country instead;
 - **provenance**: `source` is `recorded` (written by the harness) or `imported` (converted from
   an earlier scorecard or a number published on a pull request or ticket, with
-  `imported_from`), plus free-text `notes`.
+  `imported_from`), plus free-text `notes`, and `rescored` when the metrics were recomputed
+  from the record's own counts after a change of scoring method (who, which rule, and what
+  could not be recomputed).
+
+Validation checks the schema and what a schema can't say: every rate of a text run must be its
+count over its denominator (within 1e-4, as imported records keep 4 decimals), and a rate on
+an empty denominator is an error. `null` means not measured: comparison tools have no
+placeholder consistency because they don't report their replacements.
+
+**Re-scoring.** When the scoring method changes in a way the stored counts can express (a
+whole entity type left out, a metric dropped), `uv run python -m pii_guard.eval.rescore`
+rewrites the records that need it and marks them `rescored`; `--check` exits 1 if any record
+still does. Nothing is run again, so a re-scored number is a change of method, never a better
+model. The LAB-1213 rules are in `pii_guard.eval.rescore`.
 
 Languages, entity types, detectors, fixture sets and countries are data, not schema: a new
 language or detector needs no schema or code change.
@@ -150,7 +175,8 @@ existed were converted by `python -m pii_guard.eval.record_import` and are marke
 - `eval/results/index.json` (`schema_version` 1): `runs` (metadata, chronological), `rows`
   (one per text run and language), `history` (runs of one system on one set at one commit and
   date merged, for progress over time), `snapshots` (latest result per set, system and
-  language, with an exactly pooled `all`), `visual`, `headline_set`, and the vocabularies `systems` (with
+  language **on the set's current fixture files**, with an exactly pooled, micro-averaged
+  `all`), `stale_snapshots`, `visual`, `headline_set`, and the vocabularies `systems` (with
   chart colours and markers), `fixture_sets`, `languages` and `entity_types`. Rates are 0 to 1,
   latency in milliseconds. Latency percentiles can't be pooled: a pooled value built from
   several runs is their document-weighted mean and says `latency_pooled: true`;
@@ -160,6 +186,17 @@ existed were converted by `python -m pii_guard.eval.record_import` and are marke
   fixture set, its size, the run dates and the commits;
 - [`docs/benchmarks.md`](benchmarks.md): the charts, tables per fixture set, language and
   entity type, method notes and the run log.
+
+**Like with like.** A fixture file can change (the Hungarian smoke set grew from 28 to 31
+documents), so results are keyed by the file's SHA-256, not by the set's name. A set's
+*current* version is, per language, the file its newest run used
+(`fixture_sets[set].fixtures`). Snapshots use only runs on the current files; a language a
+system was run on only with an earlier file goes to `stale_snapshots` and to a separate
+"earlier version" table under the set, never into a pooled number. A snapshot that lacks one
+of the set's current languages says so (`complete: false`, `missing_languages`): it is marked
+† in the tables and left out of the pooled charts (leak vs latency, recall per type), whose
+caption names what was left out. In the progress chart, points on other documents are hollow
+and don't count towards the best-so-far line (`history[].comparable`).
 
 `docs/benchmarks/config.json` picks the headline fixture set and the systems featured on the
 charts; everything else is in the tables and the UI. `--check` writes nothing and exits 1 if
@@ -305,7 +342,10 @@ and their stderr is discarded (the tools log detected values) unless
   false positive and a miss in P/R.
 - **Over-masking** counts the tool's mapped spans that overlap no gold span. A tool masks
   everything it detects, including organisations, which pii-guard's policy keeps; masked
-  organisations overlap gold spans, so they don't count as over-masking.
+  organisations overlap gold spans, so they don't count as over-masking. Spans on an ignore
+  region (a policy-excluded label of the public set) are left out for every system alike.
+- **Placeholder consistency** is `null` for the tools: they don't report which placeholder
+  replaced which span.
 - **Round trip** uses the tool's own restore (LLM Guard `Deanonymize`, PrivAiTe
   `process_response`). Presidio's default operator is irreversible: shown as n/a.
 - **Latency** is detection time measured inside the tool, after one warm-up call, CPU only,
@@ -361,7 +401,7 @@ under another label (a tax number caught as `PHONE_NUMBER`, say).
 - The **Muse-generated** fixtures (`*-synth-sample.jsonl`) were written by the same model
   family pii-guard's LLM detector uses, which flatters Muse-based detection. The hand-written
   smoke sets don't have that bias.
-- The fixture sets are small (38 smoke, 30 synthetic documents): differences of a few
+- The fixture sets are small (51 smoke, 30 synthetic documents): differences of a few
   points are noise.
 - `pii-guard rules` is the rules-only pass, with no name detection; names come from the NER
   and LLM passes. Compare it with the tools for structured identifiers, not for `PERSON`.
@@ -383,7 +423,11 @@ Leak rate in %, pooled over languages, and detection p50:
 | PrivAiTe | 12.7 | 9.5 | 93–182 ms | |
 
 Pooled figures are from [docs/benchmarks.md](benchmarks.md) (generated from the run records);
-p50 and cost ranges are over the per-fixture rows. The machine was under unrelated load during
+p50 and cost ranges are over the per-fixture rows. They are the comparison runs of that day
+(commits `8944f96` for rules and the tools, `4f84c6a` for fast and strict). Later runs of
+rules and fast mode (LAB-1170 and LAB-1204, commit `3d9eb8b`) leak less on Ai4Privacy (63.1 % and 27.6 %);
+[docs/benchmarks.md](benchmarks.md) always shows the latest run of each system with its
+commit. The machine was under unrelated load during
 these runs (load average 13–27 on 10 cores), so latency is relative. Fast mode is as safe as
 strict on the hand-written sets but leaks 35–40 % on the public set, mostly numbers that fail
 the checksums pii-guard's rules require (see the caveats below); strict mode is the safest
@@ -400,7 +444,7 @@ documents each for `en`, `hu`, `de`, seed 2026, revision `ecfdc547`) is committe
 sample ids, label counts). `pii_guard.eval.public.ai4privacy` rebuilds it:
 
 ```bash
-uv run python -m pii_guard.eval.public.ai4privacy fetch --check   # streams ~920 MB once
+uv run python -m pii_guard.eval.public.ai4privacy fetch --check   # streams ~920 MB once, writes nothing
 uv run pii-guard eval --fixtures eval/fixtures/public/hu-ai4privacy.jsonl --detectors rules \
     --baselines presidio,llm-guard,privaite
 ```
@@ -424,10 +468,17 @@ components of the commercial PII-Masking-2M set need a commercial licence.
 | `DATE`, `AGE`, `GENDER`, `SEX`, `TITLE`, a `CITY` on its own | *policy-excluded* | not masked by pii-guard's policy (any date, not only birth dates; bare towns are kept on purpose) |
 
 **Policy-excluded** labels are left out of the gold spans, so they count neither as leaks nor
-as misses; the manifest counts them per language (about 3 per document). A tool that masks
-them (Presidio's and PrivAiTe's `DATE_TIME` maps to `DATE_OF_BIRTH`) is charged
-over-masking for it, so over-masking on this set is higher for every system that masks dates
-or towns, and is best read relative to the smoke sets. There is no `ORGANIZATION` label.
+as misses; the manifest counts them per language (about 3 per document). The converter keeps
+each as an [ignore region](#metrics), so a prediction on one is neither credited nor charged
+in precision and over-masking. The committed sample predates ignore regions (refreshing it
+needs the 920 MB download and new runs), so for now the scorer applies the per-type fallback:
+`DATE_OF_BIRTH` predictions are not scored on this set, because the set labels every date
+`DATE` (Presidio's and PrivAiTe's `DATE_TIME` maps to `DATE_OF_BIRTH`). A masked title or a
+bare town still counts as over-masking until the sample is refreshed. The stored runs were
+re-scored this way from their counts (LAB-1213; their records say `rescored`): for example
+fast mode's precision went from 83.5 % to 92.8 % and its over-masking from 12.5 % to 2.4 %, a
+change of method, not of the model. There is no `ORGANIZATION` label, so `ORGANIZATION`
+predictions (kept, never masked) still count against precision here.
 
 **Caveats.**
 

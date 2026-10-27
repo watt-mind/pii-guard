@@ -12,6 +12,14 @@
     "Public set: Ai4Privacy OpenPII 1M (CC-BY-4.0, Ai4Privacy / Ai Suisse SA), seeded sample of the validation split; see eval/fixtures/public/README.md.",
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold spans), so masking them counts as over-masking. Most card, tax and TAJ numbers in the set fail their checksums, which pii-guard's rules require."
   ],
+  "rescored": {
+    "by": "LAB-1213",
+    "method": "unscored-types",
+    "note": "63 DATE_OF_BIRTH prediction(s) taken out of precision and over-masking (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "unscored_types": [
+      "DATE_OF_BIRTH"
+    ]
+  },
   "code": {
     "commit": "4f84c6adc9baa1a2e40781549a17a3200b4d966f",
     "dirty": true,
@@ -72,25 +80,26 @@
       "documents": 200,
       "gold_spans": 628,
       "predicted_spans": 510,
+      "unscored_predictions": 63,
       "exact": {
         "gold": 628,
-        "pred": 510,
+        "pred": 447,
         "tp_pred": 302,
         "tp_gold": 302,
-        "precision": 0.592157,
+        "precision": 0.675615,
         "recall": 0.480892,
-        "f1": 0.530756
+        "f1": 0.56186
       },
       "overlap": {
         "gold": 628,
-        "pred": 510,
+        "pred": 447,
         "tp_pred": 421,
         "tp_gold": 378,
-        "precision": 0.82549,
+        "precision": 0.941834,
         "recall": 0.601911,
-        "f1": 0.69619
+        "f1": 0.734448
       },
-      "macro_f1_overlap": 0.460666,
+      "macro_f1_overlap": 0.526476,
       "leak": {
         "values": 628,
         "leaked": 246,
@@ -99,9 +108,9 @@
         "partial_rate": 0.017516
       },
       "over_masking": {
-        "masked": 503,
-        "over_masked": 75,
-        "rate": 0.149105
+        "masked": 440,
+        "over_masked": 12,
+        "rate": 0.027273
       },
       "roundtrip": {
         "documents": 200,
@@ -195,19 +204,6 @@
             "over_masked": 0
           }
         },
-        "DATE_OF_BIRTH": {
-          "gold": 0,
-          "pred": 63,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": {
-            "masked": 63,
-            "over_masked": 63
-          }
-        },
         "ID_DOCUMENT": {
           "gold": 156,
           "pred": 5,
@@ -259,25 +255,26 @@
         "documents": 200,
         "gold_spans": 628,
         "predicted_spans": 510,
+        "unscored_predictions": 63,
         "exact": {
           "gold": 628,
-          "pred": 510,
+          "pred": 447,
           "tp_pred": 302,
           "tp_gold": 302,
-          "precision": 0.592157,
+          "precision": 0.675615,
           "recall": 0.480892,
-          "f1": 0.530756
+          "f1": 0.56186
         },
         "overlap": {
           "gold": 628,
-          "pred": 510,
+          "pred": 447,
           "tp_pred": 421,
           "tp_gold": 378,
-          "precision": 0.82549,
+          "precision": 0.941834,
           "recall": 0.601911,
-          "f1": 0.69619
+          "f1": 0.734448
         },
-        "macro_f1_overlap": 0.460666,
+        "macro_f1_overlap": 0.526476,
         "leak": {
           "values": 628,
           "leaked": 246,
@@ -286,9 +283,9 @@
           "partial_rate": 0.017516
         },
         "over_masking": {
-          "masked": 503,
-          "over_masked": 75,
-          "rate": 0.149105
+          "masked": 440,
+          "over_masked": 12,
+          "rate": 0.027273
         },
         "roundtrip": {
           "documents": 200,
@@ -380,19 +377,6 @@
             "over_masking": {
               "masked": 38,
               "over_masked": 0
-            }
-          },
-          "DATE_OF_BIRTH": {
-            "gold": 0,
-            "pred": 63,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": {
-              "masked": 63,
-              "over_masked": 63
             }
           },
           "ID_DOCUMENT": {
