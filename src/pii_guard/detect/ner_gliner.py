@@ -104,7 +104,7 @@ def safetensors_checkpoint(
     """
     path = Path(model)
     if not path.exists():
-        from huggingface_hub import snapshot_download
+        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
 
         path = Path(
             snapshot_download(
