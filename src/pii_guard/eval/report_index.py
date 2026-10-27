@@ -47,18 +47,19 @@ __all__ = [
 INDEX_SCHEMA_VERSION = 1
 
 #: Colour-blind-safe colours for pii-guard systems (Okabe-Ito, then Paul Tol's muted set),
-#: assigned in featured order, then by key. All have >= 3:1 contrast on white.
+#: assigned in featured order, then by key. Ordered so neighbours differ in hue *and*
+#: lightness (no two greens or two pinks among the first seven).
 PALETTE_OURS = [
     "#0072B2",  # blue
     "#009E73",  # bluish green
     "#D55E00",  # vermillion
     "#CC79A7",  # reddish purple
-    "#E69F00",  # orange
-    "#882255",  # wine
-    "#117733",  # green
     "#332288",  # indigo
     "#999933",  # olive
+    "#882255",  # wine
+    "#117733",  # green
     "#AA4499",  # purple
+    "#E69F00",  # orange
 ]
 #: Comparison tools are grey and told apart by marker shape.
 PALETTE_COMPARISON = ["#595959", "#595959", "#595959", "#595959", "#595959", "#595959"]

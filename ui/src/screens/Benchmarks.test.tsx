@@ -36,7 +36,7 @@ function rowNames(table: HTMLElement) {
 }
 
 function cell(table: HTMLElement, system: string, column: string): string {
-  const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim());
+  const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.replace(/[▲▼]/g, "").trim());
   const row = within(table)
     .getAllByRole("row")
     .find((r) => nameOf(within(r).queryByRole("rowheader")) === system);
@@ -145,5 +145,28 @@ describe("Benchmarks screen", () => {
   it("says so when the results can't be loaded", async () => {
     const { panel } = await openBenchmarks(() => Promise.reject(new Error("chunk failed")));
     expect(await within(panel).findByRole("alert")).toHaveTextContent(/could not be loaded.*chunk failed/);
+  });
+});
+
+describe("Benchmarks screen, critique round", () => {
+  it("reverses a sort on a second click and sorts every numeric column", async () => {
+    const { user, panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    const leakHeader = () => within(resultsTable(panel)).getByRole("columnheader", { name: "Leak" });
+    await user.click(within(panel).getByRole("button", { name: "Leak" }));
+    expect(leakHeader()).toHaveAttribute("aria-sort", "descending");
+    await user.click(within(panel).getByRole("button", { name: "Recall" }));
+    expect(within(resultsTable(panel)).getByRole("columnheader", { name: "Recall" })).toHaveAttribute("aria-sort", "descending");
+  });
+
+  it("shows where runs ran and their caveats, open by default on generated sets", async () => {
+    const { user, panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    const caveats = () => within(panel).getByText("Where these ran, and caveats").closest("details")!;
+    expect(caveats()).not.toHaveAttribute("open");
+    await user.click(within(panel).getByRole("radio", { name: /^synth-dev/ }));
+    expect(caveats()).toHaveAttribute("open");
+    expect(caveats()).toHaveTextContent(/trained on the seed-7 synthetic split/);
+    expect(within(panel).getByText(/open-source tools weren’t run on this set/)).toBeInTheDocument();
   });
 });

@@ -47,7 +47,8 @@ export function Marker({ info, x = 0, y = 0, r = 6 }: { info: SystemInfo | undef
   const color = colorOf(info);
   const hollow = info?.family === "comparison";
   const fill = hollow ? "var(--surface)" : color;
-  const stroke = { stroke: hollow ? color : "var(--surface)", strokeWidth: hollow ? 2 : 1.5 };
+  // Filled markers get a faint ink ring so dark colours (indigo, wine) stay visible on a dark surface.
+  const stroke = hollow ? { stroke: color, strokeWidth: 2 } : { stroke: "var(--ink)", strokeOpacity: 0.45, strokeWidth: 1.25 };
   switch (info?.shape) {
     case "square":
       return <rect x={x - r * 0.85} y={y - r * 0.85} width={r * 1.7} height={r * 1.7} fill={fill} {...stroke} />;
@@ -128,7 +129,9 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
     const y = sy(p.metrics.leak ?? 0);
     return { x0: x - 8, y0: y - 8, x1: Math.max(x, x95) + 8, y1: y + 8 };
   });
-  const labels = pts.map((p) => {
+  // Best (lowest leak) first, so it wins its label spot; drawn last, so it sits on top.
+  const byLeak = [...pts].sort((a, b) => (a.metrics.leak ?? 1) - (b.metrics.leak ?? 1));
+  const labels = byLeak.map((p) => {
     const text = `${p.info?.short_label ?? p.key} ${formatPct(p.metrics.leak)}`;
     const w = textWidth(text);
     const x = sx(p.metrics.detect_p50_ms!);
@@ -185,7 +188,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
         <text x={(m.l + width - m.r) / 2} y={height - 4} textAnchor="middle" fontSize={FONT} fill="var(--muted)">
           detection latency per document, p50 to p95 (log scale)
         </text>
-        {pts.map((p) => {
+        {[...byLeak].reverse().map((p) => {
           const x = sx(p.metrics.detect_p50_ms!);
           const y = sy(p.metrics.leak ?? 0);
           const p95 = p.metrics.detect_p95_ms;
@@ -205,7 +208,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
         {labels.map(
           (l, i) =>
             l && (
-              <text key={pts[i]!.key} x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={600} fill="var(--ink)">
+              <text key={byLeak[i]!.key} x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={600} fill="var(--ink)">
                 {l.text}
               </text>
             ),
@@ -272,7 +275,7 @@ export function ProgressChart({
   const yTicks = Array.from({ length: Math.round(ymax / 0.1) + 1 }, (_, i) => i * 0.1).filter(
     (_, i, all) => all.length <= 6 || i % 2 === 0,
   );
-  const labelEvery = Math.max(1, Math.ceil((cats.length * 84) / (width - m.l - m.r)));
+  const labelEvery = Math.max(1, Math.ceil((cats.length * 72) / (width - m.l - m.r)));
 
   return (
     <div ref={ref} className="w-full">
@@ -407,7 +410,12 @@ export function TypeHeatmap({
   const rows = types.filter((t) => cols.some(({ m }) => m?.per_type[t]));
   if (!rows.length) return <ChartEmpty>No per-type results for this selection.</ChartEmpty>;
   return (
-    <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <div
+      role="region"
+      aria-label="Recall per entity type, scrolls sideways"
+      tabIndex={0}
+      className="-mx-4 overflow-x-auto px-4 focus-visible:outline-2 focus-visible:outline-ink sm:mx-0 sm:px-0"
+    >
       <table className="w-full min-w-max border-separate border-spacing-0.5 text-xs">
         <caption className="sr-only">Overlap recall per entity type and system</caption>
         <thead>

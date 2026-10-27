@@ -145,7 +145,7 @@
       "default": false
     },
     "llm:muse-glimmer@reasoning_strength=low": {
-      "color": "#E69F00",
+      "color": "#332288",
       "shape": "circle",
       "label": "pii-guard Muse Glimmer (low)",
       "short_label": "Muse Glimmer (low)",
@@ -162,7 +162,7 @@
       "default": false
     },
     "llm:muse-glimmer@reasoning_strength=medium": {
-      "color": "#882255",
+      "color": "#999933",
       "shape": "circle",
       "label": "pii-guard Muse Glimmer (medium)",
       "short_label": "Muse Glimmer (medium)",
@@ -179,7 +179,7 @@
       "default": false
     },
     "rules+ner:xlmr-ner-hrl": {
-      "color": "#117733",
+      "color": "#882255",
       "shape": "circle",
       "label": "pii-guard rules + NER (zero-shot)",
       "short_label": "rules + NER (zero-shot)",
@@ -197,7 +197,7 @@
       "default": false
     },
     "visual:sam-3.1+tesseract+rules": {
-      "color": "#332288",
+      "color": "#117733",
       "shape": "circle",
       "label": "pii-guard image masking (sam-3.1 + tesseract + rules)",
       "short_label": "image masking (sam-3.1 + tesseract + rules)",

@@ -87,7 +87,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
       <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <Fact label="Runs" value={index.runs.length} />
         <Fact label="Systems" value={Object.keys(index.systems).length} />
-        <Fact label="Fixture sets" value={Object.keys(index.fixture_sets).length} />
+        <Fact label="Fixture sets" value={`${sets.length} text + ${Object.values(index.fixture_sets).filter((f) => f.kind === "visual").length} image`} />
         <Fact label="Latest run" value={lastRun} />
       </dl>
 
@@ -148,6 +148,9 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
                 </div>
               );
             })}
+            {Object.values(index.systems).some((v) => v.family === "comparison") && !available.some((k) => index.systems[k]?.family === "comparison") && (
+              <p className="text-xs text-muted">The open-source tools weren’t run on this set; pick another set to compare with them.</p>
+            )}
           </div>
         </fieldset>
       </section>
@@ -162,7 +165,8 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
       {info?.origin === "generated" && (
         <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
           <strong className="font-semibold text-warn">Generated set.</strong> These documents were written by a Muse model, the same family as pii-guard's LLM detector, which flatters
-          Muse-based detection. The hand-written set has no such bias.
+          Muse-based detection, and fine-tuned detectors may have been trained on similar generated text (see the run notes under the
+          results). The hand-written set has neither bias.
         </p>
       )}
 
@@ -172,6 +176,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         <>
           <Section id="bench-table" title="Results" note="Latest run of each system. Leak = labelled values still readable after masking.">
             <ResultsTable snapshots={snapshots} index={index} lang={lang} />
+            <RunNotes key={set} snapshots={snapshots} index={index} open={info?.origin === "generated"} />
           </Section>
           <Section id="bench-scatter" title="Leak rate vs latency" note="Down and left is better. Latency was measured where each system ran, so it is not a like-for-like speed test.">
             <LeakLatencyChart points={snapshots.flatMap((s) => {
@@ -182,7 +187,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
           <Section id="bench-lang" title="By language" note="The same fixture set in each language.">
             <LanguageBars snapshots={snapshots} systems={index.systems} languages={languages} />
           </Section>
-          <Section id="bench-progress" title="Leak rate over time" note="pii-guard configurations, run by run; dashed: best result so far.">
+          <Section id="bench-progress" title="Leak rate over time" note="Each pii-guard configuration, run by run. Dashed: the best result of any configuration so far, so a drop can mean a new configuration rather than an improved one.">
             <ProgressChart history={history} systems={index.systems} lang={lang} />
             <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
               {[...new Set(history.map((h) => h.system))].map((k) => (
@@ -276,30 +281,34 @@ function Section({ id, title, note, children }: { id: string; title: string; not
   );
 }
 
-type SortKey = "f1" | "leak" | "partial_leak" | "over_masking" | "detect_p50_ms";
+type SortKey = "f1" | "leak" | "partial_leak" | "over_masking" | "detect_p50_ms" | "precision" | "recall" | "roundtrip";
 
-const COLUMNS: { key: SortKey | "precision" | "recall" | "roundtrip"; label: string; better: "high" | "low"; sortable: boolean }[] = [
-  { key: "leak", label: "Leak", better: "low", sortable: true },
-  { key: "partial_leak", label: "Partial leak", better: "low", sortable: true },
-  { key: "f1", label: "F1", better: "high", sortable: true },
-  { key: "precision", label: "Precision", better: "high", sortable: false },
-  { key: "recall", label: "Recall", better: "high", sortable: false },
-  { key: "over_masking", label: "Over-masking", better: "low", sortable: true },
-  { key: "roundtrip", label: "Round trip", better: "high", sortable: false },
-  { key: "detect_p50_ms", label: "Latency p50", better: "low", sortable: true },
+const COLUMNS: { key: SortKey; label: string; better: "high" | "low" }[] = [
+  { key: "leak", label: "Leak", better: "low" },
+  { key: "partial_leak", label: "Partial leak", better: "low" },
+  { key: "f1", label: "F1", better: "high" },
+  { key: "precision", label: "Precision", better: "high" },
+  { key: "recall", label: "Recall", better: "high" },
+  { key: "over_masking", label: "Over-masking", better: "low" },
+  { key: "roundtrip", label: "Round trip", better: "high" },
+  { key: "detect_p50_ms", label: "Latency p50", better: "low" },
 ];
 
 function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index: BenchmarkIndex; lang: LanguageFilter }) {
-  const [sort, setSort] = useState<SortKey>("leak");
-  const better = COLUMNS.find((c) => c.key === sort)!.better;
+  // Each column first sorts best-first (lowest leak, highest F1); clicking again reverses.
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "leak", dir: "asc" });
+  const onSort = (c: (typeof COLUMNS)[number]) =>
+    setSort((prev) =>
+      prev.key === c.key ? { key: c.key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key: c.key, dir: c.better === "low" ? "asc" : "desc" },
+    );
   const rows = snapshots
     .map((s) => ({ s, m: pick(s, lang) }))
     .sort((a, b) => {
-      const va = a.m?.[sort] ?? null;
-      const vb = b.m?.[sort] ?? null;
-      if (va === null) return vb === null ? 0 : 1;
+      const va = a.m?.[sort.key] ?? null;
+      const vb = b.m?.[sort.key] ?? null;
+      if (va === null) return vb === null ? 0 : 1; // not run / not measured: always last
       if (vb === null) return -1;
-      return better === "low" ? va - vb : vb - va;
+      return sort.dir === "asc" ? va - vb : vb - va;
     });
   const best = (key: keyof Metrics, dir: "high" | "low") => {
     const vals = rows.map((r) => r.m?.[key]).filter((v): v is number => typeof v === "number");
@@ -307,9 +316,16 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
   };
 
   return (
-    <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <div
+      role="region"
+      aria-label="Results table, scrolls sideways"
+      tabIndex={0}
+      className="-mx-4 overflow-x-auto px-4 focus-visible:outline-2 focus-visible:outline-ink sm:mx-0 sm:px-0"
+    >
       <table className="w-full min-w-max text-sm">
-        <caption className="sr-only">Results per system, sorted by {COLUMNS.find((c) => c.key === sort)!.label}</caption>
+        <caption className="sr-only">
+          Results per system, sorted by {COLUMNS.find((c) => c.key === sort.key)!.label}, {sort.dir === "asc" ? "lowest" : "highest"} first
+        </caption>
         <thead>
           <tr className="border-b border-line text-left text-xs text-faint">
             <th scope="col" className="sticky left-0 z-10 bg-surface py-2 pr-3 font-semibold">
@@ -320,15 +336,18 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                 key={c.key}
                 scope="col"
                 className="px-2 py-2 text-right font-semibold whitespace-nowrap"
-                aria-sort={c.key === sort ? (c.better === "low" ? "ascending" : "descending") : undefined}
+                aria-sort={c.key === sort.key ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}
               >
-                {c.sortable ? (
-                  <button type="button" onClick={() => setSort(c.key as SortKey)} className={["rounded hover:text-ink", c.key === sort ? "text-ink underline underline-offset-4" : ""].join(" ")}>
-                    {c.label}
-                  </button>
-                ) : (
-                  c.label
-                )}
+                <button
+                  type="button"
+                  onClick={() => onSort(c)}
+                  className={["inline-flex items-center gap-1 rounded hover:text-ink", c.key === sort.key ? "text-ink" : ""].join(" ")}
+                >
+                  {c.label}
+                  <span aria-hidden="true" className={["w-2.5 text-[10px]", c.key === sort.key ? "" : "opacity-0"].join(" ")}>
+                    {sort.dir === "asc" ? "▲" : "▼"}
+                  </span>
+                </button>
               </th>
             ))}
             <th scope="col" className="px-2 py-2 text-left font-semibold">
@@ -365,15 +384,54 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
           })}
         </tbody>
       </table>
-      {rows.some((r) => r.m?.latency_pooled) && <p className="mt-2 text-xs text-faint">* averaged over several runs (percentiles can’t be pooled exactly).</p>}
+      <p className="mt-2 text-xs text-faint">
+        Click a column to sort; click again to reverse. – means not measured (a tool that can’t unmask has no round trip).
+        {rows.some((r) => r.m?.latency_pooled) && " * averaged over several runs (percentiles can’t be pooled exactly)."}
+      </p>
     </div>
+  );
+}
+
+/** Where each result ran and what to keep in mind (training data overlap, remote API …). */
+function RunNotes({ snapshots, index, open }: { snapshots: Snapshot[]; index: BenchmarkIndex; open: boolean }) {
+  const runs = new Map(index.runs.map((r) => [r.run_id, r]));
+  const items = snapshots
+    .map((s) => {
+      const rs = s.run_ids.map((id) => runs.get(id)).filter((r) => r !== undefined);
+      const hardware = [...new Set(rs.map((r) => r.hardware).filter((h): h is string => !!h))];
+      const notes = [...new Set(rs.flatMap((r) => r.notes))];
+      return { s, hardware, notes };
+    })
+    .filter((i) => i.hardware.length || i.notes.length);
+  if (!items.length) return null;
+  return (
+    <details open={open} className="mt-4 rounded-xl border border-line bg-surface-2">
+      <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-ink">Where these ran, and caveats</summary>
+      <ul className="space-y-2 border-t border-line px-3 py-3 text-xs">
+        {items.map(({ s, hardware, notes }) => (
+          <li key={s.system}>
+            <p className="flex items-center gap-1.5 font-medium text-ink">
+              <MarkerIcon info={index.systems[s.system]} />
+              {index.systems[s.system]?.short_label ?? s.system}
+              {hardware.length > 0 && <span className="font-normal text-muted">· {hardware.join("; ")}</span>}
+            </p>
+            {notes.length > 0 && <p className="mt-0.5 pl-5 text-muted">{notes.join(" ")}</p>}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
 function VisualTable({ index }: { index: BenchmarkIndex }) {
   const types = [...new Set(index.visual.flatMap((r) => Object.keys(r.by_region_type)))];
   return (
-    <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <div
+      role="region"
+      aria-label="Image masking table, scrolls sideways"
+      tabIndex={0}
+      className="-mx-4 overflow-x-auto px-4 focus-visible:outline-2 focus-visible:outline-ink sm:mx-0 sm:px-0"
+    >
       <table className="w-full min-w-max text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs text-faint">
