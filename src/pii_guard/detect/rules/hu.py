@@ -6,11 +6,18 @@ the ``+36`` / ``0036`` / ``06`` prefix (validated against the area code), compan
 prefix and run for **every** language (``EVERYWHERE``): a Hungarian ID inside an English text
 is still personal data.
 
-Addresses, postcodes (four digits before a settlement name, or in context) and vehicle plates
-are formats without a checksum, so they run only when the text is Hungarian (``RULES``); in
-other languages "2019 Robin" or "ISO-900" style look-alikes would be false positives. A full
-address is validated against the gazetteer instead (``pii_guard.lang``, ADR 0009): its
-postcode must belong to its settlement.
+The personal identification number (személyi azonosító, 11 digits with a date of birth and a
+check digit), ID document numbers next to their label (személyi igazolvány, útlevél, vezetői
+engedély, tartózkodási engedély, or ``... számú személyi igazolvány`` after the number),
+machine-readable zones of ID cards and passports (TD1 and TD3, with their check digits) and
+land registry parcel numbers next to ``hrsz.`` / ``helyrajzi szám`` also run everywhere: the
+checksum or the label makes them unambiguous.
+
+Addresses, postcodes (four digits before a settlement name, or in context), vehicle plates and
+an ID card number without its label (``123456AB``) are formats without a checksum, so they run
+only when the text is Hungarian (``RULES``); in other languages "2019 Robin" or "ISO-900" style
+look-alikes would be false positives. A full address is validated against the gazetteer
+instead (``pii_guard.lang``, ADR 0009): its postcode must belong to its settlement.
 """
 
 from __future__ import annotations
@@ -21,8 +28,11 @@ from functools import cache
 
 from pii_guard.detect.checksums import (
     is_valid_giro,
+    is_valid_hu_personal_id,
     is_valid_hu_tax_id,
     is_valid_hu_tax_number,
+    is_valid_mrz_td1,
+    is_valid_mrz_td3,
     is_valid_taj,
 )
 from pii_guard.detect.rules._base import (
@@ -68,6 +78,117 @@ def _find_taj(text: str) -> Iterator[_Hit]:
             # A mod-10 check passes for 1 in 10 random numbers: context matters more here.
             score = 0.95 if context_before(text, m.start(), _TAJ_CONTEXT) else 0.8
             yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, score)
+
+
+# --- Personal identification number (személyi azonosító) --------------------
+
+# ``1-710304-1234``, ``1 710304 1234`` or ``17103041234``: sex/century digit, date of birth,
+# serial and check digit. The check digit and the date make it unambiguous everywhere; there
+# is no type of its own, so like other national numbers it is an ID_DOCUMENT.
+_PERSONAL_ID_RE = re.compile(
+    NUM_START
+    + NO_GROUP_BEFORE
+    + r"([1-8])([ -]?)(\d{6})\2(\d{4})"
+    + NUM_END
+    + NO_GROUP_AFTER
+    + NOT_AMOUNT
+)
+_PERSONAL_ID_CONTEXT = ("személyi azonosító", "személyi szám", "személyiszám", "personal id")
+
+
+def _find_hu_personal_id(text: str) -> Iterator[_Hit]:
+    for m in _PERSONAL_ID_RE.finditer(text):
+        if is_valid_hu_personal_id(m.group(1) + m.group(3) + m.group(4)):
+            score = 0.99 if context_before(text, m.start(), _PERSONAL_ID_CONTEXT) else 0.85
+            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, score)
+
+
+# --- ID document numbers ----------------------------------------------------
+
+# Hungarian document number formats: ID card ``123456AB`` (six digits, two letters), driving
+# licence ``AB123456`` and passport ``AB1234567`` (two letters, six or seven digits).
+_ID_CARD = r"\d{6}[A-Z]{2}"
+_LETTERS_FIRST = r"[A-Z]{2}\d{6,7}"
+_ID_FORMAT_RE = re.compile(rf"(?<![\w\-./])(?:{_ID_CARD}|{_LETTERS_FIRST})(?![\w\-]|[./]\w)")
+
+# The document's name, in Hungarian (also inflected and abbreviated) and English. Matched at a
+# word start, so "szig." doesn't fire inside "szigorú".
+_ID_LABEL = (
+    r"(?:szem[ée]ly(?:i|azonos[íi]t[óo])[ \t]+(?:igazolv[áa]ny\w*|ig\.?)"
+    r"(?:[ \t]*(?:sz\.|sz[áa]m\w*))?"
+    r"|szig(?:\.|sz[áa]m\w*|\b)"
+    r"|igazolv[áa]nysz[áa]m\w*|okm[áa]ny(?:azonos[íi]t[óo]|sz[áa]m)\w*|okm[áa]ny[ \t]+sz[áa]m\w*"
+    r"|[úu]tlev[ée]l\w*"
+    r"|vezet[őo]i[ \t]+eng(?:ed[ée]ly\w*|\.)|jogos[íi]tv[áa]ny\w*|jogsi\w*"
+    r"|tart[óo]zkod[áa]si[ \t]+(?:enged[ée]ly\w*|k[áa]rty[áa]\w*)"
+    r"|(?:id(?:entity)?[ \t]+card|passport|driving[ \t]+licen[cs]e|driver'?s[ \t]+licen[cs]e"
+    r"|residence[ \t]+(?:permit|card)))"
+)
+# Hungarian labels are also matched without accents, as people type them in chat ("szemelyi").
+_ID_LABEL_RE = re.compile(rf"(?i:(?<!\w){_ID_LABEL})")
+# The value right after its label: "személyi igazolvány száma: 123456AB", "útlevél (BA1234567)".
+# Any 6-12 letters and digits with at least one of each (residence permits and foreign
+# documents have other formats); a known Hungarian format scores higher.
+_ID_AFTER_LABEL_RE = re.compile(
+    rf"(?i:(?<!\w){_ID_LABEL})"
+    r"(?:[ \t]+(?i:száma|szám|sz\.|no\.?|number|nr\.?))?"
+    r"[ \t]*[:#(]?[ \t]*"
+    r"(?P<id>(?=[A-Z]*\d)(?=\d*[A-Z])[A-Z\d]{6,12})(?![\w\-]|[./]\w)"
+)
+# The label after the value, as legal Hungarian has it: "a 123456AB számú személyi igazolvány",
+# "BA1234567 sz. útlevéllel".
+_ID_LABEL_AFTER_RE = re.compile(
+    rf"[ \t]*(?:\([^)\n]{{0,20}}\)[ \t]*)?(?:számú|sz\.)[ \t]+{_ID_LABEL}", re.IGNORECASE
+)
+_ID_CONTEXT_WINDOW = 40
+
+
+def _find_id_document(text: str) -> Iterator[_Hit]:
+    """ID card, passport, driving licence and residence permit numbers next to their label."""
+    for m in _ID_AFTER_LABEL_RE.finditer(text):
+        known = _ID_FORMAT_RE.fullmatch(m.group("id")) is not None
+        yield _Hit(m.start("id"), m.end("id"), EntityType.ID_DOCUMENT, 0.95 if known else 0.85)
+    for m in _ID_FORMAT_RE.finditer(text):
+        before = text[max(0, m.start() - _ID_CONTEXT_WINDOW) : m.start()]
+        if _ID_LABEL_RE.search(before) or _ID_LABEL_AFTER_RE.match(text, m.end()):
+            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, 0.95)
+
+
+_BARE_ID_CARD_RE = re.compile(rf"(?<![\w\-./]){_ID_CARD}(?![\w\-]|[./]\w)")
+
+
+def _find_bare_id_card(text: str) -> Iterator[_Hit]:
+    """``123456AB`` without its label: distinctive in Hungarian text, but no checksum."""
+    for m in _BARE_ID_CARD_RE.finditer(text):
+        yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, 0.7)
+
+
+# --- Machine-readable zones (ICAO 9303) -------------------------------------
+
+# OCR'd ID cards (TD1: 3 lines of 30) and passports (TD3: 2 lines of 44). Every check digit
+# must agree; a zone of the right shape whose digits don't (OCR errors) still scores, lower.
+# The whole zone is the span: it holds the name, document number and date of birth.
+_MRZ_LINE = "[A-Z0-9<]"
+_MRZ_TD3_RE = re.compile(
+    rf"(?m)^[ \t]*(?P<l1>P{_MRZ_LINE}{{43}})[ \t]*\r?\n[ \t]*(?P<l2>{_MRZ_LINE}{{44}})[ \t]*$"
+)
+_MRZ_TD1_RE = re.compile(
+    rf"(?m)^[ \t]*(?P<l1>[ACI]{_MRZ_LINE}{{29}})[ \t]*\r?\n"
+    rf"[ \t]*(?P<l2>{_MRZ_LINE}{{30}})[ \t]*\r?\n[ \t]*(?P<l3>{_MRZ_LINE}{{30}})[ \t]*$"
+)
+
+
+def _find_mrz(text: str) -> Iterator[_Hit]:
+    for m in _MRZ_TD3_RE.finditer(text):
+        if "<<" not in m.group("l1"):
+            continue  # the name field always has a "<<" separator
+        valid = is_valid_mrz_td3(m.group("l1"), m.group("l2"))
+        yield _Hit(m.start("l1"), m.end("l2"), EntityType.ID_DOCUMENT, 0.99 if valid else 0.8)
+    for m in _MRZ_TD1_RE.finditer(text):
+        if "<<" not in m.group("l3"):
+            continue
+        valid = is_valid_mrz_td1(m.group("l1"), m.group("l2"), m.group("l3"))
+        yield _Hit(m.start("l1"), m.end("l3"), EntityType.ID_DOCUMENT, 0.99 if valid else 0.8)
 
 
 # --- Bank accounts ----------------------------------------------------------
@@ -284,6 +405,54 @@ def _find_address(text: str) -> Iterator[_Hit]:
         yield _Hit(start, m.end(), EntityType.ADDRESS, score)
 
 
+# --- Land registry parcel numbers (helyrajzi szám) --------------------------
+
+# ``1234``, ``1234/5``, ``0123/4`` (outskirts), ``0123/4/A/12`` (a unit in a condominium).
+# Without a checksum and easily confused with fractions, dates and case numbers, so a parcel
+# number needs its label right before or after it; a settlement name or "belterület" /
+# "külterület" nearby raises the score.
+_PARCEL = r"\d{1,6}(?:/\d{1,5})?(?:/[A-Z](?:/\d{1,4})?)?"
+# Not followed by more digits, or by a full stop and a lowercase word: "3. emelet" is an ordinal.
+_PARCEL_END = rf"(?![\w/]|[.\-]\d|\.[ \t]*[{_LOWER}])"
+_PARCEL_LABEL = r"(?:hrsz\.?|helyrajzi[ \t]+sz(?:ám|\.)\w*)"
+_PARCEL_AFTER_LABEL_RE = re.compile(
+    rf"(?i:(?<!\w){_PARCEL_LABEL})[ \t]*(?::|-?(?:on|ön|en|ú|ű)\b)?[ \t]*\r?\n?[ \t]*"
+    rf"(?P<n>{_PARCEL}){_PARCEL_END}"
+)
+# More parcels listed after the first: "hrsz.: 1234/5, 1234/6 és 1234/7".
+_PARCEL_LIST_RE = re.compile(
+    rf"(?:[ \t]*,[ \t]*|[ \t]+(?:és|valamint|and)[ \t]+)(?P<n>{_PARCEL}){_PARCEL_END}"
+)
+_PARCEL_BEFORE_LABEL_RE = re.compile(
+    rf"(?<![\w\-./,])(?P<n>{_PARCEL})(?:[ \t]*\([^)\n]{{0,20}}\))?[ \t]+-?"
+    rf"(?i:{_PARCEL_LABEL})"
+)
+_PARCEL_AREA = ("belterület", "külterület", "zártkert", "település", "ingatlan")
+_PARCEL_PLACE_RE = re.compile(rf"[{_UPPER}][{_LOWER}]{{2,}}")
+
+
+def _parcel_score(text: str, start: int) -> float:
+    before = text[max(0, start - 60) : start]
+    if any(word in before.casefold() for word in _PARCEL_AREA):
+        return 0.95
+    if any(_settlement(w.group()) for w in _PARCEL_PLACE_RE.finditer(before)):
+        return 0.95
+    return 0.9
+
+
+def _find_parcel_number(text: str) -> Iterator[_Hit]:
+    for m in _PARCEL_AFTER_LABEL_RE.finditer(text):
+        score = _parcel_score(text, m.start())
+        yield _Hit(m.start("n"), m.end("n"), EntityType.PARCEL_NUMBER_HU, score)
+        end = m.end()
+        while (more := _PARCEL_LIST_RE.match(text, end)) is not None:
+            yield _Hit(more.start("n"), more.end("n"), EntityType.PARCEL_NUMBER_HU, score)
+            end = more.end()
+    for m in _PARCEL_BEFORE_LABEL_RE.finditer(text):
+        score = _parcel_score(text, m.start())
+        yield _Hit(m.start("n"), m.end("n"), EntityType.PARCEL_NUMBER_HU, score)
+
+
 # --- Vehicles ---------------------------------------------------------------
 
 # Old format "ABC-123", new (2022) format "AA BC-123". A suffix may follow with a hyphen
@@ -334,5 +503,14 @@ EVERYWHERE: tuple[Rule, ...] = (
     _find_hu_tax_id,
     _find_taj,
     _find_hu_phone,
+    _find_hu_personal_id,
+    _find_id_document,
+    _find_mrz,
+    _find_parcel_number,
 )
-RULES: tuple[Rule, ...] = (_find_vehicle_plate, _find_address, _find_postcode)
+RULES: tuple[Rule, ...] = (
+    _find_vehicle_plate,
+    _find_address,
+    _find_postcode,
+    _find_bare_id_card,
+)

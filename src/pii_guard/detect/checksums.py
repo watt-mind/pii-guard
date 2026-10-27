@@ -8,17 +8,24 @@ can build valid fictional values; nothing here knows about real people.
 
 from __future__ import annotations
 
+from datetime import date
+
 __all__ = [
     "IBAN_LENGTHS",
     "giro_check_digit",
+    "hu_personal_id_check_digit",
     "hu_tax_id_check_digit",
     "hu_tax_number_check_digit",
     "iban_check_digits",
     "is_valid_giro",
+    "is_valid_hu_personal_id",
     "is_valid_hu_tax_id",
     "is_valid_hu_tax_number",
     "is_valid_iban",
+    "is_valid_mrz_td1",
+    "is_valid_mrz_td3",
     "is_valid_taj",
+    "mrz_check_digit",
     "taj_check_digit",
 ]
 
@@ -63,6 +70,54 @@ def is_valid_hu_tax_id(value: str) -> bool:
     if not _is_digits(value, 10) or value[0] != "8":
         return False
     return hu_tax_id_check_digit(value[:9]) == int(value[9])
+
+
+# --- Hungarian personal identification number (személyi azonosító) ---------
+#
+# 11 digits: ``S YYMMDD NNN C``. ``S`` encodes sex and century, ``YYMMDD`` is the date of
+# birth, ``NNN`` a serial for people born that day, ``C`` the check digit: the weighted sum
+# of the first 10 digits modulo 11, with weights 1..10 for people born before 1997-01-01 and
+# 10..1 from then on. A remainder of 10 means the serial is never issued.
+
+# First digit -> century of birth. 1-2: citizens born 1900-1999; 3-4: born 1800-1899; 5-6:
+# born 2000 or later; 7-8: foreign residents born 1900-1999 (0 and 9 are not used for new
+# numbers and are rejected).
+_PERSONAL_ID_CENTURY = {"1": 1900, "2": 1900, "3": 1800, "4": 1800, "5": 2000, "6": 2000,
+                        "7": 1900, "8": 1900}  # fmt: skip
+_PERSONAL_ID_REVERSED_FROM = date(1997, 1, 1)
+
+
+def _personal_id_birth_date(first7: str) -> date | None:
+    century = _PERSONAL_ID_CENTURY.get(first7[0])
+    if century is None:
+        return None
+    try:
+        return date(century + int(first7[1:3]), int(first7[3:5]), int(first7[5:7]))
+    except ValueError:
+        return None
+
+
+def hu_personal_id_check_digit(first10: str) -> int | None:
+    """Check digit for the first 10 digits of a személyi azonosító.
+
+    ``None`` if the payload can't be issued: unknown sex/century digit, an impossible date of
+    birth, or a weighted sum with remainder 10.
+    """
+    if not _is_digits(first10, 10):
+        raise ValueError("expected 10 digits")
+    born = _personal_id_birth_date(first10[:7])
+    if born is None:
+        return None
+    weights = range(1, 11) if born < _PERSONAL_ID_REVERSED_FROM else range(10, 0, -1)
+    remainder = sum(int(d) * w for d, w in zip(first10, weights, strict=True)) % 11
+    return None if remainder == 10 else remainder
+
+
+def is_valid_hu_personal_id(value: str) -> bool:
+    """11 digits, a valid sex/century digit and date of birth, a valid check digit."""
+    if not _is_digits(value, 11):
+        return False
+    return hu_personal_id_check_digit(value[:10]) == int(value[10])
 
 
 # --- Hungarian social security number (TAJ) ---------------------------------
@@ -157,3 +212,71 @@ def is_valid_iban(value: str) -> bool:
     if not value[2:4].isdigit():
         return False
     return _iban_to_int(value[4:] + value[:4]) % 97 == 1
+
+
+# --- Machine-readable zone of travel documents (ICAO Doc 9303) --------------
+#
+# Every check digit is the sum of the field's character values (digits as themselves, A-Z as
+# 10-35, the filler ``<`` as 0) times the repeating weights 7, 3, 1, modulo 10.
+
+_MRZ_WEIGHTS = (7, 3, 1)
+_MRZ_CHARS = frozenset("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ<")
+
+
+def _mrz_value(ch: str) -> int:
+    if ch == "<":
+        return 0
+    if ch.isdigit():
+        return int(ch)
+    return ord(ch) - ord("A") + 10
+
+
+def mrz_check_digit(field: str) -> int:
+    """The ICAO 9303 check digit of an MRZ field (``0-9``, ``A-Z`` and ``<`` only)."""
+    if not field or not set(field) <= _MRZ_CHARS:
+        raise ValueError("expected MRZ characters (0-9, A-Z, <)")
+    return sum(_mrz_value(ch) * _MRZ_WEIGHTS[i % 3] for i, ch in enumerate(field)) % 10
+
+
+def _mrz_check(field: str, digit: str) -> bool:
+    # A field left empty may carry '<' as its check digit (optional data in TD3).
+    if digit == "<":
+        return set(field) <= {"<"}
+    return digit.isdigit() and mrz_check_digit(field) == int(digit)
+
+
+def _is_mrz_line(line: str, length: int) -> bool:
+    return len(line) == length and set(line) <= _MRZ_CHARS
+
+
+def is_valid_mrz_td3(line1: str, line2: str) -> bool:
+    """A passport-size (TD3, 2 x 44) MRZ whose check digits all agree.
+
+    Line 2 carries the document number, date of birth, expiry date and optional data with
+    their check digits, then a composite check digit over all of them.
+    """
+    if not (_is_mrz_line(line1, 44) and _is_mrz_line(line2, 44)):
+        return False
+    return (
+        _mrz_check(line2[0:9], line2[9])
+        and _mrz_check(line2[13:19], line2[19])
+        and _mrz_check(line2[21:27], line2[27])
+        and _mrz_check(line2[28:42], line2[42])
+        and _mrz_check(line2[0:10] + line2[13:20] + line2[21:43], line2[43])
+    )
+
+
+def is_valid_mrz_td1(line1: str, line2: str, line3: str) -> bool:
+    """An ID-card-size (TD1, 3 x 30) MRZ whose check digits all agree.
+
+    The document number and its check digit are on line 1; the date of birth and expiry date
+    with theirs on line 2, which ends with the composite check digit over both lines.
+    """
+    if not all(_is_mrz_line(line, 30) for line in (line1, line2, line3)):
+        return False
+    return (
+        _mrz_check(line1[5:14], line1[14])
+        and _mrz_check(line2[0:6], line2[6])
+        and _mrz_check(line2[8:14], line2[14])
+        and _mrz_check(line1[5:30] + line2[0:7] + line2[8:15] + line2[18:29], line2[29])
+    )

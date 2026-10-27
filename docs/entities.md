@@ -21,7 +21,7 @@ keeps the two in sync. See [contracts.md](contracts.md#entity-policies-implement
 | `DATE_OF_BIRTH` | Dates in a birth-date context | LLM (context), rules (format) | mask |
 | `NATIONAL_ID_HU_TAX` | Hungarian personal tax ID (adóazonosító jel), 10 digits with checksum | rules | mask |
 | `NATIONAL_ID_HU_TAJ` | Hungarian social security (TAJ) number, 9 digits with checksum | rules | mask |
-| `ID_DOCUMENT` | ID card, passport and driving licence numbers; national numbers without their own type (US SSN, UK NINO) | rules, LLM (context) | mask |
+| `ID_DOCUMENT` | ID card, passport, driving licence and residence permit numbers; machine-readable zones (MRZ) of ID documents; national numbers without their own type (Hungarian személyi azonosító, US SSN, UK NINO) | rules, LLM (context) | mask |
 | `BANK_ACCOUNT` | IBAN (with checksum), Hungarian giro account numbers, payment card numbers (Luhn) | rules | mask |
 | `COMPANY_ID_HU` | Company registration number (cégjegyzékszám), company tax number | rules | keep |
 | `ORGANIZATION` | Company and institution names | NER, LLM | keep |
@@ -62,7 +62,16 @@ Payment cards use `BANK_ACCOUNT` until the taxonomy has a card type of its own.
 | Company tax number (adószám) | `COMPANY_ID_HU` | check digit, VAT and area code | everywhere |
 | Postcode before a settlement name or in context | `ADDRESS` | 4 digits, not an amount | language |
 | Vehicle plate (`ABC-123`, `AA BC-123`) | `VEHICLE_PLATE` | format | language |
-| Land registry parcel number | `PARCEL_NUMBER_HU` | LLM (context) | — |
+| Personal identification number (személyi azonosító, `1-710304-1237`) | `ID_DOCUMENT` | sex/century digit, date of birth, mod 11 (weights reversed from 1997) | everywhere |
+| ID card (`123456AB`), passport (`AB1234567`), driving licence (`AB123456`) number next to its label, before (`személyi igazolvány száma:`) or after (`… számú személyi igazolvány`) | `ID_DOCUMENT` | format + label, also unaccented (`szemelyi`, `szigszam`) | everywhere |
+| Other document number (residence permit, foreign ID) after its label | `ID_DOCUMENT` | 6–12 letters and digits, at least one of each + label (scores lower) | everywhere |
+| ID card number `123456AB` without a label | `ID_DOCUMENT` | format only (scores lowest) | language |
+| Machine-readable zone, TD1 (ID card, 3 × 30) and TD3 (passport, 2 × 44) | `ID_DOCUMENT` | ICAO 9303 check digits (a zone whose digits fail, e.g. after OCR, scores lower) | everywhere |
+| Land registry parcel number (`1234/5`, `0123/4`, `0123/4/A/12`) next to `hrsz.` / `helyrajzi szám`, also listed (`hrsz.: 1/2, 1/3 és 1/4`) | `PARCEL_NUMBER_HU` | format + label; settlement or `belterület`/`külterület` nearby raises the score | everywhere |
+
+A whole MRZ is one span: it holds the holder's name, document number and date of birth.
+Parcel numbers always need their label, so fractions (`1/2 arányú`), dates (`2026/10.`), page
+numbers (`3/5. oldal`) and court case numbers (`12.P.21.345/2025/7.`) stay unmasked.
 
 Vault inflection: case suffixes kept outside the placeholder (`[[PERSON_7f3a]]nek`), also
 when the stem changes: final-vowel lengthening (`Próba Zsuzsannának` → `[[PERSON_7f3a]]nak`)

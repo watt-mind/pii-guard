@@ -130,6 +130,32 @@ Before, only the postcode was masked, so the street and house number survived ("
 leaked"); now the whole address is one span. A postcode that belongs to another settlement
 keeps the address shape but isn't boosted above a bare postcode's score.
 
+## ID documents and parcel numbers
+
+Rules-only detection of `ID_DOCUMENT` and `PARCEL_NUMBER_HU`, before and after the Hungarian
+recognisers for the personal identification number, labelled document numbers, MRZ zones and
+parcel numbers (`uv run pii-guard eval --fixtures eval/fixtures/<set>.jsonl --detectors
+rules`). hu-smoke gained three documents for them (`hu-idcard-0029` with a TD1 zone,
+`hu-contract-0030`, and `hu-court-0031` with only hard negatives: case numbers, fractions,
+page numbers, dates); both columns are on the extended set.
+
+| Set | Type | | Gold | Pred | Exact P | Exact R | Leaked | Partially leaked |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| hu-smoke (31 docs) | `ID_DOCUMENT` | before | 10 | 0 | - | 0.00 | 10 | 0 |
+| | | after | 10 | 10 | **1.00** | **1.00** | **0** | 1 |
+| | `PARCEL_NUMBER_HU` | before | 6 | 0 | - | 0.00 | 6 | 0 |
+| | | after | 6 | 6 | **1.00** | **1.00** | **0** | 0 |
+| hu-synth-sample (20 docs) | `ID_DOCUMENT` | before | 8 | 0 | - | 0.00 | 8 | 0 |
+| | | after | 8 | 8 | **1.00** | **1.00** | **0** | 0 |
+| | `PARCEL_NUMBER_HU` | before | 7 | 0 | - | 0.00 | 7 | 0 |
+| | | after | 7 | 7 | **1.00** | **1.00** | **0** | 0 |
+
+No new false positives: overall exact precision stays 100.0 % on hu-smoke and hu-synth-sample
+and over-masking stays 0.0 %; en-smoke and en-synth-sample scorecards are unchanged (same
+predictions, P/R, leak and over-masking). The one partial leak is the MRZ in
+`hu-idcard-0029`: the zone is masked, but the holder's name (`PIROSKA`) also appears as a
+`PERSON` the rules don't detect; the NER pass masks it.
+
 ## Comparison with open-source tools
 
 pii-guard is also scored against the closest open-source alternatives, on the same fixtures
