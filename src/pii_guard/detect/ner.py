@@ -296,7 +296,10 @@ class TransformersBackend:
         self.tokenizer = AutoTokenizer.from_pretrained(model, use_fast=True, **kwargs)
         if not getattr(self.tokenizer, "is_fast", False):
             raise DetectionError("ner model needs a fast tokenizer (character offsets)")
-        self.model = AutoModelForTokenClassification.from_pretrained(model, **kwargs)
+        # safetensors only: never unpickle a pytorch_model.bin from the hub (code execution).
+        self.model = AutoModelForTokenClassification.from_pretrained(
+            model, use_safetensors=True, **kwargs
+        )
         self.model.to(self.device)
         self.model.eval()
         config = self.model.config
