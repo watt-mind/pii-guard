@@ -5,10 +5,12 @@ import { createMockClient } from "./api/mock";
 import type { GuardClient } from "./api/types";
 import { Header, type Screen } from "./components/Header";
 import { DEFAULT_SAMPLE, SAMPLES, type Sample } from "./content/samples";
+import type { BenchmarkLoader } from "./api/benchmarks";
 import { useEngine } from "./hooks/useEngine";
 import { useTheme } from "./hooks/useTheme";
 import { initialAnswer, runGuard, toRunError, type RunError, type RunResult } from "./lib/run";
 import { Playground } from "./screens/Playground";
+import { Benchmarks } from "./screens/Benchmarks";
 import { Images } from "./screens/Images";
 import { RoundTrip } from "./screens/RoundTrip";
 
@@ -18,15 +20,23 @@ export interface AppProps {
   envMode?: string;
   /** Loads a sample image's bytes (Images screen); injectable for tests. */
   loadImage?: (src: string) => Promise<Blob>;
+  /** Loads the benchmark index (Benchmarks screen); injectable for tests. */
+  loadBenchmarks?: BenchmarkLoader;
 }
 
-export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage }: AppProps) {
+export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks }: AppProps) {
   const apiClient = useMemo(() => api ?? createHttpClient(), [api]);
   const mockClient = useMemo(() => mock ?? createMockClient({ latencyMs: 220 }), [mock]);
   const engine = useEngine(apiClient, mockClient, envMode);
   const [theme, setTheme] = useTheme();
 
   const [screen, setScreen] = useState<Screen>("playground");
+  // Benchmarks load their data lazily on first open, then stay mounted (filters survive tab switches).
+  const [benchmarksOpened, setBenchmarksOpened] = useState(false);
+  const openScreen = (s: Screen) => {
+    if (s === "benchmarks") setBenchmarksOpened(true);
+    setScreen(s);
+  };
   const [sampleId, setSampleId] = useState<string | null>(DEFAULT_SAMPLE.id);
   const [text, setText] = useState(DEFAULT_SAMPLE.text);
   const [result, setResult] = useState<RunResult | null>(null);
@@ -70,7 +80,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
     <div className="min-h-dvh bg-canvas text-ink">
       <Header
         screen={screen}
-        onScreen={setScreen}
+        onScreen={openScreen}
         engineState={engine.state}
         engine={engine.engine}
         onPreference={engine.setPreference}
@@ -85,7 +95,9 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
             <strong className="font-semibold text-warn">Demo mode.</strong> {engineReason(engine.state)}.{" "}
             {screen === "images"
               ? "Images replay regions recorded from a real SAM 3.1 run on the built-in samples; uploads need the API."
-              : "Detection runs in your browser with a small built-in rule set, so results are illustrative."}{" "}
+              : screen === "benchmarks"
+                ? "Benchmarks are bundled with this page, so they are the same with or without the API."
+                : "Detection runs in your browser with a small built-in rule set, so results are illustrative."}{" "}
             {engine.state.status.state === "online" ? (
               engine.state.preference === "mock" ? (
                 <>Switch the engine to Auto or Live API for the real pipeline.</>
@@ -131,6 +143,9 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
         </div>
         <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={screen !== "images"}>
           <Images client={engine.client} engineState={engine.state} loadImage={loadImage} />
+        </div>
+        <div id="panel-benchmarks" role="tabpanel" aria-labelledby="tab-benchmarks" hidden={screen !== "benchmarks"}>
+          {benchmarksOpened && <Benchmarks load={loadBenchmarks} />}
         </div>
       </main>
 

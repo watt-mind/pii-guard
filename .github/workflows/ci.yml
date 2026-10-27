@@ -30,5 +30,7 @@ jobs:
         run: uv run ruff format --check .
       - name: Test
         run: uv run pytest
+      - name: Benchmark report is current
+        run: uv run pii-guard eval report --check
       - name: CLI
         run: uv run pii-guard --help

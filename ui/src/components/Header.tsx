@@ -2,12 +2,13 @@ import type { KeyboardEvent } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 
-export type Screen = "playground" | "roundtrip" | "images";
+export type Screen = "playground" | "roundtrip" | "images" | "benchmarks";
 
 const SCREENS: { id: Screen; step: string; label: string }[] = [
   { id: "playground", step: "1", label: "Playground" },
   { id: "roundtrip", step: "2", label: "Round trip" },
   { id: "images", step: "3", label: "Images" },
+  { id: "benchmarks", step: "4", label: "Benchmarks" },
 ];
 
 interface Props {
@@ -60,14 +61,14 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
                 onClick={() => onScreen(s.id)}
                 onKeyDown={onTabKey}
                 className={[
-                  "flex flex-1 items-center justify-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors md:flex-none",
+                  "flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-1.5 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors sm:px-3.5 sm:py-1.5 sm:text-sm md:flex-none",
                   selected ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-muted hover:text-ink",
                 ].join(" ")}
               >
                 <span
                   aria-hidden="true"
                   className={[
-                    "grid size-5 place-items-center rounded-full text-[11px] font-semibold tabular-nums",
+                    "hidden size-5 place-items-center rounded-full text-[11px] font-semibold tabular-nums sm:grid",
                     selected ? "bg-ink text-canvas" : "bg-line text-muted",
                   ].join(" ")}
                 >

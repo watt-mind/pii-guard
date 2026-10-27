@@ -11,10 +11,11 @@ projects.
 2. **Fail closed.** Code paths that cannot finish masking must stop the request, not forward
    it.
 3. **No raw values in logs or errors.** Log entity types, counts and placeholder ids.
-4. **Measure detection changes.** If you touch detection, include the before/after scorecard
-   from `uv run pii-guard eval` in the pull request. If it changes a headline metric (leak
-   rate, F1, latency or cost of a recommended configuration), add a milestone to
-   [docs/journey.md](docs/journey.md).
+4. **Measure detection changes.** If you touch detection, record a run and commit it with the
+   change: `uv run pii-guard eval --fixtures eval/fixtures --detectors rules --record <slug>`
+   (see [Recording a benchmark run](#recording-a-benchmark-run)), and put the before/after
+   numbers in the pull request. If it changes a headline metric (leak rate, F1, latency or
+   cost of a recommended configuration), add a milestone to [docs/journey.md](docs/journey.md).
 
 ## Development setup
 
@@ -41,6 +42,25 @@ Or without `make`: `uv sync`, `uv run pytest`, `uv run ruff check . && uv run ru
 The interfaces other components depend on (core types, detector registry, REST, vault, eval
 fixtures) are in [docs/contracts.md](docs/contracts.md). A change to one of them updates that
 file in the same pull request.
+
+## Recording a benchmark run
+
+Adding a run to the [benchmark history](docs/benchmarks.md) is one command:
+
+```bash
+uv run pii-guard eval --fixtures eval/fixtures --detectors rules,ner --record ner-threshold-0.6
+```
+
+It runs the evaluation, writes `eval/results/runs/<today>-ner-threshold-0.6.json` (plus one
+record per `--baselines` tool) and regenerates `eval/results/index.json`, the charts in
+`docs/benchmarks/`, `docs/benchmarks.md` and the UI's copy of the index. Commit all of them; CI
+runs `uv run pii-guard eval report --check` and fails if they are out of date.
+
+Models, settings, hardware and cost that the harness can't see go in a small JSON file passed
+with `--record-extra` (format in [docs/evaluation.md](docs/evaluation.md#run-records)). A
+scorecard saved earlier with `--json` becomes a record with
+`uv run pii-guard eval record SCORECARD.json --slug <slug>`. Run records hold only types,
+counts and ratios, never a value or a document text.
 
 ## Commits and pull requests
 

@@ -1,0 +1,808 @@
+"""Static SVG charts from the benchmark index, hand-written (no plotting dependency).
+
+Every chart is 1600 x 900 (16:9, slide-sized: at 1920 px wide the smallest text is >= 24 px),
+on a white card with dark text, colour-blind-safe colours (Okabe-Ito / Paul Tol; comparison
+tools grey with distinct marker shapes) and a caption naming the fixture set, its size,
+the run dates and the commits. Output depends only on the index, so it is byte-stable.
+
+- :func:`leak_vs_latency`: full leak rate vs detection latency (log x), one point per system;
+- :func:`by_language`: overlap F1 and full leak per language, per system;
+- :func:`progress`: leak rate of each pii-guard system over time, with the best so far;
+- :func:`type_recall_heatmap`: overlap recall per entity type and system;
+- :func:`visual_recall`: image-region recall per region type, per visual run.
+"""
+
+from __future__ import annotations
+
+import itertools
+import math
+from collections.abc import Mapping, Sequence
+from html import escape
+from typing import Any
+
+__all__ = ["by_language", "leak_vs_latency", "progress", "type_recall_heatmap", "visual_recall"]
+
+W, H = 1600, 900
+FONT = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+INK = "#1B1B1F"
+MUTED = "#4A4A52"
+GRID = "#E3E3E8"
+AXIS = "#8A8A93"
+BG = "#FFFFFF"
+#: Language colours (Paul Tol bright/muted, colour-blind safe), assigned in index order.
+LANG_COLORS = ["#332288", "#44AA99", "#DDCC77", "#CC6677", "#88CCEE", "#AA4499", "#117733"]
+
+
+# --- SVG primitives -----------------------------------------------------------------------
+
+
+def _n(x: float) -> str:
+    """A coordinate with at most one decimal, no trailing zeros (stable text)."""
+    s = f"{x:.1f}"
+    return s[:-2] if s.endswith(".0") else s
+
+
+def text_width(text: str, size: float, *, bold: bool = False) -> float:
+    """Approximate rendered width of ``text`` in a Helvetica-like font."""
+    narrow = sum(text.count(c) for c in "il.,:;|!'()[] 1tfjr")
+    wide = sum(text.count(c) for c in "MW@%mw")
+    caps = sum(1 for c in text if c.isupper()) - wide
+    rest = len(text) - narrow - wide - max(caps, 0)
+    em = narrow * 0.3 + wide * 0.85 + max(caps, 0) * 0.66 + rest * 0.55
+    return em * size * (1.06 if bold else 1.0)
+
+
+def _text(
+    x: float,
+    y: float,
+    content: str,
+    *,
+    size: float = 22,
+    fill: str = INK,
+    anchor: str = "start",
+    weight: str | None = None,
+    extra: str = "",
+) -> str:
+    attrs = f'x="{_n(x)}" y="{_n(y)}" font-size="{_n(size)}" fill="{fill}"'
+    if anchor != "start":
+        attrs += f' text-anchor="{anchor}"'
+    if weight:
+        attrs += f' font-weight="{weight}"'
+    return f"<text {attrs}{extra}>{escape(content)}</text>"
+
+
+def _marker(shape: str, x: float, y: float, r: float, color: str, *, hollow: bool = False) -> str:
+    fill = BG if hollow else color
+    stroke = f'stroke="{color if hollow else BG}" stroke-width="{4 if hollow else 3}"'
+    if shape == "square":
+        s = r * 1.7
+        return (
+            f'<rect x="{_n(x - s / 2)}" y="{_n(y - s / 2)}" width="{_n(s)}" height="{_n(s)}" '
+            f'fill="{fill}" {stroke}/>'
+        )
+    if shape == "triangle":
+        pts = [(x, y - r * 1.15), (x + r * 1.1, y + r * 0.8), (x - r * 1.1, y + r * 0.8)]
+        return (
+            f'<polygon points="{" ".join(f"{_n(a)},{_n(b)}" for a, b in pts)}" fill="{fill}" '
+            f"{stroke}/>"
+        )
+    if shape == "diamond":
+        pts = [(x, y - r * 1.25), (x + r * 1.25, y), (x, y + r * 1.25), (x - r * 1.25, y)]
+        return (
+            f'<polygon points="{" ".join(f"{_n(a)},{_n(b)}" for a, b in pts)}" fill="{fill}" '
+            f"{stroke}/>"
+        )
+    if shape == "cross":
+        d = r * 0.9
+        a, b, c, e = _n(x - d), _n(y - d), _n(x + d), _n(y + d)
+        return (
+            f'<path d="M{a},{b}L{c},{e}M{a},{e}L{c},{b}" '
+            f'stroke="{color}" stroke-width="5" fill="none"/>'
+        )
+    return f'<circle cx="{_n(x)}" cy="{_n(y)}" r="{_n(r)}" fill="{fill}" {stroke}/>'
+
+
+def _svg(title: str, desc: str, body: Sequence[str], caption: Sequence[str]) -> str:
+    """The SVG document: background, title block, ``body``, and the caption lines at the bottom."""
+    out = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" '
+        f'role="img" aria-labelledby="t d" font-family="{escape(FONT, quote=True)}">',
+        f'<title id="t">{escape(title)}</title>',
+        f'<desc id="d">{escape(desc)}</desc>',
+        f'<rect width="{W}" height="{H}" fill="{BG}"/>',
+        _text(56, 70, title, size=40, weight="700"),
+    ]
+    out.extend(body)
+    y = H - 30 - 30 * (len(caption) - 1)
+    for line in caption:
+        out.append(_text(56, y, line, size=20, fill=MUTED))
+        y += 30
+    out.append("</svg>")
+    return "\n".join(out) + "\n"
+
+
+def _pct(v: float | None, digits: int = 1) -> str:
+    return "n/a" if v is None else f"{v * 100:.{digits}f}"
+
+
+def _ms(v: float | None) -> str:
+    if v is None:
+        return "n/a"
+    if v >= 1000:
+        return f"{v / 1000:.1f} s"
+    if v >= 10:
+        return f"{v:.0f} ms"
+    if v >= 1:
+        return f"{v:.1f} ms"
+    return f"{v:.2f} ms"
+
+
+def _short(commit: str) -> str:
+    return commit[:7]
+
+
+def _span(dates: Sequence[str]) -> str:
+    ds = sorted(set(dates))
+    if not ds:
+        return "no runs"
+    return ds[0] if len(ds) == 1 else f"{ds[0]} to {ds[-1]}"
+
+
+def set_caption(index: Mapping[str, Any], fixture_set: str) -> str:
+    """``smoke: hand-written, hu 28 docs + en 10 docs`` (the n always goes with the set)."""
+    info = index["fixture_sets"].get(fixture_set, {})
+    docs = info.get("documents", {})
+    parts = " + ".join(f"{lang} {n} docs" for lang, n in docs.items())
+    origin = info.get("origin", "unknown")
+    if origin == "generated":
+        origin = "generated by " + (", ".join(info.get("generators") or []) or "a model")
+    return f"Fixture set '{fixture_set}' ({origin}; {parts})"
+
+
+def _snapshots(
+    index: Mapping[str, Any], fixture_set: str, systems: Sequence[str]
+) -> list[dict[str, Any]]:
+    by_key = {s["system"]: s for s in index["snapshots"] if s["fixture_set"] == fixture_set}
+    return [by_key[k] for k in systems if k in by_key]
+
+
+def _provenance(snaps: Sequence[Mapping[str, Any]]) -> str:
+    dates = [d for s in snaps for d in s["dates"]]
+    commits = sorted({_short(c) for s in snaps for c in s["commits"]})
+    return (
+        f"Runs {_span(dates)} · commits {', '.join(commits)} · generated by `pii-guard eval "
+        "report` from eval/results/runs/"
+    )
+
+
+# --- (a) leak vs latency --------------------------------------------------------------------
+
+
+def _place_labels(
+    points: list[dict[str, Any]], box: tuple[float, float, float, float], size: float
+) -> None:
+    """Greedy label placement, best (lowest) point first; avoids other labels and points."""
+    x0, y0, x1, y1 = box
+    taken: list[tuple[float, float, float, float]] = []
+    for p in points:  # markers and their p95 whiskers are obstacles too
+        taken.append(
+            (p["x"] - 14, p["y"] - 14, max(p["x"], p.get("x95", p["x"])) + 14, p["y"] + 14)
+        )
+    for p in sorted(points, key=lambda q: (-q["y"], q["x"])):  # lowest leak (best) first
+        w = text_width(p["label"], size, bold=True)
+        h = size * 1.2
+        candidates = []
+        for dy in (-30, 30, 0, -62, 62, -94, 94):
+            dx = 4 if dy else 22
+            candidates.append((p["x"] + dx, p["y"] + dy, "start"))
+            candidates.append((p["x"] - dx, p["y"] + dy, "end"))
+        choice = candidates[0]
+        for cx, cy, anchor in candidates:
+            left = cx if anchor == "start" else cx - w
+            rect = (left - 4, cy - h / 2 - 2, left + w + 4, cy + h / 2 + 2)
+            if rect[0] < x0 or rect[2] > x1 or rect[1] < y0 or rect[3] > y1:
+                continue
+            if any(
+                not (rect[2] < t[0] or rect[0] > t[2] or rect[3] < t[1] or rect[1] > t[3])
+                for t in taken
+            ):
+                continue
+            choice = (cx, cy, anchor)
+            taken.append(rect)
+            break
+        p["lx"], p["ly"], p["anchor"] = choice
+
+
+def leak_vs_latency(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[str]) -> str:
+    snaps = [s for s in _snapshots(index, fixture_set, systems) if s["all"]["detect_p50_ms"]]
+    styles = index["systems"]
+    px0, py0, px1, py1 = 150, 200, 1530, 700
+    lat = [s["all"]["detect_p50_ms"] for s in snaps] + [
+        s["all"]["detect_p95_ms"] or 0 for s in snaps
+    ]
+    lo = math.floor(math.log10(min(v for v in lat if v > 0))) if snaps else -1
+    hi = math.ceil(math.log10(max(lat))) if snaps else 4
+    leak_max = max([s["all"]["leak"] or 0 for s in snaps] + [0.1])
+    ymax = min(1.0, math.ceil(leak_max * 10 + 0.5) / 10)
+
+    def sx(ms: float) -> float:
+        return px0 + (math.log10(ms) - lo) / (hi - lo) * (px1 - px0)
+
+    pad = ymax * 0.05  # 0% sits a little above the axis so markers there stay visible
+
+    def sy(rate: float) -> float:
+        return py1 - (rate + pad) / (ymax + pad) * (py1 - py0)
+
+    body = [
+        _text(
+            56,
+            112,
+            "Full leak rate (lower is safer) vs detection latency per document "
+            "(log scale, faster is left)",
+            size=24,
+            fill=MUTED,
+        )
+    ]
+    step = 0.1 if ymax <= 0.6 else 0.2
+    ticks = [round(i * step, 2) for i in range(round(ymax / step) + 1)]
+    for t in ticks:
+        y = sy(t)
+        body.append(
+            f'<line x1="{px0}" y1="{_n(y)}" x2="{px1}" y2="{_n(y)}" stroke="{GRID}" '
+            'stroke-width="2"/>'
+        )
+        body.append(_text(px0 - 16, y + 7, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="end"))
+    for e in range(lo, hi + 1):
+        x = sx(10**e)
+        body.append(
+            f'<line x1="{_n(x)}" y1="{py0}" x2="{_n(x)}" y2="{py1}" stroke="{GRID}" '
+            'stroke-width="2"/>'
+        )
+        body.append(_text(x, py1 + 34, _ms(10.0**e), size=20, fill=MUTED, anchor="middle"))
+    body.append(
+        f'<line x1="{px0}" y1="{py1}" x2="{px1}" y2="{py1}" stroke="{AXIS}" stroke-width="2"/>'
+    )
+    body.append(
+        _text(
+            (px0 + px1) / 2,
+            py1 + 72,
+            "Detection latency per document, p50 (line to p95)",
+            size=22,
+            anchor="middle",
+        )
+    )
+    body.append(
+        _text(
+            48,
+            (py0 + py1) / 2,
+            "Full leak rate",
+            size=22,
+            anchor="middle",
+            extra=f' transform="rotate(-90 48 {_n((py0 + py1) / 2)})"',
+        )
+    )
+    body.append(_text(px0 + 16, py1 - 16, "better ↙", size=20, fill=MUTED))
+
+    points = []
+    for s in snaps:
+        st = styles[s["system"]]
+        m = s["all"]
+        x, y = sx(m["detect_p50_ms"]), sy(m["leak"] or 0)
+        if m["detect_p95_ms"] and m["detect_p95_ms"] > m["detect_p50_ms"]:
+            x95 = sx(m["detect_p95_ms"])
+            body.append(
+                f'<line x1="{_n(x)}" y1="{_n(y)}" x2="{_n(x95)}" y2="{_n(y)}" '
+                f'stroke="{st["color"]}" stroke-width="3" opacity="0.7"/>'
+            )
+            body.append(
+                f'<line x1="{_n(x95)}" y1="{_n(y - 9)}" x2="{_n(x95)}" y2="{_n(y + 9)}" '
+                f'stroke="{st["color"]}" stroke-width="3" opacity="0.7"/>'
+            )
+        label = f"{st['short_label']} {_pct(m['leak'])}%"
+        x95 = sx(m["detect_p95_ms"]) if m["detect_p95_ms"] else x
+        points.append({"x": x, "x95": x95, "y": y, "label": label, "style": st})
+    _place_labels(points, (px0 + 4, py0 - 20, W - 40, py1 - 4), 22)
+    for p in points:
+        st = p["style"]
+        hollow = st["family"] == "comparison"
+        body.append(_marker(st["shape"], p["x"], p["y"], 12, st["color"], hollow=hollow))
+        if abs(p["ly"] - p["y"]) > 40:  # placed away from its marker: a leader line says whose
+            ly = p["ly"] + (14 if p["ly"] < p["y"] else -14)
+            body.append(
+                f'<line x1="{_n(p["x"])}" y1="{_n(p["y"] + (-13 if p["ly"] < p["y"] else 13))}" '
+                f'x2="{_n(p["lx"])}" y2="{_n(ly)}" stroke="{MUTED}" stroke-width="1.5"/>'
+            )
+        body.append(
+            _text(p["lx"], p["ly"] + 8, p["label"], size=22, anchor=p["anchor"], weight="600")
+        )
+    # Legend: ours vs comparison tools, one row under the subtitle.
+    legend_a = "pii-guard (filled, one colour per configuration)"
+    body.append(_marker("circle", 66, 151, 10, "#0072B2"))
+    body.append(_text(86, 158, legend_a, size=20, fill=MUTED))
+    lx = 86 + text_width(legend_a, 20) + 48
+    body.append(_marker("square", lx, 151, 10, "#595959", hollow=True))
+    body.append(
+        _text(lx + 20, 158, "open-source comparison tools (hollow, grey)", size=20, fill=MUTED)
+    )
+    caption = [
+        set_caption(index, fixture_set)
+        + ", hu + en pooled. Small sets: a few points of difference is noise.",
+        (
+            "Latency measured where each system ran (remote API, H100, laptop CPU): see "
+            "docs/benchmarks.md; not a like-for-like speed test."
+        ),
+        _provenance(snaps),
+    ]
+    return _svg(
+        "Leak rate vs latency",
+        "Scatter of full leak rate against detection latency for each system on the "
+        + fixture_set
+        + " fixtures: "
+        + "; ".join(p["label"] for p in points),
+        body,
+        caption,
+    )
+
+
+# --- (b) by language ------------------------------------------------------------------------
+
+
+def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[str]) -> str:
+    snaps = _snapshots(index, fixture_set, systems)
+    styles = index["systems"]
+    langs = [lang for lang in index["languages"] if any(lang in s["languages"] for s in snaps)]
+    colors = {lang: LANG_COLORS[i % len(LANG_COLORS)] for i, lang in enumerate(langs)}
+    label_w = (
+        max([text_width(styles[s["system"]]["short_label"], 21, bold=True) for s in snaps] + [100])
+        + 28
+        + 32
+    )
+    top, bottom = 210, 740
+    row_h = (bottom - top) / max(len(snaps), 1)
+    bar_h = min(26, (row_h - 14) / max(len(langs), 1))
+    panels = [
+        ("Overlap F1 (higher is better)", "f1", 56 + label_w),
+        ("Full leak rate (lower is safer)", "leak", 0),
+    ]
+    gap = 110
+    pw = (W - 56 - label_w - gap - 80) / 2
+    panels[1] = (panels[1][0], panels[1][1], panels[0][2] + pw + gap)
+    body = [
+        _text(
+            56,
+            112,
+            "Per language, per system: the same fixture set in each language",
+            size=24,
+            fill=MUTED,
+        )
+    ]
+    # Legend for languages.
+    lx = 56
+    info = index["fixture_sets"].get(fixture_set, {})
+    for lang in langs:
+        body.append(f'<rect x="{lx}" y="140" width="22" height="22" fill="{colors[lang]}"/>')
+        txt = f"{lang} ({info.get('documents', {}).get(lang, '?')} docs)"
+        body.append(_text(lx + 30, 159, txt, size=21))
+        lx += 30 + text_width(txt, 21) + 36
+    for title, _key, x0 in panels:
+        body.append(_text(x0, top - 14, title, size=22, weight="600"))
+        for t in (0, 0.25, 0.5, 0.75, 1.0):
+            x = x0 + t * pw
+            body.append(
+                f'<line x1="{_n(x)}" y1="{top}" x2="{_n(x)}" y2="{bottom}" stroke="{GRID}" '
+                'stroke-width="2"/>'
+            )
+            body.append(
+                _text(x, bottom + 30, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="middle")
+            )
+    for i, s in enumerate(snaps):
+        st = styles[s["system"]]
+        y = top + i * row_h + (row_h - bar_h * len(langs)) / 2
+        body.append(
+            _marker(
+                st["shape"],
+                56 + 10,
+                y + bar_h * len(langs) / 2,
+                9,
+                st["color"],
+                hollow=st["family"] == "comparison",
+            )
+        )
+        body.append(
+            _text(56 + 28, y + bar_h * len(langs) / 2 + 8, st["short_label"], size=21, weight="600")
+        )
+        for j, lang in enumerate(langs):
+            m = s["languages"].get(lang)
+            for _, key, x0 in panels:
+                yy = y + j * bar_h
+                v = None if m is None else m[key]
+                if v is None:
+                    body.append(_text(x0 + 6, yy + bar_h - 5, "not run", size=18, fill=MUTED))
+                    continue
+                w = max(v * pw, 2)
+                body.append(
+                    f'<rect x="{_n(x0)}" y="{_n(yy + 2)}" width="{_n(w)}" '
+                    f'height="{_n(bar_h - 4)}" fill="{colors[lang]}"/>'
+                )
+                body.append(_text(x0 + w + 8, yy + bar_h - 6, _pct(v), size=19, fill=INK))
+    caption = [
+        set_caption(index, fixture_set)
+        + ". Bars are per-language results; a missing bar was not run.",
+        (
+            "Full leak = labelled values of mask-policy types surviving masking in any surface "
+            "form. F1 = span overlap match, micro."
+        ),
+        _provenance(snaps),
+    ]
+    return _svg(
+        "F1 and leak rate by language",
+        "Grouped bars of overlap F1 and full leak rate per language for each system on the "
+        + fixture_set
+        + " fixtures.",
+        body,
+        caption,
+    )
+
+
+# --- (c) progress over time -----------------------------------------------------------------
+
+
+def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[str]) -> str:
+    styles = index["systems"]
+    ours = [k for k in systems if styles.get(k, {}).get("family") == "pii-guard"]
+    ours += [
+        k for k, v in styles.items() if v.get("default") and k not in ours and v["kind"] == "text"
+    ]
+    hist = [h for h in index["history"] if h["fixture_set"] == fixture_set and h["system"] in ours]
+    cats: list[tuple[str, str]] = []
+    for h in hist:
+        if (h["date"], h["commit"]) not in cats:
+            cats.append((h["date"], h["commit"]))
+    px0, py0, px1, py1 = 150, 170, 1180, 700
+    leak_max = max([h["all"]["leak"] or 0 for h in hist] + [0.1])
+    ymax = min(1.0, math.ceil(leak_max * 10 + 0.5) / 10)
+
+    def sx(i: int) -> float:
+        return px0 + (i + 0.5) * (px1 - px0) / max(len(cats), 1)
+
+    def sy(v: float) -> float:
+        return py1 - v / ymax * (py1 - py0)
+
+    body = [
+        _text(
+            56,
+            112,
+            (
+                "Full leak rate of each pii-guard configuration, run by run, oldest first (lower "
+                "is safer)"
+            ),
+            size=24,
+            fill=MUTED,
+        )
+    ]
+    for t in [round(i * 0.1, 1) for i in range(round(ymax / 0.1) + 1)]:
+        body.append(
+            f'<line x1="{px0}" y1="{_n(sy(t))}" x2="{px1}" y2="{_n(sy(t))}" stroke="{GRID}" '
+            'stroke-width="2"/>'
+        )
+        body.append(
+            _text(px0 - 16, sy(t) + 7, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="end")
+        )
+    for i, (day, commit) in enumerate(cats):
+        body.append(_text(sx(i), py1 + 34, day, size=20, fill=MUTED, anchor="middle"))
+        body.append(_text(sx(i), py1 + 60, _short(commit), size=20, fill=MUTED, anchor="middle"))
+    body.append(
+        f'<line x1="{px0}" y1="{py1}" x2="{px1}" y2="{py1}" stroke="{AXIS}" stroke-width="2"/>'
+    )
+    # Best pii-guard result so far: a step line.
+    best: list[tuple[float, float]] = []
+    current = None
+    for i, cat in enumerate(cats):
+        vals = [
+            h["all"]["leak"]
+            for h in hist
+            if (h["date"], h["commit"]) == cat and h["all"]["leak"] is not None
+        ]
+        if vals:
+            current = min(vals) if current is None else min(current, *vals)
+        if current is not None:
+            best.append((sx(i), sy(current)))
+    if best:
+        path = f"M{_n(best[0][0] - 40)},{_n(best[0][1])}"
+        for i, (x, y) in enumerate(best):
+            if i:
+                path += f"H{_n(x - 40)}V{_n(y)}"
+        path += f"H{_n(best[-1][0] + 40)}"
+        body.append(
+            f'<path d="{path}" fill="none" stroke="{INK}" stroke-width="3" '
+            'stroke-dasharray="10 7"/>'
+        )
+    for key in ours:
+        st = styles[key]
+        pts = [
+            (cats.index((h["date"], h["commit"])), h["all"]["leak"])
+            for h in hist
+            if h["system"] == key
+        ]
+        pts = [(i, v) for i, v in pts if v is not None]
+        if len(pts) > 1:
+            d = "M" + "L".join(f"{_n(sx(i))},{_n(sy(v))}" for i, v in pts)
+            body.append(f'<path d="{d}" fill="none" stroke="{st["color"]}" stroke-width="4"/>')
+        for i, v in pts:
+            body.append(_marker("circle", sx(i), sy(v), 11, st["color"]))
+    # Legend (right).
+    ly = py0 + 10
+    for key in ours:
+        st = styles[key]
+        last = [h for h in hist if h["system"] == key]
+        if not last:
+            continue
+        body.append(_marker("circle", 1230, ly, 10, st["color"]))
+        name = st["short_label"] + (" (default)" if st.get("default") else "")
+        body.append(_text(1250, ly + 7, name, size=20, weight="600"))
+        body.append(
+            _text(
+                1250, ly + 33, f"latest {_pct(last[-1]['all']['leak'])}% leak", size=19, fill=MUTED
+            )
+        )
+        ly += 70
+    body.append(
+        f'<line x1="1218" y1="{_n(ly)}" x2="1242" y2="{_n(ly)}" stroke="{INK}" '
+        'stroke-width="3" stroke-dasharray="8 5"/>'
+    )
+    body.append(_text(1250, ly + 7, "best of any configuration so far", size=20, weight="600"))
+    snaps = [{"dates": [h["date"]], "commits": [h["commit"]]} for h in hist]
+    caption = [
+        set_caption(index, fixture_set)
+        + ", hu + en pooled; runs of one configuration at one commit are merged.",
+        (
+            "The default pipeline (rules only) finds no names by design; names come from the NER "
+            "and LLM stages."
+        ),
+        _provenance(snaps),
+    ]
+    return _svg(
+        "Leak rate over time",
+        "Line chart of the full leak rate of pii-guard configurations across runs on the "
+        + fixture_set
+        + " fixtures.",
+        body,
+        caption,
+    )
+
+
+# --- (d) per-type recall heatmap ------------------------------------------------------------
+
+_BLUES = [(0.0, (0xF3, 0xF6, 0xFB)), (0.5, (0x6B, 0xAE, 0xD6)), (1.0, (0x08, 0x30, 0x6B))]
+
+
+def _blue(v: float) -> tuple[str, bool]:
+    """A sequential single-hue colour for ``v`` in [0, 1], and whether text on it is white."""
+    for (a, ca), (b, cb) in itertools.pairwise(_BLUES):
+        if v <= b:
+            t = (v - a) / (b - a)
+            rgb = tuple(round(x + (y - x) * t) for x, y in zip(ca, cb, strict=True))
+            break
+    else:
+        rgb = _BLUES[-1][1]
+    lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+    return "#{:02X}{:02X}{:02X}".format(*rgb), lum < 140
+
+
+def _wrap(text: str, size: float, width: float) -> list[str]:
+    lines: list[str] = []
+    for word in text.split():
+        if lines and text_width(lines[-1] + " " + word, size, bold=True) <= width:
+            lines[-1] += " " + word
+        else:
+            lines.append(word)
+    return lines[:3]
+
+
+def type_recall_heatmap(
+    index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[str]
+) -> str:
+    snaps = _snapshots(index, fixture_set, systems)
+    styles = index["systems"]
+    types = [t for t in index["entity_types"] if any(t in s["all"]["per_type"] for s in snaps)]
+    gold = {
+        t: max((s["all"]["per_type"].get(t, {}).get("gold") or 0) for s in snaps) for t in types
+    }
+    x0, top = 420, 230
+    cw = (W - 56 - x0) / max(len(snaps), 1)
+    rh = min(44, (770 - top) / max(len(types), 1))
+    body = [
+        _text(
+            56,
+            112,
+            "Overlap recall per entity type (share of gold spans found), per system",
+            size=24,
+            fill=MUTED,
+        )
+    ]
+    for j, s in enumerate(snaps):
+        st = styles[s["system"]]
+        lines = _wrap(st["short_label"], 20, cw - 12)
+        for k, line in enumerate(lines):
+            body.append(
+                _text(
+                    x0 + (j + 0.5) * cw,
+                    top - 16 - (len(lines) - 1 - k) * 24,
+                    line,
+                    size=20,
+                    anchor="middle",
+                    weight="600",
+                )
+            )
+    for i, t in enumerate(types):
+        y = top + i * rh
+        keep = all(s["all"]["per_type"].get(t, {}).get("leak") is None for s in snaps)
+        name = f"{t}{' (kept)' if keep else ''}"
+        body.append(_text(x0 - 14, y + rh / 2 + 7, name, size=19, anchor="end"))
+        body.append(
+            _text(
+                x0 - 14 - text_width(name, 19) - 10,
+                y + rh / 2 + 7,
+                f"n={gold[t]}",
+                size=18,
+                fill=MUTED,
+                anchor="end",
+            )
+        )
+        for j, s in enumerate(snaps):
+            cell = s["all"]["per_type"].get(t)
+            x = x0 + j * cw
+            if not cell or cell["recall"] is None:
+                body.append(
+                    f'<rect x="{_n(x + 2)}" y="{_n(y + 2)}" width="{_n(cw - 4)}" '
+                    f'height="{_n(rh - 4)}" fill="#FAFAFB" stroke="{GRID}"/>'
+                )
+                body.append(
+                    _text(x + cw / 2, y + rh / 2 + 7, "n/a", size=18, fill=MUTED, anchor="middle")
+                )
+                continue
+            fill, white = _blue(cell["recall"])
+            body.append(
+                f'<rect x="{_n(x + 2)}" y="{_n(y + 2)}" width="{_n(cw - 4)}" '
+                f'height="{_n(rh - 4)}" fill="{fill}"/>'
+            )
+            body.append(
+                _text(
+                    x + cw / 2,
+                    y + rh / 2 + 7,
+                    f"{cell['recall'] * 100:.0f}",
+                    size=19,
+                    fill="#FFFFFF" if white else INK,
+                    anchor="middle",
+                    weight="600",
+                )
+            )
+    caption = [
+        set_caption(index, fixture_set)
+        + ", hu + en pooled. Cells are recall in %; n = gold spans of the type.",
+        (
+            "(kept) types are not masked by policy, so they cannot leak. Comparison tools have no "
+            "recognisers for Hungarian identifiers."
+        ),
+        _provenance(snaps),
+    ]
+    return _svg(
+        "Recall by entity type",
+        "Heatmap of overlap recall per entity type and system on the " + fixture_set + " fixtures.",
+        body,
+        caption,
+    )
+
+
+# --- (e) visual recall ----------------------------------------------------------------------
+
+
+_VISUAL_SETS = {
+    "specimens": "official specimen ID documents",
+    "fictional-specimens": "fictional, Muse Image",
+}
+
+
+def visual_recall(index: Mapping[str, Any]) -> str:
+    runs = index["visual"]
+    region_types = []
+    for r in runs:
+        for k in r["by_region_type"]:
+            if k not in region_types:
+                region_types.append(k)
+    groups = [*region_types, "all"]
+    colors = ["#88CCEE", "#0072B2", "#332288", "#44AA99", "#CC6677"]
+    px0, py0, px1, py1 = 150, 210, 1540, 680
+    gw = (px1 - px0) / max(len(groups), 1)
+    bw = min(90, (gw - 50) / max(len(runs), 1))
+
+    def sy(v: float) -> float:
+        return py1 - v * (py1 - py0)
+
+    body = [
+        _text(
+            56,
+            112,
+            "Share of labelled image regions masked (IoU >= 0.5), by region type",
+            size=24,
+            fill=MUTED,
+        )
+    ]
+    lx = 56
+    for k, r in enumerate(runs):
+        label = (
+            r["run_id"]
+            .removeprefix(r["date"] + "-")
+            .replace("visual-specimens-", "")
+            .replace("visual-", "")
+            .replace("-", " ")
+        )
+        body.append(
+            f'<rect x="{lx}" y="140" width="22" height="22" fill="{colors[k % len(colors)]}"/>'
+        )
+        txt = f"{label} ({r['date']}, {_short(r['commit'])})"
+        body.append(_text(lx + 30, 159, txt, size=21))
+        lx += 30 + text_width(txt, 21) + 36
+    for t in (0, 0.25, 0.5, 0.75, 1.0):
+        body.append(
+            f'<line x1="{px0}" y1="{_n(sy(t))}" x2="{px1}" y2="{_n(sy(t))}" stroke="{GRID}" '
+            'stroke-width="2"/>'
+        )
+        body.append(
+            _text(px0 - 16, sy(t) + 7, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="end")
+        )
+    for g, name in enumerate(groups):
+        gx = px0 + g * gw + (gw - bw * len(runs)) / 2
+        ns: list[int] = []
+        for k, r in enumerate(runs):
+            block = r["overall"] if name == "all" else r["by_region_type"].get(name)
+            if not block:
+                continue
+            if block["regions"] not in ns:
+                ns.append(block["regions"])
+            v = block["recall_iou50"] or 0
+            x = gx + k * bw
+            body.append(
+                f'<rect x="{_n(x + 3)}" y="{_n(sy(v))}" width="{_n(bw - 6)}" '
+                f'height="{_n(max(py1 - sy(v), 1))}" fill="{colors[k % len(colors)]}"/>'
+            )
+            body.append(_text(x + bw / 2, sy(v) - 10, _pct(v, 0), size=19, anchor="middle"))
+        body.append(
+            _text(px0 + (g + 0.5) * gw, py1 + 34, name, size=21, anchor="middle", weight="600")
+        )
+        body.append(
+            _text(
+                px0 + (g + 0.5) * gw,
+                py1 + 60,
+                "n=" + " / ".join(map(str, ns)),
+                size=19,
+                fill=MUTED,
+                anchor="middle",
+            )
+        )
+    body.append(
+        f'<line x1="{px0}" y1="{py1}" x2="{px1}" y2="{py1}" stroke="{AXIS}" stroke-width="2"/>'
+    )
+    sets: dict[str, tuple[int, int]] = {}
+    for r in runs:
+        sets[str(r.get("fixture_set") or "specimens")] = (r["specimens"], r["countries"])
+    caption = [
+        f"Fixture set '{name}': {_VISUAL_SETS.get(name, 'image documents')}, {n} images, "
+        f"{c} countries."
+        for name, (n, c) in sets.items()
+    ]
+    caption += [
+        "SAM 3.1 + Tesseract OCR + rules: text and MRZ depend on OCR (rules only here), portraits "
+        "and signatures on SAM. Compare runs within a set; n = regions per set.",
+        (
+            f"Runs {_span([r['date'] for r in runs])} · commits "
+            f"{', '.join(sorted({_short(r['commit']) for r in runs}))} · generated by `pii-guard "
+            "eval report` from eval/results/runs/"
+        ),
+    ]
+    return _svg(
+        "Visual recall on image documents",
+        "Grouped bars of region recall per region type for each visual run.",
+        body,
+        caption,
+    )
