@@ -7,16 +7,18 @@ A :class:`RequestTimer` starts when the gateway route receives the body and coll
   ``mask`` (vault), ``forward`` (serialising the masked body and opening the upstream
   client), ``upstream_ttfb`` (send until the upstream's response headers),
   ``upstream`` (all time spent waiting on the upstream: headers and body reads), ``unmask``
-  (stream restoration, summed over chunks) and ``response`` (restoring and building a
-  non-streamed answer);
+  (stream restoration, summed over chunks), ``response`` (restoring and building a
+  non-streamed answer) and ``client`` (streams: time suspended handing each event to the client,
+  i.e. the client's read speed and network backpressure -- neither pii-guard's nor the
+  upstream's);
 - **detectors** (ms): each detector's own time summed over the texts of the request
   (``rules``, ``ner``, ``llm``, ``known``). They overlap when texts run concurrently, so they
   are reported apart from the stages;
 - for streams: the upstream's first data event and the first event sent to the client.
 
 Derived: ``total_ms`` (start until the answer is built or the stream ends), ``overhead_ms =
-total - upstream`` (what pii-guard added), and for streams ``added_ttft_ms`` = time to the first
-event sent to the client minus the upstream's own time to its first data event.
+total - upstream - client`` (what pii-guard added), and for streams ``added_ttft_ms`` = time to
+the first event sent to the client minus the upstream's own time to its first data event.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ STAGES: tuple[str, ...] = (
     "upstream",
     "unmask",
     "response",
+    "client",
 )
 #: Stages that are pii-guard's own work (not waiting on the upstream).
 OWN_STAGES: tuple[str, ...] = (
@@ -108,8 +111,13 @@ class RequestTimer:
         return _ms(self.stages["upstream"])
 
     @property
+    def client_ms(self) -> float:
+        return _ms(self.stages["client"])
+
+    @property
     def overhead_ms(self) -> float:
-        return round(max(self.total_ms - self.upstream_ms, 0.0), 3)
+        """Total minus the time waiting on the upstream and on the client."""
+        return round(max(self.total_ms - self.upstream_ms - self.client_ms, 0.0), 3)
 
     def ttft(self) -> tuple[float | None, float | None, float | None]:
         """``(ttft, upstream ttft, added ttft)`` in ms, or ``None`` when not streamed."""

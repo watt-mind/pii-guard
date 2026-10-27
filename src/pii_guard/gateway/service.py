@@ -705,59 +705,82 @@ class Gateway:
                     timer.mark_first_data()
                 yield line
 
-        async def events() -> AsyncIterator[bytes]:
-            outcome = "ok"
-            echoed_answer = False
+        echoed_answer = False
 
-            def answer_event() -> bytes:
-                content = restorer.masked_content()
-                return sse_event(
+        def answer_event() -> bytes:
+            content = restorer.masked_content()
+            return sse_event(
+                json.dumps(
+                    {
+                        "object": "pii_guard.masked_answer",
+                        "choices": [{"index": i, "content": content[i]} for i in sorted(content)],
+                    },
+                    ensure_ascii=False,
+                )
+            )
+
+        async def produce() -> AsyncIterator[bytes]:
+            """The restored events; every await in here is upstream time or pii-guard's own."""
+            nonlocal echoed_answer
+            if echo:
+                yield sse_event(
                     json.dumps(
-                        {
-                            "object": "pii_guard.masked_answer",
-                            "choices": [
-                                {"index": i, "content": content[i]} for i in sorted(content)
-                            ],
-                        },
+                        {"object": "pii_guard.masked_request", "messages": masked_messages},
                         ensure_ascii=False,
                     )
                 )
-
-            try:
-                if echo:
-                    yield sse_event(
-                        json.dumps(
-                            {"object": "pii_guard.masked_request", "messages": masked_messages},
-                            ensure_ascii=False,
-                        )
-                    )
-                async for data in iter_sse_data(timed_lines()):
-                    unmasking = time.perf_counter()
-                    outs = restorer.process(data)
-                    timer.add("unmask", time.perf_counter() - unmasking)
-                    trace.scan_usage(data)
-                    for out in outs:
-                        timer.mark_first_event()
-                        if out == DONE and echo and not echoed_answer:
-                            echoed_answer = True
-                            yield answer_event()
-                        yield sse_event(out)
+            async for data in iter_sse_data(timed_lines()):
                 unmasking = time.perf_counter()
-                outs = restorer.finish()
+                outs = restorer.process(data)
                 timer.add("unmask", time.perf_counter() - unmasking)
+                trace.scan_usage(data)
                 for out in outs:
+                    timer.mark_first_event()
+                    if out == DONE and echo and not echoed_answer:
+                        echoed_answer = True
+                        yield answer_event()
                     yield sse_event(out)
-                if echo and not echoed_answer:
-                    echoed_answer = True
-                    yield answer_event()
-            except Exception as exc:
-                # Fail closed: stop the stream with an error event, no exception text.
-                outcome = f"stream_error:{type(exc).__name__}"
-                yield sse_event(error_event("stream_failed", "the response stream failed"))
+            unmasking = time.perf_counter()
+            outs = restorer.finish()
+            timer.add("unmask", time.perf_counter() - unmasking)
+            for out in outs:
+                yield sse_event(out)
+            if echo and not echoed_answer:
+                echoed_answer = True
+                yield answer_event()
+
+        async def events() -> AsyncIterator[bytes]:
+            """Hand ``produce()``'s events to the client; time suspended in ``yield`` is the
+            client's (read speed, backpressure), not overhead."""
+            outcome = "ok"
+            source = produce()
+            try:
+                try:
+                    async for chunk in source:
+                        sending = time.perf_counter()
+                        try:
+                            yield chunk
+                        finally:
+                            timer.add("client", time.perf_counter() - sending)
+                except Exception as exc:
+                    # Fail closed: stop the stream with an error event, no exception text.
+                    outcome = f"stream_error:{type(exc).__name__}"
+                    sending = time.perf_counter()
+                    try:
+                        yield sse_event(error_event("stream_failed", "the response stream failed"))
+                    finally:
+                        timer.add("client", time.perf_counter() - sending)
+            except (GeneratorExit, asyncio.CancelledError):
+                # The client went away mid-stream (the server closes or cancels this generator).
+                # The answer is partial: record it as such and never seed the cache with it.
+                if outcome == "ok":
+                    outcome = "client_disconnected"
+                raise
             finally:
+                await source.aclose()
                 await response.aclose()
                 await client.aclose()
-                stats.upstream_ms = (time.perf_counter() - started) * 1000
+                stats.upstream_ms = timer.stages["upstream"] * 1000
                 stats.unresolved = len(restorer.unresolved)
                 if outcome == "ok":
                     restored = {}
@@ -773,6 +796,8 @@ class Gateway:
                     trace.stream_chunks = restorer.chunks
                 if outcome == "ok":
                     trace.finish()
+                elif outcome == "client_disconnected":
+                    trace.finish(outcome=outcome, error={"code": outcome})
                 else:
                     trace.finish(outcome="stream_error", error={"code": "stream_failed"})
 

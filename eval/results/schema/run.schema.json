@@ -392,13 +392,13 @@
         "requests": {"$ref": "#/$defs/count"},
         "errors": {"$ref": "#/$defs/count"},
         "throughput_rps": {"type": ["number", "null"], "minimum": 0},
-        "overhead_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Gateway total minus the time spent waiting on the upstream."},
+        "overhead_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Gateway total minus the time spent waiting on the upstream and, for streams, on the client."},
         "total_ms": {"$ref": "#/$defs/latency_percentiles"},
         "upstream_ms": {"$ref": "#/$defs/latency_percentiles"},
         "added_ttft_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Streams: time to the first event sent minus the upstream's own time to its first data."},
         "client_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Wall time seen by the benchmark client."},
         "client_ttft_ms": {"$ref": "#/$defs/latency_percentiles"},
-        "stages_ms": {"type": "object", "additionalProperties": {"$ref": "#/$defs/latency_percentiles"}, "description": "parse, detect, image, mask, forward, upstream_ttfb, upstream, unmask, response."},
+        "stages_ms": {"type": "object", "additionalProperties": {"$ref": "#/$defs/latency_percentiles"}, "description": "parse, detect, image, mask, forward, upstream_ttfb, upstream, unmask, response, client (streams: time handing events to the client)."},
         "detectors_ms": {"type": "object", "additionalProperties": {"$ref": "#/$defs/latency_percentiles"}, "description": "Per detector, summed over the texts of a request."}
       }
     },
