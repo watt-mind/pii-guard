@@ -406,3 +406,27 @@ tables, the Muse Spark 1.3 comparison and cost in
 Placeholders hold against reconstruction from the masked text. They don't prevent linkage:
 with a candidate list the attacker does about twice as well as chance, because the context
 that stays readable narrows the candidates. Masking is pseudonymisation, not anonymisation.
+
+## Fictional specimen-style documents (visual)
+
+The official specimen set (LAB-1120) can't be committed, so the visual eval also runs on a
+fictional set that can: 24 specimen-style documents in `eval/fixtures/visual/` (8 document
+types x Hungarian, German and English variants), made by `eval/visual/generate_images.py`.
+Muse Image (`muse-image-1.0`) generates the portraits, signatures, stamps and textures; the
+script lays out every name and number itself, so the labels in `labels.json` are exact boxes
+from the composition step rather than hand-drawn. All IDs and MRZ check digits are valid but
+fictional; every document is overprinted MINTA / SPECIMEN and the `NOTICE` says they are
+AI-generated. `generation.json` records each prompt, the outcome (two whole-document prompts
+were refused) and the SHA-256 of every generated image (the API takes no seed).
+
+```bash
+F=eval/fixtures/visual
+uv run pii-guard eval visual --specimens $F/images --manifest $F/manifest.json \
+  --labels $F/labels.json --title "Visual recall on fictional specimen-style documents (Muse Image)" \
+  --json eval/results/visual/fictional.json --markdown eval/results/visual/fictional.md
+```
+
+Results: [fictional.md](../eval/results/visual/fictional.md). A manifest entry may carry a
+`language` for the text detectors (otherwise derived from the country); stamps and the
+overprint are recorded as `unscored` regions.
+

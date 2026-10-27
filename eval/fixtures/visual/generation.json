@@ -1,0 +1,878 @@
+{
+  "version": 1,
+  "description": "How eval/fixtures/visual/ was made: every Muse Image call (prompt, model, outcome, SHA-256 of the image), then the composed documents. All fictional.",
+  "model": "muse-image-1.0",
+  "endpoint": "https://api.meta.ai/v1/images/generations",
+  "seed": "not supported by the API (an unknown parameter); images are identified by SHA-256 and cached in data/muse-image/",
+  "cost_per_image_usd": 0.01,
+  "calls": [
+    {
+      "asset": "probe-id-card",
+      "kind": "probe",
+      "prompt": "A fictional specimen identity card, front side, with a portrait photo of a generated person, the words MINTA / SPECIMEN printed across it, plain neutral design, no national symbols",
+      "latency_s": 18.9,
+      "status": "ok",
+      "file": "probe-id-card.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "c41f775c908e360c00b7a879884db7b90d6eeae9e51c81e286115f68e1766af6",
+      "usage": {
+        "input_tokens": 18744,
+        "output_tokens": 2190,
+        "total_tokens": 20934
+      },
+      "created": 1793092840
+    },
+    {
+      "asset": "probe-passport",
+      "kind": "probe",
+      "prompt": "The data page of a fictional specimen passport with a portrait photo of a generated person, a machine readable zone, the words MINTA / SPECIMEN printed across it, plain neutral design, no national symbols",
+      "latency_s": 4.4,
+      "status": "refused",
+      "http": 400,
+      "error": "The response was filtered due to the prompt triggering our content management policy."
+    },
+    {
+      "asset": "probe-driving-licence",
+      "kind": "probe",
+      "prompt": "A fictional specimen driving licence card with a portrait photo of a generated person and a signature, the words MINTA / SPECIMEN printed across it, plain neutral design, no national symbols",
+      "latency_s": 2.9,
+      "status": "refused",
+      "http": 400,
+      "error": "The response was filtered due to the prompt triggering our content management policy."
+    },
+    {
+      "asset": "portrait-00",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional woman in her thirties, shoulder-length brown hair, wearing a dark blue blouse, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 7.9,
+      "status": "ok",
+      "file": "portrait-00.webp",
+      "format": "webp",
+      "size": [
+        1120,
+        2240
+      ],
+      "sha256": "986c784ccaa7c3950c6f934dd935c8c3360cba73617f6ef73ddba16124ba89c9",
+      "usage": {
+        "input_tokens": 9838,
+        "output_tokens": 694,
+        "total_tokens": 10532
+      },
+      "created": 1793092855
+    },
+    {
+      "asset": "portrait-01",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional man in his fifties, short grey hair and a trimmed beard, wearing a grey sweater, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 10.7,
+      "status": "ok",
+      "file": "portrait-01.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "1a1f087e7c0193f5ee8d7d9643621b4e80c3fc2ab37a1086d73bde8793a252b9",
+      "usage": {
+        "input_tokens": 9849,
+        "output_tokens": 673,
+        "total_tokens": 10522
+      },
+      "created": 1793092857
+    },
+    {
+      "asset": "portrait-02",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional young woman in her twenties, long blond hair tied back, wearing a white t-shirt, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 6.7,
+      "status": "ok",
+      "file": "portrait-02.webp",
+      "format": "webp",
+      "size": [
+        1280,
+        1920
+      ],
+      "sha256": "ef78e370813714fdcb081d61b3fb1044af541ca0fd623ada28fdd2fc4f72df80",
+      "usage": {
+        "input_tokens": 9848,
+        "output_tokens": 687,
+        "total_tokens": 10535
+      },
+      "created": 1793092854
+    },
+    {
+      "asset": "portrait-03",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional man in his forties, dark curly hair, wearing a light blue shirt, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 6.8,
+      "status": "ok",
+      "file": "portrait-03.webp",
+      "format": "webp",
+      "size": [
+        1120,
+        2240
+      ],
+      "sha256": "6e82acb6b34ae2783badb367f3730e08cf96da6ece0ff276c54ffa4a052359a4",
+      "usage": {
+        "input_tokens": 9830,
+        "output_tokens": 689,
+        "total_tokens": 10519
+      },
+      "created": 1793092854
+    },
+    {
+      "asset": "portrait-04",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional woman in her sixties, short white hair, wearing a burgundy cardigan, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 8.0,
+      "status": "ok",
+      "file": "portrait-04.webp",
+      "format": "webp",
+      "size": [
+        1280,
+        1920
+      ],
+      "sha256": "adeaf630376c6c3639c73bc29e9bde9cb88d6268abaabc52a3c70030e79f8cdc",
+      "usage": {
+        "input_tokens": 9941,
+        "output_tokens": 781,
+        "total_tokens": 10722
+      },
+      "created": 1793092856
+    },
+    {
+      "asset": "portrait-05",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional young man in his twenties, short black hair, wearing a green hoodie, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 7.3,
+      "status": "ok",
+      "file": "portrait-05.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "72d14228f652814ea19a25b0ff1a0cba6ddf0e19da6285183c5fdb98f44ec159",
+      "usage": {
+        "input_tokens": 9948,
+        "output_tokens": 770,
+        "total_tokens": 10718
+      },
+      "created": 1793092855
+    },
+    {
+      "asset": "portrait-06",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional woman in her forties, auburn bob haircut and glasses, wearing a black turtleneck, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 8.2,
+      "status": "ok",
+      "file": "portrait-06.webp",
+      "format": "webp",
+      "size": [
+        1120,
+        2240
+      ],
+      "sha256": "f3f16237c934a149b1fc462c48cfb5405a05e3ef57366b24b0b5e974f779f536",
+      "usage": {
+        "input_tokens": 9776,
+        "output_tokens": 634,
+        "total_tokens": 10410
+      },
+      "created": 1793092862
+    },
+    {
+      "asset": "portrait-07",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional man in his seventies, bald with a white moustache, wearing a brown jacket, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 8.1,
+      "status": "ok",
+      "file": "portrait-07.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "7c80d33ea7cd6279c0a8b9df521d94bed5b349cf56ff38c6fd92042cca5309cb",
+      "usage": {
+        "input_tokens": 10007,
+        "output_tokens": 837,
+        "total_tokens": 10844
+      },
+      "created": 1793092863
+    },
+    {
+      "asset": "portrait-08",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional woman in her fifties, dark hair in a bun, wearing a teal top, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 8.0,
+      "status": "ok",
+      "file": "portrait-08.webp",
+      "format": "webp",
+      "size": [
+        1280,
+        1920
+      ],
+      "sha256": "e82ef86d1f674b12861f3e9330aa855350f84b71ea3ed5899bf49ae697ca3b3b",
+      "usage": {
+        "input_tokens": 9983,
+        "output_tokens": 821,
+        "total_tokens": 10804
+      },
+      "created": 1793092863
+    },
+    {
+      "asset": "portrait-09",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional man in his thirties, red hair and freckles, wearing a navy polo shirt, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 7.3,
+      "status": "ok",
+      "file": "portrait-09.webp",
+      "format": "webp",
+      "size": [
+        1280,
+        1920
+      ],
+      "sha256": "330e731dadd23dd0c01ed28e7937952c18e0c74954629a1fc857445fdd0ddfca",
+      "usage": {
+        "input_tokens": 9928,
+        "output_tokens": 762,
+        "total_tokens": 10690
+      },
+      "created": 1793092862
+    },
+    {
+      "asset": "portrait-10",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional young woman in her twenties, black braided hair, wearing a yellow blouse, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 7.1,
+      "status": "ok",
+      "file": "portrait-10.webp",
+      "format": "webp",
+      "size": [
+        1344,
+        1792
+      ],
+      "sha256": "45b6aae294013a74fd097ff32ab9428cca45aca747e6e469769f64aec5953465",
+      "usage": {
+        "input_tokens": 9904,
+        "output_tokens": 785,
+        "total_tokens": 10689
+      },
+      "created": 1793092862
+    },
+    {
+      "asset": "portrait-11",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional man in his sixties, thinning grey hair and glasses, wearing a checked shirt, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 9.5,
+      "status": "ok",
+      "file": "portrait-11.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "8f893cfb9e3951fd14dd8d5a22f37b0959a047b0ffbaf68943c2fa036cb6e158",
+      "usage": {
+        "input_tokens": 9948,
+        "output_tokens": 774,
+        "total_tokens": 10722
+      },
+      "created": 1793092867
+    },
+    {
+      "asset": "portrait-12",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional woman in her thirties, straight black hair with a fringe, wearing a grey blazer, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 7.2,
+      "status": "ok",
+      "file": "portrait-12.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "6581c6de3167df9ee1e27522db0a2103d4cc82b7cc5c108a693c5dfb71b3774b",
+      "usage": {
+        "input_tokens": 9925,
+        "output_tokens": 746,
+        "total_tokens": 10671
+      },
+      "created": 1793092869
+    },
+    {
+      "asset": "portrait-13",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional man in his twenties, wavy brown hair, wearing a white shirt, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 7.5,
+      "status": "ok",
+      "file": "portrait-13.webp",
+      "format": "webp",
+      "size": [
+        1280,
+        1920
+      ],
+      "sha256": "07d9b5ac62f906791c989cd8a70e64cd4e66fb8acc881d30877c0e776b675125",
+      "usage": {
+        "input_tokens": 9837,
+        "output_tokens": 678,
+        "total_tokens": 10515
+      },
+      "created": 1793092870
+    },
+    {
+      "asset": "portrait-14",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional woman in her seventies, curly grey hair, wearing a lilac jumper, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 8.6,
+      "status": "ok",
+      "file": "portrait-14.webp",
+      "format": "webp",
+      "size": [
+        1344,
+        1792
+      ],
+      "sha256": "3a126428032d396089d9af0b1ff1d50871c67faf2e7c19d9d90b6f976911c91b",
+      "usage": {
+        "input_tokens": 9865,
+        "output_tokens": 748,
+        "total_tokens": 10613
+      },
+      "created": 1793092871
+    },
+    {
+      "asset": "portrait-15",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional man in his forties, shaved head and a dark beard, wearing a black t-shirt, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 10.0,
+      "status": "ok",
+      "file": "portrait-15.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "48a389e21eca76eb36059f9bde7d632d76c2ccf1622e5178aae1be8fbaa6759e",
+      "usage": {
+        "input_tokens": 9890,
+        "output_tokens": 718,
+        "total_tokens": 10608
+      },
+      "created": 1793092872
+    },
+    {
+      "asset": "portrait-16",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional woman in her twenties, pixie-cut light brown hair, wearing an orange top, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 10.0,
+      "status": "ok",
+      "file": "portrait-16.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "a6830c6e90aae46ac161432f83329664886b9f1676a9bedfa97cd75a0388068c",
+      "usage": {
+        "input_tokens": 9923,
+        "output_tokens": 751,
+        "total_tokens": 10674
+      },
+      "created": 1793092872
+    },
+    {
+      "asset": "portrait-17",
+      "kind": "portrait",
+      "prompt": "Passport-style head-and-shoulders photograph of a fictional man in his fifties, salt-and-pepper side-parted hair, wearing a dark suit jacket, neutral expression, looking straight at the camera, plain light grey background, even soft studio lighting, photorealistic, no text, no watermark",
+      "latency_s": 8.4,
+      "status": "ok",
+      "file": "portrait-17.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "4cbcbc55d19c25d87e1b7066f07cd3b7697a70ca060913a7be3016fd20cb1647",
+      "usage": {
+        "input_tokens": 9937,
+        "output_tokens": 804,
+        "total_tokens": 10741
+      },
+      "created": 1793092875
+    },
+    {
+      "asset": "signature-00",
+      "kind": "signature",
+      "prompt": "A single handwritten signature in dark blue ink on plain white paper, a looping cursive scrawl, fluid pen stroke, illegible, nothing else on the page, no printed text, no lines, top-down scan",
+      "latency_s": 14.9,
+      "status": "ok",
+      "file": "signature-00.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "ba58c5a6d1ef7af9626a72cd3aaeed57b49e7883079e10e6c550117cc2abd115",
+      "usage": {
+        "input_tokens": 17028,
+        "output_tokens": 1118,
+        "total_tokens": 18146
+      },
+      "created": 1793092884
+    },
+    {
+      "asset": "signature-01",
+      "kind": "signature",
+      "prompt": "A single handwritten signature in black ink on plain white paper, a short angular scribble with an underline, fluid pen stroke, illegible, nothing else on the page, no printed text, no lines, top-down scan",
+      "latency_s": 9.7,
+      "status": "ok",
+      "file": "signature-01.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "141f9ad660f24599a577a762568f382c681544b90ec530c9ec668f7ce8edbdff",
+      "usage": {
+        "input_tokens": 9745,
+        "output_tokens": 605,
+        "total_tokens": 10350
+      },
+      "created": 1793092880
+    },
+    {
+      "asset": "signature-02",
+      "kind": "signature",
+      "prompt": "A single handwritten signature in blue ink on plain white paper, a wide flowing signature with a large initial, fluid pen stroke, illegible, nothing else on the page, no printed text, no lines, top-down scan",
+      "latency_s": 19.7,
+      "status": "ok",
+      "file": "signature-02.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "03113658bffb36d52125e39f4a232c38e826c6696087ad56d32ff457fc0aec3d",
+      "usage": {
+        "input_tokens": 26129,
+        "output_tokens": 1706,
+        "total_tokens": 27835
+      },
+      "created": 1793092890
+    },
+    {
+      "asset": "signature-03",
+      "kind": "signature",
+      "prompt": "A single handwritten signature in black ink on plain white paper, a tight slanted cursive signature, fluid pen stroke, illegible, nothing else on the page, no printed text, no lines, top-down scan",
+      "latency_s": 18.2,
+      "status": "ok",
+      "file": "signature-03.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "89a8bb05ff47cf3b6430e278776cf3dbc5faf10cff82af909dcf650488037bbb",
+      "usage": {
+        "input_tokens": 17100,
+        "output_tokens": 1165,
+        "total_tokens": 18265
+      },
+      "created": 1793092888
+    },
+    {
+      "asset": "signature-04",
+      "kind": "signature",
+      "prompt": "A single handwritten signature in dark blue ink on plain white paper, a signature with two loops and a flourish, fluid pen stroke, illegible, nothing else on the page, no printed text, no lines, top-down scan",
+      "latency_s": 18.3,
+      "status": "ok",
+      "file": "signature-04.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "c080c8bbcb5642ac459f6ee3f3ddd2cf67f0abbedf27adb5a9ab31742f48962f",
+      "usage": {
+        "input_tokens": 25671,
+        "output_tokens": 1419,
+        "total_tokens": 27090
+      },
+      "created": 1793092891
+    },
+    {
+      "asset": "signature-05",
+      "kind": "signature",
+      "prompt": "A single handwritten signature in blue ink on plain white paper, a compact zigzag signature, fluid pen stroke, illegible, nothing else on the page, no printed text, no lines, top-down scan",
+      "latency_s": 9.0,
+      "status": "ok",
+      "file": "signature-05.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "3633c694d901005917a02ccd8a50ccb1d7428ce5fe6d1a7ceab4592ddc72e6b7",
+      "usage": {
+        "input_tokens": 9708,
+        "output_tokens": 580,
+        "total_tokens": 10288
+      },
+      "created": 1793092885
+    },
+    {
+      "asset": "stamp-00",
+      "kind": "stamp",
+      "prompt": "A round rubber stamp impression in violet ink on plain white paper, slightly uneven and faded, a double border ring around a simple five-pointed star, no letters, no words, no numbers, no flag, no coat of arms, top-down scan",
+      "latency_s": 10.5,
+      "status": "ok",
+      "file": "stamp-00.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "e3a90d666c808341ce6c94631b474b761c344b368b4143ec8a33676d495e2e3a",
+      "usage": {
+        "input_tokens": 9871,
+        "output_tokens": 725,
+        "total_tokens": 10596
+      },
+      "created": 1793092888
+    },
+    {
+      "asset": "stamp-01",
+      "kind": "stamp",
+      "prompt": "A oval rubber stamp impression in blue ink on plain white paper, slightly uneven and faded, a double border ring around an abstract leaf, no letters, no words, no numbers, no flag, no coat of arms, top-down scan",
+      "latency_s": 7.8,
+      "status": "ok",
+      "file": "stamp-01.webp",
+      "format": "webp",
+      "size": [
+        1920,
+        1280
+      ],
+      "sha256": "d9c2051b0b05abc28428866ff4aedc454a5e9d2fe5d211ae3e8e51fc2534a355",
+      "usage": {
+        "input_tokens": 9883,
+        "output_tokens": 740,
+        "total_tokens": 10623
+      },
+      "created": 1793092892
+    },
+    {
+      "asset": "texture-card-blue",
+      "kind": "texture",
+      "prompt": "Seamless abstract background texture, pale blue and white watercolour wash with gentle diagonal gradients, soft and low contrast, flat, no text, no letters, no numbers, no symbols, no emblem, no pattern of lines, no border",
+      "latency_s": 13.1,
+      "status": "ok",
+      "file": "texture-card-blue.webp",
+      "format": "webp",
+      "size": [
+        2240,
+        1120
+      ],
+      "sha256": "7a88fc7356f5315a0b59cd0f7e40d697a10abe58e3057b984d5df9351aedcae5",
+      "usage": {
+        "input_tokens": 17183,
+        "output_tokens": 1227,
+        "total_tokens": 18410
+      },
+      "created": 1793092898
+    },
+    {
+      "asset": "texture-card-green",
+      "kind": "texture",
+      "prompt": "Seamless abstract background texture, pale sage green and cream watercolour clouds, soft and low contrast, flat, no text, no letters, no numbers, no symbols, no emblem, no pattern of lines, no border",
+      "latency_s": 7.4,
+      "status": "ok",
+      "file": "texture-card-green.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "f6893f6b837f4112256fd21c9d0dcc256c115dd6bc469070c6014d9b097294a2",
+      "usage": {
+        "input_tokens": 9766,
+        "output_tokens": 612,
+        "total_tokens": 10378
+      },
+      "created": 1793092898
+    },
+    {
+      "asset": "texture-card-rose",
+      "kind": "texture",
+      "prompt": "Seamless abstract background texture, pale rose and sand coloured soft gradient with faint paper fibres, soft and low contrast, flat, no text, no letters, no numbers, no symbols, no emblem, no pattern of lines, no border",
+      "latency_s": 14.5,
+      "status": "ok",
+      "file": "texture-card-rose.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "df7fa29fe725b3f773e0fc50d1be5ac9a193812aa3be29a947332bcac50f7f6e",
+      "usage": {
+        "input_tokens": 17315,
+        "output_tokens": 1285,
+        "total_tokens": 18600
+      },
+      "created": 1793092905
+    },
+    {
+      "asset": "texture-card-grey",
+      "kind": "texture",
+      "prompt": "Seamless abstract background texture, light warm grey brushed paper with faint speckles, soft and low contrast, flat, no text, no letters, no numbers, no symbols, no emblem, no pattern of lines, no border",
+      "latency_s": 20.9,
+      "status": "ok",
+      "file": "texture-card-grey.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "55f28484cb7ee3dc013dd78f407eee88313d3edf6f696c14ccecfe3b9cd1fd8b",
+      "usage": {
+        "input_tokens": 25936,
+        "output_tokens": 1542,
+        "total_tokens": 27478
+      },
+      "created": 1793092912
+    },
+    {
+      "asset": "texture-paper",
+      "kind": "texture",
+      "prompt": "Seamless abstract background texture, off-white recycled writing paper with very faint fibres, soft and low contrast, flat, no text, no letters, no numbers, no symbols, no emblem, no pattern of lines, no border",
+      "latency_s": 9.2,
+      "status": "ok",
+      "file": "texture-paper.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "daff9cfb2837a607f6894df1147e303a3946e642de33622d04954a0195994c6b",
+      "usage": {
+        "input_tokens": 9768,
+        "output_tokens": 612,
+        "total_tokens": 10380
+      },
+      "created": 1793092900
+    },
+    {
+      "asset": "texture-badge",
+      "kind": "texture",
+      "prompt": "Seamless abstract background texture, light lavender and white soft bokeh gradient, soft and low contrast, flat, no text, no letters, no numbers, no symbols, no emblem, no pattern of lines, no border",
+      "latency_s": 7.5,
+      "status": "ok",
+      "file": "texture-badge.webp",
+      "format": "webp",
+      "size": [
+        1600,
+        1600
+      ],
+      "sha256": "c7c1506c0356abec0079981c56e25fb4e50f3faccbec834464ba914a48785fcc",
+      "usage": {
+        "input_tokens": 9875,
+        "output_tokens": 739,
+        "total_tokens": 10614
+      },
+      "created": 1793092900
+    }
+  ],
+  "spend": {
+    "calls": 35,
+    "images": 33,
+    "refused": 2,
+    "estimated_usd": 0.33,
+    "upper_bound_usd": 0.35
+  },
+  "documents": [
+    {
+      "id": "hu-id_card-front",
+      "values": {
+        "name": "Fiktív Mária",
+        "born": "1959-01-02",
+        "doc": "664444HM"
+      }
+    },
+    {
+      "id": "hu-id_card-back",
+      "values": {
+        "mrz": "I<UTO664444HM<325901027499<<<<\n5901021F3106305UTO<<<<<<<<<<<2\nFIKTIV<<MARIA<<<<<<<<<<<<<<<<<",
+        "address": "1052 Budapest, Kitalált köz 79.",
+        "doc": "664444HM"
+      }
+    },
+    {
+      "id": "hu-passport-data_page",
+      "values": {
+        "mrz": "P<UTOPELDA<<GABOR<<<<<<<<<<<<<<<<<<<<<<<<<<<\nKK74063024UTO8504168M310630518504163255<<<26",
+        "name": "Példa Gábor",
+        "doc": "KK7406302"
+      }
+    },
+    {
+      "id": "hu-driving_licence-front",
+      "values": {
+        "name": "Kitalált Eszter",
+        "doc": "CD014308"
+      }
+    },
+    {
+      "id": "hu-badge-front",
+      "values": {
+        "name": "Próba Levente",
+        "email": "levente.proba@example.org",
+        "phone": "+36 70 860 9243"
+      }
+    },
+    {
+      "id": "hu-member_card-front",
+      "values": {
+        "name": "Képzelt Ilona"
+      }
+    },
+    {
+      "id": "hu-form-page",
+      "values": {
+        "name": "Tesztes Márton",
+        "email": "marton.tesztes@example.net"
+      }
+    },
+    {
+      "id": "hu-letter-page",
+      "values": {
+        "name": "Mintás Anna",
+        "signer": "Álnév Péter"
+      }
+    },
+    {
+      "id": "de-id_card-front",
+      "values": {
+        "name": "Erika Mustermann",
+        "born": "1990-07-22",
+        "doc": "XJXK86KV4"
+      }
+    },
+    {
+      "id": "de-id_card-back",
+      "values": {
+        "mrz": "I<UTOXJXK86KV48<<<<<<<<<<<<<<<\n9007220F3106305UTO<<<<<<<<<<<0\nMUSTERMANN<<ERIKA<<<<<<<<<<<<<",
+        "address": "Platzhalterring 38, 10115 Berlin",
+        "doc": "XJXK86KV4"
+      }
+    },
+    {
+      "id": "de-passport-data_page",
+      "values": {
+        "mrz": "P<UTOBEISPIEL<<JONAS<<<<<<<<<<<<<<<<<<<<<<<<\nCZW4P8T452UTO6108056M3106305<<<<<<<<<<<<<<<4",
+        "name": "Jonas Beispiel",
+        "doc": "CZW4P8T45"
+      }
+    },
+    {
+      "id": "de-driving_licence-front",
+      "values": {
+        "name": "Hanna Probe",
+        "doc": "B2DHAA4DG16"
+      }
+    },
+    {
+      "id": "de-badge-front",
+      "values": {
+        "name": "Karl Musterle",
+        "email": "karl.musterle@example.org",
+        "phone": "0172 29909123"
+      }
+    },
+    {
+      "id": "de-member_card-front",
+      "values": {
+        "name": "Ilse Platzhalter"
+      }
+    },
+    {
+      "id": "de-form-page",
+      "values": {
+        "name": "Paul Fiktiv",
+        "email": "paul.fiktiv@example.net"
+      }
+    },
+    {
+      "id": "de-letter-page",
+      "values": {
+        "name": "Clara Mustermann",
+        "signer": "Otto Beispiel"
+      }
+    },
+    {
+      "id": "en-id_card-front",
+      "values": {
+        "name": "Jane Placeholder",
+        "born": "1995-08-19",
+        "doc": "ID8001464"
+      }
+    },
+    {
+      "id": "en-id_card-back",
+      "values": {
+        "mrz": "I<UTOID80014644<<<<<<<<<<<<<<<\n9508196F3106305UTO<<<<<<<<<<<2\nPLACEHOLDER<<JANE<<<<<<<<<<<<<",
+        "address": "38 Example Street, Exeter EX1 2AB",
+        "doc": "ID8001464"
+      }
+    },
+    {
+      "id": "en-passport-data_page",
+      "values": {
+        "mrz": "P<UTOSAMPLE<<OLIVER<<<<<<<<<<<<<<<<<<<<<<<<<\n0162324264UTO9304077M3106305<<<<<<<<<<<<<<<6",
+        "name": "Oliver Sample",
+        "doc": "016232426"
+      }
+    },
+    {
+      "id": "en-driving_licence-front",
+      "values": {
+        "name": "Amelia Specimen",
+        "doc": "SPECI899261AB9CD"
+      }
+    },
+    {
+      "id": "en-badge-front",
+      "values": {
+        "name": "Jack Example",
+        "email": "jack.example@example.org",
+        "phone": "07700 900363"
+      }
+    },
+    {
+      "id": "en-member_card-front",
+      "values": {
+        "name": "Edith Fictional"
+      }
+    },
+    {
+      "id": "en-form-page",
+      "values": {
+        "name": "George Dummy",
+        "email": "george.dummy@example.net"
+      }
+    },
+    {
+      "id": "en-letter-page",
+      "values": {
+        "name": "Ruby Placeholder",
+        "signer": "Leo Sample"
+      }
+    }
+  ],
+  "composed_with": {
+    "script": "eval/visual/generate_images.py",
+    "png": "256-colour palette"
+  }
+}

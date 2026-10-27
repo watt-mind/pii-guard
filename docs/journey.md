@@ -369,6 +369,37 @@ published checkpoint). Source:
   Reducing that would take generalising the context (roles, dates, places) rather than better
   detection; filed as a follow-up (LAB-1152).
 
+### 17. Fictional specimen documents with Muse Image (2026-10-27)
+
+LAB-1121.
+
+24 fictional specimen-style documents (ID card front and back, passport data page, driving
+licence, visitor badge, health/member card, filled-in form, signed letter; Hungarian, German
+and English variants), committed under `eval/fixtures/visual/` with exact labels and a
+`NOTICE`. Muse Image painted the 18 portraits of people who don't exist, 6 signatures, 2 stamps
+and 6 textures; every word and number is ours, laid out with Pillow, so each label box is
+exact. The issuer is fictional, the MRZ state is `UTO` and all six MRZs pass their check digits.
+Four of them replace the hand-drawn samples in the demo's Images tab.
+
+| Fictional set, SAM 3.1 + Tesseract + rules | Regions | Recall @ IoU ≥ 0.5 |
+|---|---:|---:|
+| portrait | 18 | **100.0 %** |
+| signature | 15 | **100.0 %** |
+| MRZ | 6 | 0.0 % |
+| text values | 110 | 34.5 % |
+| all | 149 | 47.6 % |
+
+Over-masking is 0.8 % of image area. Cost: 33 Muse Image images, about $0.33
+([generation.json](../eval/fixtures/visual/generation.json)), and 96 SAM calls, about $0.24
+([fictional.md](../eval/results/visual/fictional.md)).
+
+- **Finding:** Muse Image drew a whole specimen ID card when asked, but refused the passport
+  and driving-licence prompts ("content management policy"). We compose every document from
+  parts anyway, because the model's own text is neither exact nor ours to label.
+- **Known gap, confirmed on clean input:** even with perfect, checksum-valid MRZs the zone is
+  never masked: Tesseract reads long `<` runs as `K`, and only the Hungarian pack has the MRZ
+  recogniser (LAB-1124). Names need the LLM detector (LAB-1125).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
