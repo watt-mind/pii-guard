@@ -370,6 +370,7 @@ def test_usage_counts_tokens_invalid_outputs_and_refusals() -> None:
         "reasoning_tokens": 80,
         "invalid_outputs": 1,
         "refusals": 0,
+        "empty_challenged": 0,
     }
 
     refusal = completion("I can't help with that.")

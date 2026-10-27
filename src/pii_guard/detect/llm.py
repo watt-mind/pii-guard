@@ -12,6 +12,13 @@ Any OpenAI-compatible endpoint works (vLLM, Baseten, the Meta Model API for fict
 Fail closed (ADR 0006): timeouts, HTTP errors and responses that are still not valid JSON after
 one retry raise :class:`~pii_guard.types.DetectionError`. Error messages never contain the
 input text or the model output, only status codes and counts.
+
+Prompt injection (``docs/evaluation.md``, "Prompt injection"): the input is wrapped in
+delimiters with a fresh random boundary per request and the system prompt says the text is data;
+invisible characters and lookalike letters are normalised before the model sees the text
+(:mod:`pii_guard.detect.normalize`, spans mapped back); an empty answer for a chunk in which
+the rules find personal data is challenged once. None of this is relied on: the LLM can only
+add spans, so rule detections survive whatever the model is talked into.
 """
 
 from __future__ import annotations
@@ -20,6 +27,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import threading
 import unicodedata
 from collections.abc import Iterable, Iterator, Mapping
@@ -33,6 +41,7 @@ import httpx
 from pydantic import SecretStr
 
 from pii_guard.config import Settings, get_settings
+from pii_guard.detect.normalize import normalize_for_detection
 from pii_guard.languages import LanguagePack, get_pack, packs, primary_language
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, EntityType, Span
 from pii_guard.vault.inflection import inflection_for, variant_stems
@@ -70,6 +79,7 @@ USAGE_KEYS = (
     "reasoning_tokens",
     "invalid_outputs",
     "refusals",
+    "empty_challenged",
 )
 
 #: What the prompt tells the model about each text entity type.
@@ -246,14 +256,22 @@ def _notes(notes: str | Traversable) -> str:
 
 
 def build_messages(
-    text: str, language: str, *, profile: LanguageProfile | None = None
+    text: str,
+    language: str,
+    *,
+    profile: LanguageProfile | None = None,
+    boundary: str | None = None,
 ) -> list[dict[str, str]]:
     """The chat messages for one chunk, for ``language`` (see :func:`language_profile`).
 
     ``profile`` overrides the looked-up profile (the conformance suite renders an
-    unregistered pack's prompt this way). Placeholders are substituted with ``str.replace``
-    so braces in the input or in the JSON example are never interpreted.
+    unregistered pack's prompt this way). The text is wrapped in ``<<<TEXT-<boundary>`` /
+    ``TEXT-<boundary>>>>`` with a random ``boundary`` per call (unless given), so a message
+    can't fake the end of the input. Placeholders are substituted with ``str.replace`` so
+    braces in the input or in the JSON example are never interpreted; the text is
+    substituted last.
     """
+    boundary = boundary or secrets.token_hex(6)
     profile = profile if profile is not None else language_profile(language)
     types = "\n".join(f"- {t.value}: {ENTITY_DESCRIPTIONS[t]}" for t in profile.entity_types)
     system = (
@@ -262,7 +280,12 @@ def build_messages(
         .replace("{language_name}", profile.name)
         .replace("{language_notes}", _notes(profile.notes).strip())
     )
-    user = _template("user.md").replace("{language}", profile.code).replace("{text}", text)
+    user = (
+        _template("user.md")
+        .replace("{language}", profile.code)
+        .replace("{boundary}", boundary)
+        .replace("{text}", text)
+    )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
@@ -335,10 +358,24 @@ def parse_entities(content: str) -> list[LlmEntity]:
 # --- Offset mapping ---------------------------------------------------------
 
 
+# Between two characters of a value: a line break, optionally after a hyphen (``Mé-\nszáros``).
+_LINE_BREAK = r"(?:-?[ \t]*\r?\n[ \t]*)?"
+_MAX_BROKEN_VALUE = 120
+
+
 @cache
-def _pattern(value: str, word_boundary: bool, allow_suffix: bool) -> re.Pattern[str]:
-    """Literal match, but any whitespace run in ``value`` matches any whitespace run."""
-    parts = [re.escape(p) for p in value.split()]
+def _pattern(
+    value: str, word_boundary: bool, allow_suffix: bool, line_breaks: bool = False
+) -> re.Pattern[str]:
+    """Literal match, but any whitespace run in ``value`` matches any whitespace run.
+
+    With ``line_breaks``, a line break (optionally hyphenated) may also sit between any two
+    characters of a word: the value was wrapped in the text but reported unwrapped.
+    """
+    if line_breaks:
+        parts = [_LINE_BREAK.join(re.escape(c) for c in p) for p in value.split()]
+    else:
+        parts = [re.escape(p) for p in value.split()]
     body = r"\s+".join(parts)
     prefix = r"(?<!\w)" if word_boundary and value[0].isalnum() else ""
     if value[-1].isdigit():
@@ -358,7 +395,9 @@ def find_occurrences(
     Matches start at a word boundary (unless ``word_boundary`` is off, for scripts without
     spaces) and, unless ``allow_suffix``, end at one. Tries the value as given and in NFC and
     NFD forms, so a decomposed input ("e" + combining acute) still matches a precomposed model
-    answer. Returns ``[]`` when the value is not in the text: the caller drops it as
+    answer. When there is no match at all, a value of up to 120 characters is also searched
+    with line breaks allowed inside its words (``leopold.fabricant@`` + newline +
+    ``example.net``). Returns ``[]`` when the value is not in the text: the caller drops it as
     hallucinated.
     """
     value = value.strip()
@@ -370,6 +409,10 @@ def find_occurrences(
     ):
         pattern = _pattern(form, word_boundary, allow_suffix)
         found.update(m.span() for m in pattern.finditer(text))
+    if not found and len(value) <= _MAX_BROKEN_VALUE and "\n" in text:
+        for form in dict.fromkeys((value, unicodedata.normalize("NFC", value))):
+            pattern = _pattern(form, word_boundary, allow_suffix, line_breaks=True)
+            found.update(m.span() for m in pattern.finditer(text))
     return sorted(found)
 
 
@@ -427,6 +470,8 @@ class LlmDetector:
     - ``json_mode``: send ``response_format: {"type": "json_object"}``.
     - ``chunk_size`` / ``chunk_overlap``: in code points; long inputs are split and each chunk
       is a separate request. Values are then searched in the whole text.
+    - ``challenge_empty``: when the model reports nothing for a chunk in which the rules find
+      personal data, ask once more (one extra request; counted in ``usage["empty_challenged"]``).
     - ``max_retries``: extra attempts after a timeout, a transport error, a retryable HTTP
       status (429, 5xx) or output that is not valid JSON.
     - ``transport``: an ``httpx.BaseTransport`` (tests use ``httpx.MockTransport``).
@@ -453,6 +498,7 @@ class LlmDetector:
         chunk_size: int = 6000,
         chunk_overlap: int = 300,
         score: float = 0.85,
+        challenge_empty: bool = True,
         transport: httpx.BaseTransport | None = None,
         settings: Settings | None = None,
     ) -> None:
@@ -482,6 +528,7 @@ class LlmDetector:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.score = score
+        self.challenge_empty = challenge_empty
         self._transport = transport
         self.usage: dict[str, int] = dict.fromkeys(USAGE_KEYS, 0)
         self._usage_lock = threading.Lock()
@@ -492,13 +539,23 @@ class LlmDetector:
     # -- public --
 
     def detect(self, text: str, language: str = "hu") -> list[Span]:
+        """Spans over ``text``. The model sees :func:`normalize_for_detection`'s cleaned text;
+        its spans are mapped back, covering any invisible characters inside a value."""
         if not text.strip():
             return []
+        norm = normalize_for_detection(text)
         entities: list[LlmEntity] = []
         with self._client() as client:
-            for _, chunk in chunk_text(text, self.chunk_size, self.chunk_overlap):
+            for _, chunk in chunk_text(norm.text, self.chunk_size, self.chunk_overlap):
                 entities.extend(self._detect_chunk(client, chunk, language))
-        return self.align(text, entities, language)
+        spans = self.align(norm.text, entities, language)
+        if not norm.changed:
+            return spans
+        mapped: set[Span] = set()
+        for s in spans:
+            start, end = norm.to_original(s.start, s.end)
+            mapped.add(Span(start, end, s.entity_type, text[start:end], s.score, s.detector))
+        return sorted(mapped, key=lambda s: (s.start, s.end, s.entity_type.value))
 
     def align(self, text: str, entities: Iterable[LlmEntity], language: str = "hu") -> list[Span]:
         """Map entities to spans over ``text``; values not found verbatim are dropped.
@@ -577,7 +634,10 @@ class LlmDetector:
         for attempt in range(self.max_retries + 1):
             try:
                 content = self._complete(client, payload)
-                return parse_entities(content)
+                entities = parse_entities(content)
+                if not entities and self.challenge_empty:
+                    entities = self._challenge_empty(client, payload, content, chunk, language)
+                return entities
             except _InvalidOutput as exc:
                 self._count(invalid_outputs=1)
                 last_error = str(exc)
@@ -590,6 +650,40 @@ class LlmDetector:
                 last_error,
             )
         raise DetectionError(f"llm detector failed: {last_error}")
+
+    def _challenge_empty(
+        self,
+        client: httpx.Client,
+        payload: dict[str, Any],
+        answer: str,
+        chunk: str,
+        language: str,
+    ) -> list[LlmEntity]:
+        """The model reported nothing. If the rules find personal data in ``chunk``, the text
+        probably talked the model out of it: ask once more, naming the types (never values).
+        The second answer is taken as it is (empty again is not an error: the rules' spans
+        are kept by the pipeline either way)."""
+        from pii_guard.detect.rules import RuleDetector
+
+        found = sorted({s.entity_type.value for s in RuleDetector().detect(chunk, language)})
+        if not found:
+            return []
+        self._count(empty_challenged=1)
+        logger.info("llm detector: empty answer but rules found %s; asking again", found)
+        retry = dict(payload)
+        retry["messages"] = [
+            *payload["messages"],
+            {"role": "assistant", "content": answer},
+            {
+                "role": "user",
+                "content": _template("challenge.md").replace("{types}", ", ".join(found)),
+            },
+        ]
+        try:
+            return parse_entities(self._complete(client, retry))
+        except (_InvalidOutput, _Retryable):
+            # The first, valid answer stands; the rules cover what they found.
+            return []
 
     def _complete(self, client: httpx.Client, payload: dict[str, Any]) -> str:
         try:
