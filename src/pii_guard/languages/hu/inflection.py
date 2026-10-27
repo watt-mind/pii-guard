@@ -86,6 +86,10 @@ def _is_consonant(char: str) -> bool:
     return char.isalpha() and char.casefold() not in _HU_VOWELS and char.casefold() != "y"
 
 
+#: Entity types whose values inflect like words, so a suffix can change their stem.
+_STEM_CHANGE_TYPES = frozenset({EntityType.PERSON, EntityType.ADDRESS, EntityType.ORGANIZATION})
+
+
 def _word_like(value: str) -> bool:
     """A name-like last token: letters only (no digits, no e-mail address), 3+ of them."""
     tokens = value.split()
@@ -241,6 +245,10 @@ class HungarianSuffixMatcher:
         between candidate lemmas (``Zoltán`` vs ``Zoltánt``) is a guess; it is not made here.
         """
         if not suffix or suffix.startswith("-") or not lemma or not lemma[-1].isalpha():
+            return lemma + suffix
+        # Stem changes belong to names, as in variant_stems/splits: an e-mail address or an
+        # ID keeps its spelling (anna@firma.de + re -> anna@firma.dere, not ...dére).
+        if entity_type not in _STEM_CHANGE_TYPES or not _word_like(lemma):
             return lemma + suffix
         folded = suffix.casefold()
         long_vowel = _HU_LONG.get(lemma[-1])

@@ -14,11 +14,13 @@ Unknown placeholders are left as is and counted (``unresolved``).
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, UnmaskResult, VaultSession
+from pii_guard.vault.inflection import following_suffix
 
 __all__ = [
     "JsonEscapingSession",
@@ -33,42 +35,84 @@ MESSAGE_TEXT_FIELDS = ("content", "refusal", "reasoning_content", "reasoning")
 RESTORED_DETECTOR = "gateway"
 
 
-def _lookup(session: VaultSession, placeholder: str) -> str | None:
-    result = session.unmask_with_report(placeholder)
-    return None if result.unresolved else result.text
+@dataclass(frozen=True)
+class _Restored:
+    """One placeholder occurrence: ``text[start:end]`` becomes ``value + suffix``.
+
+    ``value`` is ``None`` when the placeholder is unknown (then ``end`` is the placeholder's
+    end and ``suffix`` is empty, so the text stays as is).
+    """
+
+    start: int
+    end: int
+    placeholder: str
+    entity_type: str
+    value: str | None
+    suffix: str
+
+
+def _restorations(session: VaultSession, text: str) -> Iterator[_Restored]:
+    """Each placeholder in ``text`` restored by the vault, together with its suffix.
+
+    The suffix after a placeholder can change the restored stem (Hungarian
+    ``[[PERSON_x]]nak`` -> ``Minta Máriának``), so the vault gets placeholder + suffix:
+    the same restore and inflection path :meth:`VaultSession.unmask_with_report` takes for
+    a whole text (``/v1/unmask``) and that the streaming unmasker uses.
+    """
+    cursor = 0
+    for match in PLACEHOLDER_RE.finditer(text):
+        if match.start() < cursor:  # pragma: no cover - a suffix never holds "[["
+            continue
+        placeholder = match.group(0)
+        suffix = following_suffix(text, match.end())
+        result = session.unmask_with_report(placeholder + suffix)
+        if result.unresolved:
+            cursor = match.end()
+            yield _Restored(match.start(), cursor, placeholder, match.group(1), None, "")
+            continue
+        cursor = match.end() + len(suffix)
+        restored = result.text
+        if suffix and restored.endswith(suffix):
+            restored, kept = restored[: -len(suffix)], suffix
+        else:  # pragma: no cover - every matcher keeps the suffix as written
+            kept = ""
+        yield _Restored(match.start(), cursor, placeholder, match.group(1), restored, kept)
 
 
 def restore_text(session: VaultSession, text: str) -> tuple[str, list[Span], tuple[str, ...]]:
-    """``session.unmask(text)``, plus the spans of restored values and unresolved tokens."""
+    """``session.unmask(text)``, plus the spans of restored values and unresolved tokens.
+
+    A span covers the restored value (the stem as inflected), not the suffix after it.
+    """
     parts: list[str] = []
     spans: list[Span] = []
     unresolved: dict[str, None] = {}
     cursor = 0
     length = 0
-    for match in PLACEHOLDER_RE.finditer(text):
-        before = text[cursor : match.start()]
+    for item in _restorations(session, text):
+        before = text[cursor : item.start]
         parts.append(before)
         length += len(before)
-        value = _lookup(session, match.group(0))
-        if value is None:
-            unresolved[match.group(0)] = None
-            parts.append(match.group(0))
-            length += len(match.group(0))
-        else:
-            parts.append(value)
-            if value.strip():
-                spans.append(
-                    Span(
-                        length,
-                        length + len(value),
-                        EntityType(match.group(1)),
-                        value,
-                        1.0,
-                        RESTORED_DETECTOR,
-                    )
+        cursor = item.end
+        if item.value is None:
+            unresolved[item.placeholder] = None
+            parts.append(item.placeholder)
+            length += len(item.placeholder)
+            continue
+        value = item.value
+        parts.append(value + item.suffix)
+        if value.strip():
+            spans.append(
+                Span(
+                    length,
+                    length + len(value),
+                    EntityType(item.entity_type),
+                    value,
+                    1.0,
+                    RESTORED_DETECTOR,
                 )
-            length += len(value)
-        cursor = match.end()
+            )
+        length += len(value) + len(item.suffix)
     parts.append(text[cursor:])
     return "".join(parts), spans, tuple(unresolved)
 
@@ -81,15 +125,18 @@ class JsonEscapingSession:
 
     def unmask_with_report(self, text: str) -> UnmaskResult:
         unresolved: dict[str, None] = {}
-
-        def replace(match: Any) -> str:
-            value = _lookup(self._session, match.group(0))
-            if value is None:
-                unresolved[match.group(0)] = None
-                return match.group(0)
-            return json.dumps(value, ensure_ascii=False)[1:-1]
-
-        return UnmaskResult(PLACEHOLDER_RE.sub(replace, text), tuple(unresolved))
+        parts: list[str] = []
+        cursor = 0
+        for item in _restorations(self._session, text):
+            parts.append(text[cursor : item.start])
+            cursor = item.end
+            if item.value is None:
+                unresolved[item.placeholder] = None
+                parts.append(item.placeholder)
+            else:
+                parts.append(json.dumps(item.value + item.suffix, ensure_ascii=False)[1:-1])
+        parts.append(text[cursor:])
+        return UnmaskResult("".join(parts), tuple(unresolved))
 
 
 @dataclass
