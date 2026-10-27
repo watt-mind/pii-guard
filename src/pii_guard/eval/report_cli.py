@@ -1,25 +1,37 @@
 """``pii-guard eval report``: build the benchmark index, charts and page from the run records.
 
 ```
-pii-guard eval report            # rewrite whatever is stale
-pii-guard eval report --check    # exit 1 if anything committed is stale (CI)
+pii-guard eval report             # rewrite whatever is stale
+pii-guard eval report --journey   # ... and fold docs/journey/*.md into docs/journey.md
+pii-guard eval report --check     # exit 1 if a committed output is stale
+pii-guard eval report --validate  # build everything in memory, compare nothing (PR CI)
+pii-guard eval report --print-index  # the compact index on stdout (the UI build reads it)
 ```
 
-Inputs: every run record in ``eval/results/runs/`` (validated against the schema) and
-``docs/benchmarks/config.json`` (headline fixture set and featured systems). Outputs, all a
-pure function of the inputs so ``--check`` compares them byte for byte:
+Inputs: every run record in ``eval/results/runs/`` (validated against the schema),
+``docs/benchmarks/config.json`` (headline fixture set and featured systems) and the journey
+entries in ``docs/journey/`` (:mod:`pii_guard.eval.report_journey`). Outputs, all a pure
+function of the inputs so ``--check`` compares them byte for byte:
 
-- ``eval/results/index.json``: the index (:mod:`pii_guard.eval.report_index`);
-- ``ui/src/api/benchmarks.index.json``: the same index, compact, bundled into the UI;
 - ``docs/benchmarks/*.svg``: the charts (:mod:`pii_guard.eval.report_charts`), plus
   ``validity-<set>.svg`` for each set with a number-validity breakdown;
 - ``docs/benchmarks.md``: tables, embedded charts and method notes;
 - ``docs/benchmarks/colours.json``: the append-only colour registry
   (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
-  needs a colour.
+  needs a colour;
+- with ``--journey``, the generated block of ``docs/journey.md``.
 
-Exit codes: 0 up to date (or written), 1 stale under ``--check``, 2 bad input (an invalid
-run record, an unreadable config).
+The index (:mod:`pii_guard.eval.report_index`) is a build output, never committed: the report
+writes ``eval/results/index.json`` for local use, and the UI build gets the compact form from
+``--print-index`` (``ui/vite.config.ts``). Committed copies used to make every pair of pull
+requests that added a run record conflict (LAB-1269).
+
+Who renders the committed outputs: see CONTRIBUTING.md, "Generated files". When the
+``render-docs`` workflow is on, it renders them on ``develop`` after each merge and pull
+requests run ``--validate``; otherwise pull requests commit them and run ``--check``.
+
+Exit codes: 0 up to date (or written, or valid), 1 stale under ``--check``, 2 bad input (an
+invalid run record or journey entry, an unreadable config).
 """
 
 from __future__ import annotations
@@ -36,11 +48,27 @@ from pii_guard.eval.fixtures import file_sha256
 from pii_guard.eval.record import DEFAULT_RUNS_DIR, RecordError, load_records
 from pii_guard.eval.report_colours import DEFAULT_REGISTRY, dumps_registry, load_registry
 from pii_guard.eval.report_index import build_index
+from pii_guard.eval.report_journey import (
+    DEFAULT_ENTRIES_DIR,
+    DEFAULT_JOURNEY,
+    JourneyError,
+    load_entries,
+)
+from pii_guard.eval.report_journey import render as render_journey
 
-__all__ = ["CHARTS", "build_outputs", "build_parser", "main", "render_page"]
+__all__ = [
+    "CHARTS",
+    "build_outputs",
+    "build_parser",
+    "compact_index",
+    "current_index",
+    "journey_output",
+    "main",
+    "render_page",
+]
 
+#: Written by ``pii-guard eval report`` for local use; ignored by git and by ``--check``.
 DEFAULT_INDEX = Path("eval/results/index.json")
-DEFAULT_UI_INDEX = Path("ui/src/api/benchmarks.index.json")
 DEFAULT_DOCS_DIR = Path("docs")
 DEFAULT_CONFIG = Path("docs/benchmarks/config.json")
 
@@ -595,7 +623,7 @@ def render_page(index: Mapping[str, Any], *, headline_set: str, featured: Sequen
         "on fictional data only. Each run is one JSON record in "
         "[`eval/results/runs/`](../eval/results/runs/) (format: "
         "[evaluation.md](evaluation.md#run-records)); this page, the charts and "
-        "[`eval/results/index.json`](../eval/results/index.json) are generated from them. "
+        "the index (`eval/results/index.json`, written locally) are generated from them. "
         "The same data is browsable in the UI's **Benchmarks** tab.\n",
         f"Headline fixture set: **{headline_set}** ({_set_line(index, headline_set)}). "
         "Default pipeline in **bold**.\n",
@@ -691,7 +719,7 @@ def build_outputs(
     *,
     config: Path = DEFAULT_CONFIG,
     index_path: Path = DEFAULT_INDEX,
-    ui_index_path: Path | None = DEFAULT_UI_INDEX,
+    ui_index_path: Path | None = None,
     docs_dir: Path = DEFAULT_DOCS_DIR,
     colours: Path = DEFAULT_REGISTRY,
 ) -> dict[Path, str]:
@@ -716,8 +744,7 @@ def build_outputs(
         index_path: json.dumps(index, indent=2, ensure_ascii=False) + "\n",
     }
     if ui_index_path is not None:
-        compact = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
-        outputs[ui_index_path] = compact + "\n"
+        outputs[ui_index_path] = compact_index(index) + "\n"
     for name, _, render in CHARTS:
         if not _drawn(index, name):
             continue
@@ -732,6 +759,43 @@ def build_outputs(
     return outputs
 
 
+def current_index(root: Path = Path(".")) -> dict[str, Any]:
+    """The index of the repository at ``root``, as ``pii-guard eval report`` builds it."""
+    index_path = root / DEFAULT_INDEX
+    outputs = build_outputs(
+        root / DEFAULT_RUNS_DIR,
+        config=root / DEFAULT_CONFIG,
+        index_path=index_path,
+        docs_dir=root / DEFAULT_DOCS_DIR,
+        colours=root / DEFAULT_REGISTRY,
+    )
+    index: dict[str, Any] = json.loads(outputs[index_path])
+    return index
+
+
+def compact_index(index: Mapping[str, Any]) -> str:
+    """The index on one line, as the UI bundles it."""
+    return json.dumps(index, ensure_ascii=False, separators=(",", ":"))
+
+
+def journey_output(
+    journey: Path = DEFAULT_JOURNEY, entries_dir: Path = DEFAULT_ENTRIES_DIR
+) -> tuple[Path, str] | None:
+    """``docs/journey.md`` with its generated block rebuilt from ``entries_dir``.
+
+    ``None`` when there is no journey at all (no document, no entries), as in a scratch copy
+    of the run records.
+    """
+    try:
+        entries = load_entries(entries_dir)
+        if not journey.is_file() and not entries:
+            return None
+        doc = journey.read_text(encoding="utf-8")
+        return journey, render_journey(doc, entries, journey_path=journey)
+    except JourneyError as exc:
+        raise RecordError(str(exc)) from exc
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pii-guard eval report",
@@ -740,12 +804,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--runs-dir", type=Path, default=DEFAULT_RUNS_DIR)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--index", type=Path, default=DEFAULT_INDEX, help="index.json path")
+    parser.add_argument(
+        "--index",
+        type=Path,
+        default=DEFAULT_INDEX,
+        help="where to write the index for local use (not committed, not checked)",
+    )
     parser.add_argument(
         "--ui-index",
         type=Path,
-        default=DEFAULT_UI_INDEX,
-        help="copy of the index bundled into the UI ('' to skip)",
+        default=None,
+        help="also write the compact index here (the UI build uses --print-index instead)",
     )
     parser.add_argument(
         "--docs-dir", type=Path, default=DEFAULT_DOCS_DIR, help="benchmarks.md + benchmarks/"
@@ -757,16 +826,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="append-only system -> colour registry",
     )
     parser.add_argument(
+        "--journey-dir",
+        type=Path,
+        default=DEFAULT_ENTRIES_DIR,
+        help="one file per journey milestone",
+    )
+    parser.add_argument("--journey-doc", type=Path, default=DEFAULT_JOURNEY)
+    parser.add_argument(
+        "--journey",
+        action="store_true",
+        help="also fold the journey entries into docs/journey.md (written or, with --check, "
+        "compared); without it they are only validated",
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--check",
         action="store_true",
-        help="write nothing; exit 1 if any generated file is missing or stale",
+        help="write nothing; exit 1 if any committed output is missing or stale",
+    )
+    mode.add_argument(
+        "--validate",
+        action="store_true",
+        help="write nothing, compare nothing: exit 0 if every input is valid and every output "
+        "builds (pull requests, when the render-docs workflow renders after merge)",
+    )
+    mode.add_argument(
+        "--print-index",
+        action="store_true",
+        help="write nothing; print the compact index on stdout",
     )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    ui_index = args.ui_index if str(args.ui_index) not in ("", ".") else None
+    ui_index = args.ui_index if args.ui_index is not None and str(args.ui_index) != "." else None
     try:
         outputs = build_outputs(
             args.runs_dir,
@@ -776,15 +870,31 @@ def main(argv: Sequence[str] | None = None) -> int:
             docs_dir=args.docs_dir,
             colours=args.colours,
         )
+        # Always rendered, so a broken entry fails every mode; written or compared only on
+        # --journey, so pull requests that add an entry never touch docs/journey.md.
+        if args.print_index:
+            sys.stdout.write(compact_index(json.loads(outputs[args.index])) + "\n")
+            return 0
+        journey = journey_output(args.journey_doc, args.journey_dir)
     except (OSError, json.JSONDecodeError, RecordError) as exc:
         print(f"pii-guard eval report: {exc}", file=sys.stderr)
         return 2
+    local = {args.index} | ({ui_index} if ui_index is not None else set())
+    if args.validate:
+        print(
+            f"pii-guard eval report: inputs valid; {len(outputs) - len(local)} outputs build"
+            + (", and the journey" if journey else "")
+        )
+        return 0
+    if args.journey and journey is not None:
+        outputs[journey[0]] = journey[1]
     stale = [
         path
         for path, content in outputs.items()
         if not path.is_file() or path.read_text(encoding="utf-8") != content
     ]
     if args.check:
+        stale = [p for p in stale if p not in local]
         if stale:
             print(
                 "pii-guard eval report: stale or missing (run `uv run pii-guard eval report` "
@@ -792,7 +902,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
-        print(f"pii-guard eval report: {len(outputs)} generated files are up to date")
+        checked = len(outputs) - len(local)
+        print(f"pii-guard eval report: {checked} generated files are up to date")
         return 0
     for path in stale:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -801,3 +912,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not stale:
         print(f"pii-guard eval report: {len(outputs)} generated files already up to date")
     return 0
+
+
+if __name__ == "__main__":  # ``python -m pii_guard.eval.report_cli``: the UI build calls it
+    raise SystemExit(main())

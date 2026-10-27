@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -21,6 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNS = REPO_ROOT / "eval" / "results" / "runs"
 CONFIG = json.loads((REPO_ROOT / "docs" / "benchmarks" / "config.json").read_text())
 SVG = "{http://www.w3.org/2000/svg}"
+# The committed report is rendered on develop after each merge (CONTRIBUTING.md, "Generated
+# files"), so a pull request or a merge commit may carry it stale on purpose (LAB-1269).
+RENDERED_ON_MERGE = os.environ.get("RENDER_DOCS_ON_MERGE") == "true"
 
 
 @pytest.fixture(scope="module")
@@ -36,11 +40,7 @@ def index(records: list[dict[str, Any]]) -> dict[str, Any]:
 def _copy_repo(tmp_path: Path) -> Path:
     for rel in ("eval/results/runs", "eval/results/schema", "docs/benchmarks"):
         shutil.copytree(REPO_ROOT / rel, tmp_path / rel)
-    for rel in (
-        "eval/results/index.json",
-        "docs/benchmarks.md",
-        "ui/src/api/benchmarks.index.json",
-    ):
+    for rel in ("docs/benchmarks.md",):  # the index is a build output, not committed
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO_ROOT / rel, tmp_path / rel)
     return tmp_path
@@ -51,7 +51,7 @@ def _copy_repo(tmp_path: Path) -> Path:
 
 def test_committed_report_is_up_to_date(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(REPO_ROOT)
-    assert cli.main(["eval", "report", "--check"]) == 0
+    assert cli.main(["eval", "report", "--validate" if RENDERED_ON_MERGE else "--check"]) == 0
 
 
 @pytest.mark.slow
@@ -60,11 +60,10 @@ def test_check_flags_stale_and_missing_outputs_and_a_rebuild_fixes_them(
 ) -> None:
     monkeypatch.chdir(_copy_repo(tmp_path))
     Path("docs/benchmarks/progress.svg").write_text("<svg/>")
-    Path("eval/results/index.json").unlink()
     assert cli.main(["eval", "report", "--check"]) == 1
     err = capsys.readouterr().err
     assert "progress.svg" in err
-    assert "index.json" in err
+    assert "index.json" not in err  # a local build output: never compared (LAB-1269)
     assert cli.main(["eval", "report"]) == 0
     assert cli.main(["eval", "report", "--check"]) == 0
     # A new run record makes the committed outputs stale.
@@ -190,9 +189,32 @@ def test_page_has_method_notes_tables_and_every_run(index: dict[str, Any]) -> No
 
 
 @pytest.mark.slow
-def test_outputs_include_the_ui_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_print_index_is_the_compact_index_and_writes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.chdir(_copy_repo(tmp_path))
-    outputs = build_outputs()
-    ui = json.loads(outputs[Path("ui/src/api/benchmarks.index.json")])
-    assert ui == json.loads(outputs[Path("eval/results/index.json")])
-    assert "\n" not in outputs[Path("ui/src/api/benchmarks.index.json")].rstrip("\n")
+    before = {p: p.read_bytes() for p in Path(".").rglob("*") if p.is_file()}
+    assert cli.main(["eval", "report", "--print-index"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("\n") == 1
+    assert json.loads(out) == json.loads(build_outputs()[Path("eval/results/index.json")])
+    assert {p: p.read_bytes() for p in Path(".").rglob("*") if p.is_file()} == before
+
+
+@pytest.mark.slow
+def test_validate_compares_nothing_but_rejects_bad_input(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_copy_repo(tmp_path))
+    src = Path("eval/results/runs/2026-10-26-comparison-smoke.json")
+    rec = json.loads(src.read_text())
+    rec["run_id"] = "2026-10-28-comparison-smoke"
+    rec["date"] = "2026-10-28"
+    Path(f"eval/results/runs/{rec['run_id']}.json").write_text(json.dumps(rec))
+    # A new run record without the regenerated report: stale for --check, fine for --validate.
+    assert cli.main(["eval", "report", "--check"]) == 1
+    assert cli.main(["eval", "report", "--validate"]) == 0
+    assert "inputs valid" in capsys.readouterr().out
+    assert not Path("eval/results/index.json").exists()
+    Path("eval/results/runs/broken.json").write_text('{"run_id": "broken"}')
+    assert cli.main(["eval", "report", "--validate"]) == 2

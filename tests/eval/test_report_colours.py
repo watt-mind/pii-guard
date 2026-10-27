@@ -4,6 +4,7 @@ unrelated generated files."""
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,7 @@ from typing import Any
 import pytest
 
 from pii_guard import cli
-from pii_guard.eval.report_cli import build_outputs
+from pii_guard.eval.report_cli import build_outputs, current_index
 from pii_guard.eval.report_colours import (
     DEFAULT_REGISTRY,
     PALETTE_VISUAL,
@@ -24,16 +25,18 @@ from pii_guard.eval.report_index import PALETTE_OURS
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNS = Path("eval/results/runs")
 INDEX = Path("eval/results/index.json")
+# The committed report is rendered on develop after each merge (CONTRIBUTING.md, "Generated
+# files"); until then a new system has no committed colour yet (LAB-1269).
+committed_report = pytest.mark.skipif(
+    os.environ.get("RENDER_DOCS_ON_MERGE") == "true",
+    reason="the committed report is rendered after the merge (render-docs workflow)",
+)
 
 
 def _copy_repo(tmp_path: Path) -> Path:
     for rel in ("eval/results/runs", "eval/results/schema", "docs/benchmarks"):
         shutil.copytree(REPO_ROOT / rel, tmp_path / rel)
-    for rel in (
-        "eval/results/index.json",
-        "docs/benchmarks.md",
-        "ui/src/api/benchmarks.index.json",
-    ):
+    for rel in ("docs/benchmarks.md",):  # the index is a build output, not committed
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO_ROOT / rel, tmp_path / rel)
     return tmp_path
@@ -80,9 +83,10 @@ def test_registry_round_trips_with_sorted_keys(tmp_path: Path) -> None:
     assert dumps_registry(loaded) == path.read_text(encoding="utf-8")
 
 
+@committed_report
 def test_committed_registry_covers_every_system_in_the_index() -> None:
     reg = load_registry(REPO_ROOT / DEFAULT_REGISTRY)
-    index = json.loads((REPO_ROOT / INDEX).read_text(encoding="utf-8"))
+    index = current_index(REPO_ROOT)
     for key, style in index["systems"].items():
         assert reg["systems"][key] == {"color": style["color"], "shape": style["shape"]}
     assert set(index["colours"]["visual"]) <= set(reg["visual"])
@@ -93,12 +97,15 @@ def test_committed_registry_covers_every_system_in_the_index() -> None:
 
 
 @pytest.mark.slow
+@committed_report
 def test_regenerating_without_changes_is_byte_identical(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(_copy_repo(tmp_path))
     first = build_outputs()
     for path, content in first.items():
+        if path == INDEX:
+            continue  # a local build output, not committed (LAB-1269)
         assert path.read_text(encoding="utf-8") == content, path  # committed == generated
     assert build_outputs() == first
 

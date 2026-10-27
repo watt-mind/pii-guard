@@ -1,0 +1,76 @@
+# Render the generated docs on develop after each merge (LAB-1269): docs/benchmarks.md, its
+# charts and colour registry, and the milestones block of docs/journey.md, from the run records
+# and docs/journey/*.md. Pull requests then commit only those inputs, so two of them can't
+# conflict on the outputs. CONTRIBUTING.md, "Generated files".
+#
+# Off until the repository variable RENDER_DOCS_ON_MERGE is "true". Before setting it, an admin
+# adds GitHub Actions to the bypass list of the ruleset that protects develop: this job pushes
+# straight to develop, and only the generated files.
+name: render-docs
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - eval/results/runs/**
+      - eval/datasets/results/**
+      - docs/benchmarks/config.json
+      - docs/journey/**
+      - src/pii_guard/eval/**
+      - .github/workflows/render-docs.yml
+  workflow_dispatch:
+
+permissions: {}
+
+# One render at a time, in push order. A run that waits renders everything merged before it,
+# so numbers still follow merge order.
+concurrency:
+  group: render-docs
+  cancel-in-progress: false
+
+env:
+  UV_LOCKED: "1"
+
+jobs:
+  render:
+    name: render
+    if: vars.RENDER_DOCS_ON_MERGE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: false
+      - run: uv sync --no-dev
+      - name: Render, commit the generated files, push to develop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          for attempt in 1 2 3; do
+            git fetch -q "$remote" develop
+            git reset -q --hard FETCH_HEAD
+            uv run --no-sync pii-guard eval report --journey
+            uv run --no-sync pii-guard eval report --check --journey
+            git add -- docs/benchmarks.md docs/benchmarks docs/journey.md
+            if git diff --cached --quiet; then
+              echo "generated docs already current at $(git rev-parse --short HEAD)"
+              exit 0
+            fi
+            git diff --cached --stat
+            git commit -qm "docs: render benchmarks and journey at $(git rev-parse --short HEAD)"
+            if git push -q "$remote" HEAD:develop; then
+              exit 0
+            fi
+            echo "develop moved during attempt $attempt; rendering again"
+          done
+          exit 1

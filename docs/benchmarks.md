@@ -2,7 +2,7 @@
 
 # Benchmarks
 
-Every evaluation run of pii-guard and of the open-source tools it is compared with, on fictional data only. Each run is one JSON record in [`eval/results/runs/`](../eval/results/runs/) (format: [evaluation.md](evaluation.md#run-records)); this page, the charts and [`eval/results/index.json`](../eval/results/index.json) are generated from them. The same data is browsable in the UI's **Benchmarks** tab.
+Every evaluation run of pii-guard and of the open-source tools it is compared with, on fictional data only. Each run is one JSON record in [`eval/results/runs/`](../eval/results/runs/) (format: [evaluation.md](evaluation.md#run-records)); this page, the charts and the index (`eval/results/index.json`, written locally) are generated from them. The same data is browsable in the UI's **Benchmarks** tab.
 
 Headline fixture set: **smoke** (hand-written; documents: de 10 + en 10 + hu 31). Default pipeline in **bold**.
 

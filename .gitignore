@@ -82,3 +82,8 @@ Thumbs.db
 
 # --- Agent worktrees --------------------------------------------------------
 .worktrees/
+
+# --- Build outputs of `pii-guard eval report` (LAB-1269) ------------------------
+# The benchmark index: written locally, built into the UI by ui/vite.config.ts.
+eval/results/index.json
+ui/src/api/benchmarks.index.json
