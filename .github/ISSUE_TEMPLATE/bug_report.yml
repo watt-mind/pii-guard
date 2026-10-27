@@ -1,0 +1,56 @@
+name: Bug report
+description: Something does not work as documented (not a leak; report leaks privately).
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Fictional data only.** Do not paste real names, e-mails, IDs, documents or images, not even partly redacted. Reproduce with obviously fictional values (`Jane Placeholder`, `example.com`).
+        A way to get personal data past the guard is a **security issue**: use [private reporting](https://github.com/watt-mind/pii-guard/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction (fictional data)
+      description: The smallest request, command or fixture that shows it.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Detection (rules, NER, LLM detector)
+        - Gateway (OpenAI-compatible proxy)
+        - REST API
+        - Images
+        - Demo UI
+        - Evaluation / benchmarks
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version
+      placeholder: "git rev-parse --short HEAD"
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: OS, Python, mode (fast / strict), language, and anything non-default in your environment (no keys).
+  - type: checkboxes
+    id: fictional
+    attributes:
+      label: Data
+      options:
+        - label: Everything in this issue is fictional.
+          required: true

@@ -1,333 +1,148 @@
-# pii-guard
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="pii-guard: a privacy firewall for AI agents. You send 'Írj Minta Máriának holnap', the model sees 'Írj [[PERSON_7f3a]]nak holnap', you get back the real name." width="100%">
+</p>
 
-**An open-source privacy firewall for AI agents, built on Meta's models.** pii-guard sits
-between your application and an LLM. It finds personal data in text and images, swaps it for
-reversible placeholders before anything leaves your infrastructure, and puts the real values
-back into the model's answer, even while the answer is streaming.
+<p align="center"><b>Mask personal data before it reaches the LLM, and put it back in the answer. On your machine, in milliseconds.</b></p>
 
-```
+<p align="center">
+  <a href="https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml/badge.svg?branch=develop"></a>
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
+  <a href="pyproject.toml"><img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-blue"></a>
+  <a href="docs/decisions/0005-synthetic-data-only.md"><img alt="Fictional data only" src="https://img.shields.io/badge/data-fictional%20only-b6f36b"></a>
+</p>
+
+pii-guard sits between your application and any OpenAI-compatible LLM. It finds personal data in
+text and images, swaps it for reversible placeholders before anything leaves your
+infrastructure, and restores the real values in the model's answer, even while it streams.
+
+```text
 "Kérem, írjon Próba Zsuzsannának a zsuzsa.proba@example.com címre."      ← what you send
 "Kérem, írjon [[PERSON_525263]] a [[EMAIL_20c291]] címre."                ← what the model sees
 "Megírtam a levelet Próba Zsuzsannának."                                  ← what you get back
 ```
 
-> **Status: hackathon build** for the Meta Global AI Developer Hackathon (October 26 –
-> November 4, 2026). The core works end to end today (detection, masking, streaming restore,
-> the OpenAI-compatible gateway, image masking with SAM 3.1, the evaluation harness). It is not
-> production-hardened yet. See [what works today](#what-works-today).
-
-## Why pii-guard
-
-- **Reversible, consistent placeholders**: the answer names the real person, and every document
-  in the Hungarian smoke set unmasks back to its original exactly
-  ([100 % round trip](eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json)).
-- **Grammar-aware**: Hungarian case endings stay outside the placeholder; inflected-name leaks
-  went [18/30 → 0/30](docs/journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333).
-- **Leak from about half to under 1 %** with Meta's open-weight Muse Spark Open, at 1.8 s and
-  [$2.42 per 1,000 messages](eval/results/2026-10-27-baseten/README.md) (Hungarian).
-- **Against Presidio, LLM Guard and PrivAiTe**: 1.0 % Hungarian leak vs 19.6–49.5 %
-  ([comparison](eval/results/2026-10-26-baselines/comparison.md); fresh rerun in progress).
-- **Red-teamed by Meta's own model**: prompt-injection leak
-  [3.4 % → 0.0 %](eval/results/2026-10-27-injection/README.md); re-identification
-  [measured and published](eval/results/2026-10-27-redteam/README.md).
-- **Images too**: SAM 3.1 masks [90.8 % of portraits](eval/results/visual/specimens.md) on 65
-  official specimen ID documents, plus machine-readable zones.
-- **Measured in the open**: [61 run records](eval/results/runs/), charts regenerated and checked
-  in CI, fictional data only.
-
-All 13 differentiators, with evidence and status: **[docs/why-pii-guard.md](docs/why-pii-guard.md)**.
-
-## Why it matters
-
-Every company that wants AI agents to work on real documents hits the same wall: the useful
-data is personal data. A lawyer's case file, a clinic's referral letter, an HR folder, an
-insurance claim. Under GDPR, sending it to a third-party model is a legal risk; not sending
-it means the agent can't do the job.
-
-The tools that exist today mostly:
-
-- work well in **English only**, and break on languages like Hungarian, where a name changes
-  form with every grammatical case (*Zsuzsanna, Zsuzsannának, Zsuzsannával*);
-- **redact one way**, so the answer says `[REDACTED]` instead of the person you asked about;
-- handle **text only**, and miss scans and photos: ID cards, signatures, faces;
-- don't handle **streaming** or **tool calls**, which is how agents actually talk to models;
-- publish **no leak numbers**, so nobody can tell how much gets through.
-
-**Who benefits:** teams building AI agents in Europe's regulated professions (legal, health,
-finance, HR, public sector) and the people whose data is in those documents. We build AI
-products for professional-services firms ourselves; this is the layer we needed and could not
-find. It is open source (Apache-2.0) so anyone can audit what happens to their data, and it is
-built as a drop-in proxy, so adopting it is a one-line change of the API base URL.
-
-## How it uses Meta's models
-
-Meta's models do five different jobs, chosen by one rule: **anything that sees real personal
-data is an open-weights model you can run yourself; hosted models only ever see fictional or
-already-masked data.**
-
-| Meta model | Where | What it does in pii-guard |
-|---|---|---|
-| **Muse Glimmer** (open weights, Apache-2.0, 30B) | your laptop or your GPU (llama.cpp, vLLM) | Self-hosted PII detector, so real data never leaves your machine. Also tested as a **single-pass gate**: read its yes/no token probability to skip detection for messages with no personal data. *(in progress)* |
-| **Muse Spark Open** (open weights) | partner inference (Baseten Model APIs) or self-hosted | The production LLM detector: finds names, prose addresses, birth dates and context-dependent identifiers that rules can't. Measured on Baseten: [eval/results/2026-10-27-baseten](eval/results/2026-10-27-baseten/README.md). |
-| **Muse Spark 1.3** | Meta Model API | The same detector during development (fictional data only), and the downstream model in the demo, which only ever sees placeholders. |
-| **Muse Spark 1.3 Contributor** | Meta Model API | Writes the **synthetic benchmark**: realistic Hungarian and English contracts, letters, court notices, emails and chats around fictional identities, labelled automatically. Cheap, and fine to use because nothing in it is real. |
-| **SAM 3.1** | Meta Model API | Finds **faces, ID photos and other visual personal data** in images from a text prompt; pii-guard fills the regions and strips metadata before the image goes anywhere. |
-
-What we think goes beyond a basic integration:
-
-- **The LLM never rewrites your text.** It only names spans; pii-guard finds them in the
-  original, drops anything the model invented, and lets checksum-validated rules win on
-  structured IDs. A hallucination can't add text, and a disagreement can't unmask anything.
-- **Grammar-aware placeholders.** Hungarian case endings stay outside the placeholder
-  (`[[PERSON_x]]nek`), so the model still writes grammatical answers and restoration is exact.
-- **Muse evaluates Muse.** The benchmark is generated by Muse Spark around fictional
-  identities and every inserted value is located automatically, including inflected forms;
-  documents that can't be labelled exactly are discarded, never hand-fixed.
-- **SAM 3.1 as a privacy tool**: one request per concept ("face", "photo"), boxes parsed from
-  its response format, masks filled, EXIF dropped, fail closed.
-
-## Engineering choices
-
-- **Fail closed, everywhere** ([ADR 0006](docs/decisions/0006-fail-closed.md)). A detector
-  timeout, a model error or a malformed answer blocks the request; nothing is sent unmasked.
-- **Keyed, reversible pseudonyms** ([ADR 0007](docs/decisions/0007-keyed-pseudonyms.md)).
-  HMAC-derived placeholders, the same within a conversation, unlinkable across sessions and
-  tenants. The mapping lives only in pii-guard's session vault, with a TTL.
-- **Streaming-safe restore.** Placeholders split across chunks (`[[PERS` + `ON_7f3a]]`) are
-  held back until complete, in content and in tool-call arguments.
-- **Layered detection with one resolver:** rules with checksums (Hungarian tax and TAJ
-  numbers, IBAN, giro accounts, company IDs, US SSN, UK NINO, payment cards…), an optional NER
-  model, the LLM detector, merged by one deterministic resolver.
-- **Language packs** ([docs/languages.md](docs/languages.md)): Hungarian, English and German
-  today. A language is one plugin unit (an entry point for separate distributions) with a
-  conformance suite that says what is missing: `pii-guard lang new <code>` to start.
-- **Entity policies:** mask, keep (organisations stay readable so the model can reason) or block
-  (refuse the request).
-- **Per-message detection cache.** Chat clients resend the whole history every turn; only the
-  new message is detected.
-- **Synthetic data only** ([ADR 0005](docs/decisions/0005-synthetic-data-only.md)). No real
-  personal data in the repo, in tests or in prompts to hosted models. ~900 tests, CI on every
-  change.
-
-## Results so far
-
-Every run, with charts, per-language and per-type tables and the run log, is in
-**[docs/benchmarks.md](docs/benchmarks.md)** (also the UI's Benchmarks tab).
-
-Measured with `pii-guard eval` on fictional data. **Preliminary**: the comparison against
-Presidio, LLM Guard and PrivAiTe on the same data is in progress, and results will be
-committed under `eval/results/`. Leak rate = share of labelled values that still appear, in any
-form, in what the model receives (lower is better).
-
-| Test set | Detectors | F1 (overlap) | Leak rate |
-|---|---|---:|---:|
-| Hungarian, hand-written (28 docs) | rules only | 62.1% | 52.6% |
-| English, hand-written (10 docs) | rules only | 64.0% | 46.7% |
-| Hungarian, Muse-generated (20 docs) | rules only | 57.7% | — |
-| Hungarian, Muse-generated (20 docs) | rules + Muse Spark | 100% | — |
-| English, Muse-generated (10 docs) | rules + Muse Spark | 100% | — |
-| Hungarian, hand-written (31 docs) | rules + Muse Spark Open on Baseten | 98.4% | 0.9% |
-| English, hand-written (10 docs) | rules + Muse Spark Open on Baseten | 97.1% | 0.0% |
-
-Muse Spark Open on Baseten (`reasoning_effort: low`) detects in about 1.2–1.8 s per document
-at the median (Muse Spark 1.3 on the Meta Model API: 7–11 s) for about $2–4 per 1,000 messages,
-with no refusals: [eval/results/2026-10-27-baseten](eval/results/2026-10-27-baseten/README.md).
-
-Rules alone catch every structured identifier (emails, phones, IDs, bank accounts) with no
-false positives on adversarial look-alikes; names and addresses need the model. The 100% rows
-are flattering, because the same model family wrote and read those documents. The comparison
-runs on the hand-written sets for that reason.
-
-## What works today
-
-| Area | State |
-|---|---|
-| Rules for Hungarian and English identifiers, with checksums | ✅ |
-| LLM detector (Muse Spark), resolver, entity policies | ✅ |
-| Session vault, keyed placeholders, streaming restore | ✅ |
-| REST API: `/v1/analyze`, `/v1/mask`, `/v1/unmask` | ✅ |
-| OpenAI-compatible gateway: `/v1/chat/completions`, streaming, tool calls, cache, strict/fast modes | ✅ |
-| Image masking with SAM 3.1 (+ optional OCR) | ✅ library · 🚧 API/UI |
-| Demo UI: *what the model saw* vs *what you got back* | ✅ |
-| Evaluation harness and Muse-generated benchmark (hu, en) | ✅ |
-| Muse Glimmer running locally as the detector | 🚧 |
-| NER stage for fast mode | 🚧 |
-| Baselines: Presidio, LLM Guard, PrivAiTe | 🚧 |
+<p align="center">
+  <img src="docs/assets/demo/demo.webp" alt="Demo, dark theme, fictional data: a Hungarian contract is masked, a chat goes through the gateway and comes back restored, then the live traffic dashboard fills with calls and per-call latency" width="100%">
+</p>
 
 ## Try it
 
-Requires [uv](https://docs.astral.sh/uv/) and, for the UI, [pnpm](https://pnpm.io/).
-
-**One command, offline:** the API, the gateway and the UI on a local mock upstream (no key,
-no model download), then fictional Hungarian, English and German traffic through it:
+Offline, no key, no model download: the API, the gateway and the UI on a mock upstream
+(needs [uv](https://docs.astral.sh/uv/) and [pnpm](https://pnpm.io/)).
 
 ```bash
-git clone https://github.com/watt-mind/pii-guard.git
-cd pii-guard
-make demo           # prints: open http://localhost:5173
-make demo-traffic   # second terminal; watch it at http://127.0.0.1:8787/v1/traffic
-make smoke          # the same, as a pass/fail check (CI runs it)
+git clone https://github.com/watt-mind/pii-guard.git && cd pii-guard
+make demo           # open http://localhost:5173
+make demo-traffic   # second terminal: fictional hu/en/de calls through the gateway
+make smoke          # the same as a pass/fail check (CI runs it)
 ```
 
-Each call shows up in the traffic log with what was masked, what went upstream and the
-latency pii-guard added per stage. With `BASETEN_API_KEY` or `PII_GUARD_UPSTREAM_BASE_URL` in
-`.env` the demo uses that upstream instead; `docker compose --profile demo up --build` runs the
-same stack in containers. Details, the traffic log's privacy model and the timing fields:
-[docs/operations.md](docs/operations.md).
+Without a NER checkpoint, fast mode is rules only and free-text names need known values. With
+`uv sync --extra ner` and `PII_GUARD_NER_MODEL` pointing at one
+([models.md](docs/models.md#ner-detector)) it masks names too; the screenshots below use one,
+plus `PII_GUARD_DETECTORS=rules,ner` for the Mask screen. Docker:
+`docker compose --profile demo up --build`. More: [docs/operations.md](docs/operations.md).
 
-Step by step:
+## Why pii-guard
 
-```bash
-uv sync
-export PII_GUARD_TENANT_KEY=$(openssl rand -hex 32)
-uv run pii-guard serve                  # http://127.0.0.1:8787 (rules only)
-```
+- **Fast mode is the product.** Rules with checksums plus a multilingual NER distilled from
+  Meta's Muse Glimmer, in process: no model API call per message, and nothing leaves your
+  machine before masking ([results](#results)).
+- **Reversible and grammar-aware.** The answer names the real person; Hungarian case endings
+  stay outside the placeholder, so inflected-name leaks went
+  [18/30 → 0/30](docs/journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333).
+- **A drop-in gateway that fails closed.** Streaming, tool calls and images through the
+  OpenAI-compatible API; a detection error blocks the request
+  ([ADR 0006](docs/decisions/0006-fail-closed.md)).
+- **Measured in the open.** Every number is a committed [run record](eval/results/runs/), the
+  report is regenerated and checked in CI, and all data is fictional.
 
-```bash
-cd ui && pnpm install && pnpm dev       # http://localhost:5173
-```
+All 13 differentiators, with evidence and status: **[docs/why-pii-guard.md](docs/why-pii-guard.md)**.
 
-The UI works without the API too (a demo engine runs in the browser, clearly labelled). To
-mask names live, run the API with the LLM detector. The default endpoint and model are Muse
-Spark Open on Baseten Model APIs (`https://inference.baseten.co/v1`,
-`meta-models/muse-spark-open-1026`), so only the key and the reasoning effort are needed:
+## Results
 
-```bash
-export PII_GUARD_DETECTORS=rules,llm
-export PII_GUARD_LLM_DETECTOR_API_KEY=$BASETEN_API_KEY
-export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low     # required: see docs/models.md
-uv run pii-guard serve
-```
+Hand-written fictional documents (`smoke`: 10 German, 10 English, 31 Hungarian), pooled. Leak =
+labelled personal values still readable in what the model receives; lower is safer. Copied
+from the generated [docs/benchmarks.md](docs/benchmarks.md#smoke); each row links its run
+records.
 
-Muse Spark 1.3 on the Meta Model API works the same way (fictional text only): set
-`PII_GUARD_LLM_DETECTOR_URL=https://api.meta.ai/v1`, `PII_GUARD_LLM_DETECTOR_MODEL=muse-spark-1.3`
-and `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=minimal`. Which endpoint may see real data:
-[docs/models.md](docs/models.md#baseten-model-apis-production-detector).
+| System | Leak | F1 | Detect p50 | Model call per message | Run records (2026-10-27) |
+|---|---:|---:|---:|---|---|
+| **pii-guard fast** (rules + NER) | **0.6 %** | 98.5 % | 63 ms | none | [de+en+hu](eval/results/runs/2026-10-27-unicode-normaliser-after-smoke-fast.json) |
+| pii-guard strict (+ Muse Spark Open, optional) | 0.6 % | 98.2 % | 1.9 s | Baseten | [de](eval/results/runs/2026-10-27-comparison-de-smoke-strict.json) · [en](eval/results/runs/2026-10-27-comparison-en-smoke-strict.json) · [hu](eval/results/runs/2026-10-27-comparison-hu-smoke-strict.json) |
+| PrivAiTe | 12.7 % | 55.2 % | 170 ms | none | [de](eval/results/runs/2026-10-27-comparison-de-smoke-privaite.json) · [en](eval/results/runs/2026-10-27-comparison-en-smoke-privaite.json) · [hu](eval/results/runs/2026-10-27-comparison-hu-smoke-privaite.json) |
+| Presidio | 24.3 % | 64.9 % | 88 ms | none | [de](eval/results/runs/2026-10-27-comparison-de-smoke-presidio.json) · [en](eval/results/runs/2026-10-27-comparison-en-smoke-presidio.json) · [hu](eval/results/runs/2026-10-27-comparison-hu-smoke-presidio.json) |
+| LLM Guard | 45.1 % | 53.2 % | 110 ms | none | [de](eval/results/runs/2026-10-27-comparison-de-smoke-llm-guard.json) · [en](eval/results/runs/2026-10-27-comparison-en-smoke-llm-guard.json) · [hu](eval/results/runs/2026-10-27-comparison-hu-smoke-llm-guard.json) |
 
-Run the benchmark: `uv run pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --detectors rules`.
-Docker: `docker compose up --build`. All settings: [.env.example](.env.example).
+Small sets: a few points are noise. Latency is per document on a shared laptop CPU, not a
+like-for-like speed test. Charts, per-language tables, image masking and the full run log:
+**[docs/benchmarks.md](docs/benchmarks.md)**; how the numbers moved: [docs/journey.md](docs/journey.md).
 
-### Demo
+## What you can see in the demo
 
-Five steps, all on fictional data (the UI runs at `http://localhost:5173`; tabs are deep
-links: `#mask`, `#chat`, `#images`, `#benchmarks`, `#traffic`):
+All five screens run on fictional samples; tabs are deep links (`#mask`, `#chat`, `#images`,
+`#benchmarks`, `#traffic`).
 
-1. **Mask.** Your document with every detected value highlighted, and what the model would
-   see. Pre-load **known values** (a customer record) and they are masked in any inflected form.
-2. **Chat.** The same document sent through the gateway to a real model (Muse Spark Open):
-   what you wrote, what the model received, what it answered, and what you got back.
-3. **Images.** Faces, signatures and ID numbers covered before the image leaves.
-4. **Benchmarks.** How many personal values each tool lets through, on the same documents.
-5. **Live traffic.** Every LLM call through the gateway as it happens: what was masked, the
-   request exactly as the model received it, the answer before and after restoring, a
-   per-call timing waterfall and live latency charts. Start `make demo`, then press
-   **Send demo traffic** (or run `make demo-traffic`). Even rules only, nothing leaks: names
-   are pre-loaded as known values, and one call, labelled **needs fast mode (NER)**, shows
-   the free-text name only the NER finds ([what the demo shows](docs/operations.md#demo-traffic)).
-   Originals appear only when the API runs `PII_GUARD_TRAFFIC_LOG=full` on localhost;
-   offline, the tab replays recorded masked calls.
-
-| Mask | Chat |
+| **Text:** every value found, and what the model saw | **Gateway:** a chat, masked out and restored back |
 |---|---|
-| ![Mask: a Hungarian contract with every personal value highlighted, and the placeholders the model sees](docs/assets/demo/1-mask.webp) | ![Chat: the contract sent through the gateway; the model received and answered with placeholders, the answer came back restored](docs/assets/demo/2-chat.webp) |
-| **Images** | **Benchmarks** |
-| ![Images: a fictional ID card with the face, signature and ID numbers blacked out](docs/assets/demo/3-images.webp) | ![Benchmarks: share of personal values let through, pii-guard against open-source tools](docs/assets/demo/4-benchmarks.webp) |
+| [![Mask screen: a fictional Hungarian contract with each personal value highlighted, and the placeholders the model sees](docs/assets/demo/1-mask.webp)](docs/assets/demo/1-mask.webp) | [![Chat screen: an English message sent through the gateway in fast mode; the model received placeholders and the answer came back restored](docs/assets/demo/2-chat.webp)](docs/assets/demo/2-chat.webp) |
+| **Images:** faces, signatures and ID numbers covered | **Live traffic:** every call, its masks and its latency |
+| [![Images screen: a fictional ID card; SAM 3.1 and OCR found the face, photo, signature and printed numbers, and the model saw them filled](docs/assets/demo/3-images.webp)](docs/assets/demo/3-images.webp) | [![Live traffic screen: calls through the gateway with their entity types, the selected call's details and its timing waterfall](docs/assets/demo/6-traffic.webp)](docs/assets/demo/6-traffic.webp) |
+| **Latency, live:** overhead per call, stages, values per minute | **Benchmarks:** leak against latency, from the run records |
+| [![Live latency charts: overhead per call with rolling p50 and p95, overhead by mode, time per stage and values masked per minute](docs/assets/demo/7-traffic-charts.webp)](docs/assets/demo/7-traffic-charts.webp) | [![Benchmarks screen: results table and the leak rate versus latency chart for pii-guard and the open-source tools](docs/assets/demo/4-benchmarks.webp)](docs/assets/demo/4-benchmarks.webp) |
 
-| **Live traffic** | |
-| ![Live traffic: calls through the gateway, the masked request as sent upstream, and the timing waterfall](docs/assets/demo/6-traffic.webp) | ![Live traffic: live latency charts, overhead per call with rolling p50 and p95, stage breakdown and values masked per minute](docs/assets/demo/7-traffic-charts.webp) |
+At phone width: [Mask](docs/assets/demo/5-mask-mobile.webp) ·
+[Live traffic](docs/assets/demo/8-traffic-mobile.webp). What each screen does:
+[ui/README.md](ui/README.md#screens).
 
-At phone width: [Mask at 375 px](docs/assets/demo/5-mask-mobile.webp), [Live traffic at 375 px](docs/assets/demo/8-traffic-mobile.webp).
+## Use it from your code
 
-### Gateway: drop-in for any OpenAI-compatible client
-
-Point any OpenAI-compatible client at pii-guard instead of the provider. Every message is
-masked when it arrives, the masked request is forwarded, and the answer (streamed or not) comes
-back with the real values restored. Demo configuration: strict mode (the default) detects with
-rules + Muse Spark Open on Baseten, and the masked request goes to Muse Spark 1.3 on the Meta
-Model API, which only ever sees placeholders (use **fictional data** for the demo, see
-[docs/models.md](docs/models.md)):
-
-```bash
-export PII_GUARD_TENANT_KEY=$(openssl rand -hex 32)
-export PII_GUARD_UPSTREAM_BASE_URL=https://api.meta.ai/v1
-export PII_GUARD_UPSTREAM_API_KEY=$META_API_KEY
-# strict mode's LLM detector: Muse Spark Open on Baseten (the default URL and model)
-export PII_GUARD_LLM_DETECTOR_API_KEY=$BASETEN_API_KEY
-export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low
-uv run pii-guard serve                                        # http://127.0.0.1:8787
-```
+Change the base URL of any OpenAI-compatible client; nothing else.
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(base_url="http://127.0.0.1:8787/v1", api_key="unused")
-messages = [
-    {
-        "role": "system",
-        "content": "Values like [[PERSON_1a2b3c]] are the user's real data, "
-        "masked for privacy. Use them verbatim.",
-    },
-    {
-        "role": "user",
-        "content": "I'm Jane Placeholder, jane.placeholder@example.net. "
-        "Write one sentence inviting Teszt Elek to lunch.",
-    },
-]
-raw = client.chat.completions.with_raw_response.create(model="muse-spark-1.3", messages=messages)
-print(raw.parse().choices[0].message.content)  # real names; the model only saw placeholders
-session = raw.headers["X-PII-Guard-Session"]  # send it back on the next turn
-
-stream = client.chat.completions.create(
+reply = client.chat.completions.create(
     model="muse-spark-1.3",
-    stream=True,
-    messages=[
-        *messages,
-        {"role": "assistant", "content": raw.parse().choices[0].message.content},
-        {"role": "user", "content": "Now mention Minta Mária too."},
-    ],
-    extra_headers={"X-PII-Guard-Session": session},
+    messages=[{"role": "user", "content": "I'm Jane Placeholder. Invite Teszt Elek to lunch."}],
+    extra_headers={"X-PII-Guard-Mode": "fast"},
 )
-for chunk in stream:
-    if chunk.choices:
-        print(chunk.choices[0].delta.content or "", end="")
+print(reply.choices[0].message.content)  # real names; the model only saw placeholders
 ```
 
-| Header | Direction | Meaning |
-|---|---|---|
-| `X-PII-Guard-Session` | both | The conversation. Omit it to start one; the response carries it. Same session = same placeholders, and history is not detected again. Unknown or expired → 404. |
-| `X-PII-Guard-Mode` | request | `strict` (rules + LLM detector, the default) or `fast` (rules only, no model call). |
-| `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
-| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). |
-| `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
-| `X-PII-Guard-Request-Id` | response | The call's id in the traffic log; with `PII_GUARD_SERVER_TIMING=true` a `Server-Timing` header gives the per-stage latency ([operations.md](docs/operations.md#timing)). |
-
-Fails closed: a detection error or timeout (`PII_GUARD_GATEWAY_DETECTION_TIMEOUT`, 30 s), image
-or audio parts, or a missing tenant key or upstream return an error and nothing is forwarded.
-Further settings (`PII_GUARD_GATEWAY_MODE`, `_UPSTREAM_TIMEOUT`, `_CACHE_SIZE`, `_CONCURRENCY`,
-`_KEEP_TYPES`) are documented in `src/pii_guard/gateway/config.py`. Without
-`PII_GUARD_UPSTREAM_API_KEY`, the client's own `Authorization` header is forwarded.
+Sessions, streaming, the headers, strict mode and every setting:
+[docs/architecture-gateway.md](docs/architecture-gateway.md). The REST API (`/v1/analyze`,
+`/v1/mask`, `/v1/unmask`, `/v1/mask/image`): [docs/contracts.md](docs/contracts.md).
 
 ## How it works
 
 ```
  your app / agent ──► pii-guard ──────────────────────────────► LLM provider
                       │ 1. extract text (and image regions)           │
-                      │ 2. detect PII (rules → NER → Muse detector)   │
+                      │ 2. detect PII (rules → NER → optional LLM)    │
                       │ 3. apply policies, pseudonymize (keyed)       │
-                      │ 4. mask image regions (SAM 3.1)               │
+                      │ 4. mask image regions (SAM 3.1 + OCR)         │
                       │◄──────────────── response (streamed) ─────────┘
                       │ 5. restore placeholders, chunk by chunk
  your app / agent ◄───┘
 ```
 
-The mapping between real values and placeholders **never leaves pii-guard**. Details in
-[docs/architecture.md](docs/architecture.md) and [docs/privacy-model.md](docs/privacy-model.md).
+The mapping between real values and placeholders **never leaves pii-guard**. Design and
+engineering choices: [docs/architecture.md](docs/architecture.md); threat model:
+[docs/privacy-model.md](docs/privacy-model.md); which Meta model does what:
+[docs/why-pii-guard.md](docs/why-pii-guard.md#3-built-on-metas-models-end-to-end).
+
+> **Status: hackathon build** for the Meta Global AI Developer Hackathon (October 26 –
+> November 4, 2026). Detection, masking, streaming restore, the gateway, image masking and the
+> evaluation harness work end to end; it is not production-hardened yet. What is not done:
+> [docs/why-pii-guard.md](docs/why-pii-guard.md#what-is-not-here-yet) and
+> [docs/roadmap.md](docs/roadmap.md).
 
 ## Documentation
 
 Start at [docs/INDEX.md](docs/INDEX.md): architecture, privacy model, entity taxonomy,
-evaluation method, models, contracts and decision records. How the numbers got where they
-are, milestone by milestone: [docs/journey.md](docs/journey.md).
+languages, evaluation method, models, contracts and decision records.
 
 ## Contributing
 
@@ -337,12 +152,10 @@ personal data**, not even in a test. All fixtures are synthetic.
 ## Security
 
 **No authentication by default.** Keep pii-guard on loopback (the default) or behind an
-authenticating proxy: anyone who can reach it can unmask and use the gateway, and the upstream
-key is shared by every caller. `PII_GUARD_API_TOKEN` turns on a bearer token; see
-[docs/operations.md](docs/operations.md#exposure-and-authentication).
-
-Found a way to make personal data leak past the guard? That is a security bug. Please report
-it privately; see [SECURITY.md](SECURITY.md).
+authenticating proxy: anyone who can reach it can unmask and use the gateway.
+`PII_GUARD_API_TOKEN` turns on a bearer token
+([operations.md](docs/operations.md#exposure-and-authentication)). Found a way to make personal
+data leak past the guard? Report it privately: [SECURITY.md](SECURITY.md).
 
 ## License
 

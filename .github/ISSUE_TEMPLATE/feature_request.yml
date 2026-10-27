@@ -1,0 +1,26 @@
+name: Feature request
+description: A new entity type, language, integration or improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Adding a language? Start with `pii-guard lang new <code>` and [docs/languages.md](https://github.com/watt-mind/pii-guard/blob/develop/docs/languages.md); the conformance suite says what is missing.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do and why pii-guard gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The behaviour you want. Fictional examples welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered

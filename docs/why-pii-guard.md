@@ -81,7 +81,7 @@ masked data** ([models.md](models.md)).
 | Red-team attacker | **Muse Spark Open**, and **Muse Spark 1.3** for comparison | Meta's own model tries to undo the masking | [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md) | shipped |
 | Fictional ID specimens | **Muse Image** | Portraits, signatures and stamps of people who don't exist, so image tests need no real ID | [eval/fixtures/visual/generation.json](../eval/fixtures/visual/generation.json) | shipped |
 | Faces, ID photos, signatures in images | **SAM 3.1** (Meta Model API) | Finds regions from a text prompt | [eval/results/visual/specimens.md](../eval/results/visual/specimens.md) | shipped |
-| Downstream model in the demo | **Muse Spark 1.3** | Only ever sees placeholders | [README, gateway](../README.md#gateway-drop-in-for-any-openai-compatible-client) | shipped |
+| Downstream model in the demo | **Muse Spark 1.3** | Only ever sees placeholders | [gateway usage](architecture-gateway.md#from-python) | shipped |
 
 The pattern: use the big model where its cost doesn't matter (writing fictional data,
 labelling it, attacking the guard) and ship a small, fast model distilled from it.
