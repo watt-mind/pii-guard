@@ -280,7 +280,7 @@ def test_iban_followed_by_uppercase_word(detector: RuleDetector) -> None:
         make_iban()[:-1],  # too short
         make_iban()[:-1] + ".",
         make_iban() + "7",  # runs on
-        make_iban().lower(),
+        make_iban()[:1] + make_iban()[1:2].lower() + make_iban()[2:],  # mixed-case country
     ],
 )
 def test_iban_look_alikes(detector: RuleDetector, text: str) -> None:

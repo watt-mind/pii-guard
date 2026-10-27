@@ -22,23 +22,35 @@ __all__ = ["RULES", "is_valid_card_number", "luhn_check_digit"]
 
 # --- IBAN -------------------------------------------------------------------
 
-_IBAN_START_RE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2})(\d{2})")
+_IBAN_START_RE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2}|[a-z]{2})(\d{2})")
 
 
 def _find_iban(text: str) -> Iterator[_Hit]:
-    """IBANs, compact or printed in groups (single spaces between characters allowed)."""
+    """IBANs, compact or printed in groups, in upper or lower case.
+
+    Spaces between characters are allowed, also several in a row (``DE89  3704 ...``). Every
+    letter must have the case of the country code: ``de89...`` and ``gb82west...`` are IBANs
+    typed in lower case, ``De89...`` is not how one is printed.
+    """
     for m in _IBAN_START_RE.finditer(text):
-        expected = IBAN_LENGTHS.get(m.group(1))
+        country = m.group(1)
+        expected = IBAN_LENGTHS.get(country.upper())
         if expected is None:
             continue
-        chars = [m.group(1), m.group(2)]
+        lower = country.islower()
+        chars = [country, m.group(2)]
         count, pos = 4, m.end()
         while count < expected and pos < len(text):
             ch = text[pos]
-            if ch == " " and pos + 1 < len(text) and _is_iban_char(text[pos + 1]):
-                pos += 1
-                continue
-            if not _is_iban_char(ch):
+            if ch == " ":
+                run_end = pos
+                while run_end < len(text) and text[run_end] == " ":
+                    run_end += 1
+                if run_end < len(text) and _is_iban_char(text[run_end], lower):
+                    pos = run_end
+                    continue
+                break
+            if not _is_iban_char(ch, lower):
                 break
             chars.append(ch)
             count += 1
@@ -48,12 +60,12 @@ def _find_iban(text: str) -> Iterator[_Hit]:
         # The IBAN must end here, not run on into more account characters.
         if pos < len(text) and text[pos].isalnum():
             continue
-        if is_valid_iban("".join(chars)):
+        if is_valid_iban("".join(chars).upper()):
             yield _Hit(m.start(), pos, EntityType.BANK_ACCOUNT, 0.99)
 
 
-def _is_iban_char(ch: str) -> bool:
-    return ch.isascii() and (ch.isdigit() or ch.isupper())
+def _is_iban_char(ch: str, lower: bool = False) -> bool:
+    return ch.isascii() and (ch.isdigit() or (ch.islower() if lower else ch.isupper()))
 
 
 # --- Email ------------------------------------------------------------------
@@ -84,8 +96,11 @@ def _find_email(text: str) -> Iterator[_Hit]:
 # --- International phone numbers --------------------------------------------
 
 # "+" and a country code, 8-15 digits in total (E.164). +36 is handled by the Hungarian pack.
+# The country code may stand in parentheses, ``(+44) 20 7946 0958``: the span then starts at
+# the opening parenthesis, so it stays balanced.
 _INTL_PHONE_RE = re.compile(
-    r"(?<![\w+])\+(?!36)[1-9]\d{0,2}(?:[ \-./]?(?:\(\d{1,4}\)|\d{1,4})){2,6}(?!\d)"
+    r"(?:(?<![\w+(])\(\+(?!36)[1-9]\d{0,2}\)|(?<![\w+])\+(?!36)[1-9]\d{0,2})"
+    r"(?:[ \-./]?(?:\(\d{1,4}\)|\d{1,4})){2,6}(?!\d)"
 )
 
 
