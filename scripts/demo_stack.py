@@ -151,6 +151,14 @@ def banner(p: Plan) -> str:
         f"  metrics        {p.api_url}/metrics",
         f"  upstream       {upstream}",
         f"  fast mode      {fast}",
+        *(
+            []
+            if p.ner
+            else [
+                "                 demo traffic: names are pre-loaded known values; the one call",
+                '                 labelled "needs fast mode (NER)" is an expected miss',
+            ]
+        ),
         f"  strict mode    {strict}",
         "",
         "  send demo traffic:  make demo-traffic      stop: Ctrl-C",

@@ -3,6 +3,10 @@
 Fails (exit 1) if any answer is not restored exactly, a request fails unexpectedly, a gold
 value reached the upstream (the mock records what it receives), or the traffic log is missing
 an event, holds a key or a raw session id. Offline and free; runs in CI.
+
+Rules only (the default): every scenario's values must be masked, names through session known
+values. The one scenario labelled "needs fast mode (NER)" is an expected miss, printed but not
+a failure; with ``PII_GUARD_NER_MODEL`` set its name must be masked too.
 """
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ import sys
 import httpx
 from demo_stack import Stack, plan
 
-from pii_guard.bench.scenarios import check, run
+from pii_guard.bench.scenarios import check, expected_misses, run
 
 API_PORT, MOCK_PORT = 18787, 18790
 
@@ -22,12 +26,15 @@ def main() -> int:
     p = plan(
         force_mock=True, ui=False, traffic_log="masked", api_port=API_PORT, mock_port=MOCK_PORT
     )
+    detectors = {"ner"} if p.ner else set()
     failures: list[str] = []
+    misses: list = []
     try:
         with Stack(p, quiet=True):
             outcomes = run(p.api_url)
             received = httpx.get(f"{p.mock_url}/_mock/received?limit=1000", timeout=10).json()
-            failures += check(outcomes, received["requests"])
+            failures += check(outcomes, received["requests"], detectors=detectors)
+            misses = expected_misses(outcomes, received["requests"], detectors=detectors)
             traffic = httpx.get(f"{p.api_url}/v1/traffic?limit=1000", timeout=10).json()
             failures += check_traffic(traffic["events"], outcomes)
     except RuntimeError as exc:
@@ -37,12 +44,18 @@ def main() -> int:
         state = "ok" if o.status < 400 else f"refused ({o.error})"
         print(f"  {o.scenario.name:<16} turn {o.turn}  {state:<28} {o.elapsed_ms:7.1f} ms")
     print(f"  upstream received {received['count']} requests")
+    for scenario, values in misses:
+        print(
+            f"  {scenario.name:<16} expected miss ({scenario.label}): "
+            f"{len(values)} name(s) sent as written, not a failure in rules-only mode"
+        )
     if failures:
         print("smoke: FAILED", file=sys.stderr)
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print(f"smoke: OK ({len(outcomes)} requests, no gold value reached the upstream)")
+    mode = "rules + NER" if p.ner else "rules only"
+    print(f"smoke: OK ({len(outcomes)} requests, {mode}, no gold value reached the upstream)")
     return 0
 
 

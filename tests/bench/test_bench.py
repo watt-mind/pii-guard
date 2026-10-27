@@ -16,7 +16,17 @@ from pii_guard.api.app import create_app
 from pii_guard.bench import cli as bench_cli
 from pii_guard.bench.latency import CellResult, build_records, percentiles, run_benchmark
 from pii_guard.bench.mock_upstream import create_mock_upstream, last_user_text
-from pii_guard.bench.scenarios import SCENARIOS, Outcome, check, gold_values, leaks, run
+from pii_guard.bench.scenarios import (
+    NER_LABEL,
+    SCENARIOS,
+    Outcome,
+    check,
+    expected_misses,
+    gold_values,
+    leaks,
+    run,
+    ui_export,
+)
 from pii_guard.config import Settings
 from pii_guard.eval.record import validate
 from pii_guard.observability import ObservabilitySettings
@@ -117,6 +127,55 @@ def test_scenarios_restore_exactly_and_leak_nothing() -> None:
     assert {o.request_id for o in outcomes if o.status < 400} <= {e["id"] for e in traffic}
     assert [e["outcome"] for e in traffic].count("refused") == 1
     assert "sk-test-upstream-key-0000" not in json.dumps(traffic)
+    # Rules only: the labelled NER-only scenario's free-text name is the one expected miss.
+    assert [(s.name, found) for s, found in expected_misses(outcomes, received)] == [
+        ("hu-needs-ner", ["Gipsz Jakab"])
+    ]
+    assert check(outcomes, received, detectors={"ner"}) == [
+        "gold value reached the upstream: Gipsz Jakab"
+    ]
+    # Every other name is masked (pre-loaded known values), inflected forms included.
+    by_id = {e["id"]: e for e in traffic}
+    for o in outcomes:
+        if o.scenario.known_values and o.request_id:
+            assert "known" in by_id[o.request_id]["detectors"]
+    upstream = "\n".join(received)
+    for name in ("Teszt Elek", "Jane Placeholder", "Erika Mustermann", "Minta Mári"):
+        assert name not in upstream
+    assert "]]nak a [[ORGANIZATION_" in upstream and "]]-vel" in upstream and "]]kel." in upstream
+    restored = next(o for o in outcomes if o.scenario.name == "hu-known-values").content or ""
+    assert "Minta Máriának a Placeholder Kft.-vel" in restored and "Teszt Elekkel" in restored
+
+
+def test_names_are_known_values_and_only_the_labelled_scenario_needs_the_ner() -> None:
+    labelled = [s for s in SCENARIOS if s.requires]
+    assert [(s.name, s.requires, s.label) for s in labelled] == [
+        ("hu-needs-ner", ("ner",), NER_LABEL)
+    ]
+    assert not labelled[0].known_values
+    assert "Gipsz Jakab" not in gold_values() and "Gipsz Jakab" in gold_values(detectors={"ner"})
+    known = {v for s in SCENARIOS for v, _ in s.known_values}
+    assert {"Teszt Elek", "Jane Placeholder", "Erika Mustermann", "Minta Mária"} <= known
+
+
+def test_checksum_valid_identifiers() -> None:
+    from pii_guard.detect.checksums import is_valid_hu_tax_id, is_valid_iban, is_valid_taj
+    from pii_guard.detect.rules.common import is_valid_card_number
+
+    gold = gold_values()
+    assert is_valid_hu_tax_id("8456789011") and "8456789011" in gold
+    assert is_valid_taj("123456788") and "123 456 788" in gold
+    assert is_valid_card_number("4111111111111111") and "4111 1111 1111 1111" in gold
+    ibans = [g for g in gold if g[:2] in {"HU", "GB", "DE"} and g[2:4].isdigit()]
+    assert len(ibans) == 3 and all(is_valid_iban(i.replace(" ", "")) for i in ibans)
+
+
+def test_ui_mirror_is_in_sync() -> None:
+    """ui/src/content/demoScenarios.json is what "Send demo traffic" sends in the browser."""
+    path = REPO / "ui/src/content/demoScenarios.json"
+    assert json.loads(path.read_text(encoding="utf-8")) == ui_export(), (
+        "run: uv run python scripts/demo_traffic.py --export-ui"
+    )
 
 
 def test_check_reports_leaks_and_wrong_answers() -> None:

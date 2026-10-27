@@ -221,8 +221,11 @@ links: `#mask`, `#chat`, `#images`, `#benchmarks`, `#traffic`):
 5. **Live traffic.** Every LLM call through the gateway as it happens: what was masked, the
    request exactly as the model received it, the answer before and after restoring, a
    per-call timing waterfall and live latency charts. Start `make demo`, then press
-   **Send demo traffic** (or run `make demo-traffic`). Originals appear only when the API runs
-   `PII_GUARD_TRAFFIC_LOG=full` on localhost; offline, the tab replays recorded masked calls.
+   **Send demo traffic** (or run `make demo-traffic`). Even rules only, nothing leaks: names
+   are pre-loaded as known values, and one call, labelled **needs fast mode (NER)**, shows
+   the free-text name only the NER finds ([what the demo shows](docs/operations.md#demo-traffic)).
+   Originals appear only when the API runs `PII_GUARD_TRAFFIC_LOG=full` on localhost;
+   offline, the tab replays recorded masked calls.
 
 | Mask | Chat |
 |---|---|

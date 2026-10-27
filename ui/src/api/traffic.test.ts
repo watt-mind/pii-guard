@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
+import { DEMO_SCENARIOS } from "./demoTraffic";
 import { ApiError, UnreachableError } from "./http";
 import { SSE_MAX_ERRORS, connectTraffic, fetchTraffic, parseTrafficEvent, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
 
@@ -189,8 +190,11 @@ describe("startFixtureFeed", () => {
       expect(e.response?.unmasked).toBeUndefined();
     }
     const blob = JSON.stringify(fixture);
-    for (const value of ["teszt.elek@example.com", "+36 30 123 4567", "HU42 1177", "jane.placeholder@example.net", "Minta Mária", "1051 Budapest"]) {
+    // every demo value is masked in rules-only mode, names included (session known values) ...
+    for (const value of DEMO_SCENARIOS.filter((s) => !s.requires.length).flatMap((s) => s.gold)) {
       expect(blob).not.toContain(value);
     }
+    // ... except the labelled NER-only scenario's free-text name: the expected miss
+    expect(blob).toContain("Gipsz Jakab");
   });
 });
