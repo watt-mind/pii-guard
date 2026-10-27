@@ -1,0 +1,531 @@
+{
+ "note": "Recorded at level full from make demo + make demo-traffic (mock upstream); fictional values only (ADR 0005). Test data for LAB-1167.",
+ "events": [
+  {
+   "id": "req_f653ff5d1e52cf5a",
+   "time": "2026-10-27T11:48:26.607+00:00",
+   "level": "full",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_1f6d1f47eeb32e8c",
+   "session_new": true,
+   "detectors": [
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "NATIONAL_ID_HU_TAJ": 1,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "NATIONAL_ID_HU_TAJ": 1,
+     "PHONE": 1
+    },
+    "texts": 2
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 2,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 74,
+    "completion_tokens": 45,
+    "total_tokens": 119
+   },
+   "timing": {
+    "total_ms": 7.69,
+    "upstream_ms": 2.162,
+    "overhead_ms": 5.528,
+    "stages_ms": {
+     "parse": 0.088,
+     "detect": 0.833,
+     "image": 0.0,
+     "mask": 0.324,
+     "forward": 4.146,
+     "upstream_ttfb": 1.913,
+     "upstream": 2.162,
+     "unmask": 0.0,
+     "response": 0.116
+    },
+    "detectors_ms": {
+     "rules": 0.26
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "system",
+       "content": "Ügyfélszolgálati asszisztens vagy. Válaszolj röviden."
+      },
+      {
+       "role": "user",
+       "content": "Szia! Teszt Elek vagyok, e-mail: [[EMAIL_8a0532]], telefon: [[PHONE_5e9aa3]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_339905]] számlára, TAJ számom [[NATIONAL_ID_HU_TAJ_64dc6f]]."
+      }
+     ]
+    },
+    "original": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "system",
+       "content": "Ügyfélszolgálati asszisztens vagy. Válaszolj röviden."
+      },
+      {
+       "role": "user",
+       "content": "Szia! Teszt Elek vagyok, e-mail: teszt.elek@example.com, telefon: +36 30 123 4567. Kérlek, utald a díjat a HU42 1177 3016 1111 1018 0000 0000 számlára, TAJ számom 123 456 788."
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793101706,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": "Echo: Szia! Teszt Elek vagyok, e-mail: [[EMAIL_8a0532]], telefon: [[PHONE_5e9aa3]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_339905]] számlára, TAJ számom [[NATIONAL_ID_HU_TAJ_64dc6f]]."
+       },
+       "finish_reason": "stop"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 74,
+      "completion_tokens": 45,
+      "total_tokens": 119
+     }
+    },
+    "unmasked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793101706,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": "Echo: Szia! Teszt Elek vagyok, e-mail: teszt.elek@example.com, telefon: +36 30 123 4567. Kérlek, utald a díjat a HU42 1177 3016 1111 1018 0000 0000 számlára, TAJ számom 123 456 788."
+       },
+       "finish_reason": "stop"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 74,
+      "completion_tokens": 45,
+      "total_tokens": 119
+     }
+    }
+   },
+   "seq": 9
+  },
+  {
+   "id": "req_70954384d44a51f8",
+   "time": "2026-10-27T11:48:26.627+00:00",
+   "level": "full",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_82189a11e9a77e17",
+   "session_new": true,
+   "detectors": [
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "ADDRESS": 1
+    },
+    "masked": {
+     "ADDRESS": 1
+    },
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 18,
+    "total_tokens": 42
+   },
+   "timing": {
+    "total_ms": 10.079,
+    "upstream_ms": 3.987,
+    "overhead_ms": 6.092,
+    "stages_ms": {
+     "parse": 0.074,
+     "detect": 0.414,
+     "image": 0.0,
+     "mask": 0.082,
+     "forward": 4.5,
+     "upstream_ttfb": 3.293,
+     "upstream": 3.987,
+     "unmask": 0.238,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "rules": 0.116
+    },
+    "ttft_ms": 8.955,
+    "upstream_ttft_ms": 3.83,
+    "added_ttft_ms": 5.125
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Az új lakcímem [[ADDRESS_a6b02c]], kérlek frissítsd a szerződésen."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    },
+    "original": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Az új lakcímem 1051 Budapest, Minta utca 12., kérlek frissítsd a szerződésen."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {
+      "0": "Echo: Az új lakcímem [[ADDRESS_a6b02c]], kérlek frissítsd a szerződésen."
+     }
+    },
+    "chunks": 14,
+    "unmasked": {
+     "content": {
+      "0": "Echo: Az új lakcímem 1051 Budapest, Minta utca 12., kérlek frissítsd a szerződésen."
+     }
+    }
+   },
+   "seq": 11
+  },
+  {
+   "id": "req_3fc629119e5772ef",
+   "time": "2026-10-27T11:48:26.647+00:00",
+   "level": "full",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "de",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_049506e86a0113ba",
+   "session_new": true,
+   "detectors": [
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PHONE": 1
+    },
+    "texts": 5
+   },
+   "cache": {
+    "hits": 1,
+    "misses": 4,
+    "seeded": 0
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 41,
+    "completion_tokens": 61,
+    "total_tokens": 102
+   },
+   "timing": {
+    "total_ms": 8.362,
+    "upstream_ms": 2.176,
+    "overhead_ms": 6.186,
+    "stages_ms": {
+     "parse": 0.097,
+     "detect": 1.266,
+     "image": 0.0,
+     "mask": 0.192,
+     "forward": 4.498,
+     "upstream_ttfb": 1.802,
+     "upstream": 2.176,
+     "unmask": 0.0,
+     "response": 0.118
+    },
+    "detectors_ms": {
+     "rules": 0.245
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hallo, hier ist Erika Mustermann, E-Mail [[EMAIL_21546e]], Telefon [[PHONE_ffae35]]. Bitte überweisen Sie auf [[BANK_ACCOUNT_7958ac]]."
+      }
+     ],
+     "tools": [
+      {
+       "type": "function",
+       "function": {
+        "name": "send_email",
+        "description": "Send an e-mail on the user's behalf.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       }
+      }
+     ]
+    },
+    "original": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hallo, hier ist Erika Mustermann, E-Mail erika.mustermann@example.de, Telefon +49 30 901820. Bitte überweisen Sie auf DE89 3704 0044 0532 0130 00."
+      }
+     ],
+     "tools": [
+      {
+       "type": "function",
+       "function": {
+        "name": "send_email",
+        "description": "Send an e-mail on the user's behalf.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       }
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793101706,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+         {
+          "id": "call_mock_1",
+          "type": "function",
+          "function": {
+           "name": "send_email",
+           "arguments": "{\"text\": \"Hallo, hier ist Erika Mustermann, E-Mail [[EMAIL_21546e]], Telefon [[PHONE_ffae35]]. Bitte überweisen Sie auf [[BANK_ACCOUNT_7958ac]].\"}"
+          }
+         }
+        ]
+       },
+       "finish_reason": "tool_calls"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 41,
+      "completion_tokens": 61,
+      "total_tokens": 102
+     }
+    },
+    "unmasked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793101706,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+         {
+          "id": "call_mock_1",
+          "type": "function",
+          "function": {
+           "name": "send_email",
+           "arguments": "{\"text\": \"Hallo, hier ist Erika Mustermann, E-Mail erika.mustermann@example.de, Telefon +49 30 901820. Bitte überweisen Sie auf DE89 3704 0044 0532 0130 00.\"}"
+          }
+         }
+        ]
+       },
+       "finish_reason": "tool_calls"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 41,
+      "completion_tokens": 61,
+      "total_tokens": 102
+     }
+    }
+   },
+   "seq": 13
+  },
+  {
+   "id": "req_914af73471b375a5",
+   "time": "2026-10-27T11:48:26.742+00:00",
+   "level": "full",
+   "outcome": "refused",
+   "error": {
+    "code": "detection_failed",
+    "status": 503
+   },
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_20806597ea734aec",
+   "session_new": true,
+   "detectors": [
+    "rules",
+    "visual"
+   ],
+   "entities": {
+    "detected": {},
+    "masked": {},
+    "texts": 1,
+    "images": {
+     "count": 1,
+     "masked": {},
+     "kept": {},
+     "ocr": false
+    }
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 0
+   },
+   "upstream": {
+    "status": null,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": null,
+   "timing": {
+    "total_ms": 0.975,
+    "upstream_ms": 0.0,
+    "overhead_ms": 0.975,
+    "stages_ms": {
+     "parse": 0.108,
+     "detect": 0.429,
+     "image": 0.397,
+     "mask": 0.0,
+     "forward": 0.0,
+     "upstream_ttfb": 0.0,
+     "upstream": 0.0,
+     "unmask": 0.0,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "rules": 0.112,
+     "visual": 0.386
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": null,
+    "original": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "Mi látható ezen a képen? Teszt Elek személyi igazolványa."
+        },
+        {
+         "type": "image_url",
+         "image_url": {
+          "url": "[inline image/png, 330 chars]"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "response": null,
+   "seq": 16
+  }
+ ]
+}

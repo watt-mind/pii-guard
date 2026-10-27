@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { useWidth } from "../hooks/useWidth";
 import {
   formatMs,
   formatPct,
@@ -17,26 +18,6 @@ import {
 
 const FONT = 12;
 
-function useWidth(fallback = 720) {
-  // A callback ref: the observer attaches whenever the chart's container mounts, even if the
-  // first render returned the empty state.
-  const [el, setEl] = useState<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(fallback);
-  useEffect(() => {
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(([entry]) => {
-      const w = Math.floor(entry?.contentRect.width ?? 0);
-      if (w > 0) setWidth(w);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [el]);
-  const ref = useCallback((node: HTMLDivElement | null) => {
-    setEl(node);
-    if (node && node.clientWidth > 0) setWidth(Math.floor(node.clientWidth)); // first paint, before any resize event
-  }, []);
-  return [ref, width] as const;
-}
 
 // Palette colours too dark to tell apart on the dark canvas get a theme variable (index.css).
 const DARK_ADJUSTED = new Set(["#882255", "#332288"]);

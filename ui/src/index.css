@@ -21,6 +21,18 @@
   --warn-soft: #fff1d6;
   --danger: #b4232c;
   --danger-soft: #fde4e4;
+  /* Live traffic: pii-guard's own stages, categorical slots 1-7 in fixed order (dataviz
+     reference palette, validated adjacent-pair CVD/normal-vision on both surfaces). The
+     upstream (the model's time, not pii-guard's) is a neutral. */
+  --stage-parse: #2a78d6;
+  --stage-detect: #eb6834;
+  --stage-image: #1baf7a;
+  --stage-mask: #eda100;
+  --stage-forward: #e87ba4;
+  --stage-unmask: #008300;
+  --stage-response: #6250d6;
+  --stage-upstream: #b3afa3;
+  --stage-other: #8a8d94;
   color-scheme: light;
 }
 
@@ -45,6 +57,15 @@
   /* Benchmark system colours that are too dark on this canvas (LAB-1155). */
   --sys-882255: #88ccee;
   --sys-332288: #ddcc77;
+  --stage-parse: #3987e5;
+  --stage-detect: #d95926;
+  --stage-image: #199e70;
+  --stage-mask: #c98500;
+  --stage-forward: #d55181;
+  --stage-unmask: #008300;
+  --stage-response: #9085e9;
+  --stage-upstream: #5d6472;
+  --stage-other: #737782;
   color-scheme: dark;
 }
 

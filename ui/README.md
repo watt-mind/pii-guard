@@ -2,7 +2,7 @@
 
 A small web app that makes the guard visible: **what the model saw** next to **what you got
 back**. It talks only to the pii-guard REST API (`/healthz`, `/v1/analyze`, `/v1/mask`,
-`/v1/unmask`, `/v1/mask/image`, see [docs/contracts.md](../docs/contracts.md)). It never calls a
+`/v1/unmask`, `/v1/mask/image`, `/v1/traffic`, see [docs/contracts.md](../docs/contracts.md)). It never calls a
 model provider and holds no secrets (SAM 3.1 is called by the pii-guard server).
 
 ## Run it
@@ -80,6 +80,24 @@ to fall back: the guard failed closed, and the UI says that nothing was sent.
    (how many personal values pii-guard lets through against the best open-source tool), charts
    and the results table per set and language.
 
+5. **Live traffic** (`#traffic`). Every call through the gateway as it happens, from the
+   traffic log ([docs/operations.md](../docs/operations.md#traffic-log)): `GET /v1/traffic` for
+   the backlog, then `GET /v1/traffic/stream` (SSE), falling back to polling `/v1/traffic?after=`
+   when the stream fails. Per call: time, mode, entity chips, blocked/refused badges and the
+   overhead; pick one for three panes (the **original request**, only when the server runs
+   `PII_GUARD_TRAFFIC_LOG=full` *and* this page is on localhost; the **masked request as sent
+   upstream**, tools and other fields included; the **response**, masked from the model and
+   restored for your app) and a **timing waterfall** of the event's `timing` block. Below, live
+   charts: overhead per call with rolling p50/p95, overhead by mode, pii-guard's own stages, and
+   values masked per minute by type. Pause holds new calls, Clear empties the view (the server
+   keeps its log), filters by mode, entity type and blocked/failed. **Send demo traffic** sends
+   the `make demo-traffic` scenarios from the browser (model `VITE_PII_GUARD_DEMO_MODEL`, default
+   `pii-guard-mock`, which the `make demo` mock upstream answers offline).
+
+   When the API is unreachable (or the engine is set to Demo engine, or on request when the log
+   is off) the tab replays calls recorded from `make demo` + `make demo-traffic` at level
+   `masked` (`src/content/trafficFixture.json`): no original values, ever.
+
 All sample data is fictional ([ADR 0005](../docs/decisions/0005-synthetic-data-only.md)).
 Never paste real personal data into the demo.
 
@@ -120,6 +138,12 @@ pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test --run
 | `src/api/imageMock.ts` | Demo image engine: replays recordings, refuses uploads |
 | `src/lib/imageRegions.ts` | Region geometry, labels, legend rows, coverage notes |
 | `src/screens/Images.tsx` | The Images screen |
+| `src/api/traffic.ts` | Traffic log client: backlog, SSE stream, polling fallback, recorded-traffic replay |
+| `src/hooks/useTraffic.ts` | Live traffic state: source (API or recording), pause, clear |
+| `src/lib/traffic.ts` | Timing waterfall, rolling percentiles, entity counts, reading event payloads |
+| `src/screens/Traffic.tsx`, `TrafficCharts.tsx` | The Live traffic screen and its charts |
+| `src/api/demoTraffic.ts` | "Send demo traffic": the demo scenarios, sent from the browser |
+| `src/content/trafficFixture.json` | Recorded masked-level traffic events for offline mode |
 
 ### Sample images
 

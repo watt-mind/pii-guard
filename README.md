@@ -209,8 +209,8 @@ Docker: `docker compose up --build`. All settings: [.env.example](.env.example).
 
 ### Demo
 
-Four steps, all on fictional data (the UI runs at `http://localhost:5173`; tabs are deep
-links: `#mask`, `#chat`, `#images`, `#benchmarks`):
+Five steps, all on fictional data (the UI runs at `http://localhost:5173`; tabs are deep
+links: `#mask`, `#chat`, `#images`, `#benchmarks`, `#traffic`):
 
 1. **Mask.** Your document with every detected value highlighted, and what the model would
    see. Pre-load **known values** (a customer record) and they are masked in any inflected form.
@@ -218,6 +218,11 @@ links: `#mask`, `#chat`, `#images`, `#benchmarks`):
    what you wrote, what the model received, what it answered, and what you got back.
 3. **Images.** Faces, signatures and ID numbers covered before the image leaves.
 4. **Benchmarks.** How many personal values each tool lets through, on the same documents.
+5. **Live traffic.** Every LLM call through the gateway as it happens: what was masked, the
+   request exactly as the model received it, the answer before and after restoring, a
+   per-call timing waterfall and live latency charts. Start `make demo`, then press
+   **Send demo traffic** (or run `make demo-traffic`). Originals appear only when the API runs
+   `PII_GUARD_TRAFFIC_LOG=full` on localhost; offline, the tab replays recorded masked calls.
 
 | Mask | Chat |
 |---|---|
@@ -225,7 +230,10 @@ links: `#mask`, `#chat`, `#images`, `#benchmarks`):
 | **Images** | **Benchmarks** |
 | ![Images: a fictional ID card with the face, signature and ID numbers blacked out](docs/assets/demo/3-images.webp) | ![Benchmarks: share of personal values let through, pii-guard against open-source tools](docs/assets/demo/4-benchmarks.webp) |
 
-At phone width: [Mask at 375 px](docs/assets/demo/5-mask-mobile.webp).
+| **Live traffic** | |
+| ![Live traffic: calls through the gateway, the masked request as sent upstream, and the timing waterfall](docs/assets/demo/6-traffic.webp) | ![Live traffic: live latency charts, overhead per call with rolling p50 and p95, stage breakdown and values masked per minute](docs/assets/demo/7-traffic-charts.webp) |
+
+At phone width: [Mask at 375 px](docs/assets/demo/5-mask-mobile.webp), [Live traffic at 375 px](docs/assets/demo/8-traffic-mobile.webp).
 
 ### Gateway: drop-in for any OpenAI-compatible client
 
