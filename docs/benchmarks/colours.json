@@ -1,0 +1,132 @@
+{
+  "about": "Stable chart colours, maintained by `pii-guard eval report`: a new system takes the least-used palette entry, existing entries never change. Edit a value by hand only to recolour a system on purpose.",
+  "latency": {
+    "gateway-latency:fast:rules": "#0072B2",
+    "gateway-latency:fast:rules+ner:pii-guard-ner-xlmr-large-distilled": "#009E73",
+    "gateway-latency:strict:rules+llm:muse-spark-open": "#D55E00"
+  },
+  "systems": {
+    "demo-which-parties:labels:live": {
+      "color": "#332288",
+      "shape": "circle"
+    },
+    "demo-which-parties:labels:mock": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "demo-which-parties:opaque:live": {
+      "color": "#882255",
+      "shape": "circle"
+    },
+    "demo-which-parties:opaque:mock": {
+      "color": "#117733",
+      "shape": "circle"
+    },
+    "llm-guard": {
+      "color": "#595959",
+      "shape": "triangle"
+    },
+    "llm:muse-glimmer@reasoning_strength=low": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
+    "llm:muse-glimmer@reasoning_strength=medium": {
+      "color": "#E69F00",
+      "shape": "circle"
+    },
+    "presidio": {
+      "color": "#595959",
+      "shape": "square"
+    },
+    "privaite": {
+      "color": "#595959",
+      "shape": "diamond"
+    },
+    "rules": {
+      "color": "#0072B2",
+      "shape": "circle"
+    },
+    "rules+llm:muse-glimmer@reasoning_strength=low": {
+      "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "rules+llm:muse-spark-1.3": {
+      "color": "#0072B2",
+      "shape": "circle"
+    },
+    "rules+llm:muse-spark-open@reasoning_effort=low": {
+      "color": "#D55E00",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-distilled-glimmer": {
+      "color": "#009E73",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-ft-s7": {
+      "color": "#D55E00",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-large-distilled-glimmer": {
+      "color": "#009E73",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-large-distilled-glimmer+llm:muse-spark-open@reasoning_effort=low": {
+      "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-ner-hrl": {
+      "color": "#332288",
+      "shape": "circle"
+    },
+    "visual-labels:exact": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "visual-labels:fuzzy": {
+      "color": "#882255",
+      "shape": "circle"
+    },
+    "visual:eka": {
+      "color": "#595959",
+      "shape": "cross"
+    },
+    "visual:eka-tuned": {
+      "color": "#595959",
+      "shape": "square"
+    },
+    "visual:presidio-image": {
+      "color": "#595959",
+      "shape": "triangle"
+    },
+    "visual:presidio-image-tuned": {
+      "color": "#595959",
+      "shape": "square"
+    },
+    "visual:sam-3.1+tesseract+rules": {
+      "color": "#117733",
+      "shape": "circle"
+    },
+    "visual:sam-3.1+tesseract+rules+captions": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
+    "visual:sam-3.1+tesseract+rules+llm:muse-spark-open": {
+      "color": "#E69F00",
+      "shape": "circle"
+    },
+    "visual:sam-3.1+tesseract+rules+llm:muse-spark-open+captions": {
+      "color": "#0072B2",
+      "shape": "circle"
+    }
+  },
+  "visual": {
+    "visual:eka": "#0072B2",
+    "visual:eka-tuned": "#332288",
+    "visual:presidio-image": "#88CCEE",
+    "visual:presidio-image-tuned": "#DDCC77",
+    "visual:sam-3.1+tesseract+rules": "#117733",
+    "visual:sam-3.1+tesseract+rules+captions": "#44AA99",
+    "visual:sam-3.1+tesseract+rules+llm:muse-spark-open": "#0072B2",
+    "visual:sam-3.1+tesseract+rules+llm:muse-spark-open+captions": "#CC6677"
+  }
+}

@@ -12,7 +12,10 @@ pure function of the inputs so ``--check`` compares them byte for byte:
 - ``eval/results/index.json``: the index (:mod:`pii_guard.eval.report_index`);
 - ``ui/src/api/benchmarks.index.json``: the same index, compact, bundled into the UI;
 - ``docs/benchmarks/*.svg``: the charts (:mod:`pii_guard.eval.report_charts`);
-- ``docs/benchmarks.md``: tables, embedded charts and method notes.
+- ``docs/benchmarks.md``: tables, embedded charts and method notes;
+- ``docs/benchmarks/colours.json``: the append-only colour registry
+  (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
+  needs a colour.
 
 Exit codes: 0 up to date (or written), 1 stale under ``--check``, 2 bad input (an invalid
 run record, an unreadable config).
@@ -30,6 +33,7 @@ from typing import Any
 from pii_guard.eval import report_charts as charts
 from pii_guard.eval.fixtures import file_sha256
 from pii_guard.eval.record import DEFAULT_RUNS_DIR, RecordError, load_records
+from pii_guard.eval.report_colours import DEFAULT_REGISTRY, dumps_registry, load_registry
 from pii_guard.eval.report_index import build_index
 
 __all__ = ["CHARTS", "build_outputs", "build_parser", "main", "render_page"]
@@ -421,19 +425,28 @@ def build_outputs(
     index_path: Path = DEFAULT_INDEX,
     ui_index_path: Path | None = DEFAULT_UI_INDEX,
     docs_dir: Path = DEFAULT_DOCS_DIR,
+    colours: Path = DEFAULT_REGISTRY,
 ) -> dict[Path, str]:
-    """Every generated file and its content, from the records in ``runs_dir``."""
+    """Every generated file and its content, from the records in ``runs_dir``.
+
+    ``colours`` is the append-only colour registry; it is an output too, so a new system's
+    colour is committed with it and ``--check`` fails until it is.
+    """
     records = load_records(runs_dir)
     if not records:
         raise RecordError(f"no run records in {runs_dir}")
     headline, featured = load_config(config)
     digests = {p.name: file_sha256(p) for p in sorted(runs_dir.glob("*.json"))}
-    index = build_index(records, featured=featured, digests=digests)
+    registry = load_registry(colours)
+    index = build_index(records, featured=featured, digests=digests, colours=registry)
     if headline not in index["fixture_sets"]:
         raise RecordError(f"{config}: headline_set {headline!r} has no runs")
     index["headline_set"] = headline  # the UI opens on it
     systems = index["featured"]
-    outputs = {index_path: json.dumps(index, indent=2, ensure_ascii=False) + "\n"}
+    outputs = {
+        colours: dumps_registry(registry),
+        index_path: json.dumps(index, indent=2, ensure_ascii=False) + "\n",
+    }
     if ui_index_path is not None:
         compact = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
         outputs[ui_index_path] = compact + "\n"
@@ -466,6 +479,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--docs-dir", type=Path, default=DEFAULT_DOCS_DIR, help="benchmarks.md + benchmarks/"
     )
     parser.add_argument(
+        "--colours",
+        type=Path,
+        default=DEFAULT_REGISTRY,
+        help="append-only system -> colour registry",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="write nothing; exit 1 if any generated file is missing or stale",
@@ -483,6 +502,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             index_path=args.index,
             ui_index_path=ui_index,
             docs_dir=args.docs_dir,
+            colours=args.colours,
         )
     except (OSError, json.JSONDecodeError, RecordError) as exc:
         print(f"pii-guard eval report: {exc}", file=sys.stderr)

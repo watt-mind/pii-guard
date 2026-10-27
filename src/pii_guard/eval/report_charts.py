@@ -22,6 +22,8 @@ from collections.abc import Mapping, Sequence
 from html import escape
 from typing import Any
 
+from pii_guard.eval.report_colours import PALETTE_LATENCY, PALETTE_VISUAL, assign
+
 __all__ = [
     "by_language",
     "latency",
@@ -726,8 +728,7 @@ def visual_recall(index: Mapping[str, Any]) -> str:
             if k not in region_types:
                 region_types.append(k)
     groups = [*region_types, "all"]
-    palette = ["#0072B2", "#332288", "#44AA99", "#CC6677", "#88CCEE", "#DDCC77", "#117733"]
-    color = {sk: palette[k % len(palette)] for k, sk in enumerate(systems)}
+    color = assign(dict(index.get("colours", {}).get("visual", {})), systems, PALETTE_VISUAL)
     px0, py0, px1, py1 = 150, 230, 1540, 680
     gw = (px1 - px0) / max(len(groups), 1)
     gap = 0.4  # bar widths between the sets inside a group
@@ -875,12 +876,17 @@ def stage_shares(cell: Mapping[str, Any]) -> list[tuple[str, float]]:
 def latency(index: Mapping[str, Any]) -> str:
     runs = latest_latency(index)
     rows: list[tuple[str, Mapping[str, Any], str]] = []
-    for k, run in enumerate(runs):
+    colours = assign(
+        dict(index.get("colours", {}).get("latency", {})),
+        [str(run["system"]) for run in runs],
+        PALETTE_LATENCY,
+    )
+    for run in runs:
         for cell in run["cells"]:
             label = f"{latency_label(run)}, c={cell['concurrency']}" + (
                 ", stream" if cell["stream"] else ""
             )
-            rows.append((label, cell, PALETTE_LATENCY[k % len(PALETTE_LATENCY)]))
+            rows.append((label, cell, colours[str(run["system"])]))
     body = [
         _text(
             56,
@@ -1008,6 +1014,3 @@ def latency(index: Mapping[str, Any]) -> str:
         body,
         caption,
     )
-
-
-PALETTE_LATENCY = ["#0072B2", "#009E73", "#D55E00", "#CC79A7", "#332288", "#999933"]
