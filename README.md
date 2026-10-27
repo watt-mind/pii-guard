@@ -90,6 +90,9 @@ What we think goes beyond a basic integration:
 
 ## Results so far
 
+Every run, with charts, per-language and per-type tables and the run log, is in
+**[docs/benchmarks.md](docs/benchmarks.md)** (also the UI's Benchmarks tab).
+
 Measured with `pii-guard eval` on fictional data. **Preliminary**: the comparison against
 Presidio, LLM Guard and PrivAiTe on the same data is in progress, and results will be
 committed under `eval/results/`. Leak rate = share of labelled values that still appear, in any

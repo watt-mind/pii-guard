@@ -91,6 +91,80 @@ commit hash, detector names and the SHA-256 of every fixture file. `--language e
 the run to one language. Results for every release are committed under `eval/results/` with
 the model versions, corpus seed and commit hash, so anyone can reproduce them.
 
+### Run records
+
+Every run worth keeping becomes one **run record**: `eval/results/runs/<YYYY-MM-DD>-<slug>.json`,
+specified by the JSON Schema `eval/results/schema/run.schema.json` (`schema_version` 1) and
+validated in the tests. A record says:
+
+- **what ran**: the system (`family` pii-guard or comparison, `tool`, `version`), each
+  detector with its `model`, `model_ref`, `revision`, `settings` (reasoning strength, mode,
+  thresholds) and `serving`, and a derived `system.key` such as `rules+ner:xlmr-base-ft-s7` or
+  `rules+llm:muse-glimmer@reasoning_strength=low` that groups runs of the same configuration;
+- **on what**: each fixture file with its SHA-256, language, fixture set (`smoke`,
+  `synth-sample` …), `origin` (`hand-written`, `generated` with the generator model, or
+  `specimens`) and document count;
+- **where and when**: commit, dirty flag, package version, date, hardware, and cost (tokens,
+  GPU minutes, US dollars, whether estimated, and which runs a shared cost covers);
+- **what came out**: per language and overall, P/R/F1 exact and overlap, macro F1, leak and
+  partial leak, over-masking, round trip and placeholder consistency when the system has them,
+  detection and masking latency p50/p95, and per-entity-type counts. All counts are kept, so
+  languages and runs pool exactly. Visual runs keep recall per region type, document type and
+  country instead;
+- **provenance**: `source` is `recorded` (written by the harness) or `imported` (converted from
+  an earlier scorecard or a number published on a pull request or ticket, with
+  `imported_from`), plus free-text `notes`.
+
+Languages, entity types, detectors, fixture sets and countries are data, not schema: a new
+language or detector needs no schema or code change.
+
+Writing one:
+
+```bash
+uv run pii-guard eval --fixtures eval/fixtures --detectors rules,llm --record glimmer-low \
+  --record-extra glimmer.json            # optional: what the harness can't see
+uv run pii-guard eval record saved-scorecard.json --slug old-run   # from a saved --json
+```
+
+`--record-extra` takes a partial record that is deep-merged in. `system.detectors` may map a
+detector name to its fields:
+
+```json
+{
+  "system": {"detectors": {"llm": {"model": "muse-glimmer", "serving": "Meta Model API",
+                                    "settings": {"reasoning_strength": "low"}}}},
+  "hardware": {"description": "Meta Model API (remote)"},
+  "cost": {"usd": 1.3, "estimated": true, "note": "list price x tokens"}
+}
+```
+
+Either command refuses to overwrite an existing record (`--overwrite` on `eval record`
+replaces one) and then runs `pii-guard eval report`. Results produced before run records
+existed were converted by `python -m pii_guard.eval.record_import` and are marked
+`source: imported`; the original scorecards stay under `eval/results/`.
+
+### The index
+
+`uv run pii-guard eval report` reads every record and writes, as a pure function of them:
+
+- `eval/results/index.json` (`schema_version` 1): `runs` (metadata, chronological), `rows`
+  (one per text run and language), `history` (runs of one system on one set at one commit and
+  date merged, for progress over time), `snapshots` (latest result per set, system and
+  language, with an exactly pooled `all`), `visual`, `headline_set`, and the vocabularies `systems` (with
+  chart colours and markers), `fixture_sets`, `languages` and `entity_types`. Rates are 0 to 1,
+  latency in milliseconds. Latency percentiles can't be pooled: a pooled value built from
+  several runs is their document-weighted mean and says `latency_pooled: true`;
+- `ui/src/api/benchmarks.index.json`: the same, compact, bundled into the UI's Benchmarks tab;
+- `docs/benchmarks/*.svg`: leak vs latency, F1 and leak by language, leak over time, recall
+  per entity type and visual recall: hand-written SVG, 1600 x 900, each captioned with the
+  fixture set, its size, the run dates and the commits;
+- [`docs/benchmarks.md`](benchmarks.md): the charts, tables per fixture set, language and
+  entity type, method notes and the run log.
+
+`docs/benchmarks/config.json` picks the headline fixture set and the systems featured on the
+charts; everything else is in the tables and the UI. `--check` writes nothing and exits 1 if
+any output is missing or stale; CI runs it.
+
 The hand-written smoke sets are built by `eval/fixtures/build_smoke.py` (inline
 `{{TYPE|value}}` labels, checksum-valid fictional identifiers); a test fails if the committed
 JSONL is stale.

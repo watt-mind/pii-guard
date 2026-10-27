@@ -7,6 +7,9 @@ pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language h
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
 pii-guard eval visual --specimens data/specimens  # visual recall on specimen ID documents
 pii-guard eval injection --detectors rules,llm   # leak rate per prompt-injection attack class
+pii-guard eval ... --record SLUG [--record-extra FILE.json]  # also write a run record
+pii-guard eval record SCORECARD.json --slug SLUG  # run record(s) from a saved scorecard
+pii-guard eval report [--check]  # index.json, charts and docs/benchmarks.md from the records
 ```
 
 ``--fixtures`` may be repeated and may name a directory (every ``*.jsonl`` in it); the
@@ -21,6 +24,9 @@ table per attack class (:mod:`pii_guard.eval.injection`).
 ``--redteam`` then asks an attacker model (Muse Spark Open on Baseten by default) to recover
 the masked values from the masked text, and reports the re-identification rate and exposure
 per context, language and entity type (:mod:`pii_guard.eval.redteam`).
+``--record SLUG`` writes ``eval/results/runs/<date>-<SLUG>.json`` (one per comparison tool
+too, :mod:`pii_guard.eval.record`) and regenerates the benchmark report; ``--record-extra``
+merges a partial record (models, settings, hardware, cost) into it.
 
 Exit codes: 0 success, 1 a detector or the vault failed during the run, 2 bad arguments,
 unreadable fixtures or no loadable detector.
@@ -33,6 +39,7 @@ import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from pii_guard.eval.fixtures import FixtureError, load_fixtures
 from pii_guard.eval.report import build_scorecard, render_markdown
@@ -95,6 +102,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--markdown", type=Path, metavar="OUT", help="also write the Markdown table here"
     )
+    parser.add_argument(
+        "--record",
+        metavar="SLUG",
+        help="also write a run record eval/results/runs/<date>-<SLUG>.json and rebuild the report",
+    )
+    parser.add_argument(
+        "--record-extra",
+        type=Path,
+        metavar="FILE",
+        help="JSON partial run record merged into it (models, settings, hardware, cost)",
+    )
+    parser.add_argument(
+        "--runs-dir",
+        type=Path,
+        default=Path("eval/results/runs"),
+        metavar="DIR",
+        help="where --record writes (default: eval/results/runs)",
+    )
     return parser
 
 
@@ -120,7 +145,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pii_guard.eval.injection import main as injection_main
 
         return injection_main(argv[1:])
+    if argv[:1] == ["record"]:  # ``pii-guard eval record``: run records from a scorecard
+        from pii_guard.eval.record import main as record_main
+
+        return record_main(argv[1:])
+    if argv[:1] == ["report"]:  # ``pii-guard eval report``: index, charts, benchmarks.md
+        from pii_guard.eval.report_cli import main as report_main
+
+        return report_main(argv[1:])
     args = build_parser().parse_args(argv)
+    if args.record_extra and not args.record:
+        print("pii-guard eval: --record-extra needs --record SLUG", file=sys.stderr)
+        return 2
+    extra = None
+    if args.record:
+        from pii_guard.eval.record import RecordError, load_extra
+
+        try:
+            extra = load_extra(args.record_extra)
+        except RecordError as exc:
+            print(f"pii-guard eval: {exc}", file=sys.stderr)
+            return 2
     fixture_paths = _expand_fixture_paths(args.fixtures or [DEFAULT_FIXTURES])
     try:
         documents = load_fixtures(fixture_paths)
@@ -213,4 +258,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.json.write_text(
             json.dumps(scorecard, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
+    if args.record:
+        return _record(scorecard, args.record, extra, args.runs_dir)
     return 0
+
+
+def _record(
+    scorecard: dict[str, Any], slug: str, extra: dict[str, Any] | None, runs_dir: Path
+) -> int:
+    """Write the run record(s) for ``scorecard`` and rebuild the benchmark report."""
+    from pii_guard.eval.record import RecordError, build_records, host_info, write_records
+    from pii_guard.eval.report_cli import main as report_main
+
+    try:
+        records = build_records(scorecard, slug=slug, hardware=host_info(), extra=extra)
+        paths = write_records(records, runs_dir)
+    except RecordError as exc:
+        print(f"pii-guard eval: --record: {exc}", file=sys.stderr)
+        return 2
+    for path in paths:
+        print(f"pii-guard eval: wrote {path}", file=sys.stderr)
+    return report_main(["--runs-dir", str(runs_dir)])

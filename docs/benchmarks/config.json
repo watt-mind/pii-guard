@@ -1,0 +1,13 @@
+{
+  "about": "Which fixture set and systems the headline charts show. Every system and set is in eval/results/index.json, the tables in docs/benchmarks.md and the UI regardless; this only picks what goes on the slide-sized charts. Keys are run-record system.key values.",
+  "headline_set": "smoke",
+  "featured": [
+    "rules",
+    "rules+ner:xlmr-base-ft-s7",
+    "rules+llm:muse-glimmer@reasoning_strength=low",
+    "rules+llm:muse-spark-1.3",
+    "presidio",
+    "llm-guard",
+    "privaite"
+  ]
+}

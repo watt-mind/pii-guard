@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/watt-mind/pii-guard/eval/results/schema/run.schema.json",
+  "title": "pii-guard evaluation run record",
+  "description": "One evaluation run of one system (pii-guard detectors, or a comparison tool) on one group of fixtures. Written by `pii-guard eval --record` or `pii-guard eval record`; read by `pii-guard eval report`. Languages, entity types, detectors, fixture sets, countries and region types are data: new ones need no schema change. Never contains a labelled value or a document text. Documented in docs/evaluation.md#run-records.",
+  "type": "object",
+  "required": [
+    "schema_version", "run_id", "kind", "date", "recorded_at", "source", "imported_from", "title",
+    "notes", "code", "system", "fixture_set", "fixtures", "languages", "hardware", "cost", "metrics"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1, "description": "Bumped on any breaking change; readers reject versions they don't know."},
+    "run_id": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9][a-z0-9.-]*$", "description": "<date>-<slug>; also the file name (<run_id>.json)."},
+    "kind": {"enum": ["text", "visual"], "description": "text: span detection + masking on JSONL fixtures. visual: image masking on specimen images."},
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Calendar date the run was made, as reported by whoever ran it."},
+    "recorded_at": {"type": ["string", "null"], "description": "ISO 8601 timestamp of the scorecard (UTC), when known. Orders runs within a day."},
+    "source": {"enum": ["recorded", "imported"], "description": "recorded: written by the harness at run time. imported: converted later from a scorecard or a reported table."},
+    "imported_from": {
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["path", "sha256", "note"],
+          "additionalProperties": false,
+          "properties": {
+            "path": {"type": "string", "description": "Where the original lived (may no longer exist)."},
+            "sha256": {"type": ["string", "null"]},
+            "note": {"type": ["string", "null"]}
+          }
+        }
+      ]
+    },
+    "title": {"type": "string", "minLength": 1},
+    "notes": {"type": "array", "items": {"type": "string"}, "description": "Caveats a reader needs (remote latency, small n, patched settings)."},
+    "code": {
+      "type": "object",
+      "required": ["commit", "dirty", "pii_guard_version", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"type": "string", "pattern": "^([0-9a-f]{7,40}|unknown)$"},
+        "dirty": {"type": "boolean"},
+        "pii_guard_version": {"type": ["string", "null"]},
+        "note": {"type": ["string", "null"]}
+      }
+    },
+    "system": {"$ref": "#/$defs/system"},
+    "fixture_set": {"type": "string", "minLength": 1, "description": "The set name(s) of the fixtures, '+'-joined (smoke, synth-sample, specimens)."},
+    "fixtures": {"type": "array", "items": {"$ref": "#/$defs/fixture"}},
+    "languages": {"type": "array", "items": {"$ref": "#/$defs/language"}},
+    "hardware": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/hardware"}]},
+    "cost": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/cost"}]},
+    "metrics": {"anyOf": [{"$ref": "#/$defs/text_metrics"}, {"$ref": "#/$defs/visual_metrics"}]}
+  },
+  "$defs": {
+    "language": {"type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]+)*$", "description": "BCP 47-style language code."},
+    "rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "count": {"type": "integer", "minimum": 0},
+    "detector": {
+      "type": "object",
+      "required": ["name", "model", "model_ref", "revision", "settings", "serving"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "description": "Registry name (rules, ner, llm) or the tool / stage name."},
+        "model": {"type": ["string", "null"], "description": "Short model id (muse-glimmer, muse-spark-1.3)."},
+        "model_ref": {"type": ["string", "null"], "description": "Full reference: hub id, API model name or local path."},
+        "revision": {"type": ["string", "null"]},
+        "settings": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean", "null"]}, "description": "Settings that change results (reasoning_strength, mode, threshold)."},
+        "serving": {"type": ["string", "null"], "description": "Where the model ran (Meta Model API, vLLM on 1x H100, local CPU)."}
+      }
+    },
+    "system": {
+      "type": "object",
+      "required": ["key", "label", "family", "tool", "version", "detectors"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {"type": "string", "minLength": 1, "description": "Stable id of the system; runs with the same key are the same system over time."},
+        "label": {"type": "string", "minLength": 1},
+        "family": {"enum": ["pii-guard", "comparison"]},
+        "tool": {"type": "string"},
+        "version": {"type": ["string", "null"]},
+        "detectors": {"type": "array", "items": {"$ref": "#/$defs/detector"}},
+        "info": {"type": "object", "description": "Comparison tools: versions, models and configuration as the harness reported them."}
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "required": ["path", "sha256", "set", "language", "origin", "generator", "documents"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{16,64}$"},
+        "set": {"type": "string", "minLength": 1},
+        "language": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/language"}]},
+        "origin": {"enum": ["hand-written", "generated", "specimens", "unknown"], "description": "generated sets were written by a Muse model, which flatters Muse-based detectors."},
+        "generator": {"type": ["string", "null"]},
+        "documents": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/count"}]}
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": {"type": ["string", "null"]},
+        "platform": {"type": ["string", "null"]},
+        "machine": {"type": ["string", "null"]},
+        "cpu_count": {"type": ["integer", "null"]},
+        "accelerator": {"type": ["string", "null"]},
+        "python": {"type": ["string", "null"]}
+      }
+    },
+    "cost": {
+      "type": "object",
+      "required": ["usd", "estimated", "gpu_minutes", "model_calls", "tokens", "shared_with", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "usd": {"type": ["number", "null"], "minimum": 0},
+        "estimated": {"type": "boolean"},
+        "gpu_minutes": {"type": ["number", "null"], "minimum": 0},
+        "model_calls": {"type": ["integer", "null"], "minimum": 0},
+        "tokens": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "object", "additionalProperties": {"$ref": "#/$defs/count"}, "description": "prompt, completion, reasoning, total"}
+          ]
+        },
+        "shared_with": {"type": "array", "items": {"type": "string"}, "description": "Run ids whose cost is included in this one (one GPU session for several runs)."},
+        "note": {"type": ["string", "null"]}
+      }
+    },
+    "match": {
+      "type": "object",
+      "required": ["gold", "pred", "tp_pred", "tp_gold", "precision", "recall", "f1"],
+      "additionalProperties": false,
+      "properties": {
+        "gold": {"$ref": "#/$defs/count"},
+        "pred": {"$ref": "#/$defs/count"},
+        "tp_pred": {"$ref": "#/$defs/count"},
+        "tp_gold": {"$ref": "#/$defs/count"},
+        "precision": {"$ref": "#/$defs/rate"},
+        "recall": {"$ref": "#/$defs/rate"},
+        "f1": {"$ref": "#/$defs/rate"}
+      }
+    },
+    "percentiles": {
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["p50", "p95"],
+          "additionalProperties": false,
+          "properties": {"p50": {"type": ["number", "null"], "minimum": 0}, "p95": {"type": ["number", "null"], "minimum": 0}}
+        }
+      ]
+    },
+    "type_metrics": {
+      "type": "object",
+      "required": ["gold", "pred", "exact_tp_gold", "exact_tp_pred", "overlap_tp_gold", "overlap_tp_pred", "leak", "over_masking"],
+      "additionalProperties": false,
+      "properties": {
+        "gold": {"$ref": "#/$defs/count"},
+        "pred": {"$ref": "#/$defs/count"},
+        "exact_tp_gold": {"$ref": "#/$defs/count"},
+        "exact_tp_pred": {"$ref": "#/$defs/count"},
+        "overlap_tp_gold": {"$ref": "#/$defs/count"},
+        "overlap_tp_pred": {"$ref": "#/$defs/count"},
+        "leak": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "object", "required": ["values", "leaked", "partial"], "additionalProperties": false,
+             "properties": {"values": {"$ref": "#/$defs/count"}, "leaked": {"$ref": "#/$defs/count"}, "partial": {"$ref": "#/$defs/count"}}}
+          ],
+          "description": "null for keep-policy types (not masked, so no leak)."
+        },
+        "over_masking": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "object", "required": ["masked", "over_masked"], "additionalProperties": false,
+             "properties": {"masked": {"$ref": "#/$defs/count"}, "over_masked": {"$ref": "#/$defs/count"}}}
+          ]
+        }
+      }
+    },
+    "text_block": {
+      "type": "object",
+      "required": ["documents", "gold_spans", "predicted_spans", "exact", "overlap", "macro_f1_overlap", "leak", "over_masking", "roundtrip", "consistency", "latency_ms", "per_type"],
+      "additionalProperties": false,
+      "properties": {
+        "documents": {"$ref": "#/$defs/count"},
+        "gold_spans": {"$ref": "#/$defs/count"},
+        "predicted_spans": {"$ref": "#/$defs/count"},
+        "exact": {"$ref": "#/$defs/match"},
+        "overlap": {"$ref": "#/$defs/match"},
+        "macro_f1_overlap": {"$ref": "#/$defs/rate"},
+        "leak": {
+          "type": "object",
+          "required": ["values", "leaked", "partial", "rate", "partial_rate"],
+          "additionalProperties": false,
+          "properties": {
+            "values": {"$ref": "#/$defs/count"},
+            "leaked": {"$ref": "#/$defs/count"},
+            "partial": {"$ref": "#/$defs/count"},
+            "rate": {"$ref": "#/$defs/rate"},
+            "partial_rate": {"$ref": "#/$defs/rate"}
+          }
+        },
+        "over_masking": {
+          "type": "object",
+          "required": ["masked", "over_masked", "rate"],
+          "additionalProperties": false,
+          "properties": {"masked": {"$ref": "#/$defs/count"}, "over_masked": {"$ref": "#/$defs/count"}, "rate": {"$ref": "#/$defs/rate"}}
+        },
+        "roundtrip": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "object", "required": ["documents", "exact", "rate"], "additionalProperties": false,
+             "properties": {"documents": {"$ref": "#/$defs/count"}, "exact": {"$ref": "#/$defs/count"}, "rate": {"$ref": "#/$defs/rate"}}}
+          ],
+          "description": "null when the system's masking is irreversible."
+        },
+        "consistency": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "object",
+             "required": ["entities", "consistent", "rate", "multi_occurrence", "multi_consistent", "multi_rate"],
+             "additionalProperties": false,
+             "properties": {
+               "entities": {"$ref": "#/$defs/count"}, "consistent": {"$ref": "#/$defs/count"}, "rate": {"$ref": "#/$defs/rate"},
+               "multi_occurrence": {"$ref": "#/$defs/count"}, "multi_consistent": {"$ref": "#/$defs/count"}, "multi_rate": {"$ref": "#/$defs/rate"}
+             }}
+          ],
+          "description": "Placeholder consistency; null in scorecards that predate it."
+        },
+        "latency_ms": {
+          "type": "object",
+          "required": ["detect", "mask"],
+          "additionalProperties": false,
+          "properties": {"detect": {"$ref": "#/$defs/percentiles"}, "mask": {"$ref": "#/$defs/percentiles"}}
+        },
+        "per_type": {
+          "type": "object",
+          "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]*$"},
+          "additionalProperties": {"$ref": "#/$defs/type_metrics"}
+        }
+      }
+    },
+    "text_metrics": {
+      "type": "object",
+      "required": ["overall", "languages"],
+      "additionalProperties": false,
+      "properties": {
+        "overall": {"$ref": "#/$defs/text_block"},
+        "languages": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/language"},
+          "additionalProperties": {"$ref": "#/$defs/text_block"}
+        }
+      }
+    },
+    "visual_group": {
+      "type": "object",
+      "required": ["regions", "recall_iou50", "recall_cov90", "mean_coverage"],
+      "additionalProperties": false,
+      "properties": {
+        "regions": {"$ref": "#/$defs/count"},
+        "specimens": {"$ref": "#/$defs/count"},
+        "recall_iou50": {"$ref": "#/$defs/rate"},
+        "recall_cov90": {"$ref": "#/$defs/rate"},
+        "mean_coverage": {"$ref": "#/$defs/rate"}
+      }
+    },
+    "visual_metrics": {
+      "type": "object",
+      "required": ["specimens", "overall", "by_region_type", "by_doc_type", "by_country", "over_masking_mean", "errors", "latency_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "specimens": {"$ref": "#/$defs/count"},
+        "overall": {"$ref": "#/$defs/visual_group"},
+        "by_region_type": {"type": "object", "additionalProperties": {"$ref": "#/$defs/visual_group"}},
+        "by_doc_type": {"type": "object", "additionalProperties": {"$ref": "#/$defs/visual_group"}},
+        "by_country": {"type": "object", "additionalProperties": {"$ref": "#/$defs/visual_group"}},
+        "over_masking_mean": {"$ref": "#/$defs/rate"},
+        "errors": {"$ref": "#/$defs/count"},
+        "latency_ms": {"type": "object", "additionalProperties": {"type": ["number", "null"], "minimum": 0}}
+      }
+    }
+  }
+}
