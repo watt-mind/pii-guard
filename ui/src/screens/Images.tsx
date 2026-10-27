@@ -18,6 +18,8 @@ import {
   samTargets,
   sourceLabel,
   summarizeRegions,
+  tagPlacements,
+  type TagPlacement,
 } from "../lib/imageRegions";
 import { toRunError, type RunError } from "../lib/run";
 
@@ -141,7 +143,7 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
 
       <fieldset className="min-w-0">
         <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples, or your own image</legend>
-        <div className="relative -mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
+        <div className="relative -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
           {IMAGE_SAMPLES.map((s) => {
             const on = selection.kind === "sample" && selection.sample.id === s.id;
             return (
@@ -149,7 +151,8 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
                 key={s.id}
                 type="button"
                 aria-pressed={on}
-                onClick={() => {
+                onClick={(e) => {
+                  e.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
                   const next = sampleSelection(s);
                   select(next);
                   void run(next); // one click: pick and mask
@@ -233,8 +236,8 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
           <Figure src={src} alt={alt}>
             {data &&
               showRegions &&
-              data.regions.map((r, i) => (
-                <RegionBox key={i} region={r} models={data.analysis.ocr.models} index={i} width={data.width} height={data.height} active={active === i} onActive={setActive} />
+              data.regions.map((r, i, all) => (
+                <RegionBox key={i} region={r} models={data.analysis.ocr.models} index={i} width={data.width} height={data.height} active={active === i} onActive={setActive} tag={tagPlacements(all, data.width, data.height)[i] ?? "top-left"} />
               ))}
           </Figure>
         </Pane>
@@ -353,6 +356,7 @@ function RegionBox({
   height,
   active,
   onActive,
+  tag,
 }: {
   region: ImageRegion;
   models?: Record<string, string>;
@@ -361,6 +365,7 @@ function RegionBox({
   height: number;
   active: boolean;
   onActive: (i: number | null) => void;
+  tag: TagPlacement;
 }) {
   const meta = metaFor(region.entity_type);
   const color = REGION_COLOR[region.entity_type];
@@ -387,7 +392,10 @@ function RegionBox({
       <span
         aria-hidden="true"
         className={[
-          "absolute -top-[1.15rem] left-[-2px] rounded-t px-1 font-mono text-[10px] leading-[1.1rem] font-semibold whitespace-nowrap text-white",
+          "absolute px-1 font-mono",
+          tag.startsWith("top") ? "-top-[1.15rem] rounded-t" : "-bottom-[1.15rem] rounded-b",
+          tag.endsWith("left") ? "left-[-2px]" : "right-[-2px]",
+          " text-[10px] leading-[1.1rem] font-semibold whitespace-nowrap text-white",
           // Text regions sit between lines of text: their tag would hide the line above.
           region.source === "ocr" && !active ? "hidden" : "",
         ].join(" ")}

@@ -310,7 +310,7 @@ function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (
   return (
     <fieldset className="min-w-0">
       <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples</legend>
-      <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4 sm:px-0 sm:pb-0">
+      <div className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4 sm:px-0 sm:pb-0">
         {SAMPLES.map((s) => {
           const on = s.id === selected;
           return (
@@ -318,7 +318,10 @@ function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (
               key={s.id}
               type="button"
               aria-pressed={on}
-              onClick={() => onPick(s)}
+              onClick={(e) => {
+                e.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
+                onPick(s);
+              }}
               className={[
                 "group flex w-[15rem] shrink-0 snap-start items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors sm:w-auto",
                 on ? "border-ink bg-surface shadow-sm" : "border-line bg-surface/60 hover:border-line-strong hover:bg-surface",

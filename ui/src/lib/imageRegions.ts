@@ -163,3 +163,34 @@ export function samTargets(analysis: ImageAnalysis): string {
   if (names.length <= 1) return names.join("");
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
+
+export type TagPlacement = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+/**
+ * Where to put each SAM region's type tag so overlapping regions (a face inside an ID photo)
+ * don't stack their tags on one corner. Greedy, in region order; OCR tags show on hover only.
+ * `tagWidth`/`tagHeight` are the tag's rough size as a share of the image.
+ */
+export function tagPlacements(
+  regions: readonly ImageRegion[],
+  width: number,
+  height: number,
+  tagWidth = 0.09,
+  tagHeight = 0.06,
+): TagPlacement[] {
+  const used: { x: number; y: number }[] = [];
+  const near = (x: number, y: number) => used.some((u) => Math.abs(u.x - x) < tagWidth * width && Math.abs(u.y - y) < tagHeight * height);
+  return regions.map((r) => {
+    if (r.source !== "sam") return "top-left";
+    const [x1, y1, x2, y2] = r.box;
+    const options: [TagPlacement, number, number][] = [
+      ["top-left", x1, y1],
+      ["top-right", x2 - tagWidth * width, y1],
+      ["bottom-left", x1, y2],
+      ["bottom-right", x2 - tagWidth * width, y2],
+    ];
+    const pick = options.find(([, x, y]) => !near(x, y)) ?? options[0]!;
+    used.push({ x: pick[1], y: pick[2] });
+    return pick[0];
+  });
+}
