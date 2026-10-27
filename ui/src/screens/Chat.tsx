@@ -174,7 +174,7 @@ export function Chat({ client, live, draft, replay }: Props) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">
-            {client.kind === "mock" ? "Chat through the guard. The model only ever sees placeholders." : "Chat with a real model. It only ever sees placeholders."}
+            Chat through the gateway. The model only ever sees placeholders.
           </h1>
           <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
             Your message goes through the pii-guard gateway, a drop-in for any OpenAI-compatible API. It is masked on the way out and the
@@ -372,7 +372,7 @@ function TurnView({
             </div>
             {turn.status === "done" && (
               <p className="mt-2 text-xs text-muted">
-                {restored} {restored === 1 ? "value" : "values"} restored{turn.ms !== null ? ` · ${(turn.ms / 1000).toFixed(1)} s` : ""}.{" "}
+                {restored} {restored === 1 ? "value" : "values"} restored{turn.ms !== null ? ` · ${turn.ms < 1000 ? `${Math.max(1, Math.round(turn.ms))} ms` : `${(turn.ms / 1000).toFixed(1)} s`}` : ""}.{" "}
                 {marked > 0 || restored === 0
                   ? "Marked values were placeholders in the model's answer."
                   : "Compare with the model's answer to see where they were (this answer couldn't be lined up for highlighting)."}

@@ -14,7 +14,7 @@
   --surface-2: #f8f7f3;
   --ink: #15171b;
   --muted: #55585f;
-  --faint: #72757c;
+  --faint: #66696f;
   --line: #e2e0d8;
   --line-strong: #c9c6bb;
   /* The one accent: the guard's signal green, for "protected" and the primary action. */
@@ -38,6 +38,9 @@
   --blocked-soft: var(--warn-soft);
   --leak: var(--danger);
   --leak-soft: var(--danger-soft);
+  /* Region boxes drawn over an image (a light document in either theme). */
+  --region-mask: oklch(50% 0.16 255);
+  --region-kept: #6b6e75;
   /* Focus is neutral, so it never reads as a state. */
   --focus: var(--ink);
   /* Categorical chart slots 1-8, fixed order (dataviz reference palette, validated

@@ -175,6 +175,10 @@ describe("Images screen", () => {
     expect(alert).toHaveTextContent("Blocked. Nothing was sent to the model.");
     expect(alert).toHaveTextContent("detection_failed");
     expect(within(panel).queryByTestId("masked-image")).toBeNull();
+    // The way out: switch to the demo engine and replay the recorded run on the same sample.
+    await user.click(within(panel).getByRole("button", { name: "Replay the recorded run instead" }));
+    expect(await within(panel).findByTestId("demo-masked-image")).toBeInTheDocument();
+    expect(maskImage).toHaveBeenCalledTimes(1);
   });
 
   it("drops the result when an upload replaces the sample, and waits for a click", async () => {

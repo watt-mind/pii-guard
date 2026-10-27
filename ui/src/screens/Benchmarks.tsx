@@ -6,7 +6,9 @@ import {
   headline,
   type HeadlineSide,
   languageName,
+  coverageTag,
   FAST_MODE_SYSTEM,
+  tidyLabels,
   loadBenchmarks,
   originLabel,
   pick,
@@ -33,7 +35,7 @@ export function Benchmarks({ load = loadBenchmarks }: { load?: BenchmarkLoader }
   useEffect(() => {
     let live = true;
     load().then(
-      (index) => live && setData({ state: "ready", index }),
+      (index) => live && setData({ state: "ready", index: tidyLabels(index) }),
       (err: unknown) => live && setData({ state: "error", message: err instanceof Error ? err.message : String(err) }),
     );
     return () => {
@@ -191,7 +193,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
           <Section id="bench-scatter" title="Leak rate vs latency" note="Down and left is better. Latency was measured where each system ran, so it is not a like-for-like speed test.">
             <LeakLatencyChart points={snapshots.flatMap((s) => {
               const m = pick(s, lang);
-              return m ? [{ key: s.system, info: index.systems[s.system], metrics: m }] : [];
+              return m ? [{ key: s.system, info: index.systems[s.system], metrics: m, note: lang === "all" ? coverageTag(index, s) : null }] : [];
             })} />
           </Section>
           <Section id="bench-lang" title="By language" note="The same fixture set in each language.">
@@ -409,6 +411,14 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                         fast mode
                       </span>
                     )}
+                    {lang === "all" && coverageTag(index, s) && (
+                      <span
+                        title="Not run on every language of this set, so its pooled numbers cover fewer documents than the other rows."
+                        className="rounded-sm px-1 font-mono text-2xs text-warn ring-1 ring-warn/40"
+                      >
+                        {coverageTag(index, s)}
+                      </span>
+                    )}
                   </span>
                 </th>
                 {COLUMNS.map((c) => {
@@ -468,6 +478,7 @@ function RunNotes({ snapshots, index, open }: { snapshots: Snapshot[]; index: Be
 }
 
 const VISUAL_ROWS = 8;
+const REGION_TYPE_LABEL: Record<string, string> = { portrait: "Portrait", signature: "Signature", mrz: "MRZ", text: "Printed text" };
 
 function VisualTable({ index }: { index: BenchmarkIndex }) {
   const [all, setAll] = useState(false);
@@ -495,8 +506,8 @@ function VisualTable({ index }: { index: BenchmarkIndex }) {
               Images
             </th>
             {types.map((t) => (
-              <th key={t} scope="col" className="px-2 py-2 text-right font-semibold">
-                {t}
+              <th key={t} scope="col" className="px-2 py-2 text-right font-medium">
+                {REGION_TYPE_LABEL[t] ?? t}
               </th>
             ))}
             <th scope="col" className="px-2 py-2 text-right font-medium">

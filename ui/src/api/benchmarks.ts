@@ -224,12 +224,30 @@ export interface HeadlineSide {
  * against the lowest-leak open-source tool (ties go to the faster one). Null when either side
  * has no result.
  */
+/**
+ * Languages of the set a snapshot was not run on. A pooled number from a system that ran on
+ * one language only is not comparable with one that ran on all of them.
+ */
+export function missingLanguages(index: BenchmarkIndex, s: Snapshot): string[] {
+  const langs = index.fixture_sets[s.fixture_set]?.languages ?? [];
+  return langs.filter((l) => !s.languages[l]);
+}
+
+/** "EN only", "DE + EN only", or null when the snapshot covers every language of its set. */
+export function coverageTag(index: BenchmarkIndex, s: Snapshot): string | null {
+  const langs = index.fixture_sets[s.fixture_set]?.languages ?? [];
+  const ran = langs.filter((l) => s.languages[l]);
+  return ran.length && ran.length < langs.length ? `${ran.map((l) => l.toUpperCase()).join(" + ")} only` : null;
+}
+
 export function headline(index: BenchmarkIndex, set: string, lang: LanguageFilter): { ours: HeadlineSide; theirs: HeadlineSide } | null {
   const best = (family: Family): HeadlineSide | null => {
     let out: HeadlineSide | null = null;
     for (const s of index.snapshots) {
       const sys = index.systems[s.system];
       if (s.fixture_set !== set || sys?.family !== family) continue;
+      // The pooled headline compares like with like: only systems run on every language.
+      if (lang === "all" && missingLanguages(index, s).length) continue;
       const m = pick(s, lang);
       if (!m || m.leak === null) continue;
       const p50 = m.detect_p50_ms;
@@ -251,3 +269,12 @@ export function headline(index: BenchmarkIndex, set: string, lang: LanguageFilte
  * mode falls back to without a NER checkpoint.
  */
 export const FAST_MODE_SYSTEM = "rules+ner:xlmr-large-distilled-glimmer";
+
+/** One spelling for detector names in labels: the index has both "ner" and "NER". */
+export function tidyLabels(index: BenchmarkIndex): BenchmarkIndex {
+  const tidy = (l: string) => l.replace(/\bner\b/g, "NER");
+  const systems = Object.fromEntries(
+    Object.entries(index.systems).map(([k, v]) => [k, { ...v, label: tidy(v.label), short_label: v.short_label && tidy(v.short_label) }]),
+  );
+  return { ...index, systems };
+}

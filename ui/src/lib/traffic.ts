@@ -17,7 +17,7 @@ export const STAGE_LABEL: Record<OwnStage | "upstream" | "other", string> = {
   image: "Image",
   mask: "Mask",
   forward: "Forward",
-  unmask: "Unmask",
+  unmask: "Restore stream",
   response: "Restore",
   upstream: "Model",
   other: "Other",

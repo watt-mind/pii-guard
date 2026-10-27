@@ -86,6 +86,8 @@ export interface ScatterPoint {
   key: string;
   info: SystemInfo | undefined;
   metrics: Metrics;
+  /** Coverage caveat, e.g. "EN only": shown with the label so the point isn't read as comparable. */
+  note?: string | null;
 }
 
 export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
@@ -130,7 +132,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
   const dense = pts.length > 7;
   const labels = byLeak.map((p) => {
     if (dense && !p.info?.featured && !p.info?.default) return null;
-    const text = `${p.info?.short_label ?? p.key} ${formatPct(p.metrics.leak)}`;
+    const text = `${p.info?.short_label ?? p.key}${p.note ? ` (${p.note})` : ""} ${formatPct(p.metrics.leak)}`;
     const x = sx(p.metrics.detect_p50_ms!);
     const y = sy(p.metrics.leak ?? 0);
     const tries: [number, number, "start" | "end"][] = [
@@ -240,7 +242,10 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
         {pts.map((p) => (
           <li key={p.key} className="flex items-center gap-1.5">
             <MarkerIcon info={p.info} />
-            <span className="min-w-0 flex-1 truncate text-ink">{p.info?.short_label ?? p.key}</span>
+            <span className="min-w-0 flex-1 truncate text-ink">
+                {p.info?.short_label ?? p.key}
+                {p.note && <span className="ml-1 font-mono text-2xs text-warn">{p.note}</span>}
+              </span>
             <span className="tabular-nums text-muted">
               {formatPct(p.metrics.leak)} · {formatMs(p.metrics.detect_p50_ms)}
             </span>

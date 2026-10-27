@@ -43,7 +43,7 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
           <Logo />
           <div className="leading-tight">
             <p className="font-mono text-sm font-semibold tracking-tight text-ink">pii-guard</p>
-            <p className="hidden text-xs text-muted sm:block">privacy firewall for AI agents</p>
+            <p className="hidden text-xs text-muted xl:block">privacy firewall for AI agents</p>
           </div>
         </div>
 
@@ -112,7 +112,7 @@ function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine:
     engine === "pending"
       ? { label: "Connecting…", detail: null, tone: "pending" as const }
       : engine === "mock"
-        ? { label: "Demo mode", detail: status.state === "online" ? `API ${version} idle` : "API offline", tone: "demo" as const }
+        ? { label: "Demo mode", detail: status.state === "online" ? `API ${version} up, not in use` : "API offline", tone: "demo" as const }
         : { label: "Live API", detail: version, tone: "live" as const };
   const dot = tone === "live" ? "bg-guard" : tone === "demo" ? "bg-warn" : "bg-faint motion-safe:animate-pulse";
 
@@ -129,7 +129,7 @@ function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine:
       >
         <span aria-hidden="true" className={["size-1.5 rounded-full", dot].join(" ")} />
         <span>{label}</span>
-        {detail && <span className="hidden font-mono text-2xs font-normal text-muted tabular-nums sm:inline">{detail}</span>}
+        {detail && <span className="hidden font-mono text-2xs font-normal text-muted tabular-nums xl:inline">{detail}</span>}
       </button>
     </div>
   );

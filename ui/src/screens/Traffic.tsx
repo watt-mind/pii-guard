@@ -238,7 +238,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
           >
             <StageChart events={filtered} onSelect={(id) => pick(id, true)} />
           </ChartCard>
-          <ChartCard id="chart-entities" title="Values masked per minute" note="Text values and image regions by kind, last 10 minutes. Hover a column for the exact types.">
+          <ChartCard id="chart-entities" title="Values masked per minute" note="Text values and image regions by kind, last 10 minutes. Hover or tap a column for the exact types.">
             <EntitiesChart events={filtered} now={Math.max(now, lastTime)} />
           </ChartCard>
         </div>
@@ -444,15 +444,21 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
   );
 }
 
-/** A labelled demo scenario (info tone, not a problem badge): its name needs the NER. */
+/**
+ * A labelled demo scenario: its name needs the NER. When the name went through, that is a leak,
+ * shown with the leak treatment even though it is expected; when the NER caught it, a neutral tag.
+ */
 function LabelTag({ match }: { match: LabelledMatch }) {
   const missed = match.missed.length > 0;
   return (
     <span
       title={`Demo scenario labelled “${match.scenario.label}”${missed ? ": in rules-only mode its name is an expected miss" : ""}`}
-      className="rounded px-1.5 py-0.5 text-2xs font-semibold whitespace-nowrap text-model ring-1 ring-model/30 ring-inset bg-model-soft"
+      className={[
+        "rounded-sm px-1.5 py-0.5 text-2xs font-medium whitespace-nowrap ring-1 ring-inset",
+        missed ? "bg-leak-soft text-leak ring-leak/40" : "text-muted ring-line-strong",
+      ].join(" ")}
     >
-      needs NER{missed ? <span className="font-normal"> · expected</span> : null}
+      needs NER{missed ? <span className="font-normal"> · leaked, expected</span> : null}
     </span>
   );
 }
@@ -461,8 +467,8 @@ function LabelTag({ match }: { match: LabelledMatch }) {
 function LabelledNote({ match }: { match: LabelledMatch }) {
   const missed = match.missed.length > 0;
   return (
-    <div role="note" className="mt-3 rounded-xl border border-model/30 bg-model-soft/60 p-3 text-sm">
-      <p className="font-semibold text-model">
+    <div role="note" className={["mt-3 rounded-lg border p-3 text-sm", missed ? "border-leak/40 bg-leak-soft" : "border-line bg-surface-2"].join(" ")}>
+      <p className={["font-semibold", missed ? "text-leak" : "text-ink"].join(" ")}>
         Demo scenario {match.scenario.name}: {match.scenario.label}.{" "}
         {missed ? "Expected miss in rules-only mode." : "The NER ran and masked the name."}
       </p>
@@ -528,8 +534,8 @@ function CallRow({ event: e, selected, onSelect }: { event: TrafficEvent; select
       </span>
       <span className="flex w-full items-start justify-between gap-2">
         {labelled && labelled.missed.length > 0 && totalMasked(e) === 0 ? (
-          <span className="text-xs text-muted">
-            {labelled.missed.length} name passed: expected, needs NER
+          <span className="text-xs text-leak">
+            {labelled.missed.length} name reached the model: expected, needs NER
           </span>
         ) : (
           <EntityChips counts={maskedCounts(e)} />
@@ -590,9 +596,9 @@ function CallDetail({
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
           <span>Masked:</span>
           <EntityChips counts={maskedCounts(e)} />
-          {labelled && labelled.missed.length > 0 ? <span>· {labelled.missed.length} name passed (expected, needs NER)</span> : null}
+          {labelled && labelled.missed.length > 0 ? <span className="text-leak">· {labelled.missed.length} name reached the model (expected, needs NER)</span> : null}
           {e.upstream?.unresolved_placeholders ? (
-            <span className="rounded-full bg-danger-soft px-2 py-0.5 font-semibold text-danger ring-1 ring-danger/40">
+            <span className="rounded-sm bg-leak-soft px-2 py-0.5 font-semibold text-leak ring-1 ring-leak/40">
               {e.upstream.unresolved_placeholders} placeholder{e.upstream.unresolved_placeholders === 1 ? "" : "s"} the model invented (not restored)
             </span>
           ) : null}

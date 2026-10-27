@@ -6,10 +6,11 @@ import { Boundary } from "../components/Boundary";
 import { Pane } from "../components/Pane";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
 import { DEFAULT_IMAGE_SAMPLE, IMAGE_SAMPLES, MAX_UPLOAD_BYTES, UPLOAD_TYPES, type ImageSample } from "../content/imageSamples";
-import { metaFor } from "../lib/entities";
+import { metaFor, modelLabel } from "../lib/entities";
 import {
   MASK_PADDING,
-  REGION_COLOR,
+  regionColor,
+  tint,
   coverageGaps,
   legendRows,
   percentBox,
@@ -42,6 +43,8 @@ interface Props {
   engineState?: EngineState;
   /** Fetches a sample's bytes. Injectable for tests (jsdom has no static server). */
   loadImage?: (src: string) => Promise<Blob>;
+  /** Switches the engine to the demo replay: the way out when the live pipeline refuses. */
+  onUseDemo?: () => void;
 }
 
 async function fetchImage(src: string): Promise<Blob> {
@@ -58,7 +61,7 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }>
 
 const sampleSelection = (sample: ImageSample): Selection => ({ kind: "sample", key: `sample:${sample.id}`, sample });
 
-export function Images({ client, engineState, loadImage = fetchImage }: Props) {
+export function Images({ client, engineState, loadImage = fetchImage, onUseDemo }: Props) {
   const [selection, setSelection] = useState<Selection>(() => sampleSelection(DEFAULT_IMAGE_SAMPLE));
   const [result, setResult] = useState<ImageResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -131,6 +134,15 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
       if (id === runId.current) setRunning(false);
     }
   };
+
+  // "Replay the recorded run instead": mask again once the demo engine has taken over.
+  const replayAfterSwitch = useRef(false);
+  useEffect(() => {
+    if (!replayAfterSwitch.current || !demo) return;
+    replayAfterSwitch.current = false;
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the engine switch lands
+  }, [demo]);
 
   const data = fresh ? result.data : null;
   const summary = useMemo(() => (data ? summarizeRegions(data.regions) : null), [data]);
@@ -249,7 +261,9 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
             data && data.regions.length > 0 ? (
               <span>Solid outlines: found by SAM 3.1. Dashed: text found by OCR and a detector. Hover, tap or tab to a region for its type.</span>
             ) : (
-              <span>{src ? "Mask the image to see what the model would get." : "Pick a sample or upload a fictional image, then mask it."}</span>
+              <span>
+                {error ? "Nothing left your network for this image." : src ? "Mask the image to see what the model would get." : "Pick a sample or upload a fictional image, then mask it."}
+              </span>
             )
           }
         >
@@ -294,7 +308,19 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
             ) : error.code === "invalid_image" || error.code === "unsupported_media_type" ? (
               <UnreadableNotice code={error.code} />
             ) : (
-              <BlockedNotice error={error} />
+              <div className="space-y-3">
+                <BlockedNotice error={error} />
+                {onUseDemo && selection.kind === "sample" && !demo && (
+                  <Button
+                    onClick={() => {
+                      replayAfterSwitch.current = true;
+                      onUseDemo();
+                    }}
+                  >
+                    Replay the recorded run instead
+                  </Button>
+                )}
+              </div>
             )
           ) : running ? (
             <Running />
@@ -388,7 +414,7 @@ function RegionBox({
   tag: TagPlacement;
 }) {
   const meta = metaFor(region.entity_type);
-  const color = REGION_COLOR[region.entity_type];
+  const color = regionColor(region);
   const kept = region.policy !== "mask";
   return (
     <button
@@ -405,8 +431,8 @@ function RegionBox({
       style={{
         ...percentBox(region.box, width, height, MASK_PADDING),
         border: `2px ${region.source === "ocr" ? "dashed" : "solid"} ${color}`,
-        backgroundColor: active ? `${color}33` : kept ? "transparent" : `${color}14`,
-        boxShadow: active ? `0 0 0 3px ${color}66` : undefined,
+        backgroundColor: active ? tint(color, 20) : kept ? "transparent" : tint(color, 8),
+        boxShadow: active ? `0 0 0 3px ${tint(color, 40)}` : undefined,
       }}
     >
       <span
@@ -429,7 +455,7 @@ function RegionBox({
 }
 
 function Highlight({ region, width, height }: { region: ImageRegion; width: number; height: number }) {
-  const color = REGION_COLOR[region.entity_type];
+  const color = regionColor(region);
   return (
     <span
       aria-hidden="true"
@@ -448,19 +474,19 @@ function ImageLegend({ regions, activeType }: { regions: ImageRegion[]; activeTy
         <li
           key={row.type}
           className={[
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
+            "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors",
             activeType === row.type ? "border-ink text-ink" : "border-line text-muted",
           ].join(" ")}
         >
-          <span aria-hidden="true" className="size-2.5 rounded-sm" style={{ backgroundColor: REGION_COLOR[row.type], opacity: row.kept ? 0.55 : 1 }} />
+          <span aria-hidden="true" className={["size-2 rounded-full", row.kept ? "border border-dashed border-kept" : "bg-masked"].join(" ")} />
           <span className="font-medium text-ink">{metaFor(row.type).label}</span>
           <span className="tabular-nums">{row.count}</span>
           {row.sources.map((s) => (
-            <span key={s} className="rounded bg-surface-2 px-1 font-mono text-2xs text-muted">
+            <span key={s} className="rounded-sm bg-surface-2 px-1 font-mono text-2xs text-muted">
               {s === "sam" ? "SAM" : s === "local" ? "On-device" : "OCR"}
             </span>
           ))}
-          {row.kept && <span className="rounded bg-surface-2 px-1 font-mono text-2xs text-muted">kept</span>}
+          {row.kept && <span className="font-mono text-2xs text-muted">kept</span>}
         </li>
       ))}
     </ul>
@@ -507,13 +533,13 @@ function RegionTable({
             >
               <td className="px-3 py-2">
                 <span className="inline-flex items-center gap-2 font-medium text-ink">
-                  <span aria-hidden="true" className="size-2.5 rounded-sm" style={{ backgroundColor: REGION_COLOR[r.entity_type] }} />
+                  <span aria-hidden="true" className={["size-2 rounded-full", r.policy === "mask" ? "bg-masked" : "border border-dashed border-kept"].join(" ")} />
                   {metaFor(r.entity_type).label}
                 </span>
               </td>
               <td className="px-3 py-2 text-muted">{sourceLabel(r, models)}</td>
               <td className="px-3 py-2">
-                <span className={r.policy === "mask" ? "text-guard-ink dark:text-guard" : "text-muted"}>{policyLabel(r.policy)}</span>
+                <span className={r.policy === "mask" ? "text-masked" : "text-muted"}>{policyLabel(r.policy)}</span>
               </td>
               <td className="px-3 py-2 font-mono text-xs text-muted tabular-nums">{r.box.join(", ")}</td>
             </tr>
@@ -530,7 +556,7 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
   const ocr = data.analysis.ocr;
   return (
     <div className="space-y-2" data-testid="image-scope-note">
-      <div className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink">
+      <div className="text-sm text-ink">
         <p>
           <span className="font-semibold">SAM 3.1</span> looked for {samTargets(data.analysis)}
           {ocr.ran ? (
@@ -539,6 +565,12 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
             </>
           ) : null}
           .
+          {ocr.ran && ocr.models?.llm ? (
+            <>
+              {" "}
+              The OCR text also went to <span className="font-semibold">{modelLabel(ocr.models.llm)}</span>, an LLM detector that the pii-guard server calls.
+            </>
+          ) : null}
         </p>
         {engine === "mock" && (
           <p className="mt-0.5 text-muted">

@@ -36,6 +36,10 @@ const STAGE_COLOR: Record<OwnStage | "upstream" | "other", string> = {
   other: "var(--stage-other)",
 };
 
+// The waterfall labels every row, so pii-guard's own stages share one neutral bar and only the
+// model's time (hatched) stands apart: no hue here that could be read as masked or restored.
+const OWN_BAR = "color-mix(in oklab, var(--ink) 58%, var(--surface))";
+
 function niceCeil(v: number): number {
   if (!(v > 0)) return 1;
   const p = 10 ** Math.floor(Math.log10(v));
@@ -65,12 +69,11 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
         {w.rows.map((r) => (
           <li key={r.key} className="grid grid-cols-[5.5rem_1fr_4.25rem] items-center gap-2 text-xs sm:grid-cols-[8.5rem_1fr_5rem]">
             <span className="flex min-w-0 items-center gap-1.5 text-ink">
-              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm" style={{ background: STAGE_COLOR[r.key] }} />
               <span className="truncate" title={STAGE_HINT[r.key]}>
                 {r.label}
               </span>
             </span>
-            <span aria-hidden="true" className="relative h-4 rounded-sm bg-surface-2 ring-1 ring-line ring-inset">
+            <span aria-hidden="true" className="relative h-3.5 rounded-sm bg-surface-2">
               <span
                 className="absolute inset-y-0.5 min-w-[3px] rounded-sm"
                 title={`${r.label}: ${formatMsShort(r.ms)}, from ${formatMsShort(r.start)}`}
@@ -82,7 +85,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
                       ? `repeating-linear-gradient(135deg, color-mix(in srgb, var(--ink) 22%, transparent) 0 3px, transparent 3px 6px), ${STAGE_COLOR.upstream}`
                       : r.kind === "other"
                         ? `repeating-linear-gradient(45deg, ${STAGE_COLOR.other} 0 2px, transparent 2px 5px)`
-                        : STAGE_COLOR[r.key],
+                        : OWN_BAR,
                 }}
               />
               {r.kind === "upstream" && r.ttfbMs ? (

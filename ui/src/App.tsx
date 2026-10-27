@@ -214,7 +214,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
           />
         </div>
         <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={screen !== "images"}>
-          <Images client={engine.client} engineState={engine.state} loadImage={loadImage} />
+          <Images client={engine.client} engineState={engine.state} loadImage={loadImage} onUseDemo={() => engine.setPreference("mock")} />
         </div>
         <div id="panel-benchmarks" role="tabpanel" aria-labelledby="tab-benchmarks" hidden={screen !== "benchmarks"}>
           {benchmarksOpened && <Benchmarks load={loadBenchmarks} />}
