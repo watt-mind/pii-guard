@@ -110,8 +110,8 @@ hand-written; documents: en 31 + hu 31.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 62 | 100.0% | 42.9% | 60.0% | 56.0% | 23.4% | 0.0% | 100.0% | 0.38 ms | 2026-10-27 |
-| pii-guard rules + Muse Spark Open (Baseten) | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 1.7% | 0.0% | 100.0% | 1.5 s | 2026-10-27 |
+| **pii-guard rules** | 62 | 100.0% | 44.6% | 61.7% | 54.3% | 21.1% | 0.0% | 100.0% | 0.29 ms | 2026-10-27 |
+| pii-guard rules + Muse Spark Open (Baseten) | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 1.9 s | 2026-10-27 |
 | pii-guard rules + Muse Spark 1.3 | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 1.7% | 0.0% | 100.0% | 3.3 s | 2026-10-27 |
 
 
@@ -119,7 +119,7 @@ By language:
 
 | System | en F1 | hu F1 | en leak | hu leak |
 |---|---:|---:|---:|---:|
-| **pii-guard rules** | 58.5% | 61.4% | 57.5% | 54.5% |
+| **pii-guard rules** | 59.7% | 63.6% | 56.3% | 52.3% |
 | pii-guard rules + Muse Spark Open (Baseten) | 100.0% | 100.0% | 0.0% | 0.0% |
 | pii-guard rules + Muse Spark 1.3 | 100.0% | 100.0% | 0.0% | 0.0% |
 
@@ -203,6 +203,10 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-injection-spark-open-after-normalise` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | recorded | `fb1502e` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.15 |
+| 2026-10-27 | `2026-10-27-injection-rules-after-normalise` | pii-guard rules | injection | en, hu | recorded | `fb1502e` | Apple Silicon arm64, macOS 26.5, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-injection-spark-open-before-normalise` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | recorded | `7e328ad` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.15 |
+| 2026-10-27 | `2026-10-27-injection-rules-before-normalise` | pii-guard rules | injection | en, hu | recorded | `7e328ad` | Apple Silicon arm64, macOS 26.5, 10 CPUs, CPU only | — |
 | 2026-10-27 | `2026-10-27-baseten-spark-open-hardened-en-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | en | imported | `9fad0fa` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.02 |
 | 2026-10-27 | `2026-10-27-baseten-spark-open-hardened-hu-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | hu | imported | `9fad0fa` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.08 |
 | 2026-10-27 | `2026-10-27-injection-spark-1.3` | pii-guard rules + Muse Spark 1.3 | injection | en, hu | imported | `9fad0fa` | local harness; the LLM detector is a remote API call | ≈ $0.02 |
