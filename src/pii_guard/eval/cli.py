@@ -6,6 +6,7 @@ pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language h
                [--known-values]
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
 pii-guard eval visual --specimens data/specimens  # visual recall on specimen ID documents
+pii-guard eval injection --detectors rules,llm   # leak rate per prompt-injection attack class
 ```
 
 ``--fixtures`` may be repeated and may name a directory (every ``*.jsonl`` in it); the
@@ -13,7 +14,8 @@ default is ``eval/fixtures``. Detectors are looked up in the registry by name; o
 can't be loaded is skipped with a warning. The Markdown scorecard goes to stdout (and to
 ``--markdown``), the JSON scorecard to ``--json``. ``--baselines`` also runs open-source
 tools over the same documents (:mod:`pii_guard.eval.baselines`) and appends a comparison.
-``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
+Fixtures whose documents carry ``meta.attack`` (the prompt-injection sets) also get a leak table
+per attack class (:mod:`pii_guard.eval.injection`). ``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
 ``known`` detector), to measure the uplift of pre-loading values an application already knows.
 
 Exit codes: 0 success, 1 a detector or the vault failed during the run, 2 bad arguments,
@@ -107,6 +109,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pii_guard.eval.visual import main as visual_main
 
         return visual_main(argv[1:])
+    if argv[:1] == ["injection"]:  # ``pii-guard eval injection``: red team per attack class
+        from pii_guard.eval.injection import main as injection_main
+
+        return injection_main(argv[1:])
     args = build_parser().parse_args(argv)
     fixture_paths = _expand_fixture_paths(args.fixtures or [DEFAULT_FIXTURES])
     try:
@@ -147,6 +153,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             len(d.meta.get("known_values") or ()) for d in documents
         )
     markdown = render_markdown(scorecard)
+    if any("attack" in d.meta for d in documents):
+        from pii_guard.eval.injection import attack_breakdown, attack_of, render_attack_table
+
+        order = list(dict.fromkeys(attack_of(d) for d in documents))
+        scorecard["attacks"] = attack_breakdown(results, order=order)
+        markdown += "\n## Per attack class\n\n" + render_attack_table(scorecard["attacks"])
     if args.known_values:
         markdown += (
             f"\nKnown values pre-loaded from fixture meta: {scorecard['meta']['known_values']} "
