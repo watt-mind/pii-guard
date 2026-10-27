@@ -17,7 +17,7 @@ section, in [submission.md](submission.md) and in [journey.md](journey.md) toget
 | 1 | [Reversible placeholders, consistent for a whole session](#1-reversible-placeholders-consistent-for-a-whole-session) | 100 % round trip; one placeholder per person on every repeated mention (`hu-smoke`) | shipped |
 | 2 | [Grammar-aware: Hungarian inflection in and out](#2-grammar-aware-hungarian-inflection-in-and-out) | inflected-name leak 18/30 → 0/30 | shipped |
 | 3 | [Built on Meta's models end to end](#3-built-on-metas-models-end-to-end) | 6 Meta models, each with a job and a reason | shipped; Glimmer LoRA in progress |
-| 4 | [Two modes with published leak, latency and cost](#4-two-modes-with-published-leak-latency-and-cost) | strict: 0.9 % / 0.0 % leak at 1.8 s / 1.2 s, ~$2–2.50 per 1k messages | shipped |
+| 4 | [Two modes with published leak, latency and cost](#4-two-modes-with-published-leak-latency-and-cost) | fast (production default): 0.0 % English leak at 36 ms, $0, nothing leaves the machine; audit: 0.9 % / 0.0 % at 1.8 s / 1.2 s, ~$2–2.50 per 1k messages | shipped |
 | 5 | [Head-to-head with Presidio, LLM Guard and PrivAiTe](#5-head-to-head-with-presidio-llm-guard-and-privaite) | Hungarian leak 1.0 % vs 19.6–49.5 % | shipped; refresh in progress |
 | 6 | [The LLM can only point, never write; red-teamed](#6-the-llm-can-only-point-never-write-red-teamed) | prompt-injection leak 3.4 % → 0.0 % (two runs), no partial leaks left | shipped |
 | 7 | [Honest about re-identification](#7-honest-about-re-identification) | exposure 1.4 % from masked text; 39.9 % with a 5-name candidate list | shipped |
@@ -73,7 +73,7 @@ masked data** ([models.md](models.md)).
 
 | Role | Meta model | Why this model | Evidence | Status |
 |---|---|---|---|---|
-| Strict-mode detector (production) | **Muse Spark Open** (open weights) on Baseten Model APIs, or your own GPUs | Open weights, so the detector can move inside your boundary; Muse Spark quality at 1.2–1.8 s p50 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md) | shipped |
+| Audit-mode detector (second opinion) | **Muse Spark Open** (open weights) on Baseten Model APIs, or your own GPUs | Open weights, so the detector can move inside your boundary; Muse Spark quality at 1.2–1.8 s p50 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md) | shipped |
 | Teacher for the fast-mode NER | **Muse Glimmer 30B** (open weights, Apache-2.0), vLLM on one H100 | Best zero-shot quality we measured (F1 99.3, leak 0.0 % on the smoke sets), too slow for the request path (9.4 s p50), so we distilled it | [run record](../eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [models.md](models.md#distilled-from-muse-glimmer) | shipped |
 | Fast-mode NER student | **XLM-RoBERTa** base and large (FacebookAI, MIT) | Multilingual encoder, in-process, tens of milliseconds | [eval/results/ner/distilled/](../eval/results/ner/distilled/) | shipped (train it yourself; weights not published yet) |
 | Glimmer as a fine-tuned detector | **Muse Glimmer** LoRA on Fireworks | An answer-only detector that is fast enough for the request path | LAB-1109 | in progress |
@@ -91,16 +91,19 @@ labelling it, attacking the guard) and ship a small, fast model distilled from i
 
 ## 4. Two modes with published leak, latency and cost
 
-**Strict** mode (the gateway default) runs rules plus the LLM detector; **fast** mode runs
-rules plus the in-process NER with no model call. Both numbers are published, including the
-cost per 1,000 messages, so you can choose.
+**Fast** mode, the gateway default and the production path, runs rules plus the in-process
+NER: local, no model call, $0, and nothing leaves the machine. **Audit** mode adds an LLM
+detector to every message, as a second opinion for sampled or offline quality checks, label
+generation and the benchmark upper bound; it is not meant for production traffic, because
+the text goes to the detector endpoint and each message costs a remote call. Both are
+published, including the cost per 1,000 messages.
 
 | Mode | Language | Leak | F1 (overlap) | p50 latency | $ / 1k messages | Source |
 |---|---|---:|---:|---:|---:|---|
-| strict (rules + Muse Spark Open, Baseten) | Hungarian | **0.9 %** | 98.4 | 1.8 s | 2.42 | [hu-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json) |
-| strict | English | **0.0 %** | 97.1 | 1.2 s | 1.99 | [en-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-en-smoke.json) |
 | fast (rules + distilled NER, large) | English | **0.0 %** | 98.5 | 36 ms (MPS) | no API call | [run record](../eval/results/runs/2026-10-27-distilled-large-en-smoke.json), [latency](../eval/results/ner/distilled/latency-large.json) |
 | fast | Hungarian | 0.9 % | 97.9 | 36 ms (MPS) | no API call | [models.md](models.md#distilled-from-muse-glimmer) (no committed scorecard yet; the committed one, before the ID rules, says 10.3 %) |
+| audit (rules + Muse Spark Open, Baseten) | Hungarian | 0.9 % | 98.4 | 1.8 s | 2.42 | [hu-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json) |
+| audit | English | 0.0 % | 97.1 | 1.2 s | 1.99 | [en-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-en-smoke.json) |
 | rules only (floor) | Hungarian / English | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [ner/distilled/rules/](../eval/results/ner/distilled/rules/) |
 
 - **Caveats:** the smoke sets are small (31 Hungarian, 10 English documents; one leaked value
@@ -128,7 +131,7 @@ scorer on the same hand-written fixtures.
   Baseten detector; the sets are small. The comparison runs on the hand-written sets because
   the Muse-generated ones flatter a Muse-based detector
   ([evaluation.md](evaluation.md#reading-the-numbers)).
-- **Status:** shipped (LAB-1098). A fresh comparison with today's fast and strict modes and a
+- **Status:** shipped (LAB-1098). A fresh comparison with today's fast and audit modes and a
   public benchmark (ai4privacy OpenPII-1M) is **in progress** (LAB-1148). An image baseline
   against Presidio Image Redactor is **planned** (LAB-1164).
 
@@ -286,6 +289,6 @@ hand-written ones because the generated ones flatter a Muse-based detector.
 - Published distilled NER weights, so fast mode works without training a model first.
 - Written confirmation of Baseten's data-retention terms for the shared Model APIs (LAB-1139).
   Until then only fictional or masked data goes there; for real data, run the same open
-  weights on hardware you control ([models.md](models.md#baseten-model-apis-production-detector)).
+  weights on hardware you control ([models.md](models.md#baseten-model-apis-the-audit-mode-detector)).
 - English names on Muse-generated English text: 2.5 % leak on `en-synth-sample` (LAB-1138).
 - It is a hackathon build, not production-hardened.

@@ -89,7 +89,7 @@ def test_a_chunked_body_under_the_limit_still_works() -> None:
 
 
 class _HungLlm(FakeLlm):
-    """A strict-mode LLM detector that hangs until released."""
+    """An audit-mode LLM detector that hangs until released."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -100,8 +100,8 @@ class _HungLlm(FakeLlm):
         return super().detect(text, language)
 
 
-def test_timed_out_strict_detections_do_not_starve_fast_mode() -> None:
-    """The probe: a burst of strict requests to a hung detector, then one fast request.
+def test_timed_out_audit_detections_do_not_starve_fast_mode() -> None:
+    """The probe: a burst of audit requests to a hung detector, then one fast request.
 
     Before LAB-1207 the timed-out threads filled the shared executor and the fast request
     failed with 503 ``detection_failed`` after its own timeout."""
@@ -118,7 +118,7 @@ def test_timed_out_strict_detections_do_not_starve_fast_mode() -> None:
 
             burst = await asyncio.gather(
                 *(
-                    client.post(CHAT, json=body(i), headers={"X-PII-Guard-Mode": "strict"})
+                    client.post(CHAT, json=body(i), headers={"X-PII-Guard-Mode": "audit"})
                     for i in range(40)
                 )
             )
@@ -136,7 +136,7 @@ def test_timed_out_strict_detections_do_not_starve_fast_mode() -> None:
 
 
 def test_timed_out_detections_keep_their_slots() -> None:
-    """Hung threads are not replaced by new ones: the strict pool stays at its size."""
+    """Hung threads are not replaced by new ones: the audit pool stays at its size."""
     llm = _HungLlm()
     config = GatewayConfig(detection_timeout=0.2, concurrency=2)
     app = make_app(MockUpstream(), llm=llm, config=config)
@@ -146,9 +146,7 @@ def test_timed_out_detections_keep_their_slots() -> None:
         async with httpx.AsyncClient(transport=transport, base_url="http://localhost") as client:
             for i in range(4):
                 body = {"model": "m", "messages": [{"role": "user", "content": f"szöveg {i}"}]}
-                response = await client.post(
-                    CHAT, json=body, headers={"X-PII-Guard-Mode": "strict"}
-                )
+                response = await client.post(CHAT, json=body, headers={"X-PII-Guard-Mode": "audit"})
                 assert response.status_code == 503
         gateway = app.state.gateway
         return sum(w.running for w in gateway._detect_workers.values())

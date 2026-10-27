@@ -13,7 +13,7 @@ from pii_guard.gateway.config import Mode
 def test_implicit_mode_detectors_are_rules_only() -> None:
     detectors = build_mode_detectors(Settings(), GatewayConfig(), llm_detector=FakeLlm())
     assert detectors[Mode.FAST].config_id.startswith("fast:rules;policies=")
-    assert detectors[Mode.STRICT].config_id.startswith("strict:rules;llm;model=fake-llm;")
+    assert detectors[Mode.AUDIT].config_id.startswith("audit:rules;llm;model=fake-llm;")
 
 
 @pytest.mark.ner_autodetect

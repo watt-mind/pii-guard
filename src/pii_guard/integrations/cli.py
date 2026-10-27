@@ -1,7 +1,7 @@
 """``pii-guard connect``: put a coding agent behind the gateway.
 
 ```
-pii-guard connect pi [--gateway URL] [--model ID ...] [--mode fast|strict] [--language en]
+pii-guard connect pi [--gateway URL] [--model ID ...] [--mode fast|audit] [--language en]
                      [--api-key VALUE] [--agent-dir DIR] [--dry-run | --check]
 pii-guard connect muse-code [--gateway URL] [--muse-dir DIR] [--model ID] [--dry-run | --check]
 ```
@@ -33,6 +33,7 @@ from collections.abc import Sequence
 
 import httpx
 
+from pii_guard.gateway.config import cli_mode
 from pii_guard.integrations import muse_code, pi
 from pii_guard.integrations.common import (
     DASHBOARD_URL,
@@ -69,7 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=("fast", "strict"),
+        type=lambda v: cli_mode(v, "pii-guard connect"),
+        choices=("fast", "audit"),
         default="fast",
         help="X-PII-Guard-Mode the client sends (default: fast, rules + NER)",
     )

@@ -21,7 +21,7 @@ from starlette.requests import ClientDisconnect
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
-from pii_guard.gateway import GatewayConfig, build_mode_detectors
+from pii_guard.gateway import GatewayConfig, Mode, build_mode_detectors
 from pii_guard.observability import ObservabilitySettings
 from pii_guard.observability.timing import OWN_STAGES
 
@@ -33,7 +33,7 @@ def _app(transport: httpx.AsyncBaseTransport) -> FastAPI:
         tenant_key=TEST_TENANT_KEY, upstream_base_url=UPSTREAM_URL, upstream_api_key=UPSTREAM_KEY
     )
     app = create_app(settings, ObservabilitySettings(traffic_log="masked", metrics=True))
-    config = GatewayConfig()
+    config = GatewayConfig(mode=Mode.AUDIT)
     app.state.gateway_config = config
     app.state.gateway_transport = transport
     app.state.gateway_detectors = build_mode_detectors(settings, config, llm_detector=FakeLlm())
@@ -189,7 +189,7 @@ def _assert_disconnected(app: FastAPI, stream: _Stream) -> None:
     # The disconnect closed the upstream *response*; the shared client stays open (LAB-1176).
     assert gateway._client is not None and not gateway._client.is_closed
     metrics = app.state.observability.metrics.render()
-    assert 'pii_guard_gateway_requests_total{mode="strict",outcome="client_disconnected"} 1' in (
+    assert 'pii_guard_gateway_requests_total{mode="audit",outcome="client_disconnected"} 1' in (
         metrics
     )
     assert 'outcome="ok"' not in metrics

@@ -6,6 +6,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import anyio.to_thread
 from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -14,6 +15,7 @@ from pii_guard.api.errors import install_error_handlers
 from pii_guard.api.routes import include_routers
 from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware, allowed_hosts
 from pii_guard.config import Settings, get_settings
+from pii_guard.detect import stack
 from pii_guard.detect.stack import rest_detector_names
 from pii_guard.observability import (
     Observability,
@@ -29,15 +31,6 @@ from pii_guard.registry import resolve_detector
 __all__ = ["create_app"]
 
 logger = logging.getLogger("pii_guard.api")
-
-
-@asynccontextmanager
-async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """On shutdown, close the gateway's shared upstream client (LAB-1176)."""
-    yield
-    close = getattr(getattr(app.state, "gateway", None), "aclose", None)
-    if close is not None:
-        await close()
 
 
 def create_app(
@@ -63,16 +56,29 @@ def create_app(
     400 (DNS-rebinding guard). ``PII_GUARD_API_TOKEN`` requires a bearer token on every route
     but ``/healthz``; without it the API has no authentication.
 
-    The gateway (``app.state.gateway``) keeps one upstream HTTP client; the app's lifespan
-    closes it on shutdown.
+    With ``PII_GUARD_NER_MODEL`` set, the lifespan loads the NER model before the app serves
+    (:func:`~pii_guard.detect.stack.warm_up`, LAB-1274), so concurrent first requests don't
+    race to load it; a model that can't be loaded stops startup. The gateway
+    (``app.state.gateway``) keeps one upstream HTTP client; the lifespan closes it on shutdown
+    (LAB-1176).
     """
+    settings = settings or get_settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if await anyio.to_thread.run_sync(stack.warm_up, settings):
+            logger.info("ner model warmed up before serving")
+        yield
+        close = getattr(getattr(app.state, "gateway", None), "aclose", None)
+        if close is not None:
+            await close()
+
     app = FastAPI(
         title="pii-guard",
         version=__version__,
         description="Privacy firewall for AI agents: reversible PII masking.",
-        lifespan=_lifespan,
+        lifespan=lifespan,
     )
-    settings = settings or get_settings()
     # Explicit PII_GUARD_DETECTORS, else the gateway fast-mode stack (LAB-1270). A configured
     # but missing NER raises here, like an unknown name: at startup, not on the first request.
     detector_names = rest_detector_names(settings)

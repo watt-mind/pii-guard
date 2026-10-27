@@ -63,7 +63,7 @@ class Plan:
     upstream: str = "mock"  # mock | configured | baseten
     model: str = MOCK_MODEL
     ner: str | None = None
-    strict: bool = False
+    audit: bool = False
     traffic_log: str = "masked"
     ui: bool = True
     env: dict[str, str] = field(default_factory=dict)
@@ -115,13 +115,13 @@ def plan(
         p.model = BASETEN_MODEL
     if p.upstream != "mock":
         p.model = os.environ.get("PII_GUARD_DEMO_MODEL") or p.model
-    # Strict mode works when an LLM detector key is there (Baseten is the default endpoint).
+    # Audit mode works when an LLM detector key is there (Baseten is the default endpoint).
     if setting("PII_GUARD_LLM_DETECTOR_API_KEY", env_file):
-        p.strict = True
+        p.audit = True
     elif setting("BASETEN_API_KEY", env_file) and not force_mock:
         env["PII_GUARD_LLM_DETECTOR_API_KEY"] = setting("BASETEN_API_KEY", env_file)
         env.setdefault("PII_GUARD_LLM_DETECTOR_REASONING_EFFORT", "low")
-        p.strict = True
+        p.audit = True
     ner_model = setting("PII_GUARD_NER_MODEL", env_file)
     if ner_model and importlib.util.find_spec("transformers") is not None:
         p.ner = ner_model
@@ -158,7 +158,11 @@ def banner(p: Plan) -> str:
         "baseten": f"Baseten Model APIs ({p.model}), key from BASETEN_API_KEY",
     }[p.upstream]
     fast = f"rules + NER ({Path(p.ner).name})" if p.ner else "rules only (set PII_GUARD_NER_MODEL)"
-    strict = "rules + LLM detector" if p.strict else "unavailable (no LLM detector key)"
+    audit = (
+        "rules + NER + LLM detector, opt in with X-PII-Guard-Mode: audit (quality checks)"
+        if p.audit
+        else "unavailable (no LLM detector key)"
+    )
     lines = [
         "",
         "  pii-guard demo is up",
@@ -169,7 +173,7 @@ def banner(p: Plan) -> str:
         f"level {p.traffic_log}",
         f"  metrics        {p.api_url}/metrics",
         f"  upstream       {upstream}",
-        f"  fast mode      {fast}",
+        f"  fast mode      {fast}  (default)",
         *(
             []
             if p.ner
@@ -178,7 +182,7 @@ def banner(p: Plan) -> str:
                 '                 labelled "needs fast mode (NER)" is an expected miss',
             ]
         ),
-        f"  strict mode    {strict}",
+        f"  audit mode     {audit}",
         f"  images         {ocr_status()}",
         "",
         "  send demo traffic:  make demo-traffic      stop: Ctrl-C",

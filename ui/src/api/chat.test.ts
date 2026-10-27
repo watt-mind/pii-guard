@@ -46,7 +46,7 @@ describe("gateway chat client", () => {
     const fetch = (async () =>
       new Response(JSON.stringify({ error: { code: "upstream_not_configured", message: "no upstream" } }), { status: 503 })) as unknown as typeof globalThis.fetch;
     await expect(
-      createHttpChat({ fetch }).send({ messages: [], model: "m", mode: "strict", language: "hu", sessionId: null }),
+      createHttpChat({ fetch }).send({ messages: [], model: "m", mode: "audit", language: "hu", sessionId: null }),
     ).rejects.toMatchObject({ code: "upstream_not_configured" });
   });
 });
@@ -56,7 +56,7 @@ describe("simulated chat", () => {
     const r = await createMockChat(createMockClient(), { delayMs: 0 }).send({
       messages: [{ role: "user", content: "Teszt Elek vagyok, teszt.elek@example.com." }],
       model: "m",
-      mode: "strict",
+      mode: "audit",
       language: "hu",
       sessionId: null,
     });

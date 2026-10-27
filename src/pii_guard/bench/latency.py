@@ -3,7 +3,7 @@
 The benchmark starts two local HTTP servers on free loopback ports -- the mock upstream with a
 fixed delay (:mod:`pii_guard.bench.mock_upstream`) and the pii-guard API pointing at it -- and
 sends a fixed fictional corpus (:data:`CORPUS`) through ``POST /v1/chat/completions``: N
-requests per cell, for every combination of mode (``fast``, ``strict``), concurrency (1, 8)
+requests per cell, for every combination of mode (``fast``, ``audit``), concurrency (1, 8)
 and streaming (off, on). Each request opens a new session, so nothing is served from the
 detection cache.
 
@@ -15,8 +15,8 @@ the HTTP hop to the upstream and back, unmasking. With ``--record SLUG`` the res
 as run records (``kind: latency``, one per mode) in ``eval/results/runs/`` and the benchmark
 report is regenerated.
 
-Strict mode calls the configured LLM detector (``PII_GUARD_LLM_DETECTOR_*``) once per
-request: keep ``--strict-requests`` small on a paid endpoint, and the corpus is fictional.
+Audit mode calls the configured LLM detector (``PII_GUARD_LLM_DETECTOR_*``) once per
+request: keep ``--audit-requests`` small on a paid endpoint, and the corpus is fictional.
 """
 
 from __future__ import annotations
@@ -290,7 +290,7 @@ def run_benchmark(
     delay_ms: float = 50.0,
     progress: Any = None,
 ) -> list[CellResult]:
-    """Run every cell; ``mode_requests`` caps N per mode (``{"strict": 12}``)."""
+    """Run every cell; ``mode_requests`` caps N per mode (``{"audit": 12}``)."""
     from pii_guard.api.app import create_app
     from pii_guard.config import Settings
 
@@ -311,7 +311,7 @@ def run_benchmark(
             offset = 0
             for mode in modes:
                 n = (mode_requests or {}).get(mode, requests)
-                w = min(warmup, 1) if mode == "strict" else warmup
+                w = min(warmup, 1) if mode == "audit" else warmup
                 for c in concurrency:
                     for stream in streams:
                         cell = asyncio.run(

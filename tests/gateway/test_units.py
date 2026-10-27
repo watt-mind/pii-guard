@@ -254,12 +254,12 @@ def test_cache_stores_offsets_only_and_expires() -> None:
     cache = DetectionCache(2, ttl_seconds=10, clock=lambda: now[0])
     text = "Teszt Elek írt"
     span = Span(0, 10, EntityType.PERSON, "Teszt Elek", 0.9, "llm")
-    key = cache.key("s1", "hu", "strict", text)
+    key = cache.key("s1", "hu", "audit", text)
     cache.put(key, [span])
     assert "Teszt" not in repr(cache._data) and b"Teszt" not in key[1]
     assert cache.get(key, text) == [span]
-    assert cache.get(cache.key("s2", "hu", "strict", text), text) is None
-    assert cache.get(cache.key("s1", "en", "strict", text), text) is None
+    assert cache.get(cache.key("s2", "hu", "audit", text), text) is None
+    assert cache.get(cache.key("s1", "en", "audit", text), text) is None
     assert cache.get(key, "short") is None  # offsets don't fit: a miss, never a bad span
     now[0] = 11
     assert cache.get(key, text) is None

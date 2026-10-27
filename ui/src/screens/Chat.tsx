@@ -43,9 +43,13 @@ const MODES: { id: ChatMode; label: string; hint: string }[] = [
   {
     id: "fast",
     label: "Fast",
-    hint: "Rules + the on-device NER: finds names, addresses and structured data in milliseconds, with no model call. The production path. Without a NER checkpoint on the server it runs the rules alone.",
+    hint: "The default and the production path. Rules + the on-device NER: finds names, addresses and structured data in milliseconds, with no model call; nothing leaves the machine. Without a NER checkpoint on the server it runs the rules alone.",
   },
-  { id: "strict", label: "Strict", hint: "Fast mode plus an LLM detector (Muse Spark Open) for a second pass. Needs a detector key; adds a few seconds." },
+  {
+    id: "audit",
+    label: "Audit",
+    hint: "Fast mode plus a second opinion from a remote LLM detector (Muse Spark Open on Baseten), for spot-checking quality on fictional or sample data. It sends your unmasked text, personal data included, to that detector, adds about 2 s per message and costs about $2.5–3 per 1,000. Needs a detector key on the server. Use Fast for production traffic.",
+  },
 ];
 
 export function Chat({ client, live, draft, replay }: Props) {
@@ -321,7 +325,7 @@ function TurnView({
           <p className="text-sm text-muted">Nothing was sent.</p>
         ) : turn.maskedUser === null ? (
           <Pending
-            label={simulated ? "Masking in your browser…" : turn.mode === "strict" ? "Detecting personal data (rules + NER + LLM detector)…" : "Detecting personal data (rules + NER)…"}
+            label={simulated ? "Masking in your browser…" : turn.mode === "audit" ? "Detecting personal data (rules + NER + LLM detector)…" : "Detecting personal data (rules + NER)…"}
           />
         ) : (
           <>
@@ -340,6 +344,12 @@ function TurnView({
       {turn.status === "error" && turn.error ? (
         <div className="lg:col-span-2">
           <BlockedNotice error={turn.error} />
+          {turn.error.code === "detection_failed" && turn.mode === "audit" && (
+            <p className="mt-2 text-sm text-muted">
+              Audit mode needs a working LLM detector key on the server (
+              <code className="font-mono text-xs">PII_GUARD_LLM_DETECTOR_API_KEY</code>). Switch to Fast to continue.
+            </p>
+          )}
           {turn.error.code === "upstream_not_configured" && (
             <p className="mt-2 text-sm text-muted">
               Start the API with <code className="font-mono text-xs">PII_GUARD_UPSTREAM_BASE_URL</code> and{" "}
@@ -491,6 +501,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
               type="button"
               role="radio"
               aria-checked={mode === m.id}
+              title={m.hint}
               onClick={() => onMode(m.id)}
               className={["rounded-md px-3 py-1.5 font-medium", mode === m.id ? "bg-ink text-canvas" : "text-muted hover:text-ink"].join(" ")}
             >

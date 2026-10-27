@@ -26,7 +26,7 @@ from PIL import Image, ImageDraw
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
-from pii_guard.gateway import Gateway, GatewayConfig, build_mode_detectors, collect_texts
+from pii_guard.gateway import Gateway, GatewayConfig, Mode, build_mode_detectors, collect_texts
 from pii_guard.gateway.request import UnsupportedContentError
 from pii_guard.vault import Vault
 from pii_guard.visual import OcrWord, SamClient
@@ -105,7 +105,7 @@ def make_app(
         image_render="opaque",  # solid boxes; labels: tests/visual/test_labelled_images.py
         image_require_ocr=require_ocr,
     )
-    config = config or GatewayConfig()
+    config = config or GatewayConfig(mode=Mode.AUDIT)
     app = create_app(settings)
     app.state.gateway = Gateway(
         settings=settings,
@@ -207,7 +207,7 @@ def test_tesseract_not_installed_refuses_by_default(monkeypatch: pytest.MonkeyPa
     settings = Settings(
         tenant_key=TEST_TENANT_KEY, upstream_base_url=UPSTREAM_URL, upstream_api_key=UPSTREAM_KEY
     )
-    config = GatewayConfig()
+    config = GatewayConfig(mode=Mode.AUDIT)
     app = create_app(settings)
     app.state.gateway = Gateway(
         settings=settings,

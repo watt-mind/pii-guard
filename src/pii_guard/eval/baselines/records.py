@@ -5,14 +5,15 @@ python -m pii_guard.eval.baselines.records eval/results/2026-10-27-comparison/sc
     --slug-prefix comparison [--runs-dir eval/results/runs] [--overwrite]
 ```
 
-The directory holds, per fixture ``<f>``: ``<f>-baselines.json`` (``pii-guard eval
---detectors rules --baselines ...``: pii-guard rules plus the comparison tools),
-``<f>-fast.json`` and ``<f>-strict.json`` (:mod:`pii_guard.eval.baselines.suite`). Each becomes
-records through :func:`pii_guard.eval.record.build_records`, with what the generic importer
-can't know filled in from the suite's ``run`` block: the NER checkpoint (path and SHA-256), the
-LLM endpoint, model and reasoning effort, token usage and cost, the host's load average and
-blocked documents. Fixtures from a public dataset (``meta.source`` names it) are marked
-``generated`` with the dataset as the generator, since no person wrote them.
+The directory holds, per fixture ``<f>``: ``<f>-baselines.json`` (``pii-guard eval --detectors
+rules --baselines ...``: pii-guard rules plus the comparison tools), ``<f>-fast.json`` and
+``<f>-audit.json`` (``<f>-strict.json``, the old name, is read too)
+(:mod:`pii_guard.eval.baselines.suite`). Each becomes records through
+:func:`pii_guard.eval.record.build_records`, with what the generic importer can't know filled
+in from the suite's ``run`` block: the NER checkpoint (path and SHA-256), the LLM endpoint,
+model and reasoning effort, token usage and cost, the host's load average and blocked
+documents. Fixtures from a public dataset (``meta.source`` names it) are marked ``generated``
+with the dataset as the generator, since no person wrote them.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from pii_guard.eval.record import RecordError, build_records, write_records
+from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES
 
 __all__ = ["main", "records_for"]
 
@@ -162,9 +164,10 @@ def records_for(
             )
         labels = {
             "fast": "pii-guard fast (rules + NER distilled large)",
-            "strict": "pii-guard strict (rules + NER + Muse Spark Open, Baseten)",
+            "audit": "pii-guard audit (rules + NER + Muse Spark Open, Baseten)",
         }
         mode = run["system"].removeprefix("pii-guard ")
+        mode = DEPRECATED_MODE_ALIASES.get(mode, mode)
         if mode in labels:
             extra["system"] = {"label": labels[mode]}
     records = build_records(
@@ -207,9 +210,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     records: list[dict[str, Any]] = []
     for path in sorted(args.directory.glob("*.json")):
         stem = path.stem
-        for suffix in ("-baselines", "-fast", "-strict"):
+        for suffix in ("-baselines", "-fast", "-audit", "-strict"):
             if stem.endswith(suffix):
                 fixture, kind = stem.removesuffix(suffix), suffix[1:]
+                kind = DEPRECATED_MODE_ALIASES.get(kind, kind)
                 break
         else:
             continue

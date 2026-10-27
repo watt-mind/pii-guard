@@ -135,15 +135,21 @@ export interface ModeStats {
   max: number;
 }
 
+const MODE_ORDER = ["fast", "audit"];
+
+/** Modes in display order: fast (the default), audit, then any other name alphabetically. */
+export function modeOrder(modes: readonly string[]): string[] {
+  return [...modes].sort((a, b) => (MODE_ORDER.indexOf(a) + 1 || 9) - (MODE_ORDER.indexOf(b) + 1 || 9) || a.localeCompare(b));
+}
+
 export function overheadByMode(events: readonly TrafficEvent[]): ModeStats[] {
   const by = new Map<string, number[]>();
   for (const e of events) {
     const m = e.mode ?? "unknown";
     by.set(m, [...(by.get(m) ?? []), e.timing.overhead_ms]);
   }
-  const order = ["fast", "strict"];
-  return [...by.entries()]
-    .sort(([a], [b]) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9) || a.localeCompare(b))
+  return modeOrder([...by.keys()])
+    .map((mode) => [mode, by.get(mode)!] as const)
     .map(([mode, v]) => ({ mode, n: v.length, p50: percentile(v, 50)!, p95: percentile(v, 95)!, max: Math.max(...v) }));
 }
 

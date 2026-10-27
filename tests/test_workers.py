@@ -54,7 +54,7 @@ def test_a_timed_out_call_keeps_its_slot_until_the_thread_ends() -> None:
 
 
 def test_pools_are_independent() -> None:
-    """A hung pool (strict mode's) never starves another (fast mode's)."""
+    """A hung pool (audit mode's) never starves another (fast mode's)."""
     hung, other = BoundedWorkers(1, "hung"), BoundedWorkers(1, "other")
     release = threading.Event()
 
