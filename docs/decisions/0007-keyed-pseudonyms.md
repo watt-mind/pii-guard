@@ -18,6 +18,11 @@ that nobody else can.
 - The same value maps to the same placeholder within a session, so the model sees consistent
   references.
 - Collisions within a session are detected and resolved by extending the id.
+- Occurrences of a value match case-insensitively and, by default, share its placeholder;
+  unmask restores the casing the value was first written in. Opt-in
+  `PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS` mixes the casing class (upper, lower, mixed)
+  into the HMAC for occurrences in another class, so they get their own id and round-trip
+  exactly (LAB-1119).
 - The mapping from placeholder to original value (and its inflected surface forms) is stored
   only inside pii-guard, with a TTL.
 
