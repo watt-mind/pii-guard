@@ -89,12 +89,48 @@ for chunk in stream:
 
 | Header | Direction | Meaning |
 |---|---|---|
-| `X-PII-Guard-Session` | both | The conversation. Omit it to start one; the response carries it. Same session = same placeholders, and history is not detected again. Unknown or expired → 404. |
+| `X-PII-Guard-Session` | both | The conversation. Same session = same placeholders, and history is not detected again. Unknown or expired → 404. Without it the gateway picks a sticky session (below); the response carries its id, so a client can send it back. |
+| `X-PII-Guard-Session-Source` | response | Which step chose the session: `header`, `path`, `prompt_cache_key` or `default`. Also in the traffic record (`session_source`). |
 | `X-PII-Guard-Mode` | both | Request: `fast` (rules + NER, no model call; the default) or `audit` (+ the LLM detector). The response carries the mode that ran. |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
 | `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
 | `X-PII-Guard-Request-Id` | response | The call's id in the traffic log; with `PII_GUARD_SERVER_TIMING=true` a `Server-Timing` header gives the per-stage latency ([operations.md](operations.md#timing)). |
+
+## Sessions
+
+Placeholders are stable within one vault session, so every request lands in one, even from a
+client that can't send headers (LAB-1286). The first match wins:
+
+1. **`header`**: `X-PII-Guard-Session`. Unknown or expired → `404 session_not_found`: the
+   mapping is gone, and a silent new session would give the same value another placeholder.
+2. **`path`**: a base URL `http://127.0.0.1:8787/s/<session>/v1` (also
+   `/s/<session>/muse-code/...`) reaches the same routes with that session. Same id grammar as
+   the header (1-128 of `A-Z a-z 0-9 _ -`, else 400); created on first use, never 404.
+   `pii-guard connect` writes such a URL with a random id.
+3. **`prompt_cache_key`**: the body's `prompt_cache_key` (Muse Code sends one per call stream)
+   selects the session `HMAC(tenant key, "pck:" + client identity + ":" + key)`. Created on first
+   use.
+4. **`default`**: one session per client, `HMAC(tenant key, "default:" + client identity)`.
+
+The client identity is the SHA-256 of the request's `Authorization` value (`anonymous`
+without one), so two keys never share a derived session; every derived id is keyed with the
+tenant key, so ids differ across deployments. Derived ids (`d_` + 32 hex) leave the process
+only in the `X-PII-Guard-Session` response header. With `PII_GUARD_API_TOKEN` sent as
+`Authorization: Bearer`, the token is removed before the gateway sees it, so those clients
+share the `anonymous` default session; send the token as `X-PII-Guard-Token` to keep a
+per-key default.
+
+Steps 2-4 use the session TTL like any other and have a size cap,
+`PII_GUARD_VAULT_MAX_ENTRIES` (10 000 placeholders). A full session is not cut off or
+pruned: the next request starts a new **generation** under a new derived id (logged once),
+the full one is left to expire. The client re-sends its history, which is masked again in the
+new generation; only a placeholder the model kept from before the rotation, for a value no
+longer in the request, stays unrestored (`X-PII-Guard-Unresolved`).
+
+Muse Code's `prompt_cache_key` differs between its main conversation and each reminder
+observer, so on the plain URL one task spans a few sessions and a value gets one placeholder in
+each (still restored). The path URL that `connect` writes keeps them all in one.
 
 ## Failing closed
 

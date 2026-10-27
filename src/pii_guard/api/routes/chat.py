@@ -21,6 +21,7 @@ from pii_guard.api.deps import get_max_text_chars, get_vault
 from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
 from pii_guard.api.routes.image_masking import image_workers_for
 from pii_guard.gateway import Gateway, InvalidChatRequestError
+from pii_guard.gateway.sessions import path_session
 
 __all__ = ["get_gateway", "router"]
 
@@ -75,6 +76,7 @@ async def chat_completions(request: Request) -> Response:
         request.headers,
         max_text_chars=get_max_text_chars(request),
         received_at=received_at,
+        path_session=path_session(request.scope),
     )
     log_extra(request, **stats.log_fields())
     return response

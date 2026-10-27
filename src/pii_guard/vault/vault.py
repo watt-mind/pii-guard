@@ -8,7 +8,9 @@ and errors carry entity types, counts and placeholder ids only (AGENTS.md, ADR 0
 from __future__ import annotations
 
 import copy
+import hashlib
 import heapq
+import hmac
 import itertools
 import logging
 import re
@@ -48,6 +50,7 @@ if TYPE_CHECKING:
     from pii_guard.config import Settings
 
 __all__ = [
+    "DEFAULT_MAX_ENTRIES",
     "DEFAULT_MAX_SESSIONS",
     "DEFAULT_TTL_SECONDS",
     "MIN_TENANT_KEY_BYTES",
@@ -76,6 +79,9 @@ class PlaceholderInInputError(MaskingError):
 DEFAULT_TTL_SECONDS = 3600.0
 #: Most live sessions a vault holds; a new one beyond it evicts the least recently used.
 DEFAULT_MAX_SESSIONS = 10_000
+#: Most placeholders a get-or-create session (:meth:`Vault.session_or_create`) collects before
+#: its id moves on to a new, empty generation (LAB-1286).
+DEFAULT_MAX_ENTRIES = 10_000
 MIN_TENANT_KEY_BYTES = 16
 
 
@@ -830,6 +836,11 @@ class VaultSession:
             logger.debug("unmasked %d placeholders", restored)
             return UnmaskResult(result, tuple(unresolved))
 
+    @property
+    def entry_count(self) -> int:
+        """How many placeholders this session has issued (casing and layout variants too)."""
+        return len(self._by_placeholder)
+
     def entities(self) -> list[tuple[str, EntityType, int]]:
         """``(placeholder, entity_type, count)`` for every placeholder this session issued."""
         with self._lock:
@@ -986,6 +997,15 @@ class Vault:
     whose sliding TTL ends first), which is closed like an expired one, so its later use is
     ``404 session_not_found``. Eviction rather than 429 keeps the service up under a flood;
     a client whose idle session was evicted starts a new one.
+
+    ``max_entries`` caps a **get-or-create** session (:meth:`session_or_create`: the gateway's
+    path, ``prompt_cache_key`` and default sessions, which can live as long as a client keeps
+    using them). Once a session holds that many placeholders, the next lookup of its id starts
+    a new, empty **generation** under a new derived id (logged once per rotation); the full
+    generation is no longer handed out and expires with its TTL. A conversation that crosses
+    a rotation is re-masked from its re-sent history under the new generation; only a
+    placeholder it kept from before the rotation (and no longer sends the value of) stays
+    unrestored. Explicit sessions (:meth:`session`) have no cap: their client owns them.
     """
 
     def __init__(
@@ -997,6 +1017,7 @@ class Vault:
         clock: Callable[[], float] = time.monotonic,
         case_sensitive_placeholders: bool = False,
         max_sessions: int = DEFAULT_MAX_SESSIONS,
+        max_entries: int = DEFAULT_MAX_ENTRIES,
     ) -> None:
         if not isinstance(tenant_key, bytes | bytearray):
             raise TypeError("tenant_key must be bytes")
@@ -1008,7 +1029,12 @@ class Vault:
             raise ValueError(f"id_length must be in [{MIN_ID_LENGTH}, {MAX_ID_LENGTH}]")
         if max_sessions < 1:
             raise ValueError("max_sessions must be at least 1")
+        if max_entries < 1:
+            raise ValueError("max_entries must be at least 1")
         self._max_sessions = max_sessions
+        self._max_entries = max_entries
+        # base id -> current generation, only for ids that rotated at least once.
+        self._generations: dict[str, int] = {}
         self._tenant_key = bytes(tenant_key)
         self._ttl = ttl_seconds
         self._id_length = id_length
@@ -1022,13 +1048,15 @@ class Vault:
         """A vault keyed by ``PII_GUARD_TENANT_KEY``. Fails closed if the key is unset.
 
         ``PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS`` sets ``case_sensitive_placeholders``
-        and ``PII_GUARD_VAULT_MAX_SESSIONS`` sets ``max_sessions``, unless ``kwargs`` does.
+        ``PII_GUARD_VAULT_MAX_SESSIONS`` sets ``max_sessions`` and ``PII_GUARD_VAULT_MAX_ENTRIES``
+        sets ``max_entries``, unless ``kwargs`` does.
         """
         key = settings.tenant_key_bytes()
         if key is None:
             raise MaskingError("PII_GUARD_TENANT_KEY is not set", code="vault_not_configured")
         kwargs.setdefault("case_sensitive_placeholders", settings.vault_case_sensitive_placeholders)
         kwargs.setdefault("max_sessions", settings.vault_max_sessions)
+        kwargs.setdefault("max_entries", settings.vault_max_entries)
         return cls(key, **kwargs)
 
     def __repr__(self) -> str:
@@ -1050,23 +1078,73 @@ class Vault:
         with self._lock:
             self._purge_locked()
             if session_id is None:
-                self._evict_locked(self._max_sessions - 1)
-                session_id = f"s_{secrets.token_hex(16)}"
-                session = VaultSession(
-                    session_id,
-                    self._tenant_key,
-                    ttl_seconds=self._ttl,
-                    id_length=self._id_length,
-                    clock=self._clock,
-                    case_sensitive_placeholders=self._case_sensitive,
-                )
-                self._sessions[session_id] = session
-                return session
+                return self._create_locked(f"s_{secrets.token_hex(16)}")
             session = self._sessions.get(session_id)
             if session is None:
                 raise SessionNotFoundError("vault session not found or expired")
             session._check_alive()
             return session
+
+    def session_or_create(self, session_id: str) -> tuple[VaultSession, bool]:
+        """The live session for ``session_id``, created when there is none: ``(session, new)``.
+
+        For ids the caller chose or derived (:meth:`derive_session_id`), never 404. The
+        returned session's id differs from ``session_id`` once that id rotated to a later
+        generation (``max_entries``); send the returned id back to address it directly.
+        """
+        if not session_id:
+            raise ValueError("session_id must not be empty")
+        with self._lock:
+            self._purge_locked()
+            generation = self._generations.get(session_id, 0)
+            current = self._generation_id(session_id, generation)
+            session = self._sessions.get(current)
+            if session is not None and not session.expired:
+                if session.entry_count < self._max_entries:
+                    session._check_alive()
+                    return session, False
+                generation += 1
+                self._generations[session_id] = generation
+                current = self._generation_id(session_id, generation)
+                logger.info(
+                    "vault: a session reached %d placeholders; starting generation %d",
+                    self._max_entries,
+                    generation,
+                )
+                existing = self._sessions.get(current)
+                if existing is not None and not existing.expired:  # pragma: no cover - race
+                    existing._check_alive()
+                    return existing, False
+            return self._create_locked(current), True
+
+    def derive_session_id(self, material: str) -> str:
+        """A stable session id for ``material``, keyed with the tenant key: ``d_`` + 32 hex.
+
+        The same material gives the same id in this deployment and different ids under
+        another tenant key; the id reveals nothing about the material.
+        """
+        digest = hmac.new(
+            self._tenant_key, b"pii-guard-session\x00" + material.encode("utf-8"), hashlib.sha256
+        )
+        return "d_" + digest.hexdigest()[:32]
+
+    def _generation_id(self, base: str, generation: int) -> str:
+        if generation == 0:
+            return base
+        return self.derive_session_id(f"generation:{generation}:{base}")
+
+    def _create_locked(self, session_id: str) -> VaultSession:
+        self._evict_locked(self._max_sessions - 1)
+        session = VaultSession(
+            session_id,
+            self._tenant_key,
+            ttl_seconds=self._ttl,
+            id_length=self._id_length,
+            clock=self._clock,
+            case_sensitive_placeholders=self._case_sensitive,
+        )
+        self._sessions[session_id] = session
+        return session
 
     def drop(self, session_id: str) -> None:
         """Close and forget a session now (no error if it is already gone)."""
@@ -1097,4 +1175,12 @@ class Vault:
         stale = [sid for sid, session in self._sessions.items() if session.expired]
         for sid in stale:
             self._sessions.pop(sid).close()
+        if self._generations:  # a rotated id whose current generation is gone starts over
+            gone = [
+                base
+                for base, generation in self._generations.items()
+                if self._generation_id(base, generation) not in self._sessions
+            ]
+            for base in gone:
+                del self._generations[base]
         return len(stale)

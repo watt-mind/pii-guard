@@ -77,8 +77,12 @@ reply = client.chat.completions.create(
 ```
 
 To keep one conversation's placeholders stable across turns, send the `X-PII-Guard-Session`
-that the first answer returned (docs/contracts.md). Coding agents don't need to: they resend
-the whole history every turn, and each request is masked and restored as a unit.
+that the first answer returned (docs/contracts.md). A client that can't send headers gets a
+sticky session anyway (LAB-1286): `pii-guard connect` writes a base URL with the session in
+its path (`http://127.0.0.1:8787/s/<session>/v1`), and without one the gateway uses the
+request's `prompt_cache_key`, else one default session per client key
+([architecture-gateway.md](../architecture-gateway.md#sessions)). `X-PII-Guard-Session-Source`
+on every answer says which one it used.
 
 ## 4. Check it end to end
 

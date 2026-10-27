@@ -41,10 +41,12 @@ muse
 ```json
 {
   "schema_version": 1,
-  "endpoint_transport": { "base_url": "http://127.0.0.1:8787/v1", "auth": "bearer" }
+  "endpoint_transport": { "base_url": "http://127.0.0.1:8787/s/c_5f0c3a9e1b7d4f2a8c6e0b9d3a1f7e2c/v1", "auth": "bearer" }
 }
 ```
 
+- `base_url` carries a vault session in its path (see [Sessions](#sessions)); rerunning
+  connect keeps it.
 - `auth: "bearer"` matters. Without that pin, Muse withholds its key from any base URL other
   than Meta's (a `--base-url` flag alone isn't enough).
 - **The key.** Muse sends `META_API_KEY` (or the key `muse login` saved) as its bearer token.
@@ -69,12 +71,13 @@ Language: the gateway's `PII_GUARD_DEFAULT_LANGUAGE` (set `en` for English code)
 `POST /v1/responses` with `X-PII-Guard-Echo: masked` and prints the round trip:
 
 ```
-gateway      : http://127.0.0.1:8787/v1/responses
+gateway      : http://127.0.0.1:8787/s/c_5f0c3a9e1b7d4f2a8c6e0b9d3a1f7e2c/v1/responses
 model        : muse-spark-1.3
 sent         : pii-guard connect check. Reply in one short sentence that repeats this contact exactly: email jane.placeholder@example.net, phone +44 20 7946 0958, IBAN GB82 WEST 1234 5698 7654 32.
 model saw    : pii-guard connect check. Reply in one short sentence that repeats this contact exactly: email [[EMAIL_6eab02]], phone [[PHONE_5d1e2e]], IBAN [[BANK_ACCOUNT_9fd9f1]].
 model said   : The contact is email [[EMAIL_6eab02]], phone [[PHONE_5d1e2e]], IBAN [[BANK_ACCOUNT_9fd9f1]].
 you got back : The contact is email jane.placeholder@example.net, phone +44 20 7946 0958, IBAN GB82 WEST 1234 5698 7654 32.
+session      : path (the session in the base URL: placeholders stay the same across conversations)
 ok           : 3 value(s) masked, none reached the model, answer restored
 gateway mode : fast
 ```
@@ -179,5 +182,28 @@ the recorder in the e2e harness. `--provider local` runs Muse's embedded llama.c
 downloaded Glimmer weights and ignores the base URL. It is not covered here.
 
 Muse can also attach images (`--image`). `/v1/responses` refuses image parts for now
-(LAB-1285). Each Muse turn gets its own vault session, because Muse can't send
-`X-PII-Guard-Session` (LAB-1286).
+(LAB-1285).
+
+## Sessions
+
+Muse can't send `X-PII-Guard-Session`, so `pii-guard connect muse-code` writes a base URL with a
+vault session in its path, `http://127.0.0.1:8787/s/<session>/v1` (LAB-1286): every call, the
+main agent's and its reminder observers', lands in that session, and the same value has the
+same placeholder in every turn and every task. `--check` prints `session      : path`. With
+`--no-session-path` (the plain URL) the gateway uses one session per `prompt_cache_key`;
+Muse sends one key for the main conversation and one per observer, so a task spans about four
+sessions and a value gets a placeholder in each (all of them restored). Details:
+[architecture-gateway.md](../architecture-gateway.md#sessions).
+
+| Muse 1.4.14, e2e harness | requests | sessions | distinct placeholders upstream | gold values under >1 placeholder (most for one) | gold upstream |
+|---|---|---|---|---|---|
+| scripted, `--session per-request` (before) | 10 | 10 | 150 | 16 of 16 (8) | 0 of 16 |
+| scripted, `--session auto` (`prompt_cache_key`) | 10 | 4 | 85 | 16 of 16 (4) | 0 of 16 |
+| scripted, `--session path` (`connect` default) | 11 | 1 | 25 | 0 of 16 (1) | 0 of 16 |
+| Meta Model API `muse-spark-1.3`, per-request (before; 13 gold, before `SECRET`) | 10 | 10 | 155 | 13 of 13 (8) | 0 of 13 |
+| Meta Model API `muse-spark-1.3`, path (13 gold, before `SECRET`) | 8 | 1 | 21 | 0 of 13 (1) | 0 of 13 |
+
+```bash
+uv run python -m pii_guard.integrations.e2e --client muse-code --session per-request   # before
+uv run python -m pii_guard.integrations.e2e --client muse-code                         # path
+```

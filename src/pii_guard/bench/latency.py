@@ -4,8 +4,8 @@ The benchmark starts two local HTTP servers on free loopback ports -- the mock u
 fixed delay (:mod:`pii_guard.bench.mock_upstream`) and the pii-guard API pointing at it -- and
 sends a fixed fictional corpus (:data:`CORPUS`) through ``POST /v1/chat/completions``: N
 requests per cell, for every combination of mode (``fast``, ``audit``), concurrency (1, 8)
-and streaming (off, on). Each request opens a new session, so nothing is served from the
-detection cache.
+and streaming (off, on). Each request opens a new session (a fresh ``/s/<session>/v1`` URL),
+so nothing is served from the detection cache.
 
 Per request it keeps the gateway's own timing (:class:`~pii_guard.observability.RequestTimer`:
 stages, per-detector time, ``overhead = total - upstream - client``, added time to first token)
@@ -216,20 +216,21 @@ async def _one(
     if stream:
         body["stream"] = True
     headers = {"X-PII-Guard-Mode": mode, "X-PII-Guard-Language": language}
+    # A new vault session per request: without one the gateway's default session would serve
+    # the repeated corpus from its detection cache (LAB-1286).
+    url = f"/s/bench_{secrets.token_hex(8)}/v1/chat/completions"
     started = time.perf_counter()
     first: float | None = None
     try:
         if stream:
-            async with client.stream(
-                "POST", "/v1/chat/completions", json=body, headers=headers
-            ) as r:
+            async with client.stream("POST", url, json=body, headers=headers) as r:
                 async for line in r.aiter_lines():
                     if first is None and line.startswith("data:"):
                         first = (time.perf_counter() - started) * 1000
                 ok = r.status_code == 200
                 rid = r.headers.get("x-pii-guard-request-id")
         else:
-            r = await client.post("/v1/chat/completions", json=body, headers=headers)
+            r = await client.post(url, json=body, headers=headers)
             ok = r.status_code == 200
             rid = r.headers.get("x-pii-guard-request-id")
     except httpx.HTTPError:

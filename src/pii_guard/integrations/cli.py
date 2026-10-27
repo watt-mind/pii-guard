@@ -2,9 +2,19 @@
 
 ```
 pii-guard connect pi [--gateway URL] [--model ID ...] [--mode fast|audit] [--language en]
-                     [--api-key VALUE] [--agent-dir DIR] [--dry-run | --check]
-pii-guard connect muse-code [--gateway URL] [--muse-dir DIR] [--model ID] [--dry-run | --check]
+                     [--api-key VALUE] [--agent-dir DIR] [--no-session-path]
+                     [--dry-run | --check]
+pii-guard connect muse-code [--gateway URL] [--muse-dir DIR] [--model ID] [--no-session-path]
+                            [--dry-run | --check]
 ```
+
+- Both write a gateway base URL with a stable vault session in its path,
+  ``http://127.0.0.1:8787/s/<session>/v1`` (LAB-1286): neither client can send
+  ``X-PII-Guard-Session``, and with the session in the URL the same value gets the same
+  placeholder in every turn and every conversation. The session already in the client's config
+  is kept (``connect`` stays idempotent); a new one is random. ``--no-session-path`` writes the
+  plain URL: the gateway then uses one session per ``prompt_cache_key`` (Muse sends one per
+  conversation), else one per client key.
 
 - ``connect pi`` merges a ``pii-guard`` provider into pi's ``models.json`` (a backup of the old
   file first; nothing is written when it's already up to date). ``--dry-run`` prints the diff
@@ -42,6 +52,7 @@ from pii_guard.integrations.common import (
     fetch_models,
     json_diff,
     run_check,
+    session_url,
     write_json,
 )
 
@@ -94,6 +105,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Muse Code's config dir (default: $XDG_CONFIG_HOME/muse or ~/.config/muse)",
     )
+    parser.add_argument(
+        "--session-path",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="put a stable vault session in the base URL, /s/<session>/v1 (default: on)",
+    )
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--dry-run", action="store_true", help="print the diff, write nothing")
     action.add_argument(
@@ -109,11 +126,21 @@ def _token() -> str | None:
     return token.get_secret_value() if token is not None else None
 
 
+def _gateway(args: argparse.Namespace, existing: object) -> str:
+    """The base URL to write: ``--gateway`` or the default, with the config's session kept."""
+    gateway = (args.gateway or default_gateway_url()).rstrip("/")
+    if not args.session_path:
+        return gateway
+    return session_url(gateway, existing if isinstance(existing, str) else None)
+
+
 def _pi(args: argparse.Namespace, out: list[str]) -> int:
     path = pi.config_path(args.agent_dir)
     if args.check:
         return _pi_check(path, args, out)
-    gateway = (args.gateway or default_gateway_url()).rstrip("/")
+    existing, old = pi.load(path)
+    ours = (existing.get("providers") or {}).get(pi.PROVIDER_ID)
+    gateway = _gateway(args, ours.get("baseUrl") if isinstance(ours, dict) else None)
     token = _token()
     models = list(dict.fromkeys(args.model or []))
     if not models:
@@ -129,7 +156,6 @@ def _pi(args: argparse.Namespace, out: list[str]) -> int:
     entry = pi.provider_entry(
         gateway, models, mode=args.mode, language=args.language, api_key=api_key
     )
-    existing, old = pi.load(path)
     new = pi.render(existing, old, entry)
     diff = json_diff(path, old, new)
     if args.dry_run:
@@ -143,6 +169,7 @@ def _pi(args: argparse.Namespace, out: list[str]) -> int:
         if backup is not None:
             out.append(f"backup: {backup}")
         out.append(f"wrote {path}: provider {pi.PROVIDER_ID!r}, {len(models)} model(s)")
+    out.append(f"gateway: {gateway}")
     out.append(
         f"next: pi --provider {pi.PROVIDER_ID} --model {models[0]}   "
         "(check it: pii-guard connect pi --check)"
@@ -179,7 +206,8 @@ def _muse(args: argparse.Namespace, out: list[str]) -> int:
     existing, old = muse_code.load(path)
     if args.check:
         return _muse_check(path, existing, args, out)
-    gateway = (args.gateway or default_gateway_url()).rstrip("/")
+    transport = existing.get("endpoint_transport")
+    gateway = _gateway(args, transport.get("base_url") if isinstance(transport, dict) else None)
     new = muse_code.render(existing, old, gateway)
     diff = json_diff(path, old, new)
     if args.dry_run:

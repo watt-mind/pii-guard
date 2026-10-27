@@ -62,7 +62,9 @@ def test_openai_client_non_streaming_round_trip() -> None:
     assert "teszt.elek@example.com" in content
     assert "+36 30 123 4567" in content
     assert PLACEHOLDER_RE.search(content) is None
-    assert raw.headers["x-pii-guard-session"].startswith("s_")
+    # No session header: the client's default session (LAB-1286), a derived id.
+    assert raw.headers["x-pii-guard-session"].startswith("d_")
+    assert raw.headers["x-pii-guard-session-source"] == "default"
     assert raw.headers["x-pii-guard-mode"] == "audit"
     assert raw.headers["x-pii-guard-unresolved"] == "0"
     assert int(raw.headers["x-pii-guard-masked"]) >= 4
@@ -265,7 +267,8 @@ def test_second_turn_detects_only_the_new_message(stream: bool) -> None:
     assert leaked_values(upstream.requests[1].content) == []
 
 
-def test_without_session_header_each_request_is_a_new_session() -> None:
+def test_without_session_header_requests_share_the_default_session() -> None:
+    # LAB-1286: a client that can't send the header still keeps its placeholders.
     upstream = MockUpstream()
     with TestClient(make_app(upstream)) as http:
         client = openai_client(http)
@@ -275,8 +278,10 @@ def test_without_session_header_each_request_is_a_new_session() -> None:
         b = client.chat.completions.with_raw_response.create(
             model="m", messages=conversation_turn_one()
         )
-    assert a.headers["x-pii-guard-session"] != b.headers["x-pii-guard-session"]
-    assert b.headers["x-pii-guard-cache-hits"] == "0"
+    assert a.headers["x-pii-guard-session"] == b.headers["x-pii-guard-session"]
+    assert b.headers["x-pii-guard-session-source"] == "default"
+    assert b.headers["x-pii-guard-cache-misses"] == "0"
+    assert upstream.bodies[0]["messages"] == upstream.bodies[1]["messages"]
 
 
 # --- AC5: modes, timeouts, fail closed -----------------------------------------------------
@@ -509,7 +514,7 @@ def test_upstream_error_passes_status_without_content(stream: bool) -> None:
     assert error["upstream_type"] == "invalid_request_error"
     assert "upstream_code" not in error  # not a safe token
     assert "PERSON" not in response.text and "Teszt" not in response.text
-    assert response.headers["x-pii-guard-session"].startswith("s_")
+    assert response.headers["x-pii-guard-session"].startswith("d_")
 
 
 def test_upstream_unreachable_is_502() -> None:

@@ -22,6 +22,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import secrets
 import time
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
@@ -335,14 +336,17 @@ def _send(
     if scenario.tools:
         body["tools"] = TOOLS
     headers = {"X-PII-Guard-Mode": scenario.mode, "X-PII-Guard-Language": scenario.language}
+    url = "/v1/chat/completions"
     if session:
         headers["X-PII-Guard-Session"] = session
+    else:  # a new vault session, not the gateway's shared default one (LAB-1286)
+        url = f"/s/scenario_{secrets.token_hex(8)}/v1/chat/completions"
     expected = f"Echo: {scenario.text if turn == 1 else scenario.follow_up}"
     started = time.perf_counter()
     outcome = Outcome(scenario, 0, expected=expected, turn=turn)
     try:
         if scenario.stream:
-            with client.stream("POST", "/v1/chat/completions", json=body, headers=headers) as r:
+            with client.stream("POST", url, json=body, headers=headers) as r:
                 outcome.status = r.status_code
                 outcome.headers = dict(r.headers)
                 if r.status_code < 400:
@@ -351,7 +355,7 @@ def _send(
                     r.read()
                     outcome.error = _error_code(r)
         else:
-            r = client.post("/v1/chat/completions", json=body, headers=headers)
+            r = client.post(url, json=body, headers=headers)
             outcome.status = r.status_code
             outcome.headers = dict(r.headers)
             if r.status_code < 400:

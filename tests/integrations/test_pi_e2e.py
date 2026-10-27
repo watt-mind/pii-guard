@@ -43,4 +43,8 @@ def test_pi_through_gateway_masks_upstream_and_restores_files(pi_bin: Path) -> N
     assert sorted(result.restored_in_files) == sorted(result.gold_checked)
     assert result.placeholders_in_files == 0
     assert set(load_gold()["rules"]) <= set(result.gold_checked)
+    # One vault session from the connect path URL: each value one placeholder (LAB-1286).
+    assert result.session_sources == {"path": result.requests}
+    assert result.sessions == 1
+    assert result.gold_unstable == 0
     assert result.ok

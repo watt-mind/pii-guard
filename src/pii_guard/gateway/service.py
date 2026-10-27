@@ -65,6 +65,12 @@ from pii_guard.gateway.request import (
     collect_texts,
 )
 from pii_guard.gateway.restore import restore_completion, restore_text
+from pii_guard.gateway.sessions import (
+    SESSION_HEADER,
+    SESSION_SOURCE_HEADER,
+    SessionSource,
+    resolve_session,
+)
 from pii_guard.gateway.stream import DONE, SseRestorer, error_event, iter_sse_data, sse_event
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
@@ -83,6 +89,7 @@ __all__ = [
     "MODE_HEADER",
     "REQUEST_ID_HEADER",
     "SESSION_HEADER",
+    "SESSION_SOURCE_HEADER",
     "Gateway",
     "UpstreamError",
     "UpstreamNotConfiguredError",
@@ -90,7 +97,6 @@ __all__ = [
 
 logger = logging.getLogger("pii_guard.gateway")
 
-SESSION_HEADER = "X-PII-Guard-Session"
 REQUEST_ID_HEADER = "X-PII-Guard-Request-Id"
 MODE_HEADER = "X-PII-Guard-Mode"
 LANGUAGE_HEADER = "X-PII-Guard-Language"
@@ -98,7 +104,6 @@ LANGUAGE_HEADER = "X-PII-Guard-Language"
 # masked answer), for UIs that show the boundary. Masked text only, never the values.
 ECHO_HEADER = "X-PII-Guard-Echo"
 
-_SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _LANGUAGE_RE = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})?$")
 _SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _MAX_ERROR_BODY = 65_536
@@ -141,6 +146,7 @@ class RequestStats:
     image_kept: Counter[str] = field(default_factory=Counter)
     image_ocr: bool | None = None
     image_ms: float = 0.0
+    session_source: SessionSource | None = None
 
     def headers(self, session_id: str) -> dict[str, str]:
         out = {
@@ -150,6 +156,8 @@ class RequestStats:
             "X-PII-Guard-Cache-Misses": str(self.cache_misses),
             "X-PII-Guard-Masked": str(sum(self.masked.values())),
         }
+        if self.session_source is not None:
+            out[SESSION_SOURCE_HEADER] = self.session_source.value
         if self.mode_alias:
             out["Deprecation"] = "true"
             out["Warning"] = (
@@ -369,15 +377,21 @@ class Gateway:
             raise InvalidChatRequestError(f"{ECHO_HEADER} must be 'masked'")
         return True
 
-    def _session(self, headers: Mapping[str, str]) -> tuple[VaultSession, bool]:
-        raw = headers.get(SESSION_HEADER)
-        if raw is None or not raw.strip():
-            return self.vault.session(), True
-        if not _SESSION_RE.match(raw.strip()):
-            raise InvalidChatRequestError(f"{SESSION_HEADER} is malformed")
-        # Unknown or expired -> SessionNotFoundError (404). Start a new conversation without
-        # the header; the mapping is gone, so a silent new session would be a different one.
-        return self.vault.session(raw.strip()), False
+    def _session(
+        self,
+        headers: Mapping[str, str],
+        body: Mapping[str, Any],
+        path_session: str | None,
+        stats: RequestStats,
+        trace: CallTrace,
+    ) -> tuple[VaultSession, bool]:
+        """The request's vault session: header, URL path, ``prompt_cache_key``, default
+        (:mod:`pii_guard.gateway.sessions`). Recorded on ``stats`` and ``trace``."""
+        session, created, source = resolve_session(self.vault, headers, body, path_session)
+        stats.session_source = source
+        trace.session_id, trace.session_new = session.session_id, created
+        trace.session_source = source.value
+        return session, created
 
     def _upstream_url(self) -> str:
         base = self.settings.upstream_base_url
@@ -595,13 +609,20 @@ class Gateway:
         *,
         max_text_chars: int | None = None,
         received_at: float | None = None,
+        path_session: str | None = None,
     ) -> tuple[Response, RequestStats]:
-        """Mask, forward, restore. ``received_at`` (``perf_counter``) starts the timer."""
+        """Mask, forward, restore. ``received_at`` (``perf_counter``) starts the timer;
+        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL."""
         timer = RequestTimer(received_at)
         trace = CallTrace(self.observability, timer, body)
         try:
             response, stats = await self._chat_completions(
-                body, headers, max_text_chars=max_text_chars, timer=timer, trace=trace
+                body,
+                headers,
+                max_text_chars=max_text_chars,
+                timer=timer,
+                trace=trace,
+                path_session=path_session,
             )
         except BaseException as exc:
             trace.fail(exc)
@@ -621,6 +642,7 @@ class Gateway:
         max_text_chars: int | None,
         timer: RequestTimer,
         trace: CallTrace,
+        path_session: str | None = None,
     ) -> tuple[Response, RequestStats]:
         url = self._upstream_url()
         mode = self._mode(headers)
@@ -645,8 +667,7 @@ class Gateway:
                 f"an inline image is larger than {self.config.max_image_bytes} bytes"
             )
         detector = self.detectors[mode]
-        session, created = self._session(headers)
-        trace.session_id, trace.session_new = session.session_id, created
+        session, created = self._session(headers, body, path_session, stats, trace)
         stream = bool(body.get("stream"))
         stats.stream = stream
         stats.texts = len(collected.slots)

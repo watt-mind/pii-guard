@@ -17,6 +17,7 @@ from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect import stack
 from pii_guard.detect.stack import rest_detector_names
+from pii_guard.gateway.sessions import SessionPathMiddleware
 from pii_guard.observability import (
     Observability,
     ObservabilitySettings,
@@ -103,6 +104,9 @@ def create_app(
         return {"status": "ok", "version": __version__}
 
     include_routers(app)
+    # Innermost: /s/<session>/v1/... reaches the /v1 routes with that vault session (LAB-1286);
+    # the Host, loopback and token checks see the URL as sent.
+    app.add_middleware(SessionPathMiddleware)
 
     # Outermost last: Host check, then (full only) loopback sockets, then the token.
     token = settings.api_token

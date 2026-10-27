@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -43,9 +44,11 @@ def test_write_new_settings_then_idempotent(tmp_path: Path) -> None:
     code, out = run(*args)
     assert code == 0 and "wrote" in out and "PII_GUARD_GATEWAY_MODE=fast" in out
     data = json.loads((tmp_path / "settings.json").read_text())
+    base_url = data["endpoint_transport"]["base_url"]
+    assert re.fullmatch(r"http://127\.0\.0\.1:8787/s/c_[0-9a-f]{32}/v1", base_url)
     assert data == {
         "schema_version": 1,
-        "endpoint_transport": {"base_url": "http://127.0.0.1:8787/v1", "auth": "bearer"},
+        "endpoint_transport": {"base_url": base_url, "auth": "bearer"},
     }
     code, out = run(*args)
     assert code == 0 and "already up to date" in out
@@ -63,11 +66,22 @@ def test_existing_settings_are_kept_and_backed_up(tmp_path: Path) -> None:
     assert data["telemetry"] == {"enabled": False}
     assert data["endpoint_transport"] == {
         "proxy": "http://proxy.test:3128",
-        "base_url": "http://127.0.0.1:8787/v1",
+        "base_url": data["endpoint_transport"]["base_url"],
         "auth": "bearer",
     }
+    assert data["endpoint_transport"]["base_url"].startswith("http://127.0.0.1:8787/s/c_")
     (backup,) = tmp_path.glob("settings.json.pii-guard-backup-*")
     assert backup.read_text() == EXISTING
+    run(
+        "muse-code",
+        "--gateway",
+        "http://127.0.0.1:8787/v1",
+        "--muse-dir",
+        str(tmp_path),
+        "--no-session-path",
+    )
+    plain = json.loads(path.read_text())["endpoint_transport"]["base_url"]
+    assert plain == "http://127.0.0.1:8787/v1"
 
 
 def test_bad_settings_are_refused(tmp_path: Path) -> None:
@@ -109,6 +123,7 @@ def test_connect_and_check_through_a_real_gateway(
     assert f"model        : {SCRIPTED_MODEL}" in out
     assert "ok           : 3 value(s) masked" in out
     assert "gateway mode : fast" in out
+    assert "session      : path " in out
     received = out.split("you got back : ")[1].splitlines()[0]
     model_saw = out.split("model saw    : ")[1].splitlines()[0]
     for value in CANARY_VALUES:
