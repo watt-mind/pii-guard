@@ -7,7 +7,10 @@ Order of operations (fail closed at every step, ADR 0006):
 2. detect every text (cache first; misses run concurrently, under one per-request timeout),
    then add the session's pre-loaded known values (:mod:`pii_guard.detect.known`), which win
    their conflicts and are masked even for a ``keep`` type (a ``block`` type still refuses);
-3. mask with the conversation's vault session: spans first, then a sweep for every value the
+3. widen a name detected only in part to a full name known from this request or the session
+   (:func:`~pii_guard.detect.known.widen_request`: ``1,Jane Placeholder`` with only the surname
+   detected becomes one span), then
+   mask with the conversation's vault session: spans first, then a sweep for every value the
    session already knows (so a value found in one message is masked in all of them); inline
    images are masked with the visual pipeline (SAM 3.1 + OCR text through this mode's
    detectors + policies) and replaced by a masked PNG data URL. With placeholder labels

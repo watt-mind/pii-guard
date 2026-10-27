@@ -51,7 +51,7 @@ def post(http: TestClient, messages: list[dict[str, str]], **headers: str):
     return http.post(
         "/v1/chat/completions",
         json={"model": "m", "messages": messages},
-        headers={"X-PII-Guard-Mode": "strict", **headers},
+        headers={"X-PII-Guard-Mode": "audit", **headers},
     )
 
 
