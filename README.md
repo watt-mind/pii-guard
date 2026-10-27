@@ -225,7 +225,6 @@ links: `#mask`, `#chat`, `#images`, `#benchmarks`):
 | **Images** | **Benchmarks** |
 | ![Images: a fictional ID card with the face, signature and ID numbers blacked out](docs/assets/demo/3-images.webp) | ![Benchmarks: share of personal values let through, pii-guard against open-source tools](docs/assets/demo/4-benchmarks.webp) |
 
-Known gap: on the specimen ID card the printed surname is not masked yet (tracked separately).
 At phone width: [Mask at 375 px](docs/assets/demo/5-mask-mobile.webp).
 
 ### Gateway: drop-in for any OpenAI-compatible client
