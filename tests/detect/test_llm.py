@@ -297,7 +297,10 @@ def test_request_payload_and_headers() -> None:
 
 def test_optional_fields_are_omitted() -> None:
     rec = Recorder(completion(entities_json()))
-    make(rec, api_key="", json_mode=False, max_tokens=None).detect("Szia!")
+    # Keyless is allowed only on loopback (LAB-1290): a self-hosted model on this machine.
+    make(
+        rec, api_key="", base_url="http://127.0.0.1:8000/v1", json_mode=False, max_tokens=None
+    ).detect("Szia!")
     body = rec.payloads()[0]
     assert "reasoning_effort" not in body
     assert "response_format" not in body

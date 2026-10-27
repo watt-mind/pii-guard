@@ -5,7 +5,9 @@
   ``PII_GUARD_DETECTORS``. A configured (``PII_GUARD_NER_MODEL``) but missing NER raises
   ``DetectionError`` at startup.
 - ``audit`` (formerly ``strict``): the fast detectors + the LLM detector, resolved by
-  :class:`~pii_guard.detect.pipeline.DetectionPipeline`.
+  :class:`~pii_guard.detect.pipeline.DetectionPipeline`. Without an LLM detector key it is
+  *unavailable* (LAB-1290): :meth:`ModeDetector.require_available` refuses every audit request
+  with ``503 detection_unavailable`` before any detector runs, so no text (and no image) is sent.
 
 Every detector's output is checked by :class:`~pii_guard.detect.stack.CheckedDetector` (a list of
 spans whose offsets match the text, else ``DetectionError``), as in the REST API.
@@ -30,7 +32,13 @@ from dataclasses import dataclass
 from pii_guard.config import Settings
 from pii_guard.detect import stack
 from pii_guard.detect.pipeline import DetectionPipeline
-from pii_guard.detect.stack import CheckedDetector, build_detectors, check_spans
+from pii_guard.detect.stack import (
+    CheckedDetector,
+    DetectionUnavailableError,
+    build_detectors,
+    check_spans,
+    unavailable_reason,
+)
 from pii_guard.gateway.config import GatewayConfig, Mode
 from pii_guard.policy import PolicySet
 from pii_guard.types import Detector, Span
@@ -70,12 +78,22 @@ class ModeDetector:
     detector: Detector
     config_id: str
     policies: PolicySet
+    #: Why this mode can't run as configured (audit without an LLM key), else ``None``.
+    unavailable: str | None = None
+
+    def require_available(self) -> None:
+        """Raise :class:`DetectionUnavailableError` when the mode is unavailable. The gateway
+        calls this first, before detection, image masking or any request."""
+        if self.unavailable is not None:
+            raise DetectionUnavailableError(self.unavailable)
 
     def detect(self, text: str, language: str) -> tuple[list[Span], dict[str, float]]:
         """Spans to mask plus per-detector timings (ms). Runs in a worker thread.
 
-        Raises :class:`~pii_guard.policy.BlockedEntityError` if a span has a ``block`` policy.
+        Raises :class:`~pii_guard.policy.BlockedEntityError` if a span has a ``block`` policy,
+        :class:`DetectionUnavailableError` if the mode is unavailable.
         """
+        self.require_available()
         token = _timings.set({})
         try:
             spans = self.detector.detect(text, language)
@@ -127,7 +145,13 @@ def build_mode_detectors(
         if mode is Mode.AUDIT:
             parts.append(f"model={llm_model}")
         parts.append("policies=" + policies.fingerprint())
-        return ModeDetector(mode, pipeline, f"{mode.value}:" + ";".join(parts), policies)
+        return ModeDetector(
+            mode,
+            pipeline,
+            f"{mode.value}:" + ";".join(parts),
+            policies,
+            unavailable_reason(detectors),
+        )
 
     detectors = {
         Mode.FAST: build(Mode.FAST, base),
@@ -138,6 +162,13 @@ def build_mode_detectors(
         [d.name for d in base],
         [*(d.name for d in base), llm_detector.name],
     )
+    for mode_detector in detectors.values():
+        if mode_detector.unavailable is not None:
+            logger.warning(
+                "gateway %s mode unavailable (requests get 503 detection_unavailable): %s",
+                mode_detector.mode.value,
+                mode_detector.unavailable,
+            )
     return detectors
 
 
