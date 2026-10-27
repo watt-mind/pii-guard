@@ -1,0 +1,189 @@
+{
+  "dataset": "tab-echr",
+  "title": "TAB: Text Anonymization Benchmark (ECHR)",
+  "url": "https://github.com/NorskRegnesentral/text-anonymization-benchmark",
+  "revision": "558e09e26d6b36f5f78440074e6a233946d98bd9",
+  "files": [
+    {
+      "path": "echr_test.json",
+      "sha256": "cd0f0f15f84a8739654c7cf30c6be8ce27b051ef73974d39d792a0cb8c846379"
+    }
+  ],
+  "license": "MIT (annotations); texts are public ECHR judgments from HUDOC",
+  "license_url": "https://github.com/NorskRegnesentral/text-anonymization-benchmark/blob/558e09e26d6b36f5f78440074e6a233946d98bd9/LICENSE.txt",
+  "attribution": "Pilán et al. (2022), Norsk Regnesentral / University of Oslo",
+  "synthetic": false,
+  "rows_committed": false,
+  "source_split": "test",
+  "split": "test",
+  "seed": 2026,
+  "sample_rule": "per language, rows ordered by sha256('<seed>:<uid>'), first n convertible",
+  "label_mapping": [
+    {
+      "label": "PERSON",
+      "pii_guard_type": "PERSON",
+      "per_language": {},
+      "part_only": false,
+      "note": "every person mention, whatever TAB's DIRECT/QUASI/NO_MASK decision"
+    },
+    {
+      "label": "ORG",
+      "pii_guard_type": "ORGANIZATION",
+      "per_language": {},
+      "part_only": false,
+      "note": "ORGANIZATION is a keep type: scored for recall, never a leak"
+    },
+    {
+      "label": "LOC",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": "places are mostly courts, towns and countries: policy-excluded"
+    },
+    {
+      "label": "DATETIME",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "CODE",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": "mostly application and case numbers: policy-excluded"
+    },
+    {
+      "label": "DEM",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "QUANTITY",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "MISC",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    }
+  ],
+  "merge_rule": "adjacent spans of one mapped type separated by <= 3 spaces/tabs/commas",
+  "notes": [
+    "Real documents naming real people: fixture files are rebuilt locally by fetch and never committed; no LLM or remote model is run on them.",
+    "Documents are long (median about 3,900 characters)."
+  ],
+  "languages": {
+    "en": {
+      "requested": 40,
+      "documents": 40,
+      "rows_in_split": 127,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 667,
+        "PERSON": 381
+      },
+      "policy_excluded": {
+        "CODE": 111,
+        "DATETIME": 857,
+        "DEM": 170,
+        "LOC": 177,
+        "MISC": 110,
+        "QUANTITY": 83
+      },
+      "unknown_labels": {},
+      "uids": [
+        "001-82750",
+        "001-57849",
+        "001-83404",
+        "001-85661",
+        "001-59853",
+        "001-60736",
+        "001-87512",
+        "001-85728",
+        "001-76453",
+        "001-79713",
+        "001-58086",
+        "001-90200",
+        "001-79392",
+        "001-94975",
+        "001-58095",
+        "001-57899",
+        "001-57990",
+        "001-79501",
+        "001-67071",
+        "001-78293",
+        "001-72664",
+        "001-57871",
+        "001-89128",
+        "001-61332",
+        "001-91088",
+        "001-91290",
+        "001-84580",
+        "001-80478",
+        "001-90575",
+        "001-79434",
+        "001-83331",
+        "001-88836",
+        "001-68178",
+        "001-59527",
+        "001-90234",
+        "001-87456",
+        "001-89821",
+        "001-76303",
+        "001-57642",
+        "001-159913"
+      ],
+      "text_sha256": [
+        "ef01a9ef3dd2e4d736569f45a004f1419fb449e938e488c789eea7b518e087a3",
+        "d59df50b7feabf6df48ded6ae475237d9b51650a6127bbd553abcb9b24fade5e",
+        "a25545462960b653f77e98c93927a6ebd98c20e65d15d064ee11771fbdcb3db1",
+        "14acb7a76ee9d4d1e36ce63d19006ab75e687ce8529fd701bb368fb16a7576be",
+        "dbd774cc32abc34c1e362b2705392528e93e7745779ffb0e2efb809554b0bac7",
+        "8555a840cf91d2e85d26fc1fa50138922901f6dcd46895b612045bd3a3ab3ef4",
+        "da8ae17a86aea8f0124db91b4538b3e7aa5fa08c904f9bd03a8703ec6677ab6e",
+        "ebf472a760fd0d438dfeb89b38c342fa8e625acf31540bd6da5e98e229be3afe",
+        "9f859d91d5c90da6115159b57096b38f18b77e3f2b23d15d96309f54cc74772b",
+        "3140d55e2bb4fd86a6df644cc9167596013f5c3a40003603ee74efcada973492",
+        "15d71f91ee54e93ab415dcc9854dbb8e11fef067dd4e30d0dca45f80def751c0",
+        "86422efc7bd84f12d5c04b61c744edd2eac586ea9a796f6da5afa3cb44912d07",
+        "092d80521225e949662e539b2514c73f5d19394bdc397105eb336ed8750335cd",
+        "9b56380d387e5a399b2116afe471bc10146d22bfb716c5d8422a956bb2f4ee97",
+        "e19ed1a9a7d5539883aa2a8ffd8641946759f9335a4b9d3bd8690da3bdd92e2c",
+        "3c598afbb689c3438870eead8db63edba858e2303be6760c99617776377752ca",
+        "a8904e80a557aa51e8cc51dc0209492c8cd360b43dad2bde56571883097d121c",
+        "e7f0b868f351b2d91332223896ca4bd10844f3dd31234f44001e42830afeb291",
+        "9a1e7952407174c1fe30b6226c75784be985624da38a3b2985bb45dc9c5b9bcf",
+        "cdc3a7682244285abc4c2612fe9e7345a6c2300f7fb6f31fee94378dc8a1ed61",
+        "68582f93bd325bc095bfaf8d7938add3c6ca10fb37bf75bd3697c4423a2fbed9",
+        "02dbf57ae5745a20f3a4f7e3fa10773b2c67ee4e8436df9f731d0ddbe45a9ea8",
+        "53f1803cf4fa3ab363689ba427a817116c22c95441d685e653c2cba24d885187",
+        "73aedda96161c83e44a7f200469596e76ce4485bdd33c1b24c850bb754a38dc3",
+        "8e7a41f27d4dd3dddb3fcc1356af8e705cb1559bdb03e4fb6a958870f1ec4ebc",
+        "aa797cab46b2ec548aae3141171616b9b4c04f4f95cc58647d847c3eeeabf4e0",
+        "22d0ca8892841bcf0515a028821cdbbb1e8994885bdab2f45f525bc9c2891ebe",
+        "042cfa8178a6e300a03a1ed373d92787b67d7c1888410b35905bb83301e94ee4",
+        "ec726afddbe3bede6a52dcd4d519cf311f912d66556a81b0f829fc3f8bf7080b",
+        "7b8f66ab81f084a4b8243255b49eaeeb77b7d290b2f195fdfbed10758a66a79c",
+        "73ad2bd33a7be81518fd930f364f5d4052cba91fde1c146337643e4bf3deb517",
+        "1eb84ff2b31757790ff4ec1673d5e25218b7f51b37654caf7fac6b9984ebf32c",
+        "581fc36bc261c5666ee94b4ddd23090f40057834cfc2939a3a75845c24921aa5",
+        "e5f64d97275c0f76a70702d1ddeb9598e07d18599b519454158a449b3463030c",
+        "ead7829e9e3fb8c00b59134313d985621190bd57724c559bbf59cd58f33ebdf7",
+        "93a78701f5993dc7a576db25525c57c6f1c8efa0a5e94e91daae30497cf1ae5c",
+        "49a55ed3412e28eb174094fba9af8006322e7e729f7acb7a197e674100d5f060",
+        "67e869f152ea89a91204f12fcaeaf0cdb688b67a68845afe6722e2b4f69003e9",
+        "cef5fed0bb35f8722633768c20ea8c9d353b2055ea2bce57a29bcc1d0576fa6d",
+        "5ee9d0a38971267230950f22714c723bd3efcd50fb9e85a681b9527eb7765217"
+      ]
+    }
+  }
+}

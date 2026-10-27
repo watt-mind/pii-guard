@@ -1,0 +1,89 @@
+{
+  "run_id": "2026-10-27-datasets-tab-echr-llm-guard",
+  "dataset": "tab-echr",
+  "split": "test",
+  "system": {
+    "key": "llm-guard",
+    "label": "LLM Guard"
+  },
+  "fixtures": [
+    {
+      "path": "data/datasets/fixtures/tab-echr/en-tab-echr.jsonl",
+      "sha256": "dbb8e2ca1b9eb73701651cc0f1aebe6fb79083b81f17c63720e0d78caa1eb7e1"
+    }
+  ],
+  "summary": {
+    "documents": 40,
+    "resamples": 1000,
+    "seed": 1226,
+    "leak": {
+      "value": 0.373626,
+      "low": 0.259254,
+      "high": 0.458504
+    },
+    "precision": {
+      "value": 0.951648,
+      "low": 0.890624,
+      "high": 0.993746
+    },
+    "recall": {
+      "value": 0.185115,
+      "low": 0.145183,
+      "high": 0.228722
+    },
+    "f1": {
+      "value": 0.30994,
+      "low": 0.251533,
+      "high": 0.368137
+    },
+    "over_masking": {
+      "value": 0.0,
+      "low": 0.0,
+      "high": 0.0
+    },
+    "p50_ms": 587.686,
+    "p95_ms": 4005.192
+  },
+  "documents": [
+    {"id":"tab-echr-001-82750","language":"en","gold":23,"tp_gold":2,"pred":7,"tp_pred":7,"values":2,"leaked":0,"masked":7,"over_masked":0,"detect_ms":380.024},
+    {"id":"tab-echr-001-57849","language":"en","gold":70,"tp_gold":9,"pred":18,"tp_pred":18,"values":19,"leaked":7,"masked":18,"over_masked":0,"detect_ms":3963.036},
+    {"id":"tab-echr-001-83404","language":"en","gold":13,"tp_gold":3,"pred":6,"tp_pred":6,"values":3,"leaked":0,"masked":6,"over_masked":0,"detect_ms":510.183},
+    {"id":"tab-echr-001-85661","language":"en","gold":6,"tp_gold":2,"pred":4,"tp_pred":4,"values":2,"leaked":0,"masked":4,"over_masked":0,"detect_ms":189.089},
+    {"id":"tab-echr-001-59853","language":"en","gold":22,"tp_gold":2,"pred":4,"tp_pred":4,"values":6,"leaked":4,"masked":4,"over_masked":0,"detect_ms":911.486},
+    {"id":"tab-echr-001-60736","language":"en","gold":39,"tp_gold":3,"pred":5,"tp_pred":5,"values":4,"leaked":1,"masked":5,"over_masked":0,"detect_ms":1694.463},
+    {"id":"tab-echr-001-87512","language":"en","gold":10,"tp_gold":3,"pred":6,"tp_pred":6,"values":3,"leaked":0,"masked":6,"over_masked":0,"detect_ms":969.007},
+    {"id":"tab-echr-001-85728","language":"en","gold":8,"tp_gold":2,"pred":8,"tp_pred":8,"values":2,"leaked":0,"masked":8,"over_masked":0,"detect_ms":288.349},
+    {"id":"tab-echr-001-76453","language":"en","gold":40,"tp_gold":14,"pred":14,"tp_pred":14,"values":16,"leaked":10,"masked":14,"over_masked":0,"detect_ms":4806.155},
+    {"id":"tab-echr-001-79713","language":"en","gold":19,"tp_gold":2,"pred":8,"tp_pred":8,"values":2,"leaked":0,"masked":8,"over_masked":0,"detect_ms":488.551},
+    {"id":"tab-echr-001-58086","language":"en","gold":36,"tp_gold":16,"pred":32,"tp_pred":32,"values":23,"leaked":7,"masked":32,"over_masked":0,"detect_ms":2293.632},
+    {"id":"tab-echr-001-90200","language":"en","gold":41,"tp_gold":3,"pred":7,"tp_pred":7,"values":8,"leaked":5,"masked":7,"over_masked":0,"detect_ms":2937.209},
+    {"id":"tab-echr-001-79392","language":"en","gold":41,"tp_gold":6,"pred":15,"tp_pred":15,"values":16,"leaked":7,"masked":15,"over_masked":0,"detect_ms":6186.83},
+    {"id":"tab-echr-001-94975","language":"en","gold":28,"tp_gold":4,"pred":6,"tp_pred":6,"values":3,"leaked":1,"masked":6,"over_masked":0,"detect_ms":609.475},
+    {"id":"tab-echr-001-58095","language":"en","gold":48,"tp_gold":9,"pred":16,"tp_pred":16,"values":13,"leaked":6,"masked":16,"over_masked":0,"detect_ms":2284.491},
+    {"id":"tab-echr-001-57899","language":"en","gold":47,"tp_gold":9,"pred":19,"tp_pred":19,"values":17,"leaked":10,"masked":19,"over_masked":0,"detect_ms":3084.086},
+    {"id":"tab-echr-001-57990","language":"en","gold":60,"tp_gold":6,"pred":16,"tp_pred":16,"values":24,"leaked":18,"masked":16,"over_masked":0,"detect_ms":3141.843},
+    {"id":"tab-echr-001-79501","language":"en","gold":24,"tp_gold":2,"pred":5,"tp_pred":5,"values":2,"leaked":0,"masked":5,"over_masked":0,"detect_ms":565.896},
+    {"id":"tab-echr-001-67071","language":"en","gold":46,"tp_gold":5,"pred":10,"tp_pred":10,"values":5,"leaked":0,"masked":10,"over_masked":0,"detect_ms":3496.082},
+    {"id":"tab-echr-001-78293","language":"en","gold":20,"tp_gold":11,"pred":36,"tp_pred":36,"values":7,"leaked":0,"masked":36,"over_masked":0,"detect_ms":559.345},
+    {"id":"tab-echr-001-72664","language":"en","gold":13,"tp_gold":1,"pred":2,"tp_pred":2,"values":5,"leaked":4,"masked":2,"over_masked":0,"detect_ms":625.782},
+    {"id":"tab-echr-001-57871","language":"en","gold":50,"tp_gold":19,"pred":49,"tp_pred":48,"values":17,"leaked":4,"masked":49,"over_masked":0,"detect_ms":3160.992},
+    {"id":"tab-echr-001-89128","language":"en","gold":16,"tp_gold":2,"pred":5,"tp_pred":5,"values":2,"leaked":0,"masked":5,"over_masked":0,"detect_ms":514.426},
+    {"id":"tab-echr-001-61332","language":"en","gold":9,"tp_gold":2,"pred":4,"tp_pred":2,"values":2,"leaked":1,"masked":4,"over_masked":0,"detect_ms":377.318},
+    {"id":"tab-echr-001-91088","language":"en","gold":7,"tp_gold":2,"pred":8,"tp_pred":4,"values":2,"leaked":0,"masked":8,"over_masked":0,"detect_ms":139.717},
+    {"id":"tab-echr-001-91290","language":"en","gold":12,"tp_gold":3,"pred":12,"tp_pred":12,"values":3,"leaked":0,"masked":12,"over_masked":0,"detect_ms":380.502},
+    {"id":"tab-echr-001-84580","language":"en","gold":10,"tp_gold":2,"pred":5,"tp_pred":5,"values":3,"leaked":1,"masked":5,"over_masked":0,"detect_ms":215.022},
+    {"id":"tab-echr-001-80478","language":"en","gold":18,"tp_gold":7,"pred":13,"tp_pred":13,"values":7,"leaked":2,"masked":13,"over_masked":0,"detect_ms":359.163},
+    {"id":"tab-echr-001-90575","language":"en","gold":7,"tp_gold":2,"pred":8,"tp_pred":4,"values":2,"leaked":0,"masked":8,"over_masked":0,"detect_ms":180.886},
+    {"id":"tab-echr-001-79434","language":"en","gold":11,"tp_gold":2,"pred":6,"tp_pred":6,"values":2,"leaked":0,"masked":6,"over_masked":0,"detect_ms":340.646},
+    {"id":"tab-echr-001-83331","language":"en","gold":26,"tp_gold":2,"pred":6,"tp_pred":6,"values":2,"leaked":0,"masked":6,"over_masked":0,"detect_ms":445.018},
+    {"id":"tab-echr-001-88836","language":"en","gold":15,"tp_gold":2,"pred":5,"tp_pred":5,"values":2,"leaked":0,"masked":5,"over_masked":0,"detect_ms":287.363},
+    {"id":"tab-echr-001-68178","language":"en","gold":26,"tp_gold":6,"pred":10,"tp_pred":10,"values":6,"leaked":1,"masked":10,"over_masked":0,"detect_ms":2511.6},
+    {"id":"tab-echr-001-59527","language":"en","gold":45,"tp_gold":3,"pred":18,"tp_pred":7,"values":5,"leaked":2,"masked":18,"over_masked":0,"detect_ms":2933.812},
+    {"id":"tab-echr-001-90234","language":"en","gold":22,"tp_gold":10,"pred":28,"tp_pred":28,"values":8,"leaked":1,"masked":28,"over_masked":0,"detect_ms":2666.955},
+    {"id":"tab-echr-001-87456","language":"en","gold":8,"tp_gold":3,"pred":5,"tp_pred":5,"values":3,"leaked":0,"masked":5,"over_masked":0,"detect_ms":224.519},
+    {"id":"tab-echr-001-89821","language":"en","gold":21,"tp_gold":2,"pred":5,"tp_pred":5,"values":2,"leaked":0,"masked":5,"over_masked":0,"detect_ms":475.613},
+    {"id":"tab-echr-001-76303","language":"en","gold":27,"tp_gold":4,"pred":8,"tp_pred":8,"values":5,"leaked":1,"masked":8,"over_masked":0,"detect_ms":1720.895},
+    {"id":"tab-echr-001-57642","language":"en","gold":46,"tp_gold":4,"pred":9,"tp_pred":9,"values":15,"leaked":9,"masked":9,"over_masked":0,"detect_ms":2972.144},
+    {"id":"tab-echr-001-159913","language":"en","gold":18,"tp_gold":3,"pred":7,"tp_pred":7,"values":3,"leaked":0,"masked":7,"over_masked":0,"detect_ms":413.666}
+  ]
+}

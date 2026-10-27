@@ -11,6 +11,7 @@ pii-guard eval injection --detectors rules,llm   # leak rate per prompt-injectio
 pii-guard eval ... --record SLUG [--record-extra FILE.json]  # also write a run record
 pii-guard eval record SCORECARD.json --slug SLUG  # run record(s) from a saved scorecard
 pii-guard eval report [--check]  # index.json, charts and docs/benchmarks.md from the records
+pii-guard eval datasets list|fetch|check|run  # registered datasets (docs/datasets.md)
 ```
 
 Fixtures are given as positional paths or with ``--fixtures`` (repeatable); either may
@@ -153,6 +154,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pii_guard.eval.injection import main as injection_main
 
         return injection_main(argv[1:])
+    if argv[:1] == ["datasets"]:  # ``pii-guard eval datasets``: registry, fetch, run
+        from pii_guard.eval.datasets.cli import main as datasets_main
+
+        return datasets_main(argv[1:])
     if argv[:1] == ["record"]:  # ``pii-guard eval record``: run records from a scorecard
         from pii_guard.eval.record import main as record_main
 

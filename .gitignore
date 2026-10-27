@@ -8,8 +8,9 @@ build/
 dist/
 wheels/
 
-# Virtual environments (uv creates .venv/)
+# Virtual environments (uv creates .venv/; .venv-baselines etc. hold conflicting extras)
 .venv/
+.venv-*/
 venv/
 env/
 
@@ -60,6 +61,7 @@ checkpoints/
 data/*
 !data/lexicons/
 data/lexicons/raw/
+# data/datasets/ holds dataset downloads and fetch-only fixtures (docs/datasets.md).
 eval/generated/
 eval/runs/
 # Real documents must never enter the repository, not even temporarily.

@@ -1,0 +1,87 @@
+{
+  "run_id": "2026-10-27-datasets-ai4privacy-audit-n10",
+  "dataset": "ai4privacy",
+  "split": "test",
+  "system": {
+    "key": "rules+ner:xlmr-base-v2-hn+llm:muse-spark-1.3@reasoning_effort=minimal",
+    "label": "pii-guard audit (rules + NER v2 + LLM)"
+  },
+  "fixtures": [
+    {
+      "path": "eval/fixtures/public/hu-ai4privacy.jsonl",
+      "sha256": "bd1901745c33316de08ada738e5d0c940f4b368eca7e1af70a5a689f9d8aa6c6"
+    },
+    {
+      "path": "eval/fixtures/public/en-ai4privacy.jsonl",
+      "sha256": "fcfc735dff402d7d018da51df7b7e6454cdd52c800ab9e9a261bd9a932d7c9e5"
+    },
+    {
+      "path": "eval/fixtures/public/de-ai4privacy.jsonl",
+      "sha256": "d0005390afa5e1a65e6b3b358e44c7c9eb858248e100f0b98e028b6e6253d818"
+    }
+  ],
+  "summary": {
+    "documents": 30,
+    "resamples": 1000,
+    "seed": 1226,
+    "leak": {
+      "value": 0.009804,
+      "low": 0.0,
+      "high": 0.031915
+    },
+    "precision": {
+      "value": 0.914286,
+      "low": 0.867257,
+      "high": 0.955771
+    },
+    "recall": {
+      "value": 0.970588,
+      "low": 0.933295,
+      "high": 1.0
+    },
+    "f1": {
+      "value": 0.941596,
+      "low": 0.902863,
+      "high": 0.971564
+    },
+    "over_masking": {
+      "value": 0.029703,
+      "low": 0.0,
+      "high": 0.056084
+    },
+    "p50_ms": 2217.715,
+    "p95_ms": 4320.566
+  },
+  "documents": [
+    {"id":"ai4privacy-21560334","language":"hu","gold":2,"tp_gold":2,"pred":2,"tp_pred":2,"values":2,"leaked":0,"masked":2,"over_masked":0,"detect_ms":1682.919},
+    {"id":"ai4privacy-21528555","language":"hu","gold":9,"tp_gold":9,"pred":10,"tp_pred":9,"values":9,"leaked":0,"masked":10,"over_masked":1,"detect_ms":2821.546},
+    {"id":"ai4privacy-21526205","language":"hu","gold":2,"tp_gold":2,"pred":2,"tp_pred":2,"values":2,"leaked":0,"masked":2,"over_masked":0,"detect_ms":3023.017},
+    {"id":"ai4privacy-21563153","language":"hu","gold":1,"tp_gold":1,"pred":1,"tp_pred":1,"values":1,"leaked":0,"masked":1,"over_masked":0,"detect_ms":4141.85},
+    {"id":"ai4privacy-21569116","language":"hu","gold":1,"tp_gold":1,"pred":1,"tp_pred":1,"values":1,"leaked":0,"masked":1,"over_masked":0,"detect_ms":4606.439},
+    {"id":"ai4privacy-21542252","language":"hu","gold":1,"tp_gold":1,"pred":1,"tp_pred":1,"values":1,"leaked":0,"masked":1,"over_masked":0,"detect_ms":3268.234},
+    {"id":"ai4privacy-21536683","language":"hu","gold":3,"tp_gold":3,"pred":3,"tp_pred":3,"values":3,"leaked":0,"masked":3,"over_masked":0,"detect_ms":1717.941},
+    {"id":"ai4privacy-21552800","language":"hu","gold":5,"tp_gold":4,"pred":6,"tp_pred":4,"values":5,"leaked":0,"masked":5,"over_masked":0,"detect_ms":3523.83},
+    {"id":"ai4privacy-21536863","language":"hu","gold":5,"tp_gold":5,"pred":6,"tp_pred":5,"values":5,"leaked":0,"masked":5,"over_masked":0,"detect_ms":3106.178},
+    {"id":"ai4privacy-21555867","language":"hu","gold":3,"tp_gold":3,"pred":4,"tp_pred":3,"values":3,"leaked":0,"masked":3,"over_masked":0,"detect_ms":4466.789},
+    {"id":"ai4privacy-20931162","language":"en","gold":6,"tp_gold":6,"pred":5,"tp_pred":5,"values":6,"leaked":0,"masked":5,"over_masked":0,"detect_ms":2693.059},
+    {"id":"ai4privacy-20991932","language":"en","gold":3,"tp_gold":3,"pred":3,"tp_pred":3,"values":3,"leaked":0,"masked":3,"over_masked":0,"detect_ms":2183.889},
+    {"id":"ai4privacy-21009335","language":"en","gold":1,"tp_gold":1,"pred":1,"tp_pred":1,"values":1,"leaked":0,"masked":1,"over_masked":0,"detect_ms":1485.604},
+    {"id":"ai4privacy-20976224","language":"en","gold":4,"tp_gold":4,"pred":4,"tp_pred":4,"values":4,"leaked":0,"masked":4,"over_masked":0,"detect_ms":1883.571},
+    {"id":"ai4privacy-20904253","language":"en","gold":7,"tp_gold":7,"pred":7,"tp_pred":7,"values":7,"leaked":0,"masked":7,"over_masked":0,"detect_ms":1762.777},
+    {"id":"ai4privacy-21039869","language":"en","gold":1,"tp_gold":1,"pred":1,"tp_pred":1,"values":1,"leaked":0,"masked":1,"over_masked":0,"detect_ms":3876.291},
+    {"id":"ai4privacy-21064264","language":"en","gold":4,"tp_gold":4,"pred":4,"tp_pred":4,"values":4,"leaked":0,"masked":4,"over_masked":0,"detect_ms":1183.127},
+    {"id":"ai4privacy-21077052","language":"en","gold":3,"tp_gold":2,"pred":3,"tp_pred":2,"values":3,"leaked":0,"masked":3,"over_masked":0,"detect_ms":2655.221},
+    {"id":"ai4privacy-20937220","language":"en","gold":5,"tp_gold":5,"pred":6,"tp_pred":5,"values":5,"leaked":0,"masked":6,"over_masked":1,"detect_ms":1741.18},
+    {"id":"ai4privacy-21045077","language":"en","gold":5,"tp_gold":5,"pred":5,"tp_pred":5,"values":5,"leaked":0,"masked":5,"over_masked":0,"detect_ms":1492.549},
+    {"id":"ai4privacy-20801316","language":"de","gold":6,"tp_gold":6,"pred":6,"tp_pred":6,"values":6,"leaked":0,"masked":6,"over_masked":0,"detect_ms":1572.711},
+    {"id":"ai4privacy-20763717","language":"de","gold":4,"tp_gold":3,"pred":3,"tp_pred":3,"values":4,"leaked":1,"masked":3,"over_masked":0,"detect_ms":2832.718},
+    {"id":"ai4privacy-20722038","language":"de","gold":2,"tp_gold":2,"pred":2,"tp_pred":2,"values":2,"leaked":0,"masked":2,"over_masked":0,"detect_ms":1583.367},
+    {"id":"ai4privacy-20747916","language":"de","gold":2,"tp_gold":2,"pred":2,"tp_pred":2,"values":2,"leaked":0,"masked":2,"over_masked":0,"detect_ms":1892.865},
+    {"id":"ai4privacy-20699389","language":"de","gold":0,"tp_gold":0,"pred":0,"tp_pred":0,"values":0,"leaked":0,"masked":0,"over_masked":0,"detect_ms":770.373},
+    {"id":"ai4privacy-20709359","language":"de","gold":1,"tp_gold":1,"pred":1,"tp_pred":1,"values":1,"leaked":0,"masked":1,"over_masked":0,"detect_ms":2331.861},
+    {"id":"ai4privacy-20837946","language":"de","gold":4,"tp_gold":4,"pred":4,"tp_pred":4,"values":4,"leaked":0,"masked":4,"over_masked":0,"detect_ms":1763.332},
+    {"id":"ai4privacy-20848971","language":"de","gold":2,"tp_gold":2,"pred":3,"tp_pred":2,"values":2,"leaked":0,"masked":2,"over_masked":0,"detect_ms":2251.541},
+    {"id":"ai4privacy-20797083","language":"de","gold":8,"tp_gold":8,"pred":7,"tp_pred":6,"values":8,"leaked":0,"masked":7,"over_masked":1,"detect_ms":3128.538},
+    {"id":"ai4privacy-20827390","language":"de","gold":2,"tp_gold":2,"pred":2,"tp_pred":2,"values":2,"leaked":0,"masked":2,"over_masked":0,"detect_ms":2020.591}
+  ]
+}
