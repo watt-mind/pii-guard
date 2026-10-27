@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     llm_detector_api_key: SecretStr | None = None
     # Model name the LLM detector requests; unset uses the detector's built-in default.
     llm_detector_model: str | None = None
+    # Sent as reasoning_effort (e.g. low|minimal); unset sends nothing. Muse Spark Open on
+    # Baseten needs "low".
+    llm_detector_reasoning_effort: str | None = None
+    # Per-request limits of the LLM detector; unset uses 4096 tokens and 60 seconds.
+    llm_detector_max_tokens: int | None = Field(default=None, ge=256)
+    llm_detector_timeout: float | None = Field(default=None, gt=0)
     # Sent as chat_template_kwargs.reasoning_strength (low|medium|high|xhigh). Muse Glimmer on
     # vLLM reads this instead of reasoning_effort; unset sends nothing.
     llm_detector_reasoning_strength: str | None = None

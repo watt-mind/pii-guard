@@ -21,7 +21,6 @@ partially. No error message or log line contains request text or span values.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
@@ -52,8 +51,6 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 DEFAULT_DETECTOR_NAMES: tuple[str, ...] = DEFAULT_DETECTORS
-# Read until the settings consolidation (LAB-1095) gives it a Settings field.
-LLM_REASONING_EFFORT_ENV_VAR = "PII_GUARD_LLM_DETECTOR_REASONING_EFFORT"
 # Upper bound on the analysed text, in code points. Override with app.state.max_text_chars.
 DEFAULT_MAX_TEXT_CHARS = 200_000
 
@@ -75,10 +72,9 @@ class Analyzer(Protocol):
 
 
 def build_detector(name: str, settings: Settings | None = None) -> Detector:
-    """A registry detector by name. ``llm`` gets the app's settings and reasoning effort."""
+    """A registry detector by name. ``llm`` gets the app's settings."""
     if name == "llm":
-        effort = os.environ.get(LLM_REASONING_EFFORT_ENV_VAR) or None
-        return create_detector(name, settings=settings, reasoning_effort=effort)
+        return create_detector(name, settings=settings)
     return create_detector(name)
 
 

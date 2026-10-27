@@ -162,12 +162,14 @@ disagreements.
 | API key | `PII_GUARD_LLM_DETECTOR_API_KEY` | unset |
 | Model | `PII_GUARD_LLM_DETECTOR_MODEL` | `meta-models/muse-spark-open-1026` |
 | Reasoning effort (`reasoning_effort`) | `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT` | unset (not sent); use `low` on Baseten |
+| Max tokens (`max_tokens`) | `PII_GUARD_LLM_DETECTOR_MAX_TOKENS` | unset (`4096`; at least 256) |
+| Timeout per request, seconds | `PII_GUARD_LLM_DETECTOR_TIMEOUT` | unset (`60`; above 0) |
 | Glimmer reasoning strength (`chat_template_kwargs.reasoning_strength`) | `PII_GUARD_LLM_DETECTOR_REASONING_STRENGTH` | unset (not sent) |
 
 Constructor keywords (`base_url`, `api_key`, `model`, `timeout`, `max_retries`,
-`reasoning_effort`, `json_mode`, `chunk_size`, `chunk_overlap`, `score`, `transport`) override
-them. Model and reasoning effort are read from the process environment only (not from
-`.env`). `LlmDetector.usage` counts requests, reported tokens (prompt, cached, completion,
+`reasoning_effort`, `max_tokens`, `json_mode`, `chunk_size`, `chunk_overlap`, `score`,
+`transport`) override them; all of these settings are read from the environment and `.env`.
+`max_tokens=None` sends no limit. `LlmDetector.usage` counts requests, reported tokens (prompt, cached, completion,
 reasoning), invalid outputs and refusals per instance, for cost and refusal reporting; it never
 holds text. Prompts live in `src/pii_guard/detect/prompts/`.
 
