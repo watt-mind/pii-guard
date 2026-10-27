@@ -18,7 +18,7 @@ from fastapi import FastAPI
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
-from pii_guard.gateway import GatewayConfig, build_mode_detectors
+from pii_guard.gateway import GatewayConfig, Mode, build_mode_detectors
 from pii_guard.types import DetectionError, EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE
 
@@ -156,7 +156,8 @@ def make_app(
         upstream_base_url=UPSTREAM_URL,
         upstream_api_key=UPSTREAM_KEY,
     )
-    config = config or GatewayConfig()
+    # Audit mode by default here: the fake LLM detector is what finds names in these tests.
+    config = config or GatewayConfig(mode=Mode.AUDIT)
     app = create_app(settings)
     app.state.gateway_config = config
     app.state.gateway_transport = upstream.transport()

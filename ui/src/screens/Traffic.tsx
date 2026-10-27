@@ -15,6 +15,7 @@ import {
   canShowOriginals,
   formatMsShort,
   maskedCounts,
+  modeOrder,
   percentile,
   requestExtras,
   requestMessages,
@@ -74,7 +75,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
       ),
     [t.events, filters],
   );
-  const modes = useMemo(() => [...new Set(t.events.map((e) => e.mode ?? "unknown"))].sort(), [t.events]);
+  const modes = useMemo(() => modeOrder([...new Set(t.events.map((e) => e.mode ?? "unknown"))]), [t.events]);
   const types = useMemo(
     () => [...new Set(t.events.flatMap((e) => [...Object.keys(e.entities?.detected ?? {}), ...Object.keys(maskedCounts(e))]))].sort() as EntityType[],
     [t.events],
@@ -477,7 +478,7 @@ function LabelledNote({ match }: { match: LabelledMatch }) {
           <>
             This call names a person in free text, with no pre-loaded known value and nothing a rule can recognise, so the name ({match.missed.join(", ")}) reached the
             mock model as written. Every other demo call masks its names, because they are pre-loaded as session known values. This one is kept on purpose, to show what
-            the NER adds: run fast mode with <code className="font-mono text-xs">PII_GUARD_NER_MODEL</code> set, or strict mode, and it is masked too.
+            the NER adds: run fast mode with <code className="font-mono text-xs">PII_GUARD_NER_MODEL</code> set, or audit mode, and it is masked too.
           </>
         ) : (
           <>Without the NER this free-text name would reach the model as written: no known value and no rule covers it.</>
@@ -814,12 +815,12 @@ function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
       {free ? null : e.detectors.includes("known") ? (
         <>
           This call ran {e.detectors.map((d) => detectorName(d)).join(", ")}: pre-loaded known values (names included) and structured values (e-mail, phone, IBAN, IDs) are
-          masked; other names need the NER (<code className="font-mono">PII_GUARD_NER_MODEL</code>) or strict mode's LLM detector.
+          masked; other names need the NER (<code className="font-mono">PII_GUARD_NER_MODEL</code>) or audit mode's LLM detector.
         </>
       ) : (
         <>
           This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (e-mail, phone, IBAN, IDs) but{" "}
-          <strong className="font-semibold text-ink">not names</strong>: names need the NER (<code className="font-mono">PII_GUARD_NER_MODEL</code>) or strict mode's LLM detector.
+          <strong className="font-semibold text-ink">not names</strong>: names need the NER (<code className="font-mono">PII_GUARD_NER_MODEL</code>) or audit mode's LLM detector.
         </>
       )}
     </p>

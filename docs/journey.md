@@ -1088,6 +1088,28 @@ union of the two encoders.
 - **Source:** run records `2026-10-27-ner-v2-<fixture>-<candidate>` (13 candidates × 11
   fixtures) and [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md).
 
+### 38. Strict mode becomes audit mode, and fast is the default (2026-10-27)
+
+LAB-1186. The gateway's two modes were `fast` (rules + NER) and `strict` (+ an LLM detector),
+and `strict` was the code default. The name read as the safer, more careful choice, so a
+privacy-minded user would pick it, and it clashed with policy strictness (block vs mask). In
+production it is the wrong pick: about 2 s and $2.5–3 per 1,000 messages, and every message
+goes to the detector endpoint. Its real jobs are sampled or offline quality checks, labels and
+teacher data for the NER, and the benchmark upper bound.
+
+- **Renamed `audit`**, in the header, `PII_GUARD_GATEWAY_MODE`, the CLI (`--mode`, `--modes`,
+  `--system`, `--audit-requests`), the demo banner and the UI's mode picker, whose help text
+  says what audit mode is for. The old name still works as a deprecated alias, with a
+  `Deprecation` / `Warning` response header, a log line or a stderr warning
+  ([operations.md](operations.md#modes)).
+- **`fast` is now the code default** of `PII_GUARD_GATEWAY_MODE`; audit mode is opt-in. The
+  demo stack and Docker already ran fast.
+- **History kept:** run records stay as written, under their `-strict` IDs; `pii-guard eval
+  report` shows them as audit at read time, so [benchmarks.md](benchmarks.md) and the charts
+  say audit with no record rewritten. Earlier milestones on this page keep the old name.
+- **Numbers:** none changed; this is a rename and a default.
+- **Cost:** $0.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

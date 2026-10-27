@@ -597,8 +597,8 @@
     "rules+ner:xlmr-large-distilled-glimmer+llm:muse-spark-open@reasoning_effort=low": {
       "color": "#CC79A7",
       "shape": "circle",
-      "label": "pii-guard strict (rules + NER + Muse Spark Open, Baseten)",
-      "short_label": "strict (rules + NER + Muse Spark Open, Baseten)",
+      "label": "pii-guard audit (rules + NER + Muse Spark Open, Baseten)",
+      "short_label": "audit (rules + NER + Muse Spark Open, Baseten)",
       "family": "pii-guard",
       "tool": "pii-guard",
       "kind": "text",
@@ -5791,7 +5791,7 @@
       "date": "2026-10-27",
       "recorded_at": "2026-10-27T10:57:10+00:00",
       "source": "recorded",
-      "title": "Gateway overhead, strict mode, mock upstream at 50 ms",
+      "title": "Gateway overhead, audit mode, mock upstream at 50 ms",
       "commit": "4ee1b15bf070dccf7d024cf5dd0b1c838133dfd9",
       "dirty": false,
       "system": "gateway-latency:strict:rules+llm:muse-spark-open",
@@ -5825,7 +5825,7 @@
       "notes": [
         "Mock upstream with a fixed 50 ms delay on loopback; overhead = gateway total - time waiting on the upstream.",
         "Each request is a new session (no detection cache hits); one user message per request from the fixed fictional corpus.",
-        "Strict mode: rules + Muse Spark Open on Baseten Model APIs (remote; the LLM call dominates). 44 detector calls in total, fictional corpus."
+        "Audit mode: rules + Muse Spark Open on Baseten Model APIs (remote; the LLM call dominates). 44 detector calls in total, fictional corpus."
       ],
       "rescored": null,
       "imported_from": null
@@ -182457,7 +182457,7 @@
       "date": "2026-10-27",
       "commit": "4ee1b15bf070dccf7d024cf5dd0b1c838133dfd9",
       "system": "gateway-latency:strict:rules+llm:muse-spark-open",
-      "label": "pii-guard gateway, strict mode (rules + llm muse-spark-open)",
+      "label": "pii-guard gateway, audit mode (rules + llm muse-spark-open)",
       "detectors": [
         "rules",
         "llm"
@@ -182469,7 +182469,7 @@
       "upstream_delay_ms": 50.0,
       "cells": [
         {
-          "mode": "strict",
+          "mode": "audit",
           "concurrency": 1,
           "stream": false,
           "requests": 10,
@@ -182573,7 +182573,7 @@
           }
         },
         {
-          "mode": "strict",
+          "mode": "audit",
           "concurrency": 1,
           "stream": true,
           "requests": 10,
@@ -182687,7 +182687,7 @@
           }
         },
         {
-          "mode": "strict",
+          "mode": "audit",
           "concurrency": 8,
           "stream": false,
           "requests": 10,
@@ -182791,7 +182791,7 @@
           }
         },
         {
-          "mode": "strict",
+          "mode": "audit",
           "concurrency": 8,
           "stream": true,
           "requests": 10,

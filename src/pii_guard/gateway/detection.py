@@ -1,9 +1,10 @@
 """Per-mode detection for the gateway.
 
-- ``fast``: :func:`~pii_guard.detect.stack.default_detector_names` -- ``rules`` + ``ner`` when
-  available, the same stack the REST API runs without ``PII_GUARD_DETECTORS``. A configured
-  (``PII_GUARD_NER_MODEL``) but missing NER raises ``DetectionError`` at startup.
-- ``strict``: the fast detectors + the LLM detector, resolved by
+- ``fast`` (the default): :func:`~pii_guard.detect.stack.default_detector_names` --
+  ``rules`` + ``ner`` when available, the same stack the REST API runs without
+  ``PII_GUARD_DETECTORS``. A configured (``PII_GUARD_NER_MODEL``) but missing NER raises
+  ``DetectionError`` at startup.
+- ``audit`` (formerly ``strict``): the fast detectors + the LLM detector, resolved by
   :class:`~pii_guard.detect.pipeline.DetectionPipeline`.
 
 Every detector's output is checked by :class:`~pii_guard.detect.stack.CheckedDetector` (a list of
@@ -102,7 +103,7 @@ def build_mode_detectors(
     base: Sequence[Detector] | None = None,
     llm_detector: Detector | None = None,
 ) -> dict[Mode, ModeDetector]:
-    """The fast and strict detectors.
+    """The fast and audit detectors.
 
     ``base`` defaults to :func:`~pii_guard.detect.stack.default_detector_names` (``rules`` +
     ``ner`` when available, built from the settings); ``llm_detector`` defaults to
@@ -123,17 +124,17 @@ def build_mode_detectors(
         )
         llm_model = getattr(llm_detector, "model", "")
         parts = [d.name for d in detectors]
-        if mode is Mode.STRICT:
+        if mode is Mode.AUDIT:
             parts.append(f"model={llm_model}")
         parts.append("policies=" + policies.fingerprint())
         return ModeDetector(mode, pipeline, f"{mode.value}:" + ";".join(parts), policies)
 
     detectors = {
         Mode.FAST: build(Mode.FAST, base),
-        Mode.STRICT: build(Mode.STRICT, [*base, llm_detector]),
+        Mode.AUDIT: build(Mode.AUDIT, [*base, llm_detector]),
     }
     logger.info(
-        "gateway detectors: fast=%s strict=%s",
+        "gateway detectors: fast=%s audit=%s",
         [d.name for d in base],
         [*(d.name for d in base), llm_detector.name],
     )

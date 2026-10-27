@@ -46,7 +46,7 @@ class RecordingTransport(httpx.AsyncBaseTransport):
         await self.inner.aclose()
 
 
-@pytest.mark.parametrize("mode", ["strict", "fast"])
+@pytest.mark.parametrize("mode", ["audit", "fast"])
 @pytest.mark.parametrize("stream", [False, True])
 def test_live_meta_round_trip(mode: str, stream: bool) -> None:
     settings = Settings(
@@ -93,7 +93,7 @@ def test_live_meta_round_trip(mode: str, stream: bool) -> None:
     print(f"live {mode} stream={stream}: {elapsed:.1f}s")
     assert transport.bodies, "nothing was forwarded"
     leaks = leaked_values(transport.bodies[-1])
-    if mode == "strict":
+    if mode == "audit":
         assert leaks == []
     else:
         # Rules only: emails and phones are always masked; names need the LLM pass.

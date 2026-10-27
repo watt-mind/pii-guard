@@ -6,7 +6,7 @@ python -m pii_guard.eval.baselines.suite --system fast --fixtures eval/fixtures/
 ```
 
 ``pii-guard eval`` scores detectors; this wraps the same scorer for a named *system*
-(:data:`SYSTEMS`: ``rules``, ``fast`` = rules + NER, ``strict`` = rules + NER + LLM, as the
+(:data:`SYSTEMS`: ``rules``, ``fast`` = rules + NER, ``audit`` = rules + NER + LLM, as the
 gateway's modes are built) and adds a ``run`` block to the scorecard:
 
 - one warm-up call before timing (as the baselines get), so a model load isn't a p95 outlier;
@@ -38,6 +38,7 @@ from pii_guard.eval.fixtures import FixtureError, load_fixtures
 from pii_guard.eval.injection import run_injection
 from pii_guard.eval.report import build_scorecard, render_markdown
 from pii_guard.eval.scorer import DetectorAnalyzer
+from pii_guard.gateway.config import cli_mode
 from pii_guard.types import PiiGuardError
 
 __all__ = ["BASETEN_PRICE_USD_PER_1M", "SYSTEMS", "cost_usd", "main", "ner_identity"]
@@ -45,7 +46,7 @@ __all__ = ["BASETEN_PRICE_USD_PER_1M", "SYSTEMS", "cost_usd", "main", "ner_ident
 SYSTEMS: dict[str, list[str]] = {
     "rules": ["rules"],
     "fast": ["rules", "ner"],
-    "strict": ["rules", "ner", "llm"],
+    "audit": ["rules", "ner", "llm"],
 }
 
 #: Baseten Model APIs, Muse Spark Open (baseten.co/pricing, 2026-10-27); reasoning = output.
@@ -102,7 +103,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         prog="python -m pii_guard.eval.baselines.suite",
         description="Score one pii-guard system on one fixture file, recording cost and load.",
     )
-    parser.add_argument("--system", choices=sorted(SYSTEMS), required=True)
+    parser.add_argument(
+        "--system",
+        type=lambda v: cli_mode(v, "suite"),
+        choices=sorted(SYSTEMS),
+        required=True,
+        help="rules, fast or audit (strict: deprecated alias of audit)",
+    )
     parser.add_argument("--fixtures", type=Path, action="append", required=True)
     parser.add_argument("--json", type=Path, required=True, metavar="OUT")
     parser.add_argument("--markdown", type=Path, metavar="OUT")

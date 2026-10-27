@@ -37,12 +37,19 @@ document-weighted mean of their p50/p95 and ``latency_pooled: true``.
 
 The output is a pure function of the records (no timestamps), so ``pii-guard eval report
 --check`` can compare it byte for byte.
+
+Records stay as they were written; :func:`display_record` renames what they display at read
+time. Mode ``strict`` was renamed ``audit`` (LAB-1186), so older records' labels, titles, notes
+and latency cell modes show ``audit`` while their run IDs, system keys and files keep
+``strict``, and history stays traceable.
 """
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
+import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
@@ -60,6 +67,8 @@ __all__ = [
     "compact",
     "compact_validity",
     "current_versions",
+    "display_mode",
+    "display_record",
     "fixture_shas",
     "pool",
     "pool_validity",
@@ -67,6 +76,62 @@ __all__ = [
 ]
 
 INDEX_SCHEMA_VERSION = 1
+
+#: Old display names in run records and their current ones (``strict`` mode is ``audit``).
+_DISPLAY_RENAMES = (
+    (re.compile(r"\bpii-guard strict\b"), "pii-guard audit"),
+    (re.compile(r"\bstrict mode\b"), "audit mode"),
+    (re.compile(r"\bStrict mode\b"), "Audit mode"),
+)
+_MODE_RENAMES = {"strict": "audit"}
+
+
+def display_mode(mode: str) -> str:
+    """A mode's current name (``strict`` -> ``audit``); other names unchanged."""
+    return _MODE_RENAMES.get(mode, mode)
+
+
+def _rename(text: str) -> str:
+    for pattern, new in _DISPLAY_RENAMES:
+        text = pattern.sub(new, text)
+    return text
+
+
+def _rename_notes(block: Any) -> None:
+    """Rename every ``note``/``notes`` string under ``block``, in place."""
+    if isinstance(block, dict):
+        for key, value in block.items():
+            if key == "note" and isinstance(value, str):
+                block[key] = _rename(value)
+            elif key == "notes" and isinstance(value, list):
+                block[key] = [_rename(v) if isinstance(v, str) else v for v in value]
+            else:
+                _rename_notes(value)
+    elif isinstance(block, list):
+        for item in block:
+            _rename_notes(item)
+
+
+def display_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """A copy of ``record`` with renamed modes in what it displays (see the module docstring).
+
+    Changes the system label, title, notes and latency cells' ``mode``; never ``run_id`` or
+    ``system.key``, which identify the record and its series.
+    """
+    rec = copy.deepcopy(dict(record))
+    system = rec.get("system")
+    if isinstance(system, dict) and isinstance(system.get("label"), str):
+        system["label"] = _rename(system["label"])
+    if isinstance(rec.get("title"), str):
+        rec["title"] = _rename(rec["title"])
+    _rename_notes(rec)
+    metrics = rec.get("metrics")
+    cells = metrics.get("cells") if isinstance(metrics, dict) else None
+    for cell in cells if isinstance(cells, list) else []:
+        if isinstance(cell, dict) and isinstance(cell.get("mode"), str):
+            cell["mode"] = display_mode(cell["mode"])
+    return rec
+
 
 #: Colour-blind-safe colours for pii-guard systems (Okabe-Ito, then Paul Tol's muted set). A
 #: new system takes the least-used one (see :mod:`~pii_guard.eval.report_colours`); ordered so
@@ -460,6 +525,7 @@ def build_index(
     systems it lacks are appended to it in place. Without one, colours are assigned as if the
     registry were empty.
     """
+    records = [display_record(r) for r in records]
     if colours is None:
         colours = {}
     for name in SECTIONS:

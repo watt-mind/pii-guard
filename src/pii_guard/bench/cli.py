@@ -1,7 +1,7 @@
 """``pii-guard bench``: the latency benchmark and the mock upstream.
 
 ```
-pii-guard bench latency [--modes fast,strict] [--requests 200] [--record SLUG]
+pii-guard bench latency [--modes fast,audit] [--requests 200] [--record SLUG]
 pii-guard bench mock-upstream [--port 8790] [--delay-ms 0]
 ```
 """
@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from pii_guard.bench.mock_upstream import DEFAULT_PORT
+from pii_guard.gateway.config import cli_mode
 
 __all__ = ["main"]
 
@@ -40,18 +41,20 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
     lat = sub.add_parser("latency", help="measure the gateway's overhead per stage and mode")
-    lat.add_argument("--modes", type=_names, default=["fast"], help="fast,strict (default fast)")
+    lat.add_argument("--modes", type=_names, default=["fast"], help="fast,audit (default fast)")
     lat.add_argument("--concurrency", type=_ints, default=[1, 8], help="default 1,8")
     lat.add_argument(
         "--stream", choices=["both", "off", "on"], default="both", help="streamed requests"
     )
     lat.add_argument("--requests", type=int, default=200, help="requests per cell (default 200)")
     lat.add_argument(
-        "--strict-requests",
+        "--audit-requests",
         type=int,
         default=12,
-        help="requests per strict-mode cell (each calls the LLM detector; default 12)",
+        help="requests per audit-mode cell (each calls the LLM detector; default 12)",
     )
+    # Deprecated spelling of --audit-requests (the mode was called strict).
+    lat.add_argument("--strict-requests", type=int, dest="strict_requests", help=argparse.SUPPRESS)
     lat.add_argument("--warmup", type=int, default=5, help="unrecorded requests per cell")
     lat.add_argument(
         "--upstream-delay-ms", type=float, default=50.0, help="mock upstream delay (default 50)"
@@ -83,8 +86,15 @@ def _latency(args: argparse.Namespace) -> int:
     from pii_guard.bench.latency import build_records, run_benchmark
 
     streams = {"both": [False, True], "off": [False], "on": [True]}[args.stream]
+    args.modes = [cli_mode(m, "pii-guard bench latency") for m in args.modes]
+    if args.strict_requests is not None:
+        print(
+            "pii-guard bench latency: --strict-requests is deprecated, use --audit-requests",
+            file=sys.stderr,
+        )
+        args.audit_requests = args.strict_requests
     for mode in args.modes:
-        if mode not in ("fast", "strict"):
+        if mode not in ("fast", "audit"):
             print(f"pii-guard bench latency: unknown mode {mode!r}", file=sys.stderr)
             return 2
 
@@ -105,7 +115,7 @@ def _latency(args: argparse.Namespace) -> int:
         concurrency=args.concurrency,
         streams=streams,
         requests=args.requests,
-        mode_requests={"strict": args.strict_requests},
+        mode_requests={"audit": args.audit_requests},
         warmup=args.warmup,
         delay_ms=args.upstream_delay_ms,
         progress=progress,

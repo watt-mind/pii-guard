@@ -53,11 +53,12 @@ curl -s http://127.0.0.1:8787/v1/models   # proxied from the upstream (id, objec
 
 Clients pick the detection mode per request with `X-PII-Guard-Mode`:
 
-- `fast` (rules + the NER encoder, in-process) is what `pii-guard connect` configures for
-  coding agents. An agent sends dozens of long requests per task, and strict mode's LLM
-  detector would add its latency to every one.
-- `strict` adds the LLM detector. It catches more names in free text but is slower; set
-  `--mode strict` on `connect`, or the header yourself.
+- `fast` (rules + the NER encoder, in-process, nothing leaves the machine) is the gateway's
+  default and what `pii-guard connect` configures for coding agents. An agent sends dozens of
+  long requests per task; fast mode adds milliseconds to each.
+- `audit` adds a remote LLM detector as a second opinion, for spot-checking quality rather
+  than everyday traffic: every message goes to the detector endpoint and adds about 2 s. Set
+  `--mode audit` on `connect`, or the header yourself.
 
 `X-PII-Guard-Language` (default `hu`, the gateway's `PII_GUARD_DEFAULT_LANGUAGE`) picks the
 language pack. `connect` sets `en`, since agents mostly work on English code.

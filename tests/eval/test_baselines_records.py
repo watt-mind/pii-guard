@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from pii_guard.eval.baselines import records, suite
 from pii_guard.eval.record import load_schema, validate
 
@@ -20,11 +22,12 @@ def _card(tmp_path: Path, fixture: Path) -> dict:
     return json.loads(out.read_text(encoding="utf-8"))
 
 
-def test_strict_card_gets_detectors_cost_and_hardware(tmp_path):
+@pytest.mark.parametrize("system", ["pii-guard audit", "pii-guard strict"])  # strict: old name
+def test_audit_card_gets_detectors_cost_and_hardware(tmp_path, system):
     card = _card(tmp_path, EN_SMOKE)
     card["meta"]["detectors"] = ["rules", "ner", "llm"]
     card["run"].update(
-        system="pii-guard strict",
+        system=system,
         ner={
             "model": "/x/ckpt",
             "safetensors_sha256": {"model.safetensors": "ab" * 32},
@@ -46,13 +49,13 @@ def test_strict_card_gets_detectors_cost_and_hardware(tmp_path):
         blocked=1,
     )
     (rec,) = records.records_for(
-        card, slug="comparison-en-smoke-strict", code_notes={card["meta"]["commit"][:7]: "a note"}
+        card, slug="comparison-en-smoke-audit", code_notes={card["meta"]["commit"][:7]: "a note"}
     )
     assert validate(rec, load_schema(SCHEMA)) == []
     names = [d["name"] for d in rec["system"]["detectors"]]
     assert names == ["rules", "ner", "llm"]
     assert rec["system"]["detectors"][1]["revision"] == "sha256:" + "ab" * 32
-    assert rec["system"]["label"].startswith("pii-guard strict")
+    assert rec["system"]["label"].startswith("pii-guard audit")
     assert rec["cost"]["usd"] == 0.01
     assert rec["cost"]["tokens"]["cached"] == 50
     assert "load average" in rec["hardware"]["description"]

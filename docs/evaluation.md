@@ -436,21 +436,23 @@ Leak rate in %, pooled over languages, and detection p50:
 |---|---:|---:|---:|---:|
 | pii-guard rules | 41.6 | 73.5 | 0.2–0.4 ms | |
 | **pii-guard fast** (rules + distilled NER, large) | **0.6** | 38.0 | 24–31 ms (MPS) | |
-| **pii-guard strict** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.9** | 1.8–2.3 s | 2.03–2.95 |
+| **pii-guard audit** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.9** | 1.8–2.3 s | 2.03–2.95 |
 | Presidio | 24.3 | 29.6 | 8–136 ms | |
 | LLM Guard | 45.1 | 43.8 | 61–133 ms | |
 | PrivAiTe | 12.7 | 9.5 | 93–182 ms | |
 
 Pooled figures are from [docs/benchmarks.md](benchmarks.md) (generated from the run records);
 p50 and cost ranges are over the per-fixture rows. They are the comparison runs of that day
-(commits `8944f96` for rules and the tools, `4f84c6a` for fast and strict). Later runs of
+(commits `8944f96` for rules and the tools, `4f84c6a` for fast and audit). Later runs of
 rules and fast mode (LAB-1170 and LAB-1204, commit `3d9eb8b`) leak less on Ai4Privacy (63.1 % and 27.6 %);
 [docs/benchmarks.md](benchmarks.md) always shows the latest run of each system with its
 commit. The machine was under unrelated load during
-these runs (load average 13–27 on 10 cores), so latency is relative. Fast mode is as safe as
-strict on the hand-written sets but leaks 35–40 % on the public set, mostly numbers that fail
-the checksums pii-guard's rules require (see the caveats below); strict mode is the safest
-system on both.
+these runs (load average 13–27 on 10 cores), so latency is relative. Fast mode, the
+production path, is as safe as audit mode on the hand-written sets but leaks 35–40 % on the
+public set, mostly numbers that fail the checksums pii-guard's rules require (see the caveats
+below). Audit mode leaks least on both, which makes it the upper bound and the reference for
+quality checks, not a production setting: every message is a remote LLM call (about 2 s and
+$2–3 per 1k messages) and its text leaves the machine.
 
 ### Public benchmark: Ai4Privacy OpenPII 1M
 
@@ -550,11 +552,11 @@ record validation checks that.
 It is computed for public sets only (documents of kind `public-*`) and stored in the run
 records as the optional `validity` field of each text block (counts only, never a value).
 The LAB-1148 runs kept no per-document predictions, so each system was run again to classify
-them: rules with the run's own code, fast and strict mode with theirs and the same NER
+them: rules with the run's own code, fast and audit mode with theirs and the same NER
 checkpoint, the comparison tools at the same pinned versions. `python -m
 pii_guard.eval.validity --record R --scorecard S` writes a re-run's breakdown into a record
 without touching its headline, with `source.matches_headline` saying whether the re-run
-reproduced the record's leak and recall counts exactly; where it didn't (strict mode: an LLM
+reproduced the record's leak and recall counts exactly; where it didn't (audit mode: an LLM
 doesn't answer the same way twice) the re-run's own totals are kept in
 `source.rerun_headline` and the report marks the row.
 
@@ -565,7 +567,7 @@ of those valid):
 |---|---:|---:|---:|---:|
 | pii-guard rules | 63.1 % | 100.0 / 0.0 % | 35.1 / 63.4 % | 71.1 % |
 | pii-guard fast | 27.6 % | 100.0 / 0.0 % | 35.1 / 63.4 % | 10.4 % |
-| pii-guard strict ¹ | 3.9 % | 100.0 / 0.0 % | 87.8 / 6.5 % | 2.8 % |
+| pii-guard audit ¹ | 3.9 % | 100.0 / 0.0 % | 87.8 / 6.5 % | 2.8 % |
 | Presidio | 29.6 % | 28.9 / 48.2 % | 28.8 / 40.2 % | 21.0 % |
 | LLM Guard | 43.8 % | 73.5 / 25.9 % | 23.3 / 70.8 % | 30.4 % |
 | PrivAiTe | 9.5 % | 68.1 / 4.2 % | 33.8 / 3.0 % | 14.0 % |
