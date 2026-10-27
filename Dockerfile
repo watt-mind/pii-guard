@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # --- build: resolve dependencies and install the project into /app/.venv -----
-FROM ghcr.io/astral-sh/uv:0.13.5-python3.12-trixie-slim AS build
+FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-trixie-slim AS build
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
