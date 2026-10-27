@@ -1295,16 +1295,18 @@ the tenant key, and `X-PII-Guard-Session-Source` reports which step matched.
 
 Same fictional mini-repo and task as milestones 35 and 39, fast mode (rules + NER), Muse Code
 1.4.14 (the installer's current release; the harness pin is still 1.4.13, LAB-1299).
-"Before" is the harness's `--session per-request`, which reproduces the old behaviour:
+"Before" is the harness's `--session per-request`, which reproduces the old behaviour. The
+scripted runs are after the `SECRET` type (milestone 40), so they check 16 gold values; the two
+live runs were made just before it, with 13:
 
 | Run | Requests | Vault sessions | Distinct placeholders upstream | Gold values under >1 placeholder (most for one) | Gold values upstream |
 |---|---:|---:|---:|---:|---:|
-| Muse, scripted, before | 10 | 10 | 144 | 13 of 13 (8) | 0 of 13 |
-| Muse, scripted, `connect` path URL | 10 | 1 | 23 | 0 of 13 (1) | 0 of 13 |
+| Muse, scripted, before | 10 | 10 | 150 | 16 of 16 (8) | 0 of 16 |
+| Muse, scripted, `connect` path URL | 11 | 1 | 25 | 0 of 16 (1) | 0 of 16 |
 | Muse, Meta Model API `muse-spark-1.3`, before | 10 | 10 | 155 | 13 of 13 (8) | 0 of 13 |
 | Muse, Meta Model API `muse-spark-1.3`, path URL | 8 | 1 | 21 | 0 of 13 (1) | 0 of 13 |
-| pi 1.4.0, scripted, before | 5 | 5 | 52 | 13 of 13 (4) | 0 of 13 |
-| pi 1.4.0, scripted, path URL | 5 | 1 | 17 | 0 of 13 (1) | 0 of 13 |
+| pi 1.4.0, scripted, before | 5 | 5 | 58 | 16 of 16 (4) | 0 of 16 |
+| pi 1.4.0, scripted, path URL | 5 | 1 | 20 | 0 of 16 (1) | 0 of 16 |
 
 - **Restore across turns.** With one session, a placeholder the model saw in turn 1 is
   restored in turn 5 even when that turn's request no longer carries the value (a gateway

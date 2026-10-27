@@ -197,11 +197,11 @@ sessions and a value gets a placeholder in each (all of them restored). Details:
 
 | Muse 1.4.14, e2e harness | requests | sessions | distinct placeholders upstream | gold values under >1 placeholder (most for one) | gold upstream |
 |---|---|---|---|---|---|
-| scripted, `--session per-request` (before) | 10 | 10 | 144 | 13 of 13 (8) | 0 of 13 |
-| scripted, `--session auto` (`prompt_cache_key`) | 10 | 4 | 80 | 13 of 13 (4) | 0 of 13 |
-| scripted, `--session path` (`connect` default) | 10 | 1 | 23 | 0 of 13 (1) | 0 of 13 |
-| Meta Model API `muse-spark-1.3`, per-request (before) | 10 | 10 | 155 | 13 of 13 (8) | 0 of 13 |
-| Meta Model API `muse-spark-1.3`, path | 8 | 1 | 21 | 0 of 13 (1) | 0 of 13 |
+| scripted, `--session per-request` (before) | 10 | 10 | 150 | 16 of 16 (8) | 0 of 16 |
+| scripted, `--session auto` (`prompt_cache_key`) | 10 | 4 | 85 | 16 of 16 (4) | 0 of 16 |
+| scripted, `--session path` (`connect` default) | 11 | 1 | 25 | 0 of 16 (1) | 0 of 16 |
+| Meta Model API `muse-spark-1.3`, per-request (before; 13 gold, before `SECRET`) | 10 | 10 | 155 | 13 of 13 (8) | 0 of 13 |
+| Meta Model API `muse-spark-1.3`, path (13 gold, before `SECRET`) | 8 | 1 | 21 | 0 of 13 (1) | 0 of 13 |
 
 ```bash
 uv run python -m pii_guard.integrations.e2e --client muse-code --session per-request   # before
