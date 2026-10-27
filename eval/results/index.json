@@ -65459,5 +65459,22 @@
       ]
     }
   ],
+  "colours": {
+    "visual": {
+      "visual:eka": "#0072B2",
+      "visual:eka-tuned": "#332288",
+      "visual:presidio-image": "#88CCEE",
+      "visual:presidio-image-tuned": "#DDCC77",
+      "visual:sam-3.1+tesseract+rules": "#117733",
+      "visual:sam-3.1+tesseract+rules+captions": "#44AA99",
+      "visual:sam-3.1+tesseract+rules+llm:muse-spark-open": "#0072B2",
+      "visual:sam-3.1+tesseract+rules+llm:muse-spark-open+captions": "#CC6677"
+    },
+    "latency": {
+      "gateway-latency:fast:rules": "#0072B2",
+      "gateway-latency:fast:rules+ner:pii-guard-ner-xlmr-large-distilled": "#009E73",
+      "gateway-latency:strict:rules+llm:muse-spark-open": "#D55E00"
+    }
+  },
   "headline_set": "smoke"
 }

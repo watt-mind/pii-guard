@@ -16,7 +16,10 @@
   ``runs`` but are not detection systems, so they stay out of ``systems`` and
   ``fixture_sets``;
 - ``systems``, ``fixture_sets``, ``languages``, ``entity_types``: the vocabularies, all
-  derived from the data (a new language, detector or set shows up without code changes).
+  derived from the data (a new language, detector or set shows up without code changes);
+- ``colours``: the visual-recall and latency chart colour of each system present. System,
+  visual and latency colours come from the committed registry
+  (:mod:`pii_guard.eval.report_colours`), so adding a system never recolours another.
 
 Pooling is exact for every count-based metric (P/R/F1, leak, over-masking, round trip,
 consistency, per-type recall). Latency percentiles can't be pooled: a pooled ``all`` built
@@ -36,6 +39,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from pii_guard.config import DEFAULT_DETECTORS
+from pii_guard.eval.report_colours import PALETTE_LATENCY, PALETTE_VISUAL, SECTIONS, assign
 from pii_guard.types import EntityType
 
 __all__ = [
@@ -50,9 +54,9 @@ __all__ = [
 
 INDEX_SCHEMA_VERSION = 1
 
-#: Colour-blind-safe colours for pii-guard systems (Okabe-Ito, then Paul Tol's muted set),
-#: assigned in featured order, then by key. Ordered so neighbours differ in hue *and*
-#: lightness (no two greens or two pinks among the first seven).
+#: Colour-blind-safe colours for pii-guard systems (Okabe-Ito, then Paul Tol's muted set). A
+#: new system takes the least-used one (see :mod:`~pii_guard.eval.report_colours`); ordered so
+#: neighbours differ in hue *and* lightness (no two greens or two pinks among the first seven).
 PALETTE_OURS = [
     "#0072B2",  # blue
     "#009E73",  # bluish green
@@ -68,6 +72,12 @@ PALETTE_OURS = [
 #: Comparison tools are grey and told apart by marker shape.
 PALETTE_COMPARISON = ["#595959", "#595959", "#595959", "#595959", "#595959", "#595959"]
 SHAPES_COMPARISON = ["square", "triangle", "diamond", "cross", "square", "triangle"]
+
+_STYLES_OURS = [{"color": c, "shape": "circle"} for c in PALETTE_OURS]
+_STYLES_COMPARISON: list[dict[str, str]] = []
+for _c, _s in zip(PALETTE_COMPARISON, SHAPES_COMPARISON, strict=True):
+    if {"color": _c, "shape": _s} not in _STYLES_COMPARISON:
+        _STYLES_COMPARISON.append({"color": _c, "shape": _s})
 
 _TYPE_ORDER = {t.value: i for i, t in enumerate(EntityType)}
 
@@ -269,7 +279,11 @@ def _origin(origins: Iterable[str]) -> str:
     return found[0] if len(found) == 1 else "mixed"
 
 
-def _systems(records: Sequence[Mapping[str, Any]], featured: Sequence[str]) -> dict[str, Any]:
+def _systems(
+    records: Sequence[Mapping[str, Any]],
+    featured: Sequence[str],
+    registry: dict[str, Any],
+) -> dict[str, Any]:
     latest: dict[str, Mapping[str, Any]] = {}
     for rec in sorted(records, key=run_order):
         latest[rec["system"]["key"]] = rec
@@ -282,14 +296,9 @@ def _systems(records: Sequence[Mapping[str, Any]], featured: Sequence[str]) -> d
         k for k, r in latest.items() if r["system"]["family"] == "comparison" and k not in theirs
     )
     default_key = "+".join(DEFAULT_DETECTORS)
-    out: dict[str, Any] = {}
-    for i, key in enumerate(ours):
-        out[key] = {"color": PALETTE_OURS[i % len(PALETTE_OURS)], "shape": "circle"}
-    for i, key in enumerate(theirs):
-        out[key] = {
-            "color": PALETTE_COMPARISON[i % len(PALETTE_COMPARISON)],
-            "shape": SHAPES_COMPARISON[i % len(SHAPES_COMPARISON)],
-        }
+    assign(registry, ours, _STYLES_OURS)
+    assign(registry, theirs, _STYLES_COMPARISON)
+    out: dict[str, Any] = {key: dict(registry[key]) for key in [*ours, *theirs]}
     for key, style in out.items():
         system = latest[key]["system"]
         style.update(
@@ -313,12 +322,22 @@ def build_index(
     *,
     featured: Sequence[str] = (),
     digests: Mapping[str, str] | None = None,
+    colours: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """The index (see the module docstring) from validated run records."""
+    """The index (see the module docstring) from validated run records.
+
+    ``colours`` is the colour registry (:func:`~pii_guard.eval.report_colours.load_registry`);
+    systems it lacks are appended to it in place. Without one, colours are assigned as if the
+    registry were empty.
+    """
+    if colours is None:
+        colours = {}
+    for name in SECTIONS:
+        colours.setdefault(name, {})
     records = sorted(records, key=run_order)
     text = [r for r in records if r["kind"] == "text"]
     scored = [r for r in records if r["kind"] != "latency"]
-    systems = _systems(scored, featured)
+    systems = _systems(scored, featured, colours["systems"])
 
     runs = []
     for rec in records:
@@ -521,7 +540,20 @@ def build_index(
         "snapshots": snapshots,
         "visual": visual,
         "latency": latency,
+        "colours": {
+            "visual": _chart_colours(colours["visual"], visual, PALETTE_VISUAL),
+            "latency": _chart_colours(colours["latency"], latency, PALETTE_LATENCY),
+        },
     }
+
+
+def _chart_colours(
+    section: dict[str, Any], runs: Sequence[Mapping[str, Any]], palette: Sequence[str]
+) -> dict[str, str]:
+    """Registry colours of the systems in ``runs`` (first-seen order), assigning new ones."""
+    keys = list(dict.fromkeys(str(r["system"]) for r in runs))
+    assign(section, keys, palette)
+    return {k: section[k] for k in sorted(keys)}
 
 
 def _pooled_all(
