@@ -67,8 +67,12 @@ What it does:
   upstream (the one below, on a random loopback port) echoes the masked text, and both the
   banner and a strip above the UI say so. `--mock` forces it.
 - **Mode.** Fast: rules, plus NER when the `ner` extra is installed (it pulls torch). The
-  strip and the banner list the active detectors, and the banner prints the exact
-  `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up` line to add NER.
+  NER model resolves as in [models.md](models.md#which-ner-model-fast-mode-runs): on the
+  first run the published checkpoint or the public fallback is downloaded once (about 1.1 GB)
+  before the server starts. The strip and the banner list the active detectors, the banner
+  names the NER model (`NER model  …@… (public fallback, Apache-2.0)`), and without the extra
+  it prints the exact `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up`
+  line to add NER.
   `PII_GUARD_GATEWAY_MODE` overrides the mode.
 - **Images.** They need OCR (the `ocr` extra plus the Tesseract binary) and face detection (the
   `local-vision` extra with its model, or `META_API_KEY` for SAM 3.1; see
@@ -212,9 +216,9 @@ starts the same stack in containers: `mock-upstream`, `demo-api` on
 `http://127.0.0.1:8788` (traffic log `masked`, `fast` mode with the NER) and `ui` on
 `http://localhost:5173`, next to the plain `api` service on 8787. The demo services use their
 own image, `pii-guard:demo`, built with the `ner` extra (`PII_GUARD_EXTRAS` build argument;
-the plain `pii-guard:dev` image stays without torch). It is large: 9.6 GB on arm64, because the
-locked torch wheel pulls the CUDA libraries even there (`pii-guard:dev` is 268 MB). On the first start `demo-api` downloads
-the NER model into the `pii-guard-models` volume before the server listens (`docker compose
+the plain `pii-guard:dev` image stays without torch). It is large: 9.6 GB on arm64, because
+the locked torch wheel pulls the CUDA libraries even there (`pii-guard:dev` is 268 MB;
+LAB-1308). On the first start `demo-api` downloads the NER model into the `pii-guard-models` volume before the server listens (`docker compose
 logs -f demo-api` shows `ner: downloading …`); its healthcheck allows 15 minutes for that, and
 the UI waits until `demo-api` is healthy. Later starts reuse the volume (`docker compose down
 -v` drops it). Rules only, offline, no download:
