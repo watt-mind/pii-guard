@@ -205,7 +205,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
       )}
 
       {index.visual.length > 0 && (
-        <Section id="bench-visual" title="Image masking" note="Share of labelled regions on official specimen ID documents masked (IoU ≥ 0.5).">
+        <Section id="bench-visual" title="Image masking" note="Share of labelled image regions masked (IoU ≥ 0.5). Official specimen IDs and fictional Muse Image documents are different sets: compare runs within a set.">
           <VisualTable index={index} />
         </Section>
       )}
@@ -457,7 +457,7 @@ function VisualTable({ index }: { index: BenchmarkIndex }) {
               <th scope="row" className="py-2 pr-3 text-left font-normal">
                 <span className="block font-medium text-ink">{r.run_id.replace(`${r.date}-`, "").replace(/-/g, " ")}</span>
                 <span className="text-xs text-muted">
-                  {r.date} · {r.countries} countries
+                  {r.fixture_set ?? "specimens"} · {r.date} · {r.countries} countries
                 </span>
               </th>
               <td className="px-2 py-2 text-right tabular-nums">{r.specimens}</td>

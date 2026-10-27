@@ -120,6 +120,7 @@ export interface VisualRun {
   commit: string;
   system: string;
   notes: string[];
+  fixture_set: string | null;
   specimens: number;
   overall: RegionRecall;
   by_region_type: Record<string, RegionRecall>;

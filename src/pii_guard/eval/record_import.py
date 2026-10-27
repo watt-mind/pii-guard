@@ -409,6 +409,33 @@ MANIFEST: list[dict[str, Any]] = [
         "code": _VISUAL,
         "notes": ["After the prompt study: ID_PHOTO prompted as 'photo of a person'."],
     },
+    {
+        "path": "eval/results/visual/fictional.json",
+        "slug": "visual-fictional-muse-image",
+        "date": "2026-10-27",
+        "code": {
+            **_VISUAL,
+            "commit": "88e98bdcb0bca3bcf3ad9944770dca50071ded48",
+            "note": "the develop commit that added the result (LAB-1121, #31); the result "
+            "file records no commit",
+        },
+        "fixtures": [
+            {
+                "path": "eval/fixtures/visual/manifest.json",
+                "sha256": None,
+                "set": "fictional-specimens",
+                "language": None,
+                "origin": "generated",
+                "generator": "muse-image",
+                "documents": 24,
+            }
+        ],
+        "notes": [
+            "LAB-1121: fictional specimen-style documents (portraits, signatures and textures "
+            "from Muse Image), so the images can be committed. Not comparable with the official "
+            "specimen set: different documents, and MRZ is a region type here."
+        ],
+    },
 ]
 
 
@@ -427,6 +454,8 @@ def _records_for(entry: dict[str, Any], root: Path) -> list[dict[str, Any]]:
             )
     if entry.get("code"):
         extra["code"] = entry["code"]
+    if entry.get("fixtures"):
+        extra["fixtures"] = entry["fixtures"]
     if entry.get("label"):
         extra["system"] = {"label": entry["label"]}
     records = build_records(

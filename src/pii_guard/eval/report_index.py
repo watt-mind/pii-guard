@@ -465,6 +465,7 @@ def build_index(
                 "commit": rec["code"]["commit"],
                 "system": rec["system"]["key"],
                 "notes": list(rec["notes"]),
+                "fixture_set": rec["fixtures"][0]["set"] if rec["fixtures"] else None,
                 "specimens": m["specimens"],
                 "overall": m["overall"],
                 "by_region_type": m["by_region_type"],

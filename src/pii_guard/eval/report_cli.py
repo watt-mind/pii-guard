@@ -66,7 +66,7 @@ CHARTS: list[tuple[str, str, Chart]] = [
     ),
     (
         "visual-recall.svg",
-        "Visual recall on specimen documents",
+        "Visual recall on image documents",
         lambda i, s, f: charts.visual_recall(i),
     ),
 ]
@@ -187,6 +187,7 @@ def _visual_table(index: Mapping[str, Any]) -> str:
         rows.append(
             [
                 f"`{r['run_id']}`",
+                f"`{r.get('fixture_set') or 'specimens'}`",
                 r["specimens"],
                 r["countries"],
                 *per,
@@ -195,8 +196,8 @@ def _visual_table(index: Mapping[str, Any]) -> str:
             ]
         )
     return _table(
-        ["Run", "Images", "Countries", *region_types, "All regions", "Over-masking (mean)"],
-        ["---", "---:", "---:"] + ["---:"] * (len(region_types) + 2),
+        ["Run", "Set", "Images", "Countries", *region_types, "All regions", "Over-masking (mean)"],
+        ["---", "---", "---:", "---:"] + ["---:"] * (len(region_types) + 2),
         rows,
     )
 
@@ -298,10 +299,12 @@ def render_page(index: Mapping[str, Any], *, headline_set: str, featured: Sequen
     out.append(f"## Recall per entity type (`{headline_set}`)\n")
     out.append(_type_table(index, headline_set, featured))
     if index["visual"]:
-        out.append("## Image masking (specimen documents)\n")
+        out.append("## Image masking\n")
         out.append(
-            "Share of labelled regions masked with IoU >= 0.5, on official specimen ID "
-            "documents published by their issuers.\n"
+            "Share of labelled regions masked with IoU >= 0.5. `specimens` are official "
+            "specimen ID documents published by their issuers; `fictional-specimens` are "
+            "specimen-style documents built from Muse Image output (LAB-1121). The two sets "
+            "hold different documents, so compare runs within a set.\n"
         )
         out.append(_visual_table(index))
     out.append("## Run log\n")

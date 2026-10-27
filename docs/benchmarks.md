@@ -14,7 +14,7 @@ Headline fixture set: **smoke** (hand-written; documents: en 10 + hu 31). Defaul
 
 ![Recall by entity type](benchmarks/type-recall.svg)
 
-![Visual recall on specimen documents](benchmarks/visual-recall.svg)
+![Visual recall on image documents](benchmarks/visual-recall.svg)
 
 ## How to read this
 
@@ -187,14 +187,15 @@ By language:
 | `PARCEL_NUMBER_HU` | 6 | 0.0% | 0.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 | `VEHICLE_PLATE` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 
-## Image masking (specimen documents)
+## Image masking
 
-Share of labelled regions masked with IoU >= 0.5, on official specimen ID documents published by their issuers.
+Share of labelled regions masked with IoU >= 0.5. `specimens` are official specimen ID documents published by their issuers; `fictional-specimens` are specimen-style documents built from Muse Image output (LAB-1121). The two sets hold different documents, so compare runs within a set.
 
-| Run | Images | Countries | portrait | signature | mrz | text | All regions | Over-masking (mean) |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| `2026-10-27-visual-specimens-id-photo-prompt` | 65 | 24 | 76.9% | 83.8% | 0.0% | 0.4% | 20.2% | 1.5% |
-| `2026-10-27-visual-specimens-person-prompt` | 65 | 24 | 90.8% | 83.8% | 0.0% | 0.4% | 22.4% | 2.1% |
+| Run | Set | Images | Countries | portrait | signature | mrz | text | All regions | Over-masking (mean) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `2026-10-27-visual-fictional-muse-image` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 0.0% | 34.5% | 47.6% | 0.8% |
+| `2026-10-27-visual-specimens-id-photo-prompt` | `specimens` | 65 | 24 | 76.9% | 83.8% | 0.0% | 0.4% | 20.2% | 1.5% |
+| `2026-10-27-visual-specimens-person-prompt` | `specimens` | 65 | 24 | 90.8% | 83.8% | 0.0% | 0.4% | 22.4% | 2.1% |
 
 ## Run log
 
@@ -230,6 +231,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-glimmer-zero-shot-llm-low` | pii-guard Muse Glimmer (low) | smoke | en, hu | imported | `c759b54` | Modal, 1x NVIDIA H100 80 GB, vLLM (vllm/vllm-openai:muse-glimmer), bf16 | ≈ $4.00, 60 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-visual-specimens-person-prompt` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `84b6422` | — | ≈ $0.65 |
 | 2026-10-27 | `2026-10-27-visual-specimens-id-photo-prompt` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `84b6422` | — | ≈ $0.65 |
+| 2026-10-27 | `2026-10-27-visual-fictional-muse-image` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `88e98bd` | — | ≈ $0.24 |
 | 2026-10-26 | `2026-10-26-rules-muse-spark-smoke-hu` | pii-guard rules + Muse Spark 1.3 | smoke | hu | imported | `62b64fc` | local harness; the LLM detector is a remote API call | — |
 | 2026-10-26 | `2026-10-26-rules-muse-spark-smoke-en` | pii-guard rules + Muse Spark 1.3 | smoke | en | imported | `62b64fc` | local harness; the LLM detector is a remote API call | — |
 | 2026-10-26 | `2026-10-26-comparison-synth-sample-privaite` | PrivAiTe | synth-sample | en, hu | imported | `62b64fc` | arm64, 10 CPUs, CPU only | — |

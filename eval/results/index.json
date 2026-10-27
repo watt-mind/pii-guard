@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "pii-guard eval report",
   "about": "Generated from eval/results/runs/*.json; do not edit. Rates are 0-1; latency in ms.",
-  "runs_digest": "818fdfc65c14fe8eb6ef1c3f6e89d30411911b5b2fd1c6090fa9db7d524d366a",
+  "runs_digest": "96c0d83856095c9e024c8156793ab1a031c66f44da01f9154acb36df604bf410",
   "languages": [
     "en",
     "hu"
@@ -35,6 +35,17 @@
         "hu": 368
       },
       "generators": []
+    },
+    "fictional-specimens": {
+      "origin": "generated",
+      "kind": "visual",
+      "languages": [],
+      "documents": {
+        "all": 24
+      },
+      "generators": [
+        "muse-image"
+      ]
     },
     "injection": {
       "origin": "hand-written",
@@ -1310,6 +1321,57 @@
         "The LLM detector had no reasoning-effort or token-budget setting yet; some completions were cut off and retried."
       ],
       "imported_from": "eval/results/2026-10-26-baselines/smoke-hu-rules-llm.json"
+    },
+    {
+      "run_id": "2026-10-27-visual-fictional-muse-image",
+      "kind": "visual",
+      "date": "2026-10-27",
+      "recorded_at": null,
+      "source": "imported",
+      "title": "pii-guard image masking (sam-3.1 + tesseract + rules) on specimens",
+      "commit": "88e98bdcb0bca3bcf3ad9944770dca50071ded48",
+      "dirty": false,
+      "system": "visual:sam-3.1+tesseract+rules",
+      "fixture_set": "specimens",
+      "origin": "generated",
+      "languages": [],
+      "detectors": [
+        {
+          "name": "sam",
+          "model": "sam-3.1",
+          "model_ref": null,
+          "settings": {
+            "prompts": "{\"FACE\": [\"face\"], \"ID_PHOTO\": [\"photo of a person\"], \"SIGNATURE\": [\"signature\", \"squiggly line\"]}"
+          },
+          "serving": null
+        },
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": null,
+      "cost": {
+        "usd": 0.24,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": "SAM sam-3.1: 96 calls at $0.0025/call (planning estimate; responses report no price)",
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1121: fictional specimen-style documents (portraits, signatures and textures from Muse Image), so the images can be committed. Not comparable with the official specimen set: different documents, and MRZ is a region type here."
+      ],
+      "imported_from": "eval/results/visual/fictional.json"
     },
     {
       "run_id": "2026-10-27-visual-specimens-id-photo-prompt",
@@ -29811,6 +29873,103 @@
   ],
   "visual": [
     {
+      "run_id": "2026-10-27-visual-fictional-muse-image",
+      "date": "2026-10-27",
+      "commit": "88e98bdcb0bca3bcf3ad9944770dca50071ded48",
+      "system": "visual:sam-3.1+tesseract+rules",
+      "notes": [
+        "LAB-1121: fictional specimen-style documents (portraits, signatures and textures from Muse Image), so the images can be committed. Not comparable with the official specimen set: different documents, and MRZ is a region type here."
+      ],
+      "fixture_set": "fictional-specimens",
+      "specimens": 24,
+      "overall": {
+        "regions": 149,
+        "recall_iou50": 0.4765,
+        "recall_cov90": 0.4765,
+        "mean_coverage": 0.4813
+      },
+      "by_region_type": {
+        "portrait": {
+          "regions": 18,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9893
+        },
+        "signature": {
+          "regions": 15,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9706
+        },
+        "mrz": {
+          "regions": 6,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.1008
+        },
+        "text": {
+          "regions": 110,
+          "recall_iou50": 0.3455,
+          "recall_cov90": 0.3455,
+          "mean_coverage": 0.3522
+        }
+      },
+      "by_doc_type": {
+        "badge": {
+          "regions": 12,
+          "recall_iou50": 0.6667,
+          "recall_cov90": 0.6667,
+          "mean_coverage": 0.6599,
+          "specimens": 3
+        },
+        "driving_licence": {
+          "regions": 15,
+          "recall_iou50": 0.4667,
+          "recall_cov90": 0.4667,
+          "mean_coverage": 0.4585,
+          "specimens": 3
+        },
+        "form": {
+          "regions": 27,
+          "recall_iou50": 0.6296,
+          "recall_cov90": 0.6296,
+          "mean_coverage": 0.6233,
+          "specimens": 3
+        },
+        "id_card": {
+          "regions": 29,
+          "recall_iou50": 0.3448,
+          "recall_cov90": 0.3448,
+          "mean_coverage": 0.3651,
+          "specimens": 6
+        },
+        "letter": {
+          "regions": 24,
+          "recall_iou50": 0.5417,
+          "recall_cov90": 0.5417,
+          "mean_coverage": 0.543,
+          "specimens": 3
+        },
+        "member_card": {
+          "regions": 15,
+          "recall_iou50": 0.4,
+          "recall_cov90": 0.4,
+          "mean_coverage": 0.4437,
+          "specimens": 3
+        },
+        "passport": {
+          "regions": 27,
+          "recall_iou50": 0.3704,
+          "recall_cov90": 0.3704,
+          "mean_coverage": 0.3634,
+          "specimens": 3
+        }
+      },
+      "countries": 3,
+      "over_masking_mean": 0.0075,
+      "cost_usd": 0.24
+    },
+    {
       "run_id": "2026-10-27-visual-specimens-id-photo-prompt",
       "date": "2026-10-27",
       "commit": "84b64225df4e8e499818dc6e104c00c95fabd51c",
@@ -29818,6 +29977,7 @@
       "notes": [
         "Before the prompt study: ID_PHOTO prompted as 'id photo'."
       ],
+      "fixture_set": "specimens",
       "specimens": 65,
       "overall": {
         "regions": 406,
@@ -29886,6 +30046,7 @@
       "notes": [
         "After the prompt study: ID_PHOTO prompted as 'photo of a person'."
       ],
+      "fixture_set": "specimens",
       "specimens": 65,
       "overall": {
         "regions": 406,
