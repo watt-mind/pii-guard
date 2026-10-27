@@ -46,6 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
 
+    connect = sub.add_parser(
+        "connect",
+        help="put a coding agent (pi, Muse Code) behind the gateway (docs/integrations/)",
+        add_help=False,
+    )
+    connect.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     baselines = sub.add_parser(
         "baselines", help="set up the comparison baselines (docs/evaluation.md)"
     )
@@ -104,6 +110,12 @@ def _bench(args: argparse.Namespace) -> int:
     return bench_main(args.args)
 
 
+def _connect(args: argparse.Namespace) -> int:
+    from pii_guard.integrations.cli import main as connect_main
+
+    return connect_main(args.args)
+
+
 def _baselines(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     if args.baselines_command != "download":
         parser.parse_args(["baselines", "--help"])
@@ -127,6 +139,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if argv and argv[0] == "eval":
         # Hand everything after "eval" to the eval CLI untouched (it owns its own flags).
         return _eval(argparse.Namespace(args=argv[1:]))
+    if argv and argv[0] == "connect":
+        return _connect(argparse.Namespace(args=argv[1:]))
     if argv and argv[0] == "lang":
         return _lang(argparse.Namespace(args=argv[1:]))
     parser = build_parser()

@@ -1,0 +1,61 @@
+{
+  "pi_version": "1.4.0",
+  "upstream": "https://api.meta.ai/v1",
+  "model": "muse-spark-1.3",
+  "ner": true,
+  "pi_exit": 0,
+  "requests": 3,
+  "gateway_statuses": [
+    200,
+    200,
+    200
+  ],
+  "refused": 0,
+  "placeholders_upstream": 31,
+  "gaps_upstream": {
+    "secrets": 3,
+    "csv_names": 0
+  },
+  "files_written": [
+    "reply.md"
+  ],
+  "placeholders_in_files": 0,
+  "placeholders_by_type": {
+    "BANK_ACCOUNT": 6,
+    "EMAIL": 11,
+    "PERSON": 8,
+    "PHONE": 6
+  },
+  "request_keys": {
+    "top_level": [
+      "max_completion_tokens",
+      "messages",
+      "model",
+      "stream",
+      "stream_options",
+      "tools"
+    ],
+    "message": [
+      "content",
+      "role",
+      "tool_call_id",
+      "tool_calls"
+    ],
+    "roles": [
+      "assistant",
+      "system",
+      "tool",
+      "user"
+    ]
+  },
+  "seconds": 30.6,
+  "kind": "coding-agent-e2e",
+  "date": "2026-10-27",
+  "client": "pi",
+  "gateway_mode": "fast",
+  "gold_checked": 13,
+  "gold_upstream": 0,
+  "restored_in_files": 5,
+  "ok": true,
+  "data": "fictional (examples/coding-agents/mini-repo)"
+}

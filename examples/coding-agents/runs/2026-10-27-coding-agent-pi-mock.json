@@ -1,0 +1,64 @@
+{
+  "pi_version": "1.4.0",
+  "upstream": "scripted mock",
+  "model": "pii-guard-mock-coder",
+  "ner": true,
+  "pi_exit": 0,
+  "requests": 5,
+  "gateway_statuses": [
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "refused": 0,
+  "placeholders_upstream": 52,
+  "gaps_upstream": {
+    "secrets": 3,
+    "csv_names": 0
+  },
+  "files_written": [
+    "reply.md"
+  ],
+  "placeholders_in_files": 0,
+  "placeholders_by_type": {
+    "ADDRESS": 1,
+    "BANK_ACCOUNT": 10,
+    "EMAIL": 17,
+    "PERSON": 14,
+    "PHONE": 10
+  },
+  "request_keys": {
+    "top_level": [
+      "max_completion_tokens",
+      "messages",
+      "model",
+      "stream",
+      "stream_options",
+      "tools"
+    ],
+    "message": [
+      "content",
+      "role",
+      "tool_call_id",
+      "tool_calls"
+    ],
+    "roles": [
+      "assistant",
+      "system",
+      "tool",
+      "user"
+    ]
+  },
+  "seconds": 18.5,
+  "kind": "coding-agent-e2e",
+  "date": "2026-10-27",
+  "client": "pi",
+  "gateway_mode": "fast",
+  "gold_checked": 13,
+  "gold_upstream": 0,
+  "restored_in_files": 13,
+  "ok": true,
+  "data": "fictional (examples/coding-agents/mini-repo)"
+}
