@@ -3,15 +3,16 @@
   "run_id": "2026-10-27-visual-placeholders-exact-noisy",
   "kind": "text",
   "date": "2026-10-27",
-  "recorded_at": "2026-10-27T12:28:36+00:00",
+  "recorded_at": "2026-10-27T14:23:07+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "image placeholders, exact vault matching, OCR noise 0.05",
   "notes": [
-    "LAB-1156: a value printed on a fictional image, matched to the placeholder a contract-style text gave it in the same vault session; a false merge is a near-namesake's placeholder (eval/fixtures/visual/near-namesakes.json). Gold spans = values, tp = the image carries the text's placeholder, over_masked = false merges, mask latency = whole image masking per image (cached OCR)."
+    "LAB-1156: a value printed on a fictional image, matched to the placeholder a contract-style text gave it in the same vault session; a false merge is a near-namesake's placeholder (eval/fixtures/visual/near-namesakes.json). Gold spans = values, tp = the image carries the text's placeholder, over_masked = false merges, mask latency = whole image masking per image (cached OCR).",
+    "LAB-1211 re-run: letter-letter OCR confusions are real edits (except same-shape glyphs compared with case: capital I / small l, small e/c, u/v) and partial name matches need the card's tokens to be a subset of the session name (>= 2 tokens). The near-namesake set grew from 61 to 100 values (39 OCR-confusable namesakes: Iise Platzhalter, XJXK86KU4, LD8001464, ...). Before the fix, the extended set made the old matcher merge a namesake and fail closed (masking_failed); on the original set the numbers are unchanged (fuzzy 50/51 clean, 49/51 noisy, 0 false merges, 24/24 people consistent)."
   ],
   "code": {
-    "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+    "commit": "fa1fb6fe8f6ca2e49cdcea36efe4e932a86f7ebc",
     "dirty": false,
     "pii_guard_version": "0.1.0",
     "note": null
@@ -142,8 +143,8 @@
       "latency_ms": {
         "detect": null,
         "mask": {
-          "p50": 56.6,
-          "p95": 131.5
+          "p50": 241.6,
+          "p95": 483.5
         }
       },
       "per_type": {
@@ -272,8 +273,8 @@
         "latency_ms": {
           "detect": null,
           "mask": {
-            "p50": 54.7,
-            "p95": 129.7
+            "p50": 180.8,
+            "p95": 472.9
           }
         },
         "per_type": {
@@ -401,8 +402,8 @@
         "latency_ms": {
           "detect": null,
           "mask": {
-            "p50": 45.8,
-            "p95": 131.7
+            "p50": 221.4,
+            "p95": 483.5
           }
         },
         "per_type": {
@@ -530,8 +531,8 @@
         "latency_ms": {
           "detect": null,
           "mask": {
-            "p50": 61.0,
-            "p95": 131.5
+            "p50": 382.6,
+            "p95": 461.2
           }
         },
         "per_type": {
