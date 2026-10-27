@@ -200,6 +200,78 @@ describe("Live traffic", () => {
     expect(screen.queryByRole("button", { name: "Send demo traffic" })).toBeNull();
   });
 
+  it("plays the recorded traffic once, and Replay again never inflates the counters (LAB-1200)", async () => {
+    const user = userEvent.setup();
+    const total = (fixture.events as unknown[]).map(parseTrafficEvent).filter(Boolean).length;
+    const facts = () => {
+      const value = (label: string) => screen.getByText(label, { selector: "dt" }).nextElementSibling?.textContent;
+      return { calls: value("Calls"), masked: value("Values masked"), problems: value("Blocked or failed") };
+    };
+    const rows = () => within(screen.getByTestId("call-list")).getAllByRole("button").length;
+    render(<Traffic forceFixture pageHost="localhost" fixtureIntervalMs={5} />);
+    expect(await screen.findByText("Replaying the recorded calls once…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replay again" })).toHaveAttribute("aria-disabled", "true");
+
+    expect(await screen.findByText("Replay finished: every recorded call was played once.", undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(rows()).toBe(total);
+    const onePass = facts();
+    expect(onePass.calls).toBe(String(total));
+    // Nothing loops: the counters stay put after the last recorded call.
+    await new Promise((r) => setTimeout(r, 60));
+    expect(facts()).toEqual(onePass);
+
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+
+    // Cleared after the end: the empty list points at Replay again, not "waiting".
+    await user.click(screen.getByRole("button", { name: /Clear/ }));
+    expect(screen.getByText(/The recorded replay has finished/)).toBeInTheDocument();
+
+    const again = screen.getByRole("button", { name: "Replay again" });
+    await user.click(again);
+    expect(again).toHaveFocus();
+    expect(await screen.findByText("Replaying the recorded calls once…")).toBeInTheDocument();
+    expect(Number(facts().calls)).toBeLessThanOrEqual(total);
+    expect(await screen.findByText("Replay finished: every recorded call was played once.", undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(rows()).toBe(total);
+    expect(facts()).toEqual(onePass);
+  });
+
+  it("waits while paused, so the replay never claims it finished early (LAB-1200)", async () => {
+    const user = userEvent.setup();
+    const total = (fixture.events as unknown[]).map(parseTrafficEvent).filter(Boolean).length;
+    const rows = () => within(screen.getByTestId("call-list")).getAllByRole("button").length;
+    render(<Traffic forceFixture pageHost="localhost" fixtureIntervalMs={5} />);
+    await waitFor(() => expect(rows()).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+    expect(screen.getByTestId("replay-state")).toHaveTextContent("Replay paused. Press Resume to continue.");
+    // A call already in flight as Pause was pressed may land; after that, nothing moves.
+    await new Promise((r) => setTimeout(r, 20));
+    const shown = rows();
+    const resume = screen.getByRole("button", { name: /^Resume/ }).textContent;
+    await new Promise((r) => setTimeout(r, 120)); // well past one pass at 5 ms a call
+    expect(rows()).toBe(shown);
+    expect(screen.getByRole("button", { name: /^Resume/ }).textContent).toBe(resume); // not queueing
+    expect(screen.queryByText(/Replay finished/)).toBeNull();
+
+    // Replay again while paused also resumes; here, resume and let it finish.
+    await user.click(screen.getByRole("button", { name: /^Resume/ }));
+    expect(await screen.findByText("Replay finished: every recorded call was played once.", undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(rows()).toBe(total);
+  });
+
+  it("offers Replay again only after a full pass, and the new pass can be paused", async () => {
+    const user = userEvent.setup();
+    render(<Traffic forceFixture pageHost="localhost" fixtureIntervalMs={5} />);
+    const again = await screen.findByRole("button", { name: "Replay again" });
+    await screen.findByText("Replay finished: every recorded call was played once.", undefined, { timeout: 3000 });
+    // Paused, a replay never finishes, so Replay again (which also resumes) can't be hit paused.
+    await user.click(again);
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+    expect(screen.getByRole("button", { name: /^Resume/ })).toBeInTheDocument();
+    await screen.findByText("Replay paused. Press Resume to continue.");
+    expect(again).toHaveAttribute("aria-disabled", "true");
+  });
+
   it("sends demo traffic through the gateway and reports refusals", async () => {
     const user = userEvent.setup();
     const f = fakeConnect();

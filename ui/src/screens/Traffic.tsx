@@ -104,11 +104,17 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
         </p>
       </div>
 
-      <SourceBanner source={t.source} status={t.status} apiStatus={t.apiStatus} forced={forceFixture} paused={t.paused} onFixture={t.showFixture} onRetry={t.retryApi} />
+      <SourceBanner source={t.source} status={t.status} apiStatus={t.apiStatus} forced={forceFixture} paused={t.paused} onFixture={t.showFixture} onRetry={t.retryApi} replayDone={t.replayDone} onReplay={t.replay} />
 
       <section aria-label="Controls" className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant={t.paused ? "primary" : "secondary"} onClick={() => t.setPaused(!t.paused)} aria-pressed={t.paused}>
+          <Button
+            variant={t.paused ? "primary" : "secondary"}
+            onClick={() => t.setPaused(!t.paused)}
+            aria-pressed={t.paused}
+            disabled={t.replayDone && !t.paused}
+            title={t.replayDone && !t.paused ? "The recorded replay has finished" : undefined}
+          >
             {t.paused ? (
               <>
                 <PlayIcon /> Resume{t.held ? ` (${t.held} new)` : ""}
@@ -186,7 +192,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
           </header>
           {filtered.length === 0 ? (
             <div className="p-4">
-              <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} />
+              <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} />
             </div>
           ) : (
             <ul aria-label="Calls through the gateway" className="max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
@@ -251,6 +257,8 @@ function SourceBanner({
   paused,
   onFixture,
   onRetry,
+  replayDone,
+  onReplay,
 }: {
   source: TrafficSource;
   status: TrafficStatus;
@@ -259,6 +267,8 @@ function SourceBanner({
   paused: boolean;
   onFixture: () => void;
   onRetry: () => void;
+  replayDone: boolean;
+  onReplay: () => void;
 }) {
   const code = (s: string) => <code className="rounded bg-surface px-1 font-mono text-xs">{s}</code>;
   if (source === "fixture") {
@@ -278,6 +288,24 @@ function SourceBanner({
             Connect to the API
           </Button>
         )}
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 border-t border-warn/30 pt-2">
+          <p className="min-w-0 flex-1 font-medium" data-testid="replay-state">
+            {replayDone
+              ? "Replay finished: every recorded call was played once."
+              : paused
+                ? "Replay paused. Press Resume to continue."
+                : "Replaying the recorded calls once…"}
+          </p>
+          {/* Always rendered (aria-disabled while playing) so focus stays on it after a replay. */}
+          <Button
+            onClick={() => replayDone && onReplay()}
+            aria-disabled={!replayDone}
+            className={`h-8 ${replayDone ? "" : "cursor-not-allowed opacity-45"}`}
+            title={replayDone ? "Play the recorded calls again from the start" : "Available when the replay has finished"}
+          >
+            Replay again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -337,8 +365,14 @@ function SourceBanner({
   );
 }
 
-function EmptyCalls({ hasAny, source, status }: { hasAny: boolean; source: TrafficSource; status: TrafficStatus }) {
+function EmptyCalls({ hasAny, source, status, replayDone }: { hasAny: boolean; source: TrafficSource; status: TrafficStatus; replayDone: boolean }) {
   if (hasAny) return <p className="py-6 text-center text-sm text-muted">No call matches these filters.</p>;
+  if (source === "fixture" && replayDone)
+    return (
+      <p className="py-6 text-center text-sm text-muted">
+        The recorded replay has finished. Press <strong className="text-ink">Replay again</strong> to watch it from the start.
+      </p>
+    );
   if (status.state === "disabled") return <p className="py-6 text-center text-sm text-muted">Nothing to show while the traffic log is off.</p>;
   return (
     <div className="py-6 text-center text-sm text-muted">

@@ -174,7 +174,7 @@ describe("connectTraffic", () => {
 });
 
 describe("startFixtureFeed", () => {
-  it("replays recorded events with fresh ids and no original values", () => {
+  it("replays recorded events with distinct ids and no original values", () => {
     vi.useFakeTimers();
     const recorded = (fixture.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
     const got: TrafficEvent[] = [];
@@ -196,5 +196,52 @@ describe("startFixtureFeed", () => {
     }
     // ... except the labelled NER-only scenario's free-text name: the expected miss
     expect(blob).toContain("Gipsz Jakab");
+  });
+
+  it("plays each recorded call once, then stops and reports done (LAB-1200)", () => {
+    vi.useFakeTimers();
+    const recorded = (fixture.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
+    const got: TrafficEvent[] = [];
+    const onDone = vi.fn();
+    const feed = startFixtureFeed(recorded, (e) => got.push(...e), { intervalMs: 100, initial: 3, onDone });
+    vi.advanceTimersByTime(100 * (recorded.length - 3) - 1);
+    expect(onDone).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(got).toHaveLength(recorded.length);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    // Nothing more arrives: no second pass, no duplicated calls.
+    vi.advanceTimersByTime(100 * recorded.length * 3);
+    expect(got).toHaveLength(recorded.length);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(got.map((e) => e.id)).toEqual(recorded.map((e) => `${e.id}_demo`));
+    expect(got.map((e) => e.seq)).toEqual(recorded.map((_, i) => i + 1));
+    feed.close();
+    vi.useRealTimers();
+  });
+
+  it("gives a replayed call the same id every pass, so a repeat is deduped", () => {
+    vi.useFakeTimers();
+    const recorded = (fixture.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
+    const passes: string[][] = [[], []];
+    for (const pass of passes) {
+      const feed = startFixtureFeed(recorded, (e) => pass.push(...e.map((x) => x.id)), { intervalMs: 10 });
+      vi.advanceTimersByTime(10 * recorded.length);
+      feed.close();
+    }
+    expect(passes[0]).toEqual(passes[1]);
+    expect(new Set(passes[0]).size).toBe(recorded.length);
+    vi.useRealTimers();
+  });
+
+  it("finishes at once when the burst holds the whole recording, or it is empty", () => {
+    const one = (fixture.events as unknown[]).slice(0, 2).map(parseTrafficEvent) as TrafficEvent[];
+    const got: TrafficEvent[] = [];
+    const onDone = vi.fn();
+    startFixtureFeed(one, (e) => got.push(...e), { initial: 8, onDone });
+    expect(got).toHaveLength(2);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    const none = vi.fn();
+    startFixtureFeed([], () => {}, { onDone: none });
+    expect(none).toHaveBeenCalledTimes(1);
   });
 });

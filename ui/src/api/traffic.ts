@@ -333,33 +333,56 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
 
 /**
  * Offline demo: replays events recorded from `make demo` + `make demo-traffic` (masked level,
- * mock upstream), one every `intervalMs`, each with a fresh id, seq and time. The recording
- * holds no original values, so nothing here can show one.
+ * mock upstream) **once**, one every `intervalMs` after an initial burst, then stops and calls
+ * `onDone`. While `paused()` is true the replay waits, so "done" means every call was shown. Each replayed event keeps a stable id (`<recorded id>_demo`) and gets a fresh seq
+ * and time, so a repeat is dropped by the caller's id dedupe instead of inflating counters.
+ * Replaying again is a new feed on an emptied list. The recording holds no original values,
+ * so nothing here can show one.
  */
 export function startFixtureFeed(
   recorded: readonly TrafficEvent[],
   onEvents: (events: TrafficEvent[]) => void,
-  options: { intervalMs?: number; initial?: number; now?: () => number } = {},
+  options: { intervalMs?: number; initial?: number; now?: () => number; onDone?: () => void; paused?: () => boolean } = {},
 ): TrafficConnection {
   const intervalMs = options.intervalMs ?? 1600;
   const now = options.now ?? Date.now;
   let n = 0;
   const next = (): TrafficEvent => {
-    const base = recorded[n % recorded.length]!;
+    const base = recorded[n]!;
     n += 1;
     return {
       ...base,
       level: "masked",
-      id: `${base.id}_demo${n}`,
+      id: `${base.id}_demo`,
       seq: n,
       time: new Date(now()).toISOString(),
       request: base.request ? { masked: base.request.masked } : null,
       response: base.response ? { masked: base.response.masked, chunks: base.response.chunks } : null,
     };
   };
-  if (!recorded.length) return { close() {} };
+  let timer: ReturnType<typeof setInterval> | null = null;
+  const stop = () => {
+    if (timer !== null) clearInterval(timer);
+    timer = null;
+  };
+  const finish = () => {
+    stop();
+    options.onDone?.();
+  };
+  if (!recorded.length) {
+    finish();
+    return { close() {} };
+  }
   const initial = Math.min(options.initial ?? 8, recorded.length);
   onEvents(Array.from({ length: initial }, next));
-  const timer = setInterval(() => onEvents([next()]), intervalMs);
-  return { close: () => clearInterval(timer) };
+  if (n >= recorded.length) {
+    finish();
+    return { close: stop };
+  }
+  timer = setInterval(() => {
+    if (options.paused?.()) return;
+    onEvents([next()]);
+    if (n >= recorded.length) finish();
+  }, intervalMs);
+  return { close: stop };
 }
