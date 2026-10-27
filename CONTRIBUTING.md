@@ -78,11 +78,26 @@ Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml). 
 one check to require. All jobs run in parallel on GitHub-hosted runners, cost nothing and need
 no secret.
 
+Pull requests run a **fast** suite so CI answers in about two minutes; pushes to `develop` and
+`main`, the merge queue, the nightly run and manual runs run **everything**:
+
+| | Pull request | `develop`, `main`, merge queue, nightly, manual |
+|---|---|---|
+| Tests | `make test`: every test except those marked `@pytest.mark.slow` | `make test-all`: every test |
+| Coverage | line coverage (faster to measure), floor `FAST_COV_FLOOR` in the `Makefile` | branch coverage, floor `fail_under` in `pyproject.toml` |
+| Hypothesis | `ci` profile: 25 examples where a test sets no `max_examples` | `ci-full` profile: the default 100 |
+| `docker` | only when the image's inputs changed (`src/`, `Dockerfile`, `pyproject.toml`, `uv.lock`, ...) | always |
+
+Both run pytest in parallel (pytest-xdist, `-n auto`). Mark a test `slow` when it takes seconds
+on its own and something else already covers the same ground on every pull request (the
+`eval-gate` job, for example); `make test-all` runs the slow ones locally.
+
 | Job | What fails it | Locally |
 |---|---|---|
 | `lint` | ruff lint or format | `make lint` |
 | `types` | a mypy error on `src/` not listed in `scripts/ci/mypy-baseline.txt` | `make types` |
-| `test` | a failing test, total coverage under the floor (`fail_under` in `pyproject.toml`), `make smoke`, or a stale benchmark report | `make test smoke` |
+| `test` | a failing test, or total coverage under the floor (see above) | `make test` or `make test-all` |
+| `smoke` | the demo stack leaking on the mock upstream (`make smoke`), or a stale benchmark report | `make smoke` |
 | `eval-gate` | leak or over-masking rising, or round trip falling, against the newest committed run record on the same fixtures, or past a limit in [`eval/gates.json`](eval/gates.json) | `make gate` |
 | `docker` | the image over its size budget (375 MB unpacked, `scripts/ci/docker_smoke.sh`), an unhealthy container, or a masked request that leaks to the mock upstream | `make docker-smoke` |
 | `audit` | a known vulnerability in `uv.lock` (`uv audit`), or a GPL/AGPL runtime dependency | `make audit licences` |
@@ -105,9 +120,9 @@ When a gate fails:
   --update`) and record a new run when quality improves. Don't loosen a threshold to make your
   PR pass; if a regression is a deliberate trade-off, say so in the PR and change
   `eval/gates.json` in the same commit.
-- **Hypothesis:** CI uses the derandomized `ci` profile (`HYPOTHESIS_PROFILE=ci`, in
-  `tests/conftest.py`), so `HYPOTHESIS_PROFILE=ci uv run pytest <test>` replays the same
-  examples locally.
+- **Hypothesis:** CI uses the derandomized `ci` profile on pull requests and `ci-full` on
+  everything else (`HYPOTHESIS_PROFILE`, in `tests/conftest.py`), so
+  `HYPOTHESIS_PROFILE=ci uv run pytest <test>` (or `ci-full`) replays the same examples locally.
 - **pii-in-diff:** replace the value with a fictional one (an `example.com` address, an
   identifier with a wrong check digit). If it is fictional and has to be valid, add it to
   `scripts/ci/pii-allowlist.txt` with a comment.
