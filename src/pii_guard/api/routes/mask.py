@@ -28,7 +28,9 @@ from pii_guard.api.routes._common import check_text_size, log_extra, v1_router
 from pii_guard.api.routes.analyze import Language
 from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.policy import BlockedEntityError, PolicySet
+from pii_guard.types import MaskingError
 from pii_guard.vault import Vault
+from pii_guard.vault.placeholders import PLACEHOLDER_RE
 
 __all__ = ["KeptEntity", "MaskEntity", "MaskRequest", "MaskResponse", "router"]
 
@@ -83,19 +85,19 @@ def mask(
         kept = [s for s in decision.kept if s.detector != KNOWN_DETECTOR]
         to_mask = decision.masked + [s for s in decision.kept if s.detector == KNOWN_DETECTOR]
 
-        # entities() counts across the whole session; report only what this call replaced.
-        before = {placeholder: count for placeholder, _, count in session.entities()}
-        masked_text = session.mask(body.text, to_mask, language=language)
+        # Counted from this call's own replacements: entities() counts across the session, and
+        # a concurrent request on the same session could land between two reads of it.
+        result = session.mask_with_report(body.text, to_mask, language=language)
     except BaseException as exc:
         if isinstance(exc, BlockedEntityError):
             log_extra(request, blocked=",".join(f"{t.value}:{n}" for t, n in exc.counts.items()))
         if body.session_id is None:
             vault.drop(session.session_id)
         raise
+    counts = Counter(placeholder for _, _, placeholder in result.replacements)
     entities = [
-        MaskEntity(placeholder=placeholder, entity_type=entity_type.value, count=delta)
-        for placeholder, entity_type, count in session.entities()
-        if (delta := count - before.get(placeholder, 0)) > 0
+        MaskEntity(placeholder=placeholder, entity_type=_entity_type(placeholder), count=count)
+        for placeholder, count in counts.items()
     ]
     kept_entities = [
         KeptEntity(entity_type=entity_type.value, count=count)
@@ -110,8 +112,15 @@ def mask(
         new_session=body.session_id is None,
     )
     return {
-        "masked_text": masked_text,
+        "masked_text": result.text,
         "session_id": session.session_id,
         "entities": entities,
         "kept": kept_entities,
     }
+
+
+def _entity_type(placeholder: str) -> str:
+    match = PLACEHOLDER_RE.fullmatch(placeholder)
+    if match is None:  # pragma: no cover - the vault only issues well-formed placeholders
+        raise MaskingError("the vault returned a malformed placeholder")
+    return match.group(1)

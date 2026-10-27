@@ -108,6 +108,26 @@ def test_mask_counts_are_per_request(api: TestClient) -> None:
     assert nothing["masked_text"] == "Semmi."
 
 
+def test_mask_counts_ignore_a_concurrent_request_on_the_session(
+    api: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # LAB-1208: the counts came from entities() before and after mask(), so a request on the
+    # same session that landed in between was counted too. Emulate one landing mid-call.
+    from pii_guard.vault import VaultSession
+
+    session_id = api.post("/v1/mask", json={"text": f"Csak {FAKE_EMAIL}"}).json()["session_id"]
+    original = VaultSession.mask_with_report
+
+    def with_concurrent_request(self, text, spans, **kwargs):  # type: ignore[no-untyped-def]
+        original(self, f"{FAKE_EMAIL} {FAKE_EMAIL} {FAKE_EMAIL}", [], **kwargs)
+        return original(self, text, spans, **kwargs)
+
+    monkeypatch.setattr(VaultSession, "mask_with_report", with_concurrent_request)
+    body = api.post("/v1/mask", json={"text": f"Csak {FAKE_EMAIL}", "session_id": session_id})
+    assert body.status_code == 200
+    assert [e["count"] for e in body.json()["entities"]] == [1]
+
+
 def test_mask_new_sessions_are_distinct(api: TestClient) -> None:
     a = api.post("/v1/mask", json={"text": SAMPLE_TEXT}).json()
     b = api.post("/v1/mask", json={"text": SAMPLE_TEXT}).json()

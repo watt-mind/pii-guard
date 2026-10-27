@@ -13,12 +13,14 @@ import re
 import secrets
 import threading
 import time
+import unicodedata
 from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
+from pii_guard.vault.fold import FoldedText, fold_text, fold_value
 from pii_guard.vault.inflection import (
     InflectionMatcher,
     Split,
@@ -121,17 +123,23 @@ class _Entry:
     ``original`` is the lemma as first written (``Próba Zsuzsanna``). ``surfaces`` are other
     detected forms that were split onto this lemma (``Próba Zsuzsannának``): they stay
     occurrence patterns, so a split never masks less than the unsplit value did. ``seen`` maps
-    the (case-folded) suffix that followed an occurrence to the stem as it was written there,
-    so unmask restores the input exactly. ``aliases`` are unconfirmed lemmas of an unsplit
-    span (``Minta Kendét`` may be ``Minta Kende`` + ``t``): their forms are masked with this
-    entry's placeholder too, because a missed form would leak.
+    the suffix that followed an occurrence, exactly as written, to the stem as it was written
+    there, so unmask restores the input exactly (``nek`` -> ``Teszt Elek``, ``NEK`` -> ``TESZT
+    ELEK``); ``seen_folded`` is the same keyed on the case-folded suffix, for a suffix the
+    model wrote in another casing. ``aliases`` are unconfirmed lemmas of an unsplit span
+    (``Minta Kendét`` may be ``Minta Kende`` + ``t``): their forms are masked too, because a
+    missed form would leak, with an entry of their own (created on the first match), so
+    ``Minta Kende`` is restored as ``Minta Kende`` and not as ``Minta Kendét``.
 
-    ``variants`` (case-sensitive placeholders only) holds one entry per other casing class an
-    occurrence was written in (``TESZT ELEK`` for ``Teszt Elek``): each has its own placeholder,
-    ``original`` and ``seen``, and shares this entry's patterns, which only it holds.
+    ``variants`` holds one entry per other *form* an occurrence was written in: another casing
+    class (``TESZT ELEK`` for ``Teszt Elek``, case-sensitive placeholders only) or another
+    layout (a line break or tab inside the value, decomposed accents). Each has its own
+    placeholder, ``original`` and ``seen``, and shares this entry's patterns, which only it
+    holds.
     """
 
     __slots__ = (
+        "alias_patterns",
         "aliases",
         "casing",
         "count",
@@ -142,6 +150,7 @@ class _Entry:
         "patterns",
         "placeholder",
         "seen",
+        "seen_folded",
         "surfaces",
         "variants",
     )
@@ -161,9 +170,11 @@ class _Entry:
         self.language = language
         self.count = 0
         self.patterns: dict[str, re.Pattern[str]] = {}
+        self.alias_patterns: dict[str, list[tuple[str, re.Pattern[str]]]] = {}
         self.surfaces: dict[str, None] = {}
         self.aliases: dict[str, None] = {}
         self.seen: dict[str, str] = {}
+        self.seen_folded: dict[str, str] = {}
         self.casing = casing_class(original)
         self.variants: dict[str, _Entry] = {}
 
@@ -178,15 +189,17 @@ class _Entry:
     def add_alias(self, lemma: str) -> None:
         if lemma != self.original and lemma not in self.aliases:
             self.aliases[lemma] = None
-            self.patterns.clear()
+            self.alias_patterns.clear()
 
     def remember(self, suffix: str, stem: str) -> None:
         if suffix:
-            self.seen.setdefault(suffix.casefold(), stem)
+            self.seen.setdefault(suffix, stem)
+            self.seen_folded.setdefault(suffix.casefold(), stem)
 
     def pattern(self, language: str) -> re.Pattern[str]:
-        """Case/whitespace-insensitive pattern for further occurrences of the value.
+        """Pattern for further occurrences of the value, over :func:`fold_text`'s folded text.
 
+        Case-, whitespace- and Unicode-form-insensitive (``WEISS`` for ``Weiß``, NFD for NFC).
         A match covers the stem only; an allowed suffix is checked by lookahead and stays
         outside. Alternatives: the lemma, its changed stems (``Zsuzsanná`` before ``-nak``,
         ``Kováccs`` before ``-al``) and the detected surface forms split onto it.
@@ -194,13 +207,30 @@ class _Entry:
         pattern = self.patterns.get(language)
         if pattern is None:
             matcher = inflection_for(language)
-            alternatives = _forms(matcher, self.original, self.entity_type)
-            alternatives += [_occurrence(matcher, s, self.entity_type) for s in self.surfaces]
-            for alias in self.aliases:
-                alternatives += _forms(matcher, alias, self.entity_type)
-            pattern = re.compile("|".join(f"(?:{a})" for a in alternatives), re.IGNORECASE)
+            alternatives = _forms(matcher, fold_value(self.original), self.entity_type)
+            alternatives += [
+                _occurrence(matcher, fold_value(s), self.entity_type) for s in self.surfaces
+            ]
+            pattern = _compile(alternatives)
             self.patterns[language] = pattern
         return pattern
+
+    def alias_pattern_list(self, language: str) -> list[tuple[str, re.Pattern[str]]]:
+        """``(alias, pattern of its forms)`` per alias, like :meth:`pattern`."""
+        cached = self.alias_patterns.get(language)
+        if cached is None:
+            matcher = inflection_for(language)
+            cached = [
+                (alias, _compile(_forms(matcher, fold_value(alias), self.entity_type)))
+                for alias in self.aliases
+            ]
+            self.alias_patterns[language] = cached
+        return cached
+
+
+def _compile(alternatives: list[str]) -> re.Pattern[str]:
+    # The text is case-folded already; IGNORECASE covers a custom matcher's upper-case suffix.
+    return re.compile("|".join(f"(?:{a})" for a in alternatives), re.IGNORECASE)
 
 
 def _body(value: str) -> str:
@@ -208,7 +238,11 @@ def _body(value: str) -> str:
 
 
 def _forms(matcher: InflectionMatcher, value: str, entity_type: EntityType) -> list[str]:
-    """``value`` with its allowed suffixes, then its changed stems before theirs."""
+    """``value`` with its allowed suffixes, then its changed stems before theirs.
+
+    ``value`` is folded (:func:`~pii_guard.vault.fold.fold_value`) and the patterns run over
+    folded text.
+    """
     forms = [_occurrence(matcher, value, entity_type)]
     for stem, suffix in variant_stems(matcher, value, entity_type):
         left = r"(?<!\w)" if _is_word_char(stem[0]) else ""
@@ -327,8 +361,11 @@ class VaultSession:
         """Replace each span, and every other occurrence of a confirmed value, by its placeholder.
 
         Confirmed values are those in ``spans`` plus every value this session masked before.
-        Further occurrences match case- and whitespace-insensitively and, for ``language``,
-        with inflectional suffixes kept outside the placeholder (``[[PERSON_7f3a]]nek``).
+        Further occurrences are searched in a folded view of ``text`` (:mod:`~pii_guard.vault.fold`:
+        case, whitespace, Unicode form, ``ß``/``ss``) and, for ``language``, with inflectional
+        suffixes kept outside the placeholder (``[[PERSON_7f3a]]nek``). An occurrence with a
+        line break inside it or decomposed accents gets a placeholder of its own, so it
+        round-trips as written.
 
         Every form of one value shares one placeholder keyed on its lemma: a span that ends
         in a suffix is narrowed to the stem (``Próba Zsuzsannának`` -> ``[[PERSON_x]]nak``)
@@ -407,15 +444,30 @@ class VaultSession:
                 entry.add_alias(alias)
             replacements.append((span.start, end, self._cased(entry, text[span.start : end])))
             taken[span.start : end] = b"\x01" * (end - span.start)
+        folded = fold_text(text)
         # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
         entries = sorted(self._by_key.values(), key=lambda e: len(e.normalized), reverse=True)
         for entry in entries:
-            for match in entry.pattern(language).finditer(text):
-                start, end = match.span()
+            for start, end in _occurrences(entry.pattern(language), folded):
                 if any(taken[start:end]):
                     continue
                 replacements.append((start, end, self._cased(entry, text[start:end])))
                 taken[start:end] = b"\x01" * (end - start)
+            # Forms of an alias share the entry's placeholder; with a suffix, unmask restores
+            # them from ``seen``. A bare alias ("Minta Kende" after a "Minta Kendét" span) would
+            # come back as the span's surface: it gets the alias's own entry instead.
+            for alias, pattern in entry.alias_pattern_list(language):
+                for start, end in _occurrences(pattern, folded):
+                    if any(taken[start:end]):
+                        continue
+                    written = text[start:end]
+                    owner = entry
+                    if not following_suffix(text, end) and normalize_value(
+                        written
+                    ) == normalize_value(alias):
+                        owner = self._entry_for(entry.entity_type, written, language)
+                    replacements.append((start, end, self._cased(owner, written)))
+                    taken[start:end] = b"\x01" * (end - start)
         replacements.sort(key=lambda r: r[0])
         parts: list[str] = []
         cursor = 0
@@ -490,15 +542,33 @@ class VaultSession:
                 plans.append(_Plan(span, value, len(value)))
             # A span's own value is a confirmed lemma for the others ("Zoltán" for "Zoltánt").
             confirmed.add((span.entity_type, normalize_value(value)))
+        # Lemmas other spans may be inflected forms of ("Varga Bernadett" for "...Bernadettel").
+        candidate_of: dict[tuple[EntityType, str], set[int]] = {}
+        for index, candidates in pending.items():
+            for c in candidates:
+                key = (ordered[index].entity_type, normalize_value(c.lemma))
+                candidate_of.setdefault(key, set()).add(index)
         for index, candidates in pending.items():
             span = ordered[index]
+            own = (span.entity_type, normalize_value(span.text))
+            if candidate_of.get(own, set()) - {index}:
+                # Another span reads as an inflected form of this one: it is a lemma itself.
+                plans[index] = _Plan(span, span.text, span.length)
+                continue
+            # A confirmed lemma beats one that only two surfaces agree on.
             choice = next(
                 (
                     c
                     for c in candidates
-                    if (key := (span.entity_type, normalize_value(c.lemma))) in confirmed
-                    or len(votes.get(key, ())) >= 2
+                    if (span.entity_type, normalize_value(c.lemma)) in confirmed
                     or _occurs_alone(text, c.lemma, span)
+                ),
+                None,
+            ) or next(
+                (
+                    c
+                    for c in candidates
+                    if len(votes.get((span.entity_type, normalize_value(c.lemma)), ())) >= 2
                 ),
                 None,
             )
@@ -525,25 +595,38 @@ class VaultSession:
         self._by_placeholder[placeholder] = entry
         return entry
 
+    def _form(self, value: str) -> str:
+        """The variant key of ``value``: its casing class (case-sensitive mode) and layout.
+
+        A casing-only key is the casing class itself, so those ids are derived as before.
+        """
+        casing = casing_class(value) if self._case_sensitive else ""
+        layout = _layout(value)
+        return f"{casing}|{layout}" if layout else casing
+
     def _cased(self, entry: _Entry, written: str) -> _Entry:
         """The entry an occurrence written as ``written`` is masked with.
 
-        ``entry`` itself, unless placeholders are case-sensitive and ``written`` is in another
-        casing class than the entry's value: then that class's variant, created on first use.
+        ``entry`` itself, unless ``written`` is in another form than the entry's value: another
+        layout (a line break inside it, decomposed accents) or, with case-sensitive
+        placeholders, another casing class. Then that form's variant, created on first use.
         """
-        if not self._case_sensitive:
+        form = self._form(written)
+        if form == self._form(entry.original):
             return entry
-        casing = casing_class(written)
-        if casing == entry.casing:
-            return entry
-        variant = entry.variants.get(casing)
+        variant = entry.variants.get(form)
         if variant is None:
-            placeholder = self._new_placeholder(entry.entity_type, entry.normalized, casing)
-            original = _recased(entry.original, written, entry.normalized, casing)
+            placeholder = self._new_placeholder(entry.entity_type, entry.normalized, form)
+            # The value in the written form: its casing (case-sensitive mode; the whole
+            # value as written, or a changed stem's lemma recased) and its layout.
+            original = entry.original
+            if self._case_sensitive:
+                original = _recased(original, written, entry.normalized, casing_class(written))
+            original = _relaid(original, written)
             variant = _Entry(
                 placeholder, entry.entity_type, original, entry.normalized, entry.language
             )
-            entry.variants[casing] = variant
+            entry.variants[form] = variant
             self._by_placeholder[placeholder] = variant
         return variant
 
@@ -607,6 +690,41 @@ class VaultSession:
             return [(e.placeholder, e.entity_type, e.count) for e in self._by_placeholder.values()]
 
 
+def _occurrences(pattern: re.Pattern[str], folded: FoldedText) -> list[tuple[int, int]]:
+    """Original ``(start, end)`` of every non-empty match of ``pattern`` in the folded text."""
+    return [
+        folded.to_original(*match.span())
+        for match in pattern.finditer(folded.text)
+        if match.end() > match.start()
+    ]
+
+
+def _layout(value: str) -> str:
+    """How ``value`` is laid out, beyond casing: ``""`` for spaces and composed accents.
+
+    Otherwise the whitespace between its words (``"\\n"`` for ``Teszt\\nElek``; a run of plain
+    spaces counts as one space) and ``nfd`` for decomposed accents. An occurrence in another
+    layout than its entry's value gets a variant of its own, so unmask gives back the line
+    break or the decomposed accents as written.
+    """
+    runs = [" " if not run.strip(" ") else run for run in re.findall(r"\s+", value.strip())]
+    composed = unicodedata.is_normalized("NFC", value)
+    if all(run == " " for run in runs) and composed:
+        return ""
+    return "".join(runs).encode("unicode_escape").decode("ascii") + ("" if composed else "|nfd")
+
+
+def _relaid(value: str, written: str) -> str:
+    """``value`` with the whitespace and Unicode form of ``written`` (same number of words)."""
+    words = value.split()
+    runs = re.findall(r"\s+", written.strip())
+    if len(runs) == len(words) - 1:
+        value = words[0] + "".join(run + word for run, word in zip(runs, words[1:], strict=True))
+    if not unicodedata.is_normalized("NFC", written):
+        value = unicodedata.normalize("NFD", value)
+    return value
+
+
 def _recased(original: str, written: str, normalized: str, casing: str) -> str:
     """The value a casing variant restores: as written if ``written`` is the whole value,
     otherwise (a changed stem such as ``ZSUZSANNÁ``) ``original`` in that casing class.
@@ -632,7 +750,9 @@ def _restored(entry: _Entry, suffix: str) -> str:
     """
     if not suffix:
         return entry.original
-    stem = entry.seen.get(suffix.casefold())
+    stem = entry.seen.get(suffix)
+    if stem is None:
+        stem = entry.seen_folded.get(suffix.casefold())
     if stem is not None:
         return stem + suffix
     return restore(inflection_for(entry.language), entry.original, suffix, entry.entity_type)

@@ -132,8 +132,9 @@ def test_undetected_occurrences_are_masked_case_and_whitespace_insensitively(
     masked = session.mask(text, [span_of(text, NAME, "PERSON")])
     assert "teszt" not in masked.casefold()
     assert masked.count("[[PERSON_") == 3
-    # Re-identification restores the confirmed surface form.
-    assert session.unmask(masked) == f"{NAME}, {NAME} és {NAME}"
+    # Re-identification restores the confirmed casing; a line break inside the value is kept
+    # (its own placeholder, LAB-1208).
+    assert session.unmask(masked) == f"{NAME}, {NAME} és Teszt\nElek"
 
 
 def test_values_confirmed_earlier_are_masked_in_later_calls(vault: Vault) -> None:

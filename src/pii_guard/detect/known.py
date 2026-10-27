@@ -46,15 +46,11 @@ class KnownValuesDetector:
         taken = bytearray(len(text))
         spans: list[Span] = []
         # Longest values first, so "Teszt Elek" wins over a separately loaded "Elek".
-        for item, pattern in self._values.patterns(language):
-            for match in pattern.finditer(text):
-                start, end = match.span()
-                if end <= start or any(taken[start:end]):
-                    continue
-                taken[start:end] = b"\x01" * (end - start)
-                spans.append(
-                    Span(start, end, item.entity_type, text[start:end], 1.0, KNOWN_DETECTOR)
-                )
+        for item, start, end in self._values.occurrences(text, language):
+            if end <= start or any(taken[start:end]):
+                continue
+            taken[start:end] = b"\x01" * (end - start)
+            spans.append(Span(start, end, item.entity_type, text[start:end], 1.0, KNOWN_DETECTOR))
         spans.sort(key=lambda s: s.start)
         return spans
 

@@ -86,6 +86,15 @@ def _is_consonant(char: str) -> bool:
     return char.isalpha() and char.casefold() not in _HU_VOWELS and char.casefold() != "y"
 
 
+def _hu_doubled(value: str) -> bool:
+    """``value`` ends in a doubled consonant (``Kiss``, ``Bernadett``, ``Mariann``)."""
+    return (
+        len(value) >= 2
+        and _is_consonant(value[-1])
+        and value[-1].casefold() == value[-2].casefold()
+    )
+
+
 #: Entity types whose values inflect like words, so a suffix can change their stem.
 _STEM_CHANGE_TYPES = frozenset({EntityType.PERSON, EntityType.ADDRESS, EntityType.ORGANIZATION})
 
@@ -111,8 +120,9 @@ class HungarianSuffixMatcher:
 
     Suffixes that leave the value intact: the common case endings, instrumental and
     translative forms with consonant doubling when the value ends in a single consonant
-    (``Elek`` -> ``Elekkel``, ``Elekké``), ``-val``/``-vel`` after a vowel, and hyphenated
-    suffixes after codes and numbers (``ABC-123-nak``).
+    (``Elek`` -> ``Elekkel``, ``Elekké``) and without one after a doubled consonant (``Kiss``
+    -> ``Kissel``, ``Bernadett`` -> ``Bernadetté``), ``-val``/``-vel`` after a vowel, and
+    hyphenated suffixes after codes and numbers (``ABC-123-nak``).
 
     Stem changes (:meth:`variant_stems`, :meth:`splits`, :meth:`restore`): a final ``a``/``e``
     lengthens before most suffixes (``Zsuzsanna`` -> ``Zsuzsannának``, ``Zsuzsannát``) and a
@@ -128,6 +138,9 @@ class HungarianSuffixMatcher:
         elif _hu_old_digraph(value) is not None:
             sound = value.casefold()[-2]  # Tóth -> t, Kovácz -> c
             suffixes |= {f"{sound}al", f"{sound}el", f"{sound}á", f"{sound}é"}
+        elif _hu_doubled(value):
+            # Kiss -> Kissel, Bernadett -> Bernadettel: the v assimilates, no third letter.
+            suffixes |= set(_HU_DOUBLED_ENDINGS)
         elif last.isalpha() and not value.casefold().endswith(_HU_DIGRAPHS):
             suffixes |= {f"{last}al", f"{last}el", f"{last}á", f"{last}é"}
         plain = "|".join(re.escape(s) for s in sorted(suffixes, key=len, reverse=True))
@@ -157,8 +170,10 @@ class HungarianSuffixMatcher:
         Strong: a lengthened final vowel before a three-letter case ending in vowel harmony
         (``Zsuzsannának``, ``Kendével``). Weak, applied only when the lemma is confirmed: other
         lengthened forms (``Zsuzsannát``: ``Donát`` and ``Zoltán`` look the same), consonant and
-        digraph doubling (``Elekkel``, ``Kováccsal``), unchanged stems (``Eleknek``: ``Kornél``
-        looks the same) and hyphenated suffixes after codes (``ABC-123-nak``).
+        digraph doubling (``Elekkel``, ``Kováccsal``; ``Bernadettel`` is read both as
+        ``Bernadet`` + ``tel`` and as ``Bernadett`` + ``el``, like ``Kissel`` as ``Kis`` and
+        ``Kiss``), unchanged stems (``Eleknek``: ``Kornél`` looks the same) and hyphenated
+        suffixes after codes (``ABC-123-nak``).
         """
         surface = surface.strip()
         if not surface or not surface[-1].isalpha():
@@ -204,13 +219,8 @@ class HungarianSuffixMatcher:
                 if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
                     found.append(Split(lemma, lemma, surface[len(lemma) :]))
                 continue
-            # Elek|kel -> Elek: a single final consonant doubled into the suffix.
-            if (
-                len(stem) >= 2
-                and _is_consonant(stem[-1])
-                and stem[-1].casefold() == stem[-2].casefold()
-                and _is_consonant(stem[-2])
-            ):
+            if _hu_doubled(stem):
+                # Elek|kel -> Elek: a single final consonant doubled into the suffix.
                 lemma = stem[:-1]
                 if (
                     lemma[-2:-1].casefold() != lemma[-1].casefold()
@@ -218,6 +228,9 @@ class HungarianSuffixMatcher:
                     and _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1
                 ):
                     found.append(Split(lemma, lemma, surface[len(lemma) :]))
+                # Bernadett|el -> Bernadett, Kiss|el -> Kiss: the value already ends doubled.
+                if _last_token_letters(stem) >= _MIN_LEMMA_LETTERS + 1:
+                    found.append(Split(stem, stem, surface[len(stem) :]))
         for suffix in sorted(set(_HU_SUFFIXES) | set(_HU_HYPHENATED), key=len, reverse=True):
             cut = len(surface) - len(suffix)
             if cut < 1 or not folded.endswith(suffix) or not surface[cut - 1].isalpha():

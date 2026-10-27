@@ -19,6 +19,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from pii_guard.types import EntityType, PiiGuardError
+from pii_guard.vault.fold import fold_text, fold_value
 from pii_guard.vault.inflection import inflection_for
 from pii_guard.vault.placeholders import normalize_value
 
@@ -153,34 +154,45 @@ class KnownValues:
             self._values.clear()
             self._patterns.clear()
 
+    def occurrences(self, text: str, language: str) -> list[tuple[KnownValue, int, int]]:
+        """``(value, start, end)`` of every occurrence in ``text``, longest value first.
+
+        Offsets are in ``text``; matches may overlap (the caller picks). The search runs over
+        :func:`~pii_guard.vault.fold.fold_text`'s folded view, so another casing, Unicode
+        form or ``ß``/``ss`` spelling (``WEISS`` for ``Weiß``) is found too.
+        """
+        patterns = self.patterns(language)
+        if not patterns:
+            return []
+        folded = fold_text(text)
+        found: list[tuple[KnownValue, int, int]] = []
+        for item, pattern in patterns:
+            for match in pattern.finditer(folded.text):
+                if match.end() > match.start():
+                    found.append((item, *folded.to_original(*match.span())))
+        return found
+
     def patterns(self, language: str) -> list[tuple[KnownValue, re.Pattern[str]]]:
         """``(value, pattern)`` per value, longest value first, for ``language``.
 
-        A pattern matches an occurrence case- and whitespace-insensitively; with the
-        language's inflection matcher it also matches changed stems (``Próba Zsuzsanná`` before
-        ``-nak``) and allows a suffix after the value, which stays outside the match: the
-        same occurrence rules the vault applies to values it has confirmed.
+        A pattern runs over folded text (:func:`~pii_guard.vault.fold.fold_text`; use
+        :meth:`occurrences` for offsets in the original) and matches an occurrence case-,
+        whitespace- and Unicode-form-insensitively; with the language's inflection matcher it
+        also matches changed stems (``Próba Zsuzsanná`` before ``-nak``) and allows a suffix
+        after the value, which stays outside the match: the same occurrence rules the vault
+        applies to values it has confirmed.
         """
         with self._lock:
             cached = self._patterns.get(language)
             if cached is None:
-                from pii_guard.vault.vault import _forms  # the vault's own occurrence rules
+                from pii_guard.vault.vault import _compile, _forms  # the vault's own rules
 
                 matcher = inflection_for(language)
                 ordered = sorted(
                     self._values.values(), key=lambda v: len(normalize_value(v.value)), reverse=True
                 )
                 cached = [
-                    (
-                        item,
-                        re.compile(
-                            "|".join(
-                                f"(?:{form})"
-                                for form in _forms(matcher, item.value, item.entity_type)
-                            ),
-                            re.IGNORECASE,
-                        ),
-                    )
+                    (item, _compile(_forms(matcher, fold_value(item.value), item.entity_type)))
                     for item in ordered
                 ]
                 self._patterns[language] = cached

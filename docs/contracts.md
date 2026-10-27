@@ -285,7 +285,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 
 | Status | `code` | When |
 |---|---|---|
-| 404 | `not_found` | Unknown route, or unknown `session_id` on unmask |
+| 404 | `not_found` | Unknown route, or an unknown or expired `session_id` on any route that takes one (`/v1/analyze`, `/v1/mask`, `/v1/mask/image`, `/v1/unmask`, the session and known-values routes, the gateway) |
 | 422 | `invalid_request` | Body fails validation. The message lists field locations only, never values. |
 | 422 | `invalid_known_value` | A pre-loaded known value is too short (< 3 non-space characters), too long, or has an unknown or visual type. The message names its index and type, never the value. |
 | 422 | `too_many_known_values` | The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values; nothing is added. |
@@ -431,7 +431,7 @@ Options (JSON fields, or query parameters with a raw upload):
   to `opaque`; an explicit `labels` is then `500 vault_not_configured`.
 - `session_id`: the vault session to mask in (`labels` only), shared with `/v1/mask` and the
   gateway, so the same person gets the same placeholder in text and in images. Omitted: a new
-  session is created and returned. Unknown: `404 session_not_found`.
+  session is created and returned. Unknown or expired: `404 not_found`.
 - `expiry`: `reduce` (default; the summary says `expired: true|false` only) or `keep` (the
   summary also carries the ISO expiry date).
 
@@ -689,8 +689,14 @@ class StreamUnmasker:
 
 `MaskResult` and `UnmaskResult` hold original values in `text`, so their `repr()` hides it.
 `DEFAULT_TTL_SECONDS` is 3600; `MIN_TENANT_KEY_BYTES` is 16 (`Vault` raises `ValueError`
-for a shorter key, without echoing it). `Vault.session`, the per-session `mask`/`unmask` and the
-stream unmasker are thread-safe.
+for a shorter key, without echoing it). `Vault.session` and the per-session methods (`mask`,
+`unmask`, `entities`, `known_values`) are thread-safe; each call holds the session's lock, so
+two calls never see each other half-done. `StreamUnmasker` is **not**: it buffers one
+response, so use one per stream from one thread at a time (it may share its session with
+other streams). Two calls are not one transaction either: read what a `mask` call replaced
+from `mask_with_report().replacements`, not from `entities()` before and after it
+(`/v1/mask` reports its `entities` that way, so a concurrent request on the same session
+doesn't inflate them).
 
 ### Errors
 
@@ -737,6 +743,20 @@ Messages and `repr()`s carry types, counts and placeholder ids, never an origina
 - `unmask` re-inflects: a known placeholder followed by a suffix restores the stem as written in
   the input for that suffix, or, for a suffix the model added itself, the language's inflected
   stem (`[[PERSON_x]]nak` → `Próba Zsuzsannának`, `[[PERSON_y]]val` → `Kováccsal`).
+- **Occurrences** are searched in a folded view of the text: the detection normaliser's
+  (invisible characters dropped, accents composed, Unicode spaces and dashes folded) plus a
+  full case fold, with an offset map back. So `TESZT ELEK`, a decomposed `Kova\u0301cs`
+  (macOS copy-paste), `WEISS` for `Weiß` and `Teszt\u200bElek` are masked along with the
+  span, and known values are found the same way. Hungarian `-val`/`-vel` after a doubled
+  consonant is matched without a third letter (`Kiss` → `Kissel`, `Varga Bernadett` →
+  `Varga Bernadettel`, `Szabó Mariann` → `Szabó Mariannal`).
+- **Aliases:** a form found only through an unconfirmed lemma of a span (`Minta Kende` after a
+  `Minta Kendét` span) gets that lemma's own placeholder, so it is restored as written, not as
+  the span's surface.
+- **Layout:** an occurrence written with a line break or tab inside it (`Teszt\nElek`), or
+  with decomposed accents, after the value was confirmed in another layout gets a placeholder
+  of its own (its form is mixed into the HMAC, like a casing class), so `unmask` gives it back
+  as written. Runs of plain spaces count as one space and share the placeholder.
 - **Casing:** occurrences match case-insensitively, so `TESZT ELEK` and `teszt elek` are
   masked along with a `Teszt Elek` span. By default they share its placeholder and `unmask`
   restores the value as first written (`TESZT ELEK és Teszt Elek.` → `Teszt Elek és Teszt
@@ -746,7 +766,9 @@ Messages and `repr()`s carry types, counts and placeholder ids, never an origina
   gives an occurrence in another casing class (ALL CAPS, lower case, mixed) its own
   placeholder, with the class mixed into the HMAC, so the round trip is exact; the model then
   sees one id per casing. Within a class the first-written form is restored (`Teszt ELEK`
-  after `Teszt Elek` comes back as `Teszt Elek`).
+  after `Teszt Elek` comes back as `Teszt Elek`). In both modes a suffixed occurrence is
+  restored with the stem as written before that exact suffix, so `Teszt Eleknek …, TESZT
+  ELEKNEK` round-trips exactly (the suffix's casing tells the two apart).
 - **Placeholder-shaped text in the input.** A token equal to a placeholder this session already
   issued makes `mask` raise `PlaceholderInInputError` (`placeholder_in_input`, 422), since
   `unmask` would restore a value into text that was never masked. Any other `[[TYPE_id]]` token
