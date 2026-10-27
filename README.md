@@ -252,7 +252,8 @@ The mapping between real values and placeholders **never leaves pii-guard**. Det
 ## Documentation
 
 Start at [docs/INDEX.md](docs/INDEX.md): architecture, privacy model, entity taxonomy,
-evaluation method, models, contracts and decision records.
+evaluation method, models, contracts and decision records. How the numbers got where they
+are, milestone by milestone: [docs/journey.md](docs/journey.md).
 
 ## Contributing
 

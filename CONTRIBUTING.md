@@ -12,7 +12,9 @@ projects.
    it.
 3. **No raw values in logs or errors.** Log entity types, counts and placeholder ids.
 4. **Measure detection changes.** If you touch detection, include the before/after scorecard
-   from `uv run pii-guard eval` in the pull request.
+   from `uv run pii-guard eval` in the pull request. If it changes a headline metric (leak
+   rate, F1, latency or cost of a recommended configuration), add a milestone to
+   [docs/journey.md](docs/journey.md).
 
 ## Development setup
 

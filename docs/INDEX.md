@@ -10,6 +10,7 @@
 | [languages.md](languages.md) | Adding a language: the language pack, the conformance suite, what "done" means |
 | [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
+| [journey.md](journey.md) | The project's story so far: dated milestones with before/after metrics, cost and the decisions made |
 | [roadmap.md](roadmap.md) | The 9-day hackathon plan, day-1 checks, what comes after |
 | [decisions/](decisions/) | Architecture decision records (ADRs) |
 
