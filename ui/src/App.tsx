@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
 import { engineReason } from "./api/engine";
 import { createHttpClient, type HttpGuardClient } from "./api/http";
 import { createMockClient } from "./api/mock";
@@ -13,6 +14,9 @@ import { Playground } from "./screens/Playground";
 import { Benchmarks } from "./screens/Benchmarks";
 import { Images } from "./screens/Images";
 import { RoundTrip } from "./screens/RoundTrip";
+import { Chat, type ChatDraft } from "./screens/Chat";
+import type { KnownRow } from "./lib/knownRows";
+import type { KnownSession } from "./lib/run";
 
 export interface AppProps {
   api?: HttpGuardClient;
@@ -22,12 +26,17 @@ export interface AppProps {
   loadImage?: (src: string) => Promise<Blob>;
   /** Loads the benchmark index (Benchmarks screen); injectable for tests. */
   loadBenchmarks?: BenchmarkLoader;
+  /** Gateway chat clients (Chat screen); injectable for tests. */
+  chat?: { api?: ChatClient; mock?: ChatClient };
 }
 
-export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks }: AppProps) {
+export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks, chat }: AppProps) {
   const apiClient = useMemo(() => api ?? createHttpClient(), [api]);
   const mockClient = useMemo(() => mock ?? createMockClient({ latencyMs: 220 }), [mock]);
   const engine = useEngine(apiClient, mockClient, envMode);
+  const apiChat = useMemo(() => chat?.api ?? createHttpChat(), [chat?.api]);
+  const mockChat = useMemo(() => chat?.mock ?? createMockChat(mockClient), [chat?.mock, mockClient]);
+  const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null);
   const [theme, setTheme] = useTheme();
 
   const [screen, setScreen] = useState<Screen>("playground");
@@ -39,6 +48,9 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
   };
   const [sampleId, setSampleId] = useState<string | null>(DEFAULT_SAMPLE.id);
   const [text, setText] = useState(DEFAULT_SAMPLE.text);
+  const [language, setLanguage] = useState<"hu" | "en">(DEFAULT_SAMPLE.language);
+  const [known, setKnown] = useState<KnownRow[]>([]);
+  const knownSession = useRef<KnownSession | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [answer, setAnswer] = useState("");
   const [running, setRunning] = useState(false);
@@ -50,7 +62,14 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
     setRunning(true);
     setError(null);
     try {
-      const r = await runGuard(engine.client, text, sampleId);
+      const values = known.filter((k) => k.value.trim() !== "").map((k) => ({ value: k.value, entity_type: k.entity_type }));
+      if (knownSession.current && knownSession.current.engine !== engine.engine) knownSession.current = null;
+      const r = await runGuard(engine.client, text, sampleId, {
+        language,
+        known: values,
+        knownSession: knownSession.current,
+        onKnownSession: (s) => (knownSession.current = s),
+      });
       if (id !== runId.current) return;
       setResult(r);
       setAnswer(initialAnswer(r, SAMPLES.find((s) => s.id === r.sampleId)));
@@ -58,15 +77,18 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
       if (id !== runId.current) return;
       // Fail closed: drop any previous masked output so nothing stale is shown as current.
       setResult(null);
-      setError(toRunError(err));
+      const e = toRunError(err);
+      if (e.code === "not_found") knownSession.current = null;
+      setError(e);
     } finally {
       if (id === runId.current) setRunning(false);
     }
-  }, [engine.client, text, sampleId]);
+  }, [engine.client, engine.engine, text, sampleId, language, known]);
 
   const pickSample = (s: Sample) => {
     setSampleId(s.id);
     setText(s.text);
+    setLanguage(s.language);
     setError(null);
   };
 
@@ -124,21 +146,34 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
             running={running}
             error={error}
             onRun={() => void run()}
+            language={language}
+            onLanguage={setLanguage}
+            known={known}
+            onKnown={setKnown}
             onContinue={() => {
-              setScreen("roundtrip");
+              const sample = SAMPLES.find((s) => s.id === sampleId && s.text === text);
+              setChatDraft({ text: sample ? `${sample.task}\n\n${text}` : text, language, nonce: Date.now() });
+              setScreen("chat");
               window.scrollTo?.({ top: 0 });
             }}
           />
         </div>
-        <div id="panel-roundtrip" role="tabpanel" aria-labelledby="tab-roundtrip" hidden={screen !== "roundtrip"}>
-          <RoundTrip
-            key={result?.mask.session_id ?? "none"}
-            client={engine.client}
-            result={result}
-            answer={answer}
-            onAnswer={setAnswer}
-            running={running}
-            onRun={() => void run()}
+        <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" hidden={screen !== "chat"}>
+          <Chat
+            client={engine.engine === "api" ? apiChat : mockChat}
+            live={engine.state.status.state === "online"}
+            draft={chatDraft}
+            replay={
+              <RoundTrip
+                key={result?.mask.session_id ?? "none"}
+                client={engine.client}
+                result={result}
+                answer={answer}
+                onAnswer={setAnswer}
+                running={running}
+                onRun={() => void run()}
+              />
+            }
           />
         </div>
         <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={screen !== "images"}>
@@ -150,7 +185,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
       </main>
 
       <footer className="mx-auto max-w-[1440px] px-4 pb-10 text-xs text-faint sm:px-6">
-        All sample data is fictional. This page only talks to pii-guard and never calls a model provider itself (SAM 3.1 is called by the pii-guard server); the model answers on the Round trip screen are simulated.
+        All sample data is fictional. This page only talks to pii-guard and never calls a model provider itself (SAM 3.1 is called by the pii-guard server); on the Chat screen the model is real only when the API runs with an upstream; the document replay and demo mode use a simulated answer.
       </footer>
     </div>
   );

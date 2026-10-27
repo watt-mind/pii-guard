@@ -125,7 +125,7 @@ describe("Benchmarks screen", () => {
     const { user, panel } = await openBenchmarks();
     await within(panel).findByRole("region", { name: "Results" });
     await user.click(within(panel).getByRole("radio", { name: "English" }));
-    await user.click(screen.getByRole("tab", { name: /playground/i }));
+    await user.click(screen.getByRole("tab", { name: /mask/i }));
     await user.click(screen.getByRole("tab", { name: /benchmarks/i }));
     expect(within(panel).getByRole("radio", { name: "English" })).toBeChecked();
     expect(load).toHaveBeenCalledTimes(1);

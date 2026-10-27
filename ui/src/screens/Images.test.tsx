@@ -49,7 +49,7 @@ describe("Images screen", () => {
   it("is the third tab and reachable with the arrow keys", async () => {
     const user = userEvent.setup();
     render(<App api={offlineApi()} mock={createMockClient()} loadImage={loadImage} />);
-    await user.click(screen.getByRole("tab", { name: /round trip/i }));
+    await user.click(screen.getByRole("tab", { name: /chat/i }));
     await user.keyboard("{ArrowRight}");
     expect(screen.getByRole("tab", { name: /images/i })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel", { name: /images/i })).toBeVisible();

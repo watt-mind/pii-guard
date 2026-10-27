@@ -4,6 +4,8 @@ import { Boundary } from "../components/Boundary";
 import { EntityTable } from "../components/EntityTable";
 import { HighlightedText } from "../components/HighlightedText";
 import { Inspector, type InspectorInfo } from "../components/Inspector";
+import { KnownValues } from "../components/KnownValues";
+import type { KnownRow } from "../lib/knownRows";
 import { Legend } from "../components/Legend";
 import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
@@ -23,9 +25,13 @@ interface Props {
   error: RunError | null;
   onRun: () => void;
   onContinue: () => void;
+  language: "hu" | "en";
+  onLanguage: (l: "hu" | "en") => void;
+  known: KnownRow[];
+  onKnown: (rows: KnownRow[]) => void;
 }
 
-export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue }: Props) {
+export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue, language, onLanguage, known, onKnown }: Props) {
   const [editing, setEditing] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -34,7 +40,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
     setAnchor(key ? (el ?? null) : null);
   };
 
-  const fresh = result !== null && result.input === text;
+  const fresh = result !== null && result.input === text && result.language === language;
   const showHighlighted = fresh && !editing;
   const sample = SAMPLES.find((s) => s.id === sampleId);
 
@@ -75,6 +81,13 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
 
       <SamplePicker selected={sampleId} onPick={(s) => { setEditing(false); onSample(s); }} />
 
+      <KnownValues
+        rows={known}
+        onRows={onKnown}
+        counts={result?.known ?? null}
+        error={error?.code === "invalid_known_value" && error.knownIndex !== undefined ? { index: error.knownIndex, message: error.message } : null}
+      />
+
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         <Pane
           id="input"
@@ -84,6 +97,19 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           className="lg:flex-1"
           actions={
             <>
+              <label className="sr-only" htmlFor="doc-language">
+                Document language
+              </label>
+              <select
+                id="doc-language"
+                value={language}
+                onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
+                className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                title="Language of the document: decides which rules and inflections apply"
+              >
+                <option value="hu">Hungarian</option>
+                <option value="en">English</option>
+              </select>
               {showHighlighted && (
                 <Button variant="ghost" onClick={() => setEditing(true)}>
                   Edit text
@@ -214,7 +240,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                 Colour shows the type. A dashed outline means the value was detected but kept by policy (organizations, for example, are usually not personal data and the model needs them).
               </p>
             </div>
-            <Legend counts={counts} kept={keptTypes} activeType={info?.entityType ?? null} />
+            <Legend counts={counts} kept={keptTypes} activeType={info?.entityType ?? null} known={result.spans.filter((s) => s.detector === "known").length} />
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted">
               <dt>Session</dt>
               <dd className="truncate font-mono text-ink" title={result.mask.session_id}>
@@ -284,7 +310,7 @@ function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (
   return (
     <fieldset className="min-w-0">
       <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples</legend>
-      <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
+      <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4 sm:px-0 sm:pb-0">
         {SAMPLES.map((s) => {
           const on = s.id === selected;
           return (
@@ -299,7 +325,7 @@ function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (
               ].join(" ")}
             >
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-ink" lang="hu">
+                <span className="block truncate text-sm font-semibold text-ink" lang={s.language}>
                   {s.title}
                 </span>
                 <span className="block truncate text-xs text-muted">{s.subtitle}</span>

@@ -29,14 +29,15 @@ describe("App in demo mode", () => {
     render(<App api={offlineApi()} mock={createMockClient()} />);
 
     await user.click(screen.getByRole("button", { name: /mask document/i }));
-    const playground = screen.getByRole("tabpanel", { name: /playground/i });
+    const playground = screen.getByRole("tabpanel", { name: /mask/i });
     const masked = await within(playground).findByTestId("masked-text");
     expect(masked).toHaveTextContent(/\[\[PERSON_[0-9a-f]{4,}\]\]/);
     expect(masked).not.toHaveTextContent("Bárdos Kinga");
     expect(within(playground).getByRole("table")).toHaveTextContent("Tax ID (HU)");
 
     await user.click(screen.getByRole("button", { name: /send it to the model/i }));
-    const panel = screen.getByRole("tabpanel", { name: /round trip/i });
+    const panel = screen.getByRole("tabpanel", { name: /chat/i });
+    await user.click(within(panel).getByRole("button", { name: "Replay a document" }));
     const answer = within(panel).getByLabelText("Simulated model answer") as HTMLTextAreaElement;
     expect(answer.value).toMatch(/Seller: \[\[PERSON_[0-9a-f]{4,}\]\]/);
     expect(answer.value).not.toContain("Bárdos Kinga");
@@ -51,10 +52,11 @@ describe("App in demo mode", () => {
     const user = userEvent.setup();
     render(<App api={offlineApi()} mock={createMockClient()} />);
     await user.click(screen.getByRole("button", { name: /mask document/i }));
-    await within(screen.getByRole("tabpanel", { name: /playground/i })).findByTestId("masked-text");
-    await user.click(screen.getByRole("tab", { name: /round trip/i }));
+    await within(screen.getByRole("tabpanel", { name: /mask/i })).findByTestId("masked-text");
+    await user.click(screen.getByRole("tab", { name: /chat/i }));
 
-    const panel = screen.getByRole("tabpanel", { name: /round trip/i });
+    const panel = screen.getByRole("tabpanel", { name: /chat/i });
+    await user.click(within(panel).getByRole("button", { name: "Replay a document" }));
     await user.click(within(panel).getByRole("button", { name: /invented placeholder/i }));
     await user.selectOptions(within(panel).getByLabelText("Stream speed"), "fast");
     await user.click(within(panel).getByRole("button", { name: /stream/i }));
@@ -122,14 +124,61 @@ describe("App against a live API", () => {
     expect(note).toHaveTextContent("Anything without a highlight on the left was not detected");
     expect(screen.queryByText(/The model never sees the originals/)).toBeNull();
 
-    const playground = screen.getByRole("tabpanel", { name: /playground/i });
+    const playground = screen.getByRole("tabpanel", { name: /mask/i });
     const firstMark = playground.querySelector("mark")!;
     await user.hover(firstMark);
     expect(await screen.findByTestId("entity-popover")).toHaveTextContent(/found by/);
     await user.unhover(firstMark);
     expect(screen.queryByTestId("entity-popover")).toBeNull();
 
-    await user.click(screen.getByRole("tab", { name: /round trip/i }));
+    await user.click(screen.getByRole("tab", { name: /chat/i }));
+    await user.click(screen.getByRole("button", { name: "Replay a document" }));
     expect(screen.getByRole("heading", { level: 1, name: /masked values restored/ })).toBeInTheDocument();
+  });
+});
+
+describe("Known values and Chat in demo mode", () => {
+  it("pre-loads a known value, masks its inflected form with the known marker and reuses the session", async () => {
+    const user = userEvent.setup();
+    render(<App api={offlineApi()} mock={createMockClient()} />);
+    await user.click(screen.getByText("Known values"));
+    await user.click(screen.getByRole("button", { name: "Try a fictional one" }));
+    const input = screen.getByLabelText("Document text");
+    await user.clear(input);
+    await user.type(input, "Kedves Gyakorló Tihamérnak küldöm.");
+    await user.click(screen.getByRole("button", { name: /mask document/i }));
+    const panel = screen.getByRole("tabpanel", { name: /mask/i });
+    const masked = await within(panel).findByTestId("masked-text");
+    expect(masked).toHaveTextContent(/Kedves \[\[PERSON_[0-9a-f]{4,}\]\] \(Person placeholder\)nak küldöm\./);
+    expect(panel.querySelector("[data-known]")).not.toBeNull();
+    expect(within(panel).getByTestId("known-counts")).toHaveTextContent("added 1 / total 1");
+    await user.click(screen.getByRole("button", { name: /run again/i }));
+    await waitFor(() => expect(within(panel).getByTestId("known-counts")).toHaveTextContent("added 0 / total 1"));
+  });
+
+  it("shows a refused known value inline", async () => {
+    const user = userEvent.setup();
+    render(<App api={offlineApi()} mock={createMockClient()} />);
+    await user.click(screen.getByText("Known values"));
+    await user.click(screen.getByRole("button", { name: "+ Add a value" }));
+    await user.type(screen.getByLabelText("Known value 1"), "ab");
+    await user.click(screen.getByRole("button", { name: /mask document/i }));
+    expect(await screen.findByText(/Refused:/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Known value 1")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("sends a chat message through the simulated gateway", async () => {
+    const user = userEvent.setup();
+    const mock = createMockClient();
+    const { createMockChat } = await import("./api/chat");
+    render(<App api={offlineApi()} mock={mock} chat={{ mock: createMockChat(mock, { delayMs: 0 }) }} />);
+    await user.click(screen.getByRole("tab", { name: /chat/i }));
+    const panel = screen.getByRole("tabpanel", { name: /chat/i });
+    await user.click(within(panel).getByRole("button", { name: /send through pii-guard/i }));
+    const received = await within(panel).findByRole("region", { name: "What the model received" });
+    await waitFor(() => expect(received).toHaveTextContent(/\[\[PERSON_[0-9a-f]{4,}\]\]/));
+    const back = within(panel).getByRole("region", { name: "What you got back" });
+    await waitFor(() => expect(back.querySelector("mark[data-restored]")).not.toBeNull());
+    expect(back).toHaveTextContent("Teszt Elek");
   });
 });

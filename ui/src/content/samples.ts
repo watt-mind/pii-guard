@@ -6,6 +6,7 @@ export interface Sample {
   id: string;
   title: string;
   subtitle: string;
+  language: "hu" | "en";
   /** What the user asks the model to do with the document. */
   task: string;
   text: string;
@@ -22,6 +23,7 @@ export const SAMPLES: Sample[] = [
     id: "contract",
     title: "Adásvételi szerződés",
     subtitle: "Property sale contract",
+    language: "hu",
     task: "Summarise the parties and the payment terms in English.",
     text: `ADÁSVÉTELI SZERZŐDÉS
 
@@ -47,6 +49,7 @@ Next step: {{Somogyi Ádám}} countersigns. You can reach him on {{+36 30 555 01
     id: "claim",
     title: "Kárbejelentő e-mail",
     subtitle: "Insurance claim email",
+    language: "hu",
     task: "Turn this into a structured claim summary for the insurer.",
     text: `Tárgy: Kárbejelentés – AAB-123 rendszámú gépjármű
 
@@ -70,6 +73,7 @@ Policyholder {{Takács Gábor}} reports that the car {{AAB-123}} was damaged on 
     id: "referral",
     title: "Beutaló",
     subtitle: "Medical referral",
+    language: "hu",
     task: "Write a short English handover note for the cardiology desk.",
     text: `BEUTALÓ – kardiológiai szakrendelésre
 
@@ -87,6 +91,28 @@ Kérjük, az eredményt a nemeth.zsofia@example.com címre is küldjék el.`,
 Patient {{Németh Zsófia}} (TAJ {{210345771}}, born {{1985. november 2.}}) reports chest tightness on exertion for two weeks. Referred by GP {{Kerekes Ottó}}; accompanied by {{Németh Bálint}}.
 
 Please send the results to {{nemeth.zsofia@example.com}} and confirm the appointment on {{06 30 555 0164}}.`,
+  },
+  {
+    id: "support",
+    title: "Support ticket",
+    subtitle: "English · customer email",
+    language: "en",
+    task: "Draft a short, polite reply that confirms the refund.",
+    text: `Subject: Refund for order 4471 – please help
+
+Hello,
+
+my name is Jane Placeholder and I was charged twice for my order. You can reach me at jane.placeholder@example.net or on +44 20 7946 0958. Please refund the duplicate payment to my account GB33 BUKB 2020 1555 5555 55.
+
+My colleague Sam Example (sam.example@example.org) placed the order for me from our office at 221 Example Street, London. He says Jane Placeholder's card was used by mistake.
+
+Thanks,
+Jane Placeholder`,
+    answer: `Dear {{Jane Placeholder}},
+
+Thank you for letting us know. We have refunded the duplicate payment to {{GB33 BUKB 2020 1555 5555 55}}; it should arrive within three working days. We have also sent a copy of this confirmation to {{sam.example@example.org}}.
+
+If anything is unclear, we will call you on {{+44 20 7946 0958}}.`,
   },
 ];
 
