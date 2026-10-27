@@ -212,7 +212,8 @@ starts the same stack in containers: `mock-upstream`, `demo-api` on
 `http://127.0.0.1:8788` (traffic log `masked`, `fast` mode with the NER) and `ui` on
 `http://localhost:5173`, next to the plain `api` service on 8787. The demo services use their
 own image, `pii-guard:demo`, built with the `ner` extra (`PII_GUARD_EXTRAS` build argument;
-the plain `pii-guard:dev` image stays without torch). On the first start `demo-api` downloads
+the plain `pii-guard:dev` image stays without torch). It is large: 9.6 GB on arm64, because the
+locked torch wheel pulls the CUDA libraries even there (`pii-guard:dev` is 268 MB). On the first start `demo-api` downloads
 the NER model into the `pii-guard-models` volume before the server listens (`docker compose
 logs -f demo-api` shows `ner: downloading …`); its healthcheck allows 15 minutes for that, and
 the UI waits until `demo-api` is healthy. Later starts reuse the volume (`docker compose down
