@@ -83,6 +83,7 @@ def test_baseline_is_the_newest_record_on_the_same_files(tmp_path: Path) -> None
     assert gate.baseline_record(records[2:3], detectors=["rules"], fixtures=[fixture]) is None
 
 
+@pytest.mark.slow
 def test_committed_gates_pass(in_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert gate.main([]) == 0
     out = capsys.readouterr().out

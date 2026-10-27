@@ -7,6 +7,9 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
+  # Nightly full run on the default branch (develop): every test, including the slow ones.
+  schedule:
+    - cron: "23 2 * * *"
 
 permissions:
   contents: read
@@ -26,10 +29,13 @@ jobs:
     timeout-minutes: 5
     outputs:
       ui: ${{ steps.filter.outputs.ui }}
+      docker: ${{ steps.filter.outputs.docker }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Full history for the merge base, without file contents: only names are compared.
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
       - name: Which parts changed
         id: filter
@@ -37,13 +43,16 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          # Only pull requests are filtered; pushes, merge queue and manual runs check everything.
-          ui=true
+          # Only pull requests are filtered; pushes, merge queue, nightly and manual runs check
+          # everything.
+          ui=true docker=true
           if [ "$EVENT" = pull_request ]; then
             git diff --name-only "$BASE...HEAD" > changed.txt
             grep -qE '^(ui/|\.github/workflows/ci\.yml$|scripts/ci/licenses\.py$)' changed.txt || ui=false
+            # What the image is built from (Dockerfile COPY lines) and how it is smoke-tested.
+            grep -qE '^(src/|Dockerfile$|\.dockerignore$|pyproject\.toml$|uv\.lock$|README\.md$|LICENSE$|scripts/ci/docker_smoke\.sh$|\.github/workflows/ci\.yml$)' changed.txt || docker=false
           fi
-          echo "ui=$ui" | tee -a "$GITHUB_OUTPUT"
+          { echo "ui=$ui"; echo "docker=$docker"; } | tee -a "$GITHUB_OUTPUT"
 
   lint:
     name: lint
@@ -77,12 +86,16 @@ jobs:
       - name: mypy (no errors beyond scripts/ci/mypy-baseline.txt)
         run: uv run python scripts/ci/mypy_baseline.py
 
+  # Pull requests run the fast suite (`make test`: no tests marked slow, 25 Hypothesis examples,
+  # the fast coverage floor in the Makefile). Pushes, merge queue, nightly and manual runs run
+  # every test (`make test-all`) with the coverage floor in pyproject.toml. Both use pytest-xdist.
   test:
     name: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      HYPOTHESIS_PROFILE: ci
+      FULL: ${{ github.event_name != 'pull_request' }}
+      PYTEST_ADDOPTS: --durations=15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,8 +104,26 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
-      - name: Test (coverage floor in pyproject.toml, derandomized Hypothesis)
-        run: uv run pytest --durations=15
+      - name: Test (parallel, coverage floor, derandomized Hypothesis)
+        run: |
+          if [ "$FULL" = true ]; then
+            HYPOTHESIS_PROFILE=ci-full make test-all
+          else
+            HYPOTHESIS_PROFILE=ci make test
+          fi
+
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - run: uv sync
       - name: Smoke (demo stack on the mock upstream, offline)
         run: make smoke
       - name: Benchmark report is current
@@ -117,6 +148,8 @@ jobs:
 
   docker:
     name: docker
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -132,7 +165,8 @@ jobs:
           push: false
           tags: pii-guard:ci
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Only pushes write the layer cache (writing it takes ~30 s); pull requests read it.
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
       - name: Size budget, healthcheck, one masked request on the mock upstream
         run: scripts/ci/docker_smoke.sh pii-guard:ci
 
@@ -270,7 +304,21 @@ jobs:
     name: ci-ok
     if: always()
     needs:
-      [changes, lint, types, test, eval-gate, docker, audit, ui, workflows, pii-in-diff, gitleaks, links]
+      [
+        changes,
+        lint,
+        types,
+        test,
+        smoke,
+        eval-gate,
+        docker,
+        audit,
+        ui,
+        workflows,
+        pii-in-diff,
+        gitleaks,
+        links,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

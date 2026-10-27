@@ -133,8 +133,9 @@ make smoke          # the same as a pass/fail check (CI runs it)
 
 Without a NER checkpoint, fast mode is rules only and free-text names need known values. With
 `uv sync --extra ner` and `PII_GUARD_NER_MODEL` pointing at one
-([models.md](docs/models.md#ner-detector)) it masks names too; the screenshots use one, plus
-`PII_GUARD_DETECTORS=rules,ner` for the Mask screen. Docker:
+([models.md](docs/models.md#ner-detector)) it masks names too, in the gateway and on the Mask
+and Images screens alike (the screenshots use one). A set `PII_GUARD_NER_MODEL` without the
+extra stops startup instead of quietly running rules only. Docker:
 `docker compose --profile demo up --build`. More: [docs/operations.md](docs/operations.md).
 
 ## How it works

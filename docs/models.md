@@ -366,10 +366,12 @@ only the signatures.
 
 ### Hybrid vs SAM-only (LAB-1245)
 
-| Fictional set (24 images) | Portrait recall | Portrait leak | Signature recall | Signature leak | SAM calls / image | `/v1/mask/image` p50 / p95 |
-|---|---:|---:|---:|---:|---:|---:|
-| `sam-api` (SAM 3.1 for everything, the previous default) | 100.0 % | 0.0 % | 100.0 % | 6.7 % | 5 | 7.2 s / 8.1 s |
-| **`hybrid`** (YuNet + SAM 3.1 for signatures, the default) | 100.0 % | 0.0 % | 100.0 % | 6.7 % | **2** | **3.8 s / 5.0 s** |
+| Set | Segmenter | Portrait recall | Portrait leak | Signature recall | Signature leak | SAM calls / image | `/v1/mask/image` p50 / p95 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| specimens (65) | `sam-api` (SAM 3.1 for everything, the previous default) | 90.8 % | 47.7 % | 83.8 % | 51.4 % | 5 | 7.9 s / 11.6 s |
+| | **`hybrid`** (YuNet + SAM 3.1 for signatures, the default) | 92.3 % | **10.8 %** | 83.8 % | 48.6 % | **2** | **4.1 s / 6.1 s** |
+| fictional (24) | `sam-api` | 100.0 % | 0.0 % | 100.0 % | 6.7 % | 5 | 7.2 s / 8.1 s |
+| | **`hybrid`** | 100.0 % | 0.0 % | 100.0 % | 6.7 % | **2** | **3.8 s / 5.0 s** |
 
 - **Calls:** `/v1/mask/image` with `sam-api` sends 5 SAM requests per image (`face`,
   `signature`, `squiggly line`, `photo of a person`, and `stamp`, whose regions are `keep`), not
@@ -378,21 +380,27 @@ only the signatures.
 - **Latency:** end to end through the app (`python -m pii_guard.visual.segment_eval
   --e2e-bench`: Tesseract OCR, rules detector, `render=opaque`), the two modes alternating per
   image, live SAM, 3 rounds; medians of the per-round p50 / p95 on a laptop shared with other
-  jobs (load average 11.5). Per round: hybrid p50 3.96 / 3.26 / 3.77 s, sam-api 7.24 / 6.80 /
-  7.61 s. Segmentation alone (no OCR, replayed SAM latency): p50 2.26 s vs 4.78 s.
-- **Signatures** come from the same SAM prompts in both modes, so their numbers are identical.
-  The YuNet portrait boxes over-mask around the photo (precision 80.6 % vs SAM's 100 % on this
-  set), the safe side.
-- **Specimens** (65 official documents): not re-run in LAB-1245, because the images are fetched
-  locally and were not on the measuring machine. LAB-1229's runs on that set
-  (`2026-10-27-segment-{sam-api,local}-specimens`) give the expected picture: YuNet's portrait
-  leak 10.8 % vs SAM's 47.7 % at equal or better recall, and signatures unchanged by
-  construction (same SAM prompts).
+  jobs (load average 10-12). Per round, specimens: hybrid p50 4.14 / 4.23 / 4.04 s, sam-api
+  8.10 / 7.85 / 7.20 s; fictional: hybrid 3.96 / 3.26 / 3.77 s, sam-api 7.24 / 6.80 / 7.61 s.
+  Segmentation alone (no OCR, replayed SAM latency): p50 2.51 s vs 5.23 s (specimens), 2.26 s
+  vs 4.78 s (fictional).
+- **Signatures** come from the same SAM prompts in both modes: the same 40 boxes on the
+  specimens, the same recall (83.8 %) and precision (77.5 %). The leak is slightly lower with
+  `hybrid` (48.6 % vs 51.4 %, 1 of 37 signatures) only because YuNet's ID-photo box also covers
+  a signature printed next to the portrait.
+- **Portraits:** on the specimens `hybrid` leaks 10.8 % of portraits against SAM's 47.7 %, at
+  higher recall (92.3 % vs 90.8 %). YuNet's boxes over-mask around the photo (precision 61 % on
+  the specimens, 81 % on the fictional set, vs SAM's 90-100 %), the safe side.
+- **Acceptance (LAB-1245):** met on both sets. Portrait leak ≤ `sam-api`'s, signatures equal
+  (same prompts, same boxes), fewer API calls (2 vs 5) and a lower p50 (−47 % specimens, −48 %
+  fictional).
+- **Specimen data:** fetched locally into `PII_GUARD_SPECIMENS_DIR` (outside the worktree,
+  see [evaluation.md](evaluation.md#where-the-specimen-images-live-visual)), never committed.
 - The labelled-image eval (LAB-1156 placeholders) and the "which parties have an ID?" demo do
   not depend on the segmenter's portraits and are unchanged (fuzzy 50/51 values, 0 false
   merges, 24/24 transcripts; demo 3/3 with `hybrid` and with `sam-api`).
-- Run record: `eval/results/runs/2026-10-27-segment-hybrid-fictional` (segment-only metrics
-  plus the end-to-end medians in `latency_ms.mask_image_per_image_*`).
+- Run records: `eval/results/runs/2026-10-27-segment-hybrid-{fictional,specimens}` (segment-only
+  metrics plus the end-to-end medians in `latency_ms.mask_image_per_image_*`).
 
 ### The LAB-1229 spike
 
@@ -470,7 +478,9 @@ from pii_guard.visual.segment import LocalSegmenter
 regions = LocalSegmenter().segment(png_bytes)  # FACE + ID_PHOTO, on the CPU
 ```
 
-Reproduce the table (specimens: `uv run python eval/visual/fetch_specimens.py` first; the SAM
+Reproduce the table (specimens: `uv run python eval/visual/fetch_specimens.py` first, with
+`PII_GUARD_SPECIMENS_DIR` outside the worktree, see
+[evaluation.md](evaluation.md#where-the-specimen-images-live-visual); the SAM
 rows replay the eval's response cache, `--offline`):
 
 ```bash

@@ -92,6 +92,7 @@ def test_committed_registry_covers_every_system_in_the_index() -> None:
 # --- Regeneration ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_regenerating_without_changes_is_byte_identical(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -102,6 +103,7 @@ def test_regenerating_without_changes_is_byte_identical(
     assert build_outputs() == first
 
 
+@pytest.mark.slow
 def test_a_new_text_system_leaves_other_colours_and_unrelated_files_unchanged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -134,6 +136,7 @@ def test_a_new_text_system_leaves_other_colours_and_unrelated_files_unchanged(
     assert cli.main(["eval", "report", "--check"]) == 0
 
 
+@pytest.mark.slow
 def test_a_new_visual_system_keeps_existing_visual_colours(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

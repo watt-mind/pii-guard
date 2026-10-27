@@ -545,6 +545,7 @@ Portraits and signatures only, no OCR (`python -m pii_guard.visual.segment_eval`
 | `2026-10-27-segment-efficientsam-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 0.0% | 13.3% | 4.7% | 1.5 s | 4.4 s |
 | `2026-10-27-segment-efficientsam-specimens` | `specimens` | 65 | 92.3% | 87.7% | 0.0% | 8.1% | 6.3% | 2.2 s | 3.3 s |
 | `2026-10-27-segment-hybrid-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 100.0% | 100.0% | 7.8% | 2.3 s | 3.0 s |
+| `2026-10-27-segment-hybrid-specimens` | `specimens` | 65 | 92.3% | 90.8% | 83.8% | 73.0% | 10.8% | 2.5 s | 4.1 s |
 | `2026-10-27-segment-local-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 0.0% | 6.7% | 7.7% | 176 ms | 238 ms |
 | `2026-10-27-segment-local-specimens` | `specimens` | 65 | 92.3% | 90.8% | 0.0% | 8.1% | 10.3% | 116 ms | 348 ms |
 | `2026-10-27-segment-sam-api-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 100.0% | 100.0% | 0.7% | 5.1 s | 6.9 s |
@@ -898,6 +899,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-segment-sam-api-fictional` | segmenter sam-3.1 (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 17 (shared with other jobs) | ≈ $0.24 |
 | 2026-10-27 | `2026-10-27-segment-local-specimens` | segmenter yunet-2023mar (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 16 (shared with other jobs) | $0.00 |
 | 2026-10-27 | `2026-10-27-segment-local-fictional` | segmenter yunet-2023mar (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 16 (shared with other jobs) | $0.00 |
+| 2026-10-27 | `2026-10-27-segment-hybrid-specimens` | segmenter yunet-2023mar+sam-3.1 (no OCR) | specimens | — | recorded | `f8b36d3` (dirty) | arm64 CPU, one process; host load average 13 (shared with other jobs) | ≈ $0.33 |
 | 2026-10-27 | `2026-10-27-segment-hybrid-fictional` | segmenter yunet-2023mar+sam-3.1 (no OCR) | fictional-specimens | — | recorded | `df2d70d` (dirty) | arm64 CPU, one process; host load average 14 (shared with other jobs) | ≈ $0.12 |
 | 2026-10-27 | `2026-10-27-segment-efficientsam-specimens` | segmenter yunet-2023mar+efficientsam-vitt (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 19 (shared with other jobs) | $0.00 |
 | 2026-10-27 | `2026-10-27-segment-efficientsam-fictional` | segmenter yunet-2023mar+efficientsam-vitt (no OCR) | fictional-specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 23 (shared with other jobs) | $0.00 |

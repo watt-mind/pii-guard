@@ -19,7 +19,12 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from pii_guard.detect import checksums
-from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
+from pii_guard.detect.normalize import (
+    INVISIBLE_CHARS,
+    LOOKALIKES,
+    _normalize_reference,
+    normalize_for_detection,
+)
 from pii_guard.detect.pipeline import DetectionPipeline
 from pii_guard.languages.de import checksums as de_checksums
 from pii_guard.types import EntityType, Span
@@ -354,3 +359,88 @@ def test_validators_reject_non_ascii_digits(value: str) -> None:
         return
     for validate in _VALIDATORS:
         assert validate(value) is False
+
+
+# --- the one-for-one fast path (LAB-1280) ------------------------------------
+# Text with no invisible character and no combining mark is folded with ``str.translate``
+# instead of character by character. It must give exactly what the full path gives.
+
+
+def _assert_same_as_reference(text: str) -> None:
+    fast, slow = normalize_for_detection(text), _normalize_reference(text)
+    assert fast.text == slow.text, text[:60]
+    assert tuple(fast.origin) == tuple(slow.origin), text[:60]
+    assert fast.ends == slow.ends, text[:60]
+    assert fast.changed == slow.changed, text[:60]
+
+
+_EQUIVALENCE_FILES = sorted(FIXTURES.glob("*.jsonl")) + sorted(
+    (FIXTURES / "public").glob("*-ai4privacy.jsonl")
+)
+
+
+@pytest.mark.parametrize("path", _EQUIVALENCE_FILES, ids=lambda p: p.name)
+def test_fast_path_matches_reference_on_fixtures(path: Path) -> None:
+    texts = [
+        json.loads(line)["text"]
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert texts
+    for text in texts:
+        _assert_same_as_reference(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Teszt Elek, 1051 Budapest",
+        "Árvíztűrő tükörfúrógép, Kovács Éva",
+        "T\u0435szt Elek",  # Cyrillic lookalike inside a Latin word
+        "\u0410\u0412\u0421-123",  # lookalike-only plate
+        "\u041c\u043e\u0441\u043a\u0432\u0430 2024",  # genuine Cyrillic
+        "\U0001d6a8\U0001d6a9 12",  # mathematical Greek folds (NFKC) to a lookalike
+        "\uff34\uff45\uff53\uff5a\uff54 \U0001d400",  # fullwidth and mathematical Latin
+        "+36\u00a030\u2009123\u20134567",  # no-break and thin spaces, en dash
+        "\u0661\u0662\u0663 \u0967\u0968",  # Arabic-Indic and Devanagari digits
+        "".join(chr(0x660 + d) for d in range(10)),  # a table too big for str.replace
+        "teszt\u3002elek@example\uff61com",  # ideographic and halfwidth dots
+        "[[PERSON_Teszt Elek]] és [[PERSON_3fa2c1]] é",  # spoofed and real placeholders
+        "Tel.: +36 30 123\n4567 é",  # a number wrapped over a line break
+        "jose\u0301 \u0430",  # combining mark: full path
+        "Te\u200bszt\u200bElek \u0435",  # invisible characters: full path
+        "\u0915\u093f\u0924\u093e\u092c",  # Devanagari vowel signs (marks)
+        "é",
+        "\u00a0",
+    ],
+)
+def test_fast_path_matches_reference_on_unicode_inputs(text: str) -> None:
+    _assert_same_as_reference(text)
+
+
+@given(
+    st.lists(
+        st.sampled_from(
+            [
+                *"abe5Tz -.@[]_\n\r",
+                *sorted(INVISIBLE_CHARS),
+                *list(LOOKALIKES),
+                *SPACES.values(),
+                *DASHES.values(),
+                "\u0301",
+                "\u20e3",
+                "é",
+                "\u0436",
+                "\u0663",
+                "\u3002",
+                "\uff21",
+                "\U0001d6a8",
+                "\u0915",
+                "\u093f",
+            ]
+        ),
+        max_size=40,
+    ).map("".join)
+)
+def test_fast_path_matches_reference_property(text: str) -> None:
+    _assert_same_as_reference(text)

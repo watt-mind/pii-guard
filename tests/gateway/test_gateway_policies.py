@@ -94,3 +94,36 @@ def test_deprecated_keep_types_alias() -> None:
         _settings(policy_overrides="PHONE=block"), GatewayConfig(keep_types="PHONE")
     )
     assert both.of(EntityType.PHONE) is Policy.BLOCK
+
+
+class _WrongOffsets:
+    """Returns a span whose text does not match the request text (LAB-1270)."""
+
+    name = "wrongoffsets"
+
+    def detect(self, text: str, language: str = "hu") -> list[Span]:
+        return [Span(0, 4, EntityType.PERSON, "Elek", 0.9, self.name)]
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_wrong_offsets_fail_detection_and_forward_nothing(stream: bool) -> None:
+    """The gateway checks detector output like the REST API: detection_failed, not a vault error."""
+    from pii_guard.detect.rules import RuleDetector
+    from pii_guard.gateway import build_mode_detectors
+
+    upstream = MockUpstream()
+    settings = _settings()
+    app = make_app(upstream, settings=settings)
+    app.state.gateway_detectors = build_mode_detectors(
+        settings, GatewayConfig(), base=[RuleDetector(), _WrongOffsets()], llm_detector=FakeLlm()
+    )
+    with TestClient(app, raise_server_exceptions=False) as http:
+        response = http.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": conversation_turn_one(), "stream": stream},
+        )
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "detection_failed"
+    assert upstream.requests == []
+    for value in (*EMAILS, "Teszt Elek"):
+        assert value not in response.text
