@@ -33,7 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Full history for the merge base, without file contents: only names are compared.
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
       - name: Which parts changed
         id: filter
@@ -163,7 +165,8 @@ jobs:
           push: false
           tags: pii-guard:ci
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Only pushes write the layer cache (writing it takes ~30 s); pull requests read it.
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
       - name: Size budget, healthcheck, one masked request on the mock upstream
         run: scripts/ci/docker_smoke.sh pii-guard:ci
 
