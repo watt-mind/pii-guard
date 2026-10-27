@@ -54,7 +54,7 @@ records.
 | System | Leak, hand-written (51 docs) | Precision | Leak, [ai4privacy](docs/benchmarks.md#ai4privacy) (600 docs) | Precision | Detect p50 (hand-written, shared CPU) | Per message |
 |---|---:|---:|---:|---:|---:|---|
 | **pii-guard fast** (rules + NER) | **0.6 %** | 98.5 % | 27.6 % | 92.8 % | 94 ms | on-device, $0 |
-| pii-guard audit (`strict` mode: + Muse Spark Open) | 0.6 % | 97.0 % | **3.9 %** | 92.5 % | 1.9 s | one Baseten call |
+| pii-guard audit (+ Muse Spark Open; opt-in second opinion) | 0.6 % | 97.0 % | **3.9 %** | 92.5 % | 1.9 s | one Baseten call |
 | PrivAiTe | 12.7 % | 51.2 % | 9.5 % | 64.8 % | 170 ms | on-device |
 | Presidio | 24.3 % | 62.5 % | 29.6 % | 38.6 % | 88 ms | on-device |
 | LLM Guard | 45.1 % | 61.5 % | 43.8 % | 79.3 % | 110 ms | on-device |

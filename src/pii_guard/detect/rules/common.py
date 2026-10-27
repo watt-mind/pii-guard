@@ -84,8 +84,15 @@ _EMAIL_RE = re.compile(
 )
 
 
+# ``scheme://user:`` right before a match: the "local part" is a URL password, not a mailbox
+# (``postgres://app:pw@db.example.com``); the secret rules mask it.
+_URL_USERINFO_BEFORE_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s:/?#@]+:$")
+
+
 def _find_email(text: str) -> Iterator[_Hit]:
     for m in _EMAIL_RE.finditer(text):
+        if _URL_USERINFO_BEFORE_RE.search(text, max(0, m.start() - 160), m.start()):
+            continue
         local, _, domain = m.group().rpartition("@")
         # Consecutive dots are invalid, except inside a quoted local part.
         if ".." in domain or (not local.startswith('"') and ".." in local):

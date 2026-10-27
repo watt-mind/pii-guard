@@ -1160,6 +1160,83 @@ the same fictional mini-repo and task as pi in milestone 35:
 - **Cost:** $0. About 10 requests on free Meta API credits (one live run and `--check`); the
   rest ran locally.
 
+### 40. API keys and passwords no longer reach the model (2026-10-27)
+
+LAB-1257. Entry 35 found that every fake key in the mini-repo's `.env` reached the model. There
+is now a `SECRET` type, masked by default. Language-independent rules
+(`detect/rules/secrets.py`) find three things: provider key shapes (AWS, GitHub, Slack,
+Stripe, `sk-` keys, Google, JWTs, PEM private keys), passwords in URLs, and values assigned to
+a secret-ish key (`API_KEY=`, `password:`, `"client_secret":`, `Authorization: Bearer`). Each
+span names the rule that found it as a subtype. Restore works as for every other type, so the
+agent's files get the real values back.
+
+| Check (rules only) | Before | After |
+|---|---:|---:|
+| pi + scripted mock: `.env` secrets upstream | 3 of 3 | **0 of 3** |
+| pi + scripted mock: gold values restored in the written file | 11 of 11 | 14 of 14 |
+| New `secrets` gate suite (17 docs, 5 hard negatives): leak / over-masking | n/a | 0 / 0 |
+| Over-masking check: mini-repo, 6 repo files, `uv.lock`, `ui/pnpm-lock.yaml` (431k chars): `SECRET` spans that aren't secrets | n/a | 0 |
+
+- **Code stays readable.** A value must look like a literal, not code. So `api_key=api_key`,
+  `password: str`, `os.environ[...]`, `${DB_PASSWORD}`, `<your API key>` and `****` are left
+  alone. Lockfile hashes, git SHAs and UUIDs are masked only when they're assigned to a
+  secret-ish key. A generic `*_KEY` name (`STORAGE_KEY`) needs a value that looks generated.
+- **`PASSWORD=changeme` is masked.** A weak password in a config file is still a password.
+- **Found on the way:** the existing number rules mask 14 integrity-hash fragments in
+  `uv.lock` as TAJ or ID numbers, which isn't new. It's a follow-up ticket.
+- **Cost:** $0, all local.
+
+### 41. Strict mode becomes audit mode, and fast is the default (2026-10-27)
+
+LAB-1186. The gateway's two modes were `fast` (rules + NER) and `strict` (+ an LLM detector),
+and `strict` was the code default. The name read as the safer, more careful choice, so a
+privacy-minded user would pick it, and it clashed with policy strictness (block vs mask). In
+production it is the wrong pick: about 2 s and $2.5–3 per 1,000 messages, and every message
+goes to the detector endpoint. Its real jobs are sampled or offline quality checks, labels and
+teacher data for the NER, and the benchmark upper bound.
+
+- **Renamed `audit`**, in the header, `PII_GUARD_GATEWAY_MODE`, the CLI (`--mode`, `--modes`,
+  `--system`, `--audit-requests`), the demo banner and the UI's mode picker, whose help text
+  says what audit mode is for. The old name still works as a deprecated alias, with a
+  `Deprecation` / `Warning` response header, a log line or a stderr warning
+  ([operations.md](operations.md#modes)).
+- **`fast` is now the code default** of `PII_GUARD_GATEWAY_MODE`; audit mode is opt-in. The
+  demo stack and Docker already ran fast.
+- **History kept:** run records stay as written, under their `-strict` IDs; `pii-guard eval
+  report` shows them as audit at read time, so [benchmarks.md](benchmarks.md) and the charts
+  say audit with no record rewritten. Earlier milestones on this page keep the old name.
+- **Numbers:** none changed; this is a rename and a default.
+- **Cost:** $0.
+
+### 42. A name found whole repairs the same name found in part (2026-10-27)
+
+LAB-1284, from milestone 39. When NER found only part of a name (`Placeholder` in the CSV
+row `1,Jane Placeholder`), the gateway sent `1,Jane [[PERSON_x]]` upstream, even when the same
+request had `Jane Placeholder` whole in the client letter. The second-pass sweep couldn't
+repair it: once the surname was a placeholder, the full name no longer matched.
+
+Now, before masking, a full name the gateway already knows widens the partial span. That's a
+name found elsewhere in the same request, confirmed earlier in the session, or pre-loaded. It
+has to occur around the span, matched the way the vault matches (word boundaries, any casing
+or Unicode form, Hungarian suffixes outside), and the longest name wins. Several fragments
+(`Jane` + `Placeholder`) become one span. A name is never widened into another span, so
+`Mark Jane Placeholder` with `Mark Jane` detected stays two values. Surname-first Hungarian
+(`Minta Jánosnak`) widens like English.
+
+| e2e harness, scripted mock, fast mode | Before | After |
+|---|---:|---:|
+| pi, NER v1 checkpoint: `gold_partial_upstream` | 1 | **0** |
+| Muse Code, NER v1 checkpoint: `gold_partial_upstream` | 2 | **0** |
+| pi / Muse Code, NER v2 (base + hard negatives): `gold_partial_upstream` | 0 / 0 | 0 / 0 |
+| Gold values upstream (all four runs) | 0 of 13 | 0 of 13 |
+| Gate suites: over-masking | unchanged | unchanged |
+
+- **NER v2 already finds these names whole** on the mini-repo, so the repair matters most
+  with weaker or other-language checkpoints. It's a guarantee rather than a model property.
+- **Muse Code:** the official installer now ships 1.4.14, but the harness is pinned to
+  1.4.13. These runs used 1.4.14 without changing the pin.
+- **Cost:** $0, all local.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

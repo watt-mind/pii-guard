@@ -9,6 +9,7 @@ import {
   entitiesPerMinute,
   isLoopbackHost,
   maskedCounts,
+  modeOrder,
   overheadByMode,
   percentile,
   requestMessages,
@@ -88,6 +89,12 @@ describe("stats", () => {
     const rows = overheadByMode(recorded);
     expect(rows.map((r) => r.mode)).toEqual(["fast"]);
     expect(rows[0]!.n).toBe(recorded.length);
+  });
+
+  it("orders modes fast, audit, then the rest", () => {
+    expect(modeOrder(["unknown", "audit", "fast"])).toEqual(["fast", "audit", "unknown"]);
+    const audit = recorded.map((e) => ({ ...e, mode: "audit" }));
+    expect(overheadByMode([...audit, ...recorded]).map((r) => r.mode)).toEqual(["fast", "audit"]);
   });
 
   it("buckets masked values per minute and type", () => {

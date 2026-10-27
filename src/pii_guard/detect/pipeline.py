@@ -74,6 +74,7 @@ STRUCTURED_TYPES: frozenset[EntityType] = frozenset(
         EntityType.BANK_ACCOUNT,
         EntityType.COMPANY_ID_HU,
         EntityType.VEHICLE_PLATE,
+        EntityType.SECRET,
     }
 )
 
@@ -97,6 +98,7 @@ class _Cand:
     rank: int  # detector order, lower first
     overriding: bool = False
     forced_by: str | None = None  # detector whose masked type replaced a kept type
+    subtype: str | None = None  # Span.subtype, carried through unchanged
 
 
 def _is_authoritative(span: Span, authoritative: frozenset[str]) -> bool:
@@ -348,6 +350,7 @@ def resolve_spans(
                 _is_authoritative(s, auth),
                 order.get(s.detector, len(order)),
                 s.detector in override,
+                subtype=s.subtype,
             )
         )
 
@@ -409,13 +412,23 @@ def resolve_spans(
                     c.rank,
                     c.overriding,
                     c.forced_by,
+                    c.subtype,
                 )
             )
             taken.add(ps, pe)
 
     accepted.sort(key=lambda c: (c.start, c.end))
     return [
-        Span(c.start, c.end, c.entity_type, text[c.start : c.end], c.score, c.detector, c.forced_by)
+        Span(
+            c.start,
+            c.end,
+            c.entity_type,
+            text[c.start : c.end],
+            c.score,
+            c.detector,
+            c.forced_by,
+            c.subtype,
+        )
         for c in accepted
     ]
 
@@ -427,7 +440,16 @@ def _to_original(norm: NormalizedText, text: str, span: Span) -> Span:
     ):
         raise DetectionError(f"detector {span.detector!r} returned a span that does not fit")
     start, end = norm.to_original(span.start, span.end)
-    return Span(start, end, span.entity_type, text[start:end], span.score, span.detector)
+    return Span(
+        start,
+        end,
+        span.entity_type,
+        text[start:end],
+        span.score,
+        span.detector,
+        span.forced_by,
+        span.subtype,
+    )
 
 
 class DetectionPipeline:

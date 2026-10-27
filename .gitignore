@@ -40,6 +40,8 @@ node_modules/
 *.pem
 *.key
 secrets/
+# Fake secrets the SECRET eval suite scores (eval/fixtures/secrets/build_secrets.py).
+!/eval/fixtures/secrets/
 
 # --- Models & weights (download or serve them, never commit) -----------------
 models/

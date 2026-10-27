@@ -1,0 +1,48 @@
+pii-guard
+Copyright 2026 the pii-guard contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE). It includes
+data from the third parties below, each under its own licence. The source, licence and
+SHA-256 of every committed lexicon file are in data/lexicons/MANIFEST.md (ADR 0009).
+
+------------------------------------------------------------------------------------------
+Shipped in the Python package (src/pii_guard/lang/data/hu/)
+------------------------------------------------------------------------------------------
+
+Hungarian Central Statistical Office (Központi Statisztikai Hivatal, KSH)
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
+           https://creativecommons.org/licenses/by/4.0/ ; terms: https://www.ksh.hu/copyright
+  - settlements.tsv, postcodes.tsv: settlement names, counties, KSH codes, populations and
+    postcode-to-settlement pairs, from the KSH Helységnévtár 2026-01-01
+    (https://www.ksh.hu/docs/helysegnevtar/hnt_letoltes_2026.xlsx).
+  - recent_given_names_f.tsv, recent_given_names_m.tsv: the most chosen given names of
+    newborns, from the KSH "Gyermekek utónevei" infographics, 2000-2025.
+  Changes: extracted, normalised and reduced to the columns listed; see
+  data/lexicons/fetch.py.
+
+OpenStreetMap
+  © OpenStreetMap contributors. Licence: Open Database License 1.0 (ODbL 1.0),
+  https://opendatacommons.org/licenses/odbl/1-0/ ; data via Geofabrik
+  (https://download.geofabrik.de/europe/hungary-latest.osm.pbf).
+  - street_names.tsv, street_types.tsv: the 100 most common Hungarian street names and the
+    counts of public-space types, a non-substantial extract of highway=* name values.
+
+------------------------------------------------------------------------------------------
+In the repository only (evaluation fixtures, not in the Python package or the image)
+------------------------------------------------------------------------------------------
+
+Ai4Privacy OpenPII 1M
+  Copyright © 2026 Ai Suisse SA. Attribution: Ai4Privacy / Ai Suisse SA,
+  https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m
+  Licence: Creative Commons Attribution 4.0 International (CC-BY-4.0).
+  - eval/fixtures/public/*-ai4privacy.jsonl: a seeded sample of the validation split,
+    relabelled to pii-guard's entity types (eval/fixtures/public/README.md).
+
+AI-generated fictional specimen images
+  - eval/fixtures/visual/images/: portraits, signatures, stamps and textures generated with
+    Muse Image (muse-image-1.0, Meta Model API); the people shown do not exist. Layouts and
+    every value on them are fictional. Details: eval/fixtures/visual/NOTICE.
+
+Evaluation baselines (Presidio, LLM Guard, PrivAiTe, Eka PII Redaction and their models)
+are downloaded at run time into their own environments and are not redistributed. Their
+licences, some of them non-commercial or AGPL-3.0, are listed in docs/evaluation.md.

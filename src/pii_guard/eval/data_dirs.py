@@ -5,8 +5,8 @@
 - ``PII_GUARD_VISUAL_CACHE``: the SAM 3.1 response cache of the visual evals, default
   ``data/visual-cache``.
 
-Point both outside any git worktree (for example ``~/Develop/.pii-guard-data/specimens`` and
-``~/Develop/.pii-guard-data/visual-cache``) so that removing a worktree does not delete them;
+Point both outside any git worktree (for example ``~/.pii-guard-data/specimens`` and
+``~/.pii-guard-data/visual-cache``) so that removing a worktree does not delete them;
 see ``docs/evaluation.md``. Unset or empty: the defaults, relative to the working directory.
 """
 

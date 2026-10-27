@@ -31,7 +31,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from pii_guard.config import Settings
-from pii_guard.gateway import GatewayConfig
+from pii_guard.gateway import GatewayConfig, Mode
 from pii_guard.vault import PLACEHOLDER_RE
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -63,7 +63,7 @@ def test_openai_client_non_streaming_round_trip() -> None:
     assert "+36 30 123 4567" in content
     assert PLACEHOLDER_RE.search(content) is None
     assert raw.headers["x-pii-guard-session"].startswith("s_")
-    assert raw.headers["x-pii-guard-mode"] == "strict"
+    assert raw.headers["x-pii-guard-mode"] == "audit"
     assert raw.headers["x-pii-guard-unresolved"] == "0"
     assert int(raw.headers["x-pii-guard-masked"]) >= 4
     # Forwarded with the configured key and the client's model, never the client's key.
@@ -110,7 +110,7 @@ def test_params_pass_through() -> None:
 # --- AC2: no labelled value reaches the upstream ------------------------------------------
 
 
-@pytest.mark.parametrize("mode", ["strict", "fast"])
+@pytest.mark.parametrize("mode", ["audit", "fast"])
 @pytest.mark.parametrize("stream", [False, True])
 def test_upstream_receives_no_labelled_value(mode: str, stream: bool) -> None:
     upstream = MockUpstream()
@@ -122,7 +122,7 @@ def test_upstream_receives_no_labelled_value(mode: str, stream: bool) -> None:
         if stream:
             list(result)
     leaks = leaked_values(upstream.requests[0].content)
-    if mode == "strict":
+    if mode == "audit":
         assert leaks == []
     else:
         # fast = rules only: every structured value is masked; names need the LLM pass.
@@ -294,10 +294,10 @@ def test_fast_mode_never_calls_the_llm_detector() -> None:
     assert len(upstream.requests) == 1
 
 
-def test_strict_mode_calls_the_llm_detector() -> None:
+def test_audit_mode_calls_the_llm_detector() -> None:
     llm = FakeLlm()
     with TestClient(make_app(MockUpstream(), llm=llm)) as http:
-        openai_client(http, **{"X-PII-Guard-Mode": "strict"}).chat.completions.create(
+        openai_client(http, **{"X-PII-Guard-Mode": "audit"}).chat.completions.create(
             model="m", messages=conversation_turn_one()
         )
     assert llm.calls == 2
@@ -315,9 +315,13 @@ def test_default_mode_comes_from_the_config() -> None:
 
 
 @pytest.mark.parametrize("stream", [False, True])
-def test_strict_detector_timeout_blocks_the_request(stream: bool) -> None:
+def test_audit_detector_timeout_blocks_the_request(stream: bool) -> None:
     upstream = MockUpstream()
-    app = make_app(upstream, llm=FakeLlm(delay=1.0), config=GatewayConfig(detection_timeout=0.1))
+    app = make_app(
+        upstream,
+        llm=FakeLlm(delay=1.0),
+        config=GatewayConfig(mode=Mode.AUDIT, detection_timeout=0.1),
+    )
     with TestClient(app) as http, pytest.raises(openai.APIStatusError) as caught:
         openai_client(http).chat.completions.create(
             model="m", messages=conversation_turn_one(), stream=stream

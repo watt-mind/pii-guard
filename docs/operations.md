@@ -4,11 +4,31 @@ How to run pii-guard end to end on one machine, watch what the gateway does to e
 and measure the latency it adds. Everything here works offline and free: a mock upstream
 stands in for the model unless you configure a real one.
 
+- [Modes](#modes): `fast` (the default) and `audit`
 - [One command](#one-command-pii-guard-up): `uvx ... pii-guard up`, the release wheel, `make wheel`
 - [The demo stack](#the-demo-stack): `make demo`, `make demo-traffic`, `make smoke`, Docker
 - [Traffic log](#traffic-log): `GET /v1/traffic`, the live stream, the privacy model
 - [Timing](#timing): per-stage spans, overhead, `Server-Timing`, `/metrics`
 - [Latency benchmark](#latency-benchmark): `pii-guard bench latency`
+
+## Modes
+
+- **`fast`** is the default and the production path: rules + the in-process NER, local, about
+  36 ms of detection, $0, and nothing leaves the machine. It needs no model key.
+- **`audit`** adds an LLM detector (Muse Spark Open on Baseten by default) to every message: a
+  second opinion for sampled or offline quality checks, generating labels and teacher data for
+  the NER, and the benchmark upper bound. It is not meant for production traffic: each
+  message costs a remote call (about 2 s and $2.5–3 per 1k messages) and its text goes to the
+  detector endpoint. Opt in per request (`X-PII-Guard-Mode: audit`) or per server
+  (`PII_GUARD_GATEWAY_MODE=audit`).
+
+**Rename.** Audit mode was called `strict` until LAB-1186, which read as the safer choice and
+clashed with policy strictness (block vs mask). `strict` still works everywhere a mode is
+accepted, as a deprecated alias of `audit`: the `X-PII-Guard-Mode` header (the response then
+carries `Deprecation: true` and a `Warning` header), `PII_GUARD_GATEWAY_MODE` (one log
+warning), and the CLI's `--mode` / `--modes` / `--system` values and
+`pii-guard bench latency --strict-requests` (a stderr warning). Run records written before the
+rename keep their `-strict` IDs; the report shows them as audit.
 
 ## One command: `pii-guard up`
 
@@ -94,8 +114,8 @@ It prints a banner with the URLs and what it found:
   traffic is fictional, so it may go to a hosted model.
 - **Fast mode** uses rules + the distilled NER when `PII_GUARD_NER_MODEL` points to a checkpoint
   and the `ner` extra is installed (`uv sync --extra ner`), else rules only.
-- **Strict mode** (header `X-PII-Guard-Mode: strict`) is available when an LLM detector key is
-  set (`PII_GUARD_LLM_DETECTOR_API_KEY`, or `BASETEN_API_KEY`).
+- **Audit mode** (opt in with the header `X-PII-Guard-Mode: audit`) is available when an LLM
+  detector key is set (`PII_GUARD_LLM_DETECTOR_API_KEY`, or `BASETEN_API_KEY`).
 
 Other ports: `scripts/demo.py --api-port 9787 --mock-port 9790 --ui-port 6173`.
 
@@ -237,7 +257,7 @@ Every limit fails closed with a JSON error and no value in it:
 | Limit | Setting (default) | Over it |
 |---|---|---|
 | Request body | derived from `max_text_chars` (and, for the gateway, `PII_GUARD_GATEWAY_MAX_IMAGES` x `_MAX_IMAGE_BYTES`) | `413 payload_too_large`. A declared `Content-Length` is checked first; a chunked body is counted while it is read and refused as soon as it passes the limit, so it is never buffered whole. |
-| Concurrent detections | `PII_GUARD_GATEWAY_CONCURRENCY` (4) threads **per mode** | A detection that times out (`PII_GUARD_GATEWAY_DETECTION_TIMEOUT`) keeps its thread and its slot until it really finishes, so a hung detector holds at most this many threads, and only its own mode's: a stuck strict-mode LLM never starves fast mode. When all slots are stuck, that mode's requests wait inside their timeout, then `503 detection_failed`. |
+| Concurrent detections | `PII_GUARD_GATEWAY_CONCURRENCY` (4) threads **per mode** | A detection that times out (`PII_GUARD_GATEWAY_DETECTION_TIMEOUT`) keeps its thread and its slot until it really finishes, so a hung detector holds at most this many threads, and only its own mode's: a stuck audit-mode LLM never starves fast mode. When all slots are stuck, that mode's requests wait inside their timeout, then `503 detection_failed`. |
 | Concurrent image work | `PII_GUARD_IMAGE_CONCURRENCY` (2) per app | Shared by `POST /v1/mask/image` and the gateway, held until the thread finishes, like detections. |
 | Image time | `PII_GUARD_GATEWAY_IMAGE_TIMEOUT` (120 s, per request) and `PII_GUARD_IMAGE_TIMEOUT` (120 s, `/v1/mask/image`) | `503 detection_failed`. The deadline goes into the work: Tesseract gets the remaining time as its subprocess timeout (killed, not left running) and every stage checks it, so the rest of the request's images are not started. |
 | Image size | `PII_GUARD_IMAGE_MAX_PIXELS` (16 000 000) | `413 payload_too_large`, read from the image header before decoding. OCR time and memory grow with pixels: a 221 KB PNG of 7900 x 5000 took 33 to 73 s and about 1 GB, depending on the machine. The decoder's own cap is 40 MP. |
@@ -359,13 +379,13 @@ upstream's response headers.
 
 ```bash
 uv run pii-guard bench latency                       # fast mode, concurrency 1 and 8, streamed and not
-uv run pii-guard bench latency --modes fast,strict --strict-requests 10 --record my-change
+uv run pii-guard bench latency --modes fast,audit --audit-requests 10 --record my-change
 ```
 
 It starts the mock upstream with a fixed delay (`--upstream-delay-ms`, default 50) and the API
 on free loopback ports, and sends a fixed fictional corpus (8 hu / en / de messages, one per
 request, each in a new session so the detection cache never helps) through the gateway: N
-requests per cell (`--requests`, default 200; `--strict-requests`, default 12, because each one
+requests per cell (`--requests`, default 200; `--audit-requests`, default 12, because each one
 calls the LLM detector), for every mode, concurrency (`--concurrency 1,8`) and streaming
 setting. Per cell it reports p50 / p95 / p99 / mean of the overhead, added time to first token,
 every stage and detector, and the client's wall time.
@@ -373,7 +393,7 @@ every stage and detector, and the client's wall time.
 `--record SLUG` writes one run record per mode (`kind: latency`,
 `eval/results/runs/<date>-<SLUG>-<mode>.json`, same schema as the evaluation runs);
 `uv run pii-guard eval report` then adds them to the **Gateway latency** section and chart of
-[benchmarks.md](benchmarks.md). Strict mode uses the configured LLM detector
+[benchmarks.md](benchmarks.md). Audit mode uses the configured LLM detector
 (`PII_GUARD_LLM_DETECTOR_*`); keep the request count small on a paid endpoint.
 
 Overhead is machine-dependent: compare runs on the same hardware (the record names it).

@@ -331,11 +331,11 @@ doesn't redistribute it.
 Every tool runs with its **default configuration**. The only choices we made are the ones a
 default doesn't cover, listed here.
 
-| Tool | How it runs | Configuration |
-|---|---|---|
-| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default); Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. |
-| **LLM Guard** 0.3.16 | worker process, own environment | `Anonymize(Vault())` with defaults: the `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` NER model, threshold 0.5, its default entity list, language `en` (it supports only `en` and `zh`, so Hungarian documents also go through `en`). `Deanonymize` restores. A fresh vault per document. |
-| **PrivAiTe** 0.7.3 | worker process, own environment | The proxy's `PIIEngine` in-process with the `pii` section of its shipped `config/privaite.openai.yaml`: preset `onnx` (Presidio with `fr_core_news_md` + `en_core_web_lg`, plus the ONNX `openai/privacy-filter` model), placeholder anonymization, cards masked, secrets redacted. Each document is one user message through `process_request`, as the proxy does; `process_response` restores. Its detection doesn't take a language: every text goes through its French and English configuration. |
+| Tool | How it runs | Configuration | Licences (tool; models) |
+|---|---|---|---|
+| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default); Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. | MIT; `en_core_web_lg` MIT, huSpaCy `hu_core_news_lg` CC BY-SA 4.0 |
+| **LLM Guard** 0.3.16 | worker process, own environment | `Anonymize(Vault())` with defaults: the `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` NER model, threshold 0.5, its default entity list, language `en` (it supports only `en` and `zh`, so Hungarian documents also go through `en`). `Deanonymize` restores. A fresh vault per document. | MIT; `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` CC-BY-NC-4.0 (non-commercial) |
+| **PrivAiTe** 0.7.3 | worker process, own environment | The proxy's `PIIEngine` in-process with the `pii` section of its shipped `config/privaite.openai.yaml`: preset `onnx` (Presidio with `fr_core_news_md` + `en_core_web_lg`, plus the ONNX `openai/privacy-filter` model), placeholder anonymization, cards masked, secrets redacted. Each document is one user message through `process_request`, as the proxy does; `process_response` restores. Its detection doesn't take a language: every text goes through its French and English configuration. | BSD-3-Clause; `openai/privacy-filter` Apache-2.0, `en_core_web_lg` MIT, `fr_core_news_md` LGPL-LR |
 
 LLM Guard pins `transformers==4.51.3` and Presidio 2.2.358; PrivAiTe needs
 `transformers>=5.3`. They can't share an environment with each other, so each runs as a
@@ -436,21 +436,23 @@ Leak rate in %, pooled over languages, and detection p50:
 |---|---:|---:|---:|---:|
 | pii-guard rules | 41.6 | 73.5 | 0.2–0.4 ms | |
 | **pii-guard fast** (rules + distilled NER, large) | **0.6** | 38.0 | 24–31 ms (MPS) | |
-| **pii-guard strict** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.9** | 1.8–2.3 s | 2.03–2.95 |
+| **pii-guard audit** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.9** | 1.8–2.3 s | 2.03–2.95 |
 | Presidio | 24.3 | 29.6 | 8–136 ms | |
 | LLM Guard | 45.1 | 43.8 | 61–133 ms | |
 | PrivAiTe | 12.7 | 9.5 | 93–182 ms | |
 
 Pooled figures are from [docs/benchmarks.md](benchmarks.md) (generated from the run records);
 p50 and cost ranges are over the per-fixture rows. They are the comparison runs of that day
-(commits `8944f96` for rules and the tools, `4f84c6a` for fast and strict). Later runs of
+(commits `8944f96` for rules and the tools, `4f84c6a` for fast and audit). Later runs of
 rules and fast mode (LAB-1170 and LAB-1204, commit `3d9eb8b`) leak less on Ai4Privacy (63.1 % and 27.6 %);
 [docs/benchmarks.md](benchmarks.md) always shows the latest run of each system with its
 commit. The machine was under unrelated load during
-these runs (load average 13–27 on 10 cores), so latency is relative. Fast mode is as safe as
-strict on the hand-written sets but leaks 35–40 % on the public set, mostly numbers that fail
-the checksums pii-guard's rules require (see the caveats below); strict mode is the safest
-system on both.
+these runs (load average 13–27 on 10 cores), so latency is relative. Fast mode, the
+production path, is as safe as audit mode on the hand-written sets but leaks 35–40 % on the
+public set, mostly numbers that fail the checksums pii-guard's rules require (see the caveats
+below). Audit mode leaks least on both, which makes it the upper bound and the reference for
+quality checks, not a production setting: every message is a remote LLM call (about 2 s and
+$2–3 per 1k messages) and its text leaves the machine.
 
 ### Public benchmark: Ai4Privacy OpenPII 1M
 
@@ -550,11 +552,11 @@ record validation checks that.
 It is computed for public sets only (documents of kind `public-*`) and stored in the run
 records as the optional `validity` field of each text block (counts only, never a value).
 The LAB-1148 runs kept no per-document predictions, so each system was run again to classify
-them: rules with the run's own code, fast and strict mode with theirs and the same NER
+them: rules with the run's own code, fast and audit mode with theirs and the same NER
 checkpoint, the comparison tools at the same pinned versions. `python -m
 pii_guard.eval.validity --record R --scorecard S` writes a re-run's breakdown into a record
 without touching its headline, with `source.matches_headline` saying whether the re-run
-reproduced the record's leak and recall counts exactly; where it didn't (strict mode: an LLM
+reproduced the record's leak and recall counts exactly; where it didn't (audit mode: an LLM
 doesn't answer the same way twice) the re-run's own totals are kept in
 `source.rerun_headline` and the report marks the row.
 
@@ -565,7 +567,7 @@ of those valid):
 |---|---:|---:|---:|---:|
 | pii-guard rules | 63.1 % | 100.0 / 0.0 % | 35.1 / 63.4 % | 71.1 % |
 | pii-guard fast | 27.6 % | 100.0 / 0.0 % | 35.1 / 63.4 % | 10.4 % |
-| pii-guard strict ¹ | 3.9 % | 100.0 / 0.0 % | 87.8 / 6.5 % | 2.8 % |
+| pii-guard audit ¹ | 3.9 % | 100.0 / 0.0 % | 87.8 / 6.5 % | 2.8 % |
 | Presidio | 29.6 % | 28.9 / 48.2 % | 28.8 / 40.2 % | 21.0 % |
 | LLM Guard | 43.8 % | 73.5 / 25.9 % | 23.3 / 70.8 % | 30.4 % |
 | PrivAiTe | 9.5 % | 68.1 / 4.2 % | 33.8 / 3.0 % | 14.0 % |
@@ -702,8 +704,8 @@ are. By default the images go to `data/specimens/` and the SAM 3.1 response cach
 already happened once (LAB-1245). Keep them outside every worktree instead:
 
 ```bash
-export PII_GUARD_SPECIMENS_DIR=~/Develop/.pii-guard-data/specimens    # the images
-export PII_GUARD_VISUAL_CACHE=~/Develop/.pii-guard-data/visual-cache  # SAM responses
+export PII_GUARD_SPECIMENS_DIR=~/.pii-guard-data/specimens    # the images
+export PII_GUARD_VISUAL_CACHE=~/.pii-guard-data/visual-cache  # SAM responses
 uv run python eval/visual/fetch_specimens.py   # ~46 MB, polite (1 request/s), SHA-256 checked
 ```
 
@@ -785,6 +787,16 @@ no recognised text. Its own time per image is the latency.
   pinned to a revision.
 - `presidio-image-tuned`, `eka-tuned`: the same tools with pii-guard's OCR input
   (Tesseract `hun+eng`, images enlarged to 2000 px).
+
+| Baseline | Licences (tool; models) |
+|---|---|
+| `presidio-image` | Presidio Image Redactor MIT; spaCy and huSpaCy models as in the text baseline |
+| `eka` | Eka PII Redaction library Apache-2.0; `ultralytics` and the YOLO11m weights **AGPL-3.0**; the LayoutLMv3 fine-tune **CC-BY-NC-SA-4.0** (non-commercial) |
+
+The baselines are evaluation-only: none of these tools or models is in pii-guard's default
+install or its image (they come with `--extra baselines` or a worker's own environment), and
+none is redistributed. The non-commercial and AGPL licences above apply to anyone who runs
+those baselines, not to pii-guard.
 
 Text tools return one box per OCR word. The words of one detected entity are merged per text
 line before scoring, which is the rule pii-guard applies to its own spans. Region types a tool
