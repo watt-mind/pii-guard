@@ -47,7 +47,7 @@ already-masked data.**
 | Meta model | Where | What it does in pii-guard |
 |---|---|---|
 | **Muse Glimmer** (open weights, Apache-2.0, 30B) | your laptop or your GPU (llama.cpp, vLLM) | Self-hosted PII detector, so real data never leaves your machine. Also tested as a **single-pass gate**: read its yes/no token probability to skip detection for messages with no personal data. *(in progress)* |
-| **Muse Spark Open** (open weights) | partner inference (Baseten) or self-hosted | The production LLM detector: finds names, prose addresses, birth dates and context-dependent identifiers that rules can't. *(endpoint pending)* |
+| **Muse Spark Open** (open weights) | partner inference (Baseten Model APIs) or self-hosted | The production LLM detector: finds names, prose addresses, birth dates and context-dependent identifiers that rules can't. Measured on Baseten: [eval/results/2026-10-27-baseten](eval/results/2026-10-27-baseten/README.md). |
 | **Muse Spark 1.3** | Meta Model API | The same detector during development (fictional data only), and the downstream model in the demo, which only ever sees placeholders. |
 | **Muse Spark 1.3 Contributor** | Meta Model API | Writes the **synthetic benchmark**: realistic Hungarian and English contracts, letters, court notices, emails and chats around fictional identities, labelled automatically. Cheap, and fine to use because nothing in it is real. |
 | **SAM 3.1** | Meta Model API | Finds **faces, ID photos and other visual personal data** in images from a text prompt; pii-guard fills the regions and strips metadata before the image goes anywhere. |
@@ -101,6 +101,12 @@ form, in what the model receives (lower is better).
 | Hungarian, Muse-generated (20 docs) | rules only | 57.7% | — |
 | Hungarian, Muse-generated (20 docs) | rules + Muse Spark | 100% | — |
 | English, Muse-generated (10 docs) | rules + Muse Spark | 100% | — |
+| Hungarian, hand-written (31 docs) | rules + Muse Spark Open on Baseten | 98.4% | 0.9% |
+| English, hand-written (10 docs) | rules + Muse Spark Open on Baseten | 97.1% | 0.0% |
+
+Muse Spark Open on Baseten (`reasoning_effort: low`) detects in about 1.2–1.8 s per document
+at the median (Muse Spark 1.3 on the Meta Model API: 7–11 s) for about $2–4 per 1,000 messages,
+with no refusals: [eval/results/2026-10-27-baseten](eval/results/2026-10-27-baseten/README.md).
 
 Rules alone catch every structured identifier (emails, phones, IDs, bank accounts) with no
 false positives on adversarial look-alikes; names and addresses need the model. The 100% rows
@@ -140,17 +146,21 @@ cd ui && pnpm install && pnpm dev       # http://localhost:5173
 ```
 
 The UI works without the API too (a demo engine runs in the browser, clearly labelled). To
-mask names live, run the API with the LLM detector, for example Muse Spark on the Meta Model
-API with fictional text:
+mask names live, run the API with the LLM detector. The default endpoint and model are Muse
+Spark Open on Baseten Model APIs (`https://inference.baseten.co/v1`,
+`meta-models/muse-spark-open-1026`), so only the key and the reasoning effort are needed:
 
 ```bash
 export PII_GUARD_DETECTORS=rules,llm
-export PII_GUARD_LLM_DETECTOR_URL=https://api.meta.ai/v1
-export PII_GUARD_LLM_DETECTOR_API_KEY=$META_API_KEY
-export PII_GUARD_LLM_DETECTOR_MODEL=muse-spark-1.3
-export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=minimal
+export PII_GUARD_LLM_DETECTOR_API_KEY=$BASETEN_API_KEY
+export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low     # required: see docs/models.md
 uv run pii-guard serve
 ```
+
+Muse Spark 1.3 on the Meta Model API works the same way (fictional text only): set
+`PII_GUARD_LLM_DETECTOR_URL=https://api.meta.ai/v1`, `PII_GUARD_LLM_DETECTOR_MODEL=muse-spark-1.3`
+and `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=minimal`. Which endpoint may see real data:
+[docs/models.md](docs/models.md#baseten-model-apis-production-detector).
 
 Run the benchmark: `uv run pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --detectors rules`.
 Docker: `docker compose up --build`. All settings: [.env.example](.env.example).
@@ -159,18 +169,18 @@ Docker: `docker compose up --build`. All settings: [.env.example](.env.example).
 
 Point any OpenAI-compatible client at pii-guard instead of the provider. Every message is
 masked when it arrives, the masked request is forwarded, and the answer (streamed or not) comes
-back with the real values restored. Example with the Meta Model API as upstream and Muse Spark
-as the LLM detector (**fictional data only** on hosted models, see
+back with the real values restored. Demo configuration: strict mode (the default) detects with
+rules + Muse Spark Open on Baseten, and the masked request goes to Muse Spark 1.3 on the Meta
+Model API, which only ever sees placeholders (use **fictional data** for the demo, see
 [docs/models.md](docs/models.md)):
 
 ```bash
 export PII_GUARD_TENANT_KEY=$(openssl rand -hex 32)
 export PII_GUARD_UPSTREAM_BASE_URL=https://api.meta.ai/v1
 export PII_GUARD_UPSTREAM_API_KEY=$META_API_KEY
-export PII_GUARD_LLM_DETECTOR_URL=https://api.meta.ai/v1      # strict mode's LLM detector
-export PII_GUARD_LLM_DETECTOR_API_KEY=$META_API_KEY
-export PII_GUARD_LLM_DETECTOR_MODEL=muse-spark-1.3
-export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=minimal
+# strict mode's LLM detector: Muse Spark Open on Baseten (the default URL and model)
+export PII_GUARD_LLM_DETECTOR_API_KEY=$BASETEN_API_KEY
+export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low
 uv run pii-guard serve                                        # http://127.0.0.1:8787
 ```
 

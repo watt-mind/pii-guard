@@ -1,0 +1,89 @@
+{
+  "price_usd_per_1m_tokens": {
+    "input": 1.25,
+    "cached_input": 0.15,
+    "output": 4.25
+  },
+  "runs": {
+    "hu-smoke": {
+      "exit_code": 0,
+      "documents": 31,
+      "wall_s": 60.2,
+      "model": "meta-models/muse-spark-open-1026",
+      "reasoning_effort": "low",
+      "usage": {
+        "requests": 31,
+        "prompt_tokens": 27466,
+        "cached_tokens": 24704,
+        "completion_tokens": 15977,
+        "reasoning_tokens": 13058,
+        "invalid_outputs": 0,
+        "refusals": 0
+      },
+      "cost_usd": 0.0751,
+      "usd_per_1k_messages": 2.42,
+      "refusal_rate": 0.0,
+      "invalid_output_rate": 0.0
+    },
+    "en-smoke": {
+      "exit_code": 0,
+      "documents": 10,
+      "wall_s": 15.8,
+      "model": "meta-models/muse-spark-open-1026",
+      "reasoning_effort": "low",
+      "usage": {
+        "requests": 10,
+        "prompt_tokens": 7368,
+        "cached_tokens": 6400,
+        "completion_tokens": 4175,
+        "reasoning_tokens": 3381,
+        "invalid_outputs": 0,
+        "refusals": 0
+      },
+      "cost_usd": 0.0199,
+      "usd_per_1k_messages": 1.99,
+      "refusal_rate": 0.0,
+      "invalid_output_rate": 0.0
+    },
+    "hu-synth-sample": {
+      "exit_code": 0,
+      "documents": 20,
+      "wall_s": 44.3,
+      "model": "meta-models/muse-spark-open-1026",
+      "reasoning_effort": "low",
+      "usage": {
+        "requests": 20,
+        "prompt_tokens": 27617,
+        "cached_tokens": 24832,
+        "completion_tokens": 15108,
+        "reasoning_tokens": 10602,
+        "invalid_outputs": 0,
+        "refusals": 0
+      },
+      "cost_usd": 0.0714,
+      "usd_per_1k_messages": 3.57,
+      "refusal_rate": 0.0,
+      "invalid_output_rate": 0.0
+    },
+    "en-synth-sample": {
+      "exit_code": 0,
+      "documents": 10,
+      "wall_s": 20.5,
+      "model": "meta-models/muse-spark-open-1026",
+      "reasoning_effort": "low",
+      "usage": {
+        "requests": 10,
+        "prompt_tokens": 10556,
+        "cached_tokens": 9728,
+        "completion_tokens": 6261,
+        "reasoning_tokens": 4583,
+        "invalid_outputs": 0,
+        "refusals": 0
+      },
+      "cost_usd": 0.0291,
+      "usd_per_1k_messages": 2.91,
+      "refusal_rate": 0.0,
+      "invalid_output_rate": 0.0
+    }
+  }
+}
