@@ -45,6 +45,15 @@ def build_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     bench.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
+
+    baselines = sub.add_parser(
+        "baselines", help="set up the comparison baselines (docs/evaluation.md)"
+    )
+    baselines_sub = baselines.add_subparsers(dest="baselines_command", metavar="<command>")
+    baselines_sub.add_parser(
+        "download",
+        help="fetch, verify and unpack the pinned huSpaCy model once (needs --extra baselines)",
+    )
     return parser
 
 
@@ -95,6 +104,22 @@ def _bench(args: argparse.Namespace) -> int:
     return bench_main(args.args)
 
 
+def _baselines(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    if args.baselines_command != "download":
+        parser.parse_args(["baselines", "--help"])
+        return 2  # pragma: no cover - --help exits
+    from pii_guard.eval.baselines.base import BaselineUnavailable
+    from pii_guard.eval.baselines.models import HU_CORE_NEWS_LG, download
+
+    try:
+        data_dir = download(HU_CORE_NEWS_LG)
+    except BaselineUnavailable as exc:
+        print(f"pii-guard baselines download: {exc}", file=sys.stderr)
+        return 1
+    print(f"{HU_CORE_NEWS_LG.label}: {data_dir}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "bench":
@@ -108,6 +133,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "serve":
         return _serve(args)
+    if args.command == "baselines":
+        return _baselines(args, parser)
     parser.print_help()
     return 0
 

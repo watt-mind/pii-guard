@@ -296,8 +296,9 @@ pii-guard is also scored against the closest open-source alternatives, on the sa
 and with the same scorer (`pii_guard.eval.baselines`):
 
 ```bash
-uv sync --extra baselines            # Presidio + spaCy models, in-process
-uv run pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --fixtures eval/fixtures/en-smoke.jsonl \
+uv sync --extra baselines            # Presidio + en spaCy model, in-process
+uv run --no-sync pii-guard baselines download   # once: the pinned huSpaCy model (see below)
+uv run --no-sync pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --fixtures eval/fixtures/en-smoke.jsonl \
     --detectors rules --baselines presidio,llm-guard,privaite --json OUT.json
 python -m pii_guard.eval.baselines.compare OUT.json [MORE.json ...] --out comparison.md
 make baselines                       # the same, plus the live baseline tests
@@ -309,6 +310,21 @@ tool versions, model names and the configuration, `reversible`, `unmapped_labels
 Markdown gets a comparison table per language and per entity type. A tool that can't start
 is skipped with a reason, like a detector; a tool that fails on a document fails the run.
 Committed results live in `eval/results/` (see its README for the current numbers).
+
+**The huSpaCy model is downloaded once, not installed as a package.** `hu_core_news_lg` is
+published on Hugging Face, which serves the wheel through a signed CDN redirect with
+`cache-control: no-store`. As a `[tool.uv.sources]` URL uv could never reuse its copy, so
+every `uv sync` / `uv run` with the `baselines` extra fetched and unpacked 401 MB again, in
+every worktree (LAB-1249). `pii-guard baselines download` (also run by `make baselines`)
+fetches it with `huggingface_hub.snapshot_download` at the pinned revision
+`9160ba69dbbcfe1a2346f3c7c2d72831f8250219` (one copy in `~/.cache/huggingface`), checks the
+wheel's sha256 (`e8cd6a5478419a8cdf3af1c3e3447565a49b8c60228acf76fdbd4c5ae3611cf1`, the hash
+the lockfile used to carry), and unpacks its package once into `$PII_GUARD_MODELS_DIR`
+(default `~/.cache/pii-guard/models`). The Presidio baselines import that package, which
+registers huSpaCy's lemmatizer components, and give spaCy the pipeline directory: the same
+files and code as the installed wheel, and identical scores. huSpaCy `hu_core_news_lg` is by
+SzegedAI and MILAB (<https://github.com/huspacy/huspacy>), licensed CC BY-SA 4.0; pii-guard
+doesn't redistribute it.
 
 ### The tools and their configuration
 
@@ -739,7 +755,8 @@ no recognised text. Its own time per image is the latency.
 
 - `presidio-image`: Presidio Image Redactor's `ImageAnalyzerEngine` (Tesseract + Presidio
   analyzer, predefined recognizers, default threshold) with spaCy models for en, de and hu
-  (huSpaCy, as in the text baseline). It analyses each document in its own language where a
+  (huSpaCy, as in the text baseline, from the `pii-guard baselines download` copy, passed to
+  the worker with `--hu-model`). It analyses each document in its own language where a
   model exists (`hu` for HU, `de` for DE and AT, else `en`). It is text-only by design.
 - `eka`: Eka PII Redaction's `ImagePIIRedactor` (LayoutLMv3 text PII over Tesseract words,
   plus YOLO11m faces, signatures, stamps, QR codes and logos), all categories, CPU, weights
