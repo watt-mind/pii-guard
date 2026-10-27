@@ -145,7 +145,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
               <option value="all">All</option>
               {modes.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {m.charAt(0).toUpperCase() + m.slice(1)}
                 </option>
               ))}
             </select>
@@ -195,7 +195,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
               <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} />
             </div>
           ) : (
-            <ul aria-label="Calls through the gateway" className="max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
+            <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
               {[...filtered].reverse().map((e) => (
                 <li key={e.id}>
                   <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} />
@@ -836,7 +836,12 @@ function modeNote(events: TrafficEvent[]): string {
     by.set(m, set);
   }
   if (!by.size) return "Detectors per mode appear with the first call.";
-  return [...by.entries()].map(([m, d]) => `${m}: ${[...d].map((x) => detectorName(x)).join(" + ") || "no detector"}`).join(". ") + ". Strict mode adds the LLM detector.";
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  return (
+    "Detectors seen in the shown calls. " +
+    [...by.entries()].map(([m, d]) => `${cap(m)}: ${[...d].map((x) => detectorName(x)).join(" + ") || "none reported"}`).join(". ") +
+    "."
+  );
 }
 
 const placeholdersIn = (text: string) => tokenize(text).filter((t) => t.kind === "placeholder").length;

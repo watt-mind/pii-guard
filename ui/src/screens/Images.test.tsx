@@ -93,7 +93,7 @@ describe("Images screen", () => {
   it("says an undecodable image could not be decoded", async () => {
     const maskImage = vi.fn().mockRejectedValue(new ApiError(422, "invalid_image", "image could not be decoded"));
     const { user, panel } = await openImages(liveApi(maskImage));
-    await screen.findByText("Live API", { selector: "span" });
+    await screen.findByText("API up", { selector: "span" });
     await user.click(within(panel).getByRole("button", { name: "Mask image" }));
     expect(await within(panel).findByRole("alert")).toHaveTextContent("This image couldn't be decoded.");
   });
@@ -120,7 +120,7 @@ describe("Images screen", () => {
   it("sends an upload in English by default, and the picked language when changed (LAB-1242)", async () => {
     const maskImage = vi.fn().mockResolvedValue(recorded("id-card"));
     const { user, panel } = await openImages(liveApi(maskImage));
-    await screen.findByText("Live API", { selector: "span" });
+    await screen.findByText("API up", { selector: "span" });
     const input = panel.querySelector<HTMLInputElement>("#image-upload")!;
     await user.upload(input, new File([new Uint8Array([0x89, 0x50])], "letter.png", { type: "image/png" }));
     const language = within(panel).getByRole("combobox", { name: "Language of the text in the image" });
@@ -135,7 +135,7 @@ describe("Images screen", () => {
   it("shows the API's masked PNG, the regions and what ran", async () => {
     const maskImage = vi.fn().mockResolvedValue(recorded("id-card"));
     const { user, panel } = await openImages(liveApi(maskImage));
-    expect(await screen.findByText("Live API", { selector: "span" })).toBeInTheDocument();
+    expect(await screen.findByText("API up", { selector: "span" })).toBeInTheDocument();
     await user.click(within(panel).getByRole("button", { name: "Mask image" }));
 
     const figure = await within(panel).findByTestId("masked-image");
@@ -161,7 +161,7 @@ describe("Images screen", () => {
       analysis: { sam: { model: "sam-3.1", entity_types: ["FACE"] }, ocr: { ran: false, engine: null, detectors: [], reason: "tesseract_unavailable" } },
     });
     const { user, panel } = await openImages(liveApi(vi.fn().mockResolvedValue(data)));
-    await screen.findByText("Live API", { selector: "span" });
+    await screen.findByText("API up", { selector: "span" });
     await user.click(within(panel).getByRole("button", { name: /visitor badge/i }));
     expect(await within(panel).findByText(/Text in this image was not checked/)).toBeInTheDocument();
   });
@@ -169,7 +169,7 @@ describe("Images screen", () => {
   it("fails closed: a 503 shows the blocked notice and no masked image", async () => {
     const maskImage = vi.fn().mockRejectedValue(new ApiError(503, "detection_failed", "SAM request failed: HTTP 500"));
     const { user, panel } = await openImages(liveApi(maskImage));
-    await screen.findByText("Live API", { selector: "span" });
+    await screen.findByText("API up", { selector: "span" });
     await user.click(within(panel).getByRole("button", { name: "Mask image" }));
     const alert = await within(panel).findByRole("alert");
     expect(alert).toHaveTextContent("Blocked. Nothing was sent to the model.");
@@ -184,7 +184,7 @@ describe("Images screen", () => {
   it("drops the result when an upload replaces the sample, and waits for a click", async () => {
     const maskImage = vi.fn().mockResolvedValue(recorded("id-card"));
     const { user, panel } = await openImages(liveApi(maskImage));
-    await screen.findByText("Live API", { selector: "span" });
+    await screen.findByText("API up", { selector: "span" });
     await user.click(within(panel).getByRole("button", { name: "Mask image" }));
     await within(panel).findByTestId("masked-image");
     const input = panel.querySelector<HTMLInputElement>("#image-upload")!;

@@ -113,7 +113,7 @@ function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine:
       ? { label: "Connecting…", detail: null, tone: "pending" as const }
       : engine === "mock"
         ? { label: "Demo mode", detail: status.state === "online" ? `API ${version} up, not in use` : "API offline", tone: "demo" as const }
-        : { label: "Live API", detail: version, tone: "live" as const };
+        : { label: "API up", detail: version, tone: "live" as const };
   const dot = tone === "live" ? "bg-guard" : tone === "demo" ? "bg-warn" : "bg-faint motion-safe:animate-pulse";
 
   return (

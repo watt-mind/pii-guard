@@ -292,7 +292,7 @@ describe("Live traffic", () => {
     f.push([asMasked(huChat)]);
     expect(await screen.findByText(/This call ran Rules only/)).toBeInTheDocument();
     expect(screen.getByText("not names")).toBeInTheDocument();
-    expect(screen.getByText(/^fast: Rules\. Strict mode adds/)).toBeInTheDocument();
+    expect(screen.getByText(/^Detectors seen in the shown calls\. Fast: Rules\.$/)).toBeInTheDocument();
   });
 
   it("doesn't claim there was nothing to restore in a streamed tool call", async () => {

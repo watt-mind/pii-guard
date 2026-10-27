@@ -117,7 +117,7 @@ describe("App against a live API", () => {
   it("states what the engine did instead of claiming everything was masked, and shows details on hover", async () => {
     const user = userEvent.setup();
     render(<App api={liveApi()} mock={createMockClient()} />);
-    expect(await screen.findByText("Live API", { selector: "span" })).toBeInTheDocument();
+    expect(await screen.findByText("API up", { selector: "span" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /mask document/i }));
     const note = await screen.findByTestId("scope-note");
     expect(note).toHaveTextContent(/\d+ values masked by /);

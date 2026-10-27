@@ -186,7 +186,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">Pick at least one system to compare.</p>
       ) : (
         <>
-          <Section id="bench-table" title="Results" note="Latest run of each system. Leak = labelled values still readable after masking.">
+          <Section id="bench-table" title="Results" note="Latest run of each system. Leak = labelled values still readable after masking. Underlined: the best value among systems run on every language.">
             <ResultsTable snapshots={snapshots} index={index} lang={lang} />
             <RunNotes key={set} snapshots={snapshots} index={index} open={info?.origin === "generated"} />
           </Section>
@@ -353,7 +353,11 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
       return sort.dir === "asc" ? va - vb : vb - va;
     });
   const best = (key: keyof Metrics, dir: "high" | "low") => {
-    const vals = rows.map((r) => r.m?.[key]).filter((v): v is number => typeof v === "number");
+    // Only systems that ran every language compete for "best"; a partial run is not a win.
+    const vals = rows
+      .filter((r) => lang !== "all" || !coverageTag(index, r.s))
+      .map((r) => r.m?.[key])
+      .filter((v): v is number => typeof v === "number");
     return vals.length ? (dir === "low" ? Math.min(...vals) : Math.max(...vals)) : null;
   };
 
@@ -425,7 +429,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                   const v = m?.[c.key] ?? null;
                   const top = v !== null && v === best(c.key, c.better) && rows.length > 1;
                   return (
-                    <td key={c.key} className={["px-2 py-2 text-right tabular-nums whitespace-nowrap", top ? "font-semibold text-guard-ink" : "text-ink"].join(" ")}>
+                    <td key={c.key} className={["px-2 py-2 text-right tabular-nums whitespace-nowrap", top ? "font-semibold text-ink underline decoration-line-strong decoration-2 underline-offset-4" : "text-muted"].join(" ")}>
                       {m === null ? <span className="text-faint">not run</span> : c.key === "detect_p50_ms" ? formatMs(v) + (m.latency_pooled ? "*" : "") : formatPct(v)}
                     </td>
                   );

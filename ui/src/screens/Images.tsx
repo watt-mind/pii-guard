@@ -355,7 +355,7 @@ export function Images({ client, engineState, loadImage = fetchImage, onUseDemo 
               <h2 id="regions-title" className="text-base font-semibold tracking-tight text-ink">
                 Detected regions
               </h2>
-              <p className="mt-1 text-sm text-muted">Colour shows the type. Kept regions were found but left visible by policy (company stamps, by default). No region carries the text or pixels it covers.</p>
+              <p className="mt-1 text-sm text-muted">Blue regions were masked. Dashed grey regions were found but kept visible by policy (company stamps, by default). No region carries the text or pixels it covers.</p>
             </div>
             <ImageLegend regions={data.regions} activeType={active !== null ? (data.regions[active]?.entity_type ?? null) : null} />
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted">
