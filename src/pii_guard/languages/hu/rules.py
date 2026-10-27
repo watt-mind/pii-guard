@@ -44,6 +44,7 @@ from pii_guard.detect.rules._base import (
     Rule,
     _Hit,
     context_before,
+    legal_form_after,
     reference_or_amount_before,
 )
 from pii_guard.lang import LexiconUnavailable, lexicon, postcode_index
@@ -63,7 +64,12 @@ _TAX_ID_CONTEXT = ("adóazonosító", "adóaz", "adószám", "tax id", "tax numb
 def _find_hu_tax_id(text: str) -> Iterator[_Hit]:
     for m in _TAX_ID_RE.finditer(text):
         if is_valid_hu_tax_id(m.group(1)):
-            score = 0.99 if context_before(text, m.start(), _TAX_ID_CONTEXT) else 0.95
+            if context_before(text, m.start(), _TAX_ID_CONTEXT):
+                score = 0.99
+            elif reference_or_amount_before(text, m.start()):
+                continue  # "ticket 8123456786", "Order #8123456786": a reference (LAB-1227)
+            else:
+                score = 0.95
             yield _Hit(m.start(1), m.end(1), EntityType.NATIONAL_ID_HU_TAX, score)
 
 
@@ -316,6 +322,10 @@ def _find_postcode(text: str) -> Iterator[_Hit]:
         elif context_before(text, m.start(), _POSTCODE_CONTEXT, window=25):
             score = 0.85
         elif place and place.group(1) not in _NOT_PLACES:
+            # "1999 Budapest Kft.": a company name, and "Order 1051 Budapest": a reference;
+            # neither number is a postcode (LAB-1227). A cued postcode always counts.
+            if legal_form_after(text, place.end()) or reference_or_amount_before(text, m.start()):
+                continue
             # The postcode check works like a checksum: only a consistent pair is boosted.
             settlement = _settlement(place.group(1))
             consistent = settlement is not None and _postcodes_agree(m.group("code"), settlement)

@@ -1000,6 +1000,37 @@ client's contact details.
 - New: `GET /v1/models` and [docs/integrations/](integrations/README.md).
 - **Cost:** $0. About 20 requests over three runs on free Meta API credits; the rest ran locally.
 
+### 36. Ticket numbers, SKUs and company names are not tax IDs, cards or postcodes (2026-10-27)
+
+LAB-1227, the follow-up of milestone 31. LAB-1205 stopped a context-free TAJ from firing
+right after an order or invoice label, an ID prefix or a currency, but other checksum rules
+still did: a valid ten-digit number after `ticket` came out as a Hungarian tax ID (mod 11
+and a leading 8), `SKU 4111111111111111` as a card (a Luhn check passes for 1 in 10 numbers)
+and the `1999` of `1999 Budapest Kft.` as a postcode, although the settlement is part of a
+company name.
+
+The same guard now covers a context-free tax ID, a payment card without a card or account cue
+nearby (`card`, `kártya`, `Visa`, `számlaszám` ...) and a Hungarian postcode after a reference
+label; a postcode followed by its settlement and a legal form (`Kft.`, `Zrt.`, `Bt.`, `GmbH`,
+`Ltd`, with up to two more words of the name in between) is not a postcode, and neither is a
+German address line before `GmbH`. Only the context-free hit is dropped: a cued value
+(`adóazonosító`, `irányítószám`, `H-1999`, a card cue in the window) always wins, and
+a tax ID after a name and a comma, with no label, is still masked.
+
+- **Probe:** the three cases of the reviewers' `probe3.py` now come out empty; the other 16
+  inputs are unchanged.
+- **Look-alikes:** 38 new regression texts of ticket, tracking, SKU and invoice numbers and
+  company names (en, hu, de). The rules masked 36 of them before and none now; 34 more tests
+  pin down that cued values and plain postcodes are still found, and test the legal-form
+  matcher.
+- **No regression:** the smoke, Ai4Privacy and negative-set scorecards are identical before
+  and after, in rules and fast mode (local NER checkpoint): fast-mode leak 0.6 % on smoke and
+  27.6 % on Ai4Privacy, 0 false positives on the 38 negative documents. Run records
+  `2026-10-27-reference-cues-{before,after}-{smoke,ai4privacy,negative}-{rules,fast}`.
+- **Not changed:** a valid 16-digit giro number (two mod-10 checks, 1 in 100) after a
+  reference label is still masked, as is a company tax number after `Ügyszám`.
+- **Cost:** $0; everything ran locally.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
