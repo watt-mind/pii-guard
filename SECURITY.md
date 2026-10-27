@@ -15,6 +15,19 @@ metrics, traces or error messages. Examples:
 Ordinary false negatives found by the evaluation set are tracked as normal issues. A
 **systematic** bypass is a security issue.
 
+## Deployment: no authentication by default
+
+pii-guard has **no authentication unless `PII_GUARD_API_TOKEN` is set**. Anyone who can reach
+it can unmask placeholders, read the traffic log and use the gateway, which spends the
+configured `PII_GUARD_UPSTREAM_API_KEY`: that key is shared by every caller. Run it on loopback
+(the default) or behind an authenticating proxy, and publish a container's port on
+`127.0.0.1` only. It answers only `localhost`, `127.0.0.1`, `[::1]`, `PII_GUARD_HOST` and
+`PII_GUARD_ALLOWED_HOSTS` as `Host` (a DNS-rebinding guard), and the `full` traffic log only
+serves loopback connections. Details: [docs/operations.md](docs/operations.md#exposure-and-authentication).
+
+Reports about an open deployment that ignored this are not vulnerabilities; a way around the
+token, the host check or the loopback-only `full` log is.
+
 ## How to report
 
 Please report privately, not in a public issue. Once the GitHub repository is published, use

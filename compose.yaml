@@ -50,6 +50,8 @@ services:
       PII_GUARD_HOST: 0.0.0.0
       PII_GUARD_PORT: "8787"
       PII_GUARD_GATEWAY_MODE: fast
+      # The UI's Vite proxy reaches this service as demo-api:8787 (Host header guard).
+      PII_GUARD_ALLOWED_HOSTS: demo-api
       # masked only: `full` is refused on a non-loopback bind, and a container binds 0.0.0.0.
       PII_GUARD_TRAFFIC_LOG: masked
       PII_GUARD_SERVER_TIMING: "true"

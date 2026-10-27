@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     port: int = Field(default=DEFAULT_PORT, ge=1, le=65535)
     log_level: str = "info"
     default_language: str = "hu"
+    # Exposure (docs/operations.md). No authentication by default: run on loopback or behind an
+    # authenticating proxy. Host headers answered besides localhost, 127.0.0.1, [::1] and
+    # PII_GUARD_HOST (DNS-rebinding guard), comma-separated; "*" answers any host.
+    allowed_hosts: Annotated[tuple[str, ...], NoDecode] = ()
+    # Bearer token required on every route but /healthz; unset: no authentication.
+    api_token: SecretStr | None = None
 
     # Detection and policies for the REST API (/v1/analyze, /v1/mask).
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm".
@@ -97,6 +103,13 @@ class Settings(BaseSettings):
             value = [part.strip() for part in value.split(",") if part.strip()]
         if isinstance(value, list | tuple) and not value:
             raise ValueError("PII_GUARD_DETECTORS needs at least one detector name")
+        return value
+
+    @field_validator("allowed_hosts", mode="before")
+    @classmethod
+    def _split_hosts(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = [part.strip() for part in value.split(",") if part.strip()]
         return value
 
     @field_validator("policy_overrides", mode="before")

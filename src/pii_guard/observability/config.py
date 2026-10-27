@@ -9,7 +9,11 @@
 
 ``full`` keeps the original (unmasked) request and the restored answer next to what was sent
 upstream. It is refused unless the server binds to a loopback address (:func:`check_bind`):
-the API and ``pii-guard serve`` stop at startup instead. See ``docs/operations.md``.
+the API and ``pii-guard serve`` stop at startup instead, and so does an allowed ``Host`` list
+(``PII_GUARD_ALLOWED_HOSTS``) with a name other than a loopback one (:func:`check_allowed_hosts`).
+A launcher that binds elsewhere than ``PII_GUARD_HOST`` (``uvicorn --host 0.0.0.0``) is caught
+per request: the API answers 403 to any connection that is not loopback on both ends. See
+``docs/operations.md``.
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ __all__ = [
     "ObservabilitySettings",
     "TrafficLevel",
     "TrafficLogConfigError",
+    "check_allowed_hosts",
     "check_bind",
     "is_loopback",
 ]
@@ -73,4 +78,16 @@ def check_bind(level: TrafficLevel, host: str) -> None:
         raise TrafficLogConfigError(
             f"PII_GUARD_TRAFFIC_LOG=full is only allowed when the server binds to a loopback "
             f"address (127.0.0.1, ::1, localhost), not {host!r}; use 'masked' or bind locally"
+        )
+
+
+def check_allowed_hosts(level: TrafficLevel, hosts: list[str]) -> None:
+    """Refuse ``full`` when the API answers ``Host`` names other than loopback ones."""
+    if level is not TrafficLevel.FULL:
+        return
+    public = [h for h in hosts if not is_loopback(h)]
+    if public:
+        raise TrafficLogConfigError(
+            "PII_GUARD_TRAFFIC_LOG=full is only allowed when the API answers loopback host names "
+            f"only; PII_GUARD_ALLOWED_HOSTS also allows {', '.join(public)}"
         )

@@ -37,6 +37,8 @@ RUN groupadd --system --gid 10001 piiguard \
 
 COPY --from=build --chown=piiguard:piiguard /app/.venv /app/.venv
 
+# 0.0.0.0 inside the container: publish the port on 127.0.0.1 only (compose.yaml does). The API
+# has no authentication unless PII_GUARD_API_TOKEN is set (docs/operations.md, Exposure).
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+import starlette.testclient
 from fastapi.testclient import TestClient
 
 from pii_guard.api.app import create_app
@@ -25,6 +26,24 @@ def clean_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+# TestClient defaults to Host "testserver" from client "testclient": a non-loopback name the API
+# refuses (DNS-rebinding guard, LAB-1203). Default to what a local client really sends; tests of
+# the guards pass base_url/client/headers explicitly.
+LOCAL_BASE_URL = "http://127.0.0.1:8787"
+LOCAL_CLIENT = ("127.0.0.1", 50000)
+
+
+@pytest.fixture(autouse=True)
+def local_test_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    init = starlette.testclient.TestClient.__init__
+    code, defaults = init.__code__, init.__defaults__ or ()
+    names = code.co_varnames[code.co_argcount - len(defaults) : code.co_argcount]
+    local = {"base_url": LOCAL_BASE_URL, "client": LOCAL_CLIENT}
+    monkeypatch.setattr(
+        init, "__defaults__", tuple(local.get(n, d) for n, d in zip(names, defaults, strict=True))
+    )
 
 
 NER_AUTODETECT = "ner_autodetect"

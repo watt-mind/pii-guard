@@ -119,6 +119,29 @@ and OCR availability, and prints `ocr on|off` (`docker inspect --format
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.
 
+## Exposure and authentication
+
+**There is no authentication by default.** Anyone who can reach the API can mask and unmask,
+read the traffic log and `/metrics`, and use the gateway. With `PII_GUARD_UPSTREAM_API_KEY` set,
+the upstream key is shared by every caller: an exposed gateway is an open relay that spends it.
+Run the API on loopback (the default `PII_GUARD_HOST=127.0.0.1`) or behind an authenticating
+reverse proxy. A container binds `0.0.0.0`; publish its port on `127.0.0.1` only, as
+`compose.yaml` does. On a non-loopback bind without a token, startup logs a warning.
+
+| Setting | Effect | Default |
+|---|---|---|
+| `PII_GUARD_API_TOKEN` | Every route but `/healthz` needs `Authorization: Bearer <token>` (or `X-PII-Guard-Token: <token>`); otherwise `401 unauthorized` | unset: no auth |
+| `PII_GUARD_ALLOWED_HOSTS` | Extra `Host` header names the API answers, comma-separated; `*` answers any | `localhost`, `127.0.0.1`, `[::1]` and `PII_GUARD_HOST` |
+
+- **DNS rebinding.** A web page on another site can point its own host name at `127.0.0.1` and
+  make the browser talk to a local pii-guard; its requests still carry that host name. Any other
+  `Host` gets `400 Invalid host header`. The UI's Vite proxy sends `127.0.0.1:<port>`; behind a
+  proxy or a compose service name (`demo-api`), add that name to `PII_GUARD_ALLOWED_HOSTS`.
+- **The token is never forwarded upstream.** The gateway sends `PII_GUARD_UPSTREAM_API_KEY`
+  upstream, never the client's token. Without an upstream key the client's own `Authorization`
+  is passed through (bring your own key); a pii-guard token sent as the bearer is removed first,
+  so send the token as `X-PII-Guard-Token` and your provider key as `Authorization`.
+
 ## Traffic log
 
 Every call to `POST /v1/chat/completions` produces one event, kept **in memory only**, when the
@@ -159,7 +182,10 @@ Both answer `404 traffic_log_disabled` while the log is off.
   The ref groups the calls of one conversation, cannot be turned back into the id, and changes
   on restart.
 - **Who can read it.** Anyone who can reach the API can read the log; keep the API on a
-  private interface, as for every other endpoint.
+  private interface, as for every other endpoint ([Exposure and authentication](#exposure-and-authentication)).
+  With `full`, every connection that is not loopback on both ends gets `403
+  traffic_log_not_local`, whatever launched the server (`uvicorn --host 0.0.0.0` included), and
+  `PII_GUARD_ALLOWED_HOSTS` may name loopback hosts only.
 
 ### Event fields
 
