@@ -10,6 +10,7 @@ from fastapi import Depends, Request
 from pydantic import BaseModel, Field
 
 from pii_guard.api.deps import Analyzer, get_analyzer, get_language, get_policies, get_vault
+from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import check_text_size, log_extra, v1_router
 from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.policy import Policy, PolicySet
@@ -20,34 +21,80 @@ __all__ = ["AnalyzeRequest", "AnalyzeResponse", "PublicSpan", "router"]
 
 router = v1_router()
 
-Language = Annotated[str | None, Field(default=None, min_length=2, max_length=16)]
+Language = Annotated[
+    str | None,
+    Field(
+        default=None,
+        min_length=2,
+        max_length=16,
+        description="ISO 639-1 language of the text (`hu`, `en`, `de`, ...). Defaults to "
+        "`PII_GUARD_DEFAULT_LANGUAGE` (`hu`).",
+        examples=["hu"],
+    ),
+]
 # Same constraint as ``MaskRequest.session_id`` (routes/mask.py imports this module, so it
 # cannot be imported from there).
 SessionId = Annotated[str, Field(min_length=1, max_length=128)]
 
 
 class AnalyzeRequest(BaseModel):
-    text: str
+    """Text to scan for personal data. Nothing is masked or stored."""
+
+    text: str = Field(
+        description="The text to analyse. Offsets in the response are code-point indices into it.",
+        examples=["Teszt Elek, teszt.elek@example.com"],
+    )
     language: Language = None
-    session_id: SessionId | None = None
+    session_id: SessionId | None = Field(
+        default=None,
+        description="Optional vault session (1-128 characters, as on `/v1/mask`) whose "
+        'pre-loaded known values are merged in (`detector: "known"`). Unknown or expired: '
+        "404 `not_found`. Never creates a session.",
+    )
 
 
 class PublicSpan(BaseModel):
     """A span without its raw value (``Span.to_public_dict()``) plus its type's policy."""
 
-    start: int
-    end: int
-    entity_type: str
-    score: float
-    detector: str
-    policy: Policy
+    start: int = Field(description="Code-point offset of the span in `text`, inclusive.")
+    end: int = Field(description="Code-point offset of the span in `text`, exclusive.")
+    entity_type: str = Field(
+        description="The entity type (`PERSON`, `EMAIL`, ...; see docs/entities.md).",
+        examples=["PERSON"],
+    )
+    score: float = Field(description="Detector confidence in `[0, 1]`.", examples=[0.97])
+    detector: str = Field(
+        description="Registry name of the detector that found it (`rules`, `ner`, `llm`, `known`).",
+        examples=["ner"],
+    )
+    policy: Policy = Field(
+        description="The type's effective policy. Known values report `mask` even for a "
+        "`keep` type, because `/v1/mask` masks them."
+    )
 
 
 class AnalyzeResponse(BaseModel):
-    spans: list[PublicSpan]
+    """Every detected span, `keep` and `block` ones included: analyze never refuses."""
+
+    spans: list[PublicSpan] = Field(
+        description="Spans sorted by `start`, after the resolver merged overlaps. The raw "
+        "text of a span is not returned: slice `text` with `start`/`end`."
+    )
 
 
-@router.post("/v1/analyze", response_model=AnalyzeResponse)
+@router.post(
+    "/v1/analyze",
+    response_model=AnalyzeResponse,
+    summary="Detect personal data without masking it",
+    responses=error_responses(
+        "not_found",
+        "payload_too_large",
+        "invalid_request",
+        "vault_not_configured",
+        "detection_failed",
+        "detection_unavailable",
+    ),
+)
 def analyze(
     body: AnalyzeRequest,
     request: Request,

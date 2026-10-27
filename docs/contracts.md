@@ -324,8 +324,14 @@ Every non-2xx response, including validation errors and unknown routes, has this
 
 | Status | `code` | When |
 |---|---|---|
+| 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
+| 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 404 | `not_found` | Unknown route, or an unknown or expired `session_id` on any route that takes one (`/v1/analyze`, `/v1/mask`, `/v1/mask/image`, `/v1/unmask`, the session and known-values routes, the gateway) |
+| 404 | `traffic_log_disabled` | `GET /v1/traffic` and `/v1/traffic/stream` while `PII_GUARD_TRAFFIC_LOG=off` (the default). |
+| 413 | `payload_too_large` | The body, text or image is larger than the configured limit (see docs/operations.md). |
+| 415 | `unsupported_media_type` | `/v1/mask/image`: the image is not a PNG or JPEG (sniffed from its bytes). |
 | 422 | `invalid_request` | Body fails validation. The message lists field locations only, never values. |
+| 422 | `invalid_image` | `/v1/mask/image`: the image can't be decoded, or its base64 or JSON body is malformed. |
 | 422 | `invalid_known_value` | A pre-loaded known value is too short (< 3 non-space characters), too long, or has an unknown or visual type. The message names its index and type, never the value. |
 | 422 | `too_many_known_values` | The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values; nothing is added. |
 | 422 | `blocked_entity` | `/v1/mask` (or the gateway) found an entity type whose policy is `block`. The message lists types and counts only; nothing is masked, stored or forwarded. |
@@ -334,9 +340,13 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
 | 503 | `detection_unavailable` | `DetectionUnavailableError` (a `DetectionError`): a configured detector can't run safely, so nothing ran and nothing was sent. Today: the LLM detector without `PII_GUARD_LLM_DETECTOR_API_KEY` (gateway audit mode, or `PII_GUARD_DETECTORS` with `llm` on `/v1/*`); the message is "audit mode needs PII_GUARD_LLM_DETECTOR_API_KEY …". Refused before any detection, image segmentation or request, so the text never leaves the machine. A keyless endpoint on loopback (`localhost`, `127.0.0.1`, `::1`) is allowed: the text stays on the machine. |
+| 503 | `ocr_unavailable` | `/v1/mask/image` (and gateway images): no OCR engine, so the text in the image can't be checked (`PII_GUARD_IMAGE_REQUIRE_OCR`, the default). |
 | 500 | `internal_error` | Anything unexpected. No exception text is returned. |
 
 Fail closed: on any error the response carries no masked or partially masked text.
+
+The OpenAPI schema (`/openapi.json`, `/docs`) declares the codes each route can return, with
+the `ErrorResponse` body (`pii_guard.api.errors.ERROR_CODES`).
 
 ### `POST /v1/analyze`
 

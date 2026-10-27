@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import Query, Request
 from starlette.responses import PlainTextResponse, StreamingResponse
 
+from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import v1_router
 from pii_guard.observability import Observability, TrafficLog
 from pii_guard.types import PiiGuardError
@@ -59,12 +60,39 @@ def _traffic(request: Request) -> TrafficLog:
     return traffic
 
 
-@router.get("/v1/traffic")
+_TRAFFIC_ERRORS = error_responses("traffic_log_disabled", "invalid_request")
+
+
+@router.get(
+    "/v1/traffic",
+    summary="Recent gateway traffic events",
+    responses={
+        200: {
+            "description": "`level` (`masked` or `full`), `size` (how many events the log "
+            "keeps) and `events`, oldest first. See docs/operations.md for an event's fields.",
+            "content": {
+                "application/json": {
+                    "example": {"level": "masked", "size": 200, "events": []},
+                }
+            },
+        },
+        **_TRAFFIC_ERRORS,
+    },
+)
 def recent_traffic(
     request: Request,
-    limit: int = Query(default=50, ge=1, le=10_000),
-    after: int | None = Query(default=None, ge=0),
+    limit: int = Query(
+        default=50, ge=1, le=10_000, description="Most events to return (the newest ones)."
+    ),
+    after: int | None = Query(
+        default=None, ge=0, description="Only events with a `seq` greater than this one."
+    ),
 ) -> dict[str, Any]:
+    """The most recent events of the in-memory traffic log, oldest first.
+
+    404 ``traffic_log_disabled`` while ``PII_GUARD_TRAFFIC_LOG=off`` (the default). At level
+    ``masked`` an event keeps what was sent upstream and what came back (placeholders only);
+    ``full`` (loopback only) also the original request and the restored answer."""
     traffic = _traffic(request)
     events = traffic.recent(limit, after=after)
     return {
@@ -79,10 +107,28 @@ def _sse(event: dict[str, Any]) -> bytes:
     return f"id: {event['seq']}\nevent: traffic\ndata: {data}\n\n".encode()
 
 
-@router.get("/v1/traffic/stream")
+@router.get(
+    "/v1/traffic/stream",
+    summary="Live gateway traffic as server-sent events",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "`text/event-stream`: one `traffic` event per gateway call (`id` is "
+            "the event's `seq`, `data` its JSON), a comment line every 15 s as keep-alive.",
+            "content": {"text/event-stream": {"schema": {"type": "string"}}},
+        },
+        **_TRAFFIC_ERRORS,
+    },
+)
 async def traffic_stream(
-    request: Request, replay: int = Query(default=0, ge=0, le=10_000)
+    request: Request,
+    replay: int = Query(
+        default=0, ge=0, le=10_000, description="Send the last N stored events first."
+    ),
 ) -> StreamingResponse:
+    """Server-sent events, one ``traffic`` event per gateway call, until the client leaves.
+
+    404 ``traffic_log_disabled`` while ``PII_GUARD_TRAFFIC_LOG=off`` (the default)."""
     traffic = _traffic(request)
 
     async def events() -> AsyncIterator[bytes]:

@@ -18,7 +18,8 @@ from fastapi import Depends, Path, Request
 from pydantic import BaseModel, Field
 
 from pii_guard.api.deps import get_vault
-from pii_guard.api.routes._common import log_extra, v1_router
+from pii_guard.api.errors import error_responses
+from pii_guard.api.routes._common import ephemeral_session, log_extra, v1_router
 from pii_guard.vault import Vault, VaultSession
 from pii_guard.vault.known import KnownValue, known_values_from
 
@@ -38,8 +39,29 @@ _MAX_CHARS = 10_000
 
 
 class KnownValueIn(BaseModel):
-    value: Annotated[str, Field(max_length=_MAX_CHARS, repr=False)]
-    entity_type: Annotated[str, Field(max_length=64)]
+    """A value the application already knows is sensitive, with its entity type."""
+
+    value: Annotated[
+        str,
+        Field(
+            max_length=_MAX_CHARS,
+            repr=False,
+            description="The value, at least 3 non-space characters and at most "
+            "`PII_GUARD_KNOWN_VALUES_MAX_LENGTH` (256). Matched case- and "
+            "whitespace-insensitively, whole words, inflected forms included. Never logged "
+            "or echoed.",
+            examples=["Gyakorló Tihamér"],
+        ),
+    ]
+    entity_type: Annotated[
+        str,
+        Field(
+            max_length=64,
+            description="A text entity type (`PERSON`, `ID_DOCUMENT`, ...); visual types are "
+            "refused.",
+            examples=["PERSON"],
+        ),
+    ]
 
     def __repr__(self) -> str:
         return "KnownValueIn(value=<redacted>)"
@@ -47,23 +69,34 @@ class KnownValueIn(BaseModel):
     __str__ = __repr__
 
 
-KnownValueList = Annotated[list[KnownValueIn], Field(max_length=_MAX_ITEMS)]
+KnownValueList = Annotated[
+    list[KnownValueIn],
+    Field(
+        max_length=_MAX_ITEMS,
+        description="Values to pre-load. At most `PII_GUARD_KNOWN_VALUES_MAX` (1000) per "
+        "session; duplicates are ignored.",
+    ),
+]
 
 
 class CreateSessionRequest(BaseModel):
+    """Optional body of ``POST /v1/sessions``: known values to pre-load."""
+
     known_values: KnownValueList = []
 
 
 class KnownValuesRequest(BaseModel):
+    """Known values to add to an existing session."""
+
     known_values: KnownValueList
 
 
 class KnownValuesResponse(BaseModel):
     """Counts only: ``added`` new values (duplicates are ignored), ``total`` in the session."""
 
-    session_id: str
-    added: int
-    total: int
+    session_id: str = Field(description="The vault session the values are stored on.")
+    added: int = Field(description="New values this request added (duplicates excluded).")
+    total: int = Field(description="Known values the session now holds.")
 
 
 def _validated(request: Request, items: list[KnownValueIn]) -> list[KnownValue]:
@@ -81,7 +114,19 @@ def _add(request: Request, session: VaultSession, values: list[KnownValue]) -> d
     return {"session_id": session.session_id, "added": added, "total": len(store)}
 
 
-@router.post("/v1/sessions", response_model=KnownValuesResponse, status_code=201)
+@router.post(
+    "/v1/sessions",
+    response_model=KnownValuesResponse,
+    status_code=201,
+    summary="Create a vault session, optionally with known values",
+    responses=error_responses(
+        "payload_too_large",
+        "invalid_request",
+        "invalid_known_value",
+        "too_many_known_values",
+        "vault_not_configured",
+    ),
+)
 def create_session(
     request: Request,
     vault: Annotated[Vault, Depends(get_vault)],
@@ -92,21 +137,34 @@ def create_session(
     Pass its ``session_id`` to ``/v1/mask``, ``/v1/unmask`` or the gateway's session header.
     """
     values = _validated(request, body.known_values if body else [])  # before creating
-    session = vault.session()
-    try:
+    with ephemeral_session(vault, None, request) as session:  # a refused body creates none
         return _add(request, session, values)
-    except BaseException:
-        vault.drop(session.session_id)
-        raise
 
 
-@router.post("/v1/sessions/{session_id}/known-values", response_model=KnownValuesResponse)
+@router.post(
+    "/v1/sessions/{session_id}/known-values",
+    response_model=KnownValuesResponse,
+    summary="Add known values to a session",
+    responses=error_responses(
+        "not_found",
+        "payload_too_large",
+        "invalid_request",
+        "invalid_known_value",
+        "too_many_known_values",
+        "vault_not_configured",
+    ),
+)
 def add_known_values(
-    session_id: Annotated[str, Path(min_length=1, max_length=128)],
+    session_id: Annotated[
+        str,
+        Path(min_length=1, max_length=128, description="The vault session to add values to."),
+    ],
     body: KnownValuesRequest,
     request: Request,
     vault: Annotated[Vault, Depends(get_vault)],
 ) -> dict[str, object]:
-    """Add known values to an existing session (404 if it is unknown or expired)."""
+    """Add known values to an existing session (404 if it is unknown or expired).
+
+    A refused request (an invalid value, or more than the session may hold) adds nothing."""
     values = _validated(request, body.known_values)
     return _add(request, vault.session(session_id), values)

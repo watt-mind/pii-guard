@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 
 class Policy(StrEnum):
+    """What happens to an entity type: ``mask`` it, ``keep`` it in place, or ``block`` the
+    request."""
+
     MASK = "mask"
     KEEP = "keep"
     BLOCK = "block"

@@ -45,7 +45,7 @@ import threading
 from typing import Annotated, Any
 
 from fastapi import Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pii_guard.api.deps import (
     PayloadTooLargeError,
@@ -54,10 +54,17 @@ from pii_guard.api.deps import (
     get_policies,
     get_vault,
 )
-from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
-from pii_guard.policy import BlockedEntityError, Policy
+from pii_guard.api.errors import error_responses
+from pii_guard.api.routes._common import (
+    LoggedRoute,
+    ephemeral_session,
+    log_extra,
+    text_body_limit,
+    v1_router,
+)
+from pii_guard.policy import Policy
 from pii_guard.types import PiiGuardError
-from pii_guard.vault import Vault, VaultSession
+from pii_guard.vault import Vault
 from pii_guard.visual.masking import (
     DEFAULT_MAX_IMAGE_BYTES,
     RENDER_MODES,
@@ -106,59 +113,150 @@ class ImageRoute(LoggedRoute):
 router = v1_router(ImageRoute)
 
 
+_BOX = "`[x1, y1, x2, y2]`, inclusive pixel corners in the image after EXIF orientation"
+
+
 class ImageRegionOut(BaseModel):
-    entity_type: str
-    box: list[int]
-    source: str
-    detector: str
-    score: float | None
-    policy: str
+    """A region found in the image: where, what and by whom. Never its text or pixels."""
+
+    entity_type: str = Field(
+        description="The entity type (`FACE`, `SIGNATURE`, `ID_PHOTO`, `STAMP`, or a text type "
+        "found by OCR).",
+        examples=["FACE"],
+    )
+    box: list[int] = Field(
+        description=f"The detected area, {_BOX}. `FACE` boxes are grown before masking; the "
+        "reported box is the area covered.",
+        examples=[[72, 116, 188, 262]],
+    )
+    source: str = Field(
+        description="`sam` (SAM 3.1), `local` (the on-device face detector) or `ocr` (OCR word "
+        "boxes of a span a text detector found).",
+        examples=["local"],
+    )
+    detector: str = Field(
+        description="`sam`, `yunet`, the text detector's registry name, `captions` (a value "
+        "next to a known field caption) or `vault` (a session value printed where no detector "
+        "found it).",
+        examples=["yunet"],
+    )
+    score: float | None = Field(description="Confidence in `[0, 1]`; `null` for SAM regions.")
+    policy: str = Field(
+        description="The type's policy: `mask` regions are covered, `keep` regions are left "
+        "visible.",
+        examples=["mask"],
+    )
     #: ``render="labels"`` only: the session placeholder, the printed label and the match.
-    placeholder: str | None = None
-    label: str | None = None
-    match: str | None = None
-    match_confidence: float | None = None
-    cover_box: list[int] | None = None
+    placeholder: str | None = Field(
+        default=None,
+        description='`render: "labels"` only: the session placeholder of the covered value.',
+        examples=["[[PERSON_a1b2c3]]"],
+    )
+    label: str | None = Field(
+        default=None,
+        description='`render: "labels"` only: what is printed in the box (`PHOTO · '
+        "[[PERSON_x]]`, `SIGNATURE`, `STAMP`).",
+    )
+    match: str | None = Field(
+        default=None,
+        description='`render: "labels"` only: how the value was tied to the session: '
+        "`exact`, `fuzzy`, `new` or `uncertain` (a new placeholder, never a guess).",
+        examples=["fuzzy"],
+    )
+    match_confidence: float | None = Field(
+        default=None,
+        description='`render: "labels"` only: the match confidence in `[0, 1]`.',
+    )
+    cover_box: list[int] | None = Field(
+        default=None,
+        description='`render: "labels"` only: the area actually painted, '
+        f"{_BOX}: the box grown by 2 px, extended to the right when the label needs room.",
+    )
 
 
 class TypeCount(BaseModel):
-    entity_type: str
-    count: int
+    """How many regions of one entity type got a policy."""
+
+    entity_type: str = Field(description="The entity type.", examples=["FACE"])
+    count: int = Field(description="How many regions of that type.")
 
 
 class SamInfo(BaseModel):
-    model: str
-    entity_types: list[str]
+    """What the segmenter ran."""
+
+    model: str = Field(
+        description="The segmenter's model id (`yunet-2023mar+sam-3.1` for `hybrid`).",
+        examples=["yunet-2023mar+sam-3.1"],
+    )
+    entity_types: list[str] = Field(
+        description="The visual entity types the segmenter was asked for."
+    )
 
 
 class OcrInfo(BaseModel):
-    ran: bool
-    engine: str | None
-    detectors: list[str]
-    models: dict[str, str]
-    reason: str | None
+    """Whether the text in the image was checked, and with what."""
+
+    ran: bool = Field(
+        description="`false` only with `PII_GUARD_IMAGE_REQUIRE_OCR=false` and no Tesseract: "
+        "text in the image was **not** checked."
+    )
+    engine: str | None = Field(description="The OCR engine (`tesseract`), or `null`.")
+    detectors: list[str] = Field(description="The text detectors OCR text went through.")
+    models: dict[str, str] = Field(
+        description="Each model-backed text detector's model id, by detector name."
+    )
+    reason: str | None = Field(
+        description="Why OCR did not run (`tesseract_unavailable`), or `null`."
+    )
 
 
 class Analysis(BaseModel):
-    sam: SamInfo
-    ocr: OcrInfo
+    """What ran on the image, so clients can label regions by what actually ran."""
+
+    sam: SamInfo = Field(description="The visual segmenter.")
+    ocr: OcrInfo = Field(description="OCR and the text detectors.")
 
 
 class ImageMaskResponse(BaseModel):
-    image: str
-    media_type: str
-    width: int
-    height: int
-    regions: list[ImageRegionOut]
-    masked: list[TypeCount]
-    kept: list[TypeCount]
-    analysis: Analysis
-    render: str = "opaque"
+    """The masked image and a value-free account of what was covered.
+
+    ``render``, ``session_id``, ``transcript``, ``summary`` and ``matches`` are only present
+    with ``render: "labels"``.
+    """
+
+    image: str = Field(
+        description="The masked image, base64 PNG, re-encoded from pixels with no metadata."
+    )
+    media_type: str = Field(description="Always `image/png`.", examples=["image/png"])
+    width: int = Field(description="Width of the image in pixels.")
+    height: int = Field(description="Height of the image in pixels.")
+    regions: list[ImageRegionOut] = Field(description="Every region found, covered or kept.")
+    masked: list[TypeCount] = Field(description="Covered regions by entity type.")
+    kept: list[TypeCount] = Field(description="Regions left visible by a `keep` policy.")
+    analysis: Analysis = Field(description="The segmenter, OCR and detectors that ran.")
+    render: str = Field(
+        default="opaque",
+        description="`labels` (placeholders printed in the boxes) or `opaque` (solid boxes).",
+    )
     #: The vault session the placeholders belong to (``render="labels"``).
-    session_id: str | None = None
-    transcript: str | None = None
-    summary: dict[str, Any] | None = None
-    matches: dict[str, int] = {}
+    session_id: str | None = Field(
+        default=None,
+        description="The vault session the placeholders belong to: the one sent, or a new one.",
+    )
+    transcript: str | None = Field(
+        default=None,
+        description="The OCR text with every covered value replaced by its placeholder (or "
+        "`[PHOTO]`, `[SIGNATURE]`).",
+    )
+    summary: dict[str, Any] | None = Field(
+        default=None,
+        description="The document summary (`document_type`, `holder`, `document_number`, ...), "
+        "with placeholders instead of values.",
+    )
+    matches: dict[str, int] = Field(
+        default={},
+        description="How many values matched the session: `exact`, `fuzzy`, `new`, `uncertain`.",
+    )
 
 
 class ImageOptions(BaseModel):
@@ -327,11 +425,103 @@ def _render_and_vault(request: Request, requested: Render | None) -> tuple[Rende
         return "opaque", None
 
 
-@router.post("/v1/mask/image", response_model=ImageMaskResponse, response_model_exclude_unset=True)
+_OPTIONS_DOC = {
+    "session_id": "The vault session to mask in (`labels` only). Omitted: a new one is created "
+    "and returned. Unknown or expired: 404 `not_found`.",
+    "render": "`labels` (default, `PII_GUARD_IMAGE_RENDER`) or `opaque`. Without a tenant key "
+    "the default falls back to `opaque`; an explicit `labels` is then 500 "
+    "`vault_not_configured`.",
+    "expiry": "`reduce` (default; the summary says `expired: true|false` only) or `keep` (also "
+    "the ISO expiry date).",
+}
+_ENUMS = {"render": list(RENDER_MODES), "expiry": list(_EXPIRY_MODES)}
+_BINARY = {"schema": {"type": "string", "format": "binary"}}
+_OPENAPI_EXTRA: dict[str, Any] = {
+    "parameters": [
+        {
+            "name": name,
+            "in": "query",
+            "required": False,
+            "description": f"{doc} A JSON body's field of the same name wins.",
+            "schema": {"type": "string", **({"enum": _ENUMS[name]} if name in _ENUMS else {})},
+        }
+        for name, doc in _OPTIONS_DOC.items()
+    ],
+    "requestBody": {
+        "required": True,
+        "description": "The image bytes (`image/png` or `image/jpeg`; the format is sniffed "
+        "from the bytes), or JSON with the image as base64 or a data URL.",
+        "content": {
+            "image/png": _BINARY,
+            "image/jpeg": _BINARY,
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "required": ["image"],
+                    "properties": {
+                        "image": {
+                            "type": "string",
+                            "description": "Base64, or `data:image/png;base64,...`.",
+                        },
+                        "language": {
+                            "type": "string",
+                            "description": "ISO 639-1 language of the text in the image.",
+                        },
+                        **{
+                            name: {
+                                "type": "string",
+                                "description": doc,
+                                **({"enum": _ENUMS[name]} if name in _ENUMS else {}),
+                            }
+                            for name, doc in _OPTIONS_DOC.items()
+                        },
+                    },
+                }
+            },
+        },
+    },
+}
+
+
+@router.post(
+    "/v1/mask/image",
+    response_model=ImageMaskResponse,
+    response_model_exclude_unset=True,
+    summary="Cover faces, signatures, ID photos and text personal data in an image",
+    openapi_extra=_OPENAPI_EXTRA,
+    responses=error_responses(
+        "not_found",
+        "payload_too_large",
+        "unsupported_media_type",
+        "invalid_request",
+        "invalid_image",
+        "blocked_entity",
+        "vault_not_configured",
+        "masking_failed",
+        "detection_failed",
+        "detection_unavailable",
+        "ocr_unavailable",
+    ),
+)
 async def mask_image_endpoint(
     request: Request,
-    language: Annotated[str | None, Query(min_length=2, max_length=16)] = None,
+    language: Annotated[
+        str | None,
+        Query(
+            min_length=2,
+            max_length=16,
+            description="ISO 639-1 language of the text in the image. A JSON body's `language` "
+            "wins. Defaults to `PII_GUARD_DEFAULT_LANGUAGE`.",
+        ),
+    ] = None,
 ) -> ImageMaskResponse:
+    """Mask a PNG or JPEG image: visual types by the segmenter, text by OCR + the detectors.
+
+    Send the image as the raw body or as JSON (base64 or a data URL). ``render: "labels"``
+    (the default) prints each region's vault placeholder on it and returns a masked
+    transcript and a document summary; ``opaque`` covers regions with solid boxes. Fail
+    closed: any SAM, OCR or detector error is 503 ``detection_failed``, a ``block`` region
+    422 ``blocked_entity``; the original image is never returned. See docs/contracts.md."""
     data, options = await _image_from_request(request)
     if not data:
         raise InvalidImageError("image is empty")
@@ -341,12 +531,10 @@ async def mask_image_endpoint(
     require_ocr(masker.ocr, required=request.app.state.settings.image_require_ocr)
     lang = get_language(request, options.language or language)
     render, vault = _render_and_vault(request, options.render)
-    session: VaultSession | None = None
-    if vault is not None:
-        # Unknown or expired id -> 404 session_not_found, before any detection.
-        session = vault.session(options.session_id)
     settings = request.app.state.settings
-    try:
+    # Unknown or expired id -> 404 not_found, before any detection; a session this request
+    # created is dropped again on any error, so a refused image leaves nothing in the vault.
+    with ephemeral_session(vault, options.session_id, request) as session:
         # Bounded pool and deadline; values committed to the session only on success.
         (outcome,) = await mask_images_bounded(
             masker,
@@ -358,12 +546,6 @@ async def mask_image_endpoint(
             session=session,
             expiry=options.expiry,
         )
-    except BaseException as exc:
-        if session is not None and vault is not None and options.session_id is None:
-            vault.drop(session.session_id)  # a refused image leaves nothing in the vault
-        if isinstance(exc, BlockedEntityError):
-            log_extra(request, blocked=",".join(f"{t.value}:{n}" for t, n in exc.counts.items()))
-        raise
     log_extra(
         request,
         regions=len(outcome.regions),

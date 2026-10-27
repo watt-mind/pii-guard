@@ -6,14 +6,17 @@
   ``Content-Length`` at once, and any body (chunked included) as soon as the bytes read so
   far pass the limit, so an oversized body is never buffered whole (LAB-1207).
 - :func:`v1_router` builds a router with that route class.
+- :func:`ephemeral_session` resolves a request's vault session and drops it again when the
+  request created it and then fails (ADR 0006: a refused request leaves nothing in the vault).
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable, Coroutine
-from typing import Any
+from collections.abc import Callable, Coroutine, Iterator
+from contextlib import AbstractContextManager, contextmanager
+from typing import Any, overload
 
 from fastapi import APIRouter, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -21,9 +24,18 @@ from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from pii_guard.api.deps import PayloadTooLargeError, get_max_text_chars
+from pii_guard.policy import BlockedEntityError
 from pii_guard.types import PiiGuardError
+from pii_guard.vault import Vault, VaultSession
 
-__all__ = ["LoggedRoute", "check_text_size", "log_extra", "text_body_limit", "v1_router"]
+__all__ = [
+    "LoggedRoute",
+    "check_text_size",
+    "ephemeral_session",
+    "log_extra",
+    "text_body_limit",
+    "v1_router",
+]
 
 access_logger = logging.getLogger("pii_guard.api.access")
 
@@ -130,6 +142,50 @@ def check_text_size(request: Request, text: str) -> None:
     limit = get_max_text_chars(request)
     if len(text) > limit:
         raise PayloadTooLargeError(f"text is longer than {limit} characters")
+
+
+@overload
+def ephemeral_session(
+    vault: Vault, session_id: str | None, request: Request
+) -> AbstractContextManager[VaultSession]: ...
+
+
+@overload
+def ephemeral_session(
+    vault: Vault | None, session_id: str | None, request: Request
+) -> AbstractContextManager[VaultSession | None]: ...
+
+
+def ephemeral_session(
+    vault: Vault | None, session_id: str | None, request: Request
+) -> AbstractContextManager[VaultSession | None]:
+    """``with ephemeral_session(vault, session_id, request) as session:`` fails closed.
+
+    On entry, ``vault.session(session_id)``: the existing session (unknown or expired: 404
+    ``not_found``, before the block runs) or, for ``None``, a new one. Without a vault
+    (``None``, e.g. an opaque image) the session is ``None``.
+
+    If the block raises anything (``BaseException``: cancellation and timeouts too), a
+    :class:`~pii_guard.policy.BlockedEntityError` adds ``blocked=<TYPE:count,...>`` to the
+    access log line, and a session this request created (no ``session_id``) is dropped, so
+    nothing it stored survives. An existing session is left as it is. The error is re-raised.
+    """
+    return _ephemeral_session(vault, session_id, request)
+
+
+@contextmanager
+def _ephemeral_session(
+    vault: Vault | None, session_id: str | None, request: Request
+) -> Iterator[VaultSession | None]:
+    session = vault.session(session_id) if vault is not None else None
+    try:
+        yield session
+    except BaseException as exc:
+        if isinstance(exc, BlockedEntityError):
+            log_extra(request, blocked=",".join(f"{t.value}:{n}" for t, n in exc.counts.items()))
+        if session is not None and vault is not None and session_id is None:
+            vault.drop(session.session_id)
+        raise
 
 
 def v1_router(route_class: type[LoggedRoute] = LoggedRoute) -> APIRouter:
