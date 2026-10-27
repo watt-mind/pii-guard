@@ -492,9 +492,17 @@ With `render: "labels"` (the default) the response also carries:
   registered in the session) or `uncertain` (close to a session value but not accepted: a
   **new** placeholder, never a guess; the summary lists it in `fields_uncertain`).
 - Fuzzy matching (`pii_guard.visual.fuzzy`) is case-, accent- and token-order-insensitive
-  (`FIKTIV<<MARIA` is `Fiktív Mária`) and treats OCR confusions (`0`/`o`, `1`/`l`/`i`, `5`/`s`)
-  as cheap, but one real letter of difference (`Mustermonn`) keeps two names apart.
-  Identifiers match across separators and confusions only.
+  (`FIKTIV<<MARIA` is `Fiktív Mária`) and treats OCR confusions between a letter and a digit
+  (`0`/`o`, `1`/`l`/`i`, `5`/`s`) as cheap, but one real letter of difference keeps two names
+  apart (`Mustermonn`), including a letter OCR may read for another: `ELIA` is not `Ella`,
+  `Delia` is not `Della`. The only letter pairs treated as OCR noise are the ones of the same
+  shape as printed, compared with their case: a capital `I` and a small `l` (`llse` is
+  `Ilse`), a small `e`/`c` and `u`/`v`. A card name with tokens the session's name doesn't
+  have (`KOVÁCS ANNA ZSÓFIA` against `Kovács Anna`), or a single token of a longer name
+  (`ANNA`), is at most `uncertain`; a card that leaves out a middle name (`PÉLDA GÁBOR`
+  against `Példa Gábor István`) still matches. Identifiers match across separators and
+  letter↔digit confusions only (`XJXK89KU4` is not `XJXK89KV4`, `HU-ABE-123` is not
+  `HU-ABC-123`).
 - Session values printed where no detector found them (a visitor badge's name) are also
   covered and labelled (`detector: "vault"`), for accepted matches only.
 - `cover_box` is the area actually painted: the box grown by 2 px and, when the label would
@@ -523,7 +531,7 @@ With `render: "labels"` (the default) the response also carries:
   (`STAMP` by default) are reported and left visible, any `block` region is
   `422 blocked_entity` with no image.
 - SAM segments every visual type it has a prompt for (one Meta API request per prompt:
-  `face`, `signature`, `squiggly line`, `id photo`, `stamp`). It needs `META_API_KEY` (or
+  `face`, `signature`, `squiggly line`, `photo of a person`, `stamp`). It needs `META_API_KEY` (or
   `PII_GUARD_SAM_API_KEY`); without one every call is `503 detection_failed`.
 - Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
   binary with `hun`/`eng` data; the Docker image ships both), OCR text goes through the API's

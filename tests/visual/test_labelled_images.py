@@ -490,6 +490,41 @@ def test_gateway_opaque_setting_sends_no_annotation() -> None:
     assert [p["type"] for p in forwarded[0]["messages"][0]["content"]] == ["image_url"]
 
 
+def _name_line(text: str) -> list[OcrWord]:
+    """One OCR line ``Name: …`` on the synthetic card, word by word."""
+    out, x = [], 240
+    for word in text.split(" "):
+        out.append(OcrWord(word, Box(x, 90, x + 10 * len(word), 110), (0,)))
+        x += 10 * len(word) + 8
+    return out
+
+
+@pytest.mark.parametrize(
+    ("in_text", "on_card"),
+    [
+        ("Kovács Ella", "Name: KOVÁCS ELIA"),  # a capital I is not a capital L
+        ("Hell Anna", "Name: HEIL ANNA"),
+        ("Kovács Anna", "Name: KOVÁCS ANNA ZSÓFIA"),  # a name the text does not have
+    ],
+)
+def test_a_card_never_reuses_a_near_namesakes_placeholder(in_text: str, on_card: str) -> None:
+    # LAB-1211: these were merged (fuzzy 0.95): the card's placeholder unmasked to the
+    # contract's person. Now the card gets its own placeholder, flagged uncertain.
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    placeholder = seeded(session, in_text)
+    outcome = masker(_name_line(on_card)).mask(
+        id_card_png(), "hu", render="labels", matcher=VaultMatcher(session, "hu")
+    )
+    labels = [r.label for r in outcome.regions if r.label and r.label.placeholder]
+    assert labels, outcome.regions
+    assert all(label.placeholder != placeholder for label in labels)
+    person = next(
+        r.label for r in outcome.regions if r.entity_type is EntityType.PERSON and r.label
+    )
+    assert person.match == "uncertain"
+    assert session.unmask(person.placeholder or "") == on_card.removeprefix("Name: ")
+
+
 def test_draw_helper_is_fictional() -> None:
     # Guard: the synthetic card stays fictional and small.
     image = Image.open(io.BytesIO(id_card_png()))

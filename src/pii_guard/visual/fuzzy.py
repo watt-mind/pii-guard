@@ -13,16 +13,24 @@ the best one with a **confidence** in ``[0, 1]``:
 
 - **names** (``PERSON``) are compared token by token in any order (``SURNAME GIVEN`` vs
   ``Given Surname``), accent- and case-insensitively, with a weighted edit distance in which
-  OCR confusions (``0``/``o``, ``1``/``l``/``i``, ``5``/``s``, ...) cost a fifth of a real
-  edit. The confidence is the **worst** token's similarity, so one wrong given name sinks the
+  OCR confusions between a letter and a digit or symbol (``0``/``o``, ``1``/``l``/``i``,
+  ``5``/``s``, ...) cost a fifth of a real edit. Two letters are a real edit (``Ella`` and
+  ``Elia``, ``Hell`` and ``Heil`` are different names) unless they are the same shape as
+  printed, compared with their case (:data:`SAME_SHAPE`): a capital ``I`` and a small ``l``
+  (``Ilse`` read as ``llse``), a small ``e`` and ``c``, ``u`` and ``v``.
+  The confidence is the **worst** token's similarity, so one wrong given name sinks the
   match however long the surname is (``Kovács Anna`` vs ``Kovács Hanna`` is not a match), and
   a token with even one real edit (not an OCR confusion) is capped at :data:`EDIT_CAP`, below
   :data:`ACCEPT` (``Mustermann`` vs ``Mustermonn``).
-  A value with fewer tokens than the candidate (the surname field alone) is a partial match,
-  accepted only when no other candidate matches it too;
+  A value of at least two tokens that are all in the candidate (``Nagy Anna`` vs ``Nagy Anna
+  Mária``) is a partial match, accepted only when no other candidate matches it too. A value
+  with tokens the candidate does not have (``KOVÁCS ANNA ZSÓFIA`` vs ``Kovács Anna``: maybe
+  another Anna Kovács) or a single token against a longer name (a lone ``Anna``) is at most
+  uncertain: a card's surname and given-name fields are read together by the caller
+  (:mod:`pii_guard.visual.labels`) before they are matched;
 - **numbers and codes** (document numbers, personal ids) are compared on their letters and
-  digits only, with the same OCR confusion costs; e-mail addresses and phone numbers without
-  whitespace;
+  digits only, with the same costs (``XJXK89KU4`` and ``XJXK89KV4`` are two documents, ``O``
+  and ``0`` are not); e-mail addresses and phone numbers without whitespace;
 - **dates** are compared as dates, whatever their format (``1959.01.02.``, ``02 JAN 1959``,
   ``590102`` in an MRZ).
 
@@ -76,9 +84,19 @@ EDIT_CAP = 0.8
 #: A name token shorter than this never matches on its own.
 MIN_TOKEN_LENGTH = 2
 
-#: Characters OCR reads for one another, after accents are dropped and case is folded.
-CONFUSION_GROUPS: tuple[str, ...] = ("o0", "l1i|!", "s5", "b8", "z2", "g9", "uv", "ec")
+#: Characters OCR reads for one another, after accents are dropped and case is folded: a
+#: letter and the digit or symbol it looks like. Two letters are a real edit (``Ella`` and
+#: ``Elia``, ``KU4`` and ``KV4``, ``ABC`` and ``ABE`` are different people and documents),
+#: except for the few pairs of :data:`SAME_SHAPE`, which are compared with their case.
+CONFUSION_GROUPS: tuple[str, ...] = ("o0", "i1!|", "s5", "b8", "z2", "g9")
 _CONFUSABLE = {(a, b) for group in CONFUSION_GROUPS for a in group for b in group if a != b}
+#: Glyphs that are one vertical stroke in most fonts (a capital ``I`` and a small ``l``:
+#: ``Ilse`` read as ``llse``), and the small letters that differ by one stroke (``e``/``c``,
+#: ``u``/``v``). Compared **with their case**: a capital ``L`` or a dotted ``i`` is not a
+#: stroke (``ELIA`` is not ``ELLA``, ``Delia`` is not ``Della``), and ``E``/``C``, ``U``/``V``
+#: are distinct in capitals (``CZW…`` is not ``EZW…``).
+VERTICAL_BARS = frozenset("Il1|!")
+SAME_SHAPE: frozenset[frozenset[str]] = frozenset({frozenset("ec"), frozenset("uv")})
 _PUNCTUATION = frozenset(".-'\u2019,")
 
 #: Types whose values are compared as names, as identifiers, or as dates.
@@ -158,10 +176,35 @@ def name_tokens(text: str) -> list[str]:
     return [t for t in stripped if t]
 
 
+def _plain(text: str) -> str:
+    """Accents dropped and whitespace collapsed, **case kept** (glyph shapes depend on it)."""
+    decomposed = unicodedata.normalize("NFKD", text.replace("ß", "ss"))
+    return " ".join("".join(c for c in decomposed if not unicodedata.combining(c)).split())
+
+
+def _cased_tokens(text: str) -> list[str]:
+    """:func:`name_tokens` with case kept (``name_tokens`` is these, case folded)."""
+    stripped = (t.strip(_STRIP) for t in _TOKEN_SPLIT_RE.split(_plain(text)))
+    return [t for t in stripped if t]
+
+
+def _render(candidate: str, value: str) -> str:
+    """``candidate`` written the way ``value`` is printed: in capitals when ``value`` is
+    (a card's ``KOVÁCS ELLA``), capitalised when only the candidate is in capitals."""
+    if value.isupper():
+        return candidate.upper()
+    if candidate.isupper():
+        return candidate.capitalize()
+    return candidate
+
+
 def _sub_cost(a: str, b: str) -> float:
-    if a == b:
+    fa, fb = a.casefold(), b.casefold()
+    if fa == fb:
         return 0.0
-    return CONFUSION_COST if (a, b) in _CONFUSABLE else 1.0
+    if (a in VERTICAL_BARS and b in VERTICAL_BARS) or frozenset((a, b)) in SAME_SHAPE:
+        return CONFUSION_COST
+    return CONFUSION_COST if (fa, fb) in _CONFUSABLE else 1.0
 
 
 def _indel_cost(c: str) -> float:
@@ -169,7 +212,8 @@ def _indel_cost(c: str) -> float:
 
 
 def _distance(a: str, b: str) -> float:
-    """Weighted Levenshtein distance (OCR confusions and punctuation are cheap)."""
+    """Weighted Levenshtein distance, case-insensitive (OCR confusions and punctuation are
+    cheap; whether two characters are a confusion depends on their case)."""
     previous = [0.0]
     for c in b:
         previous.append(previous[-1] + _indel_cost(c))
@@ -188,31 +232,41 @@ def _distance(a: str, b: str) -> float:
 
 
 def _token_similarity(a: str, b: str) -> float:
-    """``1 - distance / length``, capped at :data:`EDIT_CAP` (below :data:`ACCEPT`) as soon as
-    the tokens differ by one real edit, an edit that is not an OCR confusion: ``Mustermann``
-    and ``Mustermonn`` are two names, however long."""
-    if a == b:
+    """``1 - distance / length`` of the OCR'd ``a`` and the session's ``b`` (case kept;
+    ``b`` is compared as printed like ``a``, see :func:`_render`), capped at :data:`EDIT_CAP`
+    (below :data:`ACCEPT`) as soon as the tokens differ by one real edit, an edit that is not
+    an OCR confusion: ``Mustermann`` and ``Mustermonn`` are two names, however long."""
+    if a.casefold() == b.casefold():
         return 1.0
     longest = max(len(a), len(b))
     if longest == 0:
         return 0.0
-    distance = _distance(a, b)
+    distance = _distance(a, _render(b, a))
     score = max(0.0, 1.0 - distance / longest)
     return min(score, EDIT_CAP) if distance >= 1.0 else score
 
 
 def _name_similarity(value: str, candidate: str) -> tuple[float, bool]:
     """``(confidence, partial)``: the worst token similarity of the best one-to-one token
-    pairing, in any order. ``partial``: one side has tokens the other doesn't."""
-    left, right = name_tokens(value), name_tokens(candidate)
+    pairing, in any order. ``partial``: one side has tokens the other doesn't.
+
+    A partial match is accepted (discounted by :data:`PARTIAL_FACTOR`) only when ``value``
+    is the shorter side and has at least two tokens; otherwise (extra tokens on ``value``, or
+    one token against a longer name) it is capped at :data:`EDIT_CAP`, i.e. uncertain."""
+    left, right = _cased_tokens(value), _cased_tokens(candidate)
     if not left or not right:
         return 0.0, False
     short, long_ = (left, right) if len(left) <= len(right) else (right, left)
     if any(len(t) < MIN_TOKEN_LENGTH for t in short):
         return 0.0, False
     # Greedy pairing on the best similarities (names have a handful of tokens).
+    value_short = short is left
     pairs = sorted(
-        ((_token_similarity(s, t), i, j) for i, s in enumerate(short) for j, t in enumerate(long_)),
+        (
+            (_token_similarity(s, t) if value_short else _token_similarity(t, s), i, j)
+            for i, s in enumerate(short)
+            for j, t in enumerate(long_)
+        ),
         reverse=True,
     )
     used_short: set[int] = set()
@@ -227,17 +281,21 @@ def _name_similarity(value: str, candidate: str) -> tuple[float, bool]:
         if len(used_short) == len(short):
             break
     partial = len(short) != len(long_)
-    return (worst * PARTIAL_FACTOR if partial else worst), partial
+    if not partial:
+        return worst, False
+    if len(left) > len(right) or len(left) < 2:
+        return min(worst * PARTIAL_FACTOR, EDIT_CAP), True
+    return worst * PARTIAL_FACTOR, True
 
 
 def _identifier_similarity(value: str, candidate: str) -> float:
     """Letters and digits only; two document numbers one real character apart are two
     documents (see :func:`_token_similarity`)."""
-    a = "".join(c for c in fold(value) if c.isalnum())
-    b = "".join(c for c in fold(candidate) if c.isalnum())
+    a = "".join(c for c in _plain(value) if c.isalnum())
+    b = "".join(c for c in _plain(candidate) if c.isalnum())
     if not a or not b:
         return 0.0
-    if _distance(a, b) >= 2.0:
+    if _distance(a, _render(b, a)) >= 2.0:
         return 0.0  # two real edits: another document, not even an uncertain one
     return _token_similarity(a, b)
 
@@ -333,9 +391,9 @@ def similarity(value: str, entity_type: EntityType, candidate: Candidate) -> flo
         return _identifier_similarity(value, candidate.value)
     if family == "compact":
         return _token_similarity(
-            "".join(fold(value).split()), "".join(fold(candidate.value).split())
+            "".join(_plain(value).split()), "".join(_plain(candidate.value).split())
         )
-    return _token_similarity(fold(value), fold(candidate.value))
+    return _token_similarity(_plain(value), _plain(candidate.value))
 
 
 def match_value(
