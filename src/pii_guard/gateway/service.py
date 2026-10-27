@@ -371,7 +371,7 @@ class Gateway:
             for slot, found in zip(slots, spans, strict=True)
         ]
         # Second pass: values confirmed in a later text are masked in earlier ones too.
-        masked = [session.mask(text, [], language=language) for text in masked]
+        masked = [session.mask(text, [], language=language, remask=True) for text in masked]
         for slot, text in zip(slots, masked, strict=True):
             slot.write(text)
         for placeholder, entity_type, count in session.entities():
