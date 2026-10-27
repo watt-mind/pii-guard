@@ -59,12 +59,13 @@ documents with LAB-1127; rows after that use the 31-document set where marked.
 | 10-27 07:45 | [#23](https://github.com/watt-mind/pii-guard/pull/23) | same, plus ID/parcel rules (31 docs) | 0.9 % | 0.0 % | [models.md](models.md#distilled-from-muse-glimmer) |
 | 10-27 08:01 | [#24](https://github.com/watt-mind/pii-guard/pull/24) | rules + Muse Spark Open (Baseten, 31 docs) | 0.9 % | 0.0 % | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md) |
 
-<!-- TODO(LAB-1129): replace this table with the "leak rate over time" and "quality vs
-latency" SVG charts from the benchmark run history once LAB-1129 is merged into develop,
-and embed them here (keep the table as the accessible fallback). -->
-> **TODO (LAB-1129):** charts for leak rate over time and quality vs latency will be embedded
-> here once the benchmark run history and chart generator (LAB-1129) lands. Until then the
-> tables above are the source.
+The same history as charts, generated from the run records in
+[`eval/results/runs/`](../eval/results/runs/) by `pii-guard eval report` (all runs, tables and
+the run log: [benchmarks.md](benchmarks.md)). The table above is their text version.
+
+![Leak rate over time on the hand-written smoke sets, per pii-guard configuration](benchmarks/progress.svg)
+
+![Leak rate vs detection latency on the smoke sets, pii-guard configurations and the open-source tools](benchmarks/leak-vs-latency.svg)
 
 ### Spend so far
 

@@ -131,7 +131,9 @@ def test_record_from_live_scorecard(scorecard: dict[str, Any], schema: dict[str,
     assert record["fixture_set"] == "smoke"
     assert record["languages"] == ["hu"]
     assert record["fixtures"][0]["origin"] == "hand-written"
-    assert record["metrics"]["languages"]["hu"]["documents"] == 28
+    documents = len(load_fixtures([HU]))
+    assert record["metrics"]["languages"]["hu"]["documents"] == documents
+    assert record["fixtures"][0]["documents"] == documents
     # Like the scorecard, a record never carries a labelled value or document text.
     dumped = json.dumps(record, ensure_ascii=False)
     for document in load_fixtures([HU])[:5]:

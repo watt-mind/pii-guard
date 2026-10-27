@@ -142,6 +142,112 @@ def _ner(kind: str, lang: str, fixture_set: str) -> dict[str, Any]:
     }
 
 
+_SPARK_OPEN = {
+    "model": "muse-spark-open",
+    "model_ref": "meta-models/muse-spark-open-1026",
+    "serving": "Baseten Model APIs (remote)",
+    "settings": {"reasoning_effort": "low"},
+}
+_BASETEN_CLIENT = {
+    "description": "Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote)",
+    "machine": "arm64",
+    "accelerator": None,
+}
+#: USD per 1M tokens (input, cached input, output), from the result READMEs.
+_PRICES = {"baseten": (1.25, 0.15, 4.25), "meta-contributor": (0.10, 0.10, 0.20)}
+
+
+def _token_cost(usage: dict[str, Any], price: str, note: str) -> dict[str, Any]:
+    """A cost block from the detector's token counters (reasoning tokens bill as output)."""
+    inp, cached, out = _PRICES[price]
+    prompt = int(usage.get("prompt_tokens") or 0)
+    hit = int(usage.get("cached_tokens") or 0)
+    completion = int(usage.get("completion_tokens") or 0)
+    usd = ((prompt - hit) * inp + hit * cached + completion * out) / 1_000_000
+    return {
+        "usd": round(usd, 4),
+        "estimated": True,
+        "gpu_minutes": None,
+        "model_calls": usage.get("requests"),
+        "tokens": {
+            "prompt": prompt,
+            "cached": hit,
+            "completion": completion,
+            "reasoning": int(usage.get("reasoning_tokens") or 0),
+        },
+        "shared_with": [],
+        "note": note,
+    }
+
+
+def _usage(path: str, root: Path, key: str | None = None) -> dict[str, Any]:
+    try:
+        data = json.loads((root / path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if key is None:
+        return (data.get("usage") or {}).get("llm") or {}
+    return ((data.get("runs") or {}).get(key) or {}).get("usage") or {}
+
+
+_DISTILLED = {
+    size: {
+        "model": f"xlmr-{size}-distilled-glimmer",
+        "model_ref": f"FacebookAI/xlm-roberta-{size} distilled from Muse Glimmer (low) on a "
+        "5k-document Muse-generated corpus, seed 11 (not published)",
+        "revision": None,
+        "serving": "local PyTorch",
+    }
+    for size in ("base", "large")
+}
+_DISTILLED_RUNS = [
+    f"2026-10-27-distilled-{kind}-{lang}-{fs}"
+    for kind in ("base", "large")
+    for fs in ("smoke", "distill-dev")
+    for lang in ("hu", "en")
+]
+_DISTILLED_COST = {
+    "usd": 3.0,
+    "estimated": True,
+    "gpu_minutes": 56.0,
+    "model_calls": 5004,
+    "tokens": None,
+    "shared_with": _DISTILLED_RUNS,
+    "note": "Whole distillation: Meta Model API $1.05 for the corpus, about 38 H100 minutes for "
+    "the Glimmer teacher, 8 A10G and 10 L40S minutes for training; roughly $3 in total.",
+}
+
+
+def _distilled(kind: str, lang: str, fixture_set: str) -> dict[str, Any]:
+    detectors: list[dict[str, Any]] = [{"name": "rules"}]
+    if kind != "rules":
+        detectors.append({"name": "ner", **_DISTILLED[kind]})
+    notes = ["Rules as of LAB-1106 (before the Hungarian ID and parcel rules of LAB-1127)."]
+    if kind != "rules":
+        notes.append(
+            "The student was trained on the Muse-generated distillation corpus; distill-dev is "
+            "its dev split."
+        )
+    return {
+        "label": "pii-guard rules"
+        if kind == "rules"
+        else f"pii-guard rules + NER (distilled {kind})",
+        "path": f"eval/results/ner/distilled/{kind}/{lang}-{fixture_set}.json",
+        "slug": f"distilled-{kind}-{lang}-{fixture_set}",
+        "date": "2026-10-27",
+        "detectors": detectors,
+        "hardware": _MAC_NER
+        if kind != "rules"
+        else _MAC_CPU | {"description": "Apple M1 Max, macOS 26.5, CPU"},
+        "cost": _DISTILLED_COST if kind != "rules" else None,
+        "notes": notes,
+    }
+
+
+_INJECTION = "eval/results/2026-10-27-injection"
+_BASETEN = "eval/results/2026-10-27-baseten"
+
+
 #: Every imported result: the source file and what the scorecard itself doesn't record.
 MANIFEST: list[dict[str, Any]] = [
     {
@@ -196,6 +302,99 @@ MANIFEST: list[dict[str, Any]] = [
             ("rules-llm-low", "low"),
         )
     ],
+    *[
+        _distilled(kind, lang, fixture_set)
+        for kind in ("rules", "base", "large")
+        for fixture_set in ("smoke", "distill-dev")
+        for lang in ("hu", "en")
+    ],
+    *[
+        {
+            "path": f"{_BASETEN}/{lang}-{fs}-rules-llm.json",
+            "slug": f"baseten-spark-open-{lang}-{fs}",
+            "label": "pii-guard rules + Muse Spark Open (Baseten)",
+            "date": "2026-10-27",
+            "detectors": [{"name": "rules"}, {"name": "llm", **_SPARK_OPEN}],
+            "hardware": _BASETEN_CLIENT,
+            "cost_from": (f"{_BASETEN}/usage.json", f"{lang}-{fs}", "baseten"),
+            "notes": [
+                "Latency is a remote API call (one request at a time), not comparable to local "
+                "detectors. Four runs on the day; this is the committed one (see the README for "
+                "the ranges)."
+            ],
+        }
+        for fs in ("smoke", "synth-sample")
+        for lang in ("hu", "en")
+    ],
+    {
+        "path": f"{_INJECTION}/injection-rules.json",
+        "slug": "injection-rules",
+        "date": "2026-10-27",
+        "hardware": _MAC_CPU,
+        "notes": ["Prompt-injection red team; per-attack-class leaks are in the source scorecard."],
+    },
+    *[
+        {
+            "path": f"{_INJECTION}/injection-rules-llm-{name}.json",
+            "slug": f"injection-{slug}",
+            "label": label,
+            "date": "2026-10-27",
+            "detectors": [{"name": "rules"}, {"name": "llm", **model}],
+            "hardware": _BASETEN_CLIENT if model is _SPARK_OPEN else _REMOTE,
+            "cost_from": (f"{_INJECTION}/injection-rules-llm-{name}.json", None, price),
+            "notes": [
+                note,
+                "Prompt-injection red team; per-attack-class leaks are in the source scorecard.",
+            ],
+        }
+        for name, slug, label, model, price, note in (
+            (
+                "baseten-before",
+                "spark-open-before-hardening",
+                "pii-guard rules + Muse Spark Open (Baseten)",
+                _SPARK_OPEN,
+                "baseten",
+                "Detector as of LAB-1108, before the injection hardening.",
+            ),
+            (
+                "baseten-run1",
+                "spark-open-run1",
+                "pii-guard rules + Muse Spark Open (Baseten)",
+                _SPARK_OPEN,
+                "baseten",
+                "After the LAB-1107 hardening, run 1.",
+            ),
+            (
+                "baseten-run2",
+                "spark-open-run2",
+                "pii-guard rules + Muse Spark Open (Baseten)",
+                _SPARK_OPEN,
+                "baseten",
+                "After the LAB-1107 hardening, run 2.",
+            ),
+            (
+                "meta-spark-1.3",
+                "spark-1.3",
+                "pii-guard rules + Muse Spark 1.3",
+                _SPARK,
+                "meta-contributor",
+                "After the LAB-1107 hardening, Muse Spark 1.3 on the Meta Model API.",
+            ),
+        )
+    ],
+    *[
+        {
+            "path": f"{_INJECTION}/{lang}-smoke-rules-llm-baseten.json",
+            "slug": f"baseten-spark-open-hardened-{lang}-smoke",
+            "label": "pii-guard rules + Muse Spark Open (Baseten)",
+            "date": "2026-10-27",
+            "detectors": [{"name": "rules"}, {"name": "llm", **_SPARK_OPEN}],
+            "hardware": _BASETEN_CLIENT,
+            "cost_from": (f"{_INJECTION}/{lang}-smoke-rules-llm-baseten.json", None, "baseten"),
+            "notes": ["Smoke regression after the LAB-1107 injection hardening."],
+        }
+        for lang in ("hu", "en")
+    ],
     {
         "path": "eval/results/visual/specimens-before.json",
         "slug": "visual-specimens-id-photo-prompt",
@@ -219,6 +418,13 @@ def _records_for(entry: dict[str, Any], root: Path) -> list[dict[str, Any]]:
     extra: dict[str, Any] = {}
     if entry.get("cost"):
         extra["cost"] = entry["cost"]
+    elif entry.get("cost_from"):
+        path, key, price = entry["cost_from"]
+        usage = _usage(path, root, key)
+        if usage:
+            extra["cost"] = _token_cost(
+                usage, price, "From the token counts the endpoint reported, at list prices."
+            )
     if entry.get("code"):
         extra["code"] = entry["code"]
     if entry.get("label"):

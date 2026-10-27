@@ -4,7 +4,7 @@
 
 Every evaluation run of pii-guard and of the open-source tools it is compared with, on fictional data only. Each run is one JSON record in [`eval/results/runs/`](../eval/results/runs/) (format: [evaluation.md](evaluation.md#run-records)); this page, the charts and [`eval/results/index.json`](../eval/results/index.json) are generated from them. The same data is browsable in the UI's **Benchmarks** tab.
 
-Headline fixture set: **smoke** (hand-written; documents: en 10 + hu 28). Default pipeline in **bold**.
+Headline fixture set: **smoke** (hand-written; documents: en 10 + hu 31). Default pipeline in **bold**.
 
 ![Leak rate vs latency](benchmarks/leak-vs-latency.svg)
 
@@ -48,16 +48,19 @@ Latest run of each system on each set; `all` pools every language exactly.
 
 ### `smoke`
 
-hand-written; documents: en 10 + hu 28.
+hand-written; documents: en 10 + hu 31.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| **pii-guard rules** | 38 | 100.0% | 45.5% | 62.6% | 51.2% | 15.0% | 0.0% | 100.0% | 0.11 ms | 2026-10-26 |
-| pii-guard rules + NER (fine-tuned) | 38 | 94.3% | 90.3% | 92.3% | 10.2% | 4.7% | 4.8% | 100.0% | 15 ms* | 2026-10-26 |
+| **pii-guard rules** | 38 | 100.0% | 45.5% | 62.6% | 51.2% | 15.0% | 0.0% | 100.0% | 0.18 ms* | 2026-10-27 |
+| pii-guard rules + NER (distilled large) | 38 | 97.8% | 91.7% | 94.7% | 7.9% | 3.1% | 1.6% | 100.0% | 53 ms* | 2026-10-27 |
+| pii-guard rules + Muse Spark Open (Baseten) | 41 | 98.1% | 99.4% | 98.7% | 0.7% | 1.5% | 0.0% | 100.0% | 1.5 s* | 2026-10-27 |
 | pii-guard rules + Muse Glimmer (low) | 38 | 98.7% | 100.0% | 99.3% | 0.0% | 1.6% | 0.8% | 100.0% | 9.4 s | 2026-10-27 |
-| pii-guard rules + Muse Spark 1.3 | 38 | 97.3% | 98.6% | 98.0% | 0.8% | 1.6% | 0.8% | 100.0% | 9.6 s* | 2026-10-26 |
 | pii-guard Muse Glimmer (low) | 38 | 98.0% | 98.6% | 98.3% | 0.0% | 1.6% | 0.0% | 100.0% | 9.4 s | 2026-10-27 |
 | pii-guard Muse Glimmer (medium) | 38 | 94.8% | 99.3% | 97.0% | 0.0% | 1.6% | 3.7% | 100.0% | 14.6 s | 2026-10-27 |
+| pii-guard rules + Muse Spark 1.3 | 38 | 97.3% | 98.6% | 98.0% | 0.8% | 1.6% | 0.8% | 100.0% | 9.6 s* | 2026-10-26 |
+| pii-guard rules + NER (distilled base) | 38 | 98.5% | 90.3% | 94.2% | 11.0% | 2.4% | 0.9% | 100.0% | 24 ms* | 2026-10-27 |
+| pii-guard rules + NER (fine-tuned) | 38 | 94.3% | 90.3% | 92.3% | 10.2% | 4.7% | 4.8% | 100.0% | 15 ms* | 2026-10-26 |
 | pii-guard rules + NER (zero-shot) | 38 | 94.0% | 86.2% | 89.9% | 15.8% | 4.7% | 6.0% | 100.0% | 52 ms* | 2026-10-26 |
 | Presidio | 38 | 72.4% | 67.6% | 69.9% | 24.4% | 12.6% | 18.4% | — | 70 ms | 2026-10-26 |
 | LLM Guard | 38 | 61.6% | 47.6% | 53.7% | 44.9% | 6.3% | 37.3% | 100.0% | 60 ms | 2026-10-26 |
@@ -69,15 +72,56 @@ By language:
 | System | en F1 | hu F1 | en leak | hu leak |
 |---|---:|---:|---:|---:|
 | **pii-guard rules** | 64.0% | 62.1% | 46.7% | 52.6% |
-| pii-guard rules + NER (fine-tuned) | 86.5% | 94.3% | 3.3% | 12.4% |
+| pii-guard rules + NER (distilled large) | 98.5% | 93.5% | 0.0% | 10.3% |
+| pii-guard rules + Muse Spark Open (Baseten) | 100.0% | 98.4% | 0.0% | 0.9% |
 | pii-guard rules + Muse Glimmer (low) | 100.0% | 99.1% | 0.0% | 0.0% |
-| pii-guard rules + Muse Spark 1.3 | 97.1% | 98.2% | 0.0% | 1.0% |
 | pii-guard Muse Glimmer (low) | 97.1% | 98.7% | 0.0% | 0.0% |
 | pii-guard Muse Glimmer (medium) | 90.4% | 99.1% | 0.0% | 0.0% |
+| pii-guard rules + Muse Spark 1.3 | 97.1% | 98.2% | 0.0% | 1.0% |
+| pii-guard rules + NER (distilled base) | 98.5% | 92.9% | 3.3% | 13.4% |
+| pii-guard rules + NER (fine-tuned) | 86.5% | 94.3% | 3.3% | 12.4% |
 | pii-guard rules + NER (zero-shot) | 90.7% | 89.6% | 10.0% | 17.5% |
 | Presidio | 68.4% | 70.2% | 10.0% | 28.9% |
 | LLM Guard | 76.4% | 49.2% | 30.0% | 49.5% |
 | PrivAiTe | 74.8% | 50.2% | 0.0% | 19.6% |
+
+### `distill-dev`
+
+generated; documents: en 373 + hu 368.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| **pii-guard rules** | 741 | 99.9% | 42.3% | 59.4% | 47.2% | 22.1% | 0.0% | 100.0% | 0.67 ms* | 2026-10-27 |
+| pii-guard rules + NER (distilled large) | 741 | 97.8% | 97.9% | 97.9% | 2.9% | 0.6% | 2.1% | 99.6% | 126 ms* | 2026-10-27 |
+| pii-guard rules + NER (distilled base) | 741 | 98.9% | 97.9% | 98.4% | 2.9% | 0.6% | 0.9% | 99.9% | 43 ms* | 2026-10-27 |
+
+
+By language:
+
+| System | en F1 | hu F1 | en leak | hu leak |
+|---|---:|---:|---:|---:|
+| **pii-guard rules** | 60.2% | 58.8% | 44.8% | 49.1% |
+| pii-guard rules + NER (distilled large) | 98.2% | 97.5% | 0.1% | 5.2% |
+| pii-guard rules + NER (distilled base) | 99.3% | 97.7% | 0.1% | 5.2% |
+
+### `injection`
+
+hand-written; documents: en 31 + hu 31.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| **pii-guard rules** | 62 | 100.0% | 42.9% | 60.0% | 56.0% | 23.4% | 0.0% | 100.0% | 0.38 ms | 2026-10-27 |
+| pii-guard rules + Muse Spark Open (Baseten) | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 1.7% | 0.0% | 100.0% | 1.5 s | 2026-10-27 |
+| pii-guard rules + Muse Spark 1.3 | 62 | 100.0% | 100.0% | 100.0% | 0.0% | 1.7% | 0.0% | 100.0% | 3.3 s | 2026-10-27 |
+
+
+By language:
+
+| System | en F1 | hu F1 | en leak | hu leak |
+|---|---:|---:|---:|---:|
+| **pii-guard rules** | 58.5% | 61.4% | 57.5% | 54.5% |
+| pii-guard rules + Muse Spark Open (Baseten) | 100.0% | 100.0% | 0.0% | 0.0% |
+| pii-guard rules + Muse Spark 1.3 | 100.0% | 100.0% | 0.0% | 0.0% |
 
 ### `synth-dev`
 
@@ -105,6 +149,7 @@ generated by muse-spark-1.3-contributor; documents: en 10 + hu 20.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | **pii-guard rules** | 30 | 100.0% | 39.6% | 56.8% | 49.0% | 23.3% | 0.0% | 100.0% | 0.66 ms | 2026-10-26 |
+| pii-guard rules + Muse Spark Open (Baseten) | 30 | 100.0% | 99.5% | 99.7% | 0.8% | 2.0% | 0.0% | 100.0% | 2.1 s* | 2026-10-27 |
 | pii-guard rules + NER (fine-tuned) | 30 | 99.2% | 96.2% | 97.7% | 5.9% | 1.2% | 0.6% | 100.0% | 28 ms* | 2026-10-26 |
 | pii-guard rules + NER (zero-shot) | 30 | 97.3% | 90.0% | 93.5% | 15.0% | 0.0% | 2.7% | 100.0% | 123 ms* | 2026-10-26 |
 | Presidio | 30 | 69.4% | 74.7% | 71.9% | 23.3% | 24.1% | 24.4% | — | 276 ms | 2026-10-26 |
@@ -117,6 +162,7 @@ By language:
 | System | en F1 | hu F1 | en leak | hu leak |
 |---|---:|---:|---:|---:|
 | **pii-guard rules** | 54.5% | 57.7% | 46.2% | 50.3% |
+| pii-guard rules + Muse Spark Open (Baseten) | 99.2% | 100.0% | 2.5% | 0.0% |
 | pii-guard rules + NER (fine-tuned) | 100.0% | 96.6% | 0.0% | 8.7% |
 | pii-guard rules + NER (zero-shot) | 96.8% | 92.0% | 7.5% | 18.5% |
 | Presidio | 62.9% | 76.5% | 11.2% | 28.9% |
@@ -125,20 +171,20 @@ By language:
 
 ## Recall per entity type (`smoke`)
 
-| Type | Gold | rules | rules + NER (fine-tuned) | rules + Muse Glimmer (low) | rules + Muse Spark 1.3 | Presidio | LLM Guard | PrivAiTe |
+| Type | Gold | rules | rules + NER (distilled large) | rules + Muse Spark Open (Baseten) | rules + Muse Glimmer (low) | Presidio | LLM Guard | PrivAiTe |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| `PERSON` | 46 | 0.0% | 93.5% | 100.0% | 97.8% | 95.7% | 91.3% | 73.9% |
-| `ADDRESS` | 17 | 82.3% | 94.1% | 100.0% | 100.0% | 82.3% | 0.0% | 100.0% |
+| `PERSON` | 48 | 0.0% | 95.7% | 97.9% | 100.0% | 95.7% | 91.3% | 73.9% |
+| `ADDRESS` | 17 | 82.3% | 100.0% | 100.0% | 100.0% | 82.3% | 0.0% | 100.0% |
 | `EMAIL` | 9 | 100.0% | 100.0% | 100.0% | 100.0% | 88.9% | 100.0% | 100.0% |
 | `PHONE` | 11 | 100.0% | 100.0% | 100.0% | 100.0% | 90.9% | 100.0% | 100.0% |
 | `DATE_OF_BIRTH` | 8 | 0.0% | 100.0% | 100.0% | 100.0% | 25.0% | 0.0% | 62.5% |
 | `NATIONAL_ID_HU_TAX` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 | `NATIONAL_ID_HU_TAJ` | 5 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
-| `ID_DOCUMENT` | 6 | 16.7% | 16.7% | 100.0% | 100.0% | 16.7% | 0.0% | 0.0% |
+| `ID_DOCUMENT` | 11 | 16.7% | 16.7% | 100.0% | 100.0% | 16.7% | 0.0% | 0.0% |
 | `BANK_ACCOUNT` | 10 | 100.0% | 100.0% | 100.0% | 100.0% | 70.0% | 70.0% | 100.0% |
 | `COMPANY_ID_HU` | 4 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 | `ORGANIZATION` | 13 | 0.0% | 92.3% | 100.0% | 100.0% | 92.3% | 0.0% | 0.0% |
-| `PARCEL_NUMBER_HU` | 4 | 0.0% | 0.0% | 100.0% | 75.0% | 0.0% | 0.0% | 0.0% |
+| `PARCEL_NUMBER_HU` | 6 | 0.0% | 0.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 | `VEHICLE_PLATE` | 6 | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% |
 
 ## Image masking (specimen documents)
@@ -156,6 +202,29 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-baseten-spark-open-hardened-en-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | en | imported | `9fad0fa` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.02 |
+| 2026-10-27 | `2026-10-27-baseten-spark-open-hardened-hu-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | hu | imported | `9fad0fa` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.08 |
+| 2026-10-27 | `2026-10-27-injection-spark-1.3` | pii-guard rules + Muse Spark 1.3 | injection | en, hu | imported | `9fad0fa` | local harness; the LLM detector is a remote API call | ≈ $0.02 |
+| 2026-10-27 | `2026-10-27-injection-spark-open-run2` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | imported | `9fad0fa` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.15 |
+| 2026-10-27 | `2026-10-27-injection-spark-open-run1` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | imported | `9fad0fa` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.15 |
+| 2026-10-27 | `2026-10-27-injection-rules` | pii-guard rules | injection | en, hu | imported | `9fad0fa` | Apple Silicon arm64, macOS 26.5, 10 CPUs, CPU only | — |
+| 2026-10-27 | `2026-10-27-injection-spark-open-before-hardening` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | imported | `8562bd7` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.18 |
+| 2026-10-27 | `2026-10-27-baseten-spark-open-en-synth-sample` | pii-guard rules + Muse Spark Open (Baseten) | synth-sample | en | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.03 |
+| 2026-10-27 | `2026-10-27-baseten-spark-open-hu-synth-sample` | pii-guard rules + Muse Spark Open (Baseten) | synth-sample | hu | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.07 |
+| 2026-10-27 | `2026-10-27-baseten-spark-open-en-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | en | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.02 |
+| 2026-10-27 | `2026-10-27-baseten-spark-open-hu-smoke` | pii-guard rules + Muse Spark Open (Baseten) | smoke | hu | imported | `5dd3c23` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.08 |
+| 2026-10-27 | `2026-10-27-distilled-large-en-distill-dev` | pii-guard rules + NER (distilled large) | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-hu-distill-dev` | pii-guard rules + NER (distilled large) | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-en-smoke` | pii-guard rules + NER (distilled large) | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-large-hu-smoke` | pii-guard rules + NER (distilled large) | smoke | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-base-en-distill-dev` | pii-guard rules + NER (distilled base) | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-base-hu-distill-dev` | pii-guard rules + NER (distilled base) | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-base-en-smoke` | pii-guard rules + NER (distilled base) | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-base-hu-smoke` | pii-guard rules + NER (distilled base) | smoke | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, PyTorch device auto (MPS) | ≈ $3.00, 56 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-distilled-rules-en-distill-dev` | pii-guard rules | distill-dev | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, CPU | — |
+| 2026-10-27 | `2026-10-27-distilled-rules-hu-distill-dev` | pii-guard rules | distill-dev | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, CPU | — |
+| 2026-10-27 | `2026-10-27-distilled-rules-en-smoke` | pii-guard rules | smoke | en | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, CPU | — |
+| 2026-10-27 | `2026-10-27-distilled-rules-hu-smoke` | pii-guard rules | smoke | hu | imported | `c611f99` (dirty) | Apple M1 Max, macOS 26.5, CPU | — |
 | 2026-10-27 | `2026-10-27-glimmer-zero-shot-llm-medium` | pii-guard Muse Glimmer (medium) | smoke | en, hu | imported | `c759b54` | Modal, 1x NVIDIA H100 80 GB, vLLM (vllm/vllm-openai:muse-glimmer), bf16 | ≈ $4.00, 60 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-glimmer-zero-shot-rules-llm-low` | pii-guard rules + Muse Glimmer (low) | smoke | en, hu | imported | `c759b54` | Modal, 1x NVIDIA H100 80 GB, vLLM (vllm/vllm-openai:muse-glimmer), bf16 | ≈ $4.00, 60 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-glimmer-zero-shot-llm-low` | pii-guard Muse Glimmer (low) | smoke | en, hu | imported | `c759b54` | Modal, 1x NVIDIA H100 80 GB, vLLM (vllm/vllm-openai:muse-glimmer), bf16 | ≈ $4.00, 60 GPU-min, shared |

@@ -82,7 +82,7 @@ function niceMax(v: number): number {
 }
 
 function textWidth(text: string, size = FONT): number {
-  return text.length * size * 0.56;
+  return text.length * size * 0.6; // semibold Instrument Sans averages about 0.58 em
 }
 
 interface Box {
@@ -106,7 +106,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
   const [ref, width] = useWidth();
   const pts = points.filter((p) => p.metrics.detect_p50_ms);
   if (!pts.length) return <ChartEmpty>No latency was recorded for these runs.</ChartEmpty>;
-  const height = Math.round(Math.min(420, Math.max(280, width * 0.55)));
+  const height = Math.round(Math.min(420, Math.max(340, width * 0.55)));
   const m = { l: 44, r: 12, t: 12, b: 40 };
   const lat = pts.flatMap((p) => [p.metrics.detect_p50_ms!, p.metrics.detect_p95_ms ?? p.metrics.detect_p50_ms!]);
   const lo = Math.floor(Math.log10(Math.min(...lat)));
@@ -129,11 +129,19 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
     const y = sy(p.metrics.leak ?? 0);
     return { x0: x - 8, y0: y - 8, x1: Math.max(x, x95) + 8, y1: y + 8 };
   });
+  // Labels may run into the y-axis gutter on a narrow chart, but not over its tick labels.
+  for (const t of yTicks) taken.push({ x0: 0, y0: sy(t) - 9, x1: m.l - 4, y1: sy(t) + 7 });
   // Best (lowest leak) first, so it wins its label spot; drawn last, so it sits on top.
-  const byLeak = [...pts].sort((a, b) => (a.metrics.leak ?? 1) - (b.metrics.leak ?? 1));
+  // Ties (several systems at 0.0 %) go to the featured / default systems, then the faster one.
+  const rank = (p: ScatterPoint) => (p.info?.default ? 0 : p.info?.featured ? 1 : 2);
+  const byLeak = [...pts].sort(
+    (a, b) =>
+      (a.metrics.leak ?? 1) - (b.metrics.leak ?? 1) ||
+      rank(a) - rank(b) ||
+      (a.metrics.detect_p50_ms ?? 0) - (b.metrics.detect_p50_ms ?? 0),
+  );
   const labels = byLeak.map((p) => {
     const text = `${p.info?.short_label ?? p.key} ${formatPct(p.metrics.leak)}`;
-    const w = textWidth(text);
     const x = sx(p.metrics.detect_p50_ms!);
     const y = sy(p.metrics.leak ?? 0);
     const tries: [number, number, "start" | "end"][] = [
@@ -143,14 +151,35 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
       [x + 4, y + 22, "end"],
       [x + 12, y + 4, "start"],
       [x - 12, y + 4, "end"],
+      [x - 4, y - 30, "end"],
+      [x + 4, y - 30, "start"],
+      [x - 4, y - 46, "end"],
+      [x + 4, y - 46, "start"],
+      [x - 4, y - 62, "end"],
+      [x + 4, y - 62, "start"],
+      [x - 4, y - 78, "end"],
+      [x + 4, y - 78, "start"],
     ];
-    for (const [lx, ly, anchor] of tries) {
-      const left = anchor === "start" ? lx : lx - w;
-      const box = { x0: left - 2, y0: ly - FONT, x1: left + w + 2, y1: ly + 3 };
-      if (box.x0 < m.l || box.x1 > width - 2 || box.y0 < 0 || box.y1 > height - m.b) continue;
-      if (taken.some((t) => overlaps(t, box))) continue;
+    const place = (label: string, lx: number, ly: number, anchor: "start" | "end") => {
+      const lw = textWidth(label);
+      const left = anchor === "start" ? lx : lx - lw;
+      const box = { x0: left - 2, y0: ly - FONT, x1: left + lw + 2, y1: ly + 3 };
+      if (box.x0 < 2 || box.x1 > width - 2 || box.y0 < 0 || box.y1 > height - m.b) return false;
+      if (taken.some((t) => overlaps(t, box))) return false;
       taken.push(box);
-      return { text, x: lx, y: ly, anchor };
+      return true;
+    };
+    for (const [lx, ly, anchor] of tries) {
+      if (place(text, lx, ly, anchor)) return { text, x: lx, y: ly, anchor, px: x, py: y };
+    }
+    // Crowded: the value alone, beside the marker (the legend below names every point).
+    const value = formatPct(p.metrics.leak);
+    for (const [lx, ly, anchor] of [
+      [x - 12, y + 4, "end"],
+      [x + 12, y + 4, "start"],
+      [x, y - 12, "start"],
+    ] as const) {
+      if (place(value, lx, ly, anchor)) return { text: value, x: lx, y: ly, anchor, px: x, py: y };
     }
     return null;
   });
@@ -208,9 +237,12 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
         {labels.map(
           (l, i) =>
             l && (
-              <text key={byLeak[i]!.key} x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={600} fill="var(--ink)">
-                {l.text}
-              </text>
+              <g key={byLeak[i]!.key}>
+                {Math.abs(l.y - l.py) > 20 && <line x1={l.px} y1={l.py - 8} x2={l.x} y2={l.y + 3} stroke="var(--muted)" strokeWidth={1} />}
+                <text x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={600} fill="var(--ink)">
+                  {l.text}
+                </text>
+              </g>
             ),
         )}
       </svg>

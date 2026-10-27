@@ -165,6 +165,7 @@ describe("Benchmarks screen, critique round", () => {
     const caveats = () => within(panel).getByText("Where these ran, and caveats").closest("details")!;
     expect(caveats()).not.toHaveAttribute("open");
     await user.click(within(panel).getByRole("radio", { name: /^synth-dev/ }));
+    await user.click(within(panel).getByRole("button", { name: "All" }));
     expect(caveats()).toHaveAttribute("open");
     expect(caveats()).toHaveTextContent(/trained on the seed-7 synthetic split/);
     expect(within(panel).getByText(/open-source tools weren’t run on this set/)).toBeInTheDocument();

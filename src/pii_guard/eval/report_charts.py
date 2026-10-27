@@ -181,14 +181,14 @@ def _provenance(snaps: Sequence[Mapping[str, Any]]) -> str:
 def _place_labels(
     points: list[dict[str, Any]], box: tuple[float, float, float, float], size: float
 ) -> None:
-    """Greedy label placement: try right, left, above, below; avoid other labels and points."""
+    """Greedy label placement, best (lowest) point first; avoids other labels and points."""
     x0, y0, x1, y1 = box
     taken: list[tuple[float, float, float, float]] = []
     for p in points:  # markers and their p95 whiskers are obstacles too
         taken.append(
             (p["x"] - 14, p["y"] - 14, max(p["x"], p.get("x95", p["x"])) + 14, p["y"] + 14)
         )
-    for p in sorted(points, key=lambda q: (q["y"], q["x"])):
+    for p in sorted(points, key=lambda q: (-q["y"], q["x"])):  # lowest leak (best) first
         w = text_width(p["label"], size, bold=True)
         h = size * 1.2
         candidates = []
@@ -306,6 +306,12 @@ def leak_vs_latency(index: Mapping[str, Any], *, fixture_set: str, systems: Sequ
         st = p["style"]
         hollow = st["family"] == "comparison"
         body.append(_marker(st["shape"], p["x"], p["y"], 12, st["color"], hollow=hollow))
+        if abs(p["ly"] - p["y"]) > 40:  # placed away from its marker: a leader line says whose
+            ly = p["ly"] + (14 if p["ly"] < p["y"] else -14)
+            body.append(
+                f'<line x1="{_n(p["x"])}" y1="{_n(p["y"] + (-13 if p["ly"] < p["y"] else 13))}" '
+                f'x2="{_n(p["lx"])}" y2="{_n(ly)}" stroke="{MUTED}" stroke-width="1.5"/>'
+            )
         body.append(
             _text(p["lx"], p["ly"] + 8, p["label"], size=22, anchor=p["anchor"], weight="600")
         )
@@ -544,7 +550,7 @@ def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[st
         f'<line x1="1218" y1="{_n(ly)}" x2="1242" y2="{_n(ly)}" stroke="{INK}" '
         'stroke-width="3" stroke-dasharray="8 5"/>'
     )
-    body.append(_text(1250, ly + 7, "best pii-guard so far", size=20, weight="600"))
+    body.append(_text(1250, ly + 7, "best of any configuration so far", size=20, weight="600"))
     snaps = [{"dates": [h["date"]], "commits": [h["commit"]]} for h in hist]
     caption = [
         set_caption(index, fixture_set)

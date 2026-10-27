@@ -270,23 +270,26 @@ def fixture_info(
 
     The origin comes from the file (a record whose ``meta`` names a generator or
     ``source: synthetic`` makes the file *generated*); when the file isn't available (a
-    generated split that isn't committed), a set name starting with ``synth`` is taken as
-    generated and anything else as unknown.
+    generated split that isn't committed), a set name starting with ``synth`` or ``distill`` is
+    taken as generated and anything else as unknown. A file edited since the run (another
+    SHA-256) still says whether the set is hand-written, but not how many documents ran.
     """
     out = []
     for raw in paths:
         path = Path(raw)
         digest = (sha256 or {}).get(str(raw))
         current = file_sha256(path) if path.is_file() else None
-        # Read the file only if it is the one that ran (an edited set has other documents).
-        info = _origin_from_file(path) if current and digest in (None, current) else None
+        info = _origin_from_file(path) if current else None
+        # An edited set keeps its origin, but its document count is not the one that ran.
+        same_file = digest in (None, current)
         digest = digest or current
         languages = info[3] if info else []
         language, set_name = _language_and_set(path, languages)
         if info:
-            origin, generator, documents = info[0], info[1], info[2]
+            origin, generator = info[0], info[1]
+            documents = info[2] if same_file else None
         else:
-            origin = "generated" if set_name.startswith("synth") else "unknown"
+            origin = "generated" if set_name.startswith(("synth", "distill")) else "unknown"
             generator, documents = None, None
         out.append(
             {
