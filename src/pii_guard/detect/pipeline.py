@@ -37,6 +37,7 @@ partial result is returned.
 from __future__ import annotations
 
 import logging
+from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Sequence
 from copy import copy
 from dataclasses import dataclass
@@ -93,6 +94,76 @@ def _is_authoritative(span: Span, authoritative: frozenset[str]) -> bool:
     return span.detector in authoritative and span.entity_type in STRUCTURED_TYPES
 
 
+class _Intervals:
+    """Candidates sorted by start, with the running maximum of their ends.
+
+    Answers "which (or does any) candidate overlap ``[start, end)``" without scanning them
+    all: only candidates starting before ``end`` can overlap, and the walk back over them
+    stops where even the furthest end so far does not reach past ``start``. That is a binary
+    search plus the overlaps found for spans that do not nest, as one detector's never do.
+    """
+
+    __slots__ = ("_items", "_reach", "_starts")
+
+    def __init__(self, cands: Iterable[_Cand]) -> None:
+        # The position in the input breaks ties, so ``overlapping`` can keep the input order.
+        self._items = sorted(enumerate(cands), key=lambda item: item[1].start)
+        self._starts = [c.start for _, c in self._items]
+        self._reach: list[int] = []
+        furthest = -1
+        for _, c in self._items:
+            furthest = max(furthest, c.end)
+            self._reach.append(furthest)
+
+    def any_overlap(self, start: int, end: int) -> bool:
+        i = bisect_left(self._starts, end)
+        return i > 0 and self._reach[i - 1] > start
+
+    def overlapping(self, start: int, end: int) -> list[_Cand]:
+        """The candidates overlapping ``[start, end)``, in input order."""
+        found: list[tuple[int, _Cand]] = []
+        i = bisect_left(self._starts, end) - 1
+        while i >= 0 and self._reach[i] > start:
+            pos, c = self._items[i]
+            if c.end > start:
+                found.append((pos, c))
+            i -= 1
+        found.sort(key=lambda item: item[0])
+        return [c for _, c in found]
+
+
+class _Taken:
+    """Disjoint ``[start, end)`` ranges, sorted: what accepted spans already cover.
+
+    Being disjoint, the ranges are sorted by end as well as by start, so the ones a new span
+    overlaps are a contiguous run found by binary search.
+    """
+
+    __slots__ = ("_ends", "_starts")
+
+    def __init__(self) -> None:
+        self._starts: list[int] = []
+        self._ends: list[int] = []
+
+    def add(self, start: int, end: int) -> None:
+        i = bisect_left(self._starts, start)
+        self._starts.insert(i, start)
+        self._ends.insert(i, end)
+
+    def subtract(self, start: int, end: int) -> list[tuple[int, int]]:
+        """The parts of ``[start, end)`` no range covers, left to right."""
+        pieces: list[tuple[int, int]] = []
+        i = bisect_right(self._ends, start)
+        while i < len(self._starts) and self._starts[i] < end:
+            if start < self._starts[i]:
+                pieces.append((start, self._starts[i]))
+            start = max(start, self._ends[i])
+            i += 1
+        if start < end:
+            pieces.append((start, end))
+        return pieces
+
+
 def _merge_same_type(text: str, cands: list[_Cand]) -> list[_Cand]:
     """Union overlapping same-type candidates; authoritative ones absorb what they cover."""
     out: list[_Cand] = []
@@ -105,11 +176,14 @@ def _merge_same_type(text: str, cands: list[_Cand]) -> list[_Cand]:
     for group in by_type.values():
         auth = [c for c in group if c.authoritative]
         rest = [c for c in group if not c.authoritative]
-        for a in auth:
-            for c in rest:
-                if c.start < a.end and a.start < c.end:
-                    a.score = max(a.score, c.score)
-        rest = [piece for c in rest for piece in _outside(text, c, auth)]
+        index = _Intervals(auth)
+        pieces: list[_Cand] = []
+        for c in rest:
+            covering = index.overlapping(c.start, c.end)
+            for a in covering:
+                a.score = max(a.score, c.score)
+            pieces.extend(_outside(text, c, covering))
+        rest = pieces
         # Authoritative spans of the same type never overlap each other in practice; if they
         # do, keep both and let the cross-type pass split them.
         out.extend(auth)
@@ -239,10 +313,16 @@ def resolve_spans(
 
     cands = _merge_same_type(text, cands)
 
+    by_type: dict[EntityType, list[_Cand]] = {}
+    if adjudicator is not None and any(c.detector == adjudicator for c in cands):
+        for c in cands:
+            by_type.setdefault(c.entity_type, []).append(c)
+    indexes = {t: _Intervals(group) for t, group in by_type.items()}
+
     def disagrees(c: _Cand) -> bool:
+        """Another candidate of a different type overlaps ``c``."""
         return any(
-            o is not c and o.entity_type != c.entity_type and o.start < c.end and c.start < o.end
-            for o in cands
+            t != c.entity_type and index.any_overlap(c.start, c.end) for t, index in indexes.items()
         )
 
     def priority(c: _Cand) -> tuple[object, ...]:
@@ -259,7 +339,7 @@ def resolve_spans(
         )
 
     accepted: list[_Cand] = []
-    taken: list[tuple[int, int]] = []
+    taken = _Taken()
     # Where an overriding span ends inside a word: the suffix after it is not a remainder.
     stems_end = {
         c.end
@@ -267,7 +347,7 @@ def resolve_spans(
         if c.overriding and 0 < c.end < len(text) and _word(text[c.end - 1]) and _word(text[c.end])
     }
     for c in sorted(cands, key=priority):
-        for ps, pe in _subtract(c.start, c.end, taken):
+        for ps, pe in taken.subtract(c.start, c.end):
             if not c.overriding and ps in stems_end:
                 ps = min(pe, ps + len(following_suffix(text, ps)))
                 if ps >= pe:
@@ -289,7 +369,7 @@ def resolve_spans(
                     c.overriding,
                 )
             )
-            taken.append((ps, pe))
+            taken.add(ps, pe)
 
     accepted.sort(key=lambda c: (c.start, c.end))
     return [

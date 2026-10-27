@@ -33,6 +33,7 @@ validated rule already covers it (``PII_GUARD_RULES_CUED_NUMBERS``, default on).
 from __future__ import annotations
 
 import threading
+from bisect import bisect_left
 from dataclasses import dataclass
 
 from pii_guard.detect.rules import common
@@ -91,15 +92,42 @@ def rule_packs() -> dict[str, RulePack]:
 def _drop_contained(hits: list[_Hit]) -> list[_Hit]:
     """Remove hits that lie entirely inside another hit (e.g. digits inside an IBAN).
 
-    Partial overlaps are kept: the resolver decides those.
+    Partial overlaps are kept: the resolver decides those. One sweep in start order: every
+    kept hit starts at or before the current one, so the current one lies inside a kept hit
+    exactly when the kept hits reach (end) at least as far.
     """
     ordered = sorted(set(hits), key=lambda h: (h.start, -(h.end - h.start), -h.score))
     kept: list[_Hit] = []
+    reach = -1
     for hit in ordered:
-        if any(k.start <= hit.start and hit.end <= k.end for k in kept):
+        if hit.end <= reach:
             continue
         kept.append(hit)
+        reach = hit.end
     return kept
+
+
+def _outside_hits(hits: list[_Hit], others: list[_Hit]) -> list[_Hit]:
+    """The ``others`` that overlap none of ``hits``, in their order.
+
+    ``hits`` are sorted by start with the running maximum of their ends: a hit starting before
+    ``o.end`` overlaps ``o`` exactly when the furthest such end lies after ``o.start``.
+    """
+    if not hits:
+        return list(others)
+    ordered = sorted(hits, key=lambda h: h.start)
+    starts = [h.start for h in ordered]
+    reach: list[int] = []
+    furthest = -1
+    for h in ordered:
+        furthest = max(furthest, h.end)
+        reach.append(furthest)
+    out: list[_Hit] = []
+    for o in others:
+        i = bisect_left(starts, o.end)
+        if i == 0 or reach[i - 1] <= o.start:
+            out.append(o)
+    return out
 
 
 class RuleDetector:
@@ -154,11 +182,7 @@ class RuleDetector:
             matcher = self.cue_matcher(language)
             if matcher is not None:
                 # A validated hit keeps its span: cued values only fill the gaps.
-                hits += [
-                    cued
-                    for cued in matcher.find(text)
-                    if not any(h.start < cued.end and cued.start < h.end for h in hits)
-                ]
+                hits += _outside_hits(hits, list(matcher.find(text)))
             return [
                 Span(h.start, h.end, h.entity_type, text[h.start : h.end], h.score, self.name)
                 for h in _drop_contained(hits)
