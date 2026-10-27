@@ -54,7 +54,7 @@ export function KnownValues({ rows, onRows, counts, error }: Props) {
                       id={valueId}
                       value={r.value}
                       onChange={(e) => set(r.id, { value: e.target.value })}
-                      placeholder="Gyakorló Tihamér"
+                      placeholder="e.g. a full name or an ID number"
                       aria-invalid={refused || undefined}
                       aria-describedby={refused ? errId : undefined}
                       className={[
@@ -102,7 +102,7 @@ export function KnownValues({ rows, onRows, counts, error }: Props) {
           )}
           {counts && used.length > 0 && (
             <p className="text-xs text-muted" data-testid="known-counts">
-              Session: added {counts.added} / total {counts.total}
+              {counts.total} known {counts.total === 1 ? "value" : "values"} loaded in this session ({counts.added} new)
             </p>
           )}
         </div>

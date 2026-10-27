@@ -151,9 +151,9 @@ describe("Known values and Chat in demo mode", () => {
     const masked = await within(panel).findByTestId("masked-text");
     expect(masked).toHaveTextContent(/Kedves \[\[PERSON_[0-9a-f]{4,}\]\] \(Person placeholder\)nak küldöm\./);
     expect(panel.querySelector("[data-known]")).not.toBeNull();
-    expect(within(panel).getByTestId("known-counts")).toHaveTextContent("added 1 / total 1");
+    expect(within(panel).getByTestId("known-counts")).toHaveTextContent("1 known value loaded in this session (1 new)");
     await user.click(screen.getByRole("button", { name: /run again/i }));
-    await waitFor(() => expect(within(panel).getByTestId("known-counts")).toHaveTextContent("added 0 / total 1"));
+    await waitFor(() => expect(within(panel).getByTestId("known-counts")).toHaveTextContent("1 known value loaded in this session (0 new)"));
   });
 
   it("shows a refused known value inline", async () => {

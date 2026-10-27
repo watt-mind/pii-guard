@@ -400,7 +400,11 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                   <span className="flex items-center gap-1.5">
                     <MarkerIcon info={sys} />
                     {sys?.short_label ?? s.system}
-                    {sys?.default && <span className="sr-only"> (default pipeline)</span>}
+                    {sys?.default && (
+                      <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-muted uppercase ring-1 ring-line">
+                        fast mode<span className="sr-only"> (Fast mode, rules only)</span>
+                      </span>
+                    )}
                   </span>
                 </th>
                 {COLUMNS.map((c) => {

@@ -55,7 +55,7 @@ export interface ChatClient {
 export const SYSTEM_PROMPT =
   "Values like [[PERSON_1a2b3c]] stand for the user's real data, masked for privacy. " +
   "Use them verbatim wherever you mean that value, and put any grammatical suffix right after the closing brackets " +
-  "(for example [[PERSON_1a2b3c]]nak). Never ask what they stand for. Answer briefly.";
+  "(for example [[PERSON_1a2b3c]]nak). Never ask what they stand for. Answer briefly, in plain text without Markdown.";
 
 export const DEFAULT_CHAT_MODEL = import.meta.env.VITE_PII_GUARD_CHAT_MODEL || "meta-models/muse-spark-open-1026";
 
@@ -224,10 +224,10 @@ export function simulatedAnswer(maskedUser: string, language: string): string {
   const placeholders = [...new Set([...maskedUser.matchAll(placeholderRegex())].map((m) => m[0]))];
   if (language === "hu") {
     if (placeholders.length === 0) return "Rendben. Ebben az üzenetben nem találtam személyes adatot.";
-    return `Rendben, ${placeholders[0]} ügyét átnéztem. Az üzenetben szereplő adatok: ${placeholders.join(", ")}. Írjak levelet ${placeholders[0]}nak?`;
+    return `Rendben, átnéztem az üzenetet. Ezekre az adatokra hivatkozik: ${placeholders.join(", ")}. Megírjam a választ?`;
   }
   if (placeholders.length === 0) return "Sure. I found no personal data in this message.";
-  return `Sure. I looked at ${placeholders[0]}'s request. It mentions ${placeholders.join(", ")}. Shall I draft a reply to ${placeholders[0]}?`;
+  return `Sure, I read the message. It refers to ${placeholders.join(", ")}. Shall I draft the reply?`;
 }
 
 /**
