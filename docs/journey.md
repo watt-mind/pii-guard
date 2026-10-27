@@ -975,7 +975,32 @@ the API and refuse images they can't fully check.
   LAB-1229's runs on them have YuNet's portrait leak at 10.8 % against SAM's 47.7 %.
 - **Cost:** $0. About 620 SAM 3.1 calls on free Meta API credits.
 
-### 35. Ticket numbers, SKUs and company names are not tax IDs, cards or postcodes (2026-10-27)
+### 35. A coding agent works through the gateway (2026-10-27)
+
+LAB-1236. **pi, a terminal coding agent, now runs behind pii-guard:** `pii-guard connect pi`
+adds a provider to its config, and the model sees placeholders while the files pi writes hold
+the real values. A real pi 1.4.0 got the fictional mini-repo (`examples/coding-agents/`): a
+client letter, a customer CSV and a `.env`. Its task was to write a reply that quotes the
+client's contact details.
+
+| Run (fast mode, rules + NER) | Requests | Refused | Gold values upstream | Real values in the file |
+|---|---:|---:|---:|---:|
+| Scripted mock model (also in CI) | 5 | 0 | 0 of 13 | 13 of 13 |
+| Meta Model API, `muse-spark-1.3` | 3 | 0 | 0 of 13 | 5 (all the task asked for) |
+
+- **Tool-call arguments come back restored**, so the agent's `write` lands the real IBAN,
+  e-mail and phone on disk. pi's requests needed no new allow-list keys.
+- **Code survives:** 0 of 23 masked spans in the mini-repo and repository code were
+  identifiers, paths or URLs.
+- **Gaps found:** secrets (all 3 fake keys from `.env` reached the model) and names inside CSV
+  rows. The real model also left the data out of the file until the prompt said placeholders
+  are restored locally. All three are follow-up tickets.
+- **Muse Code isn't connectable yet.** It accepts a custom endpoint, but speaks the Responses
+  API, which the gateway doesn't serve ([integrations/muse-code.md](integrations/muse-code.md)).
+- New: `GET /v1/models` and [docs/integrations/](integrations/README.md).
+- **Cost:** $0. About 20 requests over three runs on free Meta API credits; the rest ran locally.
+
+### 36. Ticket numbers, SKUs and company names are not tax IDs, cards or postcodes (2026-10-27)
 
 LAB-1227, the follow-up of milestone 31. LAB-1205 stopped a context-free TAJ from firing
 right after an order or invoice label, an ID prefix or a currency, but other checksum rules

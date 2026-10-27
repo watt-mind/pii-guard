@@ -1,0 +1,196 @@
+"""``pii-guard connect``: pi config merge (dry-run, idempotent, backup), --check, muse-code."""
+
+from __future__ import annotations
+
+import io
+import json
+from pathlib import Path
+
+import pytest
+
+from pii_guard.cli import main as root_main
+from pii_guard.integrations import pi
+from pii_guard.integrations.cli import main
+from pii_guard.integrations.common import CANARY_VALUES, write_json
+from pii_guard.integrations.e2e import SCRIPTED_MODEL, Recorder, gateway_app, serve
+
+# A hand-formatted file with another provider: connect must keep its text byte for byte.
+EXISTING = """{
+  "providers": {
+    "ollama": {"baseUrl": "http://localhost:11434/v1", "api": "openai-completions",
+               "apiKey": "ollama", "models": [{"id": "qwen2.5-coder:7b"}]}
+  },
+  "extra": [1, 2]
+}
+"""
+
+
+def run(*args: str) -> tuple[int, str]:
+    out = io.StringIO()
+    code = main(list(args), stdout=out)
+    return code, out.getvalue()
+
+
+@pytest.fixture
+def unreachable() -> str:
+    return "http://127.0.0.1:9/v1"  # discard port: nothing listens
+
+
+def test_dry_run_without_gateway_writes_nothing(
+    tmp_path: Path, unreachable: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, out = run("pi", "--dry-run", "--gateway", unreachable, "--agent-dir", str(tmp_path))
+    assert code == 0
+    assert "+++ " in out and '"pii-guard"' in out and '"models": []' in out
+    assert "could not reach the gateway" in capsys.readouterr().err
+    assert not (tmp_path / "models.json").exists()
+
+
+def test_write_new_file_then_idempotent(tmp_path: Path, unreachable: str) -> None:
+    args = ("pi", "--gateway", unreachable, "--agent-dir", str(tmp_path), "--model", "m1")
+    code, out = run(*args)
+    assert code == 0 and "wrote" in out
+    data = json.loads((tmp_path / "models.json").read_text())
+    entry = data["providers"]["pii-guard"]
+    assert entry["baseUrl"] == unreachable
+    assert entry["api"] == "openai-completions"
+    assert entry["headers"] == {"X-PII-Guard-Mode": "fast", "X-PII-Guard-Language": "en"}
+    assert entry["compat"] == {"supportsDeveloperRole": False, "supportsStore": False}
+    assert entry["models"] == [{"id": "m1", "name": "m1 (pii-guard)"}]
+    assert data["$schema"] == pi.SCHEMA_URL
+
+    code, out = run(*args)
+    assert code == 0 and "already up to date" in out
+    assert list(tmp_path.glob("*.pii-guard-backup-*")) == []
+    code, out = run(*args, "--dry-run")
+    assert "already up to date" in out
+
+
+def test_existing_file_kept_and_backed_up(tmp_path: Path, unreachable: str) -> None:
+    path = tmp_path / "models.json"
+    path.write_text(EXISTING)
+    code, out = run("pi", "--gateway", unreachable, "--agent-dir", str(tmp_path), "--model", "m1")
+    assert code == 0 and "backup:" in out
+    text = path.read_text()
+    assert text.startswith(EXISTING.split('\n  },\n  "extra"')[0])  # ollama block untouched
+    assert '"extra": [1, 2]' in text
+    data = json.loads(text)
+    assert set(data["providers"]) == {"ollama", "pii-guard"}
+    assert "$schema" not in data
+    (backup,) = tmp_path.glob("models.json.pii-guard-backup-*")
+    assert backup.read_text() == EXISTING
+
+    # A second model replaces our provider in place; the rest still byte for byte.
+    code, _ = run("pi", "--gateway", unreachable, "--agent-dir", str(tmp_path), "--model", "m2")
+    data = json.loads(path.read_text())
+    assert [m["id"] for m in data["providers"]["pii-guard"]["models"]] == ["m2"]
+    assert path.read_text().count('"pii-guard": {') == 1
+    assert '"apiKey": "ollama", "models": [{"id": "qwen2.5-coder:7b"}]}' in path.read_text()
+
+
+def test_empty_providers_and_fallback_render() -> None:
+    entry = pi.provider_entry("http://g/v1", ["m"])
+    spliced = pi.render({"providers": {}}, '{"providers": {}}\n', entry)
+    assert json.loads(spliced)["providers"]["pii-guard"] == entry
+    # No providers key: re-rendered as a whole, still a correct merge.
+    rendered = pi.render({"a": 1}, '{"a": 1}', entry)
+    assert json.loads(rendered) == {"a": 1, "providers": {"pii-guard": entry}}
+
+
+def test_invalid_json_is_refused(tmp_path: Path, unreachable: str) -> None:
+    (tmp_path / "models.json").write_text("{ nope")
+    code, _ = run("pi", "--gateway", unreachable, "--agent-dir", str(tmp_path), "--model", "m")
+    assert code == 2
+    assert (tmp_path / "models.json").read_text() == "{ nope"
+
+
+def test_no_models_without_dry_run_fails(tmp_path: Path, unreachable: str) -> None:
+    code, _ = run("pi", "--gateway", unreachable, "--agent-dir", str(tmp_path))
+    assert code == 2
+    assert not (tmp_path / "models.json").exists()
+
+
+def test_api_token_becomes_env_reference(
+    tmp_path: Path, unreachable: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PII_GUARD_API_TOKEN", "t0ken-for-tests")
+    run("pi", "--gateway", unreachable, "--agent-dir", str(tmp_path), "--model", "m")
+    text = (tmp_path / "models.json").read_text()
+    assert '"apiKey": "$PII_GUARD_API_TOKEN"' in text
+    assert "t0ken-for-tests" not in text
+
+
+def test_agent_dir_from_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PI_CODING_AGENT_DIR", str(tmp_path / "agent"))
+    assert pi.config_path() == tmp_path / "agent" / "models.json"
+
+
+def test_resolve_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SOME_KEY", "v")
+    assert pi.resolve_value("$SOME_KEY") == "v"
+    assert pi.resolve_value("${SOME_KEY}") == "v"
+    assert pi.resolve_value("!cat secret") is None
+    assert pi.resolve_value("$$literal") == "$literal"
+    assert pi.resolve_value("plain") == "plain"
+
+
+def test_write_json_no_change_no_backup(tmp_path: Path) -> None:
+    path = tmp_path / "x.json"
+    assert write_json(path, "{}\n") is None
+    assert write_json(path, "{}\n") is None
+    backup = write_json(path, '{"a": 1}\n')
+    assert backup is not None and backup.read_text() == "{}\n"
+
+
+def test_connect_and_check_through_a_real_gateway(tmp_path: Path) -> None:
+    """Models from GET /v1/models, then the canary: masked upstream, restored for the user."""
+    recorder = Recorder()
+    statuses: list[int] = []
+    with serve(recorder.app) as upstream, serve(gateway_app(upstream + "/v1", statuses)) as gw:
+        code, out = run("pi", "--gateway", gw + "/v1", "--agent-dir", str(tmp_path))
+        assert code == 0, out
+        models = json.loads((tmp_path / "models.json").read_text())["providers"]["pii-guard"]
+        assert [m["id"] for m in models["models"]] == [SCRIPTED_MODEL]
+
+        code, out = run("pi", "--check", "--agent-dir", str(tmp_path))
+    assert code == 0, out
+    assert "ok           : 3 value(s) masked" in out
+    assert "#traffic" in out
+    received = out.split("you got back : ")[1].splitlines()[0]
+    model_saw = out.split("model saw    : ")[1].splitlines()[0]
+    for value in CANARY_VALUES:
+        assert value in received
+        assert value not in model_saw
+    assert all(value not in "".join(recorder.bodies) for value in CANARY_VALUES)
+    # The canary went the way pi goes: fast mode, en.
+    assert statuses == [200]
+
+
+def test_check_fails_when_url_is_not_the_gateway(tmp_path: Path) -> None:
+    recorder = Recorder()
+    with serve(recorder.app) as upstream:
+        run("pi", "--gateway", upstream + "/v1", "--agent-dir", str(tmp_path), "--model", "m")
+        code, out = run("pi", "--check", "--agent-dir", str(tmp_path))
+    assert code == 1
+    assert "no pii_guard echo" in out
+
+
+def test_check_without_provider(tmp_path: Path) -> None:
+    code, _ = run("pi", "--check", "--agent-dir", str(tmp_path))
+    assert code == 2
+
+
+def test_check_and_dry_run_exclusive(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        run("pi", "--check", "--dry-run", "--agent-dir", str(tmp_path))
+
+
+def test_muse_code_reports_the_finding() -> None:
+    code, out = run("muse-code")
+    assert code == 1
+    assert "Responses API" in out and "connect pi" in out
+
+
+def test_root_cli_dispatches_connect(capsys: pytest.CaptureFixture[str]) -> None:
+    assert root_main(["connect", "muse-code"]) == 1
+    assert "Muse Code" in capsys.readouterr().out
