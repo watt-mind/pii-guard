@@ -718,3 +718,142 @@ def test_audit_mode_still_detects_texts_as_parallel_jobs() -> None:
             model="m", messages=full_conversation()
         )
     assert llm.calls == int(raw.headers["x-pii-guard-cache-misses"])
+
+
+# --- LAB-1278: the second pass scans only entries newer than each text ---------------------
+
+
+class ScriptedNer:
+    """Reports, in a text holding a marker, the values listed for it: a detector that misses
+    a value in one message and finds it in a later one (late confirmation)."""
+
+    name = "llm"
+    model = "scripted-ner"
+
+    def __init__(self, found: dict[str, list[tuple[str, EntityType]]]) -> None:
+        self.found = found
+
+    def detect(self, text: str, language: str = "hu") -> list[Span]:
+        spans: list[Span] = []
+        for marker, values in self.found.items():
+            if marker not in text:
+                continue
+            for value, entity_type in values:
+                for m in re.finditer(rf"(?<!\w){re.escape(value)}(?!\w)", text):
+                    if any(s.start < m.end() and m.start() < s.end for s in spans):
+                        continue
+                    spans.append(Span(m.start(), m.end(), entity_type, value, 0.9, "llm"))
+        return spans
+
+
+P, E, PH = EntityType.PERSON, EntityType.EMAIL, EntityType.PHONE
+#: Each turn's new user message. Values first written undetected (or inflected) are confirmed
+#: in a later message, so the second pass has work in earlier texts; LAB-1284's widening
+#: cases (a CSV row with only the surname detected, a name known from an earlier turn) too.
+LATE_TURNS = [
+    "Szia! Holnap Próba Zsuzsannával és Kovács Bélával találkozom, a címük "
+    "zsuzsa.proba@example.com.",
+    "Marker2: Próba Zsuzsanna telefonszáma +36 30 555 0101, Kovács Béla is jön. "
+    "Próba Zsuzsannának küldd el.",
+    "id,name,email\n1,Jane Placeholder,jane.placeholder@example.net\n2,John Sample,x@example.org",
+    "Dear Jane Placeholder, Kovács Bélának is szólj (+36 30 555 0101).",
+    "Client: John Sample. Attendees:\n- John Sample\n- someone else",
+    "Köszönöm, ennyi volt.",
+    "Még egyszer: Próba Zsuzsannát és Jane Placeholdert hívd fel.",
+]
+LATE_FOUND = {
+    "Marker2": [("Próba Zsuzsanna", P), ("Kovács Béla", P), ("Próba Zsuzsannának", P)],
+    "id,name": [("Placeholder", P), ("Sample", P)],
+    "Dear": [("Jane Placeholder", P), ("Kovács Bélának", P)],
+    "Client:": [("John Sample", P)],
+    "- John": [("John", P)],
+    "Még egyszer": [("Próba Zsuzsannát", P), ("Jane Placeholdert", P)],
+}
+
+
+def _echo_all(body: dict) -> str:
+    """Echo every placeholder of the request, so the restored history carries them all."""
+    text = json.dumps(body["messages"], ensure_ascii=False)
+    tokens = dict.fromkeys(f"[[{t}_{i}]]" for t, i in PLACEHOLDER_RE.findall(text))
+    return "Rendben: " + ", ".join(tokens) + "."
+
+
+def _run_late_session(stream: bool) -> tuple[list[bytes], list[str], list[int], int]:
+    """The LATE_TURNS session; returns forwarded bodies, answers, entries scanned per request
+    and the number of entries at the end."""
+    upstream = MockUpstream(answer=_echo_all)
+    app = make_app(upstream, llm=ScriptedNer(LATE_FOUND))
+    history: list[dict] = [{"role": "system", "content": "Asszisztens vagy."}]
+    answers, scanned = [], []
+    with TestClient(app) as http:
+        client = openai_client(http)
+        session_id = None
+        for turn in LATE_TURNS:
+            history.append({"role": "user", "content": turn})
+            extra = {"X-PII-Guard-Session": session_id} if session_id else {}
+            raw = client.chat.completions.with_raw_response.create(
+                model="m", messages=history, stream=stream, extra_headers=extra
+            )
+            session_id = raw.headers["x-pii-guard-session"]
+            parsed = raw.parse()
+            if stream:
+                answer = "".join(c.choices[0].delta.content or "" for c in parsed if c.choices)
+            else:
+                answer = parsed.choices[0].message.content
+            session = app.state.gateway.vault.session(session_id)
+            scanned.append(session.entries_scanned - sum(scanned))
+            answers.append(answer)
+            history.append({"role": "assistant", "content": answer})
+        entries = len(session._by_key)
+    return [r.content for r in upstream.requests], answers, scanned, entries
+
+
+def _canonical(raw: bytes) -> str:
+    """Placeholders renumbered in order of first appearance."""
+    names: dict[str, str] = {}
+    return PLACEHOLDER_RE.sub(
+        lambda m: names.setdefault(m.group(0), f"[[{m.group(1)}_{len(names)}]]"),
+        raw.decode("utf-8"),
+    )
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_remask_since_changes_no_masked_body(monkeypatch: pytest.MonkeyPatch, stream: bool) -> None:
+    from pii_guard.vault import vault as vault_module
+
+    fast = _run_late_session(stream)
+    monkeypatch.setattr(vault_module, "_REMASK_SINCE", False)
+    full = _run_late_session(stream)
+    fast_bodies, fast_answers, fast_scanned, entries = fast
+    full_bodies, full_answers, full_scanned, _ = full
+    assert [_canonical(b) for b in fast_bodies] == [_canonical(b) for b in full_bodies]
+    assert fast_bodies == full_bodies  # same tenant key and session ids: same placeholders
+    assert fast_answers == full_answers  # and the same restored answers
+    # The late values reached the upstream as placeholders, in the earlier turns too.
+    last = full_bodies[-1].decode("utf-8")
+    for value in ("Próba Zsuzsann", "Kovács Bél", "Jane", "Placeholder", "Sample", "555 0101"):
+        assert value not in json.dumps(json.loads(last), ensure_ascii=False)
+    # The shortcut scans less, never more.
+    assert all(a <= b for a, b in zip(fast_scanned, full_scanned, strict=True))
+    assert sum(fast_scanned) < sum(full_scanned)
+    assert entries > 5
+
+
+def test_request_with_no_new_value_runs_no_remask_pass() -> None:
+    upstream = MockUpstream()
+    app = make_app(upstream)
+    messages = conversation_turn_one()
+    with TestClient(app) as http:
+        client = openai_client(http)
+        first = client.chat.completions.with_raw_response.create(model="m", messages=messages)
+        session = app.state.gateway.vault.session(first.headers["x-pii-guard-session"])
+        entries, before = len(session._by_key), session.entries_scanned
+        generation = session.generation
+        # The same texts again: every value is known, nothing new is confirmed.
+        client.chat.completions.with_raw_response.create(
+            model="m", messages=messages, extra_headers={"X-PII-Guard-Session": session.session_id}
+        )
+    assert session.generation == generation
+    # Pass 1 only: texts x entries (it was 2 x texts x entries with the full second pass).
+    assert session.entries_scanned - before == len(messages) * entries
+    assert upstream.bodies[0]["messages"] == upstream.bodies[1]["messages"]
