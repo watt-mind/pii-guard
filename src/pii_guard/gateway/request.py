@@ -5,6 +5,14 @@ history, tool results), ``content`` strings and text parts, refusals, assistant
 ``tool_calls[].function.arguments`` (and the legacy ``function_call``), and the top-level
 ``user`` field. It returns :class:`TextSlot` objects that write the masked text back in place.
 
+Request metadata is masked too: tool definitions (``tools[]``, legacy ``functions[]``),
+``response_format.json_schema`` and ``metadata`` values. In a JSON Schema every free-text
+string (``description``, ``title``, ``enum``/``const``/``default``/``examples`` values, ...) is
+masked; structural strings (``type``, ``$ref``, ``format``, ...) are left alone. Identifiers
+(function names, ``properties`` keys, ``required`` entries, ``metadata`` keys) can't carry a
+placeholder, so they are only checked: personal data in one rejects the request
+(:class:`UnsupportedContentError`, naming the location, never the value).
+
 Tool-call arguments are JSON: they are parsed and every string (keys included) is masked as
 its own text, so escaped characters can't hide a value from the detectors and the result is
 re-serialised as valid JSON. Arguments that are not valid JSON are masked as plain text.
@@ -46,6 +54,64 @@ _TEXT_FIELDS = ("refusal", "reasoning_content", "reasoning")
 _TEXT_PART_TYPES = {"text": "text", "refusal": "refusal"}
 _IMAGE_SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
 _DATA_URL_RE = re.compile(r"^data:(image/(?:png|jpeg|jpg));base64,", re.IGNORECASE)
+#: JSON-Schema keywords whose string values are structure, not text: never masked.
+_SCHEMA_STRUCTURAL = frozenset({"type", "$ref", "$schema", "$id", "$anchor", "format"})
+#: JSON-Schema keywords whose values are data (any JSON): every string in them is masked.
+_SCHEMA_DATA = frozenset({"enum", "const", "default", "examples"})
+#: JSON-Schema keywords mapping identifiers (checked, not masked) to sub-schemas.
+_SCHEMA_NAMED = frozenset({"properties", "patternProperties", "$defs", "definitions"})
+#: Every keyword above plus the common ones whose keys are structure (not checked).
+_SCHEMA_KEYWORDS = (
+    _SCHEMA_STRUCTURAL
+    | _SCHEMA_DATA
+    | _SCHEMA_NAMED
+    | frozenset(
+        {
+            "$comment",
+            "additionalItems",
+            "additionalProperties",
+            "allOf",
+            "anyOf",
+            "contains",
+            "contentEncoding",
+            "contentMediaType",
+            "dependentRequired",
+            "dependentSchemas",
+            "description",
+            "else",
+            "exclusiveMaximum",
+            "exclusiveMinimum",
+            "if",
+            "items",
+            "maxContains",
+            "maxItems",
+            "maxLength",
+            "maxProperties",
+            "maximum",
+            "minContains",
+            "minItems",
+            "minLength",
+            "minProperties",
+            "minimum",
+            "multipleOf",
+            "not",
+            "nullable",
+            "oneOf",
+            "pattern",
+            "prefixItems",
+            "propertyNames",
+            "readOnly",
+            "required",
+            "strict",
+            "then",
+            "title",
+            "unevaluatedItems",
+            "unevaluatedProperties",
+            "uniqueItems",
+            "writeOnly",
+        }
+    )
+)
 
 
 class InvalidChatRequestError(PiiGuardError):
@@ -111,6 +177,7 @@ def collect_texts(body: object) -> CollectedTexts:
         _collect_message(message, index, out)
     if isinstance(body.get("user"), str):
         out.slots.append(TextSlot(body["user"], _setter(body, "user"), "user"))
+    _collect_request_metadata(body, out)
     return out
 
 
@@ -232,19 +299,21 @@ def _collect_arguments(function: dict[str, Any], out: CollectedTexts) -> None:
     out.finalizers.append(reserialize)
 
 
-def _collect_json(container: dict[str, Any] | list[Any], key: Any, out: CollectedTexts) -> None:
+def _collect_json(
+    container: dict[str, Any] | list[Any], key: Any, out: CollectedTexts, kind: str = "arguments"
+) -> None:
     value = container[key]
     if isinstance(value, str):
-        out.slots.append(TextSlot(value, _setter(container, key), "arguments"))
+        out.slots.append(TextSlot(value, _setter(container, key), kind))
     elif isinstance(value, list):
         for i in range(len(value)):
-            _collect_json(value, i, out)
+            _collect_json(value, i, out, kind)
     elif isinstance(value, dict):
         # Keys can carry values too ({"Teszt Elek": ...}): rebuild the dict with masked keys.
         items = [[k, v] for k, v in value.items()]
         for item in items:
-            out.slots.append(TextSlot(item[0], _setter(item, 0), "arguments"))
-            _collect_json(item, 1, out)
+            out.slots.append(TextSlot(item[0], _setter(item, 0), kind))
+            _collect_json(item, 1, out, kind)
 
         def rebuild(value: dict[str, Any] = value, items: list[list[Any]] = items) -> None:
             value.clear()
@@ -252,3 +321,110 @@ def _collect_json(container: dict[str, Any] | list[Any], key: Any, out: Collecte
 
         # Inner dicts must be rebuilt before outer ones re-serialise: prepend.
         out.finalizers.insert(0, rebuild)
+
+
+# --- request metadata: tool definitions, response_format, metadata ---------------------
+
+
+def _collect_request_metadata(body: dict[str, Any], out: CollectedTexts) -> None:
+    tools = body.get("tools")
+    if isinstance(tools, list):
+        for index, tool in enumerate(tools):
+            if not isinstance(tool, dict):
+                continue
+            if "name" in tool or "parameters" in tool:
+                # A flat definition: {"type": "function", "name": ..., "parameters": ...}.
+                _collect_function(tool, f"tools.{index}", out)
+                continue
+            # {"type": "function", "function": {...}} (or another tool type's own object).
+            for key, value in tool.items():
+                if key != "type" and isinstance(value, dict):
+                    _collect_function(value, f"tools.{index}.{key}", out)
+    functions = body.get("functions")
+    if isinstance(functions, list):
+        for index, function in enumerate(functions):
+            if isinstance(function, dict):
+                _collect_function(function, f"functions.{index}", out)
+    tool_choice = body.get("tool_choice")
+    if isinstance(tool_choice, dict) and isinstance(tool_choice.get("function"), dict):
+        _check_identifier(tool_choice["function"], "name", "tool_choice.function.name", out)
+    function_call = body.get("function_call")
+    if isinstance(function_call, dict):
+        _check_identifier(function_call, "name", "function_call.name", out)
+    response_format = body.get("response_format")
+    if isinstance(response_format, dict) and isinstance(response_format.get("json_schema"), dict):
+        _collect_function(response_format["json_schema"], "response_format.json_schema", out)
+    metadata = body.get("metadata")
+    if isinstance(metadata, dict):
+        _collect_metadata(metadata, out)
+
+
+def _collect_function(function: dict[str, Any], where: str, out: CollectedTexts) -> None:
+    """A function (or json_schema) definition: ``name`` checked, schemas walked, text masked."""
+    for key, value in function.items():
+        if key in _SCHEMA_STRUCTURAL:
+            continue
+        if key == "name":
+            _check_identifier(function, key, f"{where}.name", out)
+        elif key in ("parameters", "schema"):
+            _collect_schema(function, key, f"{where}.{key}", out)
+        elif isinstance(value, str | list | dict):
+            _collect_json(function, key, out, "tools")
+
+
+def _collect_schema(
+    container: dict[str, Any] | list[Any], key: Any, where: str, out: CollectedTexts
+) -> None:
+    value = container[key]
+    if isinstance(value, str):
+        out.slots.append(TextSlot(value, _setter(container, key), "tools"))
+    elif isinstance(value, list):
+        for i in range(len(value)):
+            _collect_schema(value, i, f"{where}.{i}", out)
+    elif isinstance(value, dict):
+        for position, (name, sub) in enumerate(value.items()):
+            if name in _SCHEMA_KEYWORDS:
+                at = f"{where}.{name}"
+            else:  # not a keyword: the key itself could be a value; check it, never name it
+                at = f"{where}.{position}"
+                _check_text(name, at, out)
+            if name in _SCHEMA_STRUCTURAL:
+                continue
+            if name in _SCHEMA_DATA:
+                _collect_json(value, name, out, "tools")
+            elif name in _SCHEMA_NAMED and isinstance(sub, dict):
+                for i, prop in enumerate(list(sub)):
+                    _check_text(prop, f"{at}.{i}", out)
+                    _collect_schema(sub, prop, f"{at}.{i}", out)
+            elif name == "required" and isinstance(sub, list):
+                for i, entry in enumerate(sub):
+                    if isinstance(entry, str):
+                        _check_text(entry, f"{at}.{i}", out)
+            else:
+                _collect_schema(value, name, at, out)
+
+
+def _collect_metadata(metadata: dict[str, Any], out: CollectedTexts) -> None:
+    for i, key in enumerate(list(metadata)):
+        if isinstance(key, str):
+            _check_text(key, f"metadata.{i}", out)
+        _collect_json(metadata, key, out, "metadata")
+
+
+def _check_identifier(holder: dict[str, Any], key: str, where: str, out: CollectedTexts) -> None:
+    value = holder.get(key)
+    if isinstance(value, str):
+        _check_text(value, where, out)
+
+
+def _check_text(text: str, where: str, out: CollectedTexts) -> None:
+    """An identifier: masked text can't be written back, so personal data in it fails closed."""
+
+    def check(masked: str) -> None:
+        if masked != text:
+            raise UnsupportedContentError(
+                f"{where}: personal data detected in an identifier; identifiers can't carry "
+                "a placeholder, so the request is not forwarded"
+            )
+
+    out.slots.append(TextSlot(text, check, "identifier"))
