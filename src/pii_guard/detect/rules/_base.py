@@ -14,6 +14,7 @@ class _Hit(NamedTuple):
     end: int
     entity_type: EntityType
     score: float
+    subtype: str | None = None  # e.g. the SECRET rule that matched (``Span.subtype``)
 
 
 #: A rule takes the whole text and yields validated hits.

@@ -28,7 +28,7 @@ What runs, all on loopback, in throwaway directories (``HOME`` and the client's 
 The result (:class:`RunResult`) says whether any gold value (``examples/coding-agents/gold.json``)
 reached the upstream, whether the gateway refused a request, and what the agent wrote: the files
 hold the real values again, because tool-call arguments come back restored. Values pii-guard
-does not cover yet (API keys, names inside CSV rows) are counted separately as known gaps.
+does not cover yet (names inside CSV rows) are counted separately as known gaps.
 
 Sticky sessions (LAB-1286): ``--session`` picks how the client lands in a vault session.
 ``path`` (default) is what ``pii-guard connect`` writes, a ``/s/<session>/v1`` base URL;

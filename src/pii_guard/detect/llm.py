@@ -1,6 +1,6 @@
 """LLM detector: a second detection pass on an OpenAI-compatible Chat Completions endpoint.
 
-The model is asked for personal data as strict JSON (entity type + exact surface text). The
+The model is asked for personal data as JSON only (entity type + exact surface text). The
 detector never trusts model offsets: it searches the returned surface strings in the input
 itself, maps every occurrence to code-point offsets, and drops anything that does not appear
 verbatim (hallucinated or "corrected" values). See ``docs/models.md``.

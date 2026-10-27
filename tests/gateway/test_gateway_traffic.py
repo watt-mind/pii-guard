@@ -31,7 +31,7 @@ from gateway_helpers import (
 from pii_guard.api.app import create_app
 from pii_guard.api.routes.traffic import traffic_stream
 from pii_guard.config import Settings
-from pii_guard.gateway import GatewayConfig, build_mode_detectors
+from pii_guard.gateway import GatewayConfig, Mode, build_mode_detectors
 from pii_guard.observability import ObservabilitySettings, TrafficLogConfigError
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -54,7 +54,7 @@ def make(
         settings,
         ObservabilitySettings(traffic_log=traffic, metrics=metrics, server_timing=server_timing),
     )
-    config = GatewayConfig()
+    config = GatewayConfig(mode=Mode.AUDIT)
     app.state.gateway_config = config
     app.state.gateway_transport = (
         upstream.transport() if isinstance(upstream, MockUpstream) else upstream
@@ -85,7 +85,7 @@ def test_masked_event_holds_only_what_left_the_machine() -> None:
         assert r.status_code == 200
         (event,) = events(client)
     assert event["id"] == r.headers["x-pii-guard-request-id"]
-    assert event["level"] == "masked" and event["outcome"] == "ok" and event["mode"] == "strict"
+    assert event["level"] == "masked" and event["outcome"] == "ok" and event["mode"] == "audit"
     assert event["detectors"] == ["llm", "rules"]
     assert event["entities"]["masked"]["EMAIL"] == 1
     assert event["usage"] == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
@@ -247,7 +247,7 @@ def test_overhead_excludes_the_upstream_delay_non_streaming() -> None:
     assert t["added_ttft_ms"] is None
     header = r.headers["server-timing"]
     assert "overhead;dur=" in header and "upstream;dur=" in header
-    assert 'pii_guard_gateway_requests_total{mode="strict",outcome="ok"} 1' in metrics
+    assert 'pii_guard_gateway_requests_total{mode="audit",outcome="ok"} 1' in metrics
 
 
 def test_overhead_and_added_ttft_streaming() -> None:

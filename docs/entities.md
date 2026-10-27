@@ -27,6 +27,7 @@ keeps the two in sync. See [contracts.md](contracts.md#entity-policies-implement
 | `ORGANIZATION` | Company and institution names | NER, LLM | keep |
 | `PARCEL_NUMBER_HU` | Land registry parcel number (helyrajzi szám) | rules, LLM (context) | mask |
 | `VEHICLE_PLATE` | Licence plates | rules | mask |
+| `SECRET` | API keys and tokens (AWS, GitHub, Slack, Stripe, `sk-` style, Google, JWT), PEM private keys, passwords in URLs, values assigned to a secret-ish key (`API_KEY=`, `password:`, `Authorization: Bearer`) | rules (language-independent) | mask |
 
 `ORGANIZATION` and company identifiers default to `keep` because they're usually not personal
 data and the model needs them to reason. A company name can contain a person's name, though:
@@ -85,8 +86,17 @@ dates of birth come from the NER and LLM passes in every language.
 | Email address, also with a punycode TLD (`xn--p1ai`) or a quoted local part | `EMAIL` | shape | all |
 | International phone number (`+<country>`, not `+36`) | `PHONE` | 8–15 digits (E.164) | all |
 | Payment card number, compact or in groups of 4 (Amex 4-6-5) | `BANK_ACCOUNT` | issuer prefix + length + Luhn | all |
+| Provider key shapes: AWS access key id, GitHub (`ghp_`, `github_pat_`), Slack (`xox?-`), Stripe (`sk_`/`rk_` `live`/`test`, `whsec_`), `sk-` style (OpenAI, Anthropic), Google (`AIza`), JWT, PEM private-key block | `SECRET` | prefix + length (+ letters and digits for `sk-`) | all |
+| Password (and a non-generic user name) in `scheme://user:password@host` | `SECRET` | not a reference (`${DB_PASSWORD}`, `<password>`) | all |
+| Value assigned to a secret-ish key (`*_KEY`, `*_TOKEN`, `*_SECRET`, `PASSWORD`, `PASSWD`, `*_PWD`, `AUTH`, `BEARER`; `.env`, YAML, JSON, shell, CLI flags) and `Authorization: Bearer/Basic <token>` | `SECRET` | a literal, not code: 4+ characters, not a reference, call, type name, boolean, number (except for passwords) or mask (`****`) | all |
 
 Payment cards use `BANK_ACCOUNT` until the taxonomy has a card type of its own.
+
+`SECRET` spans carry a subtype (`Span.subtype`: `github_token`, `url_password`, `assignment`
+...; [contracts.md](contracts.md)). A hash, UUID or git SHA is a secret only when it is assigned
+to a secret-ish key (`WEBHOOK_SECRET=<sha256>`); lockfile integrity hashes and commit ids are
+left alone. A generic `*_KEY` name (`STRIPE_KEY`, but also `STORAGE_KEY`) needs a value that
+looks generated (16+ characters, letters and digits), so lookup names stay readable.
 
 **Cued numbers** (all scopes, `PII_GUARD_RULES_CUED_NUMBERS`, default on). A digit or
 alphanumeric run right after a strong cue word from a pack's `cues.tsv` (`TAJ`,

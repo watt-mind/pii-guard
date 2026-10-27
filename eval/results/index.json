@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "pii-guard eval report",
   "about": "Generated from eval/results/runs/*.json; do not edit. Rates are 0-1; latency in ms.",
-  "runs_digest": "3dbafc8ac7e4a758354af53c4314af40bf5abfa1898d6bba26b890d88652dfc3",
+  "runs_digest": "a494093438bf5e49cfc5905dc3020ddf5a15a397a8a16397fe1f661048867e6d",
   "languages": [
     "de",
     "en",
@@ -21,7 +21,8 @@
     "COMPANY_ID_HU",
     "ORGANIZATION",
     "PARCEL_NUMBER_HU",
-    "VEHICLE_PLATE"
+    "VEHICLE_PLATE",
+    "SECRET"
   ],
   "fixture_sets": {
     "ai4privacy": {
@@ -121,6 +122,20 @@
       "fixtures": {
         "en": "59d5bc89fab4",
         "hu": "99f13f4f6ca9"
+      }
+    },
+    "secrets": {
+      "origin": "hand-written",
+      "kind": "text",
+      "languages": [
+        "en"
+      ],
+      "documents": {
+        "en": 17
+      },
+      "generators": [],
+      "fixtures": {
+        "en": "8069184cfe95"
       }
     },
     "smoke": {
@@ -597,8 +612,8 @@
     "rules+ner:xlmr-large-distilled-glimmer+llm:muse-spark-open@reasoning_effort=low": {
       "color": "#CC79A7",
       "shape": "circle",
-      "label": "pii-guard strict (rules + NER + Muse Spark Open, Baseten)",
-      "short_label": "strict (rules + NER + Muse Spark Open, Baseten)",
+      "label": "pii-guard audit (rules + NER + Muse Spark Open, Baseten)",
+      "short_label": "audit (rules + NER + Muse Spark Open, Baseten)",
       "family": "pii-guard",
       "tool": "pii-guard",
       "kind": "text",
@@ -5839,7 +5854,7 @@
       "date": "2026-10-27",
       "recorded_at": "2026-10-27T10:57:10+00:00",
       "source": "recorded",
-      "title": "Gateway overhead, strict mode, mock upstream at 50 ms",
+      "title": "Gateway overhead, audit mode, mock upstream at 50 ms",
       "commit": "4ee1b15bf070dccf7d024cf5dd0b1c838133dfd9",
       "dirty": false,
       "system": "gateway-latency:strict:rules+llm:muse-spark-open",
@@ -5873,7 +5888,7 @@
       "notes": [
         "Mock upstream with a fixed 50 ms delay on loopback; overhead = gateway total - time waiting on the upstream.",
         "Each request is a new session (no detection cache hits); one user message per request from the fixed fictional corpus.",
-        "Strict mode: rules + Muse Spark Open on Baseten Model APIs (remote; the LLM call dominates). 44 detector calls in total, fictional corpus."
+        "Audit mode: rules + Muse Spark Open on Baseten Model APIs (remote; the LLM call dominates). 44 detector calls in total, fictional corpus."
       ],
       "rescored": null,
       "imported_from": null
@@ -16143,6 +16158,36 @@
       "notes": [
         "LAB-1227 after: the reference/amount guard of LAB-1205 extended from TAJ to a context-free tax ID, a payment card without a card or account cue, and a Hungarian postcode after a reference label or before a legal-form word (also a German postcode line before GmbH)"
       ],
+      "rescored": null,
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-secrets-rules",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T17:41:06+00:00",
+      "source": "recorded",
+      "title": "pii-guard rules on secrets",
+      "commit": "72bcc27bad6dae87baa38576aed7d91a2e7da6fc",
+      "dirty": true,
+      "system": "rules",
+      "fixture_set": "secrets",
+      "origin": "hand-written",
+      "languages": [
+        "en"
+      ],
+      "detectors": [
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {},
+          "serving": null
+        }
+      ],
+      "hardware": null,
+      "cost": null,
+      "notes": [],
       "rescored": null,
       "imported_from": null
     }
@@ -71402,6 +71447,53 @@
         "detect_p95_ms": 26.014,
         "latency_pooled": false,
         "per_type": {}
+      }
+    },
+    {
+      "run_id": "2026-10-27-secrets-rules",
+      "system": "rules",
+      "fixture_set": "secrets",
+      "origin": "hand-written",
+      "language": "en",
+      "fixture": "8069184cfe95",
+      "current": true,
+      "date": "2026-10-27",
+      "commit": "72bcc27bad6dae87baa38576aed7d91a2e7da6fc",
+      "metrics": {
+        "documents": 17,
+        "gold": 22,
+        "pred": 22,
+        "unscored": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 22,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": 0.354,
+        "detect_p95_ms": 5.454,
+        "latency_pooled": false,
+        "per_type": {
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "SECRET": {
+            "gold": 20,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 20
+          }
+        }
       }
     }
   ],
@@ -136756,6 +136848,95 @@
         "latency_pooled": false,
         "per_type": {}
       }
+    },
+    {
+      "system": "rules",
+      "fixture_set": "secrets",
+      "origin": "hand-written",
+      "date": "2026-10-27",
+      "commit": "72bcc27bad6dae87baa38576aed7d91a2e7da6fc",
+      "run_ids": [
+        "2026-10-27-secrets-rules"
+      ],
+      "fixtures": {
+        "en": "8069184cfe95"
+      },
+      "comparable": true,
+      "rescored": false,
+      "languages": {
+        "en": {
+          "documents": 17,
+          "gold": 22,
+          "pred": 22,
+          "unscored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 22,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 1.0,
+          "detect_p50_ms": 0.354,
+          "detect_p95_ms": 5.454,
+          "latency_pooled": false,
+          "per_type": {
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 2
+            },
+            "SECRET": {
+              "gold": 20,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 20
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 17,
+        "gold": 22,
+        "pred": 22,
+        "unscored": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 22,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": 0.354,
+        "detect_p95_ms": 5.454,
+        "latency_pooled": false,
+        "per_type": {
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "SECRET": {
+            "gold": 20,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 20
+          }
+        }
+      }
     }
   ],
   "snapshots": [
@@ -157565,6 +157746,100 @@
             "precision": 1.0,
             "leak": 0.0,
             "leak_values": 4
+          }
+        }
+      },
+      "missing_languages": [],
+      "complete": true
+    },
+    {
+      "fixture_set": "secrets",
+      "system": "rules",
+      "origin": "hand-written",
+      "run_ids": [
+        "2026-10-27-secrets-rules"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "72bcc27bad6dae87baa38576aed7d91a2e7da6fc"
+      ],
+      "fixtures": {
+        "en": "8069184cfe95"
+      },
+      "rescored": false,
+      "languages": {
+        "en": {
+          "documents": 17,
+          "gold": 22,
+          "pred": 22,
+          "unscored": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 22,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": 1.0,
+          "detect_p50_ms": 0.354,
+          "detect_p95_ms": 5.454,
+          "latency_pooled": false,
+          "per_type": {
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 2
+            },
+            "SECRET": {
+              "gold": 20,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": 0.0,
+              "leak_values": 20
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 17,
+        "gold": 22,
+        "pred": 22,
+        "unscored": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 22,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": 0.354,
+        "detect_p95_ms": 5.454,
+        "latency_pooled": false,
+        "per_type": {
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 2
+          },
+          "SECRET": {
+            "gold": 20,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": 0.0,
+            "leak_values": 20
           }
         }
       },
@@ -182583,7 +182858,7 @@
       "date": "2026-10-27",
       "commit": "4ee1b15bf070dccf7d024cf5dd0b1c838133dfd9",
       "system": "gateway-latency:strict:rules+llm:muse-spark-open",
-      "label": "pii-guard gateway, strict mode (rules + llm muse-spark-open)",
+      "label": "pii-guard gateway, audit mode (rules + llm muse-spark-open)",
       "detectors": [
         "rules",
         "llm"
@@ -182595,7 +182870,7 @@
       "upstream_delay_ms": 50.0,
       "cells": [
         {
-          "mode": "strict",
+          "mode": "audit",
           "concurrency": 1,
           "stream": false,
           "requests": 10,
@@ -182699,7 +182974,7 @@
           }
         },
         {
-          "mode": "strict",
+          "mode": "audit",
           "concurrency": 1,
           "stream": true,
           "requests": 10,
@@ -182813,7 +183088,7 @@
           }
         },
         {
-          "mode": "strict",
+          "mode": "audit",
           "concurrency": 8,
           "stream": false,
           "requests": 10,
@@ -182917,7 +183192,7 @@
           }
         },
         {
-          "mode": "strict",
+          "mode": "audit",
           "concurrency": 8,
           "stream": true,
           "requests": 10,

@@ -10,7 +10,8 @@ import { ApiError, UnreachableError } from "./http";
 import type { GuardClient } from "./types";
 
 export type ChatRole = "system" | "user" | "assistant";
-export type ChatMode = "strict" | "fast";
+/** `audit` was called `strict` until LAB-1186; the gateway still accepts that name (deprecated). */
+export type ChatMode = "fast" | "audit";
 
 export interface ChatMessage {
   role: ChatRole;

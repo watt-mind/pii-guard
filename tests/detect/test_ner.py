@@ -389,6 +389,22 @@ def test_transformers_backend_rejects_bad_settings(tiny_model_dir) -> None:
         ner.TransformersBackend(str(path), device="cuda:7")
 
 
+def test_transformers_backend_refuses_pickled_weights(tiny_model_dir, tmp_path) -> None:
+    """Only ``model.safetensors`` is loaded: a pickled ``pytorch_model.bin`` can run code."""
+    import shutil
+
+    import torch
+    from transformers import AutoModelForTokenClassification
+
+    path, _ = tiny_model_dir
+    pickled = tmp_path / "pickled"
+    shutil.copytree(path, pickled, ignore=shutil.ignore_patterns("*.safetensors"))
+    model = AutoModelForTokenClassification.from_pretrained(path)
+    torch.save(model.state_dict(), pickled / "pytorch_model.bin")
+    with pytest.raises(OSError, match="safetensors"):
+        ner.TransformersBackend(str(pickled), device="cpu")
+
+
 def test_detector_loads_a_local_model(tiny_model_dir, monkeypatch: pytest.MonkeyPatch) -> None:
     path, _ = tiny_model_dir
     monkeypatch.setenv(ner.DEVICE_ENV_VAR, "cpu")

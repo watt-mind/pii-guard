@@ -54,7 +54,8 @@ pi --provider pii-guard --model muse-spark-1.3
   `PII_GUARD_UPSTREAM_API_KEY` upstream. If the gateway requires `PII_GUARD_API_TOKEN`, connect
   writes `"$PII_GUARD_API_TOKEN"`, which pi reads from the environment at request time. The
   token itself is never written to the file.
-- `fast` mode (rules + NER) is the default for agents; `--mode strict` adds the LLM detector.
+- `fast` mode (rules + NER) is the default for agents; `--mode audit` adds the LLM detector
+  (a second opinion for quality checks: slower, and the text goes to the detector endpoint).
 - The `compat` flags make pi send `system` instead of `developer` and leave out `store`, which
   non-OpenAI upstreams may reject. The gateway accepts both fields either way.
 - Running it again is a no-op ("already up to date"). Each change keeps a backup:

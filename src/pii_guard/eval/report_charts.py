@@ -25,6 +25,7 @@ from html import escape
 from typing import Any
 
 from pii_guard.eval.report_colours import PALETTE_LATENCY, PALETTE_VISUAL, assign
+from pii_guard.eval.report_index import display_mode
 
 __all__ = [
     "by_language",
@@ -1036,6 +1037,7 @@ def latest_latency(index: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 def latency_label(run: Mapping[str, Any]) -> str:
     """``fast: rules + ner`` from a latency run's system."""
     mode = str(run["system"]).split(":")[1] if ":" in str(run["system"]) else "?"
+    mode = display_mode(mode)  # the key keeps a record's old mode name
     names = [d for d in run["detectors"] if d not in ("known", "visual")]
     return f"{mode}: " + (" + ".join(names) or "none")
 

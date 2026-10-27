@@ -65,7 +65,7 @@ TEXT_DE = (
     "Hallo, hier ist Erika Mustermann, E-Mail erika.mustermann@example.de, Telefon "
     "+49 30 901820. Bitte überweisen Sie auf DE89 3704 0044 0532 0130 00."
 )
-# A free-text name with no known value and no rule cue: only the NER (or strict mode's LLM
+# A free-text name with no known value and no rule cue: only the NER (or audit mode's LLM
 # detector) can find it. Labelled, so rules-only runs show it as an expected miss.
 TEXT_HU_NER = "Tegnap Gipsz Jakab telefonált, és azt kérte, hogy holnap délelőtt hívjam vissza."
 NER_LABEL = "needs fast mode (NER)"
