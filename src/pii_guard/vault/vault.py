@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
-from pii_guard.vault.fold import FoldedText, fold_text, fold_value
+from pii_guard.vault.fold import FoldedText, fold_value, fold_views
 from pii_guard.vault.inflection import (
     InflectionMatcher,
     Split,
@@ -202,7 +202,7 @@ class _Entry:
             self.seen_folded.setdefault(suffix.casefold(), stem)
 
     def pattern(self, language: str) -> re.Pattern[str]:
-        """Pattern for further occurrences of the value, over :func:`fold_text`'s folded text.
+        """Pattern for further occurrences of the value, over :func:`fold_views`' folded text.
 
         Case-, whitespace- and Unicode-form-insensitive (``WEISS`` for ``Weiß``, NFD for NFC).
         A match covers the stem only; an allowed suffix is checked by lookahead and stays
@@ -500,7 +500,7 @@ class VaultSession:
                 entry.add_alias(alias)
             replacements.append((span.start, end, self._cased(entry, text[span.start : end])))
             taken[span.start : end] = b"\x01" * (end - span.start)
-        folded = fold_text(text)
+        folded = fold_views(text)
         # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
         entries = sorted(self._by_key.values(), key=lambda e: len(e.normalized), reverse=True)
         for entry in entries:
@@ -746,13 +746,17 @@ class VaultSession:
             return [(e.placeholder, e.entity_type, e.count) for e in self._by_placeholder.values()]
 
 
-def _occurrences(pattern: re.Pattern[str], folded: FoldedText) -> list[tuple[int, int]]:
-    """Original ``(start, end)`` of every non-empty match of ``pattern`` in the folded text."""
-    return [
-        folded.to_original(*match.span())
-        for match in pattern.finditer(folded.text)
-        if match.end() > match.start()
-    ]
+def _occurrences(pattern: re.Pattern[str], views: tuple[FoldedText, ...]) -> list[tuple[int, int]]:
+    """Original ``(start, end)`` of every non-empty match of ``pattern`` in the folded views.
+
+    The views are :func:`~pii_guard.vault.fold.fold_views`'s; a span found in both is listed once.
+    """
+    found: dict[tuple[int, int], None] = {}
+    for folded in views:
+        for match in pattern.finditer(folded.text):
+            if match.end() > match.start():
+                found.setdefault(folded.to_original(*match.span()))
+    return list(found)
 
 
 def _layout(value: str) -> str:

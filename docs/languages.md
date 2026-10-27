@@ -93,6 +93,14 @@ eval/fixtures/pl-smoke.jsonl` before any rule exists, and every later step shows
 - `RULES`: formats that are only unambiguous in this language's texts (postcodes, national
   phone numbers, an 11-digit number without its label). They run only for this language.
 
+Accept the ways a number is really printed, not only the official one: the Hungarian giro
+account is found as `11773016-11111018`, `11773016 11111018`, `11773016.11111018` and
+`1177 3016 1111 1018`, and an IBAN in lower case or with several spaces between its groups.
+When a variant is also a common shape for something that isn't personal data, gate it on the
+label instead of dropping it: a dotted nine-digit number is usually a thousands-grouped
+amount, so `123.456.788` and `123/456/788` count as a TAJ only after a TAJ cue, while
+`123 456 788` with its weak mod-10 check is found without one.
+
 Put check-digit functions next to the rules (`languages/de/checksums.py`) with tests against
 the algorithm's published examples. Use the helpers in `detect/rules/_base.py`
 (`NUM_START`/`NUM_END` reject digits inside longer numbers and dates, `context_before` finds a
