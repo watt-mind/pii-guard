@@ -55,7 +55,7 @@ echo
 
 page="$(curl -fsS "$base/")"
 grep -q 'id="root"' <<<"$page" || { echo "wheel-smoke: / is not the bundled UI" >&2; exit 1; }
-grep -q 'mock upstream' <<<"$page" || { echo "wheel-smoke: / does not say the upstream is the mock" >&2; exit 1; }
+grep -q 'offline mock model' <<<"$page" || { echo "wheel-smoke: / does not say the upstream is the mock" >&2; exit 1; }
 curl -fsS -o /dev/null "$base/traffic" # client-side route -> index.html (SPA fallback)
 asset="$(grep -m1 -oE '/assets/[^"]+\.js' <<<"$page")"
 asset="${asset%%$'\n'*}"

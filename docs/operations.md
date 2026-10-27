@@ -35,16 +35,21 @@ What it does:
   variable that holds its key (the value is never printed). Without one, a built-in mock
   upstream (the one below, on a random loopback port) echoes the masked text, and both the
   banner and a strip above the UI say so. `--mock` forces it.
-- **Mode.** Fast: rules, plus NER when the `ner` extra is installed (the strip and the banner
-  list the active detectors). `PII_GUARD_GATEWAY_MODE` overrides it.
-- **Images.** Without Tesseract, image parts are refused (503 `ocr_unavailable`, fail closed)
-  and the banner says how to install it (`brew install tesseract` / `apt install
-  tesseract-ocr`, and the `ocr` extra: `uvx --from '<wheel>[ocr]' pii-guard up`). Text works
-  regardless.
+- **Mode.** Fast: rules, plus NER when the `ner` extra is installed (it pulls torch). The
+  strip and the banner list the active detectors, and the banner prints the exact
+  `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up` line to add NER.
+  `PII_GUARD_GATEWAY_MODE` overrides the mode.
+- **Images.** They need OCR (the `ocr` extra plus the Tesseract binary) and face detection (the
+  `local-vision` extra with its model, or `META_API_KEY` for SAM 3.1; see
+  [Segmenter](#segmenter-faces-on-the-device-signatures-on-sam-31)). Whatever is missing, image
+  parts are refused (fail closed), the strip says `images: refused (no OCR, face detection)`,
+  and the banner names the missing pieces with the commands to add them. Text works regardless.
 - **Traffic log** `masked` by default (the dashboard needs it); `--traffic-log full` only on a
   loopback bind, as everywhere. A fresh tenant key per run unless `PII_GUARD_TENANT_KEY` is set.
-- It opens the browser (`--no-browser` to skip), prints the gateway base URL and the
-  `pii-guard connect pi` line, and Ctrl-C stops everything, open live streams included.
+- It opens the browser (`--no-browser` to skip) and prints the gateway base URL and the
+  `pii-guard connect pi` lines, written with the same `uvx --from` prefix when run through uvx.
+  A port in use is refused up front (`--port`). Ctrl-C stops everything within about a second,
+  open live-traffic streams included.
 
 **Building the wheel.** `make wheel` builds the UI (`pnpm build`, API mode), copies `ui/dist`
 to `src/pii_guard/_ui/` (git-ignored, shipped as a hatch artifact) and runs `uv build --wheel`;

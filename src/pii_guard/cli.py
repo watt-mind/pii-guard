@@ -20,17 +20,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"pii-guard {__version__}")
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
-    serve = sub.add_parser("serve", help="run the REST API (default port 8787)")
-    serve.add_argument("--host", default=None, help="bind address (env: PII_GUARD_HOST)")
-    serve.add_argument("--port", type=int, default=None, help="port (env: PII_GUARD_PORT)")
-    serve.add_argument("--reload", action="store_true", help="auto-reload on code changes")
-
     up = sub.add_parser(
         "up",
-        help="API + gateway + web UI on one port, mock upstream unless one is set (default 8787)",
+        help="start here: API, gateway and web UI on one port (8787), offline mock model",
         description="Start everything in one process: the REST API, the OpenAI-compatible "
-        "gateway (fast mode) and the bundled web UI at /. Without --upstream-url (or "
-        "PII_GUARD_UPSTREAM_BASE_URL) a built-in offline mock upstream answers.",
+        "gateway and the bundled web UI at /. The gateway masks in fast mode (local rules, plus "
+        "NER when the ner extra is installed; no LLM call). Without --upstream-url (or "
+        "PII_GUARD_UPSTREAM_BASE_URL) an offline mock model answers by echoing what it receives.",
     )
     up.add_argument("--host", default="127.0.0.1", help="bind address (default 127.0.0.1)")
     up.add_argument("--port", type=int, default=8787, help="port (default 8787)")
@@ -46,13 +42,21 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="VAR",
         help="name of the environment variable holding the upstream key, e.g. OPENAI_API_KEY",
     )
-    up.add_argument("--mock", action="store_true", help="the mock upstream even if one is set")
+    up.add_argument(
+        "--mock", action="store_true", help="use the offline mock model even if an upstream is set"
+    )
     up.add_argument(
         "--traffic-log",
         choices=["masked", "full"],
         default=None,
-        help="live traffic log level (default masked; full only on a loopback bind)",
+        help="live traffic log: masked (default, placeholders only) or full (also the original "
+        "personal data; loopback binds only)",
     )
+
+    serve = sub.add_parser("serve", help="run the REST API (default port 8787)")
+    serve.add_argument("--host", default=None, help="bind address (env: PII_GUARD_HOST)")
+    serve.add_argument("--port", type=int, default=None, help="port (env: PII_GUARD_PORT)")
+    serve.add_argument("--reload", action="store_true", help="auto-reload on code changes")
 
     ev = sub.add_parser(
         "eval",

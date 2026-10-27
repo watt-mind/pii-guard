@@ -23,8 +23,11 @@ from pii_guard.app_bundle import (
     MockServer,
     Status,
     UpOptions,
+    _banner,
     active_detectors,
     create_bundle_app,
+    image_gaps,
+    launcher,
     run_up,
     ui_available,
 )
@@ -67,21 +70,25 @@ def test_ui_served_at_root_with_status_strip(ui_dir: Path) -> None:
     page = client.get("/")
     assert page.status_code == 200
     assert '<div id="root">' in page.text
-    assert "mock upstream" in page.text
+    assert "Demo mode: offline mock model" in page.text
     assert "detectors: rules" in page.text
-    assert "refused (no Tesseract)" in page.text
+    assert "images: on" in page.text
     assert page.headers["cache-control"] == "no-cache"
     assert client.get("/assets/app.js").text == "console.log('ui')"
     assert client.get("/healthz").json() == {"status": "ok", "version": __version__}
 
 
 def test_configured_upstream_and_ocr_in_strip(ui_dir: Path) -> None:
-    status = Status(upstream="https://models.example.com", detectors=["rules", "ner"], ocr=True)
+    status = Status(
+        upstream="https://models.example.com",
+        detectors=["rules", "ner"],
+        image_gaps=["tesseract", "segmenter"],
+    )
     text = _client(ui_dir, status).get("/").text
-    assert "upstream: https://models.example.com" in text
+    assert "Upstream: https://models.example.com" in text
     assert "detectors: rules, ner" in text
-    assert "OCR on" in text
-    assert "mock upstream" not in text
+    assert "images: refused (no OCR, face detection)" in text
+    assert "mock model" not in text
 
 
 def test_spa_fallback_but_not_for_api_or_assets(ui_dir: Path) -> None:
@@ -142,6 +149,46 @@ def test_up_refuses_unset_key_variable(
     assert "PII_GUARD_TEST_NO_SUCH_KEY is not set" in capsys.readouterr().err
 
 
+def test_up_refuses_a_port_in_use(capsys: pytest.CaptureFixture[str]) -> None:
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        port = busy.getsockname()[1]
+        assert run_up(UpOptions(port=port, browser=False)) == 2
+    assert f"--port {port + 1}" in capsys.readouterr().err
+
+
+def test_banner_hints_ner_and_image_extras() -> None:
+    status = Status(upstream="mock", detectors=["rules"], image_gaps=["ocr", "segmenter"])
+    text = _banner(UpOptions(port=18999), status, "masked", ui=True)
+    assert "http://localhost:18999/v1" in text
+    assert "free-text names need NER" in text
+    assert "[ner]" in text
+    assert "[ocr,local-vision]" in text
+    assert "connect pi --gateway http://localhost:18999/v1 --check" in text
+    full = _banner(
+        UpOptions(),
+        Status(upstream="https://m.example.com", detectors=["rules", "ner"]),
+        "masked",
+        ui=False,
+    )
+    assert "names need NER" not in full
+    assert "images         on" in full
+    assert "no UI bundled" in full
+
+
+def test_launcher_names_the_distribution_with_extras() -> None:
+    assert "wattmind-pii-guard[ner]" in launcher("ner")
+    assert launcher().endswith("pii-guard")
+
+
+def test_image_gaps_lists_what_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+    gaps = image_gaps(Settings(segmenter="off"))  # "ocr" first too when pytesseract is missing
+    assert gaps[-2:] == ["tesseract", "segmenter"]
+    assert image_gaps(Settings(image_require_ocr=False, segmenter="off")) == ["segmenter"]
+
+
 def test_distribution_name_is_the_pypi_one() -> None:
     assert DISTRIBUTION == "wattmind-pii-guard"
     assert __version__ != "0.0.0+unknown"
@@ -190,4 +237,6 @@ def test_up_process_serves_everything_and_stops_on_sigint(tmp_path: Path) -> Non
         out, _ = proc.communicate(timeout=20)
     assert proc.returncode == 0, out.decode()
     assert "pii-guard is up" in out.decode()
-    assert "mock (offline" in out.decode()
+    assert "offline mock model" in out.decode()
+    assert "pii-guard stopped" in out.decode()
+    assert "Traceback" not in out.decode()
