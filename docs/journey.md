@@ -710,7 +710,7 @@ document number one character off). OCR words recorded from Tesseract, SAM off:
 
 ### 28. Numbers after a cue word are masked even when their checksum fails (2026-10-27)
 
-LAB-1170.
+PR [#51](https://github.com/watt-mind/pii-guard/pull/51), LAB-1170.
 
 Milestone 24 showed fast mode leaking 35–40 % on the public Ai4Privacy sample, mostly numbers:
 about 90 % of its card, tax and TAJ numbers fail their checksums and its phone numbers use
