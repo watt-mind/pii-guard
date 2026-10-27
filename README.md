@@ -101,6 +101,12 @@ form, in what the model receives (lower is better).
 | Hungarian, Muse-generated (20 docs) | rules only | 57.7% | — |
 | Hungarian, Muse-generated (20 docs) | rules + Muse Spark | 100% | — |
 | English, Muse-generated (10 docs) | rules + Muse Spark | 100% | — |
+| Hungarian, hand-written (31 docs) | rules + Muse Spark Open on Baseten | 98.4% | 0.9% |
+| English, hand-written (10 docs) | rules + Muse Spark Open on Baseten | 97.1% | 0.0% |
+
+Muse Spark Open on Baseten (`reasoning_effort: low`) detects in about 1.2–1.8 s per document
+at the median (Muse Spark 1.3 on the Meta Model API: 7–11 s) for about $2–4 per 1,000 messages,
+with no refusals: [eval/results/2026-10-27-baseten](eval/results/2026-10-27-baseten/README.md).
 
 Rules alone catch every structured identifier (emails, phones, IDs, bank accounts) with no
 false positives on adversarial look-alikes; names and addresses need the model. The 100% rows

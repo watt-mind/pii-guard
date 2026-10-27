@@ -213,7 +213,7 @@ export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low          # required, see belo
   `temperature: 0` are accepted; usage reports `prompt_tokens_details.cached_tokens` (the
   system prompt is cached across requests) and `completion_tokens_details.reasoning_tokens`.
 - Refusals: a bare extraction prompt with no system framing was refused once in probing. With
-  the detector's system prompt, 0 of 213 requests over three eval runs were refused or invalid.
+  the detector's system prompt, 0 of 284 requests over four eval runs were refused or invalid.
 - Price (Baseten pricing page, 2026-10-27): $1.25 per million input tokens, $0.15 cached input,
   $4.25 output (reasoning tokens are output tokens). Measured cost and latency:
   [eval/results/2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md).
