@@ -8,8 +8,16 @@
 - ``history``: runs of the same system on the same fixture set at the same commit and date,
   merged (the NER study ran one file per language), each with per-language and pooled
   (``all``) metrics; this is what "progress over time" plots;
-- ``snapshots``: for each fixture set and system, the latest result per language and their
-  pooled ``all``: what the comparison charts and tables show;
+- ``snapshots``: for each fixture set and system, the latest result per language *on the
+  set's current fixture version* and their pooled ``all``: what the comparison charts and
+  tables show. A set's current version is, per language, the SHA-256 of the fixture file its
+  newest run used (``fixture_sets[set].fixtures``). A snapshot says which files it used
+  (``fixtures``), which current languages it lacks (``missing_languages``) and whether it
+  covers them all (``complete``): only complete snapshots of one set compare on pooled
+  numbers, since otherwise the documents differ;
+- ``stale_snapshots``: the same for languages a system was run on only with an earlier
+  version of the fixture file (``superseded``), kept for reference, never pooled with current
+  results;
 - ``visual``: the image-masking runs;
 - ``latency``: the gateway latency runs (``pii-guard bench latency``), one entry per run with
   its cells (mode, concurrency, streaming: overhead and stage percentiles). They are listed in
@@ -22,9 +30,10 @@
   (:mod:`pii_guard.eval.report_colours`), so adding a system never recolours another.
 
 Pooling is exact for every count-based metric (P/R/F1, leak, over-masking, round trip,
-consistency, per-type recall). Latency percentiles can't be pooled: a pooled ``all`` built
-from several runs carries the document-weighted mean of their p50/p95 and
-``latency_pooled: true``.
+consistency, per-type recall): counts are summed, then divided, so a pooled rate is
+micro-averaged (each document, span or value weighs the same; a large language weighs more).
+Latency percentiles can't be pooled: a pooled ``all`` built from several runs carries the
+document-weighted mean of their p50/p95 and ``latency_pooled: true``.
 
 The output is a pure function of the records (no timestamps), so ``pii-guard eval report
 --check`` can compare it byte for byte.
@@ -46,8 +55,11 @@ __all__ = [
     "INDEX_SCHEMA_VERSION",
     "PALETTE_COMPARISON",
     "PALETTE_OURS",
+    "SHA_DIGITS",
     "build_index",
     "compact",
+    "current_versions",
+    "fixture_shas",
     "pool",
     "run_order",
 ]
@@ -103,6 +115,37 @@ def type_order(names: Iterable[str]) -> list[str]:
 
 def run_order(record: Mapping[str, Any]) -> tuple[str, str, str]:
     return (record["date"], record.get("recorded_at") or "", record["run_id"])
+
+
+#: Hex digits of a fixture file's SHA-256 kept in the index (enough to tell versions apart).
+SHA_DIGITS = 12
+
+
+def fixture_shas(record: Mapping[str, Any]) -> dict[str, str | None]:
+    """Per language of a text run: the (short) SHA-256 of the fixture file it was scored on.
+
+    A record whose fixtures carry no language (one file for the whole run) uses that file for
+    every language; a language with no file recorded maps to ``None``.
+    """
+    by_lang: dict[str | None, str | None] = {}
+    for f in record["fixtures"]:
+        sha = f.get("sha256")
+        by_lang[f["language"]] = sha[:SHA_DIGITS] if sha else None
+    fallback = by_lang.get(None) if len(by_lang) == 1 else None
+    return {lang: by_lang.get(lang, fallback) for lang in record["metrics"].get("languages", {})}
+
+
+def current_versions(
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, str | None]]:
+    """Per text fixture set and language: the fixture SHA of the newest run (run order)."""
+    out: dict[str, dict[str, str | None]] = defaultdict(dict)
+    for rec in sorted(records, key=run_order):
+        if rec["kind"] != "text":
+            continue
+        for lang, sha in fixture_shas(rec).items():
+            out[rec["fixture_set"]][lang] = sha
+    return {name: dict(sorted(v.items())) for name, v in sorted(out.items())}
 
 
 # --- Pooling ------------------------------------------------------------------------------
@@ -184,6 +227,7 @@ def pool(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "documents": sum(docs),
         "gold_spans": total(lambda b: b["gold_spans"]),
         "predicted_spans": total(lambda b: b["predicted_spans"]),
+        "unscored_predictions": total(lambda b: b.get("unscored_predictions", 0)),
         "exact": match("exact"),
         "overlap": match("overlap"),
         "macro_f1_overlap": sum(macro_values) / len(macro_values) if macro_values else None,
@@ -249,6 +293,7 @@ def compact(block: Mapping[str, Any]) -> dict[str, Any]:
         "documents": block["documents"],
         "gold": block["gold_spans"],
         "pred": block["predicted_spans"],
+        "unscored": block.get("unscored_predictions", 0),
         "precision": _r(block["overlap"]["precision"]),
         "recall": _r(block["overlap"]["recall"]),
         "f1": _r(block["overlap"]["f1"]),
@@ -368,13 +413,18 @@ def build_index(
                     for k in ("usd", "estimated", "gpu_minutes", "note", "shared_with")
                 },
                 "notes": list(rec["notes"]),
+                "rescored": None
+                if not rec.get("rescored")
+                else {k: rec["rescored"][k] for k in ("by", "method", "note")},
                 "imported_from": (rec.get("imported_from") or {}).get("path"),
             }
         )
 
+    versions = current_versions(text)
     rows = []
     for rec in text:
         origin = {f["language"]: f["origin"] for f in rec["fixtures"]}
+        shas = fixture_shas(rec)
         for lang, block in rec["metrics"]["languages"].items():
             rows.append(
                 {
@@ -383,6 +433,8 @@ def build_index(
                     "fixture_set": rec["fixture_set"],
                     "origin": origin.get(lang) or _origin(origin.values()),
                     "language": lang,
+                    "fixture": shas[lang],
+                    "current": shas[lang] == versions[rec["fixture_set"]][lang],
                     "date": rec["date"],
                     "commit": rec["code"]["commit"],
                     "metrics": compact(block),
@@ -402,6 +454,7 @@ def build_index(
             for lang, block in rec["metrics"]["languages"].items():
                 by_lang[lang] = (rec, block)
         all_block = _pooled_all(by_lang)
+        shas = {lang: fixture_shas(r)[lang] for lang, (r, _) in sorted(by_lang.items())}
         history.append(
             {
                 "system": system,
@@ -411,6 +464,11 @@ def build_index(
                 "commit": commit,
                 "order": run_order(recs[0]),
                 "run_ids": [r["run_id"] for r in recs],
+                "fixtures": shas,
+                # Same documents as the set's current snapshots: every current language, on
+                # the current file. Other points are not directly comparable with them.
+                "comparable": shas == versions[fixture_set],
+                "rescored": any(bool(r.get("rescored")) for r in recs),
                 "languages": {lang: compact(b) for lang, (_, b) in sorted(by_lang.items())},
                 "all": compact(all_block),
             }
@@ -419,27 +477,7 @@ def build_index(
     for h in history:
         del h["order"]
 
-    snapshots = []
-    latest: dict[tuple[str, str], dict[str, tuple[Mapping[str, Any], Mapping[str, Any]]]] = (
-        defaultdict(dict)
-    )
-    for rec in text:
-        for lang, block in rec["metrics"]["languages"].items():
-            latest[(rec["fixture_set"], rec["system"]["key"])][lang] = (rec, block)
-    for (fixture_set, system), by_lang in sorted(latest.items()):
-        recs = {r["run_id"]: r for r, _ in by_lang.values()}
-        snapshots.append(
-            {
-                "fixture_set": fixture_set,
-                "system": system,
-                "origin": _origin(f["origin"] for r in recs.values() for f in r["fixtures"]),
-                "run_ids": sorted(recs),
-                "dates": sorted({r["date"] for r in recs.values()}),
-                "commits": sorted({r["code"]["commit"] for r in recs.values()}),
-                "languages": {lang: compact(b) for lang, (_, b) in sorted(by_lang.items())},
-                "all": compact(_pooled_all(by_lang)),
-            }
-        )
+    snapshots, stale_snapshots = _snapshots(text, versions)
 
     fixture_sets: dict[str, Any] = {}
     for rec in scored:
@@ -457,15 +495,19 @@ def build_index(
             entry["origin"].add(f["origin"])
             if f["language"]:
                 entry["languages"].add(f["language"])
-                if f["documents"] is not None:
+                current = versions.get(rec["fixture_set"], {}).get(f["language"])
+                sha = (f.get("sha256") or "")[:SHA_DIGITS] or None
+                if f["documents"] is not None and (current is None or sha == current):
                     entry["documents"][f["language"]] = f["documents"]
             elif f["documents"] is not None:
                 entry["documents"]["all"] = f["documents"]
             if f["generator"]:
                 entry["generators"].add(f["generator"])
     for rec in text:  # sets whose files aren't committed: take document counts from metrics
+        current = versions[rec["fixture_set"]]
         for lang, block in rec["metrics"]["languages"].items():
-            fixture_sets[rec["fixture_set"]]["documents"].setdefault(lang, block["documents"])
+            if fixture_shas(rec)[lang] == current[lang]:
+                fixture_sets[rec["fixture_set"]]["documents"].setdefault(lang, block["documents"])
     fixture_sets = {
         name: {
             "origin": _origin(v["origin"]),
@@ -473,6 +515,7 @@ def build_index(
             "languages": sorted(v["languages"]),
             "documents": dict(sorted(v["documents"].items())),
             "generators": sorted(v["generators"]),
+            "fixtures": versions.get(name, {}),
         }
         for name, v in sorted(fixture_sets.items())
     }
@@ -538,6 +581,7 @@ def build_index(
         "rows": rows,
         "history": history,
         "snapshots": snapshots,
+        "stale_snapshots": stale_snapshots,
         "visual": visual,
         "latency": latency,
         "colours": {
@@ -545,6 +589,65 @@ def build_index(
             "latency": _chart_colours(colours["latency"], latency, PALETTE_LATENCY),
         },
     }
+
+
+def _snapshot(
+    fixture_set: str,
+    system: str,
+    by_lang: Mapping[str, tuple[Mapping[str, Any], Mapping[str, Any]]],
+) -> dict[str, Any]:
+    recs = {r["run_id"]: r for r, _ in by_lang.values()}
+    return {
+        "fixture_set": fixture_set,
+        "system": system,
+        "origin": _origin(f["origin"] for r in recs.values() for f in r["fixtures"]),
+        "run_ids": sorted(recs),
+        "dates": sorted({r["date"] for r in recs.values()}),
+        "commits": sorted({r["code"]["commit"] for r in recs.values()}),
+        "fixtures": {lang: fixture_shas(r)[lang] for lang, (r, _) in sorted(by_lang.items())},
+        "rescored": any(bool(r.get("rescored")) for r in recs.values()),
+        "languages": {lang: compact(b) for lang, (_, b) in sorted(by_lang.items())},
+        "all": compact(_pooled_all(by_lang)),
+    }
+
+
+def _snapshots(
+    text: Sequence[Mapping[str, Any]], versions: Mapping[str, Mapping[str, str | None]]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Current snapshots (latest run per language on the current fixture file) and stale ones.
+
+    A language a system has only on an earlier fixture file goes to the stale snapshot; a run
+    on the current file always wins over a newer-looking one on an older file.
+    """
+    Latest = dict[tuple[str, str], dict[str, tuple[Mapping[str, Any], Mapping[str, Any]]]]
+    current: Latest = defaultdict(dict)
+    stale: Latest = defaultdict(dict)
+    for rec in text:  # chronological: a later run of a language wins
+        shas = fixture_shas(rec)
+        key = (rec["fixture_set"], rec["system"]["key"])
+        for lang, block in rec["metrics"]["languages"].items():
+            on_current = shas[lang] == versions[rec["fixture_set"]][lang]
+            (current if on_current else stale)[key][lang] = (rec, block)
+    snapshots = []
+    for (fixture_set, system), by_lang in sorted(current.items()):
+        snap = _snapshot(fixture_set, system, by_lang)
+        missing = sorted(set(versions[fixture_set]) - set(by_lang))
+        snap["missing_languages"] = missing
+        snap["complete"] = not missing
+        snapshots.append(snap)
+    stale_snapshots = []
+    for (fixture_set, system), by_lang in sorted(stale.items()):
+        only = {
+            lang: v
+            for lang, v in by_lang.items()
+            if lang not in current.get((fixture_set, system), {})
+        }
+        if not only:
+            continue
+        snap = _snapshot(fixture_set, system, only)
+        snap["superseded"] = snap.pop("fixtures")
+        stale_snapshots.append(snap)
+    return snapshots, stale_snapshots
 
 
 def _chart_colours(

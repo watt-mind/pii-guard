@@ -11,6 +11,14 @@
     "LAB-1204 after: normaliser folds Unicode spaces, dashes, digits and ideographic dots, composes NFC with an exact end map, drops marks left on ASCII letters and digits, joins numbers wrapped over a line break, folds lookalike-only identifiers; SV-number check ASCII-guarded",
     "Detect latency here ran under heavier machine load than the before record; an interleaved A/B of the rules pipeline in one process (old vs new normaliser, best of 7) gives p50 smoke 0.283 -> 0.281 ms, synth sample 1.904 -> 2.030 ms (+6.6 %), ai4privacy 0.453 -> 0.446 ms."
   ],
+  "rescored": {
+    "by": "LAB-1213",
+    "method": "unscored-types",
+    "note": "No DATE_OF_BIRTH predictions to take out (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "unscored_types": [
+      "DATE_OF_BIRTH"
+    ]
+  },
   "code": {
     "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
     "dirty": true,

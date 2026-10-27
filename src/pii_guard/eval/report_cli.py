@@ -130,13 +130,21 @@ def _label(index: Mapping[str, Any], key: str) -> str:
     return f"**{label}**" if style.get("default") else label
 
 
+def _commits(s: Mapping[str, Any]) -> str:
+    return ", ".join(f"`{c[:7]}`" for c in s["commits"])
+
+
+def _marks(s: Mapping[str, Any]) -> str:
+    return ("" if s.get("complete", True) else " †") + (" ‡" if s.get("rescored") else "")
+
+
 def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
     rows = []
     for s in _ordered_snapshots(index, fixture_set):
         m = s["all"]
         rows.append(
             [
-                _label(index, s["system"]),
+                _label(index, s["system"]) + _marks(s),
                 m["documents"],
                 _pct(m["precision"]),
                 _pct(m["recall"]),
@@ -147,6 +155,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
                 _pct(m["roundtrip"]),
                 _ms(m["detect_p50_ms"]) + ("*" if m["latency_pooled"] else ""),
                 ", ".join(s["dates"]),
+                _commits(s),
             ]
         )
     return _table(
@@ -162,9 +171,110 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
             "Round trip",
             "Detect p50",
             "Run",
+            "Commit",
         ],
-        ["---", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---:", "---"],
+        [
+            "---",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---",
+            "---",
+        ],
         rows,
+    ) + _set_notes(index, fixture_set)
+
+
+def _set_notes(index: Mapping[str, Any], fixture_set: str) -> str:
+    """Footnotes for the marks in :func:`_set_table` (only those that occur)."""
+    snaps = _ordered_snapshots(index, fixture_set)
+    langs = index["fixture_sets"][fixture_set]["languages"]
+    notes = []
+    partial = [s for s in snaps if not s.get("complete", True)]
+    if partial:
+        names = "; ".join(
+            index["systems"][s["system"]]["short_label"]
+            + f" (no {', '.join(s['missing_languages'])})"
+            for s in partial
+        )
+        notes.append(
+            f"† Not run on every language of the current fixture files ({' + '.join(langs)}): "
+            f"its `all` pools fewer documents, so compare it by language, not with the other "
+            f"rows. {names}."
+        )
+    if any(s.get("rescored") for s in snaps):
+        run_ids = {r for s in snaps if s.get("rescored") for r in s["run_ids"]}
+        methods = {
+            m
+            for run in index["runs"]
+            if run["run_id"] in run_ids and run.get("rescored")
+            for m in run["rescored"]["method"].split("+")
+        }
+        what = []
+        if "unscored-types" in methods:
+            what.append(
+                "`DATE_OF_BIRTH` predictions are left out of precision and over-masking, since "
+                "the set labels every date `DATE`, which pii-guard's policy excludes; a masked "
+                "title or bare town still counts against precision and over-masking, because "
+                "these runs kept no per-document predictions to apply ignore regions to"
+            )
+        if "no-consistency" in methods:
+            what.append(
+                "the comparison tools' placeholder consistency is null (they don't report their "
+                "replacements; it was a placeholder 0.0)"
+            )
+        notes.append(
+            "‡ Re-scored from the record's own counts after the run (LAB-1213): a change of "
+            "scoring method, not a new run and not a better model. "
+            + "; ".join(what)[:1].upper()
+            + "; ".join(what)[1:]
+            + "."
+        )
+    return "".join(f"\n{n}\n" for n in notes)
+
+
+def _stale_table(index: Mapping[str, Any], fixture_set: str) -> str:
+    """Results on an earlier version of a fixture file: kept for reference, not compared."""
+    order = {key: i for i, key in enumerate(index["systems"])}
+    snaps = sorted(
+        (s for s in index.get("stale_snapshots", []) if s["fixture_set"] == fixture_set),
+        key=lambda s: order.get(s["system"], len(order)),
+    )
+    if not snaps:
+        return ""
+    rows = []
+    for s in snaps:
+        for lang, m in s["languages"].items():
+            rows.append(
+                [
+                    _label(index, s["system"]),
+                    lang,
+                    f"`{s['superseded'][lang] or '?'}`",
+                    m["documents"],
+                    _pct(m["f1"]),
+                    _pct(m["leak"]),
+                    ", ".join(s["dates"]),
+                ]
+            )
+    current = ", ".join(
+        f"{lang} `{sha}`" for lang, sha in index["fixture_sets"][fixture_set]["fixtures"].items()
+    )
+    return (
+        "\nOn an earlier version of a fixture file (current: "
+        + current
+        + "). These ran on other documents, so they stay out of the table above and the "
+        "charts:\n\n"
+        + _table(
+            ["System", "Lang", "Fixture", "Docs", "F1", "Leak", "Run"],
+            ["---", "---", "---", "---:", "---:", "---:", "---"],
+            rows,
+        )
     )
 
 
@@ -181,7 +291,11 @@ def _language_table(index: Mapping[str, Any], fixture_set: str) -> str:
 
 
 def _type_table(index: Mapping[str, Any], fixture_set: str, systems: Sequence[str]) -> str:
-    snaps = [s for s in _ordered_snapshots(index, fixture_set) if s["system"] in systems]
+    snaps = [
+        s
+        for s in _ordered_snapshots(index, fixture_set)
+        if s["system"] in systems and s.get("complete", True)
+    ]
     types = [t for t in index["entity_types"] if any(t in s["all"]["per_type"] for s in snaps)]
     header = ["Type", "Gold", *(index["systems"][s["system"]]["short_label"] for s in snaps)]
     rows = []
@@ -321,9 +435,11 @@ _METHOD = """\
   postcode alone was masked). Details: [evaluation.md](evaluation.md#leak-rate-in-practice).
 - **Precision, recall, F1** are span-level with overlap matching (a prediction counts if it
   overlaps a gold span of the same type); the run records also keep exact-match numbers.
-  **Over-masking** is the share of masked characters outside any gold span. **Round trip** is
-  the share of documents that unmask back to the original text exactly (comparison tools that
-  can't unmask show —).
+  **Over-masking** is the share of masked spans that overlap no gold span of any type (spans,
+  not characters). A prediction on text the set labels but pii-guard's policy doesn't score
+  (Ai4Privacy's dates, titles and bare towns) is left out of precision and over-masking.
+  **Round trip** is the share of documents that unmask back to the original text exactly
+  (comparison tools that can't unmask show —).
 - **Hand-written vs generated sets.** `smoke` is written by hand with inline labels and has
   adversarial look-alikes; `synth-*` sets are written by a Meta Muse model around fictional
   identities and labelled automatically. **Generated sets flatter Muse-based detectors**: the
@@ -333,7 +449,11 @@ _METHOD = """\
   are noise. Every number below says which set, which run date and which commit it came from.
 - **Latency** is detection time per document (p50) on the hardware in the run log; it is not
   comparable across machines. `*` marks a value averaged over several runs (percentiles
-  can't be pooled exactly). Every count-based metric is pooled exactly over languages.
+  can't be pooled exactly).
+- **Pooling.** Every count-based metric is pooled exactly over languages by summing counts,
+  so `all` is **micro-averaged**: each span or value weighs the same, and a language with
+  more documents weighs more. Only runs on the current version of each fixture file are
+  pooled or charted; results on an earlier version are listed separately under their set.
 - `rules` is the rules-only pass with no name detection; names and addresses come from the
   NER and LLM passes. Compare it with the other tools on structured identifiers.
 """
@@ -361,14 +481,24 @@ def render_page(index: Mapping[str, Any], *, headline_set: str, featured: Sequen
     text_sets = [n for n, v in index["fixture_sets"].items() if v["kind"] == "text"]
     text_sets.sort(key=lambda n: (n != headline_set, n))
     out.append("## Results by fixture set\n")
-    out.append("Latest run of each system on each set; `all` pools every language exactly.\n")
+    out.append(
+        "Latest run of each system on each set, on the current version of each fixture file; "
+        "`all` pools the languages (micro-averaged).\n"
+    )
     for name in text_sets:
         out.append(f"### `{name}`\n")
         out.append(f"{_set_line(index, name)}.\n")
         out.append(_set_table(index, name))
         out.append("\nBy language:\n")
         out.append(_language_table(index, name))
+        stale = _stale_table(index, name)
+        if stale:
+            out.append(stale)
     out.append(f"## Recall per entity type (`{headline_set}`)\n")
+    out.append(
+        "Featured systems run on every language of the current fixture files, pooled "
+        "(micro-averaged).\n"
+    )
     out.append(_type_table(index, headline_set, featured))
     if index["visual"]:
         out.append("## Image masking\n")

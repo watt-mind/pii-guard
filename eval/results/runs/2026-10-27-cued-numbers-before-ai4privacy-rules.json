@@ -10,6 +10,14 @@
   "notes": [
     "LAB-1170 before: context-cued number rule off (develop before LAB-1170)."
   ],
+  "rescored": {
+    "by": "LAB-1213",
+    "method": "unscored-types",
+    "note": "No DATE_OF_BIRTH predictions to take out (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "unscored_types": [
+      "DATE_OF_BIRTH"
+    ]
+  },
   "code": {
     "commit": "9ca003faa39b59cfe532dd732ef799dbddd9ef9b",
     "dirty": true,

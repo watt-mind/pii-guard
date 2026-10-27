@@ -10,6 +10,14 @@
   "notes": [
     "LAB-1170 after: context-cued number rule on (PII_GUARD_RULES_CUED_NUMBERS default)."
   ],
+  "rescored": {
+    "by": "LAB-1213",
+    "method": "unscored-types",
+    "note": "No DATE_OF_BIRTH predictions to take out (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "unscored_types": [
+      "DATE_OF_BIRTH"
+    ]
+  },
   "code": {
     "commit": "9d133c0ba29e2ad9a219a46e050d32873a2a0cb9",
     "dirty": true,

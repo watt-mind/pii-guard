@@ -13,6 +13,10 @@ One document per line, UTF-8::
   ``text`` is optional; when present it must equal ``text[start:end]``. Spans must not
   overlap, must not be blank and must not start or end with whitespace.
 - ``meta``: optional free-form object (document kind, tags, generator seed, template …).
+  One key is read by the scorer: ``meta.ignore``, a list of ``{"start", "end", "label"}``
+  *ignore regions* (text the source labelled but pii-guard's policy doesn't score, such as a
+  date in a public dataset). A prediction that overlaps one and matches no gold span is left
+  out of precision and over-masking (:func:`pii_guard.eval.scorer.summarize`).
 
 Fixtures are organised one file per language and set: ``eval/fixtures/<language>-<set>.jsonl``
 (``hu-smoke.jsonl``, ``en-smoke.jsonl``). The ``language`` field of each record is what
@@ -41,6 +45,7 @@ __all__ = [
     "dump_document",
     "file_sha256",
     "from_markup",
+    "ignore_regions",
     "label",
     "load_fixtures",
     "parse_document",
@@ -143,6 +148,7 @@ def parse_document(obj: object, *, where: str = "record") -> Document:
     raw_spans = obj.get("spans")
     if not isinstance(raw_spans, list):
         raise FixtureError(f"{where}: 'spans' must be a list")
+    _check_ignore(meta.get("ignore"), text, where)
     spans = [_parse_span(raw, text, f"{where} span {i}") for i, raw in enumerate(raw_spans)]
     spans.sort(key=lambda s: (s.start, s.end))
     for previous, current in itertools.pairwise(spans):
@@ -152,6 +158,28 @@ def parse_document(obj: object, *, where: str = "record") -> Document:
                 f"[{current.start}, {current.end}) overlap"
             )
     return Document(doc_id, language, text, tuple(spans), meta)
+
+
+def _check_ignore(raw: object, text: str, where: str) -> None:
+    if raw is None:
+        return
+    if not isinstance(raw, list):
+        raise FixtureError(f"{where}: 'meta.ignore' must be a list")
+    for i, region in enumerate(raw):
+        start = region.get("start") if isinstance(region, dict) else None
+        end = region.get("end") if isinstance(region, dict) else None
+        if (
+            not isinstance(start, int)
+            or not isinstance(end, int)
+            or isinstance(start, bool)
+            or not 0 <= start < end <= len(text)
+        ):
+            raise FixtureError(f"{where}: 'meta.ignore' region {i} has bad offsets")
+
+
+def ignore_regions(doc: Document) -> tuple[tuple[int, int], ...]:
+    """The document's ignore regions (``meta.ignore``) as ``(start, end)`` pairs."""
+    return tuple((int(r["start"]), int(r["end"])) for r in doc.meta.get("ignore") or ())
 
 
 def _parse_span(raw: object, text: str, where: str) -> GoldSpan:

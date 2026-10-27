@@ -165,7 +165,7 @@ def test_charts_are_well_formed_captioned_and_in_bounds(index: dict[str, Any]) -
         assert root.get("viewBox") == "0 0 1600 900"
         assert root.find(f"{SVG}title").text == title, name
         texts = root.findall(f".//{SVG}text")
-        caption = " ".join("".join(t.itertext()) for t in texts[-3:])
+        caption = " ".join("".join(t.itertext()) for t in texts[-4:])
         assert "Fixture set" in caption, name
         assert "commits" in caption, name
         for t in texts:

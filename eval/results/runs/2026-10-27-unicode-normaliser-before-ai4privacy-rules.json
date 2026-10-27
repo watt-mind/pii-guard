@@ -10,6 +10,14 @@
   "notes": [
     "LAB-1204 before: develop @ 3d9eb8b, normaliser folds invisible characters and mixed-script lookalikes only"
   ],
+  "rescored": {
+    "by": "LAB-1213",
+    "method": "unscored-types",
+    "note": "No DATE_OF_BIRTH predictions to take out (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "unscored_types": [
+      "DATE_OF_BIRTH"
+    ]
+  },
   "code": {
     "commit": "3d9eb8b2bb14d26a2943786cf656638fd2032027",
     "dirty": true,

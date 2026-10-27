@@ -12,6 +12,14 @@
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold spans), so masking them counts as over-masking. Most card, tax and TAJ numbers in the set fail their checksums, which pii-guard's rules require.",
     "LLM Guard's default model was fine-tuned on an earlier Ai4Privacy release (possible train/test contamination): read its numbers as optimistic."
   ],
+  "rescored": {
+    "by": "LAB-1213",
+    "method": "unscored-types+no-consistency",
+    "note": "No DATE_OF_BIRTH predictions to take out (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied. Placeholder consistency set to null: the tool doesn't report its replacements, so the 0.0 it had was a placeholder, not a measurement.",
+    "unscored_types": [
+      "DATE_OF_BIRTH"
+    ]
+  },
   "code": {
     "commit": "8944f96f0da38a412793df6396623849d070feac",
     "dirty": true,
@@ -144,14 +152,7 @@
         "exact": 200,
         "rate": 1.0
       },
-      "consistency": {
-        "entities": 628,
-        "consistent": 0,
-        "multi_occurrence": 0,
-        "multi_consistent": 0,
-        "rate": 0.0,
-        "multi_rate": null
-      },
+      "consistency": null,
       "latency_ms": {
         "detect": {
           "p50": 67.527,
@@ -302,14 +303,7 @@
           "exact": 200,
           "rate": 1.0
         },
-        "consistency": {
-          "entities": 628,
-          "consistent": 0,
-          "multi_occurrence": 0,
-          "multi_consistent": 0,
-          "rate": 0.0,
-          "multi_rate": null
-        },
+        "consistency": null,
         "latency_ms": {
           "detect": {
             "p50": 67.527,

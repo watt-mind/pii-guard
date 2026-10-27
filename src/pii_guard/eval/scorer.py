@@ -19,7 +19,14 @@ Definitions (``docs/evaluation.md``):
   **Partial leak**: not fully leaked, but an identifying token of the value survives (a
   token of 3+ letters or 4+ digits that is not a language stopword and doesn't also occur in
   the original text outside the gold spans).
-- **Over-masking rate**: masked predicted spans that overlap no gold span of any type.
+- **Over-masking rate**: masked predicted spans that overlap no gold span of any type (a share
+  of spans, not of characters).
+- **Unscored predictions**: a prediction that overlaps one of the document's *ignore regions*
+  (``meta.ignore``: text the source labelled but pii-guard's policy doesn't score, such as any
+  date in a public dataset) and matches no gold span is left out of precision and
+  over-masking: it is neither credited nor charged. Recall and leak rate don't change.
+  Documents of a kind in :data:`LEGACY_UNSCORED_TYPES` that carry no ignore regions (a sample
+  converted before they existed) apply the same rule per type instead.
 - **Round trip**: documents where ``unmask(mask(text)) == text``.
 - **Placeholder consistency**: gold entities (per document, of a ``mask``-policy type) whose
   occurrences are all masked by one and the same placeholder. An entity groups the gold spans
@@ -40,7 +47,7 @@ from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from pii_guard.detect.pipeline import DetectionPipeline
-from pii_guard.eval.fixtures import Document, GoldSpan
+from pii_guard.eval.fixtures import Document, GoldSpan, ignore_regions
 from pii_guard.eval.forms import find_surface_forms, language_forms, surface_pattern
 from pii_guard.policy import DEFAULT_POLICIES, PolicySet
 from pii_guard.registry import create_detector
@@ -50,6 +57,7 @@ from pii_guard.vault import PLACEHOLDER_RE, Vault, normalize_value
 __all__ = [
     "DEFAULT_POLICY",
     "EVAL_TENANT_KEY",
+    "LEGACY_UNSCORED_TYPES",
     "Analyzer",
     "DetectorAnalyzer",
     "DocumentResult",
@@ -64,6 +72,7 @@ __all__ = [
     "prf",
     "run_documents",
     "summarize",
+    "unscored",
 ]
 
 MatchMode = Literal["exact", "overlap"]
@@ -73,6 +82,13 @@ MatchMode = Literal["exact", "overlap"]
 #: which the model needs to reason and which aren't personal data. Values are
 #: :class:`~pii_guard.policy.Policy` members, which compare equal to ``"mask"``/``"keep"``.
 DEFAULT_POLICY: Mapping[EntityType, str] = {t: DEFAULT_POLICIES[t] for t in TEXT_ENTITY_TYPES}
+
+#: Per ``meta.kind``: predicted types that can't be scored on documents without ignore regions.
+#: Ai4Privacy labels every date ``DATE``, which pii-guard's policy excludes, so a
+#: ``DATE_OF_BIRTH`` prediction there can be neither confirmed nor refuted.
+LEGACY_UNSCORED_TYPES: Mapping[str, frozenset[EntityType]] = {
+    "public-ai4privacy": frozenset({EntityType.DATE_OF_BIRTH}),
+}
 
 #: Fixed, public key for evaluation runs only, so placeholders are reproducible.
 EVAL_TENANT_KEY = b"pii-guard-evaluation-only-key-v1"
@@ -330,6 +346,15 @@ def consistency_report(
     return report
 
 
+def unscored(doc: Document, span: _SpanLike) -> bool:
+    """True if ``span`` is left out of precision and over-masking (see the module docstring)."""
+    if any(_matches(g, span, "overlap") for g in doc.spans):
+        return False
+    if "ignore" in doc.meta:
+        return any(span.start < end and start < span.end for start, end in ignore_regions(doc))
+    return span.entity_type in LEGACY_UNSCORED_TYPES.get(str(doc.meta.get("kind")), ())
+
+
 def over_masked(doc: Document, masked_spans: Sequence[_SpanLike]) -> list[_SpanLike]:
     """Masked spans that overlap no gold span of any type (not personal data)."""
     return [
@@ -395,7 +420,9 @@ class DocumentResult:
     roundtrip: bool
     detect_ms: float
     mask_ms: float
-    replacements: tuple[tuple[int, int, str], ...] = ()
+    #: The vault's ``(start, end, placeholder)``; ``None`` when the system doesn't report its
+    #: replacements (a comparison tool), which makes placeholder consistency ``None``.
+    replacements: tuple[tuple[int, int, str], ...] | None = None
 
     def __repr__(self) -> str:
         return (
@@ -480,11 +507,12 @@ def _percentile(values: Sequence[float], q: float) -> float | None:
 
 def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
     """One score block for ``results`` (all documents, or one language)."""
+    scored = [[p for p in r.predicted if not unscored(r.document, p)] for r in results]
     detection: dict[str, object] = {}
     for mode in ("exact", "overlap"):
         total: dict[EntityType, TypeCounts] = defaultdict(TypeCounts)
-        for r in results:
-            for t, c in match_counts(r.document.spans, r.predicted, mode).items():
+        for r, preds in zip(results, scored, strict=True):
+            for t, c in match_counts(r.document.spans, preds, mode).items():
                 total[t] += c
         detection[mode] = prf(total)
 
@@ -495,7 +523,7 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
     consistency_total: Counter[str] = Counter()
     consistency_by_type: dict[str, Counter[str]] = defaultdict(Counter)
     for r in results:
-        for entity in consistency_report(r.document, r.replacements):
+        for entity in consistency_report(r.document, r.replacements or ()):
             for bucket in (consistency_total, consistency_by_type[entity.entity_type.value]):
                 bucket["entities"] += 1
                 bucket["consistent"] += entity.consistent
@@ -507,8 +535,9 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
                 bucket["values"] += 1
                 bucket["leaked"] += leak.leaked
                 bucket["partial"] += leak.partial
-        over = {id(s) for s in over_masked(r.document, r.masked_spans)}
-        for span in r.masked_spans:
+        masked = [s for s in r.masked_spans if not unscored(r.document, s)]
+        over = {id(s) for s in over_masked(r.document, masked)}
+        for span in masked:
             for bucket in (over_total, over_by_type[span.entity_type.value]):
                 bucket["masked"] += 1
                 bucket["over_masked"] += id(span) in over
@@ -545,6 +574,9 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
         "documents": len(results),
         "gold_spans": sum(len(r.document.spans) for r in results),
         "predicted_spans": sum(len(r.predicted) for r in results),
+        "unscored_predictions": sum(
+            len(r.predicted) - len(p) for r, p in zip(results, scored, strict=True)
+        ),
         "detection": detection,
         "leak": {
             **leak_block(leak_total),
@@ -554,7 +586,9 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
             **over_block(over_total),
             "per_type": {t: over_block(over_by_type[t]) for t in _ordered_names(over_by_type)},
         },
-        "consistency": {
+        "consistency": None
+        if any(r.replacements is None for r in results)
+        else {
             **consistency_block(consistency_total),
             "per_type": {
                 t: consistency_block(consistency_by_type[t])

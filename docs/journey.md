@@ -808,6 +808,57 @@ before any arithmetic.
   `2026-10-27-unicode-normaliser-{before,after}-{smoke,synth-sample,ai4privacy}-{rules,fast}`
   in [benchmarks.md](benchmarks.md).
 
+### 30. The benchmark report compares like with like (2026-10-27)
+
+LAB-1213. **A change of scoring method, not a model improvement:** no detector ran again, and
+every number below was recomputed from counts the run records already kept. A code review
+found the report mixing documents and charging systems for text the set doesn't score:
+
+- **Fixture versions.** The headline `smoke` table keyed results by set name only, so it
+  pooled runs on the 28-document Hungarian file with runs on today's 31-document one, and
+  runs with and without German (its Docs column read 51, 41 and 38). Results are now keyed
+  by each fixture file's SHA-256: only runs on the current files are pooled or charted; rows
+  missing a current language are marked † and left out of the pooled charts, which name
+  them; runs on the old Hungarian file move to their own "earlier version" table. The
+  featured Muse Glimmer point (old 28-document file) leaves the headline chart.
+- **Policy-excluded labels on Ai4Privacy.** Dates, titles and bare towns are not gold spans
+  there, but predictions on them were charged as false positives and over-masking: all 205
+  of fast mode's `DATE_OF_BIRTH` predictions counted as over-masked. Fixtures can now carry
+  ignore regions (a prediction on one is neither credited nor charged), the converter
+  writes them, and until the committed sample is refreshed `DATE_OF_BIRTH` predictions are
+  not scored on that set. Titles and bare towns still count against the stored runs: the
+  runs kept no per-document predictions, so those regions can't be applied after the fact.
+- **Smaller fixes.** Over-masking is defined as a share of spans (the page said
+  characters); chart captions name the languages actually pooled (they said "hu + en" for
+  de + en + hu) and that pooling is micro-averaged; tables show each row's commit;
+  comparison tools' placeholder consistency is `null` (it was 0.0 by construction); record
+  validation checks every rate against its counts; `ai4privacy fetch --check` compares the
+  whole manifest and every fixture file and no longer writes them.
+
+Headline numbers that changed (pooled, old → new; leak and recall are unchanged everywhere):
+
+| Set | System | Precision | F1 | Over-masking | Macro F1 |
+|---|---|---:|---:|---:|---:|
+| Ai4Privacy | pii-guard fast (rules + distilled NER) | 83.5 → 92.8 % | 77.1 → 80.9 | 12.5 → 2.4 % | 53.5 → 59.5 |
+| Ai4Privacy | pii-guard strict (+ Muse Spark Open) | 83.5 → 92.5 % | 88.4 → 93.2 | 12.1 → 2.4 % | 58.2 → 63.0 |
+| Ai4Privacy | Presidio | 32.1 → 38.6 % | 38.9 → 43.4 | 53.9 → 49.1 % | 30.3 → 33.7 |
+| Ai4Privacy | PrivAiTe | 52.6 → 64.8 % | 58.3 → 65.1 | 26.6 → 9.6 % | 41.4 → 46.6 |
+
+- Ai4Privacy rules-only and LLM Guard predict no `DATE_OF_BIRTH` there: unchanged.
+- Placeholder consistency of Presidio, LLM Guard and PrivAiTe on every set: 0.0 % → n/a.
+- `smoke` rows that were pooled over the old Hungarian file are now en-only and marked †
+  (rules + Muse Glimmer low, Muse Glimmer low and medium, rules + Muse Spark 1.3, and the
+  zero-shot, fine-tuned and distilled-base NER runs; Docs 38 → 10), with their Hungarian
+  results listed under the earlier file. Rules + Muse Spark Open (Baseten) keeps its numbers
+  but is marked † (no German, 41 documents). The six complete rows (rules, fast, strict and
+  the three tools) are unchanged.
+- **Fast mode looks better on Ai4Privacy only because the method changed:** its predictions
+  are the same, they are no longer charged for dates the set refuses to label. Its leak on
+  the set (27.6 %, latest run after milestone 29) is what it was.
+- **Cost:** $0, no runs. Re-scoring: `python -m pii_guard.eval.rescore` (41 records, each
+  marked `rescored`); details in [evaluation.md](evaluation.md#run-records) and
+  [benchmarks.md](benchmarks.md).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
