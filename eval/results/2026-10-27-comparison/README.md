@@ -133,6 +133,10 @@ Round trip is n/a for Presidio (its default operator can't be undone).
   comparison tools and the rules row at `8944f96` (the same code plus these scorecards). The
   scorecards say `dirty` only because each run overwrote earlier scorecards in this
   directory; no code was modified.
+- **Later develop changes.** Before merging, develop gained LAB-1146 (text is normalised
+  for every detector, invisible characters and lookalikes). The rules row was re-run after
+  that merge on `hu-smoke` and the three public sets and came out identical, to the last
+  digit; the fast and strict runs were not repeated (that would cost about $1.90 more).
 
 ## Spend
 
