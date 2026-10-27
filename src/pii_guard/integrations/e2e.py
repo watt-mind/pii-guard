@@ -13,7 +13,8 @@ What runs, all on loopback, in throwaway directories (``HOME`` and the client's 
 
 1. The client is installed: pi ``PI_VERSION`` with npm into a temp prefix (or ``--pi-prefix``);
    Muse Code with its official installer (``MUSE_INSTALLER``) into a throwaway ``HOME`` (or
-   ``--muse-home``), and only version ``MUSE_VERSION`` is run.
+   ``--muse-home``), and only version ``MUSE_VERSION`` is run (``--muse-version`` runs another;
+   an installer that serves a different version stops the run with :class:`MuseVersionError`).
 2. A **recorder** stands in for the upstream: it keeps every request body it gets, then either
    answers like a scripted coding model (read the letter, read the CSV, read ``.env``, write
    ``reply.md`` with the placeholders it saw, finish), as Chat Completions chunks or as
@@ -76,6 +77,7 @@ __all__ = [
     "PI_PACKAGE",
     "PI_VERSION",
     "PROMPT",
+    "MuseVersionError",
     "Recorder",
     "RunResult",
     "install_muse",
@@ -142,12 +144,32 @@ def install_pi(prefix: Path, version: str = PI_VERSION) -> Path:
     return binary
 
 
+class MuseVersionError(RuntimeError):
+    """The official installer served another Muse Code version than the pinned one.
+
+    Not a reason to skip: the e2e then no longer covers what users install. Re-run the protocol
+    capture (docs/integrations/muse-code.md) and bump ``MUSE_VERSION_CHECKED``, or run the
+    served version anyway with ``--muse-version`` (``PII_GUARD_MUSE_VERSION`` for the tests).
+    """
+
+    def __init__(self, served: str, pinned: str) -> None:
+        self.served = served
+        self.pinned = pinned
+        super().__init__(
+            f"the official Muse Code installer serves {served}, but this harness is pinned to "
+            f"{pinned}. Re-run the protocol capture in docs/integrations/muse-code.md and bump "
+            f"MUSE_VERSION_CHECKED (src/pii_guard/integrations/muse_code.py), or run {served} "
+            f"anyway with --muse-version {served} (PII_GUARD_MUSE_VERSION={served} for pytest)"
+        )
+
+
 def install_muse(home: Path, version: str = MUSE_VERSION) -> Path:
     """Muse Code's binary, from the official installer into the throwaway ``home``.
 
     The installer always fetches the current release; only ``version`` is run (the protocol
-    capture and these tests are for it). Another version raises :class:`RuntimeError`: re-run
-    the capture (docs/integrations/muse-code.md) and update ``MUSE_VERSION_CHECKED``.
+    capture and these tests are for it). Another version raises :class:`MuseVersionError`:
+    re-run the capture (docs/integrations/muse-code.md) and update ``MUSE_VERSION_CHECKED``, or
+    pass the served version as ``version`` (``--muse-version``) to run it anyway.
     """
     bin_dir = home / ".local" / "bin"
     binary = bin_dir / f"muse-bin-{version}"
@@ -171,11 +193,15 @@ def install_muse(home: Path, version: str = MUSE_VERSION) -> Path:
         [bash, str(script)], env=env, check=True, capture_output=True, timeout=900
     )
     if not binary.exists():
-        found = sorted(p.name for p in bin_dir.glob("muse-bin-*"))
-        raise RuntimeError(
-            f"the Muse Code installer gave {', '.join(found) or 'nothing'}; this harness is "
-            f"pinned to {version} (update MUSE_VERSION_CHECKED after re-checking the protocol)"
-        )
+        # The launcher records the version it installed in .muse-version.
+        state = bin_dir / ".muse-version"
+        served = state.read_text(encoding="utf-8").strip() if state.exists() else ""
+        if not served:
+            found = sorted(p.name.removeprefix("muse-bin-") for p in bin_dir.glob("muse-bin-*"))
+            if not found:
+                raise RuntimeError("the Muse Code installer installed no muse-bin-* binary")
+            served = found[-1]
+        raise MuseVersionError(served, version)
     return binary
 
 
@@ -922,8 +948,10 @@ def run_muse(
     timeout: float = 900,
     reasoning_effort: str = "low",
     session: str = "path",
+    version: str = MUSE_VERSION,
 ) -> RunResult:
-    """Muse Code through the gateway (Responses API), the gateway in fast mode."""
+    """Muse Code through the gateway (Responses API), the gateway in fast mode. ``version`` is
+    the one ``muse_bin`` is (recorded in the result)."""
     gold = load_gold(example_dir)
     ner = _ner_available()
     started = time.monotonic()
@@ -963,7 +991,7 @@ def run_muse(
         written, texts = _written(work, before)
     return _result(
         client="muse-code",
-        version=MUSE_VERSION,
+        version=version,
         upstream=upstream,
         model=model,
         proc=proc,
@@ -1018,6 +1046,12 @@ def main(argv: list[str] | None = None) -> int:
         "--muse-home", default=None, help="throwaway HOME for the Muse Code install (default: temp)"
     )
     parser.add_argument(
+        "--muse-version",
+        default=MUSE_VERSION,
+        help=f"the Muse Code version to run (default: the pinned {MUSE_VERSION}); another "
+        "version than the installer serves stops with an error",
+    )
+    parser.add_argument(
         "--session",
         choices=SESSIONS,
         default="path",
@@ -1040,8 +1074,13 @@ def main(argv: list[str] | None = None) -> int:
             if args.muse_home
             else Path(tempfile.gettempdir()) / "pii-guard-muse"
         )
+        try:
+            muse_bin = install_muse(home, args.muse_version)
+        except MuseVersionError as exc:
+            parser.exit(2, f"error: {exc}\n")
         result = run_muse(
-            muse_bin=install_muse(home),
+            muse_bin=muse_bin,
+            version=args.muse_version,
             upstream=args.upstream,
             key=key,
             model=args.model,

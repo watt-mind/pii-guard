@@ -1,7 +1,7 @@
 """``POST /v1/responses``: mask a Responses API request, forward it natively, restore the
 answer and the ``response.*`` event stream. Fictional values only (ADR 0005).
 
-The request bodies have the shape Muse Code 1.4.13 sends (docs/integrations/muse-code.md):
+The request bodies have the shape Muse Code 1.4.13 and 1.4.14 send (docs/integrations/muse-code.md):
 developer and user messages, a ``namespace`` tool, earlier reasoning items with
 ``encrypted_content``, function calls and their outputs, ``include``, ``store: false``.
 """
@@ -18,14 +18,16 @@ from fastapi.testclient import TestClient
 from gateway_helpers import (
     EMAILS,
     IBAN,
+    NAMES,
     PHONES,
     UPSTREAM_KEY,
+    FakeLlm,
     MockUpstream,
     leaked_values,
     make_app,
 )
 
-from pii_guard.gateway.responses import responses_url
+from pii_guard.gateway.responses import responses_url, tool_names, without_tool_names
 from pii_guard.gateway.responses_restore import ResponsesSseRestorer
 from pii_guard.vault import PLACEHOLDER_RE
 
@@ -426,6 +428,43 @@ def test_personal_data_in_an_identifier_is_refused() -> None:
     assert "identifier" in response.json()["error"]["message"]
     assert "teszt.elek" not in response.text
     assert upstream.requests == []
+
+
+def test_a_tool_name_read_as_a_name_does_not_refuse_the_request() -> None:
+    """Muse 1.4.14 says "Muse" alone in its prompts and the NER can read it as a PERSON. The
+    vault then masked the ``muse`` namespace as another occurrence of that value, and the
+    request was refused as personal data in an identifier (LAB-1299). The tool vocabulary is
+    left as written; real names around it are still masked."""
+    body = muse_body()
+    body["input"][0]["content"] = "You are Muse, a coding agent. Support line +36 30 123 4567."
+    upstream = ResponsesUpstream()
+    detector = FakeLlm((*NAMES, "Muse", "Write_File"))
+    with TestClient(make_app(upstream, llm=detector)) as http:
+        response = http.post("/s/c_tool_names_0001/v1/responses", json=body)
+    assert response.status_code == 200, response.text
+    forwarded = json.loads(upstream.requests[0].content)
+    assert forwarded["tools"][0]["name"] == "muse"
+    assert forwarded["tools"][0]["tools"][0]["name"] == "write_file"
+    assert forwarded["input"][4]["name"] == "muse.read_file"
+    assert forwarded["input"][0]["content"].startswith("You are Muse, a coding agent.")
+    assert leaked_values(upstream.requests[0].content) == []
+
+
+def test_tool_names_and_the_spans_they_drop() -> None:
+    from pii_guard.types import EntityType, Span
+
+    names = tool_names(muse_body())
+    assert names == frozenset({"muse", "write_file"})
+    assert tool_names({"tools": "not a list"}) == frozenset()
+    text = "Muse wrote to Jane Placeholder via MUSE"
+    found = [
+        Span(0, 4, EntityType.PERSON, "Muse", 0.9, "ner"),
+        Span(14, 30, EntityType.PERSON, "Jane Placeholder", 0.9, "ner"),
+        Span(35, 39, EntityType.PERSON, "MUSE", 1.0, "known"),  # pre-loaded: kept
+    ]
+    kept = without_tool_names([text], [found], names)[0]
+    assert [s.text for s in kept] == ["Jane Placeholder", "MUSE"]
+    assert without_tool_names([text], [found], frozenset()) == [found]
 
 
 def test_string_input_and_easy_messages() -> None:
