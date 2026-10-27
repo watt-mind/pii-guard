@@ -12,7 +12,7 @@ export const CHAT_SAMPLES: ChatSample[] = [
   {
     id: "hu-letter",
     language: "hu",
-    label: "Levél (magyar)",
+    label: "Letter (Hungarian)",
     text: "Szia! Teszt Elek vagyok, e-mail: teszt.elek@example.com, telefon: +36 30 555 0142. Írj egy rövid, udvarias levelet Minta Máriának, hogy a szerződést jövő kedden aláírnánk a 1137 Budapest, Pozsonyi út 38. alatti irodában.",
   },
   {

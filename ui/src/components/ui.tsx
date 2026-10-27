@@ -10,7 +10,7 @@ export function Button({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
   const styles: Record<Variant, string> = {
-    primary: "bg-ink text-canvas hover:opacity-90 shadow-sm",
+    primary: "bg-ink text-canvas hover:bg-ink/85",
     secondary: "border border-line bg-surface text-ink hover:border-line-strong",
     ghost: "text-muted hover:bg-surface-2 hover:text-ink",
   };
@@ -18,7 +18,7 @@ export function Button({
     <button
       type={type}
       className={[
-        "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-45",
+        "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap transition-colors active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45",
         styles[variant],
         className,
       ].join(" ")}
@@ -30,16 +30,16 @@ export function Button({
 export function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="flex min-w-12 flex-col-reverse">
-      <dt className="mt-0.5 text-[10px] tracking-wide text-faint uppercase">{label}</dt>
-      <dd className="text-lg leading-none font-semibold tabular-nums text-ink">{value}</dd>
+      <dt className="mt-1 text-2xs text-muted">{label}</dt>
+      <dd className="font-mono text-lg leading-none font-medium tabular-nums text-ink">{value}</dd>
     </div>
   );
 }
 
 export function EmptyState({ title, body, children }: { title: string; body: string; children?: ReactNode }) {
   return (
-    <div className="flex h-full min-h-[14rem] flex-col items-center justify-center rounded-xl border border-dashed border-line px-6 py-10 text-center">
-      <p className="text-sm font-semibold text-ink">{title}</p>
+    <div className="flex h-full min-h-[14rem] flex-col items-center justify-center px-6 py-10 text-center">
+      <p className="text-sm font-medium text-ink">{title}</p>
       <p className="mt-1 max-w-xs text-sm text-muted">{body}</p>
       {children && <div className="mt-4">{children}</div>}
     </div>
@@ -67,8 +67,14 @@ export function BlockedNotice({ error, phase = "outbound" }: { error: RunError; 
         : "pii-guard shows nothing rather than a half-restored answer."
       : "pii-guard fails closed: if detection or masking fails, the request is stopped rather than forwarded unmasked.";
   return (
-    <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft p-4 text-sm">
-      <p className="font-semibold text-danger">{title}</p>
+    <div role="alert" className="rounded-lg border border-blocked/40 bg-blocked-soft p-4 text-sm">
+      <p className="flex items-center gap-2 font-semibold text-blocked">
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <circle cx="8" cy="8" r="6" />
+          <path d="M3.8 12.2 12.2 3.8" />
+        </svg>
+        {title}
+      </p>
       <p className="mt-1 text-ink">
         <code className="font-mono text-xs">{error.code}</code>
         {error.message && error.message !== error.code ? <> · {error.message}</> : null}

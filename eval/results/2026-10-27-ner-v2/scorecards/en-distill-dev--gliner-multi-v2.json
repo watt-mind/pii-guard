@@ -1,0 +1,873 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "commit": "910a6a27f002b16de825d73c1607a8cb6aae6446",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "generated_at": "2026-10-27T17:04:35+00:00",
+    "detectors": [
+      "rules",
+      "ner_gliner"
+    ],
+    "skipped_detectors": [],
+    "languages": null,
+    "fixtures": [
+      {
+        "path": "eval/generated/distill-s11/labelled/en-distill-dev.jsonl",
+        "sha256": "b13f9983ca99ade625e05185c76f25611bec6ca33147072fd58dd1e50b25557a"
+      }
+    ]
+  },
+  "overall": {
+    "documents": 373,
+    "gold_spans": 2677,
+    "predicted_spans": 2830,
+    "unscored_predictions": 0,
+    "detection": {
+      "exact": {
+        "per_type": {
+          "PERSON": {
+            "gold": 1295,
+            "pred": 1300,
+            "tp_pred": 1293,
+            "tp_gold": 1293,
+            "precision": 0.9946153846153846,
+            "recall": 0.9984555984555985,
+            "f1": 0.9965317919075144
+          },
+          "ADDRESS": {
+            "gold": 361,
+            "pred": 424,
+            "tp_pred": 361,
+            "tp_gold": 361,
+            "precision": 0.8514150943396226,
+            "recall": 1.0,
+            "f1": 0.9197452229299363
+          },
+          "EMAIL": {
+            "gold": 283,
+            "pred": 283,
+            "tp_pred": 283,
+            "tp_gold": 283,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "PHONE": {
+            "gold": 297,
+            "pred": 298,
+            "tp_pred": 297,
+            "tp_gold": 297,
+            "precision": 0.9966442953020134,
+            "recall": 1.0,
+            "f1": 0.9983193277310924
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 108,
+            "pred": 107,
+            "tp_pred": 107,
+            "tp_gold": 107,
+            "precision": 1.0,
+            "recall": 0.9907407407407407,
+            "f1": 0.9953488372093023
+          },
+          "ID_DOCUMENT": {
+            "gold": 47,
+            "pred": 117,
+            "tp_pred": 46,
+            "tp_gold": 46,
+            "precision": 0.39316239316239315,
+            "recall": 0.9787234042553191,
+            "f1": 0.5609756097560975
+          },
+          "BANK_ACCOUNT": {
+            "gold": 98,
+            "pred": 99,
+            "tp_pred": 98,
+            "tp_gold": 98,
+            "precision": 0.98989898989899,
+            "recall": 1.0,
+            "f1": 0.9949238578680203
+          },
+          "ORGANIZATION": {
+            "gold": 135,
+            "pred": 152,
+            "tp_pred": 135,
+            "tp_gold": 135,
+            "precision": 0.8881578947368421,
+            "recall": 1.0,
+            "f1": 0.9407665505226481
+          },
+          "VEHICLE_PLATE": {
+            "gold": 53,
+            "pred": 50,
+            "tp_pred": 50,
+            "tp_gold": 50,
+            "precision": 1.0,
+            "recall": 0.9433962264150944,
+            "f1": 0.970873786407767
+          }
+        },
+        "micro": {
+          "gold": 2677,
+          "pred": 2830,
+          "tp_pred": 2670,
+          "tp_gold": 2670,
+          "precision": 0.9434628975265018,
+          "recall": 0.9973851326111318,
+          "f1": 0.969674959142909
+        },
+        "macro": {
+          "precision": 0.901543783561694,
+          "recall": 0.9901462188740836,
+          "f1": 0.9308316649258198
+        }
+      },
+      "overlap": {
+        "per_type": {
+          "PERSON": {
+            "gold": 1295,
+            "pred": 1300,
+            "tp_pred": 1293,
+            "tp_gold": 1293,
+            "precision": 0.9946153846153846,
+            "recall": 0.9984555984555985,
+            "f1": 0.9965317919075144
+          },
+          "ADDRESS": {
+            "gold": 361,
+            "pred": 424,
+            "tp_pred": 361,
+            "tp_gold": 361,
+            "precision": 0.8514150943396226,
+            "recall": 1.0,
+            "f1": 0.9197452229299363
+          },
+          "EMAIL": {
+            "gold": 283,
+            "pred": 283,
+            "tp_pred": 283,
+            "tp_gold": 283,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "PHONE": {
+            "gold": 297,
+            "pred": 298,
+            "tp_pred": 297,
+            "tp_gold": 297,
+            "precision": 0.9966442953020134,
+            "recall": 1.0,
+            "f1": 0.9983193277310924
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 108,
+            "pred": 107,
+            "tp_pred": 107,
+            "tp_gold": 107,
+            "precision": 1.0,
+            "recall": 0.9907407407407407,
+            "f1": 0.9953488372093023
+          },
+          "ID_DOCUMENT": {
+            "gold": 47,
+            "pred": 117,
+            "tp_pred": 46,
+            "tp_gold": 46,
+            "precision": 0.39316239316239315,
+            "recall": 0.9787234042553191,
+            "f1": 0.5609756097560975
+          },
+          "BANK_ACCOUNT": {
+            "gold": 98,
+            "pred": 99,
+            "tp_pred": 98,
+            "tp_gold": 98,
+            "precision": 0.98989898989899,
+            "recall": 1.0,
+            "f1": 0.9949238578680203
+          },
+          "ORGANIZATION": {
+            "gold": 135,
+            "pred": 152,
+            "tp_pred": 135,
+            "tp_gold": 135,
+            "precision": 0.8881578947368421,
+            "recall": 1.0,
+            "f1": 0.9407665505226481
+          },
+          "VEHICLE_PLATE": {
+            "gold": 53,
+            "pred": 50,
+            "tp_pred": 50,
+            "tp_gold": 50,
+            "precision": 1.0,
+            "recall": 0.9433962264150944,
+            "f1": 0.970873786407767
+          }
+        },
+        "micro": {
+          "gold": 2677,
+          "pred": 2830,
+          "tp_pred": 2670,
+          "tp_gold": 2670,
+          "precision": 0.9434628975265018,
+          "recall": 0.9973851326111318,
+          "f1": 0.969674959142909
+        },
+        "macro": {
+          "precision": 0.901543783561694,
+          "recall": 0.9901462188740836,
+          "f1": 0.9308316649258198
+        }
+      }
+    },
+    "leak": {
+      "values": 1823,
+      "leaked": 3,
+      "partial": 24,
+      "rate": 0.0016456390565002743,
+      "partial_rate": 0.013165112452002194,
+      "per_type": {
+        "PERSON": {
+          "values": 723,
+          "leaked": 2,
+          "partial": 0,
+          "rate": 0.0027662517289073307,
+          "partial_rate": 0.0
+        },
+        "ADDRESS": {
+          "values": 314,
+          "leaked": 0,
+          "partial": 24,
+          "rate": 0.0,
+          "partial_rate": 0.07643312101910828
+        },
+        "EMAIL": {
+          "values": 237,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "PHONE": {
+          "values": 261,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "DATE_OF_BIRTH": {
+          "values": 106,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "ID_DOCUMENT": {
+          "values": 47,
+          "leaked": 1,
+          "partial": 0,
+          "rate": 0.02127659574468085,
+          "partial_rate": 0.0
+        },
+        "BANK_ACCOUNT": {
+          "values": 96,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "VEHICLE_PLATE": {
+          "values": 39,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        }
+      }
+    },
+    "over_masking": {
+      "masked": 2678,
+      "over_masked": 140,
+      "rate": 0.05227781926811053,
+      "per_type": {
+        "PERSON": {
+          "masked": 1300,
+          "over_masked": 7,
+          "rate": 0.005384615384615384
+        },
+        "ADDRESS": {
+          "masked": 424,
+          "over_masked": 63,
+          "rate": 0.14858490566037735
+        },
+        "EMAIL": {
+          "masked": 283,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "PHONE": {
+          "masked": 298,
+          "over_masked": 1,
+          "rate": 0.003355704697986577
+        },
+        "DATE_OF_BIRTH": {
+          "masked": 107,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "ID_DOCUMENT": {
+          "masked": 117,
+          "over_masked": 68,
+          "rate": 0.5811965811965812
+        },
+        "BANK_ACCOUNT": {
+          "masked": 99,
+          "over_masked": 1,
+          "rate": 0.010101010101010102
+        },
+        "VEHICLE_PLATE": {
+          "masked": 50,
+          "over_masked": 0,
+          "rate": 0.0
+        }
+      }
+    },
+    "consistency": {
+      "entities": 1823,
+      "consistent": 1820,
+      "rate": 0.9983543609434997,
+      "multi_occurrence": 400,
+      "multi_consistent": 400,
+      "multi_rate": 1.0,
+      "per_type": {
+        "PERSON": {
+          "entities": 723,
+          "consistent": 721,
+          "rate": 0.9972337482710927,
+          "multi_occurrence": 260,
+          "multi_consistent": 260,
+          "multi_rate": 1.0
+        },
+        "ADDRESS": {
+          "entities": 314,
+          "consistent": 314,
+          "rate": 1.0,
+          "multi_occurrence": 44,
+          "multi_consistent": 44,
+          "multi_rate": 1.0
+        },
+        "EMAIL": {
+          "entities": 237,
+          "consistent": 237,
+          "rate": 1.0,
+          "multi_occurrence": 46,
+          "multi_consistent": 46,
+          "multi_rate": 1.0
+        },
+        "PHONE": {
+          "entities": 261,
+          "consistent": 261,
+          "rate": 1.0,
+          "multi_occurrence": 36,
+          "multi_consistent": 36,
+          "multi_rate": 1.0
+        },
+        "DATE_OF_BIRTH": {
+          "entities": 106,
+          "consistent": 106,
+          "rate": 1.0,
+          "multi_occurrence": 2,
+          "multi_consistent": 2,
+          "multi_rate": 1.0
+        },
+        "ID_DOCUMENT": {
+          "entities": 47,
+          "consistent": 46,
+          "rate": 0.9787234042553191,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "BANK_ACCOUNT": {
+          "entities": 96,
+          "consistent": 96,
+          "rate": 1.0,
+          "multi_occurrence": 2,
+          "multi_consistent": 2,
+          "multi_rate": 1.0
+        },
+        "VEHICLE_PLATE": {
+          "entities": 39,
+          "consistent": 39,
+          "rate": 1.0,
+          "multi_occurrence": 10,
+          "multi_consistent": 10,
+          "multi_rate": 1.0
+        }
+      }
+    },
+    "roundtrip": {
+      "documents": 373,
+      "exact": 372,
+      "rate": 0.9973190348525469
+    },
+    "latency_ms": {
+      "detect": {
+        "p50": 106.62004095502198,
+        "p95": 333.07612501084805
+      },
+      "mask": {
+        "p50": 0.8362499065697193,
+        "p95": 2.713582944124937
+      }
+    }
+  },
+  "languages": {
+    "en": {
+      "documents": 373,
+      "gold_spans": 2677,
+      "predicted_spans": 2830,
+      "unscored_predictions": 0,
+      "detection": {
+        "exact": {
+          "per_type": {
+            "PERSON": {
+              "gold": 1295,
+              "pred": 1300,
+              "tp_pred": 1293,
+              "tp_gold": 1293,
+              "precision": 0.9946153846153846,
+              "recall": 0.9984555984555985,
+              "f1": 0.9965317919075144
+            },
+            "ADDRESS": {
+              "gold": 361,
+              "pred": 424,
+              "tp_pred": 361,
+              "tp_gold": 361,
+              "precision": 0.8514150943396226,
+              "recall": 1.0,
+              "f1": 0.9197452229299363
+            },
+            "EMAIL": {
+              "gold": 283,
+              "pred": 283,
+              "tp_pred": 283,
+              "tp_gold": 283,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "PHONE": {
+              "gold": 297,
+              "pred": 298,
+              "tp_pred": 297,
+              "tp_gold": 297,
+              "precision": 0.9966442953020134,
+              "recall": 1.0,
+              "f1": 0.9983193277310924
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 108,
+              "pred": 107,
+              "tp_pred": 107,
+              "tp_gold": 107,
+              "precision": 1.0,
+              "recall": 0.9907407407407407,
+              "f1": 0.9953488372093023
+            },
+            "ID_DOCUMENT": {
+              "gold": 47,
+              "pred": 117,
+              "tp_pred": 46,
+              "tp_gold": 46,
+              "precision": 0.39316239316239315,
+              "recall": 0.9787234042553191,
+              "f1": 0.5609756097560975
+            },
+            "BANK_ACCOUNT": {
+              "gold": 98,
+              "pred": 99,
+              "tp_pred": 98,
+              "tp_gold": 98,
+              "precision": 0.98989898989899,
+              "recall": 1.0,
+              "f1": 0.9949238578680203
+            },
+            "ORGANIZATION": {
+              "gold": 135,
+              "pred": 152,
+              "tp_pred": 135,
+              "tp_gold": 135,
+              "precision": 0.8881578947368421,
+              "recall": 1.0,
+              "f1": 0.9407665505226481
+            },
+            "VEHICLE_PLATE": {
+              "gold": 53,
+              "pred": 50,
+              "tp_pred": 50,
+              "tp_gold": 50,
+              "precision": 1.0,
+              "recall": 0.9433962264150944,
+              "f1": 0.970873786407767
+            }
+          },
+          "micro": {
+            "gold": 2677,
+            "pred": 2830,
+            "tp_pred": 2670,
+            "tp_gold": 2670,
+            "precision": 0.9434628975265018,
+            "recall": 0.9973851326111318,
+            "f1": 0.969674959142909
+          },
+          "macro": {
+            "precision": 0.901543783561694,
+            "recall": 0.9901462188740836,
+            "f1": 0.9308316649258198
+          }
+        },
+        "overlap": {
+          "per_type": {
+            "PERSON": {
+              "gold": 1295,
+              "pred": 1300,
+              "tp_pred": 1293,
+              "tp_gold": 1293,
+              "precision": 0.9946153846153846,
+              "recall": 0.9984555984555985,
+              "f1": 0.9965317919075144
+            },
+            "ADDRESS": {
+              "gold": 361,
+              "pred": 424,
+              "tp_pred": 361,
+              "tp_gold": 361,
+              "precision": 0.8514150943396226,
+              "recall": 1.0,
+              "f1": 0.9197452229299363
+            },
+            "EMAIL": {
+              "gold": 283,
+              "pred": 283,
+              "tp_pred": 283,
+              "tp_gold": 283,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "PHONE": {
+              "gold": 297,
+              "pred": 298,
+              "tp_pred": 297,
+              "tp_gold": 297,
+              "precision": 0.9966442953020134,
+              "recall": 1.0,
+              "f1": 0.9983193277310924
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 108,
+              "pred": 107,
+              "tp_pred": 107,
+              "tp_gold": 107,
+              "precision": 1.0,
+              "recall": 0.9907407407407407,
+              "f1": 0.9953488372093023
+            },
+            "ID_DOCUMENT": {
+              "gold": 47,
+              "pred": 117,
+              "tp_pred": 46,
+              "tp_gold": 46,
+              "precision": 0.39316239316239315,
+              "recall": 0.9787234042553191,
+              "f1": 0.5609756097560975
+            },
+            "BANK_ACCOUNT": {
+              "gold": 98,
+              "pred": 99,
+              "tp_pred": 98,
+              "tp_gold": 98,
+              "precision": 0.98989898989899,
+              "recall": 1.0,
+              "f1": 0.9949238578680203
+            },
+            "ORGANIZATION": {
+              "gold": 135,
+              "pred": 152,
+              "tp_pred": 135,
+              "tp_gold": 135,
+              "precision": 0.8881578947368421,
+              "recall": 1.0,
+              "f1": 0.9407665505226481
+            },
+            "VEHICLE_PLATE": {
+              "gold": 53,
+              "pred": 50,
+              "tp_pred": 50,
+              "tp_gold": 50,
+              "precision": 1.0,
+              "recall": 0.9433962264150944,
+              "f1": 0.970873786407767
+            }
+          },
+          "micro": {
+            "gold": 2677,
+            "pred": 2830,
+            "tp_pred": 2670,
+            "tp_gold": 2670,
+            "precision": 0.9434628975265018,
+            "recall": 0.9973851326111318,
+            "f1": 0.969674959142909
+          },
+          "macro": {
+            "precision": 0.901543783561694,
+            "recall": 0.9901462188740836,
+            "f1": 0.9308316649258198
+          }
+        }
+      },
+      "leak": {
+        "values": 1823,
+        "leaked": 3,
+        "partial": 24,
+        "rate": 0.0016456390565002743,
+        "partial_rate": 0.013165112452002194,
+        "per_type": {
+          "PERSON": {
+            "values": 723,
+            "leaked": 2,
+            "partial": 0,
+            "rate": 0.0027662517289073307,
+            "partial_rate": 0.0
+          },
+          "ADDRESS": {
+            "values": 314,
+            "leaked": 0,
+            "partial": 24,
+            "rate": 0.0,
+            "partial_rate": 0.07643312101910828
+          },
+          "EMAIL": {
+            "values": 237,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "PHONE": {
+            "values": 261,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "DATE_OF_BIRTH": {
+            "values": 106,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "ID_DOCUMENT": {
+            "values": 47,
+            "leaked": 1,
+            "partial": 0,
+            "rate": 0.02127659574468085,
+            "partial_rate": 0.0
+          },
+          "BANK_ACCOUNT": {
+            "values": 96,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "VEHICLE_PLATE": {
+            "values": 39,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          }
+        }
+      },
+      "over_masking": {
+        "masked": 2678,
+        "over_masked": 140,
+        "rate": 0.05227781926811053,
+        "per_type": {
+          "PERSON": {
+            "masked": 1300,
+            "over_masked": 7,
+            "rate": 0.005384615384615384
+          },
+          "ADDRESS": {
+            "masked": 424,
+            "over_masked": 63,
+            "rate": 0.14858490566037735
+          },
+          "EMAIL": {
+            "masked": 283,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "PHONE": {
+            "masked": 298,
+            "over_masked": 1,
+            "rate": 0.003355704697986577
+          },
+          "DATE_OF_BIRTH": {
+            "masked": 107,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "ID_DOCUMENT": {
+            "masked": 117,
+            "over_masked": 68,
+            "rate": 0.5811965811965812
+          },
+          "BANK_ACCOUNT": {
+            "masked": 99,
+            "over_masked": 1,
+            "rate": 0.010101010101010102
+          },
+          "VEHICLE_PLATE": {
+            "masked": 50,
+            "over_masked": 0,
+            "rate": 0.0
+          }
+        }
+      },
+      "consistency": {
+        "entities": 1823,
+        "consistent": 1820,
+        "rate": 0.9983543609434997,
+        "multi_occurrence": 400,
+        "multi_consistent": 400,
+        "multi_rate": 1.0,
+        "per_type": {
+          "PERSON": {
+            "entities": 723,
+            "consistent": 721,
+            "rate": 0.9972337482710927,
+            "multi_occurrence": 260,
+            "multi_consistent": 260,
+            "multi_rate": 1.0
+          },
+          "ADDRESS": {
+            "entities": 314,
+            "consistent": 314,
+            "rate": 1.0,
+            "multi_occurrence": 44,
+            "multi_consistent": 44,
+            "multi_rate": 1.0
+          },
+          "EMAIL": {
+            "entities": 237,
+            "consistent": 237,
+            "rate": 1.0,
+            "multi_occurrence": 46,
+            "multi_consistent": 46,
+            "multi_rate": 1.0
+          },
+          "PHONE": {
+            "entities": 261,
+            "consistent": 261,
+            "rate": 1.0,
+            "multi_occurrence": 36,
+            "multi_consistent": 36,
+            "multi_rate": 1.0
+          },
+          "DATE_OF_BIRTH": {
+            "entities": 106,
+            "consistent": 106,
+            "rate": 1.0,
+            "multi_occurrence": 2,
+            "multi_consistent": 2,
+            "multi_rate": 1.0
+          },
+          "ID_DOCUMENT": {
+            "entities": 47,
+            "consistent": 46,
+            "rate": 0.9787234042553191,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "BANK_ACCOUNT": {
+            "entities": 96,
+            "consistent": 96,
+            "rate": 1.0,
+            "multi_occurrence": 2,
+            "multi_consistent": 2,
+            "multi_rate": 1.0
+          },
+          "VEHICLE_PLATE": {
+            "entities": 39,
+            "consistent": 39,
+            "rate": 1.0,
+            "multi_occurrence": 10,
+            "multi_consistent": 10,
+            "multi_rate": 1.0
+          }
+        }
+      },
+      "roundtrip": {
+        "documents": 373,
+        "exact": 372,
+        "rate": 0.9973190348525469
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 106.62004095502198,
+          "p95": 333.07612501084805
+        },
+        "mask": {
+          "p50": 0.8362499065697193,
+          "p95": 2.713582944124937
+        }
+      }
+    }
+  },
+  "run": {
+    "system": "pii-guard fast-gliner-multi-v2",
+    "detectors": [
+      "rules",
+      "ner_gliner"
+    ],
+    "documents": 373,
+    "wall_s": 53.7,
+    "load_average_start": [
+      10.7,
+      10.06,
+      11.86
+    ],
+    "load_average_end": [
+      8.27,
+      9.52,
+      11.55
+    ],
+    "host": {
+      "platform": "macOS-26.5.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "processor": "arm",
+      "cpu_count": 10,
+      "python": "3.12.15"
+    },
+    "warmup_calls": 1,
+    "blocked": 0,
+    "blocked_documents": [],
+    "candidate": "gliner-multi-v2",
+    "gliner": {
+      "model": "pii-guard-gliner-multi-v2",
+      "weights_sha256": {
+        "pytorch_model.bin": "a8630bc7082bf5fa31d96a973df9c0b39275484140cf55397bbb619981caa125"
+      }
+    }
+  }
+}

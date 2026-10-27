@@ -8,6 +8,8 @@ export interface ImageSample {
   id: string;
   title: string;
   subtitle: string;
+  /** Language of the printed text: decides which rules run on its OCR text. */
+  language: "hu" | "en";
   src: string;
   alt: string;
 }
@@ -17,6 +19,7 @@ export const IMAGE_SAMPLES: ImageSample[] = [
     id: "id-card",
     title: "ID card",
     subtitle: "Face, signature, document and personal no.",
+    language: "hu",
     src: "/samples/id-card.png",
     alt: "Fictional specimen identity card overprinted MINTA / SPECIMEN: an AI-generated portrait, the name Fiktív Mária, a birth date, a document number, a personal number and a signature.",
   },
@@ -24,6 +27,7 @@ export const IMAGE_SAMPLES: ImageSample[] = [
     id: "health-card",
     title: "Health card",
     subtitle: "Face, TAJ number, address",
+    language: "hu",
     src: "/samples/health-card.png",
     alt: "Fictional specimen health card overprinted MINTA / SPECIMEN: an AI-generated portrait, the name Képzelt Ilona, a birth date, a TAJ number and an address.",
   },
@@ -31,6 +35,7 @@ export const IMAGE_SAMPLES: ImageSample[] = [
     id: "signed-letter",
     title: "Signed letter",
     subtitle: "Signature, company stamp, email, phone",
+    language: "hu",
     src: "/samples/signed-letter.png",
     alt: "Fictional Hungarian employer's letter overprinted MINTA / SPECIMEN, to Mintás Anna: an address, an email address, a phone number, a tax ID, a signature and a round company stamp.",
   },
@@ -38,6 +43,7 @@ export const IMAGE_SAMPLES: ImageSample[] = [
     id: "visitor-badge",
     title: "Visitor badge",
     subtitle: "Face, name, email, phone",
+    language: "hu",
     src: "/samples/visitor-badge.png",
     alt: "Fictional visitor badge overprinted MINTA / SPECIMEN: an AI-generated portrait, the name Próba Levente, an email address and a phone number.",
   },

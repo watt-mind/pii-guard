@@ -1,0 +1,362 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-ner-v2-hu-company-names-xlmr-base-v2-hn-gliner-union",
+  "kind": "text",
+  "date": "2026-10-27",
+  "recorded_at": "2026-10-27T17:06:16+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard rules + ner (xlmr-base-v2-hn) + ner_gliner (gliner-multi-v2.1, labels pii_guard.detect.ner_gliner.GLINER_LABELS) on company-names",
+  "notes": [
+    "One warm-up call before timing; wall time 2.8 s."
+  ],
+  "code": {
+    "commit": "910a6a27f002b16de825d73c1607a8cb6aae6446",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": "0.1.0",
+    "detectors": [
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "ner",
+        "model": "xlmr-base-v2-hn",
+        "model_ref": "local checkpoint pii-guard-ner-xlmr-base-v2-hn (LAB-1150, 10 types, not published)",
+        "revision": "sha256:4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9",
+        "settings": {},
+        "serving": "local PyTorch"
+      },
+      {
+        "name": "ner_gliner",
+        "model": "gliner-multi-v2.1",
+        "model_ref": "urchade/gliner_multi-v2.1 (Apache-2.0)",
+        "revision": "443d26d654e0324125a96bebd8e796c14ff2efe6",
+        "settings": {
+          "labels": "pii_guard.detect.ner_gliner.GLINER_LABELS"
+        },
+        "serving": "local PyTorch (gliner 0.2.29)"
+      }
+    ],
+    "key": "rules+ner:xlmr-base-v2-hn+ner_gliner:gliner-multi-v2.1@labels=pii_guard.detect.ner_gliner.GLINER_LABELS",
+    "label": "pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150)"
+  },
+  "fixture_set": "company-names",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/hu-company-names.jsonl",
+      "sha256": "d4565df38ae2803a26e90ffdb426621fdffd13976b90677d74839e21d1e0042a",
+      "set": "company-names",
+      "language": "hu",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 44
+    }
+  ],
+  "languages": [
+    "hu"
+  ],
+  "hardware": {
+    "description": "arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.5 at start (machine not idle)",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": "Apple MPS",
+    "python": "3.12.15"
+  },
+  "cost": null,
+  "metrics": {
+    "overall": {
+      "documents": 44,
+      "gold_spans": 93,
+      "predicted_spans": 146,
+      "unscored_predictions": 0,
+      "exact": {
+        "gold": 93,
+        "pred": 146,
+        "tp_pred": 84,
+        "tp_gold": 84,
+        "precision": 0.575342,
+        "recall": 0.903226,
+        "f1": 0.702929
+      },
+      "overlap": {
+        "gold": 93,
+        "pred": 146,
+        "tp_pred": 94,
+        "tp_gold": 92,
+        "precision": 0.643836,
+        "recall": 0.989247,
+        "f1": 0.780013
+      },
+      "macro_f1_overlap": 0.837758,
+      "leak": {
+        "values": 40,
+        "leaked": 0,
+        "partial": 1,
+        "rate": 0.0,
+        "partial_rate": 0.025
+      },
+      "over_masking": {
+        "masked": 75,
+        "over_masked": 9,
+        "rate": 0.12
+      },
+      "roundtrip": {
+        "documents": 44,
+        "exact": 44,
+        "rate": 1.0
+      },
+      "consistency": {
+        "entities": 40,
+        "consistent": 38,
+        "multi_occurrence": 21,
+        "multi_consistent": 19,
+        "rate": 0.95,
+        "multi_rate": 0.904762
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 57.311,
+          "p95": 80.391
+        },
+        "mask": {
+          "p50": 0.669,
+          "p95": 1.459
+        }
+      },
+      "per_type": {
+        "PERSON": {
+          "gold": 60,
+          "pred": 71,
+          "exact_tp_gold": 53,
+          "exact_tp_pred": 53,
+          "overlap_tp_gold": 59,
+          "overlap_tp_pred": 59,
+          "leak": {
+            "values": 37,
+            "leaked": 0,
+            "partial": 1
+          },
+          "over_masking": {
+            "masked": 71,
+            "over_masked": 9
+          }
+        },
+        "ADDRESS": {
+          "gold": 1,
+          "pred": 1,
+          "exact_tp_gold": 1,
+          "exact_tp_pred": 1,
+          "overlap_tp_gold": 1,
+          "overlap_tp_pred": 1,
+          "leak": {
+            "values": 1,
+            "leaked": 0,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 1,
+            "over_masked": 0
+          }
+        },
+        "EMAIL": {
+          "gold": 1,
+          "pred": 1,
+          "exact_tp_gold": 1,
+          "exact_tp_pred": 1,
+          "overlap_tp_gold": 1,
+          "overlap_tp_pred": 1,
+          "leak": {
+            "values": 1,
+            "leaked": 0,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 1,
+            "over_masked": 0
+          }
+        },
+        "PHONE": {
+          "gold": 1,
+          "pred": 2,
+          "exact_tp_gold": 1,
+          "exact_tp_pred": 1,
+          "overlap_tp_gold": 1,
+          "overlap_tp_pred": 1,
+          "leak": {
+            "values": 1,
+            "leaked": 0,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 2,
+            "over_masked": 0
+          }
+        },
+        "ORGANIZATION": {
+          "gold": 30,
+          "pred": 71,
+          "exact_tp_gold": 28,
+          "exact_tp_pred": 28,
+          "overlap_tp_gold": 30,
+          "overlap_tp_pred": 32,
+          "leak": null,
+          "over_masking": null
+        }
+      }
+    },
+    "languages": {
+      "hu": {
+        "documents": 44,
+        "gold_spans": 93,
+        "predicted_spans": 146,
+        "unscored_predictions": 0,
+        "exact": {
+          "gold": 93,
+          "pred": 146,
+          "tp_pred": 84,
+          "tp_gold": 84,
+          "precision": 0.575342,
+          "recall": 0.903226,
+          "f1": 0.702929
+        },
+        "overlap": {
+          "gold": 93,
+          "pred": 146,
+          "tp_pred": 94,
+          "tp_gold": 92,
+          "precision": 0.643836,
+          "recall": 0.989247,
+          "f1": 0.780013
+        },
+        "macro_f1_overlap": 0.837758,
+        "leak": {
+          "values": 40,
+          "leaked": 0,
+          "partial": 1,
+          "rate": 0.0,
+          "partial_rate": 0.025
+        },
+        "over_masking": {
+          "masked": 75,
+          "over_masked": 9,
+          "rate": 0.12
+        },
+        "roundtrip": {
+          "documents": 44,
+          "exact": 44,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 40,
+          "consistent": 38,
+          "multi_occurrence": 21,
+          "multi_consistent": 19,
+          "rate": 0.95,
+          "multi_rate": 0.904762
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 57.311,
+            "p95": 80.391
+          },
+          "mask": {
+            "p50": 0.669,
+            "p95": 1.459
+          }
+        },
+        "per_type": {
+          "PERSON": {
+            "gold": 60,
+            "pred": 71,
+            "exact_tp_gold": 53,
+            "exact_tp_pred": 53,
+            "overlap_tp_gold": 59,
+            "overlap_tp_pred": 59,
+            "leak": {
+              "values": 37,
+              "leaked": 0,
+              "partial": 1
+            },
+            "over_masking": {
+              "masked": 71,
+              "over_masked": 9
+            }
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "pred": 1,
+            "exact_tp_gold": 1,
+            "exact_tp_pred": 1,
+            "overlap_tp_gold": 1,
+            "overlap_tp_pred": 1,
+            "leak": {
+              "values": 1,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 1,
+              "over_masked": 0
+            }
+          },
+          "EMAIL": {
+            "gold": 1,
+            "pred": 1,
+            "exact_tp_gold": 1,
+            "exact_tp_pred": 1,
+            "overlap_tp_gold": 1,
+            "overlap_tp_pred": 1,
+            "leak": {
+              "values": 1,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 1,
+              "over_masked": 0
+            }
+          },
+          "PHONE": {
+            "gold": 1,
+            "pred": 2,
+            "exact_tp_gold": 1,
+            "exact_tp_pred": 1,
+            "overlap_tp_gold": 1,
+            "overlap_tp_pred": 1,
+            "leak": {
+              "values": 1,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 2,
+              "over_masked": 0
+            }
+          },
+          "ORGANIZATION": {
+            "gold": 30,
+            "pred": 71,
+            "exact_tp_gold": 28,
+            "exact_tp_pred": 28,
+            "overlap_tp_gold": 30,
+            "overlap_tp_pred": 32,
+            "leak": null,
+            "over_masking": null
+          }
+        }
+      }
+    }
+  }
+}

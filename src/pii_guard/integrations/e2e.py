@@ -1,26 +1,33 @@
-"""End-to-end run: a real pi (pinned) works on the fictional mini-repo through the gateway.
+"""End-to-end run: a real coding agent (pinned) works on the fictional mini-repo through the
+gateway. Two clients: **pi** (Chat Completions) and **Muse Code** (Responses API).
 
 ```
-uv run python -m pii_guard.integrations.e2e                 # scripted mock upstream (CI)
-uv run python -m pii_guard.integrations.e2e --upstream https://api.meta.ai/v1 \\
+uv run python -m pii_guard.integrations.e2e                       # pi, scripted mock (CI)
+uv run python -m pii_guard.integrations.e2e --client muse-code    # Muse Code, scripted mock
+uv run python -m pii_guard.integrations.e2e --client muse-code --upstream https://api.meta.ai/v1 \\
     --model muse-spark-1.3 --key-env META_API_KEY --record examples/coding-agents/runs/<name>.json
 ```
 
-What runs, all on loopback, in throwaway directories (``HOME`` and pi's agent dir too):
+What runs, all on loopback, in throwaway directories (``HOME`` and the client's config too):
 
-1. pi ``PI_VERSION`` is installed with npm into a temp prefix (or ``--pi-prefix``; reused).
+1. The client is installed: pi ``PI_VERSION`` with npm into a temp prefix (or ``--pi-prefix``);
+   Muse Code with its official installer (``MUSE_INSTALLER``) into a throwaway ``HOME`` (or
+   ``--muse-home``), and only version ``MUSE_VERSION`` is run.
 2. A **recorder** stands in for the upstream: it keeps every request body it gets, then either
    answers like a scripted coding model (read the letter, read the CSV, read ``.env``, write
-   ``reply.md`` with the placeholders it saw, finish) or forwards to a real OpenAI-compatible
-   upstream (``--upstream``) with the key from ``--key-env``. The gateway never holds that key.
-3. The gateway (``create_app``) forwards to the recorder; ``pii-guard connect pi`` writes pi's
-   ``models.json`` from the gateway's ``GET /v1/models``.
-4. pi runs headless (``--print``) on a copy of ``examples/coding-agents/mini-repo``.
+   ``reply.md`` with the placeholders it saw, finish), as Chat Completions chunks or as
+   ``response.*`` events, or forwards to a real upstream (``--upstream``) with the key from
+   ``--key-env``. The gateway and the client never hold that key.
+3. The gateway (``create_app``) forwards to the recorder; ``pii-guard connect`` configures the
+   client (pi's ``models.json``; Muse's ``settings.json``, ``endpoint_transport``). Muse can't
+   send ``X-PII-Guard-Mode``, so its gateway runs in fast mode (``PII_GUARD_GATEWAY_MODE``).
+4. The client runs headless (``pi --print``, ``muse exec``) on a copy of
+   ``examples/coding-agents/mini-repo``.
 
 The result (:class:`RunResult`) says whether any gold value (``examples/coding-agents/gold.json``)
-reached the upstream, whether the gateway refused a request, and what pi wrote: the files hold
-the real values again, because tool-call arguments come back restored. Values pii-guard does not
-cover yet (names inside CSV rows) are counted separately as known gaps.
+reached the upstream, whether the gateway refused a request, and what the agent wrote: the files
+hold the real values again, because tool-call arguments come back restored. Values pii-guard
+does not cover yet (names inside CSV rows) are counted separately as known gaps.
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -42,30 +50,40 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from pii_guard.integrations.muse_code import MUSE_VERSION_CHECKED
 from pii_guard.vault.placeholders import PLACEHOLDER_RE
 
 __all__ = [
     "EXAMPLE_DIR",
+    "MUSE_INSTALLER",
+    "MUSE_VERSION",
     "PI_PACKAGE",
     "PI_VERSION",
     "PROMPT",
     "Recorder",
     "RunResult",
+    "install_muse",
     "install_pi",
     "load_gold",
     "main",
     "run",
+    "run_muse",
 ]
 
 PI_PACKAGE = "@earendil-works/pi-coding-agent"
 PI_VERSION = "1.4.0"
+MUSE_VERSION = MUSE_VERSION_CHECKED
+MUSE_INSTALLER = "https://dev.meta.ai/install.sh"
 EXAMPLE_DIR = Path(__file__).resolve().parents[3] / "examples" / "coding-agents"
 SCRIPTED_MODEL = "pii-guard-mock-coder"
+#: The key Muse Code sends the gateway in a run; the gateway replaces it with its own.
+MUSE_RUN_KEY = "pii-guard-e2e-not-a-key"
 PROMPT = (
     "Read client-letter.md, customers.csv and .env in this directory. Then write reply.md: a "
     "short reply to the author of the letter that confirms the refund to the IBAN they gave and "
@@ -75,13 +93,14 @@ PROMPT = (
     "into the real values on this machine. Do not change any other file. Answer with one "
     "sentence when you are done."
 )
+_READS = ("client-letter.md", "customers.csv", ".env")
 
 
 def load_gold(example_dir: Path = EXAMPLE_DIR) -> dict[str, Any]:
     return json.loads((example_dir / "gold.json").read_text(encoding="utf-8"))
 
 
-# --- pi ----------------------------------------------------------------------------------
+# --- the clients -------------------------------------------------------------------------
 
 
 def install_pi(prefix: Path, version: str = PI_VERSION) -> Path:
@@ -110,6 +129,43 @@ def install_pi(prefix: Path, version: str = PI_VERSION) -> Path:
         capture_output=True,
         timeout=600,
     )
+    return binary
+
+
+def install_muse(home: Path, version: str = MUSE_VERSION) -> Path:
+    """Muse Code's binary, from the official installer into the throwaway ``home``.
+
+    The installer always fetches the current release; only ``version`` is run (the protocol
+    capture and these tests are for it). Another version raises :class:`RuntimeError`: re-run
+    the capture (docs/integrations/muse-code.md) and update ``MUSE_VERSION_CHECKED``.
+    """
+    bin_dir = home / ".local" / "bin"
+    binary = bin_dir / f"muse-bin-{version}"
+    if binary.exists():
+        return binary
+    bash = shutil.which("bash")
+    if bash is None:
+        raise RuntimeError("bash is not installed")
+    home.mkdir(parents=True, exist_ok=True)
+    script = home / "muse-install.sh"
+    response = httpx.get(MUSE_INSTALLER, follow_redirects=True, timeout=60)
+    response.raise_for_status()
+    script.write_bytes(response.content)
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(home / ".config"),
+        "MUSE_NO_MODIFY_PATH": "1",
+    }
+    subprocess.run(  # noqa: S603 - the official installer, into a throwaway HOME
+        [bash, str(script)], env=env, check=True, capture_output=True, timeout=900
+    )
+    if not binary.exists():
+        found = sorted(p.name for p in bin_dir.glob("muse-bin-*"))
+        raise RuntimeError(
+            f"the Muse Code installer gave {', '.join(found) or 'nothing'}; this harness is "
+            f"pinned to {version} (update MUSE_VERSION_CHECKED after re-checking the protocol)"
+        )
     return binary
 
 
@@ -142,6 +198,168 @@ def _tool_texts(body: dict[str, Any]) -> list[str]:
     return out
 
 
+def _seen(texts: list[str]) -> list[str]:
+    return list(dict.fromkeys(m.group(0) for m in PLACEHOLDER_RE.finditer("\n".join(texts))))
+
+
+def _reply(seen: list[str]) -> str:
+    return "Reply to the client\n\n" + "\n".join(f"- {p}" for p in seen) + "\n"
+
+
+# Responses API (Muse Code) -----------------------------------------------------------------
+
+
+def _function_names(body: dict[str, Any]) -> dict[str, tuple[str, dict[str, Any]]]:
+    """Bare tool name -> (the name a call uses, its definition). Namespaced tools are called
+    ``<namespace>.<name>`` (``muse.read_file``), as the Meta Model API does."""
+    names: dict[str, tuple[str, dict[str, Any]]] = {}
+    for tool in body.get("tools") or []:
+        if not isinstance(tool, dict):
+            continue
+        if tool.get("type") == "namespace":
+            for sub in tool.get("tools") or []:
+                if isinstance(sub, dict) and isinstance(sub.get("name"), str):
+                    names[sub["name"]] = (f"{tool.get('name')}.{sub['name']}", sub)
+        elif isinstance(tool.get("name"), str):
+            names[tool["name"]] = (tool["name"], tool)
+    return names
+
+
+def _call_outputs(body: dict[str, Any]) -> list[str]:
+    out = []
+    for item in body.get("input") or []:
+        if isinstance(item, dict) and item.get("type") == "function_call_output":
+            output = item.get("output")
+            if isinstance(output, list):
+                output = "\n".join(str(p.get("text", "")) for p in output if isinstance(p, dict))
+            out.append(str(output or ""))
+    return out
+
+
+def _last_input_text(body: dict[str, Any]) -> str:
+    items = body.get("input")
+    if isinstance(items, str):
+        return items
+    for item in reversed(items or []):
+        if isinstance(item, dict) and item.get("role") == "user":
+            content = item.get("content")
+            if isinstance(content, list):
+                return "\n".join(str(p.get("text", "")) for p in content if isinstance(p, dict))
+            return str(content or "")
+    return ""
+
+
+def _scripted_turn(body: dict[str, Any]) -> tuple[str, Any]:
+    """``("call", (name, arguments))`` or ``("text", text)`` for one Responses request."""
+    names = _function_names(body)
+    if "submit_reminder_decision" in names:
+        # Muse's side observers (skill, goal, verify reminders): decide "none".
+        name, definition = names["submit_reminder_decision"]
+        required = (definition.get("parameters") or {}).get("required") or []
+        arguments: dict[str, Any] = {key: None for key in required if isinstance(key, str)}
+        arguments["decision"] = "none"
+        return "call", (name, arguments)
+    if "read_file" not in names or "write_file" not in names:
+        return "text", "OK."
+    outputs = _call_outputs(body)
+    step = len(outputs)
+    if step < len(_READS):
+        return "call", (names["read_file"][0], {"path": _READS[step]})
+    if step == len(_READS):
+        return "call", (
+            names["write_file"][0],
+            {"path": "reply.md", "content": _reply(_seen(outputs))},
+        )
+    return "text", "Done: wrote reply.md."
+
+
+class _ResponseEvents:
+    """One scripted ``response.*`` stream (the shape the Meta Model API sends)."""
+
+    def __init__(self, number: int) -> None:
+        self.id = f"resp_mock_{number}"
+        self.sequence = 0
+        self.lines: list[str] = []
+
+    def add(self, event_type: str, **fields: Any) -> None:
+        event = {"type": event_type, **fields, "sequence_number": self.sequence}
+        self.sequence += 1
+        self.lines.append(f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n")
+
+    def response(self, status: str, output: list[dict[str, Any]]) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "object": "response",
+            "created_at": 1_800_000_000,
+            "status": status,
+            "model": SCRIPTED_MODEL,
+            "output": output,
+            "store": False,
+        }
+
+
+def _response_stream(number: int, turn: tuple[str, Any]) -> list[str]:
+    events = _ResponseEvents(number)
+    events.add("response.created", response=events.response("in_progress", []))
+    events.add("response.in_progress", response=events.response("in_progress", []))
+    # An opaque reasoning item, as the Meta Model API sends with include=[encrypted_content].
+    reasoning = {"id": f"rs_mock_{number}", "type": "reasoning", "summary": []}
+    events.add("response.output_item.added", output_index=0, item={**reasoning, "status": "x"})
+    reasoning = {**reasoning, "encrypted_content": f"mock-encrypted-{number}", "status": "done"}
+    events.add("response.output_item.done", output_index=0, item=reasoning)
+    kind, payload = turn
+    if kind == "text":
+        item_id = f"msg_mock_{number}"
+        item: dict[str, Any] = {
+            "id": item_id,
+            "type": "message",
+            "role": "assistant",
+            "content": [],
+        }
+        events.add("response.output_item.added", output_index=1, item=item)
+        part: dict[str, Any] = {"type": "output_text", "text": "", "annotations": []}
+        where = {"item_id": item_id, "output_index": 1, "content_index": 0}
+        events.add("response.content_part.added", **where, part=part)
+        for piece in _pieces(payload):
+            events.add("response.output_text.delta", **where, delta=piece)
+        events.add("response.output_text.done", **where, text=payload)
+        part = {**part, "text": payload}
+        events.add("response.content_part.done", **where, part=part)
+        item = {**item, "content": [part], "status": "completed"}
+    else:
+        name, arguments = payload
+        item_id = f"fc_mock_{number}"
+        item = {
+            "id": item_id,
+            "type": "function_call",
+            "call_id": f"call_mock_{number}",
+            "name": name,
+            "arguments": "",
+        }
+        events.add("response.output_item.added", output_index=1, item=item)
+        text = json.dumps(arguments, ensure_ascii=False)
+        for piece in _pieces(text):
+            events.add(
+                "response.function_call_arguments.delta",
+                item_id=item_id,
+                output_index=1,
+                delta=piece,
+            )
+        events.add(
+            "response.function_call_arguments.done",
+            item_id=item_id,
+            output_index=1,
+            name=name,
+            arguments=text,
+        )
+        item = {**item, "arguments": text, "status": "completed"}
+    events.add("response.output_item.done", output_index=1, item=item)
+    completed = events.response("completed", [reasoning, item])
+    completed["usage"] = {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+    events.add("response.completed", response=completed)
+    return [*events.lines, "data: [DONE]\n\n"]
+
+
 class Recorder:
     """Keeps every request; answers as a scripted coder or forwards to a real upstream."""
 
@@ -152,7 +370,9 @@ class Recorder:
         self._lock = threading.Lock()
         self.app = FastAPI()
         self.app.add_api_route("/v1/models", self.models, methods=["GET"])
+        self.app.add_api_route("/muse-code/models", self.muse_models, methods=["GET"])
         self.app.add_api_route("/v1/chat/completions", self.chat, methods=["POST"])
+        self.app.add_api_route("/v1/responses", self.responses, methods=["POST"])
 
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -160,23 +380,62 @@ class Recorder:
             headers["Authorization"] = f"Bearer {self.key}"
         return headers
 
+    def _record(self, raw: bytes) -> int:
+        with self._lock:
+            self.bodies.append(raw.decode("utf-8", errors="replace"))
+            return len(self.bodies)
+
+    async def _get(self, url: str) -> Response:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(url, headers=self._headers())
+        return Response(response.content, response.status_code, media_type="application/json")
+
     async def models(self) -> Response:
         if self.upstream is None:
             return JSONResponse({"object": "list", "data": [{"id": SCRIPTED_MODEL}]})
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get(self.upstream + "/models", headers=self._headers())
-        return Response(response.content, response.status_code, media_type="application/json")
+        return await self._get(self.upstream + "/models")
+
+    async def muse_models(self) -> Response:
+        if self.upstream is None:
+            model: dict[str, Any] = {
+                "id": SCRIPTED_MODEL,
+                "object": "model",
+                "owned_by": "pii-guard",
+                "metadata": {"muse-code": {"name": SCRIPTED_MODEL, "tool_call": True}},
+            }
+            return JSONResponse({"object": "list", "data": [model]})
+        parts = urlsplit(self.upstream)
+        return await self._get(f"{parts.scheme}://{parts.netloc}/muse-code/models")
 
     async def chat(self, request: Request) -> Response:
         raw = await request.body()
-        with self._lock:
-            self.bodies.append(raw.decode("utf-8", errors="replace"))
+        self._record(raw)
         body = json.loads(raw)
         if self.upstream is not None:
-            return await self._forward(raw, bool(body.get("stream")))
+            return await self._forward("/chat/completions", raw, bool(body.get("stream")))
         if not body.get("stream"):
             return JSONResponse(self._scripted_completion(body))
         return StreamingResponse(self._scripted(body), media_type="text/event-stream")
+
+    async def responses(self, request: Request) -> Response:
+        raw = await request.body()
+        number = self._record(raw)
+        body = json.loads(raw)
+        if self.upstream is not None:
+            return await self._forward("/responses", raw, bool(body.get("stream")))
+        if not body.get("stream"):  # connect muse-code --check
+            seen = list(dict.fromkeys(PLACEHOLDER_RE.findall(_last_input_text(body))))
+            text = "Contact: " + ", ".join(f"[[{t}_{i}]]" for t, i in seen)
+            events = _ResponseEvents(number)
+            part = {"type": "output_text", "text": text, "annotations": []}
+            item = {"id": "msg_check", "type": "message", "role": "assistant", "content": [part]}
+            return JSONResponse(events.response("completed", [item]))
+
+        async def stream() -> AsyncIterator[str]:
+            for line in _response_stream(number, _scripted_turn(body)):
+                yield line
+
+        return StreamingResponse(stream(), media_type="text/event-stream")
 
     def _scripted_completion(self, body: dict[str, Any]) -> dict[str, Any]:
         """A non-streamed answer (``connect --check``): repeats the placeholders it got."""
@@ -197,12 +456,12 @@ class Recorder:
             ],
         }
 
-    async def _forward(self, raw: bytes, stream: bool) -> Response:
-        if self.upstream is None:  # pragma: no cover - chat() only forwards with one
+    async def _forward(self, path: str, raw: bytes, stream: bool) -> Response:
+        if self.upstream is None:  # pragma: no cover - only called with an upstream
             raise RuntimeError("no upstream to forward to")
         client = httpx.AsyncClient(timeout=httpx.Timeout(300, connect=10))
         request = client.build_request(
-            "POST", self.upstream + "/chat/completions", content=raw, headers=self._headers()
+            "POST", self.upstream + path, content=raw, headers=self._headers()
         )
         response = await client.send(request, stream=True)
         if not stream or response.status_code >= 400:
@@ -224,18 +483,13 @@ class Recorder:
     def _scripted(self, body: dict[str, Any]) -> AsyncIterator[str]:
         tools = _tool_texts(body)
         step = len(tools)
-        reads = ("client-letter.md", "customers.csv", ".env")
 
         async def events() -> AsyncIterator[str]:
             yield _chunk({"role": "assistant", "content": ""})
-            if step < len(reads):
-                call = ("read", {"path": reads[step]})
-            elif step == len(reads):
-                seen = list(
-                    dict.fromkeys(m.group(0) for m in PLACEHOLDER_RE.finditer("\n".join(tools)))
-                )
-                content = "Reply to the client\n\n" + "\n".join(f"- {p}" for p in seen) + "\n"
-                call = ("write", {"path": "reply.md", "content": content})
+            if step < len(_READS):
+                call = ("read", {"path": _READS[step]})
+            elif step == len(_READS):
+                call = ("write", {"path": "reply.md", "content": _reply(_seen(tools))})
             else:
                 call = None
             if call is None:
@@ -296,11 +550,17 @@ def serve(app: Any, port: int | None = None) -> Iterator[str]:
         thread.join(timeout=10)
 
 
-def gateway_app(upstream_url: str, statuses: list[int]) -> FastAPI:
+_COUNTED = ("/v1/chat/completions", "/v1/responses")
+
+
+def gateway_app(upstream_url: str, statuses: list[int], *, mode: str | None = None) -> FastAPI:
+    """The gateway in front of ``upstream_url``; ``mode`` sets its default mode (Muse Code
+    can't send ``X-PII-Guard-Mode``)."""
     from pydantic import SecretStr
 
     from pii_guard.api.app import create_app
     from pii_guard.config import Settings
+    from pii_guard.gateway import GatewayConfig, Mode
 
     settings = Settings(
         tenant_key=SecretStr(secrets.token_hex(32)),
@@ -308,11 +568,13 @@ def gateway_app(upstream_url: str, statuses: list[int]) -> FastAPI:
         upstream_api_key=SecretStr("recorder-holds-the-real-key"),
     )
     app = create_app(settings)
+    if mode is not None:
+        app.state.gateway_config = GatewayConfig(mode=Mode(mode))
 
     @app.middleware("http")
     async def count(request: Request, call_next: Any) -> Response:
         response = await call_next(request)
-        if request.url.path == "/v1/chat/completions":
+        if request.url.path in _COUNTED:
             statuses.append(response.status_code)
         return response
 
@@ -324,12 +586,13 @@ def gateway_app(upstream_url: str, statuses: list[int]) -> FastAPI:
 
 @dataclass
 class RunResult:
-    pi_version: str
+    client: str
+    client_version: str
     upstream: str
     model: str
     ner: bool
-    pi_exit: int
-    pi_output: str
+    client_exit: int
+    client_output: str
     requests: int
     gateway_statuses: list[int]
     refused: int
@@ -343,11 +606,14 @@ class RunResult:
     placeholders_by_type: dict[str, int] = field(default_factory=dict)
     request_keys: dict[str, list[str]] = field(default_factory=dict)
     seconds: float = 0.0
+    #: Multi-word gold values (names) not upstream whole, but with a word of them upstream
+    #: (a partly masked name). Reported, not part of :attr:`ok` (the whole-value check).
+    gold_partial_upstream: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
         return (
-            self.pi_exit == 0
+            self.client_exit == 0
             and self.refused == 0
             and not self.gold_upstream
             and self.placeholders_upstream > 0
@@ -370,104 +636,106 @@ def _by_type(text: str) -> dict[str, int]:
 
 
 def _request_keys(bodies: list[str]) -> dict[str, list[str]]:
+    """The fields the client sent (names only): what the allow-list had to cover."""
     top: set[str] = set()
     message: set[str] = set()
     roles: set[str] = set()
+    items: set[str] = set()
     for raw in bodies:
         body = json.loads(raw)
         top |= set(body)
         for m in body.get("messages") or []:
             message |= set(m)
             roles.add(str(m.get("role")))
-    return {"top_level": sorted(top), "message": sorted(message), "roles": sorted(roles)}
+        inputs = body.get("input")
+        for item in inputs if isinstance(inputs, list) else []:
+            if isinstance(item, dict):
+                kind = str(item.get("type") or "message")
+                items.add(kind)
+                message |= {f"{kind}.{key}" for key in item}
+                if "role" in item:
+                    roles.add(str(item["role"]))
+    out = {"top_level": sorted(top), "message": sorted(message), "roles": sorted(roles)}
+    if items:
+        out["input_items"] = sorted(items)
+    return out
 
 
-def run(
-    *,
-    pi_bin: Path,
-    upstream: str | None = None,
-    key: str | None = None,
-    model: str | None = None,
-    example_dir: Path = EXAMPLE_DIR,
-    prompt: str = PROMPT,
-    timeout: float = 900,
-) -> RunResult:
-    gold = load_gold(example_dir)
-    ner = _ner_available()
-    checked = list(gold["rules"]) + (list(gold["ner"]) if ner else [])
-    gaps = {kind: list(values) for kind, values in gold["known_gaps"].items()}
-    started = time.monotonic()
-    recorder = Recorder(upstream, key)
-    statuses: list[int] = []
-    with tempfile.TemporaryDirectory(prefix="pii-guard-pi-e2e-") as tmp:
+@contextmanager
+def _workspace(example_dir: Path, prefix: str) -> Iterator[tuple[Path, Path, set[Path]]]:
+    """``(root, work, files before)``: a copy of the mini-repo in a throwaway directory."""
+    with tempfile.TemporaryDirectory(prefix=prefix) as tmp:
         root = Path(tmp)
         work = root / "work"
         shutil.copytree(example_dir / "mini-repo", work)
         # Kept as env.fake in the repo (a tracked .env would be ignored by git, or loaded by
         # tools that read .env); the agent sees it under its usual name.
         (work / "env.fake").rename(work / ".env")
-        before = {p.relative_to(work) for p in work.rglob("*") if p.is_file()}
-        agent_dir = root / "agent"
-        with (
-            serve(recorder.app) as recorder_url,
-            serve(gateway_app(recorder_url + "/v1", statuses)) as gateway_url,
-        ):
-            from pii_guard.integrations.cli import main as connect
+        yield root, work, {p.relative_to(work) for p in work.rglob("*") if p.is_file()}
 
-            args = ["pi", "--gateway", gateway_url + "/v1", "--agent-dir", str(agent_dir)]
-            if model:
-                args += ["--model", model]
-            with open(os.devnull, "w") as quiet:
-                if connect(args, stdout=quiet) != 0:
-                    raise RuntimeError("pii-guard connect pi failed")
-            chosen = model or SCRIPTED_MODEL
-            env = {
-                "PATH": os.environ.get("PATH", ""),
-                "HOME": str(root / "home"),
-                "PI_CODING_AGENT_DIR": str(agent_dir),
-                "PI_OFFLINE": "1",
-                "PI_SKIP_VERSION_CHECK": "1",
-                "PI_TELEMETRY": "0",
-            }
-            try:
-                proc = subprocess.run(  # noqa: S603 - the pinned pi this harness installed
-                    [
-                        str(pi_bin),
-                        "--print",
-                        "--no-session",
-                        "--provider",
-                        "pii-guard",
-                        "--model",
-                        chosen,
-                        prompt,
-                    ],
-                    cwd=work,
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                )
-            except subprocess.TimeoutExpired as exc:
-                partial = exc.stdout or b""
-                text = partial.decode(errors="replace") if isinstance(partial, bytes) else partial
-                proc = subprocess.CompletedProcess(exc.cmd, -1, text, "timed out")
-        after = {p.relative_to(work) for p in work.rglob("*") if p.is_file()}
-        written = sorted(str(p) for p in after - before)
-        texts = "\n".join(
-            (work / p).read_text(encoding="utf-8", errors="replace") for p in sorted(after - before)
+
+def _client_run(cmd: list[str], cwd: Path, env: dict[str, str], timeout: float) -> Any:
+    try:
+        return subprocess.run(  # noqa: S603 - the pinned client this harness installed
+            cmd, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout
         )
+    except subprocess.TimeoutExpired as exc:
+        partial = exc.stdout or b""
+        text = partial.decode(errors="replace") if isinstance(partial, bytes) else partial
+        return subprocess.CompletedProcess(exc.cmd, -1, text, "timed out")
 
+
+def _written(work: Path, before: set[Path]) -> tuple[list[str], str]:
+    after = {p.relative_to(work) for p in work.rglob("*") if p.is_file()}
+    new = sorted(after - before)
+    texts = "\n".join((work / p).read_text(encoding="utf-8", errors="replace") for p in new)
+    return [str(p) for p in new], texts
+
+
+def _partial(values: list[str], upstream_text: str) -> list[str]:
+    """Multi-word values whose words (3+ letters) appear upstream as words, case-sensitive."""
+
+    def found(word: str) -> bool:
+        return re.search(rf"(?<![\w.@]){re.escape(word)}(?![\w@])", upstream_text) is not None
+
+    out = []
+    for value in values:
+        words = [w for w in value.split() if len(w) >= 3 and w.isalpha()]
+        if len(words) > 1 and value not in upstream_text and any(found(w) for w in words):
+            out.append(value)
+    return out
+
+
+def _result(
+    *,
+    client: str,
+    version: str,
+    upstream: str | None,
+    model: str | None,
+    proc: Any,
+    output: str,
+    recorder: Recorder,
+    statuses: list[int],
+    written: list[str],
+    texts: str,
+    gold: dict[str, Any],
+    ner: bool,
+    started: float,
+) -> RunResult:
+    checked = list(gold["rules"]) + (list(gold["ner"]) if ner else [])
+    gaps = {kind: list(values) for kind, values in gold["known_gaps"].items()}
     upstream_text = "\n".join(
         json.dumps(json.loads(b), ensure_ascii=False) for b in recorder.bodies
     )
     upstream_text += "\n" + "\n".join(recorder.bodies)
     return RunResult(
-        pi_version=PI_VERSION,
+        client=client,
+        client_version=version,
         upstream=upstream or "scripted mock",
         model=model or SCRIPTED_MODEL,
         ner=ner,
-        pi_exit=proc.returncode,
-        pi_output=(proc.stdout + proc.stderr).strip()[-2000:],
+        client_exit=proc.returncode,
+        client_output=output.strip()[-2000:],
         requests=len(recorder.bodies),
         gateway_statuses=statuses,
         refused=sum(1 for s in statuses if s != 200),
@@ -481,6 +749,126 @@ def run(
         placeholders_by_type=_by_type(upstream_text),
         request_keys=_request_keys(recorder.bodies) if recorder.bodies else {},
         seconds=round(time.monotonic() - started, 1),
+        gold_partial_upstream=_partial(checked, upstream_text),
+    )
+
+
+def _connect(args: list[str]) -> None:
+    from pii_guard.integrations.cli import main as connect
+
+    with open(os.devnull, "w") as quiet:
+        if connect(args, stdout=quiet) != 0:
+            raise RuntimeError(f"pii-guard connect {args[0]} failed")
+
+
+def run(
+    *,
+    pi_bin: Path,
+    upstream: str | None = None,
+    key: str | None = None,
+    model: str | None = None,
+    example_dir: Path = EXAMPLE_DIR,
+    prompt: str = PROMPT,
+    timeout: float = 900,
+) -> RunResult:
+    """pi through the gateway (Chat Completions)."""
+    gold = load_gold(example_dir)
+    ner = _ner_available()
+    started = time.monotonic()
+    recorder = Recorder(upstream, key)
+    statuses: list[int] = []
+    with _workspace(example_dir, "pii-guard-pi-e2e-") as (root, work, before):
+        agent_dir = root / "agent"
+        with (
+            serve(recorder.app) as recorder_url,
+            serve(gateway_app(recorder_url + "/v1", statuses)) as gateway_url,
+        ):
+            args = ["pi", "--gateway", gateway_url + "/v1", "--agent-dir", str(agent_dir)]
+            _connect(args + (["--model", model] if model else []))
+            env = {
+                "PATH": os.environ.get("PATH", ""),
+                "HOME": str(root / "home"),
+                "PI_CODING_AGENT_DIR": str(agent_dir),
+                "PI_OFFLINE": "1",
+                "PI_SKIP_VERSION_CHECK": "1",
+                "PI_TELEMETRY": "0",
+            }
+            cmd = [str(pi_bin), "--print", "--no-session", "--provider", "pii-guard"]
+            cmd += ["--model", model or SCRIPTED_MODEL, prompt]
+            proc = _client_run(cmd, work, env, timeout)
+        written, texts = _written(work, before)
+    return _result(
+        client="pi",
+        version=PI_VERSION,
+        upstream=upstream,
+        model=model,
+        proc=proc,
+        output=proc.stdout + proc.stderr,
+        recorder=recorder,
+        statuses=statuses,
+        written=written,
+        texts=texts,
+        gold=gold,
+        ner=ner,
+        started=started,
+    )
+
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def run_muse(
+    *,
+    muse_bin: Path,
+    upstream: str | None = None,
+    key: str | None = None,
+    model: str | None = None,
+    example_dir: Path = EXAMPLE_DIR,
+    prompt: str = PROMPT,
+    timeout: float = 900,
+    reasoning_effort: str = "low",
+) -> RunResult:
+    """Muse Code through the gateway (Responses API), the gateway in fast mode."""
+    gold = load_gold(example_dir)
+    ner = _ner_available()
+    started = time.monotonic()
+    recorder = Recorder(upstream, key)
+    statuses: list[int] = []
+    with _workspace(example_dir, "pii-guard-muse-e2e-") as (root, work, before):
+        home = root / "home"
+        config = home / ".config"
+        with (
+            serve(recorder.app) as recorder_url,
+            serve(gateway_app(recorder_url + "/v1", statuses, mode="fast")) as gateway_url,
+        ):
+            muse_dir = str(config / "muse")  # Muse reads $XDG_CONFIG_HOME/muse/settings.json
+            _connect(["muse-code", "--gateway", gateway_url + "/v1", "--muse-dir", muse_dir])
+            env = {
+                "PATH": os.environ.get("PATH", ""),
+                "HOME": str(home),
+                "XDG_CONFIG_HOME": str(config),
+                "META_API_KEY": MUSE_RUN_KEY,  # the gateway replaces it with its own key
+                "MUSE_NO_AUTO_UPDATE": "1",
+                "NO_COLOR": "1",
+            }
+            cmd = [str(muse_bin), "exec", "--model", model or SCRIPTED_MODEL]
+            cmd += ["--reasoning-effort", reasoning_effort, "--workspace", str(work), prompt]
+            proc = _client_run(cmd, work, env, timeout)
+        written, texts = _written(work, before)
+    return _result(
+        client="muse-code",
+        version=MUSE_VERSION,
+        upstream=upstream,
+        model=model,
+        proc=proc,
+        output=_ANSI_RE.sub("", proc.stdout + proc.stderr),
+        recorder=recorder,
+        statuses=statuses,
+        written=written,
+        texts=texts,
+        gold=gold,
+        ner=ner,
+        started=started,
     )
 
 
@@ -490,15 +878,15 @@ def record(result: RunResult, path: Path) -> None:
     Not ``eval/results/runs/``: every record there follows the eval record schema.
     """
     data = asdict(result)
-    data.pop("pi_output")
+    data.pop("client_output")
     gold_upstream = data.pop("gold_upstream")
     restored = data.pop("restored_in_files")
     checked = data.pop("gold_checked")
+    data["gold_partial_upstream"] = len(data["gold_partial_upstream"])
     data.update(
         {
             "kind": "coding-agent-e2e",
             "date": datetime.now(UTC).strftime("%Y-%m-%d"),
-            "client": "pi",
             "gateway_mode": "fast",
             "gold_checked": len(checked),
             "gold_upstream": len(gold_upstream),
@@ -512,12 +900,16 @@ def record(result: RunResult, path: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m pii_guard.integrations.e2e")
+    parser.add_argument("--client", choices=("pi", "muse-code"), default="pi")
     parser.add_argument("--upstream", default=None, help="a real OpenAI-compatible base URL")
     parser.add_argument("--model", default=None, help="model id (required with --upstream)")
     parser.add_argument("--key-env", default=None, help="env var (or .env key) with its API key")
     parser.add_argument("--pi-prefix", default=None, help="npm prefix for pi (default: temp)")
+    parser.add_argument(
+        "--muse-home", default=None, help="throwaway HOME for the Muse Code install (default: temp)"
+    )
     parser.add_argument("--record", default=None, help="write a run record JSON here")
-    parser.add_argument("--timeout", type=float, default=900, help="pi's time limit (s)")
+    parser.add_argument("--timeout", type=float, default=900, help="the client's time limit (s)")
     args = parser.parse_args(argv)
     if args.upstream and not args.model:
         parser.error("--upstream needs --model")
@@ -526,17 +918,35 @@ def main(argv: list[str] | None = None) -> int:
         key = os.environ.get(args.key_env) or _dotenv(args.key_env)
         if not key:
             parser.error(f"{args.key_env} is not set")
-    prefix = (
-        Path(args.pi_prefix) if args.pi_prefix else Path(tempfile.gettempdir()) / "pii-guard-pi"
-    )
-    pi_bin = install_pi(prefix)
-    result = run(
-        pi_bin=pi_bin, upstream=args.upstream, key=key, model=args.model, timeout=args.timeout
-    )
+    if args.client == "muse-code":
+        home = (
+            Path(args.muse_home)
+            if args.muse_home
+            else Path(tempfile.gettempdir()) / "pii-guard-muse"
+        )
+        result = run_muse(
+            muse_bin=install_muse(home),
+            upstream=args.upstream,
+            key=key,
+            model=args.model,
+            timeout=args.timeout,
+        )
+    else:
+        prefix = (
+            Path(args.pi_prefix) if args.pi_prefix else Path(tempfile.gettempdir()) / "pii-guard-pi"
+        )
+        result = run(
+            pi_bin=install_pi(prefix),
+            upstream=args.upstream,
+            key=key,
+            model=args.model,
+            timeout=args.timeout,
+        )
     summary = asdict(result)
     summary["gold_upstream"] = len(result.gold_upstream)  # counts only: never print values
     summary["restored_in_files"] = len(result.restored_in_files)
     summary["gold_checked"] = len(result.gold_checked)
+    summary["gold_partial_upstream"] = len(result.gold_partial_upstream)
     summary["ok"] = result.ok
     print(json.dumps(summary, indent=2))
     if args.record:

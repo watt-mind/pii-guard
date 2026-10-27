@@ -4,12 +4,12 @@ import type { ThemePref } from "../hooks/useTheme";
 
 export type Screen = "playground" | "chat" | "images" | "benchmarks" | "traffic";
 
-const SCREENS: { id: Screen; step: string; label: string; short?: string }[] = [
-  { id: "playground", step: "1", label: "Mask" },
-  { id: "chat", step: "2", label: "Chat" },
-  { id: "images", step: "3", label: "Images" },
-  { id: "benchmarks", step: "4", label: "Benchmarks" },
-  { id: "traffic", step: "5", label: "Live traffic", short: "Traffic" },
+const SCREENS: { id: Screen; label: string; short?: string }[] = [
+  { id: "playground", label: "Mask" },
+  { id: "chat", label: "Chat" },
+  { id: "images", label: "Images" },
+  { id: "benchmarks", label: "Benchmarks" },
+  { id: "traffic", label: "Live traffic", short: "Traffic" },
 ];
 
 interface Props {
@@ -34,7 +34,7 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
   };
 
   return (
-    <header className="relative z-30 border-b md:sticky md:top-0 border-line bg-canvas/85 backdrop-blur-md">
+    <header className="relative z-30 border-b border-line bg-canvas md:sticky md:top-0">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:rounded focus:bg-surface focus:px-3 focus:py-1">
           Skip to content
@@ -42,12 +42,12 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
         <div className="flex items-center gap-2.5">
           <Logo />
           <div className="leading-tight">
-            <p className="text-[15px] font-semibold tracking-tight text-ink">pii-guard</p>
-            <p className="hidden text-xs text-muted sm:block">privacy firewall for AI agents</p>
+            <p className="font-mono text-sm font-semibold tracking-tight text-ink">pii-guard</p>
+            <p className="hidden text-xs text-muted xl:block">privacy firewall for AI agents</p>
           </div>
         </div>
 
-        <div role="tablist" aria-label="Demo screens" className="order-last flex w-full gap-1 rounded-xl bg-surface-2 p-1 ring-1 ring-line md:order-none md:w-auto">
+        <div role="tablist" aria-label="Demo screens" className="order-last -mb-3 flex w-full gap-1 overflow-x-auto md:order-none md:mb-0 md:w-auto md:self-stretch">
           {SCREENS.map((s) => {
             const selected = s.id === screen;
             return (
@@ -62,19 +62,11 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
                 onClick={() => onScreen(s.id)}
                 onKeyDown={onTabKey}
                 className={[
-                  "flex min-w-0 flex-auto items-center justify-center gap-2 rounded-lg px-1.5 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors sm:px-3.5 sm:py-1.5 sm:text-sm md:flex-none",
-                  selected ? "bg-surface text-ink shadow-sm ring-1 ring-line dark:bg-line-strong dark:ring-faint/40" : "text-muted hover:text-ink",
+                  "relative flex min-w-0 flex-auto items-center justify-center px-2 py-3 text-ui font-medium whitespace-nowrap transition-colors sm:px-3 sm:text-sm md:flex-none md:py-0",
+                  "after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full sm:after:inset-x-3",
+                  selected ? "text-ink after:bg-ink" : "text-muted hover:text-ink after:bg-transparent",
                 ].join(" ")}
               >
-                <span
-                  aria-hidden="true"
-                  className={[
-                    "hidden size-5 place-items-center rounded-full text-[11px] font-semibold tabular-nums sm:grid",
-                    selected ? "bg-ink text-canvas" : "bg-line text-muted",
-                  ].join(" ")}
-                >
-                  {s.step}
-                </span>
                 {s.short ? (
                   <>
                     <span className="lg:hidden">{s.short}</span>
@@ -88,8 +80,9 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
           })}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
           <EngineBadge state={engineState} engine={engine} onRecheck={onRecheck} />
+          <span className="flex-1 sm:hidden" />
           <label className="sr-only" htmlFor="engine-mode">
             Engine
           </label>
@@ -113,55 +106,31 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
 function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine: EngineDisplay; onRecheck: () => void }) {
   const reason = engineReason(state);
   const status = state.status;
-  const apiLabel =
-    status.state === "online"
-      ? engine === "mock"
-        ? `API v${status.version} · not in use`
-        : `API v${status.version}`
-      : status.state === "checking"
-        ? "API …"
-        : "API offline";
-  const dot =
-    status.state === "online" ? "bg-guard" : status.state === "checking" ? "bg-faint animate-pulse" : "bg-danger";
+  const version = status.state === "online" ? `v${status.version}` : null;
+  // One indicator: what is answering right now, and the API's own state only when it differs.
+  const { label, detail, tone } =
+    engine === "pending"
+      ? { label: "Connecting…", detail: null, tone: "pending" as const }
+      : engine === "mock"
+        ? { label: "Demo mode", detail: status.state === "online" ? `API ${version} up, not in use` : "API offline", tone: "demo" as const }
+        : { label: "API up", detail: version, tone: "live" as const };
+  const dot = tone === "live" ? "bg-guard" : tone === "demo" ? "bg-warn" : "bg-faint motion-safe:animate-pulse";
 
   return (
-    <div className="flex items-center gap-2" role="status" aria-label={`${engine === "mock" ? "Demo engine" : engine === "pending" ? "Connecting" : "Live API"}. ${reason}.`}>
+    <div role="status" aria-label={`${label}. ${reason}.`}>
       <button
         type="button"
         onClick={onRecheck}
         title={`${reason}. Click to check again.`}
-        className="hidden items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface-2 sm:inline-flex"
+        className={[
+          "inline-flex h-8 items-center gap-2 rounded-lg border px-2.5 text-xs font-medium whitespace-nowrap transition-colors",
+          tone === "demo" ? "border-warn/40 bg-warn-soft text-warn" : "border-line text-ink hover:border-line-strong",
+        ].join(" ")}
       >
-        <span aria-hidden="true" className={["size-2 rounded-full", dot].join(" ")} />
-        <span className="tabular-nums">{apiLabel}</span>
+        <span aria-hidden="true" className={["size-1.5 rounded-full", dot].join(" ")} />
+        <span>{label}</span>
+        {detail && <span className="hidden font-mono text-2xs font-normal text-muted tabular-nums xl:inline">{detail}</span>}
       </button>
-      {engine === "pending" ? (
-        <span
-          title={reason}
-          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-muted"
-        >
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-faint motion-safe:animate-pulse" />
-          Connecting…
-        </span>
-      ) : engine === "mock" ? (
-        <span
-          title={reason}
-          className="inline-flex items-center gap-1.5 rounded-full border border-warn/40 bg-warn-soft px-2.5 py-1 text-xs font-semibold text-warn"
-        >
-          <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="currentColor">
-            <path d="M8 1.5 15 14H1L8 1.5Zm0 4a.75.75 0 0 0-.75.75v3.5a.75.75 0 0 0 1.5 0v-3.5A.75.75 0 0 0 8 5.5Zm0 7.25a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z" />
-          </svg>
-          Demo mode
-        </span>
-      ) : (
-        <span
-          title={reason}
-          className="inline-flex items-center gap-1.5 rounded-full border border-guard/40 bg-guard-soft px-2.5 py-1 text-xs font-semibold text-guard-ink"
-        >
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-guard" />
-          Live
-        </span>
-      )}
     </div>
   );
 }
@@ -198,8 +167,8 @@ function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemeP
 
 function Logo() {
   return (
-    <span className="grid size-9 place-items-center rounded-[10px] bg-[#14161a] text-[#b6f36b] ring-1 ring-black/10 dark:ring-white/10">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
+    <span className="grid size-8 place-items-center rounded-lg bg-ink text-canvas dark:bg-guard-soft dark:text-guard dark:ring-1 dark:ring-guard/30">
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
         <path d="M12 3 5 6v5.2c0 4.3 2.9 8 7 9.3 4.1-1.3 7-5 7-9.3V6l-7-3Z" />
         <path d="M8.6 12h6.8" strokeLinecap="round" />
       </svg>

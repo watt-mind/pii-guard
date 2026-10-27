@@ -14,6 +14,12 @@ cache, so a rerun with the same seed reproduces the corpus byte for byte without
     uv run python training/distill/corpus.py --language hu --n 2500 --seed 11 \\
         --out eval/generated/distill-s11 --budget-usd 1.5 --workers 24
 
+    # LAB-1150: written by Muse Glimmer on Modal (deploy/modal/glimmer.py), not a paid API
+    PII_GUARD_CORPUS_API_KEY=... uv run python training/distill/corpus.py --language hu \\
+        --n 1500 --seed 13 --out eval/generated/distill-s13 --budget-usd 1 --workers 32 \\
+        --base-url https://<workspace>--pii-guard-glimmer-serve.<region>.modal.run/v1 \\
+        --model muse-glimmer --reasoning-strength low
+
 Writes ``<lang>-distill-{train,dev}.jsonl`` and ``<lang>-distill-stats.json`` (counts, discard
 reasons, token usage and cost: never values). The cost cap counts uncached calls only; once it
 is reached the remaining documents are skipped (reason ``budget``), not sent.
@@ -58,7 +64,8 @@ from pii_guard.eval.generate import (
 from pii_guard.eval.identities import Value, identity_generator
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
-CORPUS_VERSION = 1
+#: 2 (LAB-1150): the generator's lexicon packs (LAB-1126) and hard negatives.
+CORPUS_VERSION = 2
 DEFAULT_MODEL = "muse-spark-1.3-contributor"
 #: USD per million tokens, Meta Model API contributor tier (dev.meta.ai pricing, 2026-10-27).
 PRICE_PER_M = {"prompt": 0.10, "completion": 0.20}
@@ -155,6 +162,13 @@ def plan(language: str, seed: int, index: int, pack: LanguagePack | None = None)
                 lines.append(f"- {pack.field_labels.get('given', 'given name')}: {value.text}")
         blocks.append("\n".join(lines))
         values.extend(party_values)
+    # Ordinary look-alike phrases the generator's packs ask for (never labelled).
+    hard = pack.hard_negatives
+    negatives = hard.pick(rng, pack.language, values) if hard and blocks else []
+    negatives_text = ""
+    if hard and negatives:
+        quoted = ", ".join(f'"{p}"' for p in negatives)
+        negatives_text = f" {hard.instruction} {quoted}."
     system = (
         _prompt("system.md")
         .replace("{language_name}", pack.language_name)
@@ -167,6 +181,7 @@ def plan(language: str, seed: int, index: int, pack: LanguagePack | None = None)
         .replace("{register}", template.register)
         .replace("{length}", template.length)
         .replace("{typos}", pack.typos if template.typos else "")
+        .replace("{hard_negatives}", negatives_text)
         .replace("{values}", "\n\n".join(blocks) if blocks else NO_VALUES)
     )
     if not blocks:
@@ -185,13 +200,35 @@ def plan(language: str, seed: int, index: int, pack: LanguagePack | None = None)
             {"role": "system", "content": system.strip()},
             {"role": "user", "content": user.strip()},
         ),
+        hard_negatives=tuple(negatives),
     )
+
+
+class GlimmerChatClient(ChatClient):
+    """:class:`ChatClient` for Muse Glimmer served with vLLM (``deploy/modal/glimmer.py``).
+
+    Glimmer ignores ``reasoning_effort``; its reasoning depth is a chat-template argument,
+    sent as ``chat_template_kwargs: {"reasoning_strength": ...}``.
+    """
+
+    def __init__(self, *, reasoning_strength: str, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.reasoning_strength = reasoning_strength
+
+    def payload(self, messages):  # type: ignore[no-untyped-def]
+        body = super().payload(messages)
+        body["chat_template_kwargs"] = {"reasoning_strength": self.reasoning_strength}
+        return body
+
+
+#: Token prices in use; zero for a self-hosted model (its GPU time is billed separately).
+_PRICE = dict(PRICE_PER_M)
 
 
 def cost_usd(usage: dict[str, int]) -> float:
     return (
-        usage.get("prompt_tokens", 0) * PRICE_PER_M["prompt"]
-        + usage.get("completion_tokens", 0) * PRICE_PER_M["completion"]
+        usage.get("prompt_tokens", 0) * _PRICE["prompt"]
+        + usage.get("completion_tokens", 0) * _PRICE["completion"]
     ) / 1e6
 
 
@@ -271,7 +308,7 @@ def write(result: CorpusResult, out: Path, budget: Budget, model: str) -> dict[s
         model=model,
         cost_usd_uncached=round(budget.spent, 4),
         cost_usd_all_calls=round(cost_usd(usage), 4),
-        price_per_m=PRICE_PER_M,
+        price_per_m=dict(_PRICE),
     )
     path = out / f"{result.language}-distill-stats.json"
     path.write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
@@ -289,6 +326,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--model", default=os.environ.get("PII_GUARD_CORPUS_MODEL", DEFAULT_MODEL))
     parser.add_argument("--base-url", default=os.environ.get("PII_GUARD_CORPUS_URL"))
     parser.add_argument("--reasoning-effort", default="minimal")
+    parser.add_argument(
+        "--reasoning-strength",
+        help="Muse Glimmer (vLLM): send chat_template_kwargs.reasoning_strength instead of "
+        "reasoning_effort; the model is self-hosted, so token prices are zero",
+    )
     parser.add_argument("--temperature", type=float, default=0.9)
     parser.add_argument("--workers", type=int, default=16)
     parser.add_argument("--dry-run", type=int, metavar="INDEX", help="print one prompt and exit")
@@ -299,14 +341,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"--- {message['role']}\n{message['content']}\n")
         return 0
     key = os.environ.get("PII_GUARD_CORPUS_API_KEY") or os.environ.get("META_API_KEY")
-    client = ChatClient(
-        base_url=args.base_url or DEFAULT_BASE_URL,
-        api_key=key,
-        model=args.model,
-        reasoning_effort=None if args.reasoning_effort == "omit" else args.reasoning_effort,
-        temperature=args.temperature,
-        max_tokens=6144,
-    )
+    common: dict[str, Any] = {
+        "base_url": args.base_url or DEFAULT_BASE_URL,
+        "api_key": key,
+        "model": args.model,
+        "temperature": args.temperature,
+        "max_tokens": 6144,
+    }
+    if args.reasoning_strength:
+        _PRICE.update(prompt=0.0, completion=0.0)
+        client: ChatClient = GlimmerChatClient(
+            reasoning_strength=args.reasoning_strength, reasoning_effort=None, **common
+        )
+    else:
+        client = ChatClient(
+            reasoning_effort=None if args.reasoning_effort == "omit" else args.reasoning_effort,
+            **common,
+        )
     budget = Budget(args.budget_usd)
     try:
         result = build_corpus(

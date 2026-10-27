@@ -18,11 +18,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Hypothesis profiles. No deadline anywhere: one rules pass over a long random string can take
 # ~300 ms on a loaded machine, past the 200 ms default, which failed a full run once (LAB-1230).
-# "ci" (HYPOTHESIS_PROFILE=ci, set by the CI workflow) is also derandomized: the same examples on
-# every run, so a red CI run reproduces locally with the same profile; a failure prints the
-# reproduce blob.
+# The CI profiles are also derandomized: the same examples on every run, so a red CI run
+# reproduces locally with the same profile; a failure prints the reproduce blob. "ci" (pull
+# requests) runs 25 examples where a test sets no max_examples of its own; "ci-full" (develop,
+# main, nightly) runs Hypothesis's default 100 (LAB-1267).
 hypothesis_settings.register_profile("dev", deadline=None)
-hypothesis_settings.register_profile("ci", deadline=None, derandomize=True, print_blob=True)
+hypothesis_settings.register_profile(
+    "ci", deadline=None, derandomize=True, print_blob=True, max_examples=25
+)
+hypothesis_settings.register_profile("ci-full", deadline=None, derandomize=True, print_blob=True)
 hypothesis_settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "dev"))
 
 
@@ -84,7 +88,8 @@ def rules_only_mode_detectors(
     ``@pytest.mark.ner_autodetect`` to keep the real, environment-dependent selection.
     """
     if request.node.get_closest_marker(NER_AUTODETECT) is None:
-        monkeypatch.setattr("pii_guard.gateway.detection._ner_available", lambda: False)
+        # The shared stack (LAB-1270): pins the REST API's default detectors too.
+        monkeypatch.setattr("pii_guard.detect.stack._ner_available", lambda: False)
 
 
 @pytest.fixture

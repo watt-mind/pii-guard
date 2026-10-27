@@ -49,10 +49,38 @@ from transformers import AutoModelForTokenClassification, AutoTokenizer
 from pii_guard.detect.ner import RawEntity, TransformersBackend, decode_tokens
 from pii_guard.eval.fixtures import Document, load_fixtures
 
-TYPES = ("PERSON", "ADDRESS", "ORGANIZATION", "DATE_OF_BIRTH")
-LABELS = ["O"] + [f"{p}-{t}" for t in TYPES for p in ("B", "I")]
-LABEL2ID = {label: i for i, label in enumerate(LABELS)}
+#: The v1 label set (LAB-1106, LAB-1128): what the NER found before LAB-1150.
+TYPES_V1 = ("PERSON", "ADDRESS", "ORGANIZATION", "DATE_OF_BIRTH")
+#: The v2 label set (LAB-1150): v1 plus the identifier types, named after pii-guard entity
+#: types so the checkpoint's labels map 1:1 (docs/entities.md, "NER label set").
+TYPES_V2 = (
+    *TYPES_V1,
+    "EMAIL",
+    "PHONE",
+    "ID_DOCUMENT",
+    "NATIONAL_ID_HU_TAX",
+    "NATIONAL_ID_HU_TAJ",
+    "BANK_ACCOUNT",
+)
+TYPES = TYPES_V2
 IGNORE = -100
+
+
+def label_list(types: Sequence[str]) -> list[str]:
+    return ["O"] + [f"{p}-{t}" for t in types for p in ("B", "I")]
+
+
+LABELS = label_list(TYPES)
+LABEL2ID = {label: i for i, label in enumerate(LABELS)}
+
+
+def set_types(types: Sequence[str]) -> None:
+    """Switch the module's label set (``types`` in the config)."""
+    global TYPES, LABELS, LABEL2ID
+    TYPES = tuple(types)
+    LABELS = label_list(TYPES)
+    LABEL2ID = {label: i for i, label in enumerate(LABELS)}
+
 
 DEFAULTS: dict[str, Any] = {
     "base_model": "FacebookAI/xlm-roberta-base",
@@ -75,6 +103,13 @@ DEFAULTS: dict[str, Any] = {
     "seed": 13,
     "device": "auto",
     "precision": "fp32",
+    # v2 (LAB-1150): the label set, and what to do with gold spans of other types: "ignore"
+    # keeps their tokens out of the loss (a phone number is not taught as "O" just because
+    # the model doesn't predict phones); "o" is the v1 behaviour.
+    "types": list(TYPES_V2),
+    "other_types": "ignore",
+    # Batches of similar length (less padding): sort within pools of this many batches.
+    "length_pool": 50,
 }
 
 
@@ -144,6 +179,8 @@ def encode(tokenizer, docs: Sequence[Document], cfg: dict[str, Any], teacher=Non
             (s.start, s.end, s.entity_type.value) for s in doc.spans if s.entity_type.value in TYPES
         ]
         ignore = teacher_regions(teacher, doc, cfg["teacher_threshold"])
+        if cfg.get("other_types", "ignore") == "ignore":
+            ignore += [(s.start, s.end) for s in doc.spans if s.entity_type.value not in TYPES]
         ignore += [(int(s), int(e)) for s, e in doc.meta.get("loss_ignore", ())]
         ignored += len(ignore)
         enc = tokenizer(
@@ -165,12 +202,29 @@ def encode(tokenizer, docs: Sequence[Document], cfg: dict[str, Any], teacher=Non
     return features, ignored
 
 
-def batches(features, batch_size: int, pad_id: int, rng: random.Random | None):
-    order = list(range(len(features)))
-    if rng is not None:
-        rng.shuffle(order)
-    for i in range(0, len(order), batch_size):
-        chunk = [features[j] for j in order[i : i + batch_size]]
+def batch_order(lengths: Sequence[int], batch_size: int, rng: random.Random, pool: int):
+    """Shuffled batches of similar length: shuffle, sort within pools, shuffle the batches."""
+    order = list(range(len(lengths)))
+    rng.shuffle(order)
+    size = max(pool, 1) * batch_size
+    out: list[list[int]] = []
+    for i in range(0, len(order), size):
+        chunk = sorted(order[i : i + size], key=lambda j: lengths[j])
+        out.extend(chunk[k : k + batch_size] for k in range(0, len(chunk), batch_size))
+    rng.shuffle(out)
+    return out
+
+
+def batches(features, batch_size: int, pad_id: int, rng: random.Random | None, pool: int = 0):
+    if rng is not None and pool > 0:
+        groups = batch_order([len(f["input_ids"]) for f in features], batch_size, rng, pool)
+    else:
+        order = list(range(len(features)))
+        if rng is not None:
+            rng.shuffle(order)
+        groups = [order[i : i + batch_size] for i in range(0, len(order), batch_size)]
+    for group in groups:
+        chunk = [features[j] for j in group]
         width = max(len(f["input_ids"]) for f in chunk)
         yield {
             "input_ids": torch.tensor(
@@ -188,8 +242,9 @@ def batches(features, batch_size: int, pad_id: int, rng: random.Random | None):
 def span_f1(
     model, tokenizer, docs: Sequence[Document], device: str, cfg: dict[str, Any]
 ) -> dict[str, Any]:
-    """Exact and overlap span P/R/F1 over the dev documents (all four types)."""
+    """Exact and overlap span P/R/F1 over the dev documents (every type in ``TYPES``)."""
     tp_exact = tp_overlap_pred = tp_overlap_gold = n_pred = n_gold = 0
+    per_type: dict[str, list[int]] = {t: [0, 0, 0, 0] for t in TYPES}  # pred, gold, tp_p, tp_g
     model.eval()
     with torch.inference_mode():
         for doc in docs:
@@ -234,6 +289,14 @@ def span_f1(
             tp_overlap_gold += sum(
                 any(p[2] == g[2] and p[0] < g[1] and g[0] < p[1] for p in pred) for g in gold
             )
+            for p in pred:
+                row = per_type[p[2]]
+                row[0] += 1
+                row[2] += any(p[2] == g[2] and p[0] < g[1] and g[0] < p[1] for g in gold)
+            for g in gold:
+                row = per_type[g[2]]
+                row[1] += 1
+                row[3] += any(p[2] == g[2] and p[0] < g[1] and g[0] < p[1] for p in pred)
     model.train()
 
     def f1(p: float, r: float) -> float:
@@ -248,6 +311,11 @@ def span_f1(
         "p_overlap": round(po, 4),
         "r_overlap": round(ro, 4),
         "f1_overlap": round(f1(po, ro), 4),
+        "per_type_f1_overlap": {
+            t: round(f1(r[2] / max(r[0], 1), r[3] / max(r[1], 1)), 4)
+            for t, r in per_type.items()
+            if r[0] or r[1]
+        },
     }
 
 
@@ -279,6 +347,7 @@ def load_config(argv: Sequence[str] | None) -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     cfg = load_config(argv)
+    set_types(cfg["types"])
     random.seed(cfg["seed"])
     torch.manual_seed(cfg["seed"])
     device = pick_device(cfg["device"])
@@ -334,7 +403,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     model.train()
     for epoch in range(1, cfg["epochs"] + 1):
         total, n = 0.0, 0
-        for batch in batches(train_features, cfg["batch_size"], tokenizer.pad_token_id, rng):
+        for batch in batches(
+            train_features, cfg["batch_size"], tokenizer.pad_token_id, rng, cfg["length_pool"]
+        ):
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=autocast):
                 loss = model(**{k: v.to(device) for k, v in batch.items()}).loss
             loss.backward()
@@ -380,8 +451,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "seed",
                 "teacher_threshold",
                 "precision",
+                "other_types",
+                "length_pool",
             )
         },
+        "types": list(TYPES),
         "device": device,
         "train": {str(p): sha256(p) for p in train_paths},
         "dev": {str(p): sha256(p) for p in dev_paths},

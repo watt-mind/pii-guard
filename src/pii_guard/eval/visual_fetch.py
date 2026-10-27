@@ -47,6 +47,8 @@ from urllib.robotparser import RobotFileParser
 
 import httpx
 
+from pii_guard.eval.data_dirs import SPECIMENS_DIR_ENV_VAR, specimens_dir
+
 __all__ = [
     "DEFAULT_CATALOG",
     "DEFAULT_MANIFEST",
@@ -340,7 +342,9 @@ def fetch_catalog(
     return {
         "version": 1,
         "user_agent": fetcher.user_agent,
-        "out_dir": str(out_dir),
+        # A path outside the checkout (PII_GUARD_SPECIMENS_DIR) would put a home directory in
+        # the committed manifest; record the setting's name instead.
+        "out_dir": f"${SPECIMENS_DIR_ENV_VAR}" if out_dir.is_absolute() else str(out_dir),
         "sources": sources,
         "specimens": specimens,
         "skipped": skipped,
@@ -353,7 +357,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Download official specimen ID documents into a gitignored directory.",
     )
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=specimens_dir(),
+        help="where the images go (default: PII_GUARD_SPECIMENS_DIR, else data/specimens)",
+    )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--interval", type=float, default=1.0, help="seconds between requests")
     return parser

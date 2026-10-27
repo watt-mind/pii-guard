@@ -65,6 +65,7 @@ from typing import Any
 
 import httpx
 
+from pii_guard.eval.data_dirs import specimens_dir, visual_cache_dir
 from pii_guard.types import DetectionError, EntityType, PiiGuardError
 from pii_guard.visual.image import load_image
 from pii_guard.visual.regions import Box, Region
@@ -79,7 +80,8 @@ from pii_guard.visual.segment import (
 
 __all__ = ["CANDIDATES", "SETS", "SegmentScore", "build_parser", "main", "score_image"]
 
-#: (manifest, labels, images) per evaluation set.
+#: (manifest, labels, images) per evaluation set; the specimen images' directory is
+#: ``PII_GUARD_SPECIMENS_DIR`` when set (:func:`set_paths`).
 SETS: dict[str, tuple[Path, Path, Path]] = {
     "fictional": (
         Path("eval/fixtures/visual/manifest.json"),
@@ -92,6 +94,17 @@ SETS: dict[str, tuple[Path, Path, Path]] = {
         Path("data/specimens"),
     ),
 }
+
+
+def set_paths(set_name: str) -> tuple[Path, Path, Path]:
+    """(manifest, labels, images) of ``set_name``; specimen images from ``PII_GUARD_SPECIMENS_DIR``
+    when it is set."""
+    manifest, labels, images = SETS[set_name]
+    if set_name == "specimens":
+        images = specimens_dir()
+    return manifest, labels, images
+
+
 #: How each fixture set is described in a run record.
 _SET_INFO = {
     "fictional": ("fictional-specimens", "generated", "muse-image"),
@@ -450,7 +463,7 @@ def run(
         score_regions,
     )
 
-    specimens = load_specimens(*SETS[set_name], log=log)
+    specimens = load_specimens(*set_paths(set_name), log=log)
     if not specimens:
         raise DetectionError(f"no labelled images found for {set_name}")
     out = _Run()
@@ -730,7 +743,7 @@ def e2e_bench(
 
     if not tesseract_available():
         raise DetectionError("the end-to-end bench needs Tesseract (OCR on, as served)")
-    specimens = load_specimens(*SETS[set_name], log=log)
+    specimens = load_specimens(*set_paths(set_name), log=log)
     if not specimens:
         raise DetectionError(f"no labelled images found for {set_name}")
     images = [prepare_image(s.path.read_bytes(), DEFAULT_MAX_SIDE) for s in specimens]
@@ -812,7 +825,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--candidate", choices=sorted(CANDIDATES))
     parser.add_argument("--set", choices=sorted(SETS), required=True, dest="set_name")
-    parser.add_argument("--cache", type=Path, default=Path("data/visual-cache"))
+    parser.add_argument(
+        "--cache",
+        type=Path,
+        default=visual_cache_dir(),
+        help="SAM response cache (default: PII_GUARD_VISUAL_CACHE, else data/visual-cache)",
+    )
     parser.add_argument("--offline", action="store_true", help="cached SAM responses only")
     parser.add_argument("--max-live-calls", type=int, default=400)
     parser.add_argument("--json", type=Path, metavar="OUT")

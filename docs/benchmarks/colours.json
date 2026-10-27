@@ -58,12 +58,36 @@
       "color": "#D55E00",
       "shape": "circle"
     },
+    "rules+ner:xlm-roberta-base-ner-hrl": {
+      "color": "#009E73",
+      "shape": "circle"
+    },
     "rules+ner:xlmr-base-distilled-glimmer": {
       "color": "#009E73",
       "shape": "circle"
     },
     "rules+ner:xlmr-base-ft-s7": {
       "color": "#D55E00",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2": {
+      "color": "#D55E00",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn": {
+      "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn+ner_gliner:gliner-multi-v2.1@labels=pii_guard.detect.ner_gliner.GLINER_LABELS": {
+      "color": "#332288",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-no-ai4privacy": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-openpii-1k": {
+      "color": "#882255",
       "shape": "circle"
     },
     "rules+ner:xlmr-large-distilled-glimmer": {
@@ -74,8 +98,32 @@
       "color": "#CC79A7",
       "shape": "circle"
     },
+    "rules+ner:xlmr-large-v2": {
+      "color": "#117733",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-large-v2-hn": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-large-v2-no-ai4privacy": {
+      "color": "#E69F00",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-large-v2-openpii-1k": {
+      "color": "#0072B2",
+      "shape": "circle"
+    },
     "rules+ner:xlmr-ner-hrl": {
       "color": "#332288",
+      "shape": "circle"
+    },
+    "rules+ner_gliner:gliner-multi-v2-ft@labels=pii_guard.detect.ner_gliner.GLINER_LABELS": {
+      "color": "#009E73",
+      "shape": "circle"
+    },
+    "rules+ner_gliner:gliner-multi-v2.1@labels=pii_guard.detect.ner_gliner.GLINER_LABELS": {
+      "color": "#D55E00",
       "shape": "circle"
     },
     "visual-labels:exact": {

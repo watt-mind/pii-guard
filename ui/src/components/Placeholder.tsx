@@ -38,7 +38,7 @@ export function Placeholder({ text, entityType, active, unresolved, onActivate, 
           ? "bg-danger-soft text-danger ring-danger/60 line-through decoration-2"
           : meta.chip,
         onActivate ? "cursor-help" : "",
-        active ? "ring-2 shadow-[0_0_0_3px_var(--canvas),0_0_0_5px_currentColor]" : "",
+        active ? "ring-2 outline-2 outline-offset-2 outline-current" : "",
         className,
       ].join(" ")}
     >

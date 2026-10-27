@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from pii_guard.eval.baselines import records, suite
 from pii_guard.eval.record import load_schema, validate
 
@@ -61,6 +63,7 @@ def test_strict_card_gets_detectors_cost_and_hardware(tmp_path):
     assert rec["fixtures"][0]["origin"] == "hand-written"
 
 
+@pytest.mark.slow
 def test_public_fixture_is_marked_generated_with_notes(tmp_path):
     card = _card(tmp_path, HU_PUBLIC)
     card["baselines"] = {

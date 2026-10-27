@@ -16,13 +16,13 @@ keeps the two in sync. See [contracts.md](contracts.md#entity-policies-implement
 |---|---|---|---|
 | `PERSON` | Names, including inflected forms | NER, LLM | mask |
 | `ADDRESS` | Street addresses, written in any order or in prose | LLM, NER, postcode rules | mask |
-| `EMAIL` | Email addresses | rules | mask |
-| `PHONE` | Phone numbers, national and international formats | rules | mask |
+| `EMAIL` | Email addresses | rules, NER (v2) | mask |
+| `PHONE` | Phone numbers, national and international formats | rules, NER (v2) | mask |
 | `DATE_OF_BIRTH` | Dates in a birth-date context | LLM (context), rules (format) | mask |
-| `NATIONAL_ID_HU_TAX` | Hungarian personal tax ID (adóazonosító jel), 10 digits with checksum | rules | mask |
-| `NATIONAL_ID_HU_TAJ` | Hungarian social security (TAJ) number, 9 digits with checksum | rules | mask |
-| `ID_DOCUMENT` | ID card, passport, driving licence and residence permit numbers; machine-readable zones (MRZ) of ID documents; national numbers without their own type (Hungarian személyi azonosító, US SSN, UK NINO) | rules, LLM (context) | mask |
-| `BANK_ACCOUNT` | IBAN (with checksum), Hungarian giro account numbers, payment card numbers (Luhn) | rules | mask |
+| `NATIONAL_ID_HU_TAX` | Hungarian personal tax ID (adóazonosító jel), 10 digits with checksum | rules, NER (v2) | mask |
+| `NATIONAL_ID_HU_TAJ` | Hungarian social security (TAJ) number, 9 digits with checksum | rules, NER (v2) | mask |
+| `ID_DOCUMENT` | ID card, passport, driving licence and residence permit numbers; machine-readable zones (MRZ) of ID documents; national numbers without their own type (Hungarian személyi azonosító, US SSN, UK NINO) | rules, NER (v2), LLM (context) | mask |
+| `BANK_ACCOUNT` | IBAN (with checksum), Hungarian giro account numbers, payment card numbers (Luhn) | rules, NER (v2) | mask |
 | `COMPANY_ID_HU` | Company registration number (cégjegyzékszám), company tax number | rules | keep |
 | `ORGANIZATION` | Company and institution names | NER, LLM | keep |
 | `PARCEL_NUMBER_HU` | Land registry parcel number (helyrajzi szám) | rules, LLM (context) | mask |
@@ -37,6 +37,39 @@ rule finds that name part in every mode, fast mode included, and emits it as `PE
 resolver lets a `PERSON` win over the overlapping kept `ORGANIZATION`, so only the name is
 masked (`[[PERSON_x]] és Társa Bt.`) and the rest of the company name stays. See "Person names
 in company names" below.
+
+### NER label set
+
+The NER detector (`pii_guard.detect.ner`) reports a subset of the types above. A v1 checkpoint
+(LAB-1106, LAB-1128) knows four; a v2 checkpoint (LAB-1150) also proposes identifiers, so a
+number whose checksum fails or whose format no rule knows is still masked. Labels are the
+pii-guard type names (`B-PHONE`, `I-NATIONAL_ID_HU_TAX`, …), so they map one to one. GLiNER
+(`pii_guard.detect.ner_gliner`) is asked for natural-language label names, mapped the same way.
+
+| NER label (v2) | pii-guard type | Trained from | GLiNER label name |
+|---|---|---|---|
+| `PERSON` | `PERSON` | corpus gold + Glimmer, OpenPII `GIVENNAME`+`SURNAME` | person |
+| `ADDRESS` | `ADDRESS` | corpus gold, OpenPII `STREET`, `BUILDINGNUM`, `ZIPCODE`, `CITY` in an address | street address |
+| `ORGANIZATION` | `ORGANIZATION` | corpus gold + Glimmer | organization |
+| `DATE_OF_BIRTH` | `DATE_OF_BIRTH` | corpus gold (OpenPII `DATE` is left out of the loss) | date of birth |
+| `EMAIL` | `EMAIL` | corpus gold, OpenPII `EMAIL` | email address |
+| `PHONE` | `PHONE` | corpus gold, OpenPII `TELEPHONENUM` | phone number |
+| `ID_DOCUMENT` | `ID_DOCUMENT` | corpus gold, OpenPII `IDCARDNUM`, `PASSPORTNUM`, `DRIVERLICENSENUM`, and `SOCIALNUM` / `TAXNUM` outside Hungarian | identity document number |
+| `NATIONAL_ID_HU_TAX` | `NATIONAL_ID_HU_TAX` | corpus gold, OpenPII `TAXNUM` in Hungarian rows | hungarian tax identification number |
+| `NATIONAL_ID_HU_TAJ` | `NATIONAL_ID_HU_TAJ` | corpus gold, OpenPII `SOCIALNUM` in Hungarian rows | hungarian social security number |
+| `BANK_ACCOUNT` | `BANK_ACCOUNT` | corpus gold (IBAN, giro), OpenPII `CREDITCARDNUMBER` | bank account or card number |
+
+How the spans are used: the NER **proposes**; the rules keep their validated spans and
+scores. In the resolver (`detect/pipeline.py`) a rule span of a structured type keeps its
+exact boundaries and absorbs an overlapping NER span of the same type, and wins a type
+conflict, so a validated IBAN is never cut short by a NER guess. Policy then decides as for
+any other span. Corpus gold of a type the NER isn't trained on (plates, parcel and company
+numbers) is left out of the loss, never taught as "not personal data". Titles, ages, gender
+and a town on its own stay `O`, as the policy keeps them.
+
+Not in the label set: **usernames, IP addresses and URLs with an identity in them.** pii-guard
+has no entity type for them yet (adding one is a taxonomy and policy change, not a model
+change), and neither training source labels them. Tracked as a follow-up.
 
 ## Per language
 

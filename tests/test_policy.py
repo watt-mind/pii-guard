@@ -84,7 +84,8 @@ def test_settings_validate_overrides_and_detectors(monkeypatch: pytest.MonkeyPat
 
 def test_settings_defaults() -> None:
     settings = Settings(_env_file=None)
-    assert settings.detectors == ("rules",)
+    # Unset: the shared stack decides (rules, + ner when available; LAB-1270).
+    assert settings.detectors is None
     assert settings.policy_overrides == {}
     assert PolicySet.from_settings(settings) == PolicySet()
 

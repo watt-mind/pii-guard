@@ -1,7 +1,11 @@
 import type { BenchmarkIndex } from "./benchmarks";
 import { describe, expect, it } from "vitest";
 import {
+  coverageTag,
   documentCount,
+  headline,
+  missingLanguages,
+  tidyLabels,
   formatMs,
   formatPct,
   languageName,
@@ -65,5 +69,23 @@ describe("headline", () => {
     expect(index.systems[h!.ours.system]!.family).toBe("pii-guard");
     expect(index.systems[h!.theirs.system]!.family).toBe("comparison");
     expect(h!.ours.leak).toBeLessThanOrEqual(h!.theirs.leak);
+  });
+
+  it("builds the pooled headline only from systems run on every language of the set", async () => {
+    const index = await loadBenchmarks();
+    const set = index.headline_set!;
+    const h = headline(index, set, "all")!;
+    for (const side of [h.ours, h.theirs]) {
+      const snap = index.snapshots.find((x) => x.fixture_set === set && x.system === side.system)!;
+      expect(missingLanguages(index, snap)).toEqual([]);
+      expect(coverageTag(index, snap)).toBeNull();
+    }
+    const partial = index.snapshots.find((x) => x.fixture_set === set && missingLanguages(index, x).length > 0);
+    if (partial) expect(coverageTag(index, partial)).toMatch(/^[A-Z]{2}( \+ [A-Z]{2})* only$/);
+  });
+
+  it("spells detector names one way in labels", async () => {
+    const index = tidyLabels(await loadBenchmarks());
+    expect(Object.values(index.systems).some((v) => /\bner\b/.test(v.label) || /\bner\b/.test(v.short_label ?? ""))).toBe(false);
   });
 });

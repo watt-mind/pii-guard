@@ -1,14 +1,14 @@
 # Integrations: putting a client behind pii-guard
 
-The gateway is an OpenAI-compatible endpoint: `POST /v1/chat/completions` and
-`GET /v1/models` at `http://127.0.0.1:8787/v1`. A client that lets you set a base URL for Chat
-Completions works through it. The client sends real data, the model gets placeholders, and the
+The gateway is an OpenAI-compatible endpoint: `POST /v1/chat/completions`,
+`POST /v1/responses` (the Responses API) and `GET /v1/models` at `http://127.0.0.1:8787/v1`. A
+client that lets you set a base URL for either API works through it. The client sends real data, the model gets placeholders, and the
 answer (tool-call arguments included) comes back restored.
 
 | Client | Status | Setup |
 |---|---|---|
 | [pi](pi.md) (coding agent) | Supported, tested end to end in CI (mock upstream) and on the Meta Model API | `pii-guard connect pi` |
-| [Muse Code](muse-code.md) (Meta's coding agent) | Not yet: it speaks the Responses API | `pii-guard connect muse-code` explains why |
+| [Muse Code](muse-code.md) (Meta's coding agent) | Supported through `/v1/responses`, tested end to end on a mock upstream and on the Meta Model API | `pii-guard connect muse-code` |
 | Any OpenAI-compatible client (OpenAI SDKs, LangChain, LiteLLM, Open WebUI, ...) | Supported | Base URL `http://127.0.0.1:8787/v1`, see below |
 
 ## 1. Point the gateway at an upstream

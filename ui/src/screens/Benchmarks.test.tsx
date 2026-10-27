@@ -119,7 +119,9 @@ describe("Benchmarks screen", () => {
     expect(within(panel).getByText("Pick at least one system to compare.")).toBeInTheDocument();
     await user.click(within(panel).getByRole("button", { name: "Featured" }));
     expect(within(panel).getByRole("region", { name: "Results" })).toBeInTheDocument();
-  });
+    // Clicks every system checkbox: with the 13 NER v2 candidates (LAB-1150) this takes ~2 s
+    // locally and over 5 s on CI runners.
+  }, 20_000);
 
   it("keeps its filters when switching tabs", async () => {
     const { user, panel } = await openBenchmarks();

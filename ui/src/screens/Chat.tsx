@@ -40,13 +40,17 @@ interface Props {
 }
 
 const MODES: { id: ChatMode; label: string; hint: string }[] = [
-  { id: "strict", label: "Strict", hint: "Rules + an AI detector (Muse Spark Open). Finds names too; adds a few seconds." },
-  { id: "fast", label: "Fast", hint: "Rules only, no AI detector call. Finds structured data (emails, phones, IDs, IBANs), not names." },
+  {
+    id: "fast",
+    label: "Fast",
+    hint: "Rules + the on-device NER: finds names, addresses and structured data in milliseconds, with no model call. The production path. Without a NER checkpoint on the server it runs the rules alone.",
+  },
+  { id: "strict", label: "Strict", hint: "Fast mode plus an LLM detector (Muse Spark Open) for a second pass. Needs a detector key; adds a few seconds." },
 ];
 
 export function Chat({ client, live, draft, replay }: Props) {
   const [view, setView] = useState<"chat" | "replay">("chat");
-  const [mode, setMode] = useState<ChatMode>("strict");
+  const [mode, setMode] = useState<ChatMode>("fast");
   const [language, setLanguage] = useState<"hu" | "en">(CHAT_SAMPLES[0]!.language);
   const [model, setModel] = useState(DEFAULT_CHAT_MODEL);
   const [text, setText] = useState(CHAT_SAMPLES[0]!.text);
@@ -170,7 +174,7 @@ export function Chat({ client, live, draft, replay }: Props) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">
-            {client.kind === "mock" ? "Chat through the guard. The model only ever sees placeholders." : "Chat with a real model. It only ever sees placeholders."}
+            Chat through the gateway. The model only ever sees placeholders.
           </h1>
           <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
             Your message goes through the pii-guard gateway, a drop-in for any OpenAI-compatible API. It is masked on the way out and the
@@ -221,7 +225,7 @@ export function Chat({ client, live, draft, replay }: Props) {
           </p>
           <section ref={conversationRef} tabIndex={-1} aria-label="Conversation" className="space-y-5 focus:outline-none">
             {turns.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-line px-6 py-8 text-center">
+              <div className="rounded-xl border border-line px-6 py-8 text-center">
                 <p className="text-sm font-semibold text-ink">No messages yet</p>
                 <p className="mx-auto mt-1 max-w-md text-sm text-muted">
                   Send the sample below, or write your own (fictional data only). You will see the message as the model received it, its
@@ -317,7 +321,7 @@ function TurnView({
           <p className="text-sm text-muted">Nothing was sent.</p>
         ) : turn.maskedUser === null ? (
           <Pending
-            label={simulated ? "Masking in your browser…" : turn.mode === "strict" ? "Detecting personal data (rules + AI detector)…" : "Detecting personal data (rules)…"}
+            label={simulated ? "Masking in your browser…" : turn.mode === "strict" ? "Detecting personal data (rules + NER + LLM detector)…" : "Detecting personal data (rules + NER)…"}
           />
         ) : (
           <>
@@ -368,7 +372,7 @@ function TurnView({
             </div>
             {turn.status === "done" && (
               <p className="mt-2 text-xs text-muted">
-                {restored} {restored === 1 ? "value" : "values"} restored{turn.ms !== null ? ` · ${(turn.ms / 1000).toFixed(1)} s` : ""}.{" "}
+                {restored} {restored === 1 ? "value" : "values"} restored{turn.ms !== null ? ` · ${turn.ms < 1000 ? `${Math.max(1, Math.round(turn.ms))} ms` : `${(turn.ms / 1000).toFixed(1)} s`}` : ""}.{" "}
                 {marked > 0 || restored === 0
                   ? "Marked values were placeholders in the model's answer."
                   : "Compare with the model's answer to see where they were (this answer couldn't be lined up for highlighting)."}
@@ -394,14 +398,14 @@ function Bubble({ side, label, children, className = "" }: { side: "you" | "mode
       aria-label={label}
       data-side={side}
       className={[
-        "min-w-0 rounded-2xl border px-4 py-3",
+        "min-w-0 rounded-xl border px-4 py-3",
         side === "model" ? "border-model/25 bg-model-soft/40" : "border-line bg-surface",
         className,
       ].join(" ")}
     >
       <h3
         className={[
-          "mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase",
+          "mb-1.5 font-mono text-2xs",
           side === "model" ? "text-model" : "text-guard",
         ].join(" ")}
       >
@@ -444,9 +448,9 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
     ? "The demo engine runs a small rule set in your browser in both modes; the AI detector and the real model need the live API."
     : MODES.find((m) => m.id === mode)!.hint;
   return (
-    <section aria-label="New message" className="space-y-3 rounded-2xl border border-line bg-surface p-4 sm:p-5">
+    <section aria-label="New message" className="space-y-3 rounded-xl border border-line bg-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples</span>
+        <span className="text-xs font-medium text-muted">Fictional samples</span>
         {CHAT_SAMPLES.map((s) => (
           <button
             key={s.id}
@@ -477,7 +481,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
         rows={4}
         spellCheck={false}
         placeholder="Write a message with some (fictional) personal data in it…"
-        className="doc block w-full resize-y rounded-lg border border-line bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-guard focus:outline-none"
+        className="doc block w-full resize-y rounded-lg border border-line bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-line-strong"
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div role="radiogroup" aria-label="Detection mode" className="flex rounded-lg border border-line bg-surface-2 p-0.5 text-sm">
@@ -524,7 +528,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
       </div>
       <p className="text-xs text-muted">
         <span className="font-semibold text-ink">{mock ? "Demo engine" : `${MODES.find((m) => m.id === mode)!.label} mode`}:</span> {modeHint}{" "}
-        <kbd className="rounded border border-line px-1 font-mono text-[10px]">⌘/Ctrl ↵</kbd> sends.
+        <kbd className="rounded border border-line px-1 font-mono text-2xs">⌘/Ctrl ↵</kbd> sends.
       </p>
       <details className="text-xs text-muted">
         <summary className="cursor-pointer">Connection details</summary>

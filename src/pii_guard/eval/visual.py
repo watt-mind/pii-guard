@@ -51,6 +51,7 @@ from typing import Any, Protocol
 import httpx
 from PIL import Image, ImageDraw
 
+from pii_guard.eval.data_dirs import specimens_dir, visual_cache_dir
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import DetectionError, Detector, EntityType, PiiGuardError
 from pii_guard.visual.image import encode_image, load_image
@@ -821,10 +822,20 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pii-guard eval visual",
         description="Visual recall of image masking on official specimen ID documents.",
     )
-    parser.add_argument("--specimens", type=Path, default=DEFAULT_SPECIMENS)
+    parser.add_argument(
+        "--specimens",
+        type=Path,
+        default=specimens_dir(),
+        help="specimen images (default: PII_GUARD_SPECIMENS_DIR, else data/specimens)",
+    )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--labels", type=Path, default=DEFAULT_LABELS)
-    parser.add_argument("--cache", type=Path, default=DEFAULT_CACHE, help="SAM response cache")
+    parser.add_argument(
+        "--cache",
+        type=Path,
+        default=visual_cache_dir(),
+        help="SAM response cache (default: PII_GUARD_VISUAL_CACHE, else data/visual-cache)",
+    )
     parser.add_argument("--offline", action="store_true", help="cached SAM responses only")
     parser.add_argument(
         "--max-live-calls", type=int, default=800, help="cap on live SAM calls in this run"

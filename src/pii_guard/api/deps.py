@@ -4,18 +4,21 @@ All are cached on ``app.state``; the analyzer and vault are built lazily, once p
 
 - ``app.state.analyzer`` -- anything with ``analyze(text, language) -> list[Span]``. The
   default, :class:`RegistryAnalyzer`, runs the detectors named in ``app.state.detector_names``
-  (set by ``create_app`` from ``PII_GUARD_DETECTORS``, default ``rules``) through
+  (set by ``create_app`` with :func:`~pii_guard.detect.stack.rest_detector_names`: an explicit
+  ``PII_GUARD_DETECTORS``, else the gateway fast-mode stack, rules + ner when available) through
   :class:`~pii_guard.detect.pipeline.DetectionPipeline`, the one resolver shared with the
   gateway and the eval. Tests and embedders can set ``app.state.analyzer`` directly -- the
   routes only depend on the :class:`Analyzer` protocol.
 - ``app.state.policies`` -- the :class:`~pii_guard.policy.PolicySet` (defaults plus
-  ``PII_GUARD_POLICY_OVERRIDES``), built by ``create_app``.
+  ``PII_GUARD_POLICY_OVERRIDES``, via :meth:`~pii_guard.policy.PolicySet.from_settings`, the
+  builder the gateway uses too), built by ``create_app``.
 - ``app.state.vault`` -- a :class:`~pii_guard.vault.Vault` keyed by ``PII_GUARD_TENANT_KEY``.
   Without a key every masking endpoint fails closed with ``vault_not_configured``.
 
 Fail closed (ADR 0006): any detector error, including an unexpected exception or an invalid
-span, is raised as :class:`~pii_guard.types.DetectionError`; nothing is ever returned
-partially. No error message or log line contains request text or span values.
+span, is raised as :class:`~pii_guard.types.DetectionError`
+(:class:`~pii_guard.detect.stack.CheckedDetector`, shared with the gateway); nothing is ever
+returned partially. No error message or log line contains request text or span values.
 """
 
 from __future__ import annotations
@@ -29,9 +32,14 @@ from fastapi import Request
 
 from pii_guard.config import DEFAULT_DETECTORS, Settings
 from pii_guard.detect.pipeline import DetectionPipeline
+from pii_guard.detect.stack import (
+    CheckedDetector,
+    build_detector,
+    build_detectors,
+    rest_detector_names,
+)
 from pii_guard.policy import PolicySet
-from pii_guard.registry import create_detector
-from pii_guard.types import DetectionError, Detector, PiiGuardError, Span
+from pii_guard.types import Detector, PiiGuardError, Span
 from pii_guard.vault import Vault
 
 __all__ = [
@@ -71,31 +79,6 @@ class Analyzer(Protocol):
     def analyze(self, text: str, language: str) -> list[Span]: ...
 
 
-def build_detector(name: str, settings: Settings | None = None) -> Detector:
-    """A registry detector by name. ``llm`` gets the app's settings."""
-    if name == "llm":
-        return create_detector(name, settings=settings)
-    return create_detector(name)
-
-
-class _Checked:
-    """Wraps a detector: unexpected errors and malformed output become ``DetectionError``."""
-
-    def __init__(self, inner: Detector) -> None:
-        self.inner = inner
-        self.name = getattr(inner, "name", type(inner).__name__)
-
-    def detect(self, text: str, language: str = "hu") -> list[Span]:
-        try:
-            found = self.inner.detect(text, language=language)
-        except DetectionError:
-            raise
-        except Exception as exc:
-            # Never str(exc): it may quote the input.
-            raise DetectionError(f"detector {self.name!r} failed") from exc
-        return _checked(found, text, self.name)
-
-
 class RegistryAnalyzer:
     """Runs registry detectors by name through :class:`DetectionPipeline`.
 
@@ -110,31 +93,14 @@ class RegistryAnalyzer:
         policies: PolicySet | None = None,
         settings: Settings | None = None,
     ) -> None:
-        if not detector_names:
-            raise DetectionError("no detectors configured")
-        self.detectors: list[Detector] = [build_detector(n, settings) for n in detector_names]
+        self.detectors: list[Detector] = build_detectors(detector_names, settings)
         self.pipeline = DetectionPipeline(
-            [_Checked(d) for d in self.detectors],
+            [CheckedDetector(d) for d in self.detectors],
             keep_types=(policies or PolicySet()).keep_types,
         )
 
     def analyze(self, text: str, language: str) -> list[Span]:
         return self.pipeline.detect(text, language)
-
-
-def _checked(found: object, text: str, name: str) -> list[Span]:
-    """Reject anything that is not a list of valid spans of ``text`` (fail closed)."""
-    if not isinstance(found, list):
-        raise DetectionError(f"detector {name!r} returned {type(found).__name__}, not a list")
-    for index, span in enumerate(found):
-        if not isinstance(span, Span):
-            raise DetectionError(f"detector {name!r} returned a non-span at index {index}")
-        if span.end > len(text) or text[span.start : span.end] != span.text:
-            raise DetectionError(
-                f"detector {name!r} returned a {span.entity_type.value} span that does not "
-                f"match the text at [{span.start}, {span.end})"
-            )
-    return found
 
 
 def get_analyzer(request: Request) -> Analyzer:
@@ -145,7 +111,9 @@ def get_analyzer(request: Request) -> Analyzer:
         with _init_lock:
             analyzer = getattr(state, "analyzer", None)
             if analyzer is None:
-                names = getattr(state, "detector_names", None) or DEFAULT_DETECTOR_NAMES
+                names = getattr(state, "detector_names", None) or rest_detector_names(
+                    state.settings
+                )
                 analyzer = RegistryAnalyzer(
                     names, policies=get_policies(request), settings=state.settings
                 )

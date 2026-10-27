@@ -2,68 +2,102 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Hallmark · design system: ui/DESIGN.md · genre: modern-minimal · theme: custom (guard)
+ * paper: near-black graphite (dark, primary) / warm paper (light) · one accent: guard lime
+ * display + body: Instrument Sans · values and placeholders: JetBrains Mono
+ */
+
 :root {
+  /* Surfaces and ink. */
   --canvas: #f4f3ee;
   --surface: #ffffff;
-  --surface-2: #faf9f6;
+  --surface-2: #f8f7f3;
   --ink: #15171b;
-  --muted: #5d6068;
-  --faint: #8a8d94;
+  --muted: #55585f;
+  --faint: #66696f;
   --line: #e2e0d8;
-  --line-strong: #cfccc2;
-  /* The guard's own colour: a signal green used only for "protected". */
+  --line-strong: #c9c6bb;
+  /* The one accent: the guard's signal green, for "protected" and the primary action. */
   --guard: #2f7d1f;
   --guard-soft: #e7f5d9;
   --guard-ink: #1f5413;
-  --model: #3b4a8c;
-  --model-soft: #e9ecf8;
-  --warn: #9a5b00;
+  /* The model's side of the boundary. */
+  --model: oklch(45% 0.11 248);
+  --model-soft: oklch(95.5% 0.02 245);
+  --warn: #8a5100;
   --warn-soft: #fff1d6;
   --danger: #b4232c;
   --danger-soft: #fde4e4;
-  /* Live traffic: pii-guard's own stages, categorical slots 1-7 in fixed order (dataviz
-     reference palette, validated adjacent-pair CVD/normal-vision on both surfaces). The
-     upstream (the model's time, not pii-guard's) is a neutral. */
-  --stage-parse: #2a78d6;
-  --stage-detect: #eb6834;
-  --stage-image: #1baf7a;
-  --stage-mask: #eda100;
-  --stage-forward: #e87ba4;
-  --stage-unmask: #008300;
-  --stage-response: #6250d6;
+  /* What happened to a value. Every highlight, chip and count uses one of these. */
+  --masked: var(--model);
+  --masked-soft: oklch(93% 0.035 245);
+  --restored: var(--guard);
+  --restored-soft: var(--guard-soft);
+  --kept: #8f8b80;
+  --blocked: var(--warn);
+  --blocked-soft: var(--warn-soft);
+  --leak: var(--danger);
+  --leak-soft: var(--danger-soft);
+  /* Region boxes drawn over an image (a light document in either theme). */
+  --region-mask: oklch(50% 0.16 255);
+  --region-kept: #6b6e75;
+  /* Focus is neutral, so it never reads as a state. */
+  --focus: var(--ink);
+  /* Categorical chart slots 1-8, fixed order (dataviz reference palette, validated
+     adjacent-pair CVD and normal vision on both surfaces). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+  /* Live traffic: pii-guard's own stages take slots 1-7 in order. The upstream (the model's
+     time, not pii-guard's) is a neutral. */
+  --stage-parse: var(--series-1);
+  --stage-detect: var(--series-2);
+  --stage-image: var(--series-3);
+  --stage-mask: var(--series-4);
+  --stage-forward: var(--series-5);
+  --stage-unmask: var(--series-6);
+  --stage-response: var(--series-7);
   --stage-upstream: #b3afa3;
   --stage-other: #8a8d94;
   color-scheme: light;
 }
 
 .dark {
-  --canvas: #0c0d10;
-  --surface: #14161b;
-  --surface-2: #181b21;
+  --canvas: #0b0c0f;
+  --surface: #121418;
+  --surface-2: #171a1f;
   --ink: #eceef2;
   --muted: #a3a7b0;
-  --faint: #737782;
-  --line: #262a32;
-  --line-strong: #353a44;
+  --faint: #80848e;
+  --line: #23272e;
+  --line-strong: #343943;
   --guard: #b6f36b;
-  --guard-soft: #1d2a12;
+  --guard-soft: #1b2711;
   --guard-ink: #d4f9a8;
-  --model: #9fb0ff;
-  --model-soft: #1a1f35;
+  --model: oklch(80% 0.085 240);
+  --model-soft: oklch(22% 0.03 245);
   --warn: #ffc66b;
   --warn-soft: #2e2210;
   --danger: #ff8a8f;
   --danger-soft: #341517;
+  --masked-soft: oklch(80% 0.085 240 / 0.14);
+  --kept: #6f737c;
   /* Benchmark system colours that are too dark on this canvas (LAB-1155). */
   --sys-882255: #88ccee;
   --sys-332288: #ddcc77;
-  --stage-parse: #3987e5;
-  --stage-detect: #d95926;
-  --stage-image: #199e70;
-  --stage-mask: #c98500;
-  --stage-forward: #d55181;
-  --stage-unmask: #008300;
-  --stage-response: #9085e9;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
   --stage-upstream: #5d6472;
   --stage-other: #737782;
   color-scheme: dark;
@@ -89,9 +123,36 @@
   --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
+  --color-masked: var(--masked);
+  --color-masked-soft: var(--masked-soft);
+  --color-restored: var(--restored);
+  --color-restored-soft: var(--restored-soft);
+  --color-kept: var(--kept);
+  --color-blocked: var(--blocked);
+  --color-blocked-soft: var(--blocked-soft);
+  --color-leak: var(--leak);
+  --color-leak-soft: var(--leak-soft);
+  --color-focus: var(--focus);
+}
+
+/* Type, radius and motion scales. Three radii: chips, controls, panels. */
+@theme {
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-ui: 0.8125rem;
+  --text-ui--line-height: 1.25rem;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 8px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-duration: 120ms;
 }
 
 html {
+  overflow-x: clip;
   background: var(--canvas);
   color: var(--ink);
   -webkit-text-size-adjust: 100%;
@@ -99,6 +160,7 @@ html {
 
 body {
   margin: 0;
+  overflow-x: clip;
   min-height: 100dvh;
   background: var(--canvas);
   font-family: var(--font-sans);
@@ -141,8 +203,8 @@ body {
 
 @keyframes restore-in {
   from {
-    background-color: var(--guard-soft);
-    box-shadow: 0 0 0 3px var(--guard);
+    background-color: var(--restored);
+    color: var(--canvas);
   }
 }
 
@@ -154,11 +216,11 @@ body {
 }
 
 .animate-restore {
-  animation: restore-in 900ms ease-out;
+  animation: restore-in 700ms var(--ease-out);
 }
 
 .animate-chunk {
-  animation: chunk-in 180ms ease-out;
+  animation: chunk-in 160ms var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -166,9 +228,16 @@ body {
   .animate-chunk {
     animation: none;
   }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 :focus-visible {
-  outline: 2px solid var(--guard);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

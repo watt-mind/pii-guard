@@ -34,11 +34,11 @@ export function RestoredText({ segments, activeKey = null, onActivate, freshFrom
             onFocus={onActivate ? (e) => onActivate(seg.placeholder, e.currentTarget) : undefined}
             onBlur={onActivate ? () => onActivate(null) : undefined}
             className={[
-              "rounded-[5px] px-0.5 -mx-0.5 ring-1 ring-inset underline decoration-2 underline-offset-[5px] decoration-current/35",
-              meta.mark,
+              "rounded-md px-0.5 -mx-0.5 ring-1 ring-inset",
+              outgoing ? meta.mark : "bg-restored-soft text-ink ring-restored/45",
               onActivate ? "cursor-help" : "",
               i >= freshFrom ? "animate-restore" : "",
-              active ? "ring-2 shadow-[0_0_0_3px_var(--canvas),0_0_0_5px_currentColor]" : "",
+              active ? "ring-2 outline-2 outline-offset-2 outline-current" : "",
             ].join(" ")}
           >
             {seg.text}

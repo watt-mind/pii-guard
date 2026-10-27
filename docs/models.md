@@ -9,7 +9,7 @@
 | Job | Model | Where it runs | Sees real data? |
 |---|---|---|---|
 | Structured identifiers | Rules (no model) | pii-guard container | yes (inside the boundary) |
-| Names, organizations, addresses (dates of birth when fine-tuned) | Multilingual NER encoder (XLM-RoBERTa-base, open) | pii-guard container (CPU / MPS / CUDA) | yes |
+| Names, organizations, addresses, dates of birth and (NER v2) contact and ID numbers the rules can't validate | Multilingual NER encoder (XLM-RoBERTa-base, open; GLiNER as an alternative backend) | pii-guard container (CPU / MPS / CUDA) | yes |
 | Second-pass detection and adjudication | **Muse Spark Open** (open weights), optionally fine-tuned; **Muse Glimmer** as a smaller local candidate | Baseten (`meta-models/muse-spark-open-1026`), or your own hardware | yes |
 | Faces, ID photos | **YuNet** (OpenCV model zoo, 0.23 MB, MIT; the default `hybrid` segmenter, see [Local segmentation](#local-segmentation)) | pii-guard container (CPU) | yes |
 | Signatures (and faces with `PII_GUARD_SEGMENTER=sam-api`) | **SAM 3.1** | Meta Model API, or a GPU endpoint (`PII_GUARD_SAM_URL`) | yes |
@@ -24,7 +24,9 @@ you can host yourself.** Hosted Meta models only ever see fictional data or mask
 
 `pii_guard.detect.ner.NerDetector` (registry name `ner`) runs a Hugging Face token-classification
 encoder in-process and reports `PERSON`, `ADDRESS`, `ORGANIZATION` and, with the fine-tuned
-model, `DATE_OF_BIRTH`. Rules stay authoritative for structured identifiers in
+model, `DATE_OF_BIRTH`. NER v2 checkpoints also report `EMAIL`, `PHONE`, `ID_DOCUMENT`,
+`NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ` and `BANK_ACCOUNT`; see
+[NER v2](#ner-v2-wider-labels-openpii-train-split-hard-negatives). Rules stay authoritative for structured identifiers in
 `DetectionPipeline`. Install with `uv sync --extra ner` (torch, transformers, sentencepiece,
 protobuf). Without the extra the registry reports `ner` as unavailable, so the gateway's fast
 mode stays rules-only; with it, fast mode picks `ner` up automatically. A model that can't be
@@ -35,6 +37,8 @@ loaded and any inference error raise `DetectionError` (fail closed).
 | Model (hub id or directory) | `PII_GUARD_NER_MODEL` | `Davlan/xlm-roberta-base-ner-hrl` (pinned revision) |
 | Revision | `PII_GUARD_NER_REVISION` | pinned for the default model |
 | Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
+| Backend | `PII_GUARD_NER_BACKEND` | `transformers`; `gliner` runs a GLiNER model instead (needs the `gliner` extra) |
+| GLiNER model | `PII_GUARD_GLINER_MODEL` | `urchade/gliner_multi-v2.1` (pinned revision) |
 
 Constructor keywords: `thresholds` (`{language: {type: min_score}}`, default 0.5), `entity_types`,
 `label_map`, `max_length`/`stride` (token windows for long inputs), `aggregation`, `preload`.
@@ -54,8 +58,8 @@ Unicode input. Warm the cache with `uv run --extra ner python -m pii_guard.detec
   outside the span. About 18 minutes on an M1 Max (MPS); `--device cuda` for a GPU. Weights
   are not committed or published yet: train locally and set `PII_GUARD_NER_MODEL`.
 - Also evaluated zero-shot: `urchade/gliner_multi_pii-v1` (GLiNER, Apache-2.0). It finds dates
-  of birth and whole addresses, but over-masked more (18–20 % on the synth samples), was 3–4×
-  slower and needs its own package, so it isn't wired in.
+  of birth and whole addresses, but over-masked more (18–20 % on the synth samples) and was 3–4×
+  slower. GLiNER multi v2.1 is now wired in as `ner_gliner` (LAB-1150, below).
 
 **Results** (rules vs rules + NER, overlap F1 / leak rate, %; full scorecards in
 `eval/results/ner/`):
@@ -155,6 +159,56 @@ fine-tuned model, so with the machine idle it should match that model's 17 ms (M
 **Spend:** Meta Model API $1.05 (5,004 billed calls, contributor tier at $0.10 per million
 input and $0.20 per million output tokens). Modal GPU about 38 H100 minutes for Glimmer, plus
 about 8 A10G and 10 L40S minutes for training: roughly $3 in total.
+
+### NER v2: wider labels, OpenPII train split, hard negatives
+
+LAB-1150. The full method, every candidate and the latency tables are in
+[eval/results/2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md). The model card is
+[training/ner/model-card.md](../training/ner/model-card.md).
+
+- **Labels:** the 10 types listed above (`training/ner/train.py`, `TYPES_V2`). The NER proposes
+  identifier spans that the rules can't validate (most Ai4Privacy numbers fail their
+  checksums). Validated rule spans keep their boundaries in the resolver. The mapping is in
+  [entities.md](entities.md#ner-label-set).
+- **Data:**
+  - distillation s11 (LAB-1128);
+  - s13, written from the lexicon packs and labelled by Muse Glimmer on Modal;
+  - 5,000 rows per language from the Ai4Privacy OpenPII-1M **train** split
+    (`training/ner/openpii.py`). The script asserts these are disjoint from the evaluated
+    validation rows; only its manifest is committed;
+  - 2,000 seeded hard negatives per language (`training/ner/negatives.py`): order, invoice,
+    tracking and case numbers, and amounts, with no spans.
+- **Training:** on Modal, 3 epochs, bf16: base on an A10G took 11 minutes, large on an L40S 14 minutes (with hard negatives).
+
+| rules + NER, % | ai4privacy leak (pooled) | smoke leak, max | smoke over-masking, max | CPU p95 (M1) |
+|---|---:|---:|---:|---:|
+| v1 large (before) | 27.6 | 0.9 | 0.9 | 147 ms |
+| **v2 base + hard negatives** (default) | **0.4** | **0.0** | 3.0 | **50 ms** |
+| v2 large + hard negatives (best quality) | 0.4 | 0.0 | 3.0 | 145 ms |
+| v2 large, no Ai4Privacy rows (held-out ablation) | 12.5 | 0.0 | 0.9 | 149 ms |
+| GLiNER multi v2.1, zero-shot | 22.5 | 5.4 | 10.0 | 126 ms |
+
+**The ai4privacy numbers are in-distribution** for models trained on OpenPII rows. The
+ablation, which never saw those rows, is the held-out figure.
+
+**Recommendation:**
+- Use `xlmr-base-v2-hn` for fast mode. It meets the ~150 ms CPU p95 limit everywhere,
+  including 85 ms on a 4-vCPU T4 container.
+- Use large + hard negatives on GPU or MPS hosts.
+- Neither checkpoint is published (the owner decides), so point `PII_GUARD_NER_MODEL` at one you trained.
+
+**GLiNER:**
+- GLiNER is not adopted as the default. It leaks and over-masks more zero-shot, over-masks
+  21 % on en-smoke fine-tuned, and is 2–5× slower.
+- Adding GLiNER's spans to the default's in a union doesn't lower the leak, but it raises
+  smoke over-masking to 9.5 %.
+- It is still the best public **fallback** when no trained checkpoint exists. Zero-shot it
+  leaks 22.5 % vs Davlan's 28.7 % on ai4privacy, and 2.8–5.4 % vs 7.5–10 % on smoke. It is
+  Apache-2.0. LAB-1192 wires it into `make demo`.
+- The `gliner` extra pins `transformers<5.17`, so it can't be installed alongside `ner`.
+
+**Spend:** about $4.85 of Modal: Glimmer for the corpus and labels, 8 XLM-R trainings, 1
+GLiNER fine-tune and a T4 latency bench.
 
 ## LLM detector
 
@@ -312,10 +366,12 @@ only the signatures.
 
 ### Hybrid vs SAM-only (LAB-1245)
 
-| Fictional set (24 images) | Portrait recall | Portrait leak | Signature recall | Signature leak | SAM calls / image | `/v1/mask/image` p50 / p95 |
-|---|---:|---:|---:|---:|---:|---:|
-| `sam-api` (SAM 3.1 for everything, the previous default) | 100.0 % | 0.0 % | 100.0 % | 6.7 % | 5 | 7.2 s / 8.1 s |
-| **`hybrid`** (YuNet + SAM 3.1 for signatures, the default) | 100.0 % | 0.0 % | 100.0 % | 6.7 % | **2** | **3.8 s / 5.0 s** |
+| Set | Segmenter | Portrait recall | Portrait leak | Signature recall | Signature leak | SAM calls / image | `/v1/mask/image` p50 / p95 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| specimens (65) | `sam-api` (SAM 3.1 for everything, the previous default) | 90.8 % | 47.7 % | 83.8 % | 51.4 % | 5 | 7.9 s / 11.6 s |
+| | **`hybrid`** (YuNet + SAM 3.1 for signatures, the default) | 92.3 % | **10.8 %** | 83.8 % | 48.6 % | **2** | **4.1 s / 6.1 s** |
+| fictional (24) | `sam-api` | 100.0 % | 0.0 % | 100.0 % | 6.7 % | 5 | 7.2 s / 8.1 s |
+| | **`hybrid`** | 100.0 % | 0.0 % | 100.0 % | 6.7 % | **2** | **3.8 s / 5.0 s** |
 
 - **Calls:** `/v1/mask/image` with `sam-api` sends 5 SAM requests per image (`face`,
   `signature`, `squiggly line`, `photo of a person`, and `stamp`, whose regions are `keep`), not
@@ -324,21 +380,27 @@ only the signatures.
 - **Latency:** end to end through the app (`python -m pii_guard.visual.segment_eval
   --e2e-bench`: Tesseract OCR, rules detector, `render=opaque`), the two modes alternating per
   image, live SAM, 3 rounds; medians of the per-round p50 / p95 on a laptop shared with other
-  jobs (load average 11.5). Per round: hybrid p50 3.96 / 3.26 / 3.77 s, sam-api 7.24 / 6.80 /
-  7.61 s. Segmentation alone (no OCR, replayed SAM latency): p50 2.26 s vs 4.78 s.
-- **Signatures** come from the same SAM prompts in both modes, so their numbers are identical.
-  The YuNet portrait boxes over-mask around the photo (precision 80.6 % vs SAM's 100 % on this
-  set), the safe side.
-- **Specimens** (65 official documents): not re-run in LAB-1245, because the images are fetched
-  locally and were not on the measuring machine. LAB-1229's runs on that set
-  (`2026-10-27-segment-{sam-api,local}-specimens`) give the expected picture: YuNet's portrait
-  leak 10.8 % vs SAM's 47.7 % at equal or better recall, and signatures unchanged by
-  construction (same SAM prompts).
+  jobs (load average 10-12). Per round, specimens: hybrid p50 4.14 / 4.23 / 4.04 s, sam-api
+  8.10 / 7.85 / 7.20 s; fictional: hybrid 3.96 / 3.26 / 3.77 s, sam-api 7.24 / 6.80 / 7.61 s.
+  Segmentation alone (no OCR, replayed SAM latency): p50 2.51 s vs 5.23 s (specimens), 2.26 s
+  vs 4.78 s (fictional).
+- **Signatures** come from the same SAM prompts in both modes: the same 40 boxes on the
+  specimens, the same recall (83.8 %) and precision (77.5 %). The leak is slightly lower with
+  `hybrid` (48.6 % vs 51.4 %, 1 of 37 signatures) only because YuNet's ID-photo box also covers
+  a signature printed next to the portrait.
+- **Portraits:** on the specimens `hybrid` leaks 10.8 % of portraits against SAM's 47.7 %, at
+  higher recall (92.3 % vs 90.8 %). YuNet's boxes over-mask around the photo (precision 61 % on
+  the specimens, 81 % on the fictional set, vs SAM's 90-100 %), the safe side.
+- **Acceptance (LAB-1245):** met on both sets. Portrait leak ≤ `sam-api`'s, signatures equal
+  (same prompts, same boxes), fewer API calls (2 vs 5) and a lower p50 (−47 % specimens, −48 %
+  fictional).
+- **Specimen data:** fetched locally into `PII_GUARD_SPECIMENS_DIR` (outside the worktree,
+  see [evaluation.md](evaluation.md#where-the-specimen-images-live-visual)), never committed.
 - The labelled-image eval (LAB-1156 placeholders) and the "which parties have an ID?" demo do
   not depend on the segmenter's portraits and are unchanged (fuzzy 50/51 values, 0 false
   merges, 24/24 transcripts; demo 3/3 with `hybrid` and with `sam-api`).
-- Run record: `eval/results/runs/2026-10-27-segment-hybrid-fictional` (segment-only metrics
-  plus the end-to-end medians in `latency_ms.mask_image_per_image_*`).
+- Run records: `eval/results/runs/2026-10-27-segment-hybrid-{fictional,specimens}` (segment-only
+  metrics plus the end-to-end medians in `latency_ms.mask_image_per_image_*`).
 
 ### The LAB-1229 spike
 
@@ -416,7 +478,9 @@ from pii_guard.visual.segment import LocalSegmenter
 regions = LocalSegmenter().segment(png_bytes)  # FACE + ID_PHOTO, on the CPU
 ```
 
-Reproduce the table (specimens: `uv run python eval/visual/fetch_specimens.py` first; the SAM
+Reproduce the table (specimens: `uv run python eval/visual/fetch_specimens.py` first, with
+`PII_GUARD_SPECIMENS_DIR` outside the worktree, see
+[evaluation.md](evaluation.md#where-the-specimen-images-live-visual); the SAM
 rows replay the eval's response cache, `--offline`):
 
 ```bash

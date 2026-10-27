@@ -1,0 +1,797 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "commit": "910a6a27f002b16de825d73c1607a8cb6aae6446",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "generated_at": "2026-10-27T17:01:20+00:00",
+    "detectors": [
+      "rules",
+      "ner_gliner"
+    ],
+    "skipped_detectors": [],
+    "languages": null,
+    "fixtures": [
+      {
+        "path": "eval/fixtures/de-smoke.jsonl",
+        "sha256": "b623ca3b33af7ef72a17cb4244a342a60a19eb1447fbe3024bd33e3627bf5470"
+      }
+    ]
+  },
+  "overall": {
+    "documents": 10,
+    "gold_spans": 40,
+    "predicted_spans": 45,
+    "unscored_predictions": 0,
+    "detection": {
+      "exact": {
+        "per_type": {
+          "PERSON": {
+            "gold": 13,
+            "pred": 13,
+            "tp_pred": 10,
+            "tp_gold": 10,
+            "precision": 0.7692307692307693,
+            "recall": 0.7692307692307693,
+            "f1": 0.7692307692307693
+          },
+          "ADDRESS": {
+            "gold": 5,
+            "pred": 7,
+            "tp_pred": 4,
+            "tp_gold": 4,
+            "precision": 0.5714285714285714,
+            "recall": 0.8,
+            "f1": 0.6666666666666666
+          },
+          "EMAIL": {
+            "gold": 3,
+            "pred": 3,
+            "tp_pred": 3,
+            "tp_gold": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "PHONE": {
+            "gold": 5,
+            "pred": 5,
+            "tp_pred": 5,
+            "tp_gold": 5,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "pred": 3,
+            "tp_pred": 3,
+            "tp_gold": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "ID_DOCUMENT": {
+            "gold": 6,
+            "pred": 8,
+            "tp_pred": 6,
+            "tp_gold": 6,
+            "precision": 0.75,
+            "recall": 1.0,
+            "f1": 0.8571428571428571
+          },
+          "BANK_ACCOUNT": {
+            "gold": 2,
+            "pred": 3,
+            "tp_pred": 2,
+            "tp_gold": 2,
+            "precision": 0.6666666666666666,
+            "recall": 1.0,
+            "f1": 0.8
+          },
+          "ORGANIZATION": {
+            "gold": 3,
+            "pred": 3,
+            "tp_pred": 3,
+            "tp_gold": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "micro": {
+          "gold": 40,
+          "pred": 45,
+          "tp_pred": 36,
+          "tp_gold": 36,
+          "precision": 0.8,
+          "recall": 0.9,
+          "f1": 0.8470588235294118
+        },
+        "macro": {
+          "precision": 0.8446657509157509,
+          "recall": 0.9461538461538461,
+          "f1": 0.8866300366300366
+        }
+      },
+      "overlap": {
+        "per_type": {
+          "PERSON": {
+            "gold": 13,
+            "pred": 13,
+            "tp_pred": 13,
+            "tp_gold": 13,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "ADDRESS": {
+            "gold": 5,
+            "pred": 7,
+            "tp_pred": 6,
+            "tp_gold": 5,
+            "precision": 0.8571428571428571,
+            "recall": 1.0,
+            "f1": 0.923076923076923
+          },
+          "EMAIL": {
+            "gold": 3,
+            "pred": 3,
+            "tp_pred": 3,
+            "tp_gold": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "PHONE": {
+            "gold": 5,
+            "pred": 5,
+            "tp_pred": 5,
+            "tp_gold": 5,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "pred": 3,
+            "tp_pred": 3,
+            "tp_gold": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "ID_DOCUMENT": {
+            "gold": 6,
+            "pred": 8,
+            "tp_pred": 6,
+            "tp_gold": 6,
+            "precision": 0.75,
+            "recall": 1.0,
+            "f1": 0.8571428571428571
+          },
+          "BANK_ACCOUNT": {
+            "gold": 2,
+            "pred": 3,
+            "tp_pred": 2,
+            "tp_gold": 2,
+            "precision": 0.6666666666666666,
+            "recall": 1.0,
+            "f1": 0.8
+          },
+          "ORGANIZATION": {
+            "gold": 3,
+            "pred": 3,
+            "tp_pred": 3,
+            "tp_gold": 3,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "micro": {
+          "gold": 40,
+          "pred": 45,
+          "tp_pred": 41,
+          "tp_gold": 40,
+          "precision": 0.9111111111111111,
+          "recall": 1.0,
+          "f1": 0.9534883720930233
+        },
+        "macro": {
+          "precision": 0.9092261904761905,
+          "recall": 1.0,
+          "f1": 0.9475274725274725
+        }
+      }
+    },
+    "leak": {
+      "values": 37,
+      "leaked": 0,
+      "partial": 1,
+      "rate": 0.0,
+      "partial_rate": 0.02702702702702703,
+      "per_type": {
+        "PERSON": {
+          "values": 13,
+          "leaked": 0,
+          "partial": 1,
+          "rate": 0.0,
+          "partial_rate": 0.07692307692307693
+        },
+        "ADDRESS": {
+          "values": 5,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "EMAIL": {
+          "values": 3,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "PHONE": {
+          "values": 5,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "DATE_OF_BIRTH": {
+          "values": 3,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "ID_DOCUMENT": {
+          "values": 6,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "BANK_ACCOUNT": {
+          "values": 2,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        }
+      }
+    },
+    "over_masking": {
+      "masked": 42,
+      "over_masked": 4,
+      "rate": 0.09523809523809523,
+      "per_type": {
+        "PERSON": {
+          "masked": 13,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "ADDRESS": {
+          "masked": 7,
+          "over_masked": 1,
+          "rate": 0.14285714285714285
+        },
+        "EMAIL": {
+          "masked": 3,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "PHONE": {
+          "masked": 5,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "DATE_OF_BIRTH": {
+          "masked": 3,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "ID_DOCUMENT": {
+          "masked": 8,
+          "over_masked": 2,
+          "rate": 0.25
+        },
+        "BANK_ACCOUNT": {
+          "masked": 3,
+          "over_masked": 1,
+          "rate": 0.3333333333333333
+        }
+      }
+    },
+    "consistency": {
+      "entities": 37,
+      "consistent": 36,
+      "rate": 0.972972972972973,
+      "multi_occurrence": 0,
+      "multi_consistent": 0,
+      "multi_rate": null,
+      "per_type": {
+        "PERSON": {
+          "entities": 13,
+          "consistent": 13,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "ADDRESS": {
+          "entities": 5,
+          "consistent": 4,
+          "rate": 0.8,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "EMAIL": {
+          "entities": 3,
+          "consistent": 3,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "PHONE": {
+          "entities": 5,
+          "consistent": 5,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "DATE_OF_BIRTH": {
+          "entities": 3,
+          "consistent": 3,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "ID_DOCUMENT": {
+          "entities": 6,
+          "consistent": 6,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "BANK_ACCOUNT": {
+          "entities": 2,
+          "consistent": 2,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        }
+      }
+    },
+    "roundtrip": {
+      "documents": 10,
+      "exact": 10,
+      "rate": 1.0
+    },
+    "latency_ms": {
+      "detect": {
+        "p50": 69.71470802091062,
+        "p95": 82.55987497977912
+      },
+      "mask": {
+        "p50": 0.6212911102920771,
+        "p95": 0.8078748360276222
+      }
+    }
+  },
+  "languages": {
+    "de": {
+      "documents": 10,
+      "gold_spans": 40,
+      "predicted_spans": 45,
+      "unscored_predictions": 0,
+      "detection": {
+        "exact": {
+          "per_type": {
+            "PERSON": {
+              "gold": 13,
+              "pred": 13,
+              "tp_pred": 10,
+              "tp_gold": 10,
+              "precision": 0.7692307692307693,
+              "recall": 0.7692307692307693,
+              "f1": 0.7692307692307693
+            },
+            "ADDRESS": {
+              "gold": 5,
+              "pred": 7,
+              "tp_pred": 4,
+              "tp_gold": 4,
+              "precision": 0.5714285714285714,
+              "recall": 0.8,
+              "f1": 0.6666666666666666
+            },
+            "EMAIL": {
+              "gold": 3,
+              "pred": 3,
+              "tp_pred": 3,
+              "tp_gold": 3,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "PHONE": {
+              "gold": 5,
+              "pred": 5,
+              "tp_pred": 5,
+              "tp_gold": 5,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 3,
+              "pred": 3,
+              "tp_pred": 3,
+              "tp_gold": 3,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "ID_DOCUMENT": {
+              "gold": 6,
+              "pred": 8,
+              "tp_pred": 6,
+              "tp_gold": 6,
+              "precision": 0.75,
+              "recall": 1.0,
+              "f1": 0.8571428571428571
+            },
+            "BANK_ACCOUNT": {
+              "gold": 2,
+              "pred": 3,
+              "tp_pred": 2,
+              "tp_gold": 2,
+              "precision": 0.6666666666666666,
+              "recall": 1.0,
+              "f1": 0.8
+            },
+            "ORGANIZATION": {
+              "gold": 3,
+              "pred": 3,
+              "tp_pred": 3,
+              "tp_gold": 3,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            }
+          },
+          "micro": {
+            "gold": 40,
+            "pred": 45,
+            "tp_pred": 36,
+            "tp_gold": 36,
+            "precision": 0.8,
+            "recall": 0.9,
+            "f1": 0.8470588235294118
+          },
+          "macro": {
+            "precision": 0.8446657509157509,
+            "recall": 0.9461538461538461,
+            "f1": 0.8866300366300366
+          }
+        },
+        "overlap": {
+          "per_type": {
+            "PERSON": {
+              "gold": 13,
+              "pred": 13,
+              "tp_pred": 13,
+              "tp_gold": 13,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "ADDRESS": {
+              "gold": 5,
+              "pred": 7,
+              "tp_pred": 6,
+              "tp_gold": 5,
+              "precision": 0.8571428571428571,
+              "recall": 1.0,
+              "f1": 0.923076923076923
+            },
+            "EMAIL": {
+              "gold": 3,
+              "pred": 3,
+              "tp_pred": 3,
+              "tp_gold": 3,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "PHONE": {
+              "gold": 5,
+              "pred": 5,
+              "tp_pred": 5,
+              "tp_gold": 5,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 3,
+              "pred": 3,
+              "tp_pred": 3,
+              "tp_gold": 3,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "ID_DOCUMENT": {
+              "gold": 6,
+              "pred": 8,
+              "tp_pred": 6,
+              "tp_gold": 6,
+              "precision": 0.75,
+              "recall": 1.0,
+              "f1": 0.8571428571428571
+            },
+            "BANK_ACCOUNT": {
+              "gold": 2,
+              "pred": 3,
+              "tp_pred": 2,
+              "tp_gold": 2,
+              "precision": 0.6666666666666666,
+              "recall": 1.0,
+              "f1": 0.8
+            },
+            "ORGANIZATION": {
+              "gold": 3,
+              "pred": 3,
+              "tp_pred": 3,
+              "tp_gold": 3,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            }
+          },
+          "micro": {
+            "gold": 40,
+            "pred": 45,
+            "tp_pred": 41,
+            "tp_gold": 40,
+            "precision": 0.9111111111111111,
+            "recall": 1.0,
+            "f1": 0.9534883720930233
+          },
+          "macro": {
+            "precision": 0.9092261904761905,
+            "recall": 1.0,
+            "f1": 0.9475274725274725
+          }
+        }
+      },
+      "leak": {
+        "values": 37,
+        "leaked": 0,
+        "partial": 1,
+        "rate": 0.0,
+        "partial_rate": 0.02702702702702703,
+        "per_type": {
+          "PERSON": {
+            "values": 13,
+            "leaked": 0,
+            "partial": 1,
+            "rate": 0.0,
+            "partial_rate": 0.07692307692307693
+          },
+          "ADDRESS": {
+            "values": 5,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "EMAIL": {
+            "values": 3,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "PHONE": {
+            "values": 5,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "DATE_OF_BIRTH": {
+            "values": 3,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "ID_DOCUMENT": {
+            "values": 6,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "BANK_ACCOUNT": {
+            "values": 2,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          }
+        }
+      },
+      "over_masking": {
+        "masked": 42,
+        "over_masked": 4,
+        "rate": 0.09523809523809523,
+        "per_type": {
+          "PERSON": {
+            "masked": 13,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "ADDRESS": {
+            "masked": 7,
+            "over_masked": 1,
+            "rate": 0.14285714285714285
+          },
+          "EMAIL": {
+            "masked": 3,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "PHONE": {
+            "masked": 5,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "DATE_OF_BIRTH": {
+            "masked": 3,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "ID_DOCUMENT": {
+            "masked": 8,
+            "over_masked": 2,
+            "rate": 0.25
+          },
+          "BANK_ACCOUNT": {
+            "masked": 3,
+            "over_masked": 1,
+            "rate": 0.3333333333333333
+          }
+        }
+      },
+      "consistency": {
+        "entities": 37,
+        "consistent": 36,
+        "rate": 0.972972972972973,
+        "multi_occurrence": 0,
+        "multi_consistent": 0,
+        "multi_rate": null,
+        "per_type": {
+          "PERSON": {
+            "entities": 13,
+            "consistent": 13,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "ADDRESS": {
+            "entities": 5,
+            "consistent": 4,
+            "rate": 0.8,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "EMAIL": {
+            "entities": 3,
+            "consistent": 3,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "PHONE": {
+            "entities": 5,
+            "consistent": 5,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "DATE_OF_BIRTH": {
+            "entities": 3,
+            "consistent": 3,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "ID_DOCUMENT": {
+            "entities": 6,
+            "consistent": 6,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "BANK_ACCOUNT": {
+            "entities": 2,
+            "consistent": 2,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          }
+        }
+      },
+      "roundtrip": {
+        "documents": 10,
+        "exact": 10,
+        "rate": 1.0
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 69.71470802091062,
+          "p95": 82.55987497977912
+        },
+        "mask": {
+          "p50": 0.6212911102920771,
+          "p95": 0.8078748360276222
+        }
+      }
+    }
+  },
+  "run": {
+    "system": "pii-guard fast-gliner-multi-v2",
+    "detectors": [
+      "rules",
+      "ner_gliner"
+    ],
+    "documents": 10,
+    "wall_s": 0.7,
+    "load_average_start": [
+      8.02,
+      9.5,
+      12.04
+    ],
+    "load_average_end": [
+      8.02,
+      9.5,
+      12.04
+    ],
+    "host": {
+      "platform": "macOS-26.5.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "processor": "arm",
+      "cpu_count": 10,
+      "python": "3.12.15"
+    },
+    "warmup_calls": 1,
+    "blocked": 0,
+    "blocked_documents": [],
+    "candidate": "gliner-multi-v2",
+    "gliner": {
+      "model": "pii-guard-gliner-multi-v2",
+      "weights_sha256": {
+        "pytorch_model.bin": "a8630bc7082bf5fa31d96a973df9c0b39275484140cf55397bbb619981caa125"
+      }
+    }
+  }
+}

@@ -205,8 +205,12 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_PORT` | `port` | `int` | `8787` |
 | `PII_GUARD_LOG_LEVEL` | `log_level` | `str` | `info` |
 | `PII_GUARD_DEFAULT_LANGUAGE` | `default_language` | `str` | `hu` |
-| `PII_GUARD_DETECTORS` | `detectors` | `tuple[str, ...]` (comma-separated registry names) | `rules` |
+| `PII_GUARD_DETECTORS` | `detectors` | `tuple[str, ...] \| None` (comma-separated registry names) | unset (the gateway fast-mode stack: `rules`, plus `ner` when available) |
 | `PII_GUARD_POLICY_OVERRIDES` | `policy_overrides` | `dict[EntityType, Policy]` (`TYPE=mask\|keep\|block,...`) | none |
+| `PII_GUARD_GATEWAY_KEEP_TYPES` | `gateway_keep_types` | `frozenset[EntityType] \| None` (deprecated) | unset |
+| `PII_GUARD_NER_MODEL` | `ner_model` | `str \| None` (hub id or directory) | unset (detector default; a set model makes a missing `ner` extra stop startup) |
+| `PII_GUARD_NER_REVISION` | `ner_revision` | `str \| None` | unset (pinned for the default model) |
+| `PII_GUARD_NER_DEVICE` | `ner_device` | `str \| None` (`auto\|cpu\|mps\|cuda`) | unset (`auto`) |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
@@ -223,8 +227,16 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `hybrid` |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
-`PII_GUARD_DETECTORS` picks the REST API's detectors (`rules,llm` for the demo; the gateway
-has its own per-mode set). `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
+One factory, `pii_guard.detect.stack`, picks the detectors for both the REST API and the
+gateway (LAB-1270). Without `PII_GUARD_DETECTORS` the REST API runs the gateway fast-mode stack:
+`rules`, plus `ner` when the `ner` extra is installed. An explicit `PII_GUARD_DETECTORS`
+(`rules,llm`, say) wins for the REST API only; the gateway keeps its per-mode set. NER fails
+closed (ADR 0006): with `PII_GUARD_NER_MODEL` set but the extra missing, startup raises
+`DetectionError` ("ner configured but the 'ner' extra is not installed") in both; with neither,
+NER is skipped and one WARNING is logged. `NerDetector` gets its model, revision and device
+from `Settings`. Every detector's output goes through `CheckedDetector`: anything other than a
+list of spans whose offsets match the text is `503 detection_failed`, in the gateway as in the
+REST API. `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
 settings load: an unknown type or policy stops startup. `LlmDetector` resolves its model,
 reasoning effort, max tokens and timeout as the constructor argument, then the setting
 (environment or `.env`), then its built-in default, so the registry and `pii-guard eval`
@@ -240,8 +252,8 @@ gateway settings into `Settings` is LAB-1095.
 
 - `pii_guard.api.app:create_app(settings: Settings | None = None) -> FastAPI`. Settings are
   on `request.app.state.settings`, the detector names on `app.state.detector_names` and the
-  `PolicySet` on `app.state.policies`. An unknown name in `PII_GUARD_DETECTORS` raises
-  `DetectionError` here, at startup. The analyzer (`app.state.analyzer`, default
+  `PolicySet` on `app.state.policies`. An unknown name in `PII_GUARD_DETECTORS`, or a
+  configured but missing NER, raises `DetectionError` here, at startup. The analyzer (`app.state.analyzer`, default
   `pii_guard.api.deps.RegistryAnalyzer`) runs the detectors through `DetectionPipeline`.
 - `GET /healthz` → `200 {"status": "ok", "version": "<package version>"}`.
 - **Routers.** Every module in `pii_guard/api/routes/` that defines a module-level
@@ -287,8 +299,10 @@ the adjudicator, then the largest overlap, score and detector order, and `Span.f
 names the detector it came from. Only a `keep` policy for that masked type as well leaves the
 value in place. `BlockedEntityError` carries types
 and counts (`counts`), never values. The REST API, the gateway and the eval share the
-resolver (`DetectionPipeline`) and the defaults. The gateway's `PII_GUARD_GATEWAY_KEEP_TYPES`
-is a deprecated alias: when set, it is the exact keep set; `PII_GUARD_POLICY_OVERRIDES` wins.
+resolver (`DetectionPipeline`), the defaults and one policy builder, `PolicySet.from_settings`.
+`PII_GUARD_GATEWAY_KEEP_TYPES` is a deprecated alias, applied to the REST API and the gateway
+alike: when set, it is the exact keep set (with a deprecation warning);
+`PII_GUARD_POLICY_OVERRIDES` wins.
 
 ## REST API (implemented)
 
@@ -583,7 +597,7 @@ With `render: "labels"` (the default) the response also carries:
   is `503 detection_failed`.
 - Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
   binary with `hun`/`eng` data; the Docker image ships both), OCR text goes through the API's
-  detectors (`PII_GUARD_DETECTORS`, so names need `llm`). Without it the image is refused with
+  detectors (`PII_GUARD_DETECTORS`, else rules + ner when available; names need `llm` too). Without it the image is refused with
   `503 ocr_unavailable` before SAM runs (fail closed), here and in the gateway. Only with
   `PII_GUARD_IMAGE_REQUIRE_OCR=false` does SAM run alone, and `analysis.ocr` is
   `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "tesseract_unavailable"}`:
@@ -656,6 +670,77 @@ Treatments:
 | content part | `{"type": "refusal"}` | `refusal` mask |
 | content part | `{"type": "image_url"}` | inline PNG/JPEG data URL masked as an image (above); `image_url.detail` and `cache_control` check |
 | content part | any other type (`input_audio`, `file`, ...) | `400 unsupported_content` |
+
+## Responses API (implemented)
+
+`POST /v1/responses` is the gateway for clients that speak the OpenAI **Responses API**, such
+as Muse Code (docs/integrations/muse-code.md). It gives the same guarantees as
+`/v1/chat/completions` and uses the same headers (`X-PII-Guard-Mode`, `-Language`, `-Session`,
+`-Echo`), detectors, cache and vault (`pii_guard.gateway.responses`). The masked body goes to
+the upstream's own `{PII_GUARD_UPSTREAM_BASE_URL}/responses` (a `/chat/completions` suffix is
+dropped first). Nothing is translated to Chat Completions: an upstream that answers that path
+with 404 or 405 gets **`501 responses_unsupported`**. Other upstream errors keep their status
+and only the upstream's `type`/`code` tokens, never its message.
+
+**Request fields.** These are walked against an allow-list (`pii_guard.gateway.responses_request`),
+with the treatments of the table above. Any other key, item type or part type is
+`400 unsupported_content`, and nothing is forwarded.
+
+| Where | Key | Treatment |
+| --- | --- | --- |
+| body | `model` | pass (non-empty string, required) |
+| body | `input` | a string (mask), or a non-empty array of items, below (required) |
+| body | `instructions` | mask |
+| body | `temperature`, `top_p`, `top_logprobs`, `max_output_tokens`, `max_tool_calls`, `parallel_tool_calls`, `store`, `stream`, `background` | pass |
+| body | `reasoning`, `include`, `tool_choice`, `truncation`, `service_tier`, `stream_options` | check |
+| body | `user`, `safety_identifier`, `prompt_cache_key` | mask |
+| body | `metadata` | keys check; values mask JSON |
+| body | `text` | `verbosity` check; `format` (`type`, `name`, `schema`, `description`, `strict`) as a definition |
+| body | `tools` | `function` and `custom` tools as definitions (as for chat); `namespace` tools: `name` check, `description` mask, `tools` (function/custom only) walked; hosted tools (`web_search`, `file_search`, `mcp`, ...) `400` |
+| body | `previous_response_id`, `conversation`, `prompt` | `400`: server-side state would hold another vault session's placeholders; send the whole `input` with `store: false` |
+| every item | `type`, `id`, `call_id`, `status`, `phase` | check |
+| `message` item (or `{role, content}` without `type`) | `role` | one of `system`, `developer`, `user`, `assistant` |
+| `message` item | `content` | string mask; or parts: `input_text`/`output_text` (`text` mask, `annotations`/`logprobs` mask JSON), `refusal` (`refusal` mask); `input_image`/`input_file`/`input_audio` `400` |
+| `function_call` item | `name` check; `arguments` | as a chat tool call's `arguments` (JSON parsed, mask JSON, re-serialised) |
+| `function_call_output` item | `output` | string mask, or text parts as above |
+| `custom_tool_call` item | `name` check; `input` | mask |
+| `custom_tool_call_output` item | `output` | as `function_call_output` |
+| `reasoning` item | `summary[]` (`summary_text`), `content[]` (`reasoning_text`) | `text` mask |
+| `reasoning` item | `encrypted_content` | pass (opaque, provider-encrypted) |
+| other items (`item_reference`, `web_search_call`, ...) | | `400` |
+
+A **line-number gutter** at the start of a line of message text or tool output (`12|`, as Muse
+Code's `read_file` prints files) is shown to the detectors as spaces of the same length and
+kept in the forwarded text, so the first word of the line is detected on its own.
+
+**Restore.** In a whole `response` object, every string the upstream returns is restored
+(output text, refusals, reasoning summaries, and the request fields it echoes back).
+`arguments` get JSON-escaped values, as chat tool-call arguments do. `encrypted_content` is
+left as is. `X-PII-Guard-Unresolved` counts unknown placeholders.
+
+**Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
+stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
+`summary_index`: `response.output_text.delta`, `response.refusal.delta`,
+`response.function_call_arguments.delta` (JSON-escaped), `response.reasoning_summary_text.delta`,
+`response.reasoning_text.delta` and `response.custom_tool_call_input.delta`. A placeholder split
+across deltas is held back until it is complete. When the stream's `.done` event arrives (or the
+stream ends), what is held back goes out as one more delta event just before it, so the joined
+deltas equal the restored `.done` text. Every other event (`response.created`,
+`response.output_item.added`/`.done`, `response.content_part.*`, `response.completed`, ...) is
+restored whole. `sequence_number` is renumbered so it stays strictly increasing. An upstream
+`error` event becomes `{"type": "error", "code": "upstream_error", ...}`, and
+`response.failed` keeps its status with a generic `error`. `data: [DONE]` is passed on.
+
+**Echo.** `X-PII-Guard-Echo: masked` works on non-streamed calls: the answer gets
+`pii_guard: {masked_input: [{role, content}], masked_output: [{index, content}]}` (placeholders
+only). With `stream: true` the header is `400 invalid_request`.
+
+**`GET /muse-code/models`** is Muse Code's catalog, served at the gateway root. With
+`PII_GUARD_UPSTREAM_MODELS` set, it is those ids. Otherwise it is the upstream's
+`{scheme://host}/muse-code/models` with only `id`, `object`, `created`, `owned_by` and
+`metadata["muse-code"]` kept per model. On a 404 it is `GET /v1/models` with default client
+settings (`tool_call`, text in and out, a 128k context). Upstream errors keep their status
+(5xx becomes 502), never their message.
 
 ## Vault (implemented)
 

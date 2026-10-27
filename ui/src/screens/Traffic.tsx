@@ -106,7 +106,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
 
       <SourceBanner source={t.source} status={t.status} apiStatus={t.apiStatus} forced={forceFixture} paused={t.paused} onFixture={t.showFixture} onRetry={t.retryApi} replayDone={t.replayDone} onReplay={t.replay} />
 
-      <section aria-label="Controls" className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+      <section aria-label="Controls" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={t.paused ? "primary" : "secondary"}
@@ -145,7 +145,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
               <option value="all">All</option>
               {modes.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {m.charAt(0).toUpperCase() + m.slice(1)}
                 </option>
               ))}
             </select>
@@ -181,7 +181,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
       </dl>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(19rem,25rem)_minmax(0,1fr)]">
-        <section aria-labelledby="calls-title" className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface">
+        <section aria-labelledby="calls-title" className="flex min-w-0 flex-col rounded-xl border border-line bg-surface">
           <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
             <h2 id="calls-title" className="text-base font-semibold tracking-tight text-ink">
               Calls <span className="font-normal text-muted">newest first</span>
@@ -195,7 +195,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
               <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} />
             </div>
           ) : (
-            <ul aria-label="Calls through the gateway" className="max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
+            <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
               {[...filtered].reverse().map((e) => (
                 <li key={e.id}>
                   <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} />
@@ -209,7 +209,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
           {selected ? (
             <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)} />
           ) : (
-            <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-2xl border border-dashed border-line px-6 py-10 text-center">
+            <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-xl border border-line px-6 py-10 text-center">
               <p className="text-sm font-semibold text-ink">No call selected</p>
               <p className="mt-1 max-w-sm text-sm text-muted">Calls appear here as they go through the gateway. Pick one to see what the model received.</p>
             </div>
@@ -238,7 +238,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
           >
             <StageChart events={filtered} onSelect={(id) => pick(id, true)} />
           </ChartCard>
-          <ChartCard id="chart-entities" title="Values masked per minute" note="Text values and image regions, by type, last 10 minutes.">
+          <ChartCard id="chart-entities" title="Values masked per minute" note="Text values and image regions by kind, last 10 minutes. Hover or tap a column for the exact types.">
             <EntitiesChart events={filtered} now={Math.max(now, lastTime)} />
           </ChartCard>
         </div>
@@ -431,7 +431,7 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
   return (
     <span
       className={[
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold ring-1 ring-inset",
         blocked ? "bg-warn-soft text-warn ring-warn/40" : "bg-danger-soft text-danger ring-danger/40",
       ].join(" ")}
     >
@@ -444,15 +444,21 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
   );
 }
 
-/** A labelled demo scenario (info tone, not a problem badge): its name needs the NER. */
+/**
+ * A labelled demo scenario: its name needs the NER. When the name went through, that is a leak,
+ * shown with the leak treatment even though it is expected; when the NER caught it, a neutral tag.
+ */
 function LabelTag({ match }: { match: LabelledMatch }) {
   const missed = match.missed.length > 0;
   return (
     <span
       title={`Demo scenario labelled “${match.scenario.label}”${missed ? ": in rules-only mode its name is an expected miss" : ""}`}
-      className="rounded px-1.5 py-0.5 text-[11px] font-semibold whitespace-nowrap text-model ring-1 ring-model/30 ring-inset bg-model-soft"
+      className={[
+        "rounded-sm px-1.5 py-0.5 text-2xs font-medium whitespace-nowrap ring-1 ring-inset",
+        missed ? "bg-leak-soft text-leak ring-leak/40" : "text-muted ring-line-strong",
+      ].join(" ")}
     >
-      needs NER{missed ? <span className="font-normal"> · expected</span> : null}
+      needs NER{missed ? <span className="font-normal"> · leaked, expected</span> : null}
     </span>
   );
 }
@@ -461,8 +467,8 @@ function LabelTag({ match }: { match: LabelledMatch }) {
 function LabelledNote({ match }: { match: LabelledMatch }) {
   const missed = match.missed.length > 0;
   return (
-    <div role="note" className="mt-3 rounded-xl border border-model/30 bg-model-soft/60 p-3 text-sm">
-      <p className="font-semibold text-model">
+    <div role="note" className={["mt-3 rounded-lg border p-3 text-sm", missed ? "border-leak/40 bg-leak-soft" : "border-line bg-surface-2"].join(" ")}>
+      <p className={["font-semibold", missed ? "text-leak" : "text-ink"].join(" ")}>
         Demo scenario {match.scenario.name}: {match.scenario.label}.{" "}
         {missed ? "Expected miss in rules-only mode." : "The NER ran and masked the name."}
       </p>
@@ -482,7 +488,7 @@ function LabelledNote({ match }: { match: LabelledMatch }) {
 }
 
 function Tag({ children }: { children: ReactNode }) {
-  return <span className="rounded px-1.5 py-0.5 text-[11px] font-medium text-muted ring-1 ring-line ring-inset">{children}</span>;
+  return <span className="rounded px-1.5 py-0.5 text-2xs font-medium text-muted ring-1 ring-line ring-inset">{children}</span>;
 }
 
 function EntityChips({ counts }: { counts: Partial<Record<EntityType, number>> }) {
@@ -491,7 +497,7 @@ function EntityChips({ counts }: { counts: Partial<Record<EntityType, number>> }
   return (
     <span className="flex flex-wrap gap-1">
       {entries.map(([type, n]) => (
-        <span key={type} title={`${metaFor(type).label}: ${n} masked`} className={["rounded-md px-1.5 py-px font-mono text-[11px] font-medium ring-1 ring-inset", metaFor(type).chip].join(" ")}>
+        <span key={type} title={`${metaFor(type).label}: ${n} masked`} className={["rounded-md px-1.5 py-px font-mono text-2xs font-medium ring-1 ring-inset", metaFor(type).chip].join(" ")}>
           {metaFor(type).short} {n}
           <span className="sr-only"> {metaFor(type).label}</span>
         </span>
@@ -528,8 +534,8 @@ function CallRow({ event: e, selected, onSelect }: { event: TrafficEvent; select
       </span>
       <span className="flex w-full items-start justify-between gap-2">
         {labelled && labelled.missed.length > 0 && totalMasked(e) === 0 ? (
-          <span className="text-xs text-muted">
-            {labelled.missed.length} name passed: expected, needs NER
+          <span className="text-xs text-leak">
+            {labelled.missed.length} name reached the model: expected, needs NER
           </span>
         ) : (
           <EntityChips counts={maskedCounts(e)} />
@@ -561,7 +567,7 @@ function CallDetail({
   const labelled = labelledScenarioFor(e);
   return (
     <>
-      <section aria-labelledby="detail-title" className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
+      <section aria-labelledby="detail-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 id="detail-title" className="flex flex-wrap items-center gap-2 text-base font-semibold tracking-tight text-ink">
@@ -590,9 +596,9 @@ function CallDetail({
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
           <span>Masked:</span>
           <EntityChips counts={maskedCounts(e)} />
-          {labelled && labelled.missed.length > 0 ? <span>· {labelled.missed.length} name passed (expected, needs NER)</span> : null}
+          {labelled && labelled.missed.length > 0 ? <span className="text-leak">· {labelled.missed.length} name reached the model (expected, needs NER)</span> : null}
           {e.upstream?.unresolved_placeholders ? (
-            <span className="rounded-full bg-danger-soft px-2 py-0.5 font-semibold text-danger ring-1 ring-danger/40">
+            <span className="rounded-sm bg-leak-soft px-2 py-0.5 font-semibold text-leak ring-1 ring-leak/40">
               {e.upstream.unresolved_placeholders} placeholder{e.upstream.unresolved_placeholders === 1 ? "" : "s"} the model invented (not restored)
             </span>
           ) : null}
@@ -614,7 +620,7 @@ function CallDetail({
         </div>
       )}
 
-      <section aria-labelledby="timing-title" className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
+      <section aria-labelledby="timing-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
         <h2 id="timing-title" className="mb-3 text-base font-semibold tracking-tight text-ink">
           Timing
         </h2>
@@ -654,7 +660,7 @@ function CallDetail({
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] tracking-wide text-faint uppercase">{label}</dt>
+      <dt className="text-2xs text-muted">{label}</dt>
       <dd className="truncate text-ink" title={value}>
         {value}
       </dd>
@@ -667,13 +673,13 @@ function DetailPane({ eyebrow, title, side, wide, children }: { eyebrow: string;
     <section
       aria-label={title}
       className={[
-        "flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-surface",
+        "flex min-w-0 flex-col overflow-hidden rounded-xl border bg-surface",
         side === "model" ? "border-model/25" : "border-line",
         wide ? "md:col-span-2" : "",
       ].join(" ")}
     >
       <header className={["border-b px-4 py-2.5", side === "model" ? "border-model/20 bg-model-soft/60" : "border-line bg-surface-2"].join(" ")}>
-        <p className={["text-[11px] font-semibold tracking-[0.08em] uppercase", side === "model" ? "text-model" : "text-guard"].join(" ")}>{eyebrow}</p>
+        <p className={["font-mono text-2xs", side === "model" ? "text-model" : "text-guard"].join(" ")}>{eyebrow}</p>
         <h3 className="text-sm font-semibold tracking-tight text-ink">{title}</h3>
       </header>
       <div className="max-h-[32rem] min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">{children}</div>
@@ -682,11 +688,11 @@ function DetailPane({ eyebrow, title, side, wide, children }: { eyebrow: string;
 }
 
 function Notice({ children }: { children: ReactNode }) {
-  return <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">{children}</p>;
+  return <p className="py-4 text-sm text-muted">{children}</p>;
 }
 
 function Role({ role }: { role: string }) {
-  return <p className="mb-1 text-[11px] font-semibold tracking-wide text-faint uppercase">{role}</p>;
+  return <p className="mb-1 font-mono text-2xs text-muted">{role}</p>;
 }
 
 function ImagePart({ summary, event }: { summary: string; event?: TrafficEvent }) {
@@ -733,7 +739,7 @@ function MessageList({ messages, event }: { messages: Message[]; event?: Traffic
 function ToolCallView({ name, children }: { name: string; children: ReactNode }) {
   return (
     <div className="rounded-lg border border-line p-2">
-      <p className="mb-1 font-mono text-[11px] text-muted">
+      <p className="mb-1 font-mono text-2xs text-muted">
         tool call · <span className="text-ink">{name}</span>
       </p>
       {children}
@@ -830,7 +836,12 @@ function modeNote(events: TrafficEvent[]): string {
     by.set(m, set);
   }
   if (!by.size) return "Detectors per mode appear with the first call.";
-  return [...by.entries()].map(([m, d]) => `${m}: ${[...d].map((x) => detectorName(x)).join(" + ") || "no detector"}`).join(". ") + ". Strict mode adds the LLM detector.";
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  return (
+    "Detectors seen in the shown calls. " +
+    [...by.entries()].map(([m, d]) => `${cap(m)}: ${[...d].map((x) => detectorName(x)).join(" + ") || "none reported"}`).join(". ") +
+    "."
+  );
 }
 
 const placeholdersIn = (text: string) => tokenize(text).filter((t) => t.kind === "placeholder").length;
@@ -861,9 +872,13 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
           ))
         )}
       </div>
-      <div aria-hidden="true" className="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-guard uppercase md:flex-col md:justify-center">
+      <div aria-hidden="true" className="flex items-center gap-2 font-mono text-2xs text-guard md:flex-col md:justify-center">
         <span className="h-px flex-1 bg-guard/40 md:h-auto md:w-px" />
-        <span className="md:[writing-mode:vertical-rl]">restored by pii-guard</span>
+        <span className="whitespace-nowrap">pii-guard</span>
+        <span className="text-faint">
+          <span className="md:hidden">↓</span>
+          <span className="hidden md:inline">→</span>
+        </span>
         <span className="h-px flex-1 bg-guard/40 md:h-auto md:w-px" />
       </div>
       <div data-testid="unmasked-response" className="min-w-0 space-y-2">
@@ -910,7 +925,7 @@ function Fact({ label, value }: { label: string; value: number | string }) {
 
 function ChartCard({ id, title, note, children }: { id: string; title: string; note: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-title`} className="min-w-0 rounded-2xl border border-line bg-surface p-4 sm:p-5">
+    <section aria-labelledby={`${id}-title`} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
       <h3 id={`${id}-title`} className="text-base font-semibold tracking-tight text-ink">
         {title}
       </h3>
