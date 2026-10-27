@@ -14,8 +14,9 @@ default is ``eval/fixtures``. Detectors are looked up in the registry by name; o
 can't be loaded is skipped with a warning. The Markdown scorecard goes to stdout (and to
 ``--markdown``), the JSON scorecard to ``--json``. ``--baselines`` also runs open-source
 tools over the same documents (:mod:`pii_guard.eval.baselines`) and appends a comparison.
-Fixtures whose documents carry ``meta.attack`` (the prompt-injection sets) also get a leak table
-per attack class (:mod:`pii_guard.eval.injection`). ``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
+Fixtures whose documents carry ``meta.attack`` (the prompt-injection sets) also get a leak
+table per attack class (:mod:`pii_guard.eval.injection`).
+``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
 ``known`` detector), to measure the uplift of pre-loading values an application already knows.
 
 Exit codes: 0 success, 1 a detector or the vault failed during the run, 2 bad arguments,

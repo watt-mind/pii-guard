@@ -41,7 +41,10 @@ __all__ = [
     "run_injection",
 ]
 
-DEFAULT_INJECTION_FIXTURES = ("eval/fixtures/hu-injection.jsonl", "eval/fixtures/en-injection.jsonl")
+DEFAULT_INJECTION_FIXTURES = (
+    "eval/fixtures/hu-injection.jsonl",
+    "eval/fixtures/en-injection.jsonl",
+)
 #: Attack class of documents without ``meta.attack``.
 UNTAGGED = "(none)"
 
