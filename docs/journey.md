@@ -428,6 +428,28 @@ committed; reproduce with the commands in [evaluation.md](evaluation.md).
   lines (one line of a 2- or 3-line zone covers under half the labelled box), and a one-line
   driving-licence MRZ with a single filler.
 
+### 19. Person names inside company names (2026-10-27)
+
+LAB-1149.
+
+In fast mode a Hungarian business name that carries a person's name (`Tóth és Társa Bt.`,
+`Kiss-Lukács Kft.`, `Molnár Péter Bt.`) was one `ORGANIZATION` to the NER, and organisations
+are kept, so the name reached the model. A rule in the Hungarian pack now finds the name part
+before a legal form with the surname and given-name lexicons and masks only it
+(`[[PERSON_x]] és Társa Bt.`); sole traders (`e.v.`, `egyéni vállalkozó`) are masked even when
+the surname is not in the lexicon.
+
+- **Before → after** (new `hu-company-names.jsonl`, 44 docs, 54 names inside company names):
+  rules + distilled large NER **61.1 % → 0 %** of those names leaked, rules alone 100 % → 0 %;
+  over-masking of company names without a person 0 / 30 → 0 / 30. Default sets unchanged
+  except one more true-positive `PERSON` with the rules. Source:
+  [evaluation.md, "Person names inside company names"](evaluation.md#person-names-inside-company-names),
+  *(ticket comment, LAB-1149)*.
+- **Decision:** a surname that is also an ordinary word (`Fekete`, `Magyar`, `Szabó`,
+  `Pécsi`) needs person evidence (a given name, `és Társa`/`és Fia`, a sole-trader form or a
+  bare `Bt.`), so `Fekete Kavics Kft.` stays intact and `Fekete Kft.` is accepted as a possible
+  miss.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
