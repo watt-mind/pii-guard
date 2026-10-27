@@ -26,6 +26,8 @@ META_URL = "https://api.meta.ai/v1"
 
 pytestmark = [
     pytest.mark.live,
+    # A live check exercises the real detector stack, NER included when it is installed.
+    pytest.mark.ner_autodetect,
     pytest.mark.skipif(not LIVE_KEY, reason="META_API_KEY not set"),
     pytest.mark.filterwarnings("ignore::DeprecationWarning"),
 ]
