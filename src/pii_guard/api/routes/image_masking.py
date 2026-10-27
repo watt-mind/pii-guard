@@ -186,6 +186,8 @@ class ImageMasker:
     - ``sam``: required. Without an API key every call fails closed (``detection_failed``).
     - ``ocr`` / ``text_detector``: both or neither. Without them only SAM runs, and the
       outcome says so (``ocr_engine is None``).
+    - ``captions``: also mask the values next to known field captions on the OCR'd text
+      (:mod:`pii_guard.visual.captions`; on by default).
     - ``entity_types``: the visual types to segment; default every type ``sam`` has a prompt
       for, so ``keep`` types (``STAMP``) are found and reported, not silently ignored.
     """
@@ -200,6 +202,7 @@ class ImageMasker:
         text_detector_names: Sequence[str] = (),
         text_detector_models: dict[str, str] | None = None,
         entity_types: Sequence[EntityType] | None = None,
+        captions: bool = True,
     ) -> None:
         if (ocr is None) != (text_detector is None):
             raise ValueError("ocr and text_detector go together")
@@ -209,6 +212,7 @@ class ImageMasker:
         self.text_detector = text_detector
         self.text_detector_names = list(text_detector_names)
         self.text_detector_models = dict(text_detector_models or {})
+        self.captions = captions
         self.entity_types = list(entity_types) if entity_types is not None else list(sam.prompts)
         if not self.entity_types:
             raise ValueError("at least one visual entity type is needed")
@@ -232,6 +236,7 @@ class ImageMasker:
             ocr=self.ocr,
             detectors=[self.text_detector] if self.text_detector is not None else (),
             language=language,
+            captions=self.captions,
         )
         regions = [_grow_face(r, width, height) for r in regions]
         policed = _merge([self._police(r) for r in regions])

@@ -34,4 +34,5 @@ def pack() -> LanguagePack:
         inflection=inflection.GermanGenitiveMatcher(),
         surface_forms=forms.SURFACE_FORMS,
         allow_suffix=True,  # "Annas": a name runs on into the genitive
+        captions=files(__name__).joinpath("captions.tsv"),
     )

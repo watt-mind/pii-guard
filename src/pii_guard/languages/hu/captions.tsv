@@ -1,0 +1,39 @@
+# Field captions on Hungarian identity documents and forms (visual/captions.py).
+# caption <TAB> entity type of the value printed next to it, or "-" when that value is not
+# personal data (the caption is still recognised, so it bounds its neighbours).
+Név	PERSON
+Családi név	PERSON
+Családi és utónév	PERSON
+Utónév	PERSON
+Utónevek	PERSON
+Születési név	PERSON
+Születési családi és utónév	PERSON
+Anyja neve	PERSON
+Anyja születési neve	PERSON
+Születési idő	DATE_OF_BIRTH
+Születési dátum	DATE_OF_BIRTH
+Születési hely	ADDRESS
+Születési hely és idő	DATE_OF_BIRTH
+Lakcím	ADDRESS
+Lakóhely	ADDRESS
+Cím	ADDRESS
+Okmányszám	ID_DOCUMENT
+Okmányazonosító	ID_DOCUMENT
+Igazolványszám	ID_DOCUMENT
+Személyi azonosító	ID_DOCUMENT
+Személyazonosító	ID_DOCUMENT
+TAJ szám	NATIONAL_ID_HU_TAJ
+Adóazonosító jel	NATIONAL_ID_HU_TAX
+Adószám	NATIONAL_ID_HU_TAX
+Telefon	PHONE
+Telefonszám	PHONE
+E-mail	EMAIL
+Nem	-
+Állampolgárság	-
+Érvényes	-
+Érvényesség	-
+Érvényességi idő	-
+Kiállítás dátuma	-
+Kiállító hatóság	-
+Aláírás	-
+Kategóriák	-

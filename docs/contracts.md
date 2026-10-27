@@ -449,7 +449,9 @@ uploads are not accepted (they would need an extra dependency).
 
 - `box` is `[x1, y1, x2, y2]`, inclusive pixel corners in the image after EXIF orientation.
   `source` is `sam` (SAM 3.1 segmentation) or `ocr` (OCR word boxes of a span a text detector
-  found); `detector` is `sam` or the text detector's registry name. SAM gives no scores.
+  found); `detector` is `sam`, the text detector's registry name, or `captions` for a value
+  printed next to a known field caption (`Név`, `Date of birth`; score 0.8). SAM gives no
+  scores.
 - `FACE` boxes are grown before masking (40% up, 10% on each side, 5% down, clamped to the
   image) because SAM's face box leaves hair and ears visible; the reported box is the grown
   one, i.e. the area covered.

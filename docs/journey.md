@@ -21,7 +21,7 @@ leak 52.6 % (Hungarian) and 46.7 % (English) of labelled values. Rules plus Muse
 Baseten leak 0.9 % and 0.0 %, at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. A
 fast mode with no LLM call (rules plus a small NER model distilled from Muse Glimmer) gets
 Hungarian down to 0.9 % and English to 0.0 % at tens of milliseconds per message. On a public benchmark
-(Ai4Privacy OpenPII, 600 documents, milestone 22) strict mode leaks 3.9 % and fast mode 38.0 %:
+(Ai4Privacy OpenPII, 600 documents, milestone 23) strict mode leaks 3.9 % and fast mode 38.0 %:
 fast mode suits text like ours, not unfamiliar number formats.
 
 | Language | Mode | Best configuration | Leak | F1 (overlap) | p50 latency | $ / 1k msgs | Source |
@@ -32,11 +32,11 @@ fast mode suits text like ours, not unfamiliar number formats.
 | English | fast | rules + distilled NER, large | **0.0 %** | 98.5 | 36 ms (MPS) | no API call | [distilled/large/en-smoke.md](../eval/results/ner/distilled/large/en-smoke.md), [latency-large.json](../eval/results/ner/distilled/latency-large.json) |
 | either | none | rules only (baseline) | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [distilled/rules/](../eval/results/ner/distilled/rules/) `hu-smoke.md`, `en-smoke.md` |
 
-¹ Measured in the 2026-10-27 comparison (milestone 22), which confirmed the 0.9 % figure
+¹ Measured in the 2026-10-27 comparison (milestone 23), which confirmed the 0.9 % figure
 that milestone 14 had only stated in docs/models.md: 1 of 106 labelled values, F1 97.9. That
 run's machine was under unrelated load too (load average about 15 on 10 cores), so read
 the latency as relative. On the public Ai4Privacy set the same fast mode leaks 35–40 %
-(milestone 22); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
+(milestone 23); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
 you train them yourself (see [models.md](models.md#ner-detector)).
 
 Leak = share of labelled values that still appear, in any surface form, in the text the
@@ -514,7 +514,45 @@ timing breakdown; `full` mode with the originals is refused off localhost
 - **Cost:** 44 Muse Spark Open calls on Baseten for the strict cells, about $0.10; everything
   else ran locally.
 
-### 22. Fresh comparison: fast and strict vs Presidio, LLM Guard, PrivAiTe, on a public set too (2026-10-27)
+### 22. Values next to field captions on ID cards (2026-10-27)
+
+LAB-1125.
+
+On a card a value sits under a small caption (`Családi név / Surname` above `FIKTÍV`), and a
+text detector sees the value alone: a surname on its own line, a foreign date, a document
+number with no checksum. Even the LLM detector left the surname of the fictional Hungarian
+card unmasked. Owner decision: keep the text detectors and also mask the value next to every
+known caption, per language pack, but no blanket rule that masks whatever is printed on a card.
+
+Two changes, measured separately below. `visual/captions.py` reads the captions from each
+language pack's `captions.tsv` (Hungarian, English, German, plus French, Italian, Spanish,
+Polish and Dutch until they have packs, and the EU driving-licence field numbers `1.`–`5.`),
+matches them despite small-print OCR errors (`Date of bith`, `Sumame`) and masks the value on
+the caption's right or under it in its column, up to the next caption. Captions of values
+that aren't personal data (`Sex`, `Nationality`, `Expiry`) bound the columns but stay visible.
+And Tesseract now reads small images enlarged to 2000 px: card captions are 6–10 px high,
+below what it reads, so before this it returned no caption to pair with.
+
+| Text recall @ IoU ≥ 0.5 | Text labels | Rules, before | after | Rules + Muse Spark Open, before | after |
+|---|---:|---:|---:|---:|---:|
+| Fictional set (milestone 17) | 110 | 34.5 % | **87.3 %** | 89.1 % | **99.1 %** |
+| Official specimens (LAB-1120) | 274 | 1.5 % | **15.0 %** | 27.7 % | **29.2 %** |
+
+- **Over-masking** (mean share of the image covered outside every label): fictional
+  0.8 → 1.2 % (rules) and 0.9 → 1.2 % (LLM); specimens 2.6 → 4.0 % and 3.1 → 4.8 %, inside
+  the 3-point budget the ticket set.
+- **Fully covered** (coverage ≥ 90 %) specimen text values with the LLM: 9.8 → 20.1 %: the
+  LLM already found many values, but only partly (one line of two, a box missing its edges).
+- **The ≥ 50 % target** is met on the fictional set and missed on the specimens. On 108 of
+  the 274 specimen values Tesseract returns no word at all (guilloche backgrounds, holograms,
+  2-4 px strokes on 500 px scans), so no text method can reach them *(ticket comment, LAB-1125)*; a better reader for
+  security-printed cards is the next step, not more captions.
+- **Cost:** 96 + 260 SAM calls, about **$0.89**, fetched once and served from the cache
+  for every other run; Baseten tokens for four LLM runs not metered. Before = the same code with
+  `--no-captions --ocr-upscale 0`. Source: run records `2026-10-27-visual-{fictional,specimens}-rules{,-llm}{,-captions}`
+  in [benchmarks.md](benchmarks.md) and the reports in `eval/results/visual/*-captions*.md`.
+
+### 23. Fresh comparison: fast and strict vs Presidio, LLM Guard, PrivAiTe, on a public set too (2026-10-27)
 
 PR [#45](https://github.com/watt-mind/pii-guard/pull/45), LAB-1148.
 
@@ -589,7 +627,9 @@ data, labelling it, judging), and ship a small, fast, self-hostable model distil
   so a third language is a checklist.
 - **Prompt-injection red team** (LAB-1107): text that tries to talk the LLM detector out of
   reporting values.
-- **Images:** mask printed values on ID cards (LAB-1125); MRZ zones are masked since milestone 18.
+- **Images:** a reader that copes with security-printed cards, since OCR misses 39 % of the
+  specimen values outright (milestone 22); MRZ zones and captioned values are masked since
+  milestones 18 and 22.
 - **English names** still missed on Muse-generated English (2.5–5.0 % leak across runs,
   LAB-1138).
 - **Publish the distilled weights**, so fast mode works without training a model first.

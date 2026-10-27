@@ -152,6 +152,19 @@ Vault inflection: the genitive kept outside the placeholder (`Annas` → `[[PERS
 | `ID_PHOTO` | The photo area of an ID document | SAM 3.1 | mask |
 | `STAMP` | Official stamps and seals | SAM 3.1 | keep |
 | *(text types above)* | Text found in an image by OCR | OCR + `detect` | per type |
+| *(text types above)* | The value printed next to a known field caption (`Név`, `Date of birth`, EU licence field `1.`) | OCR + caption lexicon (`visual/captions.py`) | per type |
+
+On ID cards a value sits under or beside a small caption (`Családi név / Surname` above
+`FIKTÍV`), and a text detector reading the value alone often misses it: a surname on its own
+line, a foreign date format, a document number with no checksum. Image masking therefore also
+pairs every recognised caption with its value and masks the value with the caption's type.
+The captions come from the language packs (`captions.tsv`, [languages.md](languages.md)),
+plus French, Italian, Spanish, Polish and Dutch captions until those languages have packs,
+and the EU driving licence field numbers (`1.` surname, `2.` given names, `3.` date and
+place of birth, `5.` licence number, `8.` address) on a page where at least three of them
+start a line. Captions of values that are not personal data (`Sex`, `Nationality`, `Expiry`)
+are recognised too, so they bound the columns, but their values stay visible. A word is
+masked only as the value of a personal-data caption, never because it is printed on a card.
 
 ## Adding a language
 

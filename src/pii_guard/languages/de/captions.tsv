@@ -1,0 +1,33 @@
+# Field captions on German identity documents and forms (visual/captions.py).
+# caption <TAB> entity type of the value printed next to it, or "-" when that value is not
+# personal data (the caption is still recognised, so it bounds its neighbours).
+Name	PERSON
+Familienname	PERSON
+Vorname	PERSON
+Vornamen	PERSON
+Geburtsname	PERSON
+Ordens- oder Künstlername	PERSON
+Geburtsdatum	DATE_OF_BIRTH
+Geburtstag	DATE_OF_BIRTH
+Geburtsort	ADDRESS
+Anschrift	ADDRESS
+Wohnort	ADDRESS
+Adresse	ADDRESS
+Ausweisnummer	ID_DOCUMENT
+Ausweisnr	ID_DOCUMENT
+Dokumentnummer	ID_DOCUMENT
+Passnummer	ID_DOCUMENT
+Steuer-ID	ID_DOCUMENT
+Steuer-Identifikationsnummer	ID_DOCUMENT
+Versichertennummer	ID_DOCUMENT
+Telefon	PHONE
+E-Mail	EMAIL
+Geschlecht	-
+Staatsangehörigkeit	-
+Gültig bis	-
+Ausstellungsdatum	-
+Behörde	-
+Unterschrift	-
+Klassen	-
+Größe	-
+Augenfarbe	-

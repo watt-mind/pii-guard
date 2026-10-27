@@ -227,8 +227,16 @@ Share of labelled regions masked with IoU >= 0.5. `specimens` are official speci
 | Run | Set | Images | Countries | portrait | signature | mrz | text | All regions | Over-masking (mean) |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | `2026-10-27-visual-fictional-muse-image` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 0.0% | 34.5% | 47.6% | 0.8% |
+| `2026-10-27-visual-fictional-rules` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 100.0% | 34.5% | 51.7% | 0.8% |
+| `2026-10-27-visual-fictional-rules-captions` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 100.0% | 87.3% | 90.6% | 1.2% |
+| `2026-10-27-visual-fictional-rules-llm` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 100.0% | 89.1% | 92.0% | 0.9% |
+| `2026-10-27-visual-fictional-rules-llm-captions` | `fictional-specimens` | 24 | 3 | 100.0% | 100.0% | 100.0% | 99.1% | 99.3% | 1.2% |
 | `2026-10-27-visual-specimens-id-photo-prompt` | `specimens` | 65 | 24 | 76.9% | 83.8% | 0.0% | 0.4% | 20.2% | 1.5% |
 | `2026-10-27-visual-specimens-person-prompt` | `specimens` | 65 | 24 | 90.8% | 83.8% | 0.0% | 0.4% | 22.4% | 2.1% |
+| `2026-10-27-visual-specimens-rules` | `specimens` | 65 | 24 | 90.8% | 83.8% | 76.7% | 1.5% | 28.8% | 2.6% |
+| `2026-10-27-visual-specimens-rules-captions` | `specimens` | 65 | 24 | 90.8% | 83.8% | 76.7% | 15.0% | 37.9% | 4.0% |
+| `2026-10-27-visual-specimens-rules-llm` | `specimens` | 65 | 24 | 90.8% | 83.8% | 76.7% | 27.7% | 46.6% | 3.1% |
+| `2026-10-27-visual-specimens-rules-llm-captions` | `specimens` | 65 | 24 | 90.8% | 83.8% | 80.0% | 29.2% | 47.8% | 4.8% |
 
 ## Gateway latency
 
@@ -336,8 +344,16 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-glimmer-zero-shot-llm-medium` | pii-guard Muse Glimmer (medium) | smoke | en, hu | imported | `c759b54` | Modal, 1x NVIDIA H100 80 GB, vLLM (vllm/vllm-openai:muse-glimmer), bf16 | ≈ $4.00, 60 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-glimmer-zero-shot-rules-llm-low` | pii-guard rules + Muse Glimmer (low) | smoke | en, hu | imported | `c759b54` | Modal, 1x NVIDIA H100 80 GB, vLLM (vllm/vllm-openai:muse-glimmer), bf16 | ≈ $4.00, 60 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-glimmer-zero-shot-llm-low` | pii-guard Muse Glimmer (low) | smoke | en, hu | imported | `c759b54` | Modal, 1x NVIDIA H100 80 GB, vLLM (vllm/vllm-openai:muse-glimmer), bf16 | ≈ $4.00, 60 GPU-min, shared |
+| 2026-10-27 | `2026-10-27-visual-specimens-rules-llm-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten) | — |
+| 2026-10-27 | `2026-10-27-visual-specimens-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten) | — |
+| 2026-10-27 | `2026-10-27-visual-specimens-rules-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.00 |
+| 2026-10-27 | `2026-10-27-visual-specimens-rules` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.65 |
 | 2026-10-27 | `2026-10-27-visual-specimens-person-prompt` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `84b6422` | — | ≈ $0.65 |
 | 2026-10-27 | `2026-10-27-visual-specimens-id-photo-prompt` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `84b6422` | — | ≈ $0.65 |
+| 2026-10-27 | `2026-10-27-visual-fictional-rules-llm-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten) | — |
+| 2026-10-27 | `2026-10-27-visual-fictional-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten) | — |
+| 2026-10-27 | `2026-10-27-visual-fictional-rules-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.00 |
+| 2026-10-27 | `2026-10-27-visual-fictional-rules` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.24 |
 | 2026-10-27 | `2026-10-27-visual-fictional-muse-image` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `88e98bd` | — | ≈ $0.24 |
 | 2026-10-26 | `2026-10-26-rules-muse-spark-smoke-hu` | pii-guard rules + Muse Spark 1.3 | smoke | hu | imported | `62b64fc` | local harness; the LLM detector is a remote API call | — |
 | 2026-10-26 | `2026-10-26-rules-muse-spark-smoke-en` | pii-guard rules + Muse Spark 1.3 | smoke | en | imported | `62b64fc` | local harness; the LLM detector is a remote API call | — |

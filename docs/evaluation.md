@@ -590,6 +590,32 @@ Results: [fictional.md](../eval/results/visual/fictional.md). A manifest entry m
 `language` for the text detectors (otherwise derived from the country); stamps and the
 overprint are recorded as `unscored` regions.
 
+### Text detectors, captions and OCR size (visual)
+
+`--detectors` takes the same comma-separated list as the text eval: `rules,llm` runs the
+detection pipeline the API uses (overlaps resolved, `keep` types honoured) on the OCR text;
+a detector that can't be loaded fails the run. Values next to known field captions
+(`visual/captions.py`) are masked unless `--no-captions`, and Tesseract reads images enlarged
+to 2000 px on the longer side unless `--ocr-upscale 0`; the report's `pipeline` block records
+both, and the text detector is reported as e.g. `rules+llm+captions`. The before/after of
+LAB-1125 (journey milestone 22) ran the same commit with and without those two flags:
+
+```bash
+F=eval/fixtures/visual
+uv run pii-guard eval visual --specimens $F/images --manifest $F/manifest.json \
+  --labels $F/labels.json --detectors rules,llm --offline \
+  --json eval/results/visual/fictional-captions-llm.json \
+  --markdown eval/results/visual/fictional-captions-llm.md
+uv run pii-guard eval visual --no-captions --ocr-upscale 0 ...   # the "before"
+```
+
+Results: [fictional-captions.md](../eval/results/visual/fictional-captions.md),
+[fictional-captions-llm.md](../eval/results/visual/fictional-captions-llm.md),
+[specimens-captions.md](../eval/results/visual/specimens-captions.md),
+[specimens-captions-llm.md](../eval/results/visual/specimens-captions-llm.md); run records
+`2026-10-27-visual-{fictional,specimens}-rules{,-llm}{,-captions}`. The LLM detector is
+configured as for the API (`PII_GUARD_LLM_DETECTOR_*`); its runs are not deterministic.
+
 ## Person names inside company names
 
 `eval/fixtures/hu-company-names.jsonl` (44 documents, built by
