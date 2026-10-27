@@ -150,8 +150,9 @@ class YolosSignatures:  # pragma: no cover - needs torch + transformers and the 
 
         self._torch = torch
         self._proc = AutoImageProcessor.from_pretrained(YOLOS_SIGNATURE, revision=YOLOS_REVISION)
+        # safetensors only: never unpickle a pytorch_model.bin from the hub (LAB-1304).
         self._model = AutoModelForObjectDetection.from_pretrained(
-            YOLOS_SIGNATURE, revision=YOLOS_REVISION
+            YOLOS_SIGNATURE, revision=YOLOS_REVISION, use_safetensors=True
         ).eval()
         self.score = score
         self.grid = grid
