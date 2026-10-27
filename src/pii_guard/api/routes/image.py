@@ -20,7 +20,9 @@ The format is sniffed from the bytes (PNG or JPEG only; anything else is ``415``
 response carries the masked image as base64 PNG (``image``), re-encoded from pixels with no
 metadata, plus the regions found, without values. See ``docs/contracts.md``.
 
-Detection: SAM 3.1 (``PII_GUARD_SAM_URL`` / ``META_API_KEY``) for visual types, and, when
+Detection: the segmenter (``PII_GUARD_SEGMENTER``, default ``hybrid``: YuNet on the CPU for
+faces and ID photos, SAM 3.1 via ``PII_GUARD_SAM_URL`` / ``META_API_KEY`` for signatures; see
+:mod:`pii_guard.visual.segmenters`) for visual types, and, when
 Tesseract is installed (``uv sync --extra ocr`` + the ``tesseract`` binary), OCR text through
 the API's own text detectors (``PII_GUARD_DETECTORS``). Without Tesseract only SAM runs and
 ``analysis.ocr.ran`` is ``false`` with a ``reason``.
@@ -28,7 +30,8 @@ the API's own text detectors (``PII_GUARD_DETECTORS``). Without Tesseract only S
 Fail closed (ADR 0006): any SAM, OCR or detector error is ``503 detection_failed``, a
 ``block`` policy region is ``422 blocked_entity``; the original image is never returned.
 
-Tests and embedders can set ``app.state.sam_client`` (a :class:`~pii_guard.visual.SamClient`),
+Tests and embedders can set ``app.state.sam_client`` (any segmenter, e.g. a
+:class:`~pii_guard.visual.SamClient`),
 ``app.state.ocr_engine`` (an :class:`~pii_guard.visual.OcrEngine`, or ``None`` to disable OCR)
 and ``app.state.max_image_bytes``.
 """
@@ -70,7 +73,8 @@ from pii_guard.policy import BlockedEntityError, Policy
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import Vault, VaultSession
 from pii_guard.visual.ocr import OcrEngine
-from pii_guard.visual.sam import SamClient
+from pii_guard.visual.segment import Segmenter
+from pii_guard.visual.segmenters import build_segmenter
 
 __all__ = ["ImageMaskResponse", "get_image_masker", "max_image_bytes", "router"]
 
@@ -165,14 +169,14 @@ class ImageOptions(BaseModel):
     expiry: str = "reduce"
 
 
-def _sam_client(request: Request) -> SamClient:
+def _sam_client(request: Request) -> Segmenter:
     state = request.app.state
     sam = getattr(state, "sam_client", None)
     if sam is None:
         with _lock:
             sam = getattr(state, "sam_client", None)
             if sam is None:
-                sam = SamClient(settings=state.settings)
+                sam = build_segmenter(state.settings)
                 state.sam_client = sam
     return sam
 

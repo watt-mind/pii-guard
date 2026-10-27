@@ -11,15 +11,21 @@ WORKDIR /app
 
 # Dependencies first, so code changes don't invalidate this layer. The `ocr` extra
 # (pytesseract) reads the text in images; without it image parts are refused (ADR 0006).
+# The `local-vision` extra (OpenCV headless) runs YuNet, the on-device face and ID-photo
+# detector of the default hybrid segmenter (PII_GUARD_SEGMENTER, LAB-1245).
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-dev --extra ocr --no-install-project
+    uv sync --locked --no-dev --extra ocr --extra local-vision --no-install-project
 
 COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --extra ocr --no-editable
+    uv sync --locked --no-dev --extra ocr --extra local-vision --no-editable
+
+# The YuNet model (0.23 MB, MIT, OpenCV model zoo): fetched from its pinned URL and checked
+# against its pinned SHA-256 (pii_guard.visual.segment.YUNET); the build fails on a mismatch.
+RUN PII_GUARD_MODEL_DIR=/app/models /app/.venv/bin/python -m pii_guard.visual.segment fetch
 
 # --- runtime: Python, Tesseract and the virtualenv, as a non-root user -------
 FROM python:3.12-slim-trixie AS runtime
@@ -36,6 +42,7 @@ RUN groupadd --system --gid 10001 piiguard \
     && useradd --system --uid 10001 --gid piiguard --no-create-home piiguard
 
 COPY --from=build --chown=piiguard:piiguard /app/.venv /app/.venv
+COPY --from=build --chown=piiguard:piiguard /app/models /app/models
 
 # 0.0.0.0 inside the container: publish the port on 127.0.0.1 only (compose.yaml does). The API
 # has no authentication unless PII_GUARD_API_TOKEN is set (docs/operations.md, Exposure).
@@ -43,7 +50,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PII_GUARD_HOST=0.0.0.0 \
-    PII_GUARD_PORT=8787
+    PII_GUARD_PORT=8787 \
+    PII_GUARD_MODEL_DIR=/app/models
 
 WORKDIR /app
 USER piiguard

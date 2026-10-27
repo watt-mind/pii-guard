@@ -104,7 +104,8 @@ export interface ImageMaskRequest {
   language?: string;
 }
 
-export type RegionSource = "sam" | "ocr";
+/** `sam`: SAM 3.1 (Meta API); `local`: the on-device face detector (YuNet); `ocr`: OCR + a text detector. */
+export type RegionSource = "sam" | "local" | "ocr";
 export type RegionPolicy = "mask" | "keep" | "block";
 
 /** One region, as the API reports it: inclusive pixel corners, no value. */

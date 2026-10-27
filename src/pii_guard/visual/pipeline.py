@@ -1,4 +1,4 @@
-"""The visual pipeline: SAM 3.1 regions + OCR text regions → masked image.
+"""The visual pipeline: segmenter regions (SAM 3.1 and/or YuNet) + OCR text regions → masked image.
 
 Fail closed (ADR 0006): if segmentation, OCR, detection or masking fails, the call raises
 (:class:`~pii_guard.types.DetectionError` / :class:`~pii_guard.types.MaskingError`) and no
@@ -14,7 +14,7 @@ from pii_guard.types import DetectionError, Detector, EntityType, PiiGuardError
 from pii_guard.visual.image import DEFAULT_FILL, load_image, mask_image
 from pii_guard.visual.ocr import OcrEngine, OcrText, ocr_text
 from pii_guard.visual.regions import Region
-from pii_guard.visual.sam import SamClient
+from pii_guard.visual.segment import Segmenter
 
 __all__ = ["ImageAnalysis", "VisualResult", "analyze_image", "analyze_image_text", "mask_visual"]
 
@@ -46,7 +46,7 @@ class ImageAnalysis:
 def analyze_image(
     image: bytes,
     *,
-    sam: SamClient | None = None,
+    sam: Segmenter | None = None,
     entity_types: Sequence[EntityType | str] | None = None,
     ocr: OcrEngine | None = None,
     detectors: Sequence[Detector] = (),
@@ -74,7 +74,7 @@ def analyze_image(
 def analyze_image_text(
     image: bytes,
     *,
-    sam: SamClient | None = None,
+    sam: Segmenter | None = None,
     entity_types: Sequence[EntityType | str] | None = None,
     ocr: OcrEngine | None = None,
     detectors: Sequence[Detector] = (),
@@ -110,7 +110,7 @@ def analyze_image_text(
 def mask_visual(
     image: bytes,
     *,
-    sam: SamClient | None = None,
+    sam: Segmenter | None = None,
     entity_types: Sequence[EntityType | str] | None = None,
     ocr: OcrEngine | None = None,
     detectors: Sequence[Detector] = (),

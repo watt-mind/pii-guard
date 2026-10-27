@@ -52,6 +52,7 @@ export type DetectorModels = Readonly<Record<string, string>>;
 
 export function sourceLabel(region: Pick<ImageRegion, "source" | "detector" | "entity_type">, models: DetectorModels = {}): string {
   if (region.source === "sam") return "SAM 3.1";
+  if (region.source === "local") return "YuNet (on-device)";
   return `OCR + ${detectorLabel(region.detector, { types: [region.entity_type], model: models[region.detector] })}`;
 }
 
@@ -77,7 +78,8 @@ export function summarizeRegions(regions: readonly ImageRegion[]): RegionSummary
     found: regions.length,
     masked: regions.filter((r) => r.policy === "mask").length,
     kept: regions.filter((r) => r.policy === "keep").length,
-    sam: regions.filter((r) => r.source === "sam").length,
+    // Every segmenter region (SAM 3.1 or the on-device face detector), as opposed to OCR.
+    sam: regions.filter((r) => r.source !== "ocr").length,
     ocr: regions.filter((r) => r.source === "ocr").length,
   };
 }
@@ -85,7 +87,7 @@ export function summarizeRegions(regions: readonly ImageRegion[]): RegionSummary
 export interface LegendRow {
   type: EntityType;
   count: number;
-  sources: ("sam" | "ocr")[];
+  sources: ImageRegion["source"][];
   kept: boolean;
 }
 
@@ -181,7 +183,7 @@ export function tagPlacements(
   const used: { x: number; y: number }[] = [];
   const near = (x: number, y: number) => used.some((u) => Math.abs(u.x - x) < tagWidth * width && Math.abs(u.y - y) < tagHeight * height);
   return regions.map((r) => {
-    if (r.source !== "sam") return "top-left";
+    if (r.source === "ocr") return "top-left";
     const [x1, y1, x2, y2] = r.box;
     const options: [TagPlacement, number, number][] = [
       ["top-left", x1, y1],

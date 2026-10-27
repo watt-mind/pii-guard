@@ -2,7 +2,8 @@
 
 ```
 python -m pii_guard.visual.segment_eval --candidate local --set specimens
-       [--record SLUG] [--json OUT] [--offline] [--max-live-calls 400] [--note TEXT]
+       [--record SLUG] [--json OUT] [--offline] [--max-live-calls 400] [--e2e E2E.json]
+python -m pii_guard.visual.segment_eval --e2e-bench --set fictional --rounds 3 --json E2E.json
 ```
 
 Scores only what a segmenter is for, the ``portrait`` and ``signature`` regions of the
@@ -26,6 +27,9 @@ image's time, peak RSS of the process and the model files' size.
 Candidates (the extra packages are needed only for the candidate that uses them):
 
 - ``sam-api``: :class:`~pii_guard.visual.sam.SamClient`, through the eval's response cache;
+- ``hybrid`` (LAB-1245, the serving default): :class:`~pii_guard.visual.segmenters.HybridSegmenter`,
+  YuNet for faces and ID photos and SAM (same cache) for signatures; its latency per image is
+  the longer of the two parts, which run concurrently;
 - ``local``: :class:`~pii_guard.visual.segment.LocalSegmenter` (YuNet; ``local-vision``);
 - ``small-detectors``: ``local`` plus a YOLOS-tiny signature detector run on the whole image
   and 2x2 overlapping tiles (``mdefrance/yolos-tiny-signature-detection``, Apache-2.0;
@@ -33,6 +37,13 @@ Candidates (the extra packages are needed only for the candidate that uses them)
 - ``efficientsam``: ``local`` with each ID-photo box replaced by the bounding box of an
   EfficientSAM-ViT-T mask prompted with it (``yformer/EfficientSAM`` ONNX export,
   Apache-2.0; needs ``onnxruntime``).
+
+**End-to-end bench** (``--e2e-bench``, LAB-1245): ``POST /v1/mask/image`` through the real app
+(OCR with Tesseract, the rules detector, ``render=opaque``) for each image of the set, with the
+``hybrid`` and ``sam-api`` segmenters alternating per image (which goes first alternates too)
+for ``--rounds`` rounds, SAM called live (no cache) so its latency is real. Reports per mode
+the per-image p50 / p95 of each round, their medians, and SAM calls per image. ``--e2e FILE``
+then adds that mode's medians to a run record's ``latency_ms``.
 
 Output holds numbers, region types and specimen ids only, never images or text.
 """
@@ -51,6 +62,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any
+
+import httpx
 
 from pii_guard.types import DetectionError, EntityType, PiiGuardError
 from pii_guard.visual.image import load_image
@@ -243,7 +256,7 @@ class Candidate:
     licence: str
     #: Model bytes on disk (``None``: not local).
     size_bytes: int | None
-    #: Builds the segmenter; ``transport`` is the SAM cache (``sam-api`` only).
+    #: Builds the segmenter; ``transport`` is the SAM cache (``sam-api`` and ``hybrid``).
     build: Callable[[Any], Any]
 
 
@@ -251,6 +264,30 @@ def _sam(transport: Any) -> Any:
     from pii_guard.visual.sam import SamClient
 
     return SamClient(transport=transport, max_retries=2)
+
+
+class _Timed:
+    """Wraps a segmenter and keeps the wall time of its last ``segment()`` call."""
+
+    def __init__(self, inner: Any) -> None:
+        self.inner = inner
+        self.model = getattr(inner, "model", None)
+        self.last_ms = 0.0
+
+    def segment(
+        self, image: bytes, entity_types: Sequence[EntityType | str] | None = None
+    ) -> list[Region]:
+        start = time.perf_counter()
+        try:
+            return self.inner.segment(image, entity_types)
+        finally:
+            self.last_ms = (time.perf_counter() - start) * 1000
+
+
+def _hybrid(transport: Any) -> Any:
+    from pii_guard.visual.segmenters import HybridSegmenter
+
+    return HybridSegmenter(sam=_sam(transport), local=_Timed(LocalSegmenter()))
 
 
 def _yunet_detector() -> dict[str, Any]:
@@ -263,6 +300,13 @@ def _yunet_detector() -> dict[str, Any]:
 
 
 CANDIDATES: dict[str, Candidate] = {
+    "hybrid": Candidate(
+        "hybrid",
+        (_yunet_detector(), {"name": "sam", "model": "sam-3.1", "model_ref": "meta-api:sam-3.1"}),
+        "MIT (YuNet weights), Apache-2.0 (OpenCV); hosted (Meta Model API) for signatures",
+        YUNET.size,
+        _hybrid,
+    ),
     "sam-api": Candidate(
         "sam-api",
         ({"name": "sam", "model": "sam-3.1", "model_ref": "meta-api:sam-3.1"},),
@@ -433,6 +477,10 @@ def run(
             result.sam_calls = len(recorded)
             result.sam_ms = sum(recorded)
             elapsed = result.sam_ms
+            local = getattr(segmenter, "local", None)
+            if isinstance(local, _Timed):  # hybrid: YuNet runs alongside the SAM calls
+                result.local_ms = local.last_ms
+                elapsed = max(elapsed, local.last_ms)
         else:
             result.local_ms = wall
             elapsed = wall
@@ -576,7 +624,8 @@ def to_record(
         "pii_guard_version": record["code"].get("pii_guard_version"),
         "note": None,
     }
-    record["title"] = f"Segmenter {candidate.name} on {set_label} (LAB-1229)"
+    ticket = "LAB-1245" if candidate.name == "hybrid" else "LAB-1229"
+    record["title"] = f"Segmenter {candidate.name} on {set_label} ({ticket})"
     record["fixture_set"] = set_label
     record["fixtures"] = [
         {
@@ -589,7 +638,7 @@ def to_record(
             "documents": card["specimens"],
         }
     ]
-    if candidate.name != "sam-api":
+    if candidate.name not in _USES_SAM:
         record["cost"] = {
             "usd": 0.0,
             "estimated": False,
@@ -602,12 +651,166 @@ def to_record(
     return record
 
 
+_USES_SAM = frozenset({"sam-api", "hybrid"})
+
+#: The modes the end-to-end bench alternates.
+E2E_MODES: tuple[str, ...] = ("hybrid", "sam-api")
+
+
+class _CountingTransport(httpx.BaseTransport):
+    """Live SAM calls, counted (no cache: the bench measures real latency)."""
+
+    def __init__(self) -> None:
+        self.inner = httpx.HTTPTransport()
+        self.calls = 0
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        self.calls += 1
+        return self.inner.handle_request(request)
+
+    def close(self) -> None:
+        self.inner.close()
+
+
+def e2e_summary(
+    per_mode: dict[str, list[list[float]]], calls: dict[str, list[int]], errors: dict[str, int]
+) -> dict[str, Any]:
+    """Per mode: p50 / p95 per image of each round, their medians, SAM calls per image."""
+    import statistics
+
+    out: dict[str, Any] = {}
+    for mode, rounds in per_mode.items():
+        p50s = [p for p in (_percentile(r, 0.5) for r in rounds) if p is not None]
+        p95s = [p for p in (_percentile(r, 0.95) for r in rounds) if p is not None]
+        n = calls.get(mode, [])
+        out[mode] = {
+            "rounds": len(rounds),
+            "images_per_round": len(rounds[0]) if rounds else 0,
+            "p50_per_round": p50s,
+            "p95_per_round": p95s,
+            "p50_median": round(statistics.median(p50s), 1) if p50s else None,
+            "p95_median": round(statistics.median(p95s), 1) if p95s else None,
+            "sam_calls_per_image": round(sum(n) / len(n), 2) if n else None,
+            "sam_calls_per_image_max": max(n) if n else None,
+            "errors": errors.get(mode, 0),
+        }
+    return out
+
+
+def add_e2e(card: dict[str, Any], bench: dict[str, Any], mode: str) -> None:
+    """Add ``mode``'s end-to-end medians (from ``--e2e-bench``) to a card's ``latency_ms``."""
+    row = bench.get("modes", {}).get(mode)
+    if row is None:
+        return
+    card["latency_ms"].update(
+        {
+            "mask_image_per_image_p50": row["p50_median"],
+            "mask_image_per_image_p95": row["p95_median"],
+        }
+    )
+    card["sam"]["mask_image_calls_per_image"] = row["sam_calls_per_image"]
+
+
+def e2e_bench(
+    set_name: str,
+    *,
+    rounds: int = 3,
+    modes: Sequence[str] = E2E_MODES,
+    log: Callable[[str], None] = lambda _m: None,
+) -> dict[str, Any]:  # pragma: no cover - live SAM calls and the data sets
+    """``POST /v1/mask/image`` per image, ``modes`` alternating; see the module docstring."""
+    from fastapi.testclient import TestClient
+
+    from pii_guard.api.app import create_app
+    from pii_guard.config import Settings
+    from pii_guard.eval.visual import DEFAULT_MAX_SIDE, load_specimens, prepare_image
+    from pii_guard.visual.ocr import tesseract_available
+    from pii_guard.visual.sam import SamClient
+    from pii_guard.visual.segmenters import HybridSegmenter, build_segmenter
+
+    if not tesseract_available():
+        raise DetectionError("the end-to-end bench needs Tesseract (OCR on, as served)")
+    specimens = load_specimens(*SETS[set_name], log=log)
+    if not specimens:
+        raise DetectionError(f"no labelled images found for {set_name}")
+    images = [prepare_image(s.path.read_bytes(), DEFAULT_MAX_SIDE) for s in specimens]
+    settings = Settings()
+    transport = _CountingTransport()
+    sam = SamClient(settings=settings, transport=transport, max_retries=2)
+    segmenters: dict[str, Any] = {}
+    for mode in modes:
+        built = build_segmenter(settings, mode=mode)
+        if isinstance(built, HybridSegmenter):
+            if built.local is None:
+                raise DetectionError("hybrid bench needs YuNet (uv sync --extra local-vision)")
+            built = HybridSegmenter(sam=sam, local=built.local)
+        elif isinstance(built, SamClient):
+            built = sam
+        segmenters[mode] = built
+    apps = {}
+    for mode in modes:
+        app = create_app(settings)
+        app.state.sam_client = segmenters[mode]
+        apps[mode] = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000))
+    per_mode: dict[str, list[list[float]]] = {m: [] for m in modes}
+    calls: dict[str, list[int]] = {m: [] for m in modes}
+    errors: dict[str, int] = {}
+    try:
+        for r in range(rounds):
+            times: dict[str, list[float]] = {m: [] for m in modes}
+            for i, data in enumerate(images):
+                order = list(modes) if (i + r) % 2 == 0 else list(reversed(modes))
+                for mode in order:
+                    before = transport.calls
+                    start = time.perf_counter()
+                    response = apps[mode].post(
+                        "/v1/mask/image?render=opaque",
+                        content=data,
+                        headers={"Content-Type": "image/png"},
+                    )
+                    times[mode].append((time.perf_counter() - start) * 1000)
+                    calls[mode].append(transport.calls - before)
+                    if response.status_code != 200:
+                        errors[mode] = errors.get(mode, 0) + 1
+                        code = response.json().get("error", {}).get("code", response.status_code)
+                        log(f"{specimens[i].id} {mode}: {code}")
+            for mode in modes:
+                per_mode[mode].append(times[mode])
+            log(f"round {r + 1}/{rounds} done")
+    finally:
+        transport.close()
+        for client in apps.values():
+            client.close()
+    load = os.getloadavg()[0] if hasattr(os, "getloadavg") else None
+    return {
+        "set": set_name,
+        "images": len(images),
+        "endpoint": "POST /v1/mask/image (render=opaque, OCR tesseract, detectors rules)",
+        "platform": f"{platform.system()} {platform.machine()}",
+        "host_load_average": round(load, 1) if load is not None else None,
+        "modes": e2e_summary(per_mode, calls, errors),
+    }
+
+
+def _e2e_main(args: argparse.Namespace, log: Callable[[str], None]) -> int:  # pragma: no cover
+    try:
+        result = e2e_bench(args.set_name, rounds=args.rounds, log=log)
+    except PiiGuardError as exc:
+        log(f"bench failed: {exc.code}: {exc.message}")
+        return 1
+    text = json.dumps(result, indent=2)
+    print(text)
+    if args.json:
+        args.json.write_text(text + "\n", encoding="utf-8")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m pii_guard.visual.segment_eval",
         description="Compare segmenters (SAM 3.1 API vs on-device) on portraits and signatures.",
     )
-    parser.add_argument("--candidate", choices=sorted(CANDIDATES), required=True)
+    parser.add_argument("--candidate", choices=sorted(CANDIDATES))
     parser.add_argument("--set", choices=sorted(SETS), required=True, dest="set_name")
     parser.add_argument("--cache", type=Path, default=Path("data/visual-cache"))
     parser.add_argument("--offline", action="store_true", help="cached SAM responses only")
@@ -615,18 +818,33 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", type=Path, metavar="OUT")
     parser.add_argument("--record", metavar="SLUG", help="write eval/results/runs/<date>-SLUG")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--e2e-bench",
+        action="store_true",
+        help="time POST /v1/mask/image end to end, hybrid vs sam-api alternating (live SAM)",
+    )
+    parser.add_argument("--rounds", type=int, default=3, help="--e2e-bench rounds")
+    parser.add_argument(
+        "--e2e", type=Path, metavar="E2E.json", help="add an --e2e-bench result to the record"
+    )
+    parser.add_argument("--note", action="append", default=[], help="a note for the record")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs the data sets
     args = build_parser().parse_args(argv)
-    candidate = CANDIDATES[args.candidate]
+    candidate = CANDIDATES[args.candidate] if args.candidate else None
 
     def log(message: str) -> None:
         print(f"segment_eval: {message}", file=sys.stderr)
 
     transport = None
-    if candidate.name == "sam-api":
+    if args.e2e_bench:
+        return _e2e_main(args, log)
+    if candidate is None:
+        log("--candidate is required (or --e2e-bench)")
+        return 2
+    if candidate.name in _USES_SAM:
         from pii_guard.eval.visual import CachingTransport
 
         transport = CachingTransport(
@@ -641,6 +859,8 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs 
         if transport is not None:
             transport.close()
     card = build_card(candidate, args.set_name, done, transport)
+    if args.e2e:
+        add_e2e(card, json.loads(args.e2e.read_text(encoding="utf-8")), candidate.name)
     summary = {
         "segmenter": card["segmenter"],
         "latency_ms": {k: v for k, v in card["latency_ms"].items() if k.startswith("segment")},
@@ -653,6 +873,7 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs 
         from pii_guard.eval.record import write_records
 
         record = to_record(card, candidate, args.set_name, args.record)
+        record["notes"].extend(args.note)
         for path in write_records([record], overwrite=args.overwrite):
             log(f"wrote {path}")
     return 0
