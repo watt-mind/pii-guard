@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 
@@ -60,6 +61,11 @@ def _serve(args: argparse.Namespace) -> int:
     except TrafficLogConfigError as exc:
         print(f"pii-guard serve: {exc}", file=sys.stderr)
         return 2
+    # The app checks the bind it is told about: hand it the real one, not just the env value
+    # (PII_GUARD_HOST=0.0.0.0 with --host 127.0.0.1 is a loopback server). The env is inherited
+    # by the --reload worker, which builds its own app.
+    os.environ["PII_GUARD_HOST"] = host
+    get_settings.cache_clear()
     uvicorn.run(
         "pii_guard.api.app:create_app",
         factory=True,

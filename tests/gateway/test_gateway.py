@@ -39,7 +39,7 @@ pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 def openai_client(http: TestClient, **headers: str) -> openai.OpenAI:
     return openai.OpenAI(
-        base_url="http://testserver/v1",
+        base_url="http://127.0.0.1:8787/v1",
         api_key="client-key-not-forwarded",
         http_client=http,
         default_headers=headers or None,

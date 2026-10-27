@@ -74,7 +74,9 @@ def test_live_meta_round_trip(mode: str, stream: bool) -> None:
         {"role": "user", "content": "Ismételd meg pontosan a nevemet és az e-mail címemet!"},
     ]
     with TestClient(app) as http:
-        client = openai.OpenAI(base_url="http://testserver/v1", api_key="unused", http_client=http)
+        client = openai.OpenAI(
+            base_url="http://127.0.0.1:8787/v1", api_key="unused", http_client=http
+        )
         started = time.perf_counter()
         result = client.chat.completions.create(
             model="muse-spark-1.3",

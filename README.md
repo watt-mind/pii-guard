@@ -336,6 +336,11 @@ personal data**, not even in a test. All fixtures are synthetic.
 
 ## Security
 
+**No authentication by default.** Keep pii-guard on loopback (the default) or behind an
+authenticating proxy: anyone who can reach it can unmask and use the gateway, and the upstream
+key is shared by every caller. `PII_GUARD_API_TOKEN` turns on a bearer token; see
+[docs/operations.md](docs/operations.md#exposure-and-authentication).
+
 Found a way to make personal data leak past the guard? That is a security bug. Please report
 it privately; see [SECURITY.md](SECURITY.md).
 
