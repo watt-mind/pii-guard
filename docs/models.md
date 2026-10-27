@@ -372,6 +372,7 @@ uv run python -m pii_guard.visual.segment fetch  # YuNet from the OpenCV model z
 
 ```python
 from pii_guard.visual.segment import LocalSegmenter
+
 regions = LocalSegmenter().segment(png_bytes)  # FACE + ID_PHOTO, on the CPU
 ```
 

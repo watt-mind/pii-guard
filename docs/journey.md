@@ -920,6 +920,35 @@ still personal data; the split only shows where the gap comes from. Of the set's
   in [benchmarks.md](benchmarks.md#ai4privacy) (`validity-ai4privacy.svg`) and
   [evaluation.md](evaluation.md#number-validity).
 
+### 33. Faces on the device, signatures still need SAM (2026-10-27)
+
+LAB-1229. A spike: can faces, ID photos and signatures be found on the device instead of with
+SAM 3.1 on the Meta API (four calls and 5-6 s per image, and the image leaves the machine)?
+**Faces and ID photos yes, signatures no**, so SAM 3.1 stays the default and nothing in the API
+or the gateway changes.
+
+| Specimens (65 official ID documents) | Portrait recall | Portrait leak | Signature recall | p50 / image | Weights |
+|---|---:|---:|---:|---:|---:|
+| SAM 3.1, Meta API (default) | 90.8 % | 47.7 % | 83.8 % | 5.5 s | hosted |
+| YuNet on the CPU (`LocalSegmenter`) | 92.3 % | 10.8 % | — | 116 ms | 0.23 MB |
+| YuNet + YOLOS-tiny signatures | 93.8 % | 6.2 % | 51.3 % | 727 ms | 26 MB |
+
+- **YuNet** (OpenCV model zoo, MIT) passes the face half of the "close enough" rule on both
+  sets: as much recall as SAM, a lower leak (a region under 95 % covered; 0.0 % on the
+  fictional set for both), under 500 ms on a busy laptop CPU. It over-masks around the photo
+  (61 % of its portrait boxes hit a labelled portrait, SAM's 90 %), which is the safe side.
+- **No small signature detector comes close.** The permissively licensed ones on Hugging Face
+  are trained on scanned pages and find 16-32 % of ID-card signatures (51 % on image tiles, at
+  9 % precision); the YOLOv8 ones are AGPL. EfficientSAM as a photo refiner added nothing
+  and costs 1.5-2.2 s. Local SAM 3 was not run: its weights are gated (no access) and 3.4 GB.
+- **What shipped:** `LocalSegmenter` as a library component (`--extra local-vision`, model
+  fetched with a pinned SHA-256; it raises if asked for signatures), the comparison as
+  `python -m pii_guard.visual.segment_eval` with 8 run records, and a segmenter section and
+  chart in [benchmarks.md](benchmarks.md#segmenters-sam-31-api-vs-on-device). Details and the
+  rule-by-rule verdict: [models.md](models.md#local-segmentation).
+- **Cost:** $0. 356 SAM 3.1 calls on free Meta API credits (≈ $0.89 at the planning
+  estimate); every local candidate ran on the CPU.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
