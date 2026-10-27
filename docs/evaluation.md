@@ -504,3 +504,52 @@ Results: [fictional.md](../eval/results/visual/fictional.md). A manifest entry m
 `language` for the text detectors (otherwise derived from the country); stamps and the
 overprint are recorded as `unscored` regions.
 
+## Person names inside company names
+
+`eval/fixtures/hu-company-names.jsonl` (44 documents, built by
+`eval/fixtures/build_company_names.py`, fictional names only) measures Hungarian company
+names that carry a person's name: sole traders (`e.v.`, `ev.`, `egyéni vállalkozó`),
+partnerships (`Tóth és Társa Bt.`, `Balogh és Fia Kkt.`, `Varga és Kiss Kkt.`) and companies
+(`Kiss-Lukács Kft.`, `Szilágyi Attila Zrt.`, `Hegedűs Nonprofit Kft.`), in upper case and in
+inflected forms (`Bt.-nek`, `Kft-vel`, `egyéni vállalkozónak`), plus 11 hard-negative
+documents of company names made of ordinary words, several of them also surnames
+(`Fekete Kavics Kft.`, `Magyar Kalapács Zrt.`, `Pécsi Kerámia Kft.`, `Vörös Rózsa Kft.`). Only
+the name part is labelled `PERSON` (`{{PERSON|Tóth}} és Társa Bt.`); a company name without a
+person is `ORGANIZATION`. The rule and its false-positive decision are described in
+[entities.md](entities.md#person-names-in-company-names).
+
+Two numbers per run come from the documents' `meta.companies`
+(`uv run python eval/fixtures/build_company_names.py --measure --detectors rules,ner`):
+
+- **company person leak**: occurrences of a person's name inside a company name not fully
+  covered by a masked span (54 occurrences);
+- **company over-masking**: occurrences of a company name without a person that any masked
+  span overlaps (30 occurrences).
+
+Fast mode is `rules,ner` with the distilled large NER model (milestone 14 of
+[journey.md](journey.md), `PII_GUARD_NER_MODEL` pointing at a local checkpoint); before = the
+develop branch without the rule, after = with it. Measured 2026-10-27:
+
+| Detectors | | Company person leak | Company over-masking | Leak (all values) | Consistency | `PERSON` P / R exact |
+|---|---|---:|---:|---:|---:|---:|
+| `rules` | before | 54 / 54 (100 %) | 0 / 30 (0 %) | 92.5 % | 7.5 % | - / 0.0 |
+| | after | **0 / 54 (0 %)** | **0 / 30 (0 %)** | 2.5 % | 97.5 % | 100.0 / 90.0 |
+| `rules,ner` (fast mode) | before | 33 / 54 (61.1 %) | 0 / 30 (0 %) | 52.5 % | 45.0 % | 93.1 / 45.0 |
+| | after | **0 / 54 (0 %)** | **0 / 30 (0 %)** | **0.0 %** | **100.0 %** | 100.0 / 100.0 |
+
+Before, the NER tagged every partnership and company name as one `ORGANIZATION` (kept), and
+caught only the sole traders, whose names it reads as people. With the rules alone the
+remaining 2.5 % leak is one of 40 values, a person named only in a signature, outside any
+company name: the NER and the LLM find those. Other stand-alone mentions of a name found in a
+company name are masked by the vault with the same placeholder (`Kedves [[PERSON_x]]! ...
+[[PERSON_x]] e.v.`); a longer stand-alone form (`Sipos Márta` after `Sipos és Társa Bt.`)
+keeps its given name with the rules alone, a partial leak the NER closes.
+`ORGANIZATION` precision is unchanged by the rule (it emits `PERSON` only).
+
+**No regression on the default sets** (hu/en/de smoke, synth-sample, inflection and injection
+fixtures, 151 documents; scorecards diffed before and after): with `rules`, one more
+`PERSON` found (`Molnár Teszt Lajos egyéni vállalkozó` in hu-smoke, a true positive; Hungarian
+leak 47.6 → 47.4 %), every other number unchanged; with `rules,ner`, identical apart from
+latency noise. On the 2,472 Hungarian documents of the NER distillation corpus, whose 1,548
+company names are all brand words (`... Villanyszerelő Kft.`), the rule fires 0 times. It adds
+about 0.01 ms to the rules' median detection time.

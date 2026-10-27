@@ -29,8 +29,13 @@ keeps the two in sync. See [contracts.md](contracts.md#entity-policies-implement
 | `VEHICLE_PLATE` | Licence plates | rules | mask |
 
 `ORGANIZATION` and company identifiers default to `keep` because they're usually not personal
-data and the model needs them to reason. A sole trader's company name can contain a person's
-name, though; the LLM pass is expected to flag that case as `PERSON`.
+data and the model needs them to reason. A company name can contain a person's name, though:
+a sole trader's (`Horváth Emese e.v.`) always does, and small partnerships and companies are
+often named after their members (`Tóth és Társa Bt.`, `Kiss-Lukács Kft.`). For Hungarian a
+rule finds that name part in every mode, fast mode included, and emits it as `PERSON`; the
+resolver lets a `PERSON` win over the overlapping kept `ORGANIZATION`, so only the name is
+masked (`[[PERSON_x]] és Társa Bt.`) and the rest of the company name stays. See "Person names
+in company names" below.
 
 ## Per language
 
@@ -69,9 +74,36 @@ Payment cards use `BANK_ACCOUNT` until the taxonomy has a card type of its own.
 | Machine-readable zone, TD1 (ID card, 3 × 30) and TD3 (passport, 2 × 44) | `ID_DOCUMENT` | ICAO 9303 check digits (a zone whose digits fail, e.g. after OCR, scores lower) | everywhere |
 | Land registry parcel number (`1234/5`, `0123/4`, `0123/4/A/12`) next to `hrsz.` / `helyrajzi szám`, also listed (`hrsz.: 1/2, 1/3 és 1/4`) | `PARCEL_NUMBER_HU` | format + label; settlement or `belterület`/`külterület` nearby raises the score | everywhere |
 
+| Person name inside a company name with a legal form (`e.v.`, `ev.`, `egyéni vállalkozó`, `Bt.`, `Kkt.`, `Kft.`, `Zrt.`, `Nyrt.`, `Kht.`, `Nonprofit Kft.`; any case, with or without the full stop, inflected: `Bt.-nek`) | `PERSON` | surname / given-name lexicons + legal form; see below | language |
+
 A whole MRZ is one span: it holds the holder's name, document number and date of birth.
 Parcel numbers always need their label, so fractions (`1/2 arányú`), dates (`2026/10.`), page
 numbers (`3/5. oldal`) and court case numbers (`12.P.21.345/2025/7.`) stay unmasked.
+
+#### Person names in company names
+
+`pii_guard.languages.hu.companies` looks at the capitalised words right before a legal form
+and masks the person's name only:
+
+| Company name | Masked | Why |
+|---|---|---|
+| `Horváth Emese e.v.`, `Balogh Ernő egyéni vállalkozónak` | the name (0.9) | sole trader: the business name is the person |
+| `Ördögh Tihamér e.v.` | the name (0.7) | sole trader, surname not in the lexicon: the legal form is enough |
+| `Molnár Péter Bt.`, `Fekete Anna Kft.` | the name (0.9) | surname + given name, any form |
+| `Tóth és Társa Bt.`, `Szabó és Fiai Kkt.`, `Varga és Kiss Kkt.` | the surname(s) (0.85) | family or partner connector |
+| `Horváth Bt.`, `Kiss-Lukács Kft.`, `Mészáros Építő Kft.` | the surname (0.8 / 0.75) | a surname that is not an ordinary word |
+| `Kis Bt.` | the surname (0.7) | a partnership's name traditionally carries a member's name |
+| `Fekete Kft.`, `Magyar Kalapács Zrt.`, `Pécsi Kerámia Kft.`, `Vörös Rózsa Kft.` | nothing | an ordinary word (adjective, occupation, demonym, place adjective; a flower) with no person evidence |
+| `Pannon Csempe Kft.`, `Duna Lámpa Bt.` | nothing | no surname |
+
+**The false-positive decision.** Many Hungarian surnames are also everyday words (`Nagy`,
+`Kis`, `Fekete`, `Magyar`, `Szabó`, `Molnár`, `Kovács`, `Varga`; demonyms such as `Lengyel`;
+place adjectives such as `Pécsi`), and businesses use them as brand words. Such a surname on
+its own is masked only with person evidence: a given name next to it (unless that given name is
+itself a common word, as in `Vörös Rózsa`), a family connector, a sole-trader form, or a bare
+surname in a `Bt.`/`Kkt.`. So `Fekete Kft.` and `Kovács Autószerviz Kft.` stay unmasked even
+when they are in fact named after a person; the NER and LLM passes may still catch them, and
+lower-case names (`kovács bt.`) are left to them.
 
 Vault inflection: case suffixes kept outside the placeholder (`[[PERSON_7f3a]]nek`), also
 when the stem changes: final-vowel lengthening (`Próba Zsuzsannának` → `[[PERSON_7f3a]]nak`)

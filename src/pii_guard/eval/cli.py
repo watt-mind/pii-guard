@@ -1,9 +1,10 @@
 """``pii-guard eval``: run the evaluation fixtures and print the scorecard.
 
 ```
-pii-guard eval [--fixtures PATH ...] [--detectors rules[,ner,llm]] [--language hu[,en]]
-               [--json OUT] [--markdown OUT] [--baselines presidio,llm-guard,privaite]
-               [--known-values] [--redteam [--redteam-contexts masked-only,decoys]]
+pii-guard eval [PATH ...] [--fixtures PATH ...] [--detectors rules[,ner,llm]]
+               [--language hu[,en]] [--json OUT] [--markdown OUT]
+               [--baselines presidio,llm-guard,privaite] [--known-values]
+               [--redteam [--redteam-contexts masked-only,decoys]]
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
 pii-guard eval visual --specimens data/specimens  # visual recall on specimen ID documents
 pii-guard eval injection --detectors rules,llm   # leak rate per prompt-injection attack class
@@ -12,11 +13,12 @@ pii-guard eval record SCORECARD.json --slug SLUG  # run record(s) from a saved s
 pii-guard eval report [--check]  # index.json, charts and docs/benchmarks.md from the records
 ```
 
-``--fixtures`` may be repeated and may name a directory (every ``*.jsonl`` in it); the
-default is ``eval/fixtures``. Detectors are looked up in the registry by name; one that
-can't be loaded is skipped with a warning. The Markdown scorecard goes to stdout (and to
-``--markdown``), the JSON scorecard to ``--json``. ``--baselines`` also runs open-source
-tools over the same documents (:mod:`pii_guard.eval.baselines`) and appends a comparison.
+Fixtures are given as positional paths or with ``--fixtures`` (repeatable); either may
+name a directory (every ``*.jsonl`` in it); the default is ``eval/fixtures``. Detectors are
+looked up in the registry by name; one that can't be loaded is skipped with a warning. The
+Markdown scorecard goes to stdout (and to ``--markdown``), the JSON scorecard to ``--json``.
+``--baselines`` also runs open-source tools over the same documents
+(:mod:`pii_guard.eval.baselines`) and appends a comparison.
 Fixtures whose documents carry ``meta.attack`` (the prompt-injection sets) also get a leak
 table per attack class (:mod:`pii_guard.eval.injection`).
 ``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
@@ -62,6 +64,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pii-guard eval",
         description="Score detectors and masking on the synthetic evaluation fixtures.",
+    )
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        metavar="PATH",
+        help="JSONL file or directory, same as --fixtures",
     )
     parser.add_argument(
         "--fixtures",
@@ -166,7 +174,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         except RecordError as exc:
             print(f"pii-guard eval: {exc}", file=sys.stderr)
             return 2
-    fixture_paths = _expand_fixture_paths(args.fixtures or [DEFAULT_FIXTURES])
+    fixture_paths = _expand_fixture_paths(
+        [*args.paths, *(args.fixtures or [])] or [DEFAULT_FIXTURES]
+    )
     try:
         documents = load_fixtures(fixture_paths)
     except (FixtureError, OSError) as exc:

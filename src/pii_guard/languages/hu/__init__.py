@@ -2,7 +2,8 @@
 
 - rules (:mod:`.rules`): tax ID, TAJ, personal ID, giro accounts, company numbers, ``+36``
   phone numbers, ID documents, MRZ and parcel numbers everywhere; addresses validated against
-  the gazetteer, postcodes, plates and unlabelled ID card numbers in Hungarian text;
+  the gazetteer, postcodes, plates and unlabelled ID card numbers in Hungarian text; person
+  names inside company names (:mod:`.companies`: ``Tóth és Társa Bt.``, ``... e.v.``);
 - inflection (:mod:`.inflection`): case suffixes and the stem changes they cause;
 - LLM prompt notes (``prompt.md``) and every Hungarian-specific entity type;
 - eval surface forms (:mod:`.forms`) and the lexicons in ``pii_guard/lang/data/hu``.
@@ -26,7 +27,7 @@ def pack() -> LanguagePack:
         code="hu",
         name="Hungarian",
         prompt=files(__name__).joinpath("prompt.md"),
-        smoke_fixtures=("hu-smoke.jsonl", "hu-inflection.jsonl"),
+        smoke_fixtures=("hu-smoke.jsonl", "hu-inflection.jsonl", "hu-company-names.jsonl"),
         everywhere=rules.EVERYWHERE,
         rules=rules.RULES,
         inflection=inflection.HungarianSuffixMatcher(),

@@ -46,6 +46,7 @@ from pii_guard.detect.rules._base import (
     context_before,
 )
 from pii_guard.lang import LexiconUnavailable, lexicon, postcode_index
+from pii_guard.languages.hu.companies import find_company_person
 from pii_guard.types import EntityType
 from pii_guard.vault.inflection import inflection_for
 
@@ -513,4 +514,5 @@ RULES: tuple[Rule, ...] = (
     _find_address,
     _find_postcode,
     _find_bare_id_card,
+    find_company_person,
 )
