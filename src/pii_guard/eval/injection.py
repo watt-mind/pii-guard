@@ -30,6 +30,7 @@ from typing import Any
 
 from pii_guard.eval.fixtures import Document, FixtureError, load_fixtures
 from pii_guard.eval.scorer import DocumentResult, leak_report, run_documents, summarize
+from pii_guard.eval.stats import fmt_pct
 from pii_guard.types import DetectionError
 
 __all__ = [
@@ -118,10 +119,6 @@ def attack_breakdown(
     return out
 
 
-def _pct(value: float | None) -> str:
-    return "-" if value is None else f"{value * 100:.1f}"
-
-
 def render_attack_table(breakdown: dict[str, dict[str, Any]]) -> str:
     """Markdown: one row per attack class plus a total row."""
     lines = [
@@ -132,7 +129,7 @@ def render_attack_table(breakdown: dict[str, dict[str, Any]]) -> str:
     for name, row in breakdown.items():
         lines.append(
             f"| `{name}` | {row['documents']} | {row['blocked']} | {row['values']} | "
-            f"{row['leaked']} | {_pct(row['leak_rate'])} | {_pct(row['partial_rate'])} | "
+            f"{row['leaked']} | {fmt_pct(row['leak_rate'])} | {fmt_pct(row['partial_rate'])} | "
             f"{row['documents_leaked']} |"
         )
         for key in ("documents", "blocked", "values", "leaked", "partial", "documents_leaked"):
@@ -140,8 +137,8 @@ def render_attack_table(breakdown: dict[str, dict[str, Any]]) -> str:
     v = total["values"]
     lines.append(
         f"| **all** | {total['documents']} | {total['blocked']} | {v} | {total['leaked']} | "
-        f"{_pct(total['leaked'] / v if v else None)} | "
-        f"{_pct(total['partial'] / v if v else None)} | {total['documents_leaked']} |"
+        f"{fmt_pct(total['leaked'] / v if v else None)} | "
+        f"{fmt_pct(total['partial'] / v if v else None)} | {total['documents_leaked']} |"
     )
     return "\n".join(lines) + "\n"
 

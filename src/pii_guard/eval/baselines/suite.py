@@ -24,7 +24,6 @@ Nothing in the output contains a document text or a labelled value.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -38,6 +37,7 @@ from pii_guard.eval.fixtures import FixtureError, load_fixtures
 from pii_guard.eval.injection import run_injection
 from pii_guard.eval.report import build_scorecard, render_markdown
 from pii_guard.eval.scorer import DetectorAnalyzer
+from pii_guard.eval.stats import sha256_file
 from pii_guard.gateway.config import cli_mode
 from pii_guard.types import PiiGuardError
 
@@ -67,14 +67,6 @@ def cost_usd(usage: Mapping[str, int], price: Mapping[str, float] = BASETEN_PRIC
     ) / 1_000_000
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1 << 22):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def ner_identity() -> dict[str, Any]:
     """Which NER model ran: the configured path or hub id and, for a directory, weight hashes."""
     model = os.environ.get("PII_GUARD_NER_MODEL")
@@ -82,10 +74,10 @@ def ner_identity() -> dict[str, Any]:
     if model and Path(model).is_dir():
         out["model"] = Path(model).name  # a local directory: its name, not the user's path
         weights = sorted(Path(model).glob("*.safetensors"))
-        out["safetensors_sha256"] = {w.name: _sha256(w) for w in weights}
+        out["safetensors_sha256"] = {w.name: sha256_file(w) for w in weights}
         meta = Path(model) / "training_meta.json"
         if meta.is_file():
-            out["training_meta_sha256"] = _sha256(meta)
+            out["training_meta_sha256"] = sha256_file(meta)
     device = os.environ.get("PII_GUARD_NER_DEVICE")
     out["device"] = device or "auto"
     return out

@@ -52,6 +52,7 @@ import httpx
 from PIL import Image, ImageDraw
 
 from pii_guard.eval.data_dirs import specimens_dir, visual_cache_dir
+from pii_guard.eval.stats import fmt_pct, percentile
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import DetectionError, Detector, EntityType, PiiGuardError
 from pii_guard.visual.image import encode_image, load_image
@@ -505,14 +506,6 @@ def _group(scores: Sequence[RegionScore]) -> dict[str, Any]:
     }
 
 
-def _percentile(values: Sequence[float], q: float) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, round(q * (len(ordered) - 1))))
-    return round(ordered[index], 1)
-
-
 def build_report(
     results: Sequence[SpecimenResult],
     *,
@@ -591,14 +584,14 @@ def build_report(
             "spent_this_run_usd": round(live_calls * sam_cost, 4),
         },
         "latency_ms": {
-            "sam_call_p50": _percentile(per_call, 0.5),
-            "sam_call_p95": _percentile(per_call, 0.95),
-            "sam_per_image_p50": _percentile(sam_ms, 0.5),
-            "sam_per_image_p95": _percentile(sam_ms, 0.95),
-            "local_per_image_p50": _percentile(local_ms, 0.5),
-            "local_per_image_p95": _percentile(local_ms, 0.95),
-            "total_per_image_p50": _percentile(total_ms, 0.5),
-            "total_per_image_p95": _percentile(total_ms, 0.95),
+            "sam_call_p50": percentile(per_call, 0.5, 1),
+            "sam_call_p95": percentile(per_call, 0.95, 1),
+            "sam_per_image_p50": percentile(sam_ms, 0.5, 1),
+            "sam_per_image_p95": percentile(sam_ms, 0.95, 1),
+            "local_per_image_p50": percentile(local_ms, 0.5, 1),
+            "local_per_image_p95": percentile(local_ms, 0.95, 1),
+            "total_per_image_p50": percentile(total_ms, 0.5, 1),
+            "total_per_image_p95": percentile(total_ms, 0.95, 1),
         },
         "per_specimen": [
             {
@@ -617,10 +610,6 @@ def build_report(
             for r in results
         ],
     }
-
-
-def _pct(value: float | None) -> str:
-    return "-" if value is None else f"{value * 100:.1f}"
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -656,8 +645,8 @@ def render_markdown(report: dict[str, Any]) -> str:
     ]
     for name, group in [*report["by_region_type"].items(), ("**all**", report["overall"])]:
         lines.append(
-            f"| {name} | {group['regions']} | {_pct(group['recall_iou50'])} | "
-            f"{_pct(group['recall_cov90'])} | {_pct(group['mean_coverage'])} |"
+            f"| {name} | {group['regions']} | {fmt_pct(group['recall_iou50'])} | "
+            f"{fmt_pct(group['recall_cov90'])} | {fmt_pct(group['mean_coverage'])} |"
         )
     lines += [
         "",
@@ -667,10 +656,10 @@ def render_markdown(report: dict[str, Any]) -> str:
     ]
     for country, group in report["by_country"].items():
         per = group["by_type"]
-        cells = [_pct(per[t]["recall_iou50"]) if t in per else "-" for t in REGION_TYPES]
+        cells = [fmt_pct(per[t]["recall_iou50"]) if t in per else "-" for t in REGION_TYPES]
         lines.append(
             f"| {country} | {group['specimens']} | {group['regions']} | "
-            f"{_pct(group['recall_iou50'])} | {_pct(group['recall_cov90'])} | "
+            f"{fmt_pct(group['recall_iou50'])} | {fmt_pct(group['recall_cov90'])} | "
             + " | ".join(cells)
             + " |"
         )
@@ -679,13 +668,13 @@ def render_markdown(report: dict[str, Any]) -> str:
     for doc_type, group in report["by_doc_type"].items():
         lines.append(
             f"| {doc_type} | {group['specimens']} | {group['regions']} | "
-            f"{_pct(group['recall_iou50'])} | {_pct(group['recall_cov90'])} |"
+            f"{fmt_pct(group['recall_iou50'])} | {fmt_pct(group['recall_cov90'])} |"
         )
     sam, lat = report.get("sam"), report["latency_ms"]
     lines += [
         "",
         f"Over-masking (covered area outside every labelled region, mean share of the image): "
-        f"{_pct(report['over_masking_mean'])} %. Errors: {report['errors'] or 'none'}.",
+        f"{fmt_pct(report['over_masking_mean'])} %. Errors: {report['errors'] or 'none'}.",
         "",
     ]
     if sam is None:
@@ -798,8 +787,8 @@ def render_prompt_study(rows: Sequence[dict[str, Any]]) -> str:
     for row in rows:
         lines.append(
             f"| {row['entity_type']} | `{row['prompt']}` | {', '.join(row['targets'])} | "
-            f"{row['regions']} | {_pct(row['recall_iou50'])} | {_pct(row['recall_cov90'])} | "
-            f"{_pct(row['mean_coverage'])} | {row['regions_found']} | {row['stray_regions']} | "
+            f"{row['regions']} | {fmt_pct(row['recall_iou50'])} | {fmt_pct(row['recall_cov90'])} | "
+            f"{fmt_pct(row['mean_coverage'])} | {row['regions_found']} | {row['stray_regions']} | "
             f"{row['errors']} |"
         )
     return "\n".join(lines) + "\n"

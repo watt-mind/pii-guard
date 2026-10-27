@@ -29,8 +29,6 @@ from _image_protocol import clamp_box, protocol_stdout, quiet_logging, serve
 
 HF_REPO = "ekacare/document-pii-redactor"
 HF_REVISION = "c088fc4823f608947af224524bbb8909bed3ae7e"
-#: Eka's visual categories mapped to the region kinds the eval labels.
-VISUAL_KINDS = {"face_photo": "face", "signature": "signature"}
 
 
 def main(argv: list[str] | None = None) -> int:

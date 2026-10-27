@@ -66,6 +66,7 @@ from typing import Any
 import httpx
 
 from pii_guard.eval.data_dirs import specimens_dir, visual_cache_dir
+from pii_guard.eval.stats import percentile
 from pii_guard.types import DetectionError, EntityType, PiiGuardError
 from pii_guard.visual.image import load_image
 from pii_guard.visual.regions import Box, Region
@@ -514,13 +515,6 @@ def run(
     return out
 
 
-def _percentile(values: Sequence[float], q: float) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    return round(ordered[min(len(ordered) - 1, max(0, round(q * (len(ordered) - 1))))], 1)
-
-
 def build_card(candidate: Candidate, set_name: str, done: _Run, transport: Any) -> dict[str, Any]:
     """The run as a ``visual-specimens`` result (portrait and signature only) plus a
     ``segmenter`` block with leak, precision, latency, memory, size and licence."""
@@ -544,8 +538,8 @@ def build_card(candidate: Candidate, set_name: str, done: _Run, transport: Any) 
     ms = done.per_image_ms
     card["latency_ms"].update(
         {
-            "segment_per_image_p50": _percentile(ms, 0.5),
-            "segment_per_image_p95": _percentile(ms, 0.95),
+            "segment_per_image_p50": percentile(ms, 0.5, 1),
+            "segment_per_image_p95": percentile(ms, 0.95, 1),
             "segment_first_image": round(ms[0], 1) if ms else None,
             "segment_model_load": round(done.load_ms, 1),
         }
@@ -693,8 +687,8 @@ def e2e_summary(
 
     out: dict[str, Any] = {}
     for mode, rounds in per_mode.items():
-        p50s = [p for p in (_percentile(r, 0.5) for r in rounds) if p is not None]
-        p95s = [p for p in (_percentile(r, 0.95) for r in rounds) if p is not None]
+        p50s = [p for p in (percentile(r, 0.5, 1) for r in rounds) if p is not None]
+        p95s = [p for p in (percentile(r, 0.95, 1) for r in rounds) if p is not None]
         n = calls.get(mode, [])
         out[mode] = {
             "rounds": len(rounds),

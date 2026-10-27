@@ -40,7 +40,6 @@ Definitions (``docs/evaluation.md``):
 
 from __future__ import annotations
 
-import math
 import re
 import statistics
 import time
@@ -52,6 +51,7 @@ from typing import Literal, Protocol
 from pii_guard.detect.pipeline import DetectionPipeline
 from pii_guard.eval.fixtures import Document, GoldSpan, ignore_regions
 from pii_guard.eval.forms import find_surface_forms, language_forms, surface_pattern
+from pii_guard.eval.stats import percentile
 from pii_guard.policy import DEFAULT_POLICIES, PolicySet
 from pii_guard.registry import create_detector
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, Detector, EntityType, Span
@@ -503,14 +503,6 @@ def _ratio(num: int, den: int) -> float | None:
     return num / den if den else None
 
 
-def _percentile(values: Sequence[float], q: float) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, math.ceil(q * len(ordered)) - 1))  # nearest rank
-    return ordered[index]
-
-
 def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
     """One score block for ``results`` (all documents, or one language)."""
     scored = [[p for p in r.predicted if not unscored(r.document, p)] for r in results]
@@ -610,8 +602,8 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
             "rate": _ratio(sum(r.roundtrip for r in results), len(results)),
         },
         "latency_ms": {
-            "detect": {"p50": _percentile(detect_ms, 0.5), "p95": _percentile(detect_ms, 0.95)},
-            "mask": {"p50": _percentile(mask_ms, 0.5), "p95": _percentile(mask_ms, 0.95)},
+            "detect": {"p50": percentile(detect_ms, 0.5), "p95": percentile(detect_ms, 0.95)},
+            "mask": {"p50": percentile(mask_ms, 0.5), "p95": percentile(mask_ms, 0.95)},
         },
         **extra,
     }

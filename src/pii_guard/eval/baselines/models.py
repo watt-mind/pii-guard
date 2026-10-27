@@ -19,7 +19,6 @@ installed wheel loaded. Model licence and attribution: see ``docs/evaluation.md`
 
 from __future__ import annotations
 
-import hashlib
 import importlib
 import os
 import shutil
@@ -30,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pii_guard.eval.baselines.base import BaselineUnavailable
+from pii_guard.eval.stats import sha256_file
 
 __all__ = [
     "DOWNLOAD_HINT",
@@ -95,14 +95,6 @@ def models_dir() -> Path:
     return Path(cache) / "pii-guard" / "models"
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def _fetch_wheel(model: PinnedSpacyWheel) -> Path:
     try:
         from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
@@ -118,7 +110,7 @@ def _fetch_wheel(model: PinnedSpacyWheel) -> Path:
 
 def unpack(model: PinnedSpacyWheel, wheel: Path, base: Path | None = None) -> Path:
     """Check ``wheel`` against the pin and unpack its package into the model cache."""
-    actual = _sha256(wheel)
+    actual = sha256_file(wheel)
     if actual != model.sha256:
         raise BaselineUnavailable(
             f"{model.filename}: sha256 {actual} does not match the pinned {model.sha256}"

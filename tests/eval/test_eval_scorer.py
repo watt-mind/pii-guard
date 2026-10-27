@@ -19,7 +19,6 @@ from pii_guard.eval import (
     run_documents,
     summarize,
 )
-from pii_guard.eval.scorer import _percentile
 from pii_guard.types import DetectionError, EntityType, Span
 
 P, E, A = EntityType.PERSON, EntityType.EMAIL, EntityType.ADDRESS
@@ -209,12 +208,6 @@ def test_summarize_empty() -> None:
     block = summarize([])
     assert block["leak"]["rate"] is None
     assert block["latency_ms"]["mask"]["p95"] is None
-
-
-def test_percentile_nearest_rank() -> None:
-    assert _percentile([1.0, 2.0, 3.0, 4.0], 0.5) == 2.0
-    assert _percentile([1.0, 2.0, 3.0, 4.0], 0.95) == 4.0
-    assert _percentile([], 0.5) is None
 
 
 def test_detector_analyzer_skips_unknown_and_merges_overlaps() -> None:

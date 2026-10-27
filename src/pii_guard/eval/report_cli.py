@@ -55,6 +55,7 @@ from pii_guard.eval.report_journey import (
     load_entries,
 )
 from pii_guard.eval.report_journey import render as render_journey
+from pii_guard.eval.stats import fmt_duration, fmt_pct
 
 __all__ = [
     "CHARTS",
@@ -139,14 +140,6 @@ def validity_chart(fixture_set: str) -> str:
 # --- Page ---------------------------------------------------------------------------------
 
 
-def _pct(v: float | None) -> str:
-    return "—" if v is None else f"{v * 100:.1f}%"
-
-
-def _ms(v: float | None) -> str:
-    return "—" if v is None else charts._ms(v)
-
-
 def _cell(text: object) -> str:
     return str(text).replace("|", "\\|").replace("\n", " ")
 
@@ -194,14 +187,14 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
             [
                 _label(index, s["system"]) + _marks(s),
                 m["documents"],
-                _pct(m["precision"]),
-                _pct(m["recall"]),
-                _pct(m["f1"]),
-                _pct(m["leak"]),
-                _pct(m["partial_leak"]),
-                _pct(m["over_masking"]),
-                _pct(m["roundtrip"]),
-                _ms(m["detect_p50_ms"]) + ("*" if m["latency_pooled"] else ""),
+                fmt_pct(m["precision"], sign=True),
+                fmt_pct(m["recall"], sign=True),
+                fmt_pct(m["f1"], sign=True),
+                fmt_pct(m["leak"], sign=True),
+                fmt_pct(m["partial_leak"], sign=True),
+                fmt_pct(m["over_masking"], sign=True),
+                fmt_pct(m["roundtrip"], sign=True),
+                fmt_duration(m["detect_p50_ms"]) + ("*" if m["latency_pooled"] else ""),
                 ", ".join(s["dates"]),
                 _commits(s),
             ]
@@ -305,8 +298,8 @@ def _stale_table(index: Mapping[str, Any], fixture_set: str) -> str:
                     lang,
                     f"`{s['superseded'][lang] or '?'}`",
                     m["documents"],
-                    _pct(m["f1"]),
-                    _pct(m["leak"]),
+                    fmt_pct(m["f1"], sign=True),
+                    fmt_pct(m["leak"], sign=True),
                     ", ".join(s["dates"]),
                 ]
             )
@@ -327,7 +320,7 @@ def _stale_table(index: Mapping[str, Any], fixture_set: str) -> str:
 
 
 def _share(c: Mapping[str, Any], num: str, den: str) -> str:
-    return f"{_pct(c[num] / c[den] if c[den] else None)} ({c[num]}/{c[den]})"
+    return f"{fmt_pct(c[num] / c[den] if c[den] else None, sign=True)} ({c[num]}/{c[den]})"
 
 
 def _validity_section(index: Mapping[str, Any], fixture_set: str) -> str:
@@ -342,7 +335,7 @@ def _validity_section(index: Mapping[str, Any], fixture_set: str) -> str:
         rows.append(
             [
                 _label(index, s["system"]) + mark,
-                _pct(m["leak"]),
+                fmt_pct(m["leak"], sign=True),
                 _share(v["valid"], "found", "gold"),
                 _share(v["valid"], "leaked", "values"),
                 _share(v["invalid"], "found", "gold"),
@@ -389,8 +382,8 @@ def _validity_section(index: Mapping[str, Any], fixture_set: str) -> str:
     if off:
         names = "; ".join(
             f"{index['systems'][s['system']]['short_label']} "
-            f"(re-run leak {_pct(s['all']['validity']['rerun_leak'])}, "
-            f"headline {_pct(s['all']['leak'])})"
+            f"(re-run leak {fmt_pct(s['all']['validity']['rerun_leak'], sign=True)}, "
+            f"headline {fmt_pct(s['all']['leak'], sign=True)})"
             for s in off
         )
         out.append(
@@ -407,8 +400,8 @@ def _language_table(index: Mapping[str, Any], fixture_set: str) -> str:
     header = ["System"] + [f"{lang} F1" for lang in langs] + [f"{lang} leak" for lang in langs]
     rows = []
     for s in snaps:
-        f1 = [_pct(s["languages"].get(lang, {}).get("f1")) for lang in langs]
-        leak = [_pct(s["languages"].get(lang, {}).get("leak")) for lang in langs]
+        f1 = [fmt_pct(s["languages"].get(lang, {}).get("f1"), sign=True) for lang in langs]
+        leak = [fmt_pct(s["languages"].get(lang, {}).get("leak"), sign=True) for lang in langs]
         rows.append([_label(index, s["system"]), *f1, *leak])
     return _table(header, ["---"] + ["---:"] * (2 * len(langs)), rows)
 
@@ -425,7 +418,11 @@ def _type_table(index: Mapping[str, Any], fixture_set: str, systems: Sequence[st
     for t in types:
         gold = max((s["all"]["per_type"].get(t, {}).get("gold") or 0) for s in snaps)
         rows.append(
-            [f"`{t}`", gold, *(_pct(s["all"]["per_type"].get(t, {}).get("recall")) for s in snaps)]
+            [
+                f"`{t}`",
+                gold,
+                *(fmt_pct(s["all"]["per_type"].get(t, {}).get("recall"), sign=True) for s in snaps),
+            ]
         )
     return _table(header, ["---", "---:"] + ["---:"] * len(snaps), rows)
 
@@ -437,7 +434,10 @@ def _visual_table(index: Mapping[str, Any]) -> str:
         region_types += [k for k in r["by_region_type"] if k not in region_types]
     rows = []
     for r in runs:
-        per = [_pct((r["by_region_type"].get(k) or {}).get("recall_iou50")) for k in region_types]
+        per = [
+            fmt_pct((r["by_region_type"].get(k) or {}).get("recall_iou50"), sign=True)
+            for k in region_types
+        ]
         rows.append(
             [
                 f"`{r['run_id']}`",
@@ -445,8 +445,8 @@ def _visual_table(index: Mapping[str, Any]) -> str:
                 r["specimens"],
                 r["countries"],
                 *per,
-                _pct(r["overall"]["recall_iou50"]),
-                _pct(r["over_masking_mean"]),
+                fmt_pct(r["overall"]["recall_iou50"], sign=True),
+                fmt_pct(r["over_masking_mean"], sign=True),
             ]
         )
     return _table(
@@ -468,13 +468,13 @@ def _segmenter_table(index: Mapping[str, Any]) -> str:
                 f"`{r['run_id']}`",
                 f"`{r.get('fixture_set') or 'specimens'}`",
                 r["specimens"],
-                _pct((by.get("portrait") or {}).get("recall_iou50")),
-                _pct((by.get("portrait") or {}).get("recall_cov90")),
-                _pct((by.get("signature") or {}).get("recall_iou50")),
-                _pct((by.get("signature") or {}).get("recall_cov90")),
-                _pct(r["over_masking_mean"]),
-                _ms(lat.get("segment_per_image_p50")),
-                _ms(lat.get("segment_per_image_p95")),
+                fmt_pct((by.get("portrait") or {}).get("recall_iou50"), sign=True),
+                fmt_pct((by.get("portrait") or {}).get("recall_cov90"), sign=True),
+                fmt_pct((by.get("signature") or {}).get("recall_iou50"), sign=True),
+                fmt_pct((by.get("signature") or {}).get("recall_cov90"), sign=True),
+                fmt_pct(r["over_masking_mean"], sign=True),
+                fmt_duration(lat.get("segment_per_image_p50")),
+                fmt_duration(lat.get("segment_per_image_p95")),
             ]
         )
     return _table(
@@ -499,12 +499,12 @@ def _latency_table(index: Mapping[str, Any]) -> str:
                     c["concurrency"],
                     "yes" if c["stream"] else "no",
                     c["requests"],
-                    _ms(o.get("p50")),
-                    _ms(o.get("p95")),
-                    _ms(o.get("p99")),
-                    _ms(det.get("p50")),
-                    _ms(t.get("p50")) if c["stream"] else "—",
-                    _ms(t.get("p95")) if c["stream"] else "—",
+                    fmt_duration(o.get("p50")),
+                    fmt_duration(o.get("p95")),
+                    fmt_duration(o.get("p99")),
+                    fmt_duration(det.get("p50")),
+                    fmt_duration(t.get("p50")) if c["stream"] else "—",
+                    fmt_duration(t.get("p95")) if c["stream"] else "—",
                     f"{run['upstream_delay_ms']:g}",
                     f"`{run['run_id']}`",
                 ]

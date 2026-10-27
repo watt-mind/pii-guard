@@ -26,6 +26,7 @@ from typing import Any
 
 from pii_guard.eval.report_colours import PALETTE_LATENCY, PALETTE_VISUAL, assign
 from pii_guard.eval.report_index import display_mode
+from pii_guard.eval.stats import fmt_duration, fmt_pct
 
 __all__ = [
     "by_language",
@@ -134,22 +135,6 @@ def _svg(title: str, desc: str, body: Sequence[str], caption: Sequence[str]) -> 
         y += 30
     out.append("</svg>")
     return "\n".join(out) + "\n"
-
-
-def _pct(v: float | None, digits: int = 1) -> str:
-    return "n/a" if v is None else f"{v * 100:.{digits}f}"
-
-
-def _ms(v: float | None) -> str:
-    if v is None:
-        return "n/a"
-    if v >= 1000:
-        return f"{v / 1000:.1f} s"
-    if v >= 10:
-        return f"{v:.0f} ms"
-    if v >= 1:
-        return f"{v:.1f} ms"
-    return f"{v:.2f} ms"
 
 
 def _short(commit: str) -> str:
@@ -311,7 +296,7 @@ def leak_vs_latency(index: Mapping[str, Any], *, fixture_set: str, systems: Sequ
             f'<line x1="{_n(x)}" y1="{py0}" x2="{_n(x)}" y2="{py1}" stroke="{GRID}" '
             'stroke-width="2"/>'
         )
-        body.append(_text(x, py1 + 34, _ms(10.0**e), size=20, fill=MUTED, anchor="middle"))
+        body.append(_text(x, py1 + 34, fmt_duration(10.0**e), size=20, fill=MUTED, anchor="middle"))
     body.append(
         f'<line x1="{px0}" y1="{py1}" x2="{px1}" y2="{py1}" stroke="{AXIS}" stroke-width="2"/>'
     )
@@ -351,7 +336,7 @@ def leak_vs_latency(index: Mapping[str, Any], *, fixture_set: str, systems: Sequ
                 f'<line x1="{_n(x95)}" y1="{_n(y - 9)}" x2="{_n(x95)}" y2="{_n(y + 9)}" '
                 f'stroke="{st["color"]}" stroke-width="3" opacity="0.7"/>'
             )
-        label = f"{st['short_label']} {_pct(m['leak'])}%"
+        label = f"{st['short_label']} {fmt_pct(m['leak'])}%"
         x95 = sx(m["detect_p95_ms"]) if m["detect_p95_ms"] else x
         points.append({"x": x, "x95": x95, "y": y, "label": label, "style": st})
     _place_labels(points, (px0 + 4, py0 - 20, W - 40, py1 - 4), 22)
@@ -481,7 +466,7 @@ def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence
                     f'<rect x="{_n(x0)}" y="{_n(yy + 2)}" width="{_n(w)}" '
                     f'height="{_n(bar_h - 4)}" fill="{colors[lang]}"/>'
                 )
-                body.append(_text(x0 + w + 8, yy + bar_h - 6, _pct(v), size=19, fill=INK))
+                body.append(_text(x0 + w + 8, yy + bar_h - 6, fmt_pct(v), size=19, fill=INK))
     caption = [
         set_caption(index, fixture_set) + ". Bars: runs on the current fixture files only.",
         (
@@ -566,7 +551,7 @@ def number_validity(index: Mapping[str, Any], *, fixture_set: str) -> str:
         label = st["short_label"] + ("" if v["matches_headline"] else " §")
         body.append(_text(56 + 28, mid + 8, label, size=21, weight="600"))
         if not v["matches_headline"]:
-            off.append(f"{st['short_label']} re-run {_pct(v['rerun_leak'])}%")
+            off.append(f"{st['short_label']} re-run {fmt_pct(v['rerun_leak'])}%")
         for j, (key, _, color) in enumerate(VALIDITY_BARS):
             value = m["leak"] if key is None else v[key]["leak"]
             yy = y + j * bar_h
@@ -578,7 +563,7 @@ def number_validity(index: Mapping[str, Any], *, fixture_set: str) -> str:
                 f'<rect x="{_n(x0)}" y="{_n(yy + 2)}" width="{_n(w)}" '
                 f'height="{_n(bar_h - 4)}" fill="{color}"/>'
             )
-            body.append(_text(x0 + w + 8, yy + bar_h - 6, _pct(value), size=19, fill=INK))
+            body.append(_text(x0 + w + 8, yy + bar_h - 6, fmt_pct(value), size=19, fill=INK))
     caption = [
         set_caption(index, fixture_set) + ", " + pooled_languages(index, fixture_set) + ".",
         "Valid = a validated rule of the type recognises the value (checksum, numbering plan, "
@@ -702,7 +687,7 @@ def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[st
             _text(
                 1250,
                 ly + 33,
-                f"latest {_pct(last[-1]['all']['leak'])}% leak"
+                f"latest {fmt_pct(last[-1]['all']['leak'])}% leak"
                 + ("" if last[-1].get("comparable", True) else ", other documents"),
                 size=19,
                 fill=MUTED,
@@ -957,7 +942,11 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
             )
             body.append(
                 _text(
-                    x + bw / 2, sy(v) - 10, _pct(v, 0), size=19 if bw >= 34 else 18, anchor="middle"
+                    x + bw / 2,
+                    sy(v) - 10,
+                    fmt_pct(v, 0),
+                    size=19 if bw >= 34 else 18,
+                    anchor="middle",
                 )
             )
         body.append(
@@ -1105,7 +1094,7 @@ def latency(index: Mapping[str, Any]) -> str:
             f'<line x1="{_n(x)}" y1="{ly0}" x2="{_n(x)}" y2="{ly1}" stroke="{GRID}" '
             'stroke-width="2"/>'
         )
-        body.append(_text(x, ly1 + 32, _ms(decade), size=20, fill=MUTED, anchor="middle"))
+        body.append(_text(x, ly1 + 32, fmt_duration(decade), size=20, fill=MUTED, anchor="middle"))
         decade *= 10
     rh = (ly1 - ly0) / max(len(rows), 1)
     bar = min(30.0, rh * 0.6)
@@ -1129,7 +1118,7 @@ def latency(index: Mapping[str, Any]) -> str:
                 _text(
                     max(sx(p.get("p95") or p["p50"]), sx(p["p50"])) + 12,
                     y + 7,
-                    f"{_ms(p['p50'])} / {_ms(p.get('p95'))}",
+                    f"{fmt_duration(p['p50'])} / {fmt_duration(p.get('p95'))}",
                     size=18,
                     fill=MUTED,
                 )
@@ -1165,7 +1154,9 @@ def latency(index: Mapping[str, Any]) -> str:
             )
             if w >= 70:
                 ink = BG if name in ("detect", "unmask") else INK
-                body.append(_text(x + w / 2, ry + 40, _ms(v), size=18, fill=ink, anchor="middle"))
+                body.append(
+                    _text(x + w / 2, ry + 40, fmt_duration(v), size=18, fill=ink, anchor="middle")
+                )
             x += w
         ry += 110
     lx, ly = float(rx0 - 20), float(max(ry, 560))

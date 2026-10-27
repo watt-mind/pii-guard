@@ -20,17 +20,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from pii_guard.eval.stats import fmt_ms, fmt_pct
 from pii_guard.types import EntityType
 
 __all__ = ["main", "render_comparison", "systems"]
-
-
-def _pct(value: object) -> str:
-    return "-" if value is None else f"{float(value) * 100:.1f}"  # type: ignore[arg-type]
-
-
-def _ms(value: object) -> str:
-    return "-" if value is None else f"{float(value):.1f}"  # type: ignore[arg-type]
 
 
 def systems(scorecard: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
@@ -63,16 +56,16 @@ def _summary_table(rows: list[tuple[str, dict[str, Any], bool]]) -> list[str]:
         cells = [
             name,
             str(block["documents"]),
-            _pct(ov["precision"]),
-            _pct(ov["recall"]),
-            _pct(ov["f1"]),
-            _pct(ex["f1"]),
-            _pct(block["leak"]["rate"]),
-            _pct(block["leak"]["partial_rate"]),
-            _pct(block["over_masking"]["rate"]),
-            _pct(block["roundtrip"]["rate"]) if reversible else "n/a",
-            _ms(block["latency_ms"]["detect"]["p50"]),
-            _ms(block["latency_ms"]["detect"]["p95"]),
+            fmt_pct(ov["precision"]),
+            fmt_pct(ov["recall"]),
+            fmt_pct(ov["f1"]),
+            fmt_pct(ex["f1"]),
+            fmt_pct(block["leak"]["rate"]),
+            fmt_pct(block["leak"]["partial_rate"]),
+            fmt_pct(block["over_masking"]["rate"]),
+            fmt_pct(block["roundtrip"]["rate"]) if reversible else "n/a",
+            fmt_ms(block["latency_ms"]["detect"]["p50"]),
+            fmt_ms(block["latency_ms"]["detect"]["p95"]),
         ]
         lines.append("| " + " | ".join(cells) + " |")
     return lines
@@ -99,9 +92,9 @@ def _type_table(rows: list[tuple[str, dict[str, Any], bool]]) -> list[str]:
         cells = [f"`{t}`", str(gold.get(t) or 0)]
         for _, block, _ in rows:
             counts = block["detection"]["overlap"]["per_type"].get(t)
-            recall = _pct(counts["recall"]) if counts else "0.0"
+            recall = fmt_pct(counts["recall"]) if counts else "0.0"
             leak = block["leak"]["per_type"].get(t)
-            cells.append(recall + (f" / {_pct(leak['rate'])}" if leak else ""))
+            cells.append(recall + (f" / {fmt_pct(leak['rate'])}" if leak else ""))
         lines.append("| " + " | ".join(cells) + " |")
     return lines
 
