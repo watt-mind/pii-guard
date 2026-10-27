@@ -12,6 +12,7 @@ from pii_guard.api.errors import install_error_handlers
 from pii_guard.api.routes import include_routers
 from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware, allowed_hosts
 from pii_guard.config import Settings, get_settings
+from pii_guard.detect.stack import rest_detector_names
 from pii_guard.observability import (
     Observability,
     ObservabilitySettings,
@@ -34,7 +35,8 @@ def create_app(
     """Build the app. ``settings`` defaults to :func:`pii_guard.config.get_settings`.
 
     The settings object is available to routes as ``request.app.state.settings``; the
-    detector names (``PII_GUARD_DETECTORS``) as ``app.state.detector_names`` and the entity
+    detector names (``PII_GUARD_DETECTORS``, else rules + ner when available) as
+    ``app.state.detector_names`` and the entity
     policies (``PII_GUARD_POLICY_OVERRIDES``) as ``app.state.policies``. Unknown detector
     names stop startup (:class:`~pii_guard.types.DetectionError`) rather than the first
     request.
@@ -56,10 +58,13 @@ def create_app(
         description="Privacy firewall for AI agents: reversible PII masking.",
     )
     settings = settings or get_settings()
-    for name in settings.detectors:
-        resolve_detector(name)  # fail at startup on a typo, not on the first request
+    # Explicit PII_GUARD_DETECTORS, else the gateway fast-mode stack (LAB-1270). A configured
+    # but missing NER raises here, like an unknown name: at startup, not on the first request.
+    detector_names = rest_detector_names(settings)
+    for name in detector_names:
+        resolve_detector(name)
     app.state.settings = settings
-    app.state.detector_names = list(settings.detectors)
+    app.state.detector_names = list(detector_names)
     app.state.policies = PolicySet.from_settings(settings)
     obs_settings = observability or ObservabilitySettings()
     hosts = allowed_hosts(settings)

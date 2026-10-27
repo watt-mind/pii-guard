@@ -84,7 +84,8 @@ def rules_only_mode_detectors(
     ``@pytest.mark.ner_autodetect`` to keep the real, environment-dependent selection.
     """
     if request.node.get_closest_marker(NER_AUTODETECT) is None:
-        monkeypatch.setattr("pii_guard.gateway.detection._ner_available", lambda: False)
+        # The shared stack (LAB-1270): pins the REST API's default detectors too.
+        monkeypatch.setattr("pii_guard.detect.stack._ner_available", lambda: False)
 
 
 @pytest.fixture
