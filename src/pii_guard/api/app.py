@@ -8,13 +8,16 @@ from pii_guard import __version__
 from pii_guard.api.errors import install_error_handlers
 from pii_guard.api.routes import include_routers
 from pii_guard.config import Settings, get_settings
+from pii_guard.observability import Observability, ObservabilitySettings, check_bind
 from pii_guard.policy import PolicySet
 from pii_guard.registry import resolve_detector
 
 __all__ = ["create_app"]
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, observability: ObservabilitySettings | None = None
+) -> FastAPI:
     """Build the app. ``settings`` defaults to :func:`pii_guard.config.get_settings`.
 
     The settings object is available to routes as ``request.app.state.settings``; the
@@ -22,6 +25,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     policies (``PII_GUARD_POLICY_OVERRIDES``) as ``app.state.policies``. Unknown detector
     names stop startup (:class:`~pii_guard.types.DetectionError`) rather than the first
     request.
+
+    ``observability`` (default: from the environment) configures the traffic log, the
+    ``Server-Timing`` header and ``/metrics`` (``app.state.observability``). The traffic log at
+    level ``full`` on a non-loopback ``PII_GUARD_HOST`` stops startup
+    (:class:`~pii_guard.observability.TrafficLogConfigError`).
     """
     app = FastAPI(
         title="pii-guard",
@@ -34,6 +42,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.detector_names = list(settings.detectors)
     app.state.policies = PolicySet.from_settings(settings)
+    obs_settings = observability or ObservabilitySettings()
+    check_bind(obs_settings.traffic_log, settings.host)
+    upstream_key = settings.upstream_api_key
+    app.state.observability = Observability(
+        obs_settings,
+        secrets=[upstream_key.get_secret_value()] if upstream_key is not None else [],
+    )
     install_error_handlers(app)
 
     @app.get("/healthz", tags=["health"])

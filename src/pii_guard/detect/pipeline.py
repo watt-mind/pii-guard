@@ -36,6 +36,7 @@ import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
+from pii_guard.detect.normalize import NormalizedText, normalize_for_detection
 from pii_guard.registry import create_detector
 from pii_guard.types import DetectionError, Detector, EntityType, Span
 from pii_guard.vault.inflection import following_suffix
@@ -250,6 +251,16 @@ def resolve_spans(
     ]
 
 
+def _to_original(norm: NormalizedText, text: str, span: Span) -> Span:
+    """``span`` over ``norm.text`` mapped onto the original ``text``; fail closed on a misfit."""
+    if not 0 <= span.start < span.end <= len(norm.text) or (
+        norm.text[span.start : span.end] != span.text
+    ):
+        raise DetectionError(f"detector {span.detector!r} returned a span that does not fit")
+    start, end = norm.to_original(span.start, span.end)
+    return Span(start, end, span.entity_type, text[start:end], span.score, span.detector)
+
+
 class DetectionPipeline:
     """Run detectors in order and resolve their spans. Itself a :class:`Detector`.
 
@@ -282,10 +293,19 @@ class DetectionPipeline:
         self.overriding = frozenset(overriding)
 
     def detect(self, text: str, language: str = "hu") -> list[Span]:
+        """Resolved spans over ``text``.
+
+        Every detector sees :func:`~pii_guard.detect.normalize.normalize_for_detection`'s
+        cleaned text (invisible characters dropped, lookalikes folded), so an obfuscated value
+        is found whole by all of them; their spans are mapped back to ``text``, covering any
+        invisible characters inside a value. Text with nothing to clean is passed unchanged.
+        """
+        norm = normalize_for_detection(text)
+        seen = norm.text if norm.changed else text
         spans: list[Span] = []
         for detector in self.detectors:
             try:
-                found = detector.detect(text, language)
+                found = detector.detect(seen, language)
             except DetectionError:
                 raise
             except Exception as exc:
@@ -293,7 +313,10 @@ class DetectionPipeline:
                 raise DetectionError(
                     f"detector {detector.name!r} failed ({type(exc).__name__})"
                 ) from exc
-            spans.extend(s for s in found if s.score >= self.min_score)
+            kept = [s for s in found if s.score >= self.min_score]
+            if norm.changed:
+                kept = [_to_original(norm, text, s) for s in kept]
+            spans.extend(kept)
         resolved = resolve_spans(
             text,
             spans,

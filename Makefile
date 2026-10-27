@@ -1,7 +1,7 @@
-.PHONY: help setup lint format test serve check docker baselines
+.PHONY: help setup lint format test serve check docker baselines demo demo-traffic smoke bench
 
 help: ## list targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-13s %s\n", $$1, $$2}'
 
 setup: ## install dependencies and the pre-commit hook
 	uv sync
@@ -31,3 +31,15 @@ baselines: ## compare with Presidio, LLM Guard and PrivAiTe (first run downloads
 	PII_GUARD_BASELINE_WORKERS=1 uv run pytest tests/eval/test_baselines_live.py --no-cov
 	uv run pii-guard eval --fixtures eval/fixtures/hu-smoke.jsonl --fixtures eval/fixtures/en-smoke.jsonl \
 		--detectors rules --baselines presidio,llm-guard,privaite
+
+demo: ## start API + gateway + UI on a mock upstream (offline); real upstream if configured
+	uv run python scripts/demo.py
+
+demo-traffic: ## send scripted fictional hu/en/de requests through the running demo gateway
+	uv run python scripts/demo_traffic.py
+
+smoke: ## start the stack on the mock upstream, send the demo traffic, assert nothing leaked
+	uv run python scripts/smoke.py
+
+bench: ## gateway latency benchmark on the mock upstream (fast mode, concurrency 1 and 8)
+	uv run pii-guard bench latency

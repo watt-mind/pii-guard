@@ -1,9 +1,10 @@
 # Contracts
 
 > Status: accepted for the hackathon build. These are the interfaces the detectors, vault,
-> API, evaluation harness and UI agree on. Sections marked **implemented** exist in code;
-> sections marked **planned** are the contract the owning component must implement. Change a
-> contract only together with every consumer, and update this file in the same pull request.
+> API, evaluation harness and UI agree on. Sections marked **implemented** describe code that
+> exists; a section for a component that is not built yet is marked **planned** and is the
+> contract its owner must implement (none is at the moment). Change a contract only together
+> with every consumer, and update this file in the same pull request.
 
 ## Core types (implemented)
 
@@ -104,6 +105,82 @@ A new built-in detector therefore only adds `src/pii_guard/detect/<name>.py` end
 `DETECTOR_CLASS = MyDetector`; it doesn't edit the registry. The detector's `name` attribute
 should equal its registry name, and it is what goes into `Span.detector`.
 
+## Rule detector (implemented)
+
+Module: `pii_guard.detect.rules` (registry name `rules`). Deterministic and stateless: every
+rule is a regular expression plus validation (checksum, known prefixes and area codes, label
+or address context), so a look-alike such as a wrong check digit, digits inside a longer digit
+run or a date is not reported. The identifier formats per language are listed in
+[entities.md](entities.md#per-language); this section is the interface.
+
+```python
+class RuleDetector:                       # name = "rules"; implements Detector
+    def detect(self, text: str, language: str = "hu") -> list[Span]   # DetectionError, never the text
+    def rules_for(self, language: str) -> tuple[Rule, ...]            # every rule that runs
+
+Rule = Callable[[str], Iterator[_Hit]]    # _Hit(start, end, entity_type, score)
+@dataclass(frozen=True, slots=True)
+class RulePack:
+    language: str                         # ISO 639-1 code
+    everywhere: tuple[Rule, ...] = ()     # run for every language
+    rules: tuple[Rule, ...] = ()          # run only when the text's language matches
+
+register_rule_pack(pack: RulePack) -> None   # replaces the rules of pack.language for new detectors
+rule_packs() -> dict[str, RulePack]          # the language packs' rules, with overrides applied
+```
+
+- **Scopes.** The language-independent rules (`pii_guard.detect.rules.common`) run for every
+  text. A language pack ([ADR 0008](decisions/0008-language-packs.md), `languages/<lang>/rules.py`)
+  contributes `everywhere` rules (identifiers with a checksum or a distinctive validated format,
+  run whatever the text's language: a Hungarian tax ID in an English e-mail is still personal
+  data) and `rules` (formats that are only unambiguous in that language, such as postcodes,
+  plates and national phone formats, run only when `language` matches, `en-GB` counting as
+  `en`). A language without a pack gets the language-independent rules and every pack's
+  `everywhere` rules.
+- Hits that lie entirely inside a longer hit (digits inside an IBAN) are dropped; partial
+  overlaps are left to the resolver. Spans carry code-point offsets and `detector == "rules"`.
+- Rules that need a label (`személyi igazolvány száma:`, `hrsz.`) span only the value; the
+  label stays outside the span.
+
+Entity coverage and scores. Where a cell gives several scores, the higher one applies when
+there is more evidence: a keyword such as `adóazonosító` or `TAJ` right before the value, a
+label, a consistent postcode and settlement, or valid check digits:
+
+| Scope | Entity types | Scores |
+|---|---|---|
+| all | `BANK_ACCOUNT` (IBAN, mod 97; payment card, issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
+| `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labelled ID card / passport / licence / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
+| `hu`, language | `ADDRESS` (postcode, address with settlement and street), `VEHICLE_PLATE`, bare `ID_DOCUMENT` card number, `PERSON` inside a company name with a legal form | postcode 0.75-0.9, address 0.75 / 0.85 / 0.97 (postcode and settlement agree), plate 0.85 / 0.8, bare ID card 0.7, company-name person 0.7-0.9 (`languages/hu/companies.py`) |
+| `en`, everywhere | `ID_DOCUMENT` (US SSN, UK NINO) | SSN 0.95 / 0.85, NINO 0.95 / 0.9 |
+| `en`, language | `PHONE` (UK, US/NANP), `ADDRESS` (UK postcode, US ZIP), `VEHICLE_PLATE` (UK), `ID_DOCUMENT` (labelled passport / licence, SSN after a label) | phone 0.8-0.85, postcode 0.75-0.85, ZIP 0.8 / 0.85, plate 0.8, labelled ID 0.85, SSN after a label 0.9 |
+| `de`, everywhere | `ID_DOCUMENT` (Sozialversicherungsnummer, labelled Steuer-ID) | 0.9 / 0.97 |
+| `de`, language | `ID_DOCUMENT` (Steuer-ID without a label), `PHONE`, `ADDRESS` (street + house number, postcode line) | Steuer-ID 0.85, phone 0.8, address 0.75 / 0.85, postcode line 0.7 |
+
+Names, organisations, prose addresses and dates of birth are not rule territory; they come
+from the NER and LLM detectors. Scores are heuristics for the resolver, not probabilities;
+the code is the source of truth for the exact values.
+
+### Checksum helpers
+
+Module: `pii_guard.detect.checksums`. Each identifier has a public `*_check_digit` function
+that computes the check digit(s) from the payload and an `is_valid_*` predicate on the
+normalized value (digits only; IBANs upper-case without spaces). The check-digit functions are
+public so synthetic data generators build valid fictional values; nothing here knows real people.
+
+| Identifier | Compute | Validate |
+|---|---|---|
+| Hungarian personal tax ID (adóazonosító jel) | `hu_tax_id_check_digit(first9) -> int \| None` | `is_valid_hu_tax_id(value)` |
+| Hungarian personal identification number (személyi azonosító) | `hu_personal_id_check_digit(first10) -> int \| None` | `is_valid_hu_personal_id(value)` |
+| TAJ number | `taj_check_digit(first8) -> int` | `is_valid_taj(value)` |
+| Giro account number | `giro_check_digit(payload) -> int` | `is_valid_giro(value)` |
+| Hungarian company tax number | `hu_tax_number_check_digit(first7) -> int` | `is_valid_hu_tax_number(base, vat_code, area)` |
+| IBAN | `iban_check_digits(country, bban) -> str` | `is_valid_iban(value)`; `IBAN_LENGTHS` maps country to length |
+| Machine-readable zone (ICAO 9303) | `mrz_check_digit(field) -> int` | `is_valid_mrz_td3(line1, line2)` (passport, 2 x 44), `is_valid_mrz_td1(line1, line2, line3)` (ID card, 3 x 30) |
+
+Payment cards (`is_valid_card_number`, `luhn_check_digit`) live in
+`pii_guard.detect.rules.common`; the English SSN and NINO validators in
+`languages/en/rules.py`.
+
 ## Configuration (implemented)
 
 Module: `pii_guard.config`. `Settings` is a pydantic-settings model; `get_settings()` returns
@@ -193,7 +270,7 @@ and counts (`counts`), never values. The REST API, the gateway and the eval shar
 resolver (`DetectionPipeline`) and the defaults. The gateway's `PII_GUARD_GATEWAY_KEEP_TYPES`
 is a deprecated alias: when set, it is the exact keep set; `PII_GUARD_POLICY_OVERRIDES` wins.
 
-## REST API (planned)
+## REST API (implemented)
 
 JSON over HTTP, UTF-8. Offsets are code-point indices into the request `text`. `language`
 defaults to `Settings.default_language` (`"hu"`).
@@ -214,6 +291,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `too_many_known_values` | The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values; nothing is added. |
 | 422 | `blocked_entity` | `/v1/mask` (or the gateway) found an entity type whose policy is `block`. The message lists types and counts only; nothing is masked, stored or forwarded. |
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
+| 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
 | 500 | `internal_error` | Anything unexpected. No exception text is returned. |
@@ -403,32 +481,70 @@ never fetches URLs. Limits: `PII_GUARD_GATEWAY_MAX_IMAGES` (4) images of
 for all of a request's images. Responses to requests with images carry `X-PII-Guard-Images`,
 `X-PII-Guard-Image-Regions-Masked` and `X-PII-Guard-Image-OCR: on|off`.
 
-## Vault (planned)
+## Vault (implemented)
 
-Package: `pii_guard.vault`. Implements [ADR 0007](decisions/0007-keyed-pseudonyms.md).
+Package: `pii_guard.vault`. Implements [ADR 0007](decisions/0007-keyed-pseudonyms.md). The
+mapping lives in memory only and is keyed by the tenant key.
 
 ```python
 class Vault:
-    def __init__(self, tenant_key: bytes) -> None: ...
+    def __init__(
+        self,
+        tenant_key: bytes,
+        *,
+        ttl_seconds: float = DEFAULT_TTL_SECONDS,
+        id_length: int = DEFAULT_ID_LENGTH,
+        clock=time.monotonic,
+        case_sensitive_placeholders: bool = False,
+    ) -> None: ...
 
-    # None -> a new session with a fresh random id; an existing id -> that session.
+    # PII_GUARD_TENANT_KEY (and PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS) from Settings.
+    @classmethod
+    def from_settings(cls, settings: Settings, **kwargs) -> Vault: ...
+
+    # None -> a new session with a fresh random id ("s_" + 32 hex); an existing id -> that session.
     def session(self, session_id: str | None = None) -> VaultSession: ...
+
+    def drop(self, session_id: str) -> None: ...  # close and forget now; no error if gone
+    def purge_expired(self) -> int: ...  # drop every expired session, return how many
+    def __len__(self) -> int: ...  # live sessions
 
 
 class VaultSession:
     session_id: str
+    expired: bool  # property
+    known_values: KnownValues  # property, see the known-values routes
 
-    # Replace each span with its placeholder and record the mapping.
-    def mask(self, text: str, spans: list[Span], *, language: str = "hu") -> str: ...
+    # Replace each span (and every other occurrence of a confirmed value) with its placeholder.
+    def mask(
+        self, text: str, spans: Sequence[Span], *, language: str = "hu", remask: bool = False
+    ) -> str: ...
 
     # Same, plus (start, end, placeholder) of every replacement in input offsets.
-    def mask_with_report(self, text, spans, *, language="hu") -> MaskResult: ...
+    def mask_with_report(self, text, spans, *, language="hu", remask=False) -> MaskResult: ...
 
     # Replace known placeholders with their original values.
     def unmask(self, text: str) -> str: ...
 
+    # Same, plus the placeholder-shaped tokens that are not in the mapping.
+    def unmask_with_report(self, text: str) -> UnmaskResult: ...
+
     # (placeholder, entity_type, count) for every placeholder this session issued.
     def entities(self) -> list[tuple[str, EntityType, int]]: ...
+
+    def close(self) -> None: ...  # forget the mapping now
+
+
+@dataclass(frozen=True, slots=True)
+class MaskResult:
+    text: str
+    replacements: tuple[tuple[int, int, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class UnmaskResult:
+    text: str
+    unresolved: tuple[str, ...]  # once each, in order of appearance
 
 
 class StreamUnmasker:
@@ -437,25 +553,59 @@ class StreamUnmasker:
     # Text that is safe to emit now; holds back a trailing partial "[[...".
     def feed(self, chunk: str) -> str: ...
 
-    # Whatever is still buffered, at the end of the stream.
+    # Whatever is still buffered, at the end of the stream. feed() after flush() is an error.
     def flush(self) -> str: ...
+
+    unresolved: tuple[str, ...]  # property, unknown placeholders seen so far
 ```
 
-- **Placeholder format:** `[[<TYPE>_<id>]]`, where `<TYPE>` is the `EntityType` value and
-  `<id>` is lowercase hex, at least 4 characters, from a truncated HMAC-SHA256 of the
-  normalized value under the tenant key (optionally mixed with the session key). Regex:
-  `\[\[([A-Z][A-Z0-9_]*)_([0-9a-f]{4,})\]\]`. Example: `[[PERSON_7f3a]]`. Collisions inside a
-  session extend the id.
-- Same normalized value → same placeholder within a session; different tenants never share
-  placeholders. The key is the value's **lemma**: every inflected form of one value shares one
+`MaskResult` and `UnmaskResult` hold original values in `text`, so their `repr()` hides it.
+`DEFAULT_TTL_SECONDS` is 3600; `MIN_TENANT_KEY_BYTES` is 16 (`Vault` raises `ValueError`
+for a shorter key, without echoing it). `Vault.session`, the per-session `mask`/`unmask` and the
+stream unmasker are thread-safe.
+
+### Errors
+
+| Exception | `code` | HTTP | When |
+|---|---|---|---|
+| `SessionNotFoundError` (`PiiGuardError`) | `not_found` | 404 | The session id is unknown, expired or closed. Raised by `Vault.session` and by every `VaultSession` method (and so by `StreamUnmasker`) once the session is gone; the gateway fails the request instead of forwarding unrestored text. |
+| `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
+| `MaskingError` | `vault_not_configured` | 500 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
+| `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
+
+Messages and `repr()`s carry types, counts and placeholder ids, never an original value.
+
+### Lifetime
+
+- A session lives for `ttl_seconds` and the TTL is **sliding**: every use (mask, unmask,
+  entities, `known_values`, `Vault.session(id)`) extends it. An expired session is closed and
+  forgotten on the next access, and `Vault.purge_expired()` (also run by `session()` and
+  `len(vault)`) drops all expired ones.
+- `Vault.drop(id)` and `VaultSession.close()` forget the mapping and the known values at once;
+  later calls raise `SessionNotFoundError`. The mapping never leaves the process, is never
+  logged and has no persistence.
+
+### Placeholders
+
+- **Format:** `[[<TYPE>_<id>]]`, where `<TYPE>` is the `EntityType` value and `<id>` is
+  lowercase hex. The id is the first `id_length` characters of an HMAC-SHA256 under the tenant
+  key over a domain tag, the entity type, the **session id** and the normalized value (NFKC,
+  case-folded, whitespace collapsed; `normalize_value`). Regex (`PLACEHOLDER_RE`):
+  `\[\[([A-Z][A-Z0-9_]*)_([0-9a-f]{4,})\]\]`. Example: `[[PERSON_7f3a9c]]`.
+- **Length:** `DEFAULT_ID_LENGTH` is 6 hex characters, `MIN_ID_LENGTH` 4, `MAX_ID_LENGTH` 64 (a
+  full digest). A placeholder that collides with another value's, or with a placeholder-shaped
+  token from the input, extends its id by two characters at a time up to the maximum.
+- Same normalized value of the same type → same placeholder within a session. Different
+  tenants, and different sessions, never share placeholders: without the key an id can't be
+  reversed, enumerated or linked.
+- **Inflection.** The key is the value's **lemma**: every inflected form of one value shares one
   placeholder, with the suffix outside it. Hungarian: `Próba Zsuzsannának` →
   `[[PERSON_x]]nak`, `Próba Zsuzsannát` → `[[PERSON_x]]t`, `Kováccsal` → `[[PERSON_y]]al`,
   `Teszt Elekkel` → `[[PERSON_z]]kel`, `ABC-123-nak` → `[[VEHICLE_PLATE_w]]-nak`. A detector
   span that includes a suffix is narrowed to the stem; an ambiguous split (`Zoltán` could be
   `Zolta` + `n`) is applied only when the lemma is confirmed (it occurs on its own, another span
   or an earlier request has it, or two different forms agree). Otherwise the whole word is masked
-  and the candidate lemmas' forms get the same placeholder (recall first). See
-  `vault/inflection.py` (`splits`, `variant_stems`, `restore`).
+  and the candidate lemmas' forms get the same placeholder (recall first).
 - `unmask` re-inflects: a known placeholder followed by a suffix restores the stem as written in
   the input for that suffix, or, for a suffix the model added itself, the language's inflected
   stem (`[[PERSON_x]]nak` → `Próba Zsuzsannának`, `[[PERSON_y]]val` → `Kováccsal`).
@@ -469,12 +619,67 @@ class StreamUnmasker:
   placeholder, with the class mixed into the HMAC, so the round trip is exact; the model then
   sees one id per casing. Within a class the first-written form is restored (`Teszt ELEK`
   after `Teszt Elek` comes back as `Teszt Elek`).
-- `mask` raises `MaskingError` on overlapping or out-of-range spans rather than guessing.
-- `StreamUnmasker.feed("[[PERS") + feed("ON_7f3a]] ok") + flush()` equals
-  `session.unmask("[[PERSON_7f3a]] ok")`: concatenated output is identical to unmasking the
-  whole text at once. A complete placeholder followed only by word characters (a suffix that
-  may still grow, at most 12 characters) is held back until the next non-word character.
-- The mapping never leaves the process, is never logged, and has a TTL.
+- **Placeholder-shaped text in the input.** A token equal to a placeholder this session already
+  issued makes `mask` raise `PlaceholderInInputError` (`placeholder_in_input`, 422), since
+  `unmask` would restore a value into text that was never masked. Any other `[[TYPE_id]]` token
+  is reserved: left as it is and never issued later. `remask=True` is for text this session's
+  own `mask` produced (a second pass that catches values confirmed later).
+- `mask` raises `MaskingError` on overlapping or out-of-range spans rather than guessing, and
+  records nothing when it raises.
+
+### Inflection hook
+
+Module: `pii_guard.vault.inflection`; the interface and `Split` live in
+`pii_guard.languages.inflection` (the module re-exports them), and each language pack
+([ADR 0008](decisions/0008-language-packs.md)) supplies its matcher: Hungarian
+(`HungarianSuffixMatcher`, `languages/hu/inflection.py`), English (`EnglishPossessiveMatcher`:
+`Smith's` → `[[PERSON_7f3a]]'s`), German (`GermanGenitiveMatcher`). The vault masks the value
+itself and keeps the suffix, so re-identification is exact.
+
+```python
+@runtime_checkable
+class InflectionMatcher(Protocol):
+    # A regex fragment (no capturing groups) for an allowed suffix; "" means none. Required.
+    def suffix_pattern(self, value: str, entity_type: EntityType) -> str: ...
+    # Optional, for languages whose stems change before a suffix:
+    def variant_stems(self, value: str, entity_type: EntityType) -> list[tuple[str, str]]: ...
+    def splits(self, surface: str, entity_type: EntityType) -> list[Split]: ...
+    def restore(self, lemma: str, suffix: str, entity_type: EntityType) -> str: ...
+
+@dataclass(frozen=True, slots=True)
+class Split:                  # one reading of a surface form as stem + suffix of a lemma
+    lemma: str                # dictionary form as written: "Próba Zsuzsanna"
+    stem: str                 # "Próba Zsuzsanná"; stem + suffix is the surface form
+    suffix: str               # "nak"
+    strong: bool = False      # unambiguous enough to apply alone; a weak one needs a confirmed lemma
+
+class ExactMatcher:           # no inflection: the value must stand alone between word boundaries
+
+register_inflection(language: str, matcher: InflectionMatcher) -> None   # beats the pack's matcher
+inflection_for(language: str) -> InflectionMatcher   # registered, then the pack's, then ExactMatcher; "en-GB" -> "en"
+variant_stems(matcher, value, entity_type) -> list[tuple[str, str]]   # fall back to []
+splits(matcher, surface, entity_type) -> list[Split]                  # fall back to []
+restore(matcher, lemma, suffix, entity_type) -> str                   # fall back to lemma + suffix
+following_suffix(text: str, pos: int) -> str   # the word-character run (after one hyphen) at pos
+MAX_SUFFIX_LENGTH = 12   # a longer run is never a suffix; it bounds what the stream holds back
+```
+
+- `variant_stems` returns the changed stems of a lemma with the regex of the suffixes that must
+  follow them (occurrence expansion in the vault and `LlmDetector.align`).
+- `splits` reads a detected surface form as `lemma + suffix` (`Próba Zsuzsannának` → `Próba
+  Zsuzsanna` + `nak`), so the placeholder covers the stem. `restore` re-inflects on unmask.
+- A matcher that only has `suffix_pattern` keeps exact-stem behaviour; call the module
+  functions, which provide the fallbacks. A hook registered with `register_inflection` applies
+  to new masking calls of that primary language.
+
+### Streaming
+
+`StreamUnmasker.feed("[[PERS") + feed("ON_7f3a]] ok") + flush()` equals
+`session.unmask("[[PERSON_7f3a]] ok")`: concatenated output is identical to unmasking the
+whole text at once. It holds back a trailing partial `[[...`, and a complete placeholder
+followed only by word characters (a suffix that may still grow, at most `MAX_SUFFIX_LENGTH`
+characters) until the next non-word character. Errors from the session propagate, so the caller
+can fail the response.
 
 ## Evaluation fixtures and harness (implemented)
 

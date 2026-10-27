@@ -2,6 +2,7 @@
 
 | Doc | What it covers |
 |---|---|
+| [why-pii-guard.md](why-pii-guard.md) | What is different about pii-guard, each claim with its evidence and status |
 | [vision.md](vision.md) | The problem, who it is for, goals and non-goals |
 | [architecture.md](architecture.md) | Components, data flow, APIs, the gateway and streaming re-identification |
 | [privacy-model.md](privacy-model.md) | Threat model, what pii-guard guarantees and what it does not |
@@ -11,6 +12,7 @@
 | [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [journey.md](journey.md) | The project's story so far: dated milestones with before/after metrics, cost and the decisions made |
+| [submission.md](submission.md) | Draft hackathon submission text, consistent with why-pii-guard.md |
 | [roadmap.md](roadmap.md) | The 9-day hackathon plan, day-1 checks, what comes after |
 | [decisions/](decisions/) | Architecture decision records (ADRs) |
 

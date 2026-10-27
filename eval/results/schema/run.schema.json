@@ -12,7 +12,7 @@
   "properties": {
     "schema_version": {"const": 1, "description": "Bumped on any breaking change; readers reject versions they don't know."},
     "run_id": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9][a-z0-9.-]*$", "description": "<date>-<slug>; also the file name (<run_id>.json)."},
-    "kind": {"enum": ["text", "visual"], "description": "text: span detection + masking on JSONL fixtures. visual: image masking on specimen images."},
+    "kind": {"enum": ["text", "visual", "latency"], "description": "text: span detection + masking on JSONL fixtures. visual: image masking on specimen images. latency: gateway overhead per stage and mode (pii-guard bench latency)."},
     "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Calendar date the run was made, as reported by whoever ran it."},
     "recorded_at": {"type": ["string", "null"], "description": "ISO 8601 timestamp of the scorecard (UTC), when known. Orders runs within a day."},
     "source": {"enum": ["recorded", "imported"], "description": "recorded: written by the harness at run time. imported: converted later from a scorecard or a reported table."},
@@ -50,7 +50,7 @@
     "languages": {"type": "array", "items": {"$ref": "#/$defs/language"}},
     "hardware": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/hardware"}]},
     "cost": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/cost"}]},
-    "metrics": {"anyOf": [{"$ref": "#/$defs/text_metrics"}, {"$ref": "#/$defs/visual_metrics"}]}
+    "metrics": {"anyOf": [{"$ref": "#/$defs/text_metrics"}, {"$ref": "#/$defs/visual_metrics"}, {"$ref": "#/$defs/latency_metrics"}]}
   },
   "$defs": {
     "language": {"type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]+)*$", "description": "BCP 47-style language code."},
@@ -282,6 +282,57 @@
         "over_masking_mean": {"$ref": "#/$defs/rate"},
         "errors": {"$ref": "#/$defs/count"},
         "latency_ms": {"type": "object", "additionalProperties": {"type": ["number", "null"], "minimum": 0}}
+      }
+    },
+    "latency_percentiles": {
+      "description": "Milliseconds over a cell's requests: p50/p95/p99 (linear interpolation) and the mean.",
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["p50", "p95", "p99", "mean"],
+          "additionalProperties": false,
+          "properties": {
+            "p50": {"type": "number", "minimum": 0},
+            "p95": {"type": "number", "minimum": 0},
+            "p99": {"type": "number", "minimum": 0},
+            "mean": {"type": "number", "minimum": 0}
+          }
+        }
+      ]
+    },
+    "latency_cell": {
+      "type": "object",
+      "description": "One combination of mode, concurrency and streaming.",
+      "required": [
+        "mode", "concurrency", "stream", "requests", "errors", "throughput_rps", "overhead_ms", "total_ms",
+        "upstream_ms", "added_ttft_ms", "client_ms", "client_ttft_ms", "stages_ms", "detectors_ms"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"type": "string", "minLength": 1},
+        "concurrency": {"type": "integer", "minimum": 1},
+        "stream": {"type": "boolean"},
+        "requests": {"$ref": "#/$defs/count"},
+        "errors": {"$ref": "#/$defs/count"},
+        "throughput_rps": {"type": ["number", "null"], "minimum": 0},
+        "overhead_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Gateway total minus the time spent waiting on the upstream."},
+        "total_ms": {"$ref": "#/$defs/latency_percentiles"},
+        "upstream_ms": {"$ref": "#/$defs/latency_percentiles"},
+        "added_ttft_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Streams: time to the first event sent minus the upstream's own time to its first data."},
+        "client_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Wall time seen by the benchmark client."},
+        "client_ttft_ms": {"$ref": "#/$defs/latency_percentiles"},
+        "stages_ms": {"type": "object", "additionalProperties": {"$ref": "#/$defs/latency_percentiles"}, "description": "parse, detect, image, mask, forward, upstream_ttfb, upstream, unmask, response."},
+        "detectors_ms": {"type": "object", "additionalProperties": {"$ref": "#/$defs/latency_percentiles"}, "description": "Per detector, summed over the texts of a request."}
+      }
+    },
+    "latency_metrics": {
+      "type": "object",
+      "required": ["upstream_delay_ms", "cells"],
+      "additionalProperties": false,
+      "properties": {
+        "upstream_delay_ms": {"type": "number", "minimum": 0, "description": "Fixed delay of the mock upstream before each answer."},
+        "cells": {"type": "array", "items": {"$ref": "#/$defs/latency_cell"}}
       }
     }
   }

@@ -11,6 +11,10 @@
 - ``snapshots``: for each fixture set and system, the latest result per language and their
   pooled ``all``: what the comparison charts and tables show;
 - ``visual``: the image-masking runs;
+- ``latency``: the gateway latency runs (``pii-guard bench latency``), one entry per run with
+  its cells (mode, concurrency, streaming: overhead and stage percentiles). They are listed in
+  ``runs`` but are not detection systems, so they stay out of ``systems`` and
+  ``fixture_sets``;
 - ``systems``, ``fixture_sets``, ``languages``, ``entity_types``: the vocabularies, all
   derived from the data (a new language, detector or set shows up without code changes).
 
@@ -313,7 +317,8 @@ def build_index(
     """The index (see the module docstring) from validated run records."""
     records = sorted(records, key=run_order)
     text = [r for r in records if r["kind"] == "text"]
-    systems = _systems(records, featured)
+    scored = [r for r in records if r["kind"] != "latency"]
+    systems = _systems(scored, featured)
 
     runs = []
     for rec in records:
@@ -418,7 +423,7 @@ def build_index(
         )
 
     fixture_sets: dict[str, Any] = {}
-    for rec in records:
+    for rec in scored:
         for f in rec["fixtures"]:
             entry = fixture_sets.setdefault(
                 f["set"],
@@ -476,6 +481,23 @@ def build_index(
             }
         )
 
+    latency = [
+        {
+            "run_id": rec["run_id"],
+            "date": rec["date"],
+            "commit": rec["code"]["commit"],
+            "system": rec["system"]["key"],
+            "label": rec["system"]["label"],
+            "detectors": [d["name"] for d in rec["system"]["detectors"]],
+            "models": [d["model"] for d in rec["system"]["detectors"] if d.get("model")],
+            "hardware": (rec.get("hardware") or {}).get("description"),
+            "upstream_delay_ms": rec["metrics"]["upstream_delay_ms"],
+            "cells": rec["metrics"]["cells"],
+        }
+        for rec in records
+        if rec["kind"] == "latency"
+    ]
+
     digest = hashlib.sha256(
         json.dumps(sorted((digests or {}).items()), separators=(",", ":")).encode()
     ).hexdigest()
@@ -498,6 +520,7 @@ def build_index(
         "history": history,
         "snapshots": snapshots,
         "visual": visual,
+        "latency": latency,
     }
 
 

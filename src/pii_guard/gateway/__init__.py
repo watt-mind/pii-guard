@@ -16,6 +16,7 @@ from pii_guard.gateway.request import (
 from pii_guard.gateway.service import (
     LANGUAGE_HEADER,
     MODE_HEADER,
+    REQUEST_ID_HEADER,
     SESSION_HEADER,
     Gateway,
     UpstreamError,
@@ -26,6 +27,7 @@ from pii_guard.gateway.stream import SseRestorer
 __all__ = [
     "LANGUAGE_HEADER",
     "MODE_HEADER",
+    "REQUEST_ID_HEADER",
     "SESSION_HEADER",
     "DetectionCache",
     "Gateway",

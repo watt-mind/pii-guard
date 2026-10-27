@@ -1,4 +1,15 @@
 # Local API on http://127.0.0.1:8787. Configuration comes from .env (see .env.example).
+#
+# Demo stack (docs/operations.md): docker compose --profile demo up --build
+#   UI http://localhost:5173, demo API + gateway http://127.0.0.1:8788 (traffic log on),
+#   mock upstream (offline). Set PII_GUARD_DEMO_UPSTREAM_URL / _API_KEY for a real upstream.
+#   The local equivalent without Docker is `make demo`.
+x-healthcheck: &healthcheck
+  interval: 5s
+  timeout: 3s
+  start_period: 10s
+  retries: 12
+
 services:
   api:
     build: .
@@ -13,3 +24,65 @@ services:
       PII_GUARD_PORT: "8787"
     read_only: true
     restart: unless-stopped
+
+  mock-upstream:
+    profiles: [demo]
+    image: pii-guard:dev
+    build: .
+    command: ["pii-guard", "bench", "mock-upstream", "--host", "0.0.0.0", "--port", "8790"]
+    read_only: true
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8790/healthz', timeout=2)"]
+
+  demo-api:
+    profiles: [demo]
+    image: pii-guard:dev
+    build: .
+    ports:
+      - "127.0.0.1:8788:8787"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PII_GUARD_HOST: 0.0.0.0
+      PII_GUARD_PORT: "8787"
+      PII_GUARD_GATEWAY_MODE: fast
+      # masked only: `full` is refused on a non-loopback bind, and a container binds 0.0.0.0.
+      PII_GUARD_TRAFFIC_LOG: masked
+      PII_GUARD_SERVER_TIMING: "true"
+      PII_GUARD_METRICS: "true"
+      PII_GUARD_UPSTREAM_BASE_URL: ${PII_GUARD_DEMO_UPSTREAM_URL:-http://mock-upstream:8790/v1}
+      PII_GUARD_UPSTREAM_API_KEY: ${PII_GUARD_DEMO_UPSTREAM_API_KEY:-}
+    # A fresh tenant key per container unless .env sets one (pseudonyms are per run).
+    command:
+      - sh
+      - -c
+      - >-
+        export PII_GUARD_TENANT_KEY="$${PII_GUARD_TENANT_KEY:-$$(python -c 'import secrets; print(secrets.token_hex(32))')}"
+        && exec pii-guard serve
+    read_only: true
+    depends_on:
+      mock-upstream:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2)"]
+
+  ui:
+    profiles: [demo]
+    image: node:22-slim
+    working_dir: /app
+    command: ["sh", "-c", "corepack enable && pnpm install --frozen-lockfile && pnpm dev --host 0.0.0.0"]
+    environment:
+      PII_GUARD_API_URL: http://demo-api:8787
+      VITE_PII_GUARD_MODE: api
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      demo-api:
+        condition: service_healthy

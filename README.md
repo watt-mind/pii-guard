@@ -16,6 +16,27 @@ back into the model's answer, even while the answer is streaming.
 > the OpenAI-compatible gateway, image masking with SAM 3.1, the evaluation harness). It is not
 > production-hardened yet. See [what works today](#what-works-today).
 
+## Why pii-guard
+
+- **Reversible, consistent placeholders**: the answer names the real person, and every document
+  in the Hungarian smoke set unmasks back to its original exactly
+  ([100 % round trip](eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json)).
+- **Grammar-aware**: Hungarian case endings stay outside the placeholder; inflected-name leaks
+  went [18/30 → 0/30](docs/journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333).
+- **Leak from about half to under 1 %** with Meta's open-weight Muse Spark Open, at 1.8 s and
+  [$2.42 per 1,000 messages](eval/results/2026-10-27-baseten/README.md) (Hungarian).
+- **Against Presidio, LLM Guard and PrivAiTe**: 1.0 % Hungarian leak vs 19.6–49.5 %
+  ([comparison](eval/results/2026-10-26-baselines/comparison.md); fresh rerun in progress).
+- **Red-teamed by Meta's own model**: prompt-injection leak
+  [3.4 % → 0.0 %](eval/results/2026-10-27-injection/README.md); re-identification
+  [measured and published](eval/results/2026-10-27-redteam/README.md).
+- **Images too**: SAM 3.1 masks [90.8 % of portraits](eval/results/visual/specimens.md) on 65
+  official specimen ID documents, plus machine-readable zones.
+- **Measured in the open**: [61 run records](eval/results/runs/), charts regenerated and checked
+  in CI, fictional data only.
+
+All 13 differentiators, with evidence and status: **[docs/why-pii-guard.md](docs/why-pii-guard.md)**.
+
 ## Why it matters
 
 Every company that wants AI agents to work on real documents hits the same wall: the useful
@@ -137,9 +158,26 @@ runs on the hand-written sets for that reason.
 
 Requires [uv](https://docs.astral.sh/uv/) and, for the UI, [pnpm](https://pnpm.io/).
 
+**One command, offline:** the API, the gateway and the UI on a local mock upstream (no key,
+no model download), then fictional Hungarian, English and German traffic through it:
+
 ```bash
 git clone https://github.com/watt-mind/pii-guard.git
 cd pii-guard
+make demo           # prints: open http://localhost:5173
+make demo-traffic   # second terminal; watch it at http://127.0.0.1:8787/v1/traffic
+make smoke          # the same, as a pass/fail check (CI runs it)
+```
+
+Each call shows up in the traffic log with what was masked, what went upstream and the
+latency pii-guard added per stage. With `BASETEN_API_KEY` or `PII_GUARD_UPSTREAM_BASE_URL` in
+`.env` the demo uses that upstream instead; `docker compose --profile demo up --build` runs the
+same stack in containers. Details, the traffic log's privacy model and the timing fields:
+[docs/operations.md](docs/operations.md).
+
+Step by step:
+
+```bash
 uv sync
 export PII_GUARD_TENANT_KEY=$(openssl rand -hex 32)
 uv run pii-guard serve                  # http://127.0.0.1:8787 (rules only)
@@ -229,6 +267,7 @@ for chunk in stream:
 | `X-PII-Guard-Mode` | request | `strict` (rules + LLM detector, the default) or `fast` (rules only, no model call). |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
+| `X-PII-Guard-Request-Id` | response | The call's id in the traffic log; with `PII_GUARD_SERVER_TIMING=true` a `Server-Timing` header gives the per-stage latency ([operations.md](docs/operations.md#timing)). |
 
 Fails closed: a detection error or timeout (`PII_GUARD_GATEWAY_DETECTION_TIMEOUT`, 30 s), image
 or audio parts, or a missing tenant key or upstream return an error and nothing is forwarded.

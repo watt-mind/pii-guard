@@ -69,7 +69,19 @@ CHARTS: list[tuple[str, str, Chart]] = [
         "Visual recall on image documents",
         lambda i, s, f: charts.visual_recall(i),
     ),
+    (
+        "latency.svg",
+        "Gateway overhead",
+        lambda i, s, f: charts.latency(i),
+    ),
 ]
+#: Charts drawn only when the index has the data they need.
+_OPTIONAL = {"visual-recall.svg": "visual", "latency.svg": "latency"}
+
+
+def _drawn(index: Mapping[str, Any], name: str) -> bool:
+    key = _OPTIONAL.get(name)
+    return key is None or bool(index.get(key))
 
 
 # --- Page ---------------------------------------------------------------------------------
@@ -202,6 +214,61 @@ def _visual_table(index: Mapping[str, Any]) -> str:
     )
 
 
+def _latency_table(index: Mapping[str, Any]) -> str:
+    rows = []
+    for run in charts.latest_latency(index):
+        for c in run["cells"]:
+            o, t = c["overhead_ms"] or {}, c.get("added_ttft_ms") or {}
+            det = c.get("stages_ms", {}).get("detect") or {}
+            rows.append(
+                [
+                    charts.latency_label(run),
+                    c["concurrency"],
+                    "yes" if c["stream"] else "no",
+                    c["requests"],
+                    _ms(o.get("p50")),
+                    _ms(o.get("p95")),
+                    _ms(o.get("p99")),
+                    _ms(det.get("p50")),
+                    _ms(t.get("p50")) if c["stream"] else "—",
+                    _ms(t.get("p95")) if c["stream"] else "—",
+                    f"{run['upstream_delay_ms']:g}",
+                    f"`{run['run_id']}`",
+                ]
+            )
+    return _table(
+        [
+            "System",
+            "Concurrency",
+            "Stream",
+            "n",
+            "Overhead p50",
+            "p95",
+            "p99",
+            "Detect p50",
+            "Added TTFT p50",
+            "p95",
+            "Upstream delay ms",
+            "Run",
+        ],
+        [
+            "---",
+            "---:",
+            "---",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---:",
+            "---",
+        ],
+        rows,
+    )
+
+
 def _cost(run: Mapping[str, Any]) -> str:
     cost = run.get("cost") or {}
     parts = []
@@ -216,13 +283,14 @@ def _cost(run: Mapping[str, Any]) -> str:
 
 def _run_log(index: Mapping[str, Any]) -> str:
     rows = []
+    latency_labels = {r["run_id"]: r["label"] for r in index.get("latency", [])}
     for run in reversed(index["runs"]):
         style = index["systems"].get(run["system"], {})
         rows.append(
             [
                 run["date"],
                 f"`{run['run_id']}`",
-                style.get("label", run["system"]),
+                latency_labels.get(run["run_id"]) or style.get("label", run["system"]),
                 run["fixture_set"],
                 ", ".join(run["languages"]) or "—",
                 run["source"],
@@ -282,7 +350,7 @@ def render_page(index: Mapping[str, Any], *, headline_set: str, featured: Sequen
         "Default pipeline in **bold**.\n",
     ]
     for name, title, _ in CHARTS:
-        if name == "visual-recall.svg" and not index["visual"]:
+        if not _drawn(index, name):
             continue
         out.append(f"![{title}](benchmarks/{name})\n")
     out.append(_METHOD)
@@ -307,6 +375,16 @@ def render_page(index: Mapping[str, Any], *, headline_set: str, featured: Sequen
             "hold different documents, so compare runs within a set.\n"
         )
         out.append(_visual_table(index))
+    if index.get("latency"):
+        out.append("## Gateway latency\n")
+        out.append(
+            "What the gateway adds to an LLM call, measured by `pii-guard bench latency` against "
+            "the mock upstream with a fixed delay, so the upstream's own time is taken out: "
+            "overhead = gateway total - time waiting on the upstream. Streams also report the "
+            "added time to the first token. Each request is a new session (no cache hits). "
+            "Stages and fields: [operations.md](operations.md#timing).\n"
+        )
+        out.append(_latency_table(index))
     out.append("## Run log\n")
     out.append(
         "Newest first. `imported` runs were converted from earlier scorecards and Linear/PR "
@@ -360,7 +438,7 @@ def build_outputs(
         compact = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
         outputs[ui_index_path] = compact + "\n"
     for name, _, render in CHARTS:
-        if name == "visual-recall.svg" and not index["visual"]:
+        if not _drawn(index, name):
             continue
         outputs[docs_dir / "benchmarks" / name] = render(index, headline, systems)
     outputs[docs_dir / "benchmarks.md"] = render_page(

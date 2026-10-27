@@ -21,7 +21,7 @@ leak 52.6 % (Hungarian) and 46.7 % (English) of labelled values. Rules plus Muse
 Baseten leak 0.9 % and 0.0 %, at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. A
 fast mode with no LLM call (rules plus a small NER model distilled from Muse Glimmer) gets
 Hungarian down to 0.9 % and English to 0.0 % at tens of milliseconds per message. On a public benchmark
-(Ai4Privacy OpenPII, 600 documents, milestone 20) strict mode leaks 3.9 % and fast mode 38.0 %:
+(Ai4Privacy OpenPII, 600 documents, milestone 22) strict mode leaks 3.9 % and fast mode 38.0 %:
 fast mode suits text like ours, not unfamiliar number formats.
 
 | Language | Mode | Best configuration | Leak | F1 (overlap) | p50 latency | $ / 1k msgs | Source |
@@ -32,11 +32,11 @@ fast mode suits text like ours, not unfamiliar number formats.
 | English | fast | rules + distilled NER, large | **0.0 %** | 98.5 | 36 ms (MPS) | no API call | [distilled/large/en-smoke.md](../eval/results/ner/distilled/large/en-smoke.md), [latency-large.json](../eval/results/ner/distilled/latency-large.json) |
 | either | none | rules only (baseline) | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [distilled/rules/](../eval/results/ner/distilled/rules/) `hu-smoke.md`, `en-smoke.md` |
 
-¹ Measured in the 2026-10-27 comparison (milestone 20), which confirmed the 0.9 % figure
+¹ Measured in the 2026-10-27 comparison (milestone 22), which confirmed the 0.9 % figure
 that milestone 14 had only stated in docs/models.md: 1 of 106 labelled values, F1 97.9. That
 run's machine was under unrelated load too (load average about 15 on 10 cores), so read
 the latency as relative. On the public Ai4Privacy set the same fast mode leaks 35–40 %
-(milestone 20); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
+(milestone 22); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
 you train them yourself (see [models.md](models.md#ner-detector)).
 
 Leak = share of labelled values that still appear, in any surface form, in the text the
@@ -457,7 +457,64 @@ the surname is not in the lexicon.
   bare `Bt.`), so `Fekete Kavics Kft.` stays intact and `Fekete Kft.` is accepted as a possible
   miss.
 
-### 20. Fresh comparison: fast and strict vs Presidio, LLM Guard, PrivAiTe, on a public set too (2026-10-27)
+### 20. Every detector sees normalised text (2026-10-27)
+
+LAB-1146.
+
+The prompt-injection red team (LAB-1107) showed that only the LLM detector cleaned invisible
+characters and lookalike letters. A zero-width space inside a phone number hid it from the
+rules, and a zero-width joiner inside an e-mail address made the rules match only the part
+after it; that validated rule span then kept its boundaries over the LLM's whole-address span,
+so the local part leaked. The pipeline now normalises once, before any detector runs, and maps
+every span back to the original text, invisible characters included.
+
+- **Before → after**, `pii-guard eval injection`, `zero-width` class (14 values): rules alone
+  **9 leaked / 5 partial → 6 / 3**, e-mail and phone exact recall 0 → 100 %; the rest are
+  names, addresses and a birth date only a language model finds. Rules + Muse Spark Open
+  (Baseten, `reasoning_effort: low`) **3 partial → 0**, so all 175 injection values are now
+  masked whole (partial leak 1.7 % → 0.0 %). Source: run records
+  `2026-10-27-injection-{rules,spark-open}-{before,after}-normalise` in
+  [benchmarks.md](benchmarks.md), *(ticket comment, LAB-1146)*.
+- **No regression:** `hu-smoke` and `en-smoke` scorecards with the rules are identical before
+  and after; on the default fixture set only the injection documents changed, all for the
+  better.
+- **Cost:** two Baseten runs, about $0.30.
+
+### 21. One-command demo, live traffic log and the gateway's measured overhead (2026-10-27)
+
+LAB-1166.
+
+Trying the gateway took five manual steps and a key, and nobody could see what it did to a
+call or what it cost in latency. `make demo` now starts the API, the gateway and the UI on a
+local mock upstream (offline, free), `make demo-traffic` sends fictional hu / en / de
+requests through it (streaming, tool calls, known values, an image that is refused fail
+closed), and `make smoke` checks in CI that every answer comes back restored exactly and that
+no gold value reached the upstream. Every call becomes one in-memory traffic event
+(`GET /v1/traffic`, live over SSE) with what was masked, what went upstream and a per-stage
+timing breakdown; `full` mode with the originals is refused off localhost
+([operations.md](operations.md)).
+
+- **Measured overhead** (`pii-guard bench latency`, mock upstream with a fixed 50 ms delay, a
+  new session per request, Apple M1 Max; p50 / p95 of total minus upstream wait):
+
+  | Mode | c=1 | c=1, streamed (added time to first token) | c=8 |
+  |---|---:|---:|---:|
+  | fast, rules | **5.2 / 7.8 ms** | 6.5 / 8.1 ms (5.3 / 6.6 ms) | 11 / 26 ms |
+  | fast, rules + distilled NER (XLM-R large, MPS) | **36 / 45 ms** | 39 / 47 ms (37 / 46 ms) | 166 / 182 ms |
+  | strict, rules + Muse Spark Open on Baseten | **1.23 / 1.79 s** | 1.32 / 1.58 s (1.32 / 1.58 s) | 1.90 / 2.44 s |
+
+  Source: run records `2026-10-27-gateway-latency-{rules-fast,ner-fast,baseten-strict}` in
+  [benchmarks.md](benchmarks.md#gateway-latency) (200 requests per fast cell, 10 per strict
+  cell).
+- **What the breakdown showed:** in rules-only fast mode detection and masking take about
+  0.7 ms; **4.4 of the 5.2 ms** are the `forward` stage, a new HTTP client (and TLS context)
+  built for every upstream call. Under concurrency the NER is serialised behind one lock (p50
+  36 → 166 ms at c=8), and strict mode queues behind the gateway's detection limit
+  (`PII_GUARD_GATEWAY_CONCURRENCY`, 4). Each is now a follow-up with a number to beat.
+- **Cost:** 44 Muse Spark Open calls on Baseten for the strict cells, about $0.10; everything
+  else ran locally.
+
+### 22. Fresh comparison: fast and strict vs Presidio, LLM Guard, PrivAiTe, on a public set too (2026-10-27)
 
 PR [#45](https://github.com/watt-mind/pii-guard/pull/45), LAB-1148.
 
