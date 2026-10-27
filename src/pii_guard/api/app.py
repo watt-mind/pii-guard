@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -29,6 +31,15 @@ __all__ = ["create_app"]
 logger = logging.getLogger("pii_guard.api")
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """On shutdown, close the gateway's shared upstream client (LAB-1176)."""
+    yield
+    close = getattr(getattr(app.state, "gateway", None), "aclose", None)
+    if close is not None:
+        await close()
+
+
 def create_app(
     settings: Settings | None = None, observability: ObservabilitySettings | None = None
 ) -> FastAPI:
@@ -51,11 +62,15 @@ def create_app(
     Requests with a ``Host`` header outside :func:`~pii_guard.api.security.allowed_hosts` get
     400 (DNS-rebinding guard). ``PII_GUARD_API_TOKEN`` requires a bearer token on every route
     but ``/healthz``; without it the API has no authentication.
+
+    The gateway (``app.state.gateway``) keeps one upstream HTTP client; the app's lifespan
+    closes it on shutdown.
     """
     app = FastAPI(
         title="pii-guard",
         version=__version__,
         description="Privacy firewall for AI agents: reversible PII masking.",
+        lifespan=_lifespan,
     )
     settings = settings or get_settings()
     # Explicit PII_GUARD_DETECTORS, else the gateway fast-mode stack (LAB-1270). A configured

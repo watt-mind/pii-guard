@@ -1160,6 +1160,38 @@ the same fictional mini-repo and task as pi in milestone 35:
 - **Cost:** $0. About 10 requests on free Meta API credits (one live run and `--check`); the
   rest ran locally.
 
+### 40. The gateway stops rebuilding its HTTP client: overhead 5.2 → 1.0 ms (2026-10-27)
+
+LAB-1176, from the LAB-1268 performance audit. **Most of the gateway's own overhead wasn't
+masking at all.** Every upstream call built a new `httpx.AsyncClient`, and building one costs
+about 4.5 ms: loading the certificate bundle into a TLS context (78 % of it) and reading the
+macOS proxy settings (12 %). It ran synchronously on the event loop, so with 8 requests in
+flight each one also waited for the others' clients, and no connection to the upstream was
+ever reused.
+
+Now each gateway builds one client on first use and shares it between
+`/v1/chat/completions` and `/v1/responses`. The upstream timeout is set per request, each
+call closes only its own response, and the app's lifespan closes the client on shutdown. Pool
+limits are settings (`PII_GUARD_GATEWAY_UPSTREAM_MAX_CONNECTIONS`, `_MAX_KEEPALIVE`,
+`_KEEPALIVE_EXPIRY`), and keep-alive is on.
+
+| Cell (fast mode, rules only, mock upstream at 50 ms) | Overhead p50, before → after | `forward` stage | `detect` stage | Throughput |
+|---|---:|---:|---:|---:|
+| 1 client, not streamed | 5.16 → 0.99 ms (0.19x) | 4.28 → 0.08 ms | 0.47 → 0.47 ms | 16.0 → 18.3 rps |
+| 1 client, streamed (added time to first token) | 5.12 → 0.91 ms (0.18x) | 4.26 → 0.08 ms | 0.46 → 0.45 ms | 16.1 → 17.9 rps |
+| 8 clients, not streamed | 12.29 → 2.68 ms (0.22x) | 4.25 → 0.07 ms | 7.33 → 2.15 ms | 83 → 127 rps (1.53x) |
+| 8 clients, streamed (added time to first token) | 11.34 → 2.66 ms (0.24x) | 4.30 → 0.08 ms | 6.70 → 2.22 ms | 78 → 115 rps (1.48x) |
+
+- **Measured** with `pii-guard bench latency --concurrency 1,8 --requests 100`, alternating
+  base and fix runs three times on a loaded machine; medians of the three runs. Read the
+  ratios, not the absolute times. The published run records are re-recorded on an idle
+  machine under LAB-1243.
+- **Deterministic counter:** `httpx.AsyncClient` constructions per 100 gateway requests,
+  100 → 1.
+- **What's left:** at 8 clients the `detect` stage is still about 4.5x its 1-client value,
+  while the rules detector itself takes 0.18 ms. That queueing is LAB-1178.
+- **Cost:** $0. Local runs only.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

@@ -7,6 +7,9 @@ These live here, not in ``pii_guard.config``, until the settings work (LAB-1095)
 | ``PII_GUARD_GATEWAY_MODE`` | ``mode`` | ``strict`` |
 | ``PII_GUARD_GATEWAY_DETECTION_TIMEOUT`` | ``detection_timeout`` (s) | ``30`` |
 | ``PII_GUARD_GATEWAY_UPSTREAM_TIMEOUT`` | ``upstream_timeout`` (s) | ``120`` |
+| ``PII_GUARD_GATEWAY_UPSTREAM_MAX_CONNECTIONS`` | ``upstream_max_connections`` | ``100`` |
+| ``PII_GUARD_GATEWAY_UPSTREAM_MAX_KEEPALIVE`` | ``upstream_max_keepalive`` (idle kept) | ``20`` |
+| ``PII_GUARD_GATEWAY_UPSTREAM_KEEPALIVE_EXPIRY`` | ``upstream_keepalive_expiry`` (s) | ``30`` |
 | ``PII_GUARD_GATEWAY_CACHE_SIZE`` | ``cache_size`` (entries) | ``4096`` |
 | ``PII_GUARD_GATEWAY_CONCURRENCY`` | ``concurrency`` (parallel detections) | ``4`` |
 | ``PII_GUARD_GATEWAY_MAX_IMAGES`` | ``max_images`` (inline images per request) | ``4`` |
@@ -58,6 +61,16 @@ class GatewayConfig(BaseSettings):
     )
     upstream_timeout: float = Field(
         default=120.0, gt=0, validation_alias="PII_GUARD_GATEWAY_UPSTREAM_TIMEOUT"
+    )
+    # The one shared upstream client's pool (LAB-1176): connections are kept alive between calls.
+    upstream_max_connections: int = Field(
+        default=100, ge=1, validation_alias="PII_GUARD_GATEWAY_UPSTREAM_MAX_CONNECTIONS"
+    )
+    upstream_max_keepalive: int = Field(
+        default=20, ge=0, validation_alias="PII_GUARD_GATEWAY_UPSTREAM_MAX_KEEPALIVE"
+    )
+    upstream_keepalive_expiry: float = Field(
+        default=30.0, ge=0, validation_alias="PII_GUARD_GATEWAY_UPSTREAM_KEEPALIVE_EXPIRY"
     )
     cache_size: int = Field(default=4096, ge=0, validation_alias="PII_GUARD_GATEWAY_CACHE_SIZE")
     concurrency: int = Field(default=4, ge=1, validation_alias="PII_GUARD_GATEWAY_CONCURRENCY")
