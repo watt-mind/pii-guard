@@ -58,22 +58,27 @@ def _is_iban_char(ch: str) -> bool:
 
 # --- Email ------------------------------------------------------------------
 
-# Pragmatic, not RFC 5322: Unicode letters allowed, the TLD is letters only. A Hungarian case
-# suffix attached with a hyphen ("…@example.com-ra") is not part of the address.
+# Pragmatic, not RFC 5322: Unicode letters allowed, the TLD is letters only or an IDN in
+# punycode (``xn--p1ai``). A quoted local part (``"john doe"@example.com``) is matched with its
+# quotes. A Hungarian case suffix attached with a hyphen ("…@example.com-ra") is not part of
+# the address.
 _EMAIL_RE = re.compile(
-    r"(?<![\w.%+-])"
-    r"[\w%+-](?:[\w.%+-]*[\w%+-])?"
+    r"(?:(?<![\w.%+-])[\w%+-](?:[\w.%+-]*[\w%+-])?"
+    r'|(?<![\w"])"(?:[^"\\\r\n]|\\[^\r\n]){1,64}")'
     r"@"
     r"(?:[^\W_](?:[\w-]*[^\W_])?\.)+"
-    r"[^\W\d_]{2,}"
+    r"(?:[xX][nN]--[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?|[^\W\d_]{2,})"
     r"(?!\w)(?!\.[^\W_])"
 )
 
 
 def _find_email(text: str) -> Iterator[_Hit]:
     for m in _EMAIL_RE.finditer(text):
-        if ".." not in m.group():
-            yield _Hit(m.start(), m.end(), EntityType.EMAIL, 0.99)
+        local, _, domain = m.group().rpartition("@")
+        # Consecutive dots are invalid, except inside a quoted local part.
+        if ".." in domain or (not local.startswith('"') and ".." in local):
+            continue
+        yield _Hit(m.start(), m.end(), EntityType.EMAIL, 0.99)
 
 
 # --- International phone numbers --------------------------------------------

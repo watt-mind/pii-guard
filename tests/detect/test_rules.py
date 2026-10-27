@@ -200,6 +200,44 @@ def test_taj_look_alikes(detector: RuleDetector, text: str) -> None:
     assert E.NATIONAL_ID_HU_TAJ not in {s.entity_type for s in detector.detect(text)}
 
 
+# A context-free TAJ (a mod-10 check, 1 in 10 random numbers passes) right after an order,
+# invoice or reference label, an identifier prefix or a currency is that number, not a TAJ
+# (LAB-1205). The fictional values all pass the TAJ check.
+@pytest.mark.parametrize(
+    ("language", "text"),
+    [
+        ("en", "Order #123456788 shipped"),
+        ("en", "Order number: 123456788"),
+        ("hu", "Rendelésszám: 123456788"),
+        ("hu", "A megrendelés száma 123 456 788."),
+        ("en", "Invoice INV-123456788"),
+        ("en", "INV-123456788"),
+        ("hu", "Számla: SZ-123456788"),
+        ("de", "Rechnung RE-123456788"),
+        ("en", "Total: $123 456 788"),
+        ("en", "Amount EUR 123 456 788"),
+        ("de", "Betrag € 123 456 788"),
+        ("hu", "Összeg: 123 456 788,- Ft"),
+        ("hu", "Összeg: 123 456 788,-Ft"),
+    ],
+)
+def test_taj_after_reference_or_currency_is_not_masked(language: str, text: str) -> None:
+    assert RuleDetector(cued_numbers=False).detect(text, language) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "TAJ: 123 456 788",  # its own cue wins over everything
+        "Rendelésszám: 2026-0042, TAJ szám: 123456788",
+        "Teszt Elek, 123 456 788, Szeged",  # no cue at all: still masked, at the lower score
+        "A rendelést Teszt Elek adta le, 123 456 788",  # the label must end right before it
+    ],
+)
+def test_taj_without_reference_cue_is_still_masked(detector: RuleDetector, text: str) -> None:
+    assert E.NATIONAL_ID_HU_TAJ in {s.entity_type for s in detector.detect(text)}
+
+
 @settings(max_examples=50)
 @given(payload=st.text(alphabet="0123456789", min_size=8, max_size=8))
 def test_taj_property(payload: str) -> None:
@@ -247,6 +285,21 @@ def test_iban_followed_by_uppercase_word(detector: RuleDetector) -> None:
 )
 def test_iban_look_alikes(detector: RuleDetector, text: str) -> None:
     assert E.BANK_ACCOUNT not in {s.entity_type for s in detector.detect(text)}
+
+
+# Countries the SWIFT registry added or that were missing from the length table (LAB-1205).
+@pytest.mark.parametrize(
+    ("country", "length"),
+    [
+        ("BI", 27), ("DJ", 27), ("FK", 18), ("HN", 28), ("MN", 20), ("NI", 28),
+        ("OM", 23), ("RU", 33), ("SD", 18), ("SO", 23), ("YE", 30),
+    ],
+)  # fmt: skip
+def test_iban_registry_countries(detector: RuleDetector, country: str, length: int) -> None:
+    assert IBAN_LENGTHS[country] == length
+    value = make_iban(country, "1234567890123456789012345678901"[: length - 4])
+    assert found(detector, f"Pay to {value} please") == [(E.BANK_ACCOUNT, value)]
+    assert found(detector, f"Pay to {grouped(value)} please") == [(E.BANK_ACCOUNT, grouped(value))]
 
 
 @settings(max_examples=50)
@@ -319,10 +372,21 @@ def test_giro_16_followed_by_unrelated_block(detector: RuleDetector) -> None:
         "minta+hirlevel@mail.example.hu",
         "árvíz.tűrő@példa.hu",
         "a_b-c@sub-domain.example.org",
+        # An internationalised TLD in punycode, and a quoted local part (LAB-1205).
+        "teszt@example.xn--p1ai",
+        "teszt@pelda.XN--90AE",
+        '"teszt elek"@example.com',
+        '"teszt..elek"@example.com',
+        '"a\\"b"@example.com',
     ],
 )
 def test_email(detector: RuleDetector, value: str) -> None:
     assert_detects(detector, value, E.EMAIL)
+
+
+def test_quoted_email_after_quoted_text(detector: RuleDetector) -> None:
+    text = 'Azt írta, "hamarosan", majd "teszt elek"@example.com címről küldte.'
+    assert found(detector, text) == [(E.EMAIL, '"teszt elek"@example.com')]
 
 
 def test_email_with_hungarian_suffix(detector: RuleDetector) -> None:
@@ -335,7 +399,15 @@ def test_email_with_hungarian_suffix(detector: RuleDetector) -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ["teszt@localhost", "teszt@example", "@example.com", "teszt..elek@example.com", "a@b.c"],
+    [
+        "teszt@localhost",
+        "teszt@example",
+        "@example.com",
+        "teszt..elek@example.com",
+        "a@b.c",
+        '"teszt elek" @example.com',
+        '""@example.com',
+    ],
 )
 def test_email_look_alikes(detector: RuleDetector, text: str) -> None:
     assert E.EMAIL not in {s.entity_type for s in detector.detect(text)}

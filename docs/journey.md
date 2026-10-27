@@ -859,6 +859,43 @@ Headline numbers that changed (pooled, old → new; leak and recall are unchange
   marked `rescored`); details in [evaluation.md](evaluation.md#run-records) and
   [benchmarks.md](benchmarks.md).
 
+### 31. Order numbers and amounts are no longer read as TAJ numbers (2026-10-27)
+
+LAB-1205.
+
+A code review of `develop` found four correctness gaps in the rules and the resolver. A TAJ
+number is nine digits with a mod-10 check, so 1 in 10 random nine-digit numbers passes it, and
+without its `TAJ` cue the rule fired on `Order number: 123456788`, `Rendelésszám: ...`,
+`INV-123456788`, `Total: $123 456 788` and `123 456 788,- Ft`. In the resolver, a validated
+rule span dropped every other detector's same-type span that overlapped it, so when the rule cut
+a value short (`user@example.xn` out of `user@example.xn--p1ai`, a phone number without its
+`/ 123` extension) the rest leaked; a span of another type already kept its rest. The IBAN
+length table missed eleven countries of the SWIFT registry (Russia, Oman, Nicaragua, Mongolia,
+Yemen ...), and the e-mail rule stopped at a punycode TLD and missed a quoted local part
+(`"john doe"@example.com`).
+
+A context-free TAJ right after an order, invoice or reference label, an ID prefix (`INV-`,
+`#`) or a currency is now dropped, and `,- Ft` reads as an amount for every number rule. The
+resolver keeps the rest of a same-type span when it can be the rest of the value (it holds a
+digit, or continues the validated span without a space); a label word the other detector took
+along (`(mobil)`, `E-mail:`) and an inflectional suffix (`-ra`) stay unmasked. The IBAN table
+follows the registry, and the e-mail rule accepts `xn--` TLDs and quoted local parts.
+
+- **Probes:** every input of the reviewers' four probe scripts in the ticket's scope now comes
+  out right: the 7 TAJ over-masking cases, the same-type e-mail and phone remainders, 6 of the
+  7 IBAN countries (the probe's Sudanese IBAN has 16 characters; the registry says 18, and an
+  18-character one is found) and both e-mail forms.
+- **Negative set:** 6 new hand-written documents of order numbers and amounts that pass the TAJ
+  check (en, hu, de). The rules masked 11 values in them as TAJ before and mask none now; the
+  38 documents of the set come out clean.
+- **No regression:** the smoke and Ai4Privacy scorecards are identical before and after, in
+  rules and fast mode (rules: smoke 41.6 % leak / 0.0 % over-masking, Ai4Privacy 63.1 / 0.1;
+  fast: smoke 0.6 / 0.6, Ai4Privacy 27.6 / 2.4). Neither set has an over-masked order number or
+  a value a rule cuts short, so the change shows only on the negative set and the probes.
+- **Cost:** $0, local runs (NER on Apple MPS). Source: run records
+  `2026-10-27-rules-resolve-{before,after}-{smoke,ai4privacy}-{rules,fast}` in
+  [benchmarks.md](benchmarks.md).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

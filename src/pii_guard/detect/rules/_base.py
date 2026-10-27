@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterator
 from typing import NamedTuple
 
@@ -19,10 +20,11 @@ class _Hit(NamedTuple):
 Rule = Callable[[str], Iterator[_Hit]]
 
 # A number must not continue a longer digit run, directly or through a date/decimal separator
-# ("2026-10-26", "1.234.567"), or be followed by a currency (an amount, not an identifier).
+# ("2026-10-26", "1.234.567"), or be followed by a currency (an amount, not an identifier),
+# also after the Hungarian ",-" of a round amount ("123 456 788,- Ft").
 NUM_START = r"(?<!\d)(?<!\d[-./,])"
 NUM_END = r"(?!\d)(?![-./,]\d)"
-NOT_AMOUNT = r"(?!\s?(?:Ft|HUF|forint|EUR|€)(?!\w))"
+NOT_AMOUNT = r"(?!\s?(?:,-\s?)?(?:Ft|HUF|forint|EUR|€)(?!\w))"
 # Space-grouped numbers must not be part of a longer space-grouped number ("1 234 567 890").
 NO_GROUP_BEFORE = r"(?<!\d )"
 NO_GROUP_AFTER = r"(?! \d)"
@@ -32,3 +34,30 @@ def context_before(text: str, start: int, keywords: tuple[str, ...], window: int
     """True if one of ``keywords`` (lowercase) appears in the ``window`` chars before ``start``."""
     before = text[max(0, start - window) : start].casefold()
     return any(k in before for k in keywords)
+
+
+# What directly before a number makes it a business number or an amount, not personal data:
+# an order, invoice or reference label ("Order number:", "Rendelésszám:", "Rechnung"), an
+# identifier prefix ("INV-", "SZ-", "#") or a currency ("$", "EUR"). Only the label's last
+# word and a little punctuation may stand between it and the number.
+_REFERENCE_WORD = (
+    r"order|invoice|inv|receipt|reference|ref|booking|tracking|shipment|ticket|item|sku"
+    r"|article|case|total|amount|price|balance"
+    r"|\w*rendel[ée]s\w*|sz[áa]ml[áa]\w*|nyugta\w*|hivatkoz[áa]s\w*|sorsz[áa]m\w*"
+    r"|ügysz[áa]m\w*|iktat[óo]sz[áa]m\w*|cikksz[áa]m\w*|össz?eg\w*|v[ée]g[öo]sszeg\w*"
+    r"|bestell\w*|rechnung\w*|auftrag\w*|referenz\w*|artikel\w*|vorgang\w*|betrag\w*"
+    r"|summe\w*"
+)
+_REFERENCE_BEFORE_RE = re.compile(
+    rf"(?:(?i:(?<!\w)(?:{_REFERENCE_WORD})"
+    r"(?:[ \t]*(?:number|no|nr|num|id|sz[áa]m|sz[áa]ma|nummer)(?!\w)\.?)?)"
+    r"[ \t:#=()\-]*(?:[A-Z]{1,6}[-/#][ \t]?)?"
+    r"|(?<![\w-])[A-Z]{1,6}-|#[ \t]?"
+    r"|(?:[$€£¥]|(?<!\w)(?:USD|EUR|GBP|CHF|HUF|Ft|forint)(?!\w)\.?)[ \t]?)$"
+)
+_REFERENCE_WINDOW = 40
+
+
+def reference_or_amount_before(text: str, start: int) -> bool:
+    """True if an order/invoice/reference label, an ID prefix or a currency ends at ``start``."""
+    return _REFERENCE_BEFORE_RE.search(text, max(0, start - _REFERENCE_WINDOW), start) is not None

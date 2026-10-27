@@ -48,8 +48,8 @@ dates of birth come from the NER and LLM passes in every language.
 
 | Identifier | Type | Validation | Scope |
 |---|---|---|---|
-| IBAN, compact or grouped | `BANK_ACCOUNT` | country length + mod 97 | all |
-| Email address | `EMAIL` | shape | all |
+| IBAN, compact or grouped | `BANK_ACCOUNT` | country length (SWIFT registry) + mod 97 | all |
+| Email address, also with a punycode TLD (`xn--p1ai`) or a quoted local part | `EMAIL` | shape | all |
 | International phone number (`+<country>`, not `+36`) | `PHONE` | 8–15 digits (E.164) | all |
 | Payment card number, compact or in groups of 4 (Amex 4-6-5) | `BANK_ACCOUNT` | issuer prefix + length + Luhn | all |
 
@@ -70,7 +70,7 @@ numbers after an order, invoice or reference cue are never masked
 | Identifier | Type | Validation | Scope |
 |---|---|---|---|
 | Personal tax ID (adóazonosító jel) | `NATIONAL_ID_HU_TAX` | mod 11 | everywhere |
-| Social security (TAJ) number | `NATIONAL_ID_HU_TAJ` | weighted mod 10 | everywhere |
+| Social security (TAJ) number; without its `TAJ` cue, not right after an order, invoice or reference label, an ID prefix (`INV-`, `#`) or a currency | `NATIONAL_ID_HU_TAJ` | weighted mod 10 | everywhere |
 | Giro account number (16 or 24 digits) | `BANK_ACCOUNT` | weights 9-7-3-1 per block | everywhere |
 | Phone number (`+36`, `0036`, `06`) | `PHONE` | area code and length | everywhere |
 | Company registration number (cégjegyzékszám) | `COMPANY_ID_HU` | court and form codes | everywhere |
