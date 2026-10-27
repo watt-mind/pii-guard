@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "pii-guard eval report",
   "about": "Generated from eval/results/runs/*.json; do not edit. Rates are 0-1; latency in ms.",
-  "runs_digest": "8f048fe6cbb12ebc289971d2c2fce4c2012b0423ffa7182c40ece2755e3513e1",
+  "runs_digest": "081a4ea2ef8a45562d5d3d128ac0045b1e8436c302b49c940f28d27f43c6616f",
   "languages": [
     "de",
     "en",
@@ -39,6 +39,18 @@
       },
       "generators": [
         "ai4privacy/pii-masking-openpii-1m (not Muse)"
+      ]
+    },
+    "demo-which-parties": {
+      "origin": "generated",
+      "kind": "text",
+      "languages": [],
+      "documents": {
+        "all": 1,
+        "hu": 1
+      },
+      "generators": [
+        "muse-image"
       ]
     },
     "distill-dev": {
@@ -129,6 +141,34 @@
       "generators": [
         "muse-spark-1.3-contributor"
       ]
+    },
+    "visual-placeholders": {
+      "origin": "generated",
+      "kind": "text",
+      "languages": [],
+      "documents": {
+        "all": 24,
+        "de": 8,
+        "en": 8,
+        "hu": 8
+      },
+      "generators": [
+        "muse-image"
+      ]
+    },
+    "visual-placeholders-noisy": {
+      "origin": "generated",
+      "kind": "text",
+      "languages": [],
+      "documents": {
+        "all": 24,
+        "de": 8,
+        "en": 8,
+        "hu": 8
+      },
+      "generators": [
+        "muse-image"
+      ]
     }
   },
   "systems": {
@@ -201,8 +241,86 @@
       "featured": true,
       "default": false
     },
-    "llm:muse-glimmer@reasoning_strength=low": {
+    "demo-which-parties:labels:live": {
       "color": "#332288",
+      "shape": "circle",
+      "label": "pii-guard gateway, labels images, Muse Spark Open (Baseten)",
+      "short_label": "gateway, labels images, Muse Spark Open (Baseten)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "text",
+      "detectors": [
+        "ocr",
+        "rules",
+        "upstream"
+      ],
+      "models": [
+        "tesseract",
+        "muse-spark-open"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "demo-which-parties:labels:mock": {
+      "color": "#999933",
+      "shape": "circle",
+      "label": "pii-guard gateway, labels images, mock upstream",
+      "short_label": "gateway, labels images, mock upstream",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "text",
+      "detectors": [
+        "ocr",
+        "rules",
+        "upstream"
+      ],
+      "models": [
+        "tesseract"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "demo-which-parties:opaque:live": {
+      "color": "#882255",
+      "shape": "circle",
+      "label": "pii-guard gateway, opaque images, Muse Spark Open (Baseten)",
+      "short_label": "gateway, opaque images, Muse Spark Open (Baseten)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "text",
+      "detectors": [
+        "ocr",
+        "rules",
+        "upstream"
+      ],
+      "models": [
+        "tesseract",
+        "muse-spark-open"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "demo-which-parties:opaque:mock": {
+      "color": "#117733",
+      "shape": "circle",
+      "label": "pii-guard gateway, opaque images, mock upstream",
+      "short_label": "gateway, opaque images, mock upstream",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "text",
+      "detectors": [
+        "ocr",
+        "rules",
+        "upstream"
+      ],
+      "models": [
+        "tesseract"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "llm:muse-glimmer@reasoning_strength=low": {
+      "color": "#AA4499",
       "shape": "circle",
       "label": "pii-guard Muse Glimmer (low)",
       "short_label": "Muse Glimmer (low)",
@@ -219,7 +337,7 @@
       "default": false
     },
     "llm:muse-glimmer@reasoning_strength=medium": {
-      "color": "#999933",
+      "color": "#E69F00",
       "shape": "circle",
       "label": "pii-guard Muse Glimmer (medium)",
       "short_label": "Muse Glimmer (medium)",
@@ -236,7 +354,7 @@
       "default": false
     },
     "rules+llm:muse-spark-1.3": {
-      "color": "#882255",
+      "color": "#0072B2",
       "shape": "circle",
       "label": "pii-guard rules + Muse Spark 1.3",
       "short_label": "rules + Muse Spark 1.3",
@@ -254,7 +372,7 @@
       "default": false
     },
     "rules+ner:xlmr-base-distilled-glimmer": {
-      "color": "#117733",
+      "color": "#009E73",
       "shape": "circle",
       "label": "pii-guard rules + NER (distilled base)",
       "short_label": "rules + NER (distilled base)",
@@ -272,7 +390,7 @@
       "default": false
     },
     "rules+ner:xlmr-base-ft-s7": {
-      "color": "#AA4499",
+      "color": "#D55E00",
       "shape": "circle",
       "label": "pii-guard rules + NER (fine-tuned)",
       "short_label": "rules + NER (fine-tuned)",
@@ -290,7 +408,7 @@
       "default": false
     },
     "rules+ner:xlmr-large-distilled-glimmer+llm:muse-spark-open@reasoning_effort=low": {
-      "color": "#E69F00",
+      "color": "#CC79A7",
       "shape": "circle",
       "label": "pii-guard strict (rules + NER + Muse Spark Open, Baseten)",
       "short_label": "strict (rules + NER + Muse Spark Open, Baseten)",
@@ -310,7 +428,7 @@
       "default": false
     },
     "rules+ner:xlmr-ner-hrl": {
-      "color": "#0072B2",
+      "color": "#332288",
       "shape": "circle",
       "label": "pii-guard rules + NER (zero-shot)",
       "short_label": "rules + NER (zero-shot)",
@@ -327,8 +445,46 @@
       "featured": false,
       "default": false
     },
+    "visual-labels:exact": {
+      "color": "#999933",
+      "shape": "circle",
+      "label": "pii-guard image placeholders (exact matching)",
+      "short_label": "image placeholders (exact matching)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "text",
+      "detectors": [
+        "ocr",
+        "rules",
+        "vault-match"
+      ],
+      "models": [
+        "tesseract"
+      ],
+      "featured": false,
+      "default": false
+    },
+    "visual-labels:fuzzy": {
+      "color": "#882255",
+      "shape": "circle",
+      "label": "pii-guard image placeholders (fuzzy matching)",
+      "short_label": "image placeholders (fuzzy matching)",
+      "family": "pii-guard",
+      "tool": "pii-guard",
+      "kind": "text",
+      "detectors": [
+        "ocr",
+        "rules",
+        "vault-match"
+      ],
+      "models": [
+        "tesseract"
+      ],
+      "featured": false,
+      "default": false
+    },
     "visual:sam-3.1+tesseract+rules": {
-      "color": "#009E73",
+      "color": "#117733",
       "shape": "circle",
       "label": "pii-guard image masking (sam-3.1 + tesseract + rules)",
       "short_label": "image masking (sam-3.1 + tesseract + rules)",
@@ -348,7 +504,7 @@
       "default": false
     },
     "visual:sam-3.1+tesseract+rules+captions": {
-      "color": "#D55E00",
+      "color": "#AA4499",
       "shape": "circle",
       "label": "pii-guard image masking (sam-3.1 + tesseract + rules + captions)",
       "short_label": "image masking (sam-3.1 + tesseract + rules + captions)",
@@ -369,7 +525,7 @@
       "default": false
     },
     "visual:sam-3.1+tesseract+rules+llm:muse-spark-open": {
-      "color": "#CC79A7",
+      "color": "#E69F00",
       "shape": "circle",
       "label": "pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open)",
       "short_label": "image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open)",
@@ -391,7 +547,7 @@
       "default": false
     },
     "visual:sam-3.1+tesseract+rules+llm:muse-spark-open+captions": {
-      "color": "#332288",
+      "color": "#0072B2",
       "shape": "circle",
       "label": "pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions)",
       "short_label": "image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions)",
@@ -5897,6 +6053,475 @@
         "Public set: Ai4Privacy OpenPII 1M (CC-BY-4.0, Ai4Privacy / Ai Suisse SA), seeded sample of the validation split; see eval/fixtures/public/README.md.",
         "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold spans), so masking them counts as over-masking. Most card, tax and TAJ numbers in the set fail their checksums, which pii-guard's rules require."
       ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-exact-clean",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T12:28:31+00:00",
+      "source": "recorded",
+      "title": "image placeholders, exact vault matching, OCR noise 0.0",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "dirty": false,
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+          "settings": {
+            "cached": true,
+            "noise": 0.0
+          },
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "captions": true
+          },
+          "serving": null
+        },
+        {
+          "name": "vault-match",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "matcher": "exact"
+          },
+          "serving": null
+        }
+      ],
+      "hardware": "local CPU; OCR words from the cache",
+      "cost": {
+        "usd": 0.0,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": null,
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1156: a value printed on a fictional image, matched to the placeholder a contract-style text gave it in the same vault session; a false merge is a near-namesake's placeholder (eval/fixtures/visual/near-namesakes.json). Gold spans = values, tp = the image carries the text's placeholder, over_masked = false merges, mask latency = whole image masking per image (cached OCR)."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-exact-noisy",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T12:28:36+00:00",
+      "source": "recorded",
+      "title": "image placeholders, exact vault matching, OCR noise 0.05",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "dirty": false,
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+          "settings": {
+            "cached": true,
+            "noise": 0.05
+          },
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "captions": true
+          },
+          "serving": null
+        },
+        {
+          "name": "vault-match",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "matcher": "exact"
+          },
+          "serving": null
+        }
+      ],
+      "hardware": "local CPU; OCR words from the cache",
+      "cost": {
+        "usd": 0.0,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": null,
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1156: a value printed on a fictional image, matched to the placeholder a contract-style text gave it in the same vault session; a false merge is a near-namesake's placeholder (eval/fixtures/visual/near-namesakes.json). Gold spans = values, tp = the image carries the text's placeholder, over_masked = false merges, mask latency = whole image masking per image (cached OCR)."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-fuzzy-clean",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T12:28:45+00:00",
+      "source": "recorded",
+      "title": "image placeholders, fuzzy vault matching, OCR noise 0.0",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "dirty": false,
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+          "settings": {
+            "cached": true,
+            "noise": 0.0
+          },
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "captions": true
+          },
+          "serving": null
+        },
+        {
+          "name": "vault-match",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "matcher": "fuzzy"
+          },
+          "serving": null
+        }
+      ],
+      "hardware": "local CPU; OCR words from the cache",
+      "cost": {
+        "usd": 0.0,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": null,
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1156: a value printed on a fictional image, matched to the placeholder a contract-style text gave it in the same vault session; a false merge is a near-namesake's placeholder (eval/fixtures/visual/near-namesakes.json). Gold spans = values, tp = the image carries the text's placeholder, over_masked = false merges, mask latency = whole image masking per image (cached OCR).",
+        "Render modes on the same set (text + MRZ regions, 116): opaque recall_iou50 0.8793 / recall_cov90 0.8362 / gold pixels overwritten 0.8872; labels 0.8793 / 0.8362 / 0.8873 (python -m pii_guard.eval.visual_labels --coverage). Labels never cover less."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-fuzzy-noisy",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T12:28:50+00:00",
+      "source": "recorded",
+      "title": "image placeholders, fuzzy vault matching, OCR noise 0.05",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "dirty": false,
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "languages": [
+        "de",
+        "en",
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+          "settings": {
+            "cached": true,
+            "noise": 0.05
+          },
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "captions": true
+          },
+          "serving": null
+        },
+        {
+          "name": "vault-match",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "matcher": "fuzzy"
+          },
+          "serving": null
+        }
+      ],
+      "hardware": "local CPU; OCR words from the cache",
+      "cost": {
+        "usd": 0.0,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": null,
+        "shared_with": []
+      },
+      "notes": [
+        "LAB-1156: a value printed on a fictional image, matched to the placeholder a contract-style text gave it in the same vault session; a false merge is a near-namesake's placeholder (eval/fixtures/visual/near-namesakes.json). Gold spans = values, tp = the image carries the text's placeholder, over_masked = false merges, mask latency = whole image masking per image (cached OCR)."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-demo-which-parties-labels-live",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T12:30:57+00:00",
+      "source": "recorded",
+      "title": "\"which parties have an ID?\" demo, labels images, Muse Spark Open (Baseten)",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "dirty": false,
+      "system": "demo-which-parties:labels:live",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "languages": [
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+          "settings": {
+            "cached": true,
+            "noise": 0.0
+          },
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "captions": true
+          },
+          "serving": null
+        },
+        {
+          "name": "upstream",
+          "model": "muse-spark-open",
+          "model_ref": "baseten:meta-models/muse-spark-open-1026",
+          "settings": {
+            "render": "labels"
+          },
+          "serving": "Baseten Model APIs"
+        }
+      ],
+      "hardware": "local CPU; OCR words from the cache",
+      "cost": {
+        "usd": 0.0066,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": "From the token counts the endpoint reported, at list prices.",
+        "shared_with": []
+      },
+      "notes": [
+        "One live call to Baseten (meta-models/muse-spark-open-1026, reasoning_effort low, max_tokens 1200), recorded OCR words, SAM off; the answer was scored after the call by score_demo_answer (statuses: present / expired / missing per party)."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-demo-which-parties-opaque-live",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T12:30:57+00:00",
+      "source": "recorded",
+      "title": "\"which parties have an ID?\" demo, opaque images, Muse Spark Open (Baseten)",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "dirty": false,
+      "system": "demo-which-parties:opaque:live",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "languages": [
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+          "settings": {
+            "cached": true,
+            "noise": 0.0
+          },
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "captions": true
+          },
+          "serving": null
+        },
+        {
+          "name": "upstream",
+          "model": "muse-spark-open",
+          "model_ref": "baseten:meta-models/muse-spark-open-1026",
+          "settings": {
+            "render": "opaque"
+          },
+          "serving": "Baseten Model APIs"
+        }
+      ],
+      "hardware": "local CPU; OCR words from the cache",
+      "cost": {
+        "usd": 0.0074,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": "From the token counts the endpoint reported, at list prices.",
+        "shared_with": []
+      },
+      "notes": [
+        "One live call to Baseten (meta-models/muse-spark-open-1026, reasoning_effort low, max_tokens 1200), recorded OCR words, SAM off; the answer was scored after the call by score_demo_answer (statuses: present / expired / missing per party)."
+      ],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-demo-which-parties-labels-mock",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T12:30:58+00:00",
+      "source": "recorded",
+      "title": "\"which parties have an ID?\" demo, labels images, mock upstream",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "dirty": false,
+      "system": "demo-which-parties:labels:mock",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "languages": [
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+          "settings": {
+            "cached": true,
+            "noise": 0.0
+          },
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "captions": true
+          },
+          "serving": null
+        },
+        {
+          "name": "upstream",
+          "model": null,
+          "model_ref": "mock",
+          "settings": {
+            "render": "labels"
+          },
+          "serving": null
+        }
+      ],
+      "hardware": "local CPU; OCR words from the cache",
+      "cost": {
+        "usd": 0.0,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": null,
+        "shared_with": []
+      },
+      "notes": [],
+      "imported_from": null
+    },
+    {
+      "run_id": "2026-10-27-demo-which-parties-opaque-mock",
+      "kind": "text",
+      "date": "2026-10-27",
+      "recorded_at": "2026-10-27T12:31:00+00:00",
+      "source": "recorded",
+      "title": "\"which parties have an ID?\" demo, opaque images, mock upstream",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "dirty": false,
+      "system": "demo-which-parties:opaque:mock",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "languages": [
+        "hu"
+      ],
+      "detectors": [
+        {
+          "name": "ocr",
+          "model": "tesseract",
+          "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+          "settings": {
+            "cached": true,
+            "noise": 0.0
+          },
+          "serving": null
+        },
+        {
+          "name": "rules",
+          "model": null,
+          "model_ref": null,
+          "settings": {
+            "captions": true
+          },
+          "serving": null
+        },
+        {
+          "name": "upstream",
+          "model": null,
+          "model_ref": "mock",
+          "settings": {
+            "render": "opaque"
+          },
+          "serving": null
+        }
+      ],
+      "hardware": "local CPU; OCR words from the cache",
+      "cost": {
+        "usd": 0.0,
+        "estimated": true,
+        "gpu_minutes": null,
+        "note": null,
+        "shared_with": []
+      },
+      "notes": [],
       "imported_from": null
     }
   ],
@@ -18541,6 +19166,986 @@
             "leak_values": 43
           }
         }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-exact-clean",
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 12,
+        "precision": 1.0,
+        "recall": 0.7059,
+        "f1": 0.8276,
+        "f1_exact": 0.8276,
+        "macro_f1": 0.8276,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 0.625,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-exact-clean",
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 13,
+        "precision": 1.0,
+        "recall": 0.7647,
+        "f1": 0.8667,
+        "f1_exact": 0.8667,
+        "macro_f1": 0.8667,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-exact-clean",
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 11,
+        "precision": 1.0,
+        "recall": 0.6471,
+        "f1": 0.7857,
+        "f1_exact": 0.7857,
+        "macro_f1": 0.7857,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 0.5,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 0.5,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-exact-noisy",
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 10,
+        "precision": 1.0,
+        "recall": 0.5882,
+        "f1": 0.7407,
+        "f1_exact": 0.7407,
+        "macro_f1": 0.7407,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 0.625,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 0.5,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-exact-noisy",
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 11,
+        "precision": 1.0,
+        "recall": 0.6471,
+        "f1": 0.7857,
+        "f1_exact": 0.7857,
+        "macro_f1": 0.7857,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 0.625,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-exact-noisy",
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 6,
+        "precision": 1.0,
+        "recall": 0.3529,
+        "f1": 0.5217,
+        "f1_exact": 0.5217,
+        "macro_f1": 0.5217,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 0.125,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-fuzzy-clean",
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 16,
+        "precision": 1.0,
+        "recall": 0.9412,
+        "f1": 0.9697,
+        "f1_exact": 0.9697,
+        "macro_f1": 0.9697,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-fuzzy-clean",
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 17,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-fuzzy-clean",
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 17,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-fuzzy-noisy",
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "language": "de",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 16,
+        "precision": 1.0,
+        "recall": 0.9412,
+        "f1": 0.9697,
+        "f1_exact": 0.9697,
+        "macro_f1": 0.9697,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 0.75,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-fuzzy-noisy",
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "language": "en",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 17,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-visual-placeholders-fuzzy-noisy",
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "metrics": {
+        "documents": 8,
+        "gold": 17,
+        "pred": 16,
+        "precision": 1.0,
+        "recall": 0.9412,
+        "f1": 0.9697,
+        "f1_exact": 0.9697,
+        "macro_f1": 0.9697,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 17,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 8,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 2,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 1,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 1,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 4,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "run_id": "2026-10-27-demo-which-parties-labels-live",
+      "system": "demo-which-parties:labels:live",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "metrics": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "run_id": "2026-10-27-demo-which-parties-opaque-live",
+      "system": "demo-which-parties:opaque:live",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "metrics": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 0.3333,
+        "recall": 0.3333,
+        "f1": 0.3333,
+        "f1_exact": 0.3333,
+        "macro_f1": 0.3333,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "run_id": "2026-10-27-demo-which-parties-labels-mock",
+      "system": "demo-which-parties:labels:mock",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "metrics": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "run_id": "2026-10-27-demo-which-parties-opaque-mock",
+      "system": "demo-which-parties:opaque:mock",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "language": "hu",
+      "date": "2026-10-27",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "metrics": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 0.3333,
+        "recall": 0.3333,
+        "f1": 0.3333,
+        "f1_exact": 0.3333,
+        "macro_f1": 0.3333,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
       }
     }
   ],
@@ -36437,6 +38042,1270 @@
           }
         }
       }
+    },
+    {
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "run_ids": [
+        "2026-10-27-visual-placeholders-exact-clean"
+      ],
+      "languages": {
+        "de": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 12,
+          "precision": 1.0,
+          "recall": 0.7059,
+          "f1": 0.8276,
+          "f1_exact": 0.8276,
+          "macro_f1": 0.8276,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.625,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 13,
+          "precision": 1.0,
+          "recall": 0.7647,
+          "f1": 0.8667,
+          "f1_exact": 0.8667,
+          "macro_f1": 0.8667,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 11,
+          "precision": 1.0,
+          "recall": 0.6471,
+          "f1": 0.7857,
+          "f1_exact": 0.7857,
+          "macro_f1": 0.7857,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.5,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 0.5,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 24,
+        "gold": 51,
+        "pred": 36,
+        "precision": 1.0,
+        "recall": 0.7059,
+        "f1": 0.8276,
+        "f1_exact": 0.8276,
+        "macro_f1": 0.8276,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 51,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.625,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 24,
+            "recall": 0.625,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 12,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "system": "visual-labels:exact",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "run_ids": [
+        "2026-10-27-visual-placeholders-exact-noisy"
+      ],
+      "languages": {
+        "de": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 10,
+          "precision": 1.0,
+          "recall": 0.5882,
+          "f1": 0.7407,
+          "f1_exact": 0.7407,
+          "macro_f1": 0.7407,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.625,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 0.5,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 11,
+          "precision": 1.0,
+          "recall": 0.6471,
+          "f1": 0.7857,
+          "f1_exact": 0.7857,
+          "macro_f1": 0.7857,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.625,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 6,
+          "precision": 1.0,
+          "recall": 0.3529,
+          "f1": 0.5217,
+          "f1_exact": 0.5217,
+          "macro_f1": 0.5217,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.125,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 24,
+        "gold": 51,
+        "pred": 27,
+        "precision": 1.0,
+        "recall": 0.5294,
+        "f1": 0.6923,
+        "f1_exact": 0.6923,
+        "macro_f1": 0.6923,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 51,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.4583,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 24,
+            "recall": 0.4583,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 3,
+            "recall": 0.3333,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 0.5,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 3,
+            "recall": 0.6667,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 12,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "run_ids": [
+        "2026-10-27-visual-placeholders-fuzzy-clean"
+      ],
+      "languages": {
+        "de": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 16,
+          "precision": 1.0,
+          "recall": 0.9412,
+          "f1": 0.9697,
+          "f1_exact": 0.9697,
+          "macro_f1": 0.9697,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 17,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 17,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 24,
+        "gold": 51,
+        "pred": 50,
+        "precision": 1.0,
+        "recall": 0.9804,
+        "f1": 0.9901,
+        "f1_exact": 0.9901,
+        "macro_f1": 0.9901,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 51,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 24,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 12,
+            "recall": 0.9167,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "system": "visual-labels:fuzzy",
+      "fixture_set": "visual-placeholders-noisy",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "6d2cf04c832582a945c400cbf4305fc330f5fc18",
+      "run_ids": [
+        "2026-10-27-visual-placeholders-fuzzy-noisy"
+      ],
+      "languages": {
+        "de": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 16,
+          "precision": 1.0,
+          "recall": 0.9412,
+          "f1": 0.9697,
+          "f1_exact": 0.9697,
+          "macro_f1": 0.9697,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 17,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 16,
+          "precision": 1.0,
+          "recall": 0.9412,
+          "f1": 0.9697,
+          "f1_exact": 0.9697,
+          "macro_f1": 0.9697,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 24,
+        "gold": 51,
+        "pred": 49,
+        "precision": 1.0,
+        "recall": 0.9608,
+        "f1": 0.98,
+        "f1_exact": 0.98,
+        "macro_f1": 0.98,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 51,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 24,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 0.6667,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 12,
+            "recall": 0.9167,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "system": "demo-which-parties:labels:live",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "run_ids": [
+        "2026-10-27-demo-which-parties-labels-live"
+      ],
+      "languages": {
+        "hu": {
+          "documents": 1,
+          "gold": 3,
+          "pred": 3,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 3,
+          "over_masking": null,
+          "roundtrip": null,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {}
+        }
+      },
+      "all": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "system": "demo-which-parties:opaque:live",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "run_ids": [
+        "2026-10-27-demo-which-parties-opaque-live"
+      ],
+      "languages": {
+        "hu": {
+          "documents": 1,
+          "gold": 3,
+          "pred": 3,
+          "precision": 0.3333,
+          "recall": 0.3333,
+          "f1": 0.3333,
+          "f1_exact": 0.3333,
+          "macro_f1": 0.3333,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 3,
+          "over_masking": null,
+          "roundtrip": null,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {}
+        }
+      },
+      "all": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 0.3333,
+        "recall": 0.3333,
+        "f1": 0.3333,
+        "f1_exact": 0.3333,
+        "macro_f1": 0.3333,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "system": "demo-which-parties:labels:mock",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "run_ids": [
+        "2026-10-27-demo-which-parties-labels-mock"
+      ],
+      "languages": {
+        "hu": {
+          "documents": 1,
+          "gold": 3,
+          "pred": 3,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 3,
+          "over_masking": null,
+          "roundtrip": null,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {}
+        }
+      },
+      "all": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "system": "demo-which-parties:opaque:mock",
+      "fixture_set": "demo-which-parties",
+      "origin": "generated",
+      "date": "2026-10-27",
+      "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+      "run_ids": [
+        "2026-10-27-demo-which-parties-opaque-mock"
+      ],
+      "languages": {
+        "hu": {
+          "documents": 1,
+          "gold": 3,
+          "pred": 3,
+          "precision": 0.3333,
+          "recall": 0.3333,
+          "f1": 0.3333,
+          "f1_exact": 0.3333,
+          "macro_f1": 0.3333,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 3,
+          "over_masking": null,
+          "roundtrip": null,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {}
+        }
+      },
+      "all": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 0.3333,
+        "recall": 0.3333,
+        "f1": 0.3333,
+        "f1_exact": 0.3333,
+        "macro_f1": 0.3333,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
     }
   ],
   "snapshots": [
@@ -38499,6 +41368,230 @@
             "leak_values": null
           }
         }
+      }
+    },
+    {
+      "fixture_set": "demo-which-parties",
+      "system": "demo-which-parties:labels:live",
+      "origin": "generated",
+      "run_ids": [
+        "2026-10-27-demo-which-parties-labels-live"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "8b57e158009ff64fd22b03f34fced9cf932e49c4"
+      ],
+      "languages": {
+        "hu": {
+          "documents": 1,
+          "gold": 3,
+          "pred": 3,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 3,
+          "over_masking": null,
+          "roundtrip": null,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {}
+        }
+      },
+      "all": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "fixture_set": "demo-which-parties",
+      "system": "demo-which-parties:labels:mock",
+      "origin": "generated",
+      "run_ids": [
+        "2026-10-27-demo-which-parties-labels-mock"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "8b57e158009ff64fd22b03f34fced9cf932e49c4"
+      ],
+      "languages": {
+        "hu": {
+          "documents": 1,
+          "gold": 3,
+          "pred": 3,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 3,
+          "over_masking": null,
+          "roundtrip": null,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {}
+        }
+      },
+      "all": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "f1_exact": 1.0,
+        "macro_f1": 1.0,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "fixture_set": "demo-which-parties",
+      "system": "demo-which-parties:opaque:live",
+      "origin": "generated",
+      "run_ids": [
+        "2026-10-27-demo-which-parties-opaque-live"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "8b57e158009ff64fd22b03f34fced9cf932e49c4"
+      ],
+      "languages": {
+        "hu": {
+          "documents": 1,
+          "gold": 3,
+          "pred": 3,
+          "precision": 0.3333,
+          "recall": 0.3333,
+          "f1": 0.3333,
+          "f1_exact": 0.3333,
+          "macro_f1": 0.3333,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 3,
+          "over_masking": null,
+          "roundtrip": null,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {}
+        }
+      },
+      "all": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 0.3333,
+        "recall": 0.3333,
+        "f1": 0.3333,
+        "f1_exact": 0.3333,
+        "macro_f1": 0.3333,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
+      }
+    },
+    {
+      "fixture_set": "demo-which-parties",
+      "system": "demo-which-parties:opaque:mock",
+      "origin": "generated",
+      "run_ids": [
+        "2026-10-27-demo-which-parties-opaque-mock"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "8b57e158009ff64fd22b03f34fced9cf932e49c4"
+      ],
+      "languages": {
+        "hu": {
+          "documents": 1,
+          "gold": 3,
+          "pred": 3,
+          "precision": 0.3333,
+          "recall": 0.3333,
+          "f1": 0.3333,
+          "f1_exact": 0.3333,
+          "macro_f1": 0.3333,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 3,
+          "over_masking": null,
+          "roundtrip": null,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {}
+        }
+      },
+      "all": {
+        "documents": 1,
+        "gold": 3,
+        "pred": 3,
+        "precision": 0.3333,
+        "recall": 0.3333,
+        "f1": 0.3333,
+        "f1_exact": 0.3333,
+        "macro_f1": 0.3333,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 3,
+        "over_masking": null,
+        "roundtrip": null,
+        "consistency": null,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {}
       }
     },
     {
@@ -49184,6 +52277,1078 @@
             "precision": 1.0,
             "leak": 0.0,
             "leak_values": 7
+          }
+        }
+      }
+    },
+    {
+      "fixture_set": "visual-placeholders",
+      "system": "visual-labels:exact",
+      "origin": "generated",
+      "run_ids": [
+        "2026-10-27-visual-placeholders-exact-clean"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "6d2cf04c832582a945c400cbf4305fc330f5fc18"
+      ],
+      "languages": {
+        "de": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 12,
+          "precision": 1.0,
+          "recall": 0.7059,
+          "f1": 0.8276,
+          "f1_exact": 0.8276,
+          "macro_f1": 0.8276,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.625,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 13,
+          "precision": 1.0,
+          "recall": 0.7647,
+          "f1": 0.8667,
+          "f1_exact": 0.8667,
+          "macro_f1": 0.8667,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 11,
+          "precision": 1.0,
+          "recall": 0.6471,
+          "f1": 0.7857,
+          "f1_exact": 0.7857,
+          "macro_f1": 0.7857,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.5,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 0.5,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 24,
+        "gold": 51,
+        "pred": 36,
+        "precision": 1.0,
+        "recall": 0.7059,
+        "f1": 0.8276,
+        "f1_exact": 0.8276,
+        "macro_f1": 0.8276,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 51,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.625,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 24,
+            "recall": 0.625,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 12,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "fixture_set": "visual-placeholders",
+      "system": "visual-labels:fuzzy",
+      "origin": "generated",
+      "run_ids": [
+        "2026-10-27-visual-placeholders-fuzzy-clean"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "6d2cf04c832582a945c400cbf4305fc330f5fc18"
+      ],
+      "languages": {
+        "de": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 16,
+          "precision": 1.0,
+          "recall": 0.9412,
+          "f1": 0.9697,
+          "f1_exact": 0.9697,
+          "macro_f1": 0.9697,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 17,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 17,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 24,
+        "gold": 51,
+        "pred": 50,
+        "precision": 1.0,
+        "recall": 0.9804,
+        "f1": 0.9901,
+        "f1_exact": 0.9901,
+        "macro_f1": 0.9901,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 51,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 24,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 12,
+            "recall": 0.9167,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "fixture_set": "visual-placeholders-noisy",
+      "system": "visual-labels:exact",
+      "origin": "generated",
+      "run_ids": [
+        "2026-10-27-visual-placeholders-exact-noisy"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "6d2cf04c832582a945c400cbf4305fc330f5fc18"
+      ],
+      "languages": {
+        "de": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 10,
+          "precision": 1.0,
+          "recall": 0.5882,
+          "f1": 0.7407,
+          "f1_exact": 0.7407,
+          "macro_f1": 0.7407,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.625,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 0.5,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 11,
+          "precision": 1.0,
+          "recall": 0.6471,
+          "f1": 0.7857,
+          "f1_exact": 0.7857,
+          "macro_f1": 0.7857,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.625,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 6,
+          "precision": 1.0,
+          "recall": 0.3529,
+          "f1": 0.5217,
+          "f1_exact": 0.5217,
+          "macro_f1": 0.5217,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 0.125,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 24,
+        "gold": 51,
+        "pred": 27,
+        "precision": 1.0,
+        "recall": 0.5294,
+        "f1": 0.6923,
+        "f1_exact": 0.6923,
+        "macro_f1": 0.6923,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 51,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 0.4583,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 24,
+            "recall": 0.4583,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 3,
+            "recall": 0.3333,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 0.5,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 3,
+            "recall": 0.6667,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 0.0,
+            "precision": null,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 12,
+            "recall": 0.8333,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          }
+        }
+      }
+    },
+    {
+      "fixture_set": "visual-placeholders-noisy",
+      "system": "visual-labels:fuzzy",
+      "origin": "generated",
+      "run_ids": [
+        "2026-10-27-visual-placeholders-fuzzy-noisy"
+      ],
+      "dates": [
+        "2026-10-27"
+      ],
+      "commits": [
+        "6d2cf04c832582a945c400cbf4305fc330f5fc18"
+      ],
+      "languages": {
+        "de": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 16,
+          "precision": 1.0,
+          "recall": 0.9412,
+          "f1": 0.9697,
+          "f1_exact": 0.9697,
+          "macro_f1": 0.9697,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 0.75,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "en": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 17,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "f1_exact": 1.0,
+          "macro_f1": 1.0,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        },
+        "hu": {
+          "documents": 8,
+          "gold": 17,
+          "pred": 16,
+          "precision": 1.0,
+          "recall": 0.9412,
+          "f1": 0.9697,
+          "f1_exact": 0.9697,
+          "macro_f1": 0.9697,
+          "leak": 0.0,
+          "partial_leak": 0.0,
+          "leak_values": 17,
+          "over_masking": 0.0,
+          "roundtrip": 1.0,
+          "consistency": null,
+          "detect_p50_ms": null,
+          "detect_p95_ms": null,
+          "latency_pooled": false,
+          "per_type": {
+            "PERSON": {
+              "gold": 8,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "ADDRESS": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "EMAIL": {
+              "gold": 2,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "PHONE": {
+              "gold": 1,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 1,
+              "recall": 0.0,
+              "precision": null,
+              "leak": null,
+              "leak_values": null
+            },
+            "ID_DOCUMENT": {
+              "gold": 4,
+              "recall": 1.0,
+              "precision": 1.0,
+              "leak": null,
+              "leak_values": null
+            }
+          }
+        }
+      },
+      "all": {
+        "documents": 24,
+        "gold": 51,
+        "pred": 49,
+        "precision": 1.0,
+        "recall": 0.9608,
+        "f1": 0.98,
+        "f1_exact": 0.98,
+        "macro_f1": 0.98,
+        "leak": 0.0,
+        "partial_leak": 0.0,
+        "leak_values": 51,
+        "over_masking": 0.0,
+        "roundtrip": 1.0,
+        "consistency": 1.0,
+        "detect_p50_ms": null,
+        "detect_p95_ms": null,
+        "latency_pooled": false,
+        "per_type": {
+          "PERSON": {
+            "gold": 24,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ADDRESS": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "EMAIL": {
+            "gold": 6,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "PHONE": {
+            "gold": 3,
+            "recall": 1.0,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 3,
+            "recall": 0.6667,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
+          },
+          "ID_DOCUMENT": {
+            "gold": 12,
+            "recall": 0.9167,
+            "precision": 1.0,
+            "leak": null,
+            "leak_values": null
           }
         }
       }
