@@ -175,7 +175,8 @@ existed were converted by `python -m pii_guard.eval.record_import` and are marke
 
 `uv run pii-guard eval report` reads every record and writes, as a pure function of them:
 
-- `eval/results/index.json` (`schema_version` 1): `runs` (metadata, chronological), `rows`
+- `eval/results/index.json` (`schema_version` 1; written locally, not committed, LAB-1269):
+  `runs` (metadata, chronological), `rows`
   (one per text run and language), `history` (runs of one system on one set at one commit and
   date merged, for progress over time), `snapshots` (latest result per set, system and
   language **on the set's current fixture files**, with an exactly pooled, micro-averaged
@@ -183,7 +184,8 @@ existed were converted by `python -m pii_guard.eval.record_import` and are marke
   chart colours and markers), `fixture_sets`, `languages` and `entity_types`. Rates are 0 to 1,
   latency in milliseconds. Latency percentiles can't be pooled: a pooled value built from
   several runs is their document-weighted mean and says `latency_pooled: true`;
-- `ui/src/api/benchmarks.index.json`: the same, compact, bundled into the UI's Benchmarks tab;
+- the same, compact, on stdout with `--print-index`: the UI build bundles it into the
+  Benchmarks tab (`ui/vite.config.ts`);
 - `docs/benchmarks/*.svg`: leak vs latency, F1 and leak by language, leak over time, recall
   per entity type and visual recall: hand-written SVG, 1600 x 900, each captioned with the
   fixture set, its size, the run dates and the commits;

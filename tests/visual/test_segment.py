@@ -252,12 +252,10 @@ def test_candidates_and_parser() -> None:
 
 
 def test_report_keeps_segmenter_runs_apart() -> None:
-    import json
-
     from pii_guard.eval import report_charts as charts
     from pii_guard.eval import report_cli
 
-    index = json.loads((ROOT / "eval" / "results" / "index.json").read_text(encoding="utf-8"))
+    index = report_cli.current_index(ROOT)  # built, not committed (LAB-1269)
     segment_runs = [r for r in index["visual"] if charts.is_segment_run(r)]
     assert {r["fixture_set"] for r in segment_runs} == {"fictional-specimens", "specimens"}
     main_chart = charts.visual_recall(index)
