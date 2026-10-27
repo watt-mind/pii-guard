@@ -1,0 +1,26 @@
+{
+  "model": "/Users/hdkiller/models/pii-guard-ner/pii-guard-ner-xlmr-base-v2-hn",
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "processor": "arm",
+  "torch": "2.14.1",
+  "fixtures": [
+    "eval/fixtures/hu-synth-sample.jsonl",
+    "eval/fixtures/en-synth-sample.jsonl"
+  ],
+  "results": [
+    {
+      "device": "cpu",
+      "torch_threads": 8,
+      "messages": 122,
+      "mean_chars": 382.5,
+      "p50_ms": 46.6,
+      "p95_ms": 54.9,
+      "mean_ms": 47.1,
+      "load_average": [
+        8.95,
+        10.74,
+        11.76
+      ]
+    }
+  ]
+}

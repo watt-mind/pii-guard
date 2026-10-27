@@ -117,9 +117,8 @@ make smoke-fast       # the same in fast mode with the NER (local)
 **First run of `make demo`.** It installs the `ner` extra (torch, transformers) and, unless
 `PII_GUARD_NER_MODEL` is set, downloads the NER model before the API starts, printing
 `ner: downloading … (Apache-2.0, about 1110 MB, first run only)`. The model is the published
-pii-guard checkpoint once it is pinned (LAB-1306), until then the public fallback of
-[models.md](models.md#which-ner-model-fast-mode-runs), a stop-gap that over-masks (about 23 % on
-en-smoke), pinned to a hub revision and
+pii-guard checkpoint, `hdkiller/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
+[models.md](models.md#which-ner-model-fast-mode-runs)), pinned to a hub revision and
 checked against its SHA-256, stored in `~/.cache/pii-guard/models/ner/`
 (`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK=cached`
 uses it only if it is already there; `off` (what `MODE=rules` sets) never uses it.

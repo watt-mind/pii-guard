@@ -36,7 +36,7 @@ loaded and any inference error raise `DetectionError` (fail closed).
 |---|---|---|
 | Model (hub id or directory) | `PII_GUARD_NER_MODEL` | unset: the published checkpoint, else the public fallback ([below](#which-ner-model-fast-mode-runs)) |
 | Revision | `PII_GUARD_NER_REVISION` | pinned for the published and fallback models |
-| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `hdkiller/pii-guard-ner-xlmr-base`, used once pinned (LAB-1306); `repo` or `repo@revision` |
+| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `hdkiller/pii-guard-ner-xlmr-base`, pinned to release `v2.0` (LAB-1306); `repo` or `repo@revision` |
 | Fallback | `PII_GUARD_NER_FALLBACK` | `download`: fetch it on first use; `cached`: only if already downloaded; `off`: never |
 | Model cache | `PII_GUARD_MODELS_DIR` | `~/.cache/pii-guard/models` |
 | Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
@@ -56,13 +56,19 @@ would run, without downloading).
 
 1. **`PII_GUARD_NER_MODEL`**, a local directory or a hub id (with `PII_GUARD_NER_REVISION`).
    If it is set and can't load, startup stops (fail closed, ADR 0006).
-2. **The published pii-guard checkpoint**, `hdkiller/pii-guard-ner-xlmr-base`
-   (`PII_GUARD_NER_PUBLISHED_MODEL`). The owner decided to publish the trained XLM-R base
-   NER there; LAB-1306 trains it and pins its revision and SHA-256 in
-   `pii_guard.detect.ner_resolve.PUBLISHED`. A checkpoint is never loaded unpinned, so until
-   that lands this step is skipped (or set `repo@revision` yourself).
-3. **The public fallback**, a **stop-gap** so that fast mode is rules + NER from a clean
-   checkout until step 2 is pinned:
+2. **The published pii-guard checkpoint**, the default:
+   [`hdkiller/pii-guard-ner-xlmr-base`](https://huggingface.co/hdkiller/pii-guard-ner-xlmr-base)
+   (`PII_GUARD_NER_PUBLISHED_MODEL`), release `v2.0` at revision
+   `95f612a9ad65cc5ade5b9248bd152020541e7097`, `model.safetensors` SHA-256
+   `4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9`, both pinned in
+   `pii_guard.detect.ner_resolve.PUBLISHED` (LAB-1306). It is NER v2 base + hard negatives
+   (LAB-1150), Apache-2.0, trained in part on Ai4Privacy OpenPII-1M (CC-BY-4.0, "Ai4Privacy /
+   Ai Suisse SA"); see [NER v2.1](#ner-v21-and-the-published-checkpoint) and its
+   [model card](../training/ner/model-card.md). A checkpoint is never loaded unpinned: another
+   repo needs `repo@revision`. It downloads like the fallback below (1.1 GB, first run only,
+   into `~/.cache/pii-guard/models/ner/hdkiller--pii-guard-ner-xlmr-base-95f612a9ad65/`).
+3. **The public fallback**, a **stop-gap** used only when step 2 is turned off or replaced by
+   an unpinned repo:
    [`bardsai/eu-pii-anonimization-multilang`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang)
    at revision `62ca5712368705bac11b8fea19e42e65cce088dd`. It leaks little but **over-masks:
    about 23 % on en-smoke** (below).
@@ -217,8 +223,8 @@ checkpoint above.
   keeps the earlier rules so the comparison with the fine-tuned model is like for like.
 
 **Recommendation:** use the distilled large model where its latency fits and the base model
-otherwise. Neither becomes the built-in default: the weights aren't published yet, so you
-point `PII_GUARD_NER_MODEL` at a checkpoint you trained.
+otherwise. Neither is published; the published default is the later v2 base (LAB-1306), and
+`PII_GUARD_NER_MODEL` points at a checkpoint you trained.
 
 **Latency**, per ~400-character message (`eval/results/ner/distilled/latency-*.json`, M1 Max).
 The machine was under heavy unrelated load (load average 30–50), so read these as relative
@@ -272,9 +278,9 @@ ablation, which never saw those rows, is the held-out figure.
 - Use `xlmr-base-v2-hn` for fast mode. It meets the ~150 ms CPU p95 limit everywhere,
   including 85 ms on a 4-vCPU T4 container.
 - Use large + hard negatives on GPU or MPS hosts.
-- Neither checkpoint is published yet. The owner decided to publish the trained base model as
-  `hdkiller/pii-guard-ner-xlmr-base` (LAB-1306, step 2 of [the resolution order](#which-ner-model-fast-mode-runs));
-  until then point `PII_GUARD_NER_MODEL` at one you trained.
+- The base checkpoint is published as `hdkiller/pii-guard-ner-xlmr-base` release `v2.0`
+  (LAB-1306), step 2 of [the resolution order](#which-ner-model-fast-mode-runs). The large one
+  is not published.
 
 **GLiNER:**
 - GLiNER is not adopted as the default. It leaks and over-masks more zero-shot, over-masks
@@ -289,6 +295,30 @@ ablation, which never saw those rows, is the held-out figure.
 
 **Spend:** about $4.85 of Modal: Glimmer for the corpus and labels, 8 XLM-R trainings, 1
 GLiNER fine-tune and a T4 latency bench.
+
+### NER v2.1 and the published checkpoint
+
+LAB-1306 retrained base + hard negatives for 5 epochs instead of 3, with 1,500 more hard
+negatives per language (`training/ner/negatives_v21.py`): reference numbers without a cue
+word, lone street names, family firms as `ORGANIZATION`. Every epoch was kept and scored. The
+rule, set beforehand, was lowest leak on LAB-1226's unseen `agent-traffic-dev` split, with
+smoke over-masking no worse than v2.
+
+| rules + NER, % | agent-traffic-dev leak / over-masking | smoke leak, max | smoke over-masking, max |
+|---|---:|---:|---:|
+| **v2 (published)** | **1.7** / 11.9 | **0.0** | 3.0 |
+| v2.1, best epoch (5 of 5) | 2.4 / 11.2 | 0.9 | 3.0 |
+
+**v2 stays, and is the one published.** The new negatives removed the "és Fia" `PERSON` and
+lone-street `ADDRESS` false positives (LAB-1220), and cut cee-pii over-masking from 39 to 29 %.
+But they also made the model drop real ids and e-mails that have no cue word. Full tables,
+held-out test sets and latency are in
+[eval/results/2026-10-27-ner-v21/](../eval/results/2026-10-27-ner-v21/README.md).
+
+**Publishing** (`training/ner/publish_hf.py`): `model.safetensors` only, the tokenizer and
+config, `training_meta.json` without local values, the model card as `README.md`, and `NOTICE`.
+It uses the local Hugging Face login, tags the upload commit, and prints the revision and
+SHA-256 that `ner_resolve.PUBLISHED` pins. Modal spend: $2.92 of free credits.
 
 ## LLM detector
 

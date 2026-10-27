@@ -6,8 +6,8 @@ Resolution order (LAB-1192, ``docs/models.md``), first match wins:
    ``PII_GUARD_NER_REVISION``). A configured model that can't load stops startup (ADR 0006).
 2. **Published**: the published pii-guard checkpoint, ``PII_GUARD_NER_PUBLISHED_MODEL``
    (``repo`` or ``repo@revision``, default :data:`PUBLISHED_REPO`). It is used only once it is
-   pinned: a ``@revision`` in the setting, or :data:`PUBLISHED`'s revision, which LAB-1306 fills
-   in with the weights' SHA-256 when it publishes. Until then this step is skipped.
+   pinned: a ``@revision`` in the setting, or :data:`PUBLISHED`'s revision (release ``v2.0``,
+   pinned with the weights' SHA-256 by LAB-1306).
 3. **Public fallback**: :data:`PUBLIC_FALLBACK`, a public multilingual PII token classifier
    (Apache-2.0), pinned to a hub revision. A stop-gap until the published checkpoint exists:
    it leaks little but over-masks (about 23 % on en-smoke). ``PII_GUARD_NER_FALLBACK`` decides
@@ -133,9 +133,12 @@ PUBLISHED_REPO = "hdkiller/pii-guard-ner-xlmr-base"
 #: ``size_mb`` when it publishes; with an empty revision the step is skipped (nothing to pin).
 PUBLISHED = PinnedModel(
     repo_id=PUBLISHED_REPO,
-    revision="",
-    licence="see its model card",
+    # Release tag v2.0 (LAB-1306): the LAB-1150 checkpoint xlmr-base-v2-hn, kept over a v2.1
+    # retrain on agent-traffic-dev leak (eval/results/2026-10-27-ner-v21/README.md).
+    revision="95f612a9ad65cc5ade5b9248bd152020541e7097",
+    licence="Apache-2.0 (trained on Ai4Privacy OpenPII-1M, CC-BY-4.0: Ai4Privacy / Ai Suisse SA)",
     size_mb=1110,
+    weights_sha256="4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9",
 )
 
 

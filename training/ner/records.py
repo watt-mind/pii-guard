@@ -60,8 +60,19 @@ CANDIDATES: dict[str, dict[str, Any]] = {
     },
     "xlmr-base-v2-hn": {
         "label": "pii-guard fast, NER v2 base + hard negatives (LAB-1150)",
-        "ner": ("xlmr-base-v2-hn", "LAB-1150, 10 types, not published"),
+        "ner": (
+            "xlmr-base-v2-hn",
+            "LAB-1150, 10 types; published as hdkiller/pii-guard-ner-xlmr-base v2.0 (LAB-1306)",
+        ),
         "ai4privacy_train": True,
+    },
+    **{
+        f"xlmr-base-v21-hn-e{epoch}": {
+            "label": f"pii-guard fast, NER v2.1 base, epoch {epoch} of 5 (LAB-1306)",
+            "ner": (f"xlmr-base-v21-hn-e{epoch}", "LAB-1306 v2.1 candidate, not published"),
+            "ai4privacy_train": True,
+        }
+        for epoch in range(1, 6)
     },
     "xlmr-large-v2-hn": {
         "label": "pii-guard fast, NER v2 large + hard negatives (LAB-1150)",
@@ -145,7 +156,9 @@ def _detectors(run: Mapping[str, Any], spec: Mapping[str, Any]) -> list[dict[str
     return out
 
 
-def records_for(card: Mapping[str, Any], fixture: str, candidate: str) -> list[dict[str, Any]]:
+def records_for(
+    card: Mapping[str, Any], fixture: str, candidate: str, prefix: str = "ner-v2"
+) -> list[dict[str, Any]]:
     spec = CANDIDATES[candidate]
     run = card["run"]
     paths = [f["path"] for f in card["meta"]["fixtures"]]
@@ -155,7 +168,7 @@ def records_for(card: Mapping[str, Any], fixture: str, candidate: str) -> list[d
         notes.append(f"{run['blocked']} document(s) blocked (fail closed); not scored.")
     records = build_records(
         card,
-        slug=f"ner-v2-{fixture}-{candidate}",
+        slug=f"{prefix}-{fixture}-{candidate}",
         detectors=_detectors(run, spec),
         hardware=_hardware(run, remote_llm=False),
         extra={"system": {"label": spec["label"]}},
@@ -177,6 +190,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("directory", type=Path)
     parser.add_argument("--runs-dir", type=Path, default=Path("eval/results/runs"))
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--prefix", default="ner-v2", help="slug prefix (LAB-1306: ner-v21)")
     args = parser.parse_args(argv)
     records: list[dict[str, Any]] = []
     for path in sorted(args.directory.glob("*--*.json")):
@@ -185,7 +199,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"records: unknown candidate {candidate!r} in {path.name}", file=sys.stderr)
             return 2
         card = json.loads(path.read_text(encoding="utf-8"))
-        records.extend(records_for(card, fixture, candidate))
+        records.extend(records_for(card, fixture, candidate, args.prefix))
     try:
         written = write_records(records, args.runs_dir, overwrite=args.overwrite)
     except RecordError as exc:

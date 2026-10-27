@@ -74,10 +74,15 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | pii-guard rules + NER (distilled base) † | 10 | 100.0% | 97.1% | 98.5% | 3.3% | 3.3% | 0.0% | 100.0% | 35 ms | 2026-10-27 | `c611f99` |
 | pii-guard rules + NER (fine-tuned) † | 10 | 80.0% | 94.1% | 86.5% | 3.3% | 6.7% | 16.2% | 100.0% | 14 ms | 2026-10-26 | `0ba3c1a` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 51 | 88.7% | 90.7% | 89.7% | 1.2% | 1.7% | 6.2% | 100.0% | 16 ms* | 2026-10-27 | `910a6a2` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 18 ms* | 2026-10-27 | `477196a` |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 51 | 90.0% | 96.4% | 93.1% | 0.0% | 2.3% | 7.2% | 100.0% | 81 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 51 | 98.0% | 98.5% | 98.2% | 1.2% | 2.9% | 1.1% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 51 | 89.0% | 92.3% | 90.6% | 1.2% | 2.9% | 5.9% | 100.0% | 14 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 51 | 93.5% | 94.3% | 93.9% | 0.6% | 3.5% | 2.2% | 100.0% | 16 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 51 | 92.4% | 93.8% | 93.1% | 0.6% | 1.2% | 2.7% | 100.0% | 14 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 51 | 96.8% | 92.3% | 94.5% | 1.2% | 2.9% | 0.0% | 100.0% | 11 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 51 | 94.4% | 94.3% | 94.4% | 1.2% | 1.7% | 1.7% | 100.0% | 18 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 51 | 92.3% | 92.3% | 92.3% | 0.6% | 1.7% | 1.6% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
 | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 51 | 97.0% | 99.5% | 98.2% | 0.6% | 1.2% | 1.1% | 100.0% | 1.9 s* | 2026-10-27 | `4f84c6a` |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 51 | 90.5% | 91.8% | 91.1% | 0.0% | 0.6% | 4.8% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 51 | 92.8% | 90.7% | 91.7% | 0.0% | 0.6% | 1.1% | 100.0% | 25 ms* | 2026-10-27 | `910a6a2` |
@@ -115,6 +120,11 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 95.3% | 94.3% | 91.9% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 98.8% | 98.6% | 97.9% | 0.0% | 0.0% | 1.9% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 94.0% | 87.3% | 90.4% | 0.0% | 0.0% | 1.9% |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 96.3% | 95.8% | 92.5% | 0.0% | 0.0% | 0.9% |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 98.7% | 92.8% | 91.3% | 0.0% | 0.0% | 0.9% |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 97.4% | 97.0% | 92.8% | 0.0% | 0.0% | 1.9% |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 98.7% | 97.1% | 92.1% | 0.0% | 0.0% | 1.9% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 97.5% | 95.8% | 89.5% | 0.0% | 0.0% | 0.9% |
 | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 100.0% | 100.0% | 97.2% | 0.0% | 0.0% | 0.9% |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 93.9% | 91.3% | 90.1% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 96.2% | 91.0% | 90.4% | 0.0% | 0.0% | 0.0% |
@@ -148,8 +158,9 @@ generated; documents: de 330 + en 330 + hu 330.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 990 | 99.5% | 50.3% | 66.8% | 45.3% | 10.9% | 0.0% | 100.0% | 0.84 ms | 2026-10-27 | `18b15fa` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 990 | 82.6% | 94.8% | 88.3% | 2.6% | 0.8% | 14.0% | 100.0% | 17 ms | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 990 | 82.6% | 94.8% | 88.3% | 2.6% | 0.8% | 14.0% | 100.0% | 17 ms* | 2026-10-27 | `477196a` |
 | pii-guard audit (rules + NER v2 + LLM) | 30 | 82.0% | 100.0% | 90.1% | 0.0% | 0.0% | 11.2% | 100.0% | 1.9 s | 2026-10-27 | `cd119ae` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 990 | 82.4% | 93.2% | 87.5% | 3.4% | 0.5% | 12.4% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
 | Presidio | 990 | 52.1% | 71.8% | 60.4% | 12.4% | 12.3% | 36.8% | — | 15 ms | 2026-10-27 | `cd119ae` |
 | LLM Guard | 990 | 74.7% | 67.6% | 71.0% | 20.2% | 8.6% | 16.9% | 100.0% | 59 ms | 2026-10-27 | `cd119ae` |
 | PrivAiTe | 990 | 56.0% | 84.3% | 67.3% | 2.4% | 1.9% | 35.2% | 65.1% | 106 ms | 2026-10-27 | `cd119ae` |
@@ -162,9 +173,36 @@ By language:
 | **pii-guard rules** | 68.0% | 65.2% | 67.2% | 43.3% | 46.8% | 45.8% |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 87.4% | 88.9% | 88.7% | 2.4% | 3.8% | 1.7% |
 | pii-guard audit (rules + NER v2 + LLM) | 88.0% | 91.5% | 90.9% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 87.5% | 87.2% | 87.8% | 2.9% | 4.6% | 2.7% |
 | Presidio | 55.8% | 62.4% | 63.7% | 8.1% | 9.3% | 19.7% |
 | LLM Guard | 73.5% | 78.4% | 64.2% | 18.4% | 18.2% | 23.9% |
 | PrivAiTe | 69.9% | 71.0% | 61.2% | 0.5% | 0.5% | 6.1% |
+
+
+### `agent-traffic-dev`
+
+generated; documents: de 100 + en 100 + hu 100.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 300 | 84.8% | 95.5% | 89.9% | 1.7% | 0.6% | 11.9% | 100.0% | 17 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 300 | 76.5% | 92.1% | 83.6% | 2.5% | 0.7% | 16.6% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 300 | 81.7% | 92.0% | 86.6% | 4.8% | 0.3% | 14.2% | 100.0% | 16 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 300 | 84.2% | 94.0% | 88.8% | 3.1% | 0.7% | 12.1% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 300 | 84.9% | 91.8% | 88.2% | 4.3% | 0.4% | 9.1% | 100.0% | 14 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 300 | 82.9% | 94.0% | 88.1% | 2.4% | 0.3% | 11.2% | 100.0% | 18 ms* | 2026-10-27 | `477196a` |
+
+
+By language:
+
+| System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
+|---|---:|---:|---:|---:|---:|---:|
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 87.8% | 90.7% | 91.2% | 1.7% | 2.2% | 1.3% |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 83.9% | 83.9% | 82.9% | 3.8% | 1.8% | 1.9% |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 84.6% | 86.7% | 88.5% | 7.2% | 4.4% | 2.9% |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 87.7% | 88.3% | 90.5% | 4.0% | 2.6% | 2.7% |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 87.4% | 87.8% | 89.4% | 6.6% | 3.4% | 2.9% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 87.1% | 88.8% | 88.4% | 3.2% | 2.0% | 1.9% |
 
 
 ### `ai4privacy`
@@ -178,11 +216,16 @@ mixed; documents: de 200 + en 200 + hu 200.
 | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 600 | 83.1% | 85.5% | 84.3% | 10.4% | 1.5% | 9.6% | 100.0% | 32 ms* | 2026-10-27 | `e126829` |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 600 | 84.9% | 70.3% | 76.9% | 28.7% | 4.4% | 10.3% | 100.0% | 22 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 600 | 98.4% | 99.0% | 98.7% | 0.4% | 0.1% | 0.9% | 100.0% | 16 ms* | 2026-10-27 | `b6e7bac` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 600 | 97.9% | 99.0% | 98.4% | 0.4% | 0.1% | 1.4% | 100.0% | 22 ms | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 600 | 97.9% | 99.0% | 98.4% | 0.4% | 0.1% | 1.4% | 100.0% | 32 ms* | 2026-10-27 | `477196a` |
 | pii-guard audit (rules + NER v2 + LLM) | 30 | 91.4% | 97.1% | 94.2% | 1.0% | 0.0% | 3.0% | 100.0% | 2.2 s | 2026-10-27 | `cd119ae` |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 600 | 86.6% | 98.7% | 92.2% | 0.4% | 0.1% | 5.4% | 100.0% | 136 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 600 | 86.7% | 79.3% | 82.8% | 13.8% | 1.7% | 2.6% | 100.0% | 18 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 600 | 97.5% | 98.5% | 98.0% | 0.5% | 0.2% | 1.0% | 100.0% | 17 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 600 | 96.7% | 97.6% | 97.2% | 0.5% | 0.8% | 1.1% | 100.0% | 14 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 600 | 95.8% | 98.7% | 97.2% | 0.5% | 0.1% | 3.2% | 100.0% | 14 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 600 | 98.7% | 98.5% | 98.6% | 0.8% | 0.2% | 0.5% | 100.0% | 14 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 600 | 98.1% | 98.9% | 98.5% | 0.4% | 0.2% | 1.1% | 100.0% | 13 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 600 | 98.3% | 99.0% | 98.7% | 0.3% | 0.1% | 0.9% | 100.0% | 16 ms* | 2026-10-27 | `477196a` |
 | pii-guard audit (rules + NER + Muse Spark Open, Baseten) ‡ | 600 | 92.5% | 93.9% | 93.2% | 3.9% | 0.1% | 2.4% | 100.0% | 2.1 s* | 2026-10-27 | `4f84c6a` |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 600 | 98.8% | 99.0% | 98.9% | 0.3% | 0.1% | 0.3% | 100.0% | 29 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 600 | 98.5% | 98.6% | 98.6% | 0.4% | 0.1% | 0.2% | 100.0% | 35 ms* | 2026-10-27 | `b6e7bac` |
@@ -211,6 +254,11 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 92.5% | 90.8% | 93.5% | 0.3% | 0.2% | 0.5% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 82.1% | 79.5% | 86.9% | 13.5% | 15.0% | 12.6% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 97.7% | 97.2% | 99.0% | 0.6% | 0.5% | 0.4% |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 98.1% | 95.2% | 98.5% | 0.3% | 0.8% | 0.4% |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 96.7% | 96.2% | 98.8% | 0.6% | 0.4% | 0.5% |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 98.4% | 98.0% | 99.4% | 0.8% | 0.8% | 0.8% |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 98.6% | 97.7% | 99.3% | 0.6% | 0.2% | 0.4% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 98.6% | 98.0% | 99.5% | 0.5% | 0.1% | 0.4% |
 | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 94.5% | 92.1% | 93.3% | 4.8% | 3.5% | 3.7% |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 98.9% | 98.4% | 99.5% | 0.5% | 0.0% | 0.4% |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 98.7% | 97.5% | 99.6% | 0.5% | 0.2% | 0.4% |
@@ -239,6 +287,11 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 0.4% | 99.4% (165/166) | 0.0% (0/166) | 97.7% (726/743) | 0.0% (0/743) | 0.6% (8/1276) |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 13.8% | 98.2% (163/166) | 0.0% (0/166) | 61.2% (455/743) | 20.3% (151/743) | 11.8% (150/1276) |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 0.5% | 100.0% (166/166) | 0.0% (0/166) | 97.3% (723/743) | 0.0% (0/743) | 0.9% (11/1276) |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 0.5% | 100.0% (166/166) | 0.0% (0/166) | 94.1% (699/743) | 0.5% (4/743) | 0.5% (7/1276) |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 0.5% | 100.0% (166/166) | 0.0% (0/166) | 97.7% (726/743) | 0.1% (1/743) | 0.8% (10/1276) |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 0.8% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 1.3% (17/1276) |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.1% (1/743) | 0.6% (8/1276) |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 0.3% | 100.0% (166/166) | 0.0% (0/166) | 97.8% (727/743) | 0.1% (1/743) | 0.5% (6/1276) |
 | pii-guard audit (rules + NER + Muse Spark Open, Baseten) § | 3.9% | 100.0% (166/166) | 0.0% (0/166) | 87.8% (652/743) | 6.5% (48/743) | 2.8% (36/1276) |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 0.3% | 100.0% (166/166) | 0.0% (0/166) | 98.1% (729/743) | 0.0% (0/743) | 0.5% (6/1276) |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 96.9% (720/743) | 0.0% (0/743) | 0.6% (8/1276) |
@@ -256,13 +309,14 @@ These runs kept no per-document predictions, so each system was run again to cla
 
 ### `cee-pii`
 
-hand-written; documents: en 200 + hu 251.
+mixed; documents: en 200 + hu 251.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 451 | 96.3% | 57.3% | 71.9% | 40.9% | 14.1% | 1.0% | 100.0% | 0.28 ms | 2026-10-27 | `18b15fa` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 451 | 59.2% | 97.2% | 73.6% | 0.4% | 0.0% | 39.4% | 100.0% | 20 ms | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 451 | 59.2% | 97.2% | 73.6% | 0.4% | 0.0% | 39.4% | 100.0% | 13 ms* | 2026-10-27 | `477196a` |
 | pii-guard audit (rules + NER v2 + LLM) | 20 | 54.0% | 100.0% | 70.1% | 0.0% | 0.0% | 42.5% | 100.0% | 1.6 s | 2026-10-27 | `cd119ae` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 451 | 67.9% | 98.0% | 80.2% | 0.4% | 0.0% | 29.0% | 100.0% | 17 ms* | 2026-10-27 | `477196a` |
 | Presidio | 451 | 34.0% | 53.0% | 41.4% | 36.5% | 13.5% | 52.5% | — | 42 ms | 2026-10-27 | `cd119ae` |
 | LLM Guard | 451 | 31.3% | 20.4% | 24.7% | 75.8% | 0.6% | 66.4% | 100.0% | 55 ms | 2026-10-27 | `cd119ae` |
 | PrivAiTe | 451 | 24.9% | 55.0% | 34.2% | 4.4% | 1.0% | 59.2% | 96.5% | 82 ms | 2026-10-27 | `cd119ae` |
@@ -275,6 +329,7 @@ By language:
 | **pii-guard rules** | 67.7% | 74.5% | 41.8% | 40.3% |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 68.8% | 76.8% | 0.0% | 0.7% |
 | pii-guard audit (rules + NER v2 + LLM) | 68.4% | 71.8% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 75.1% | 83.8% | 0.5% | 0.3% |
 | Presidio | 36.4% | 50.6% | 11.2% | 52.6% |
 | LLM Guard | 20.6% | 27.4% | 78.1% | 74.4% |
 | PrivAiTe | 51.9% | 22.9% | 3.1% | 5.2% |
@@ -289,6 +344,7 @@ By language:
 | **pii-guard rules** | 40.9% | 100.0% (219/219) | 0.0% (0/219) | 0.0% (0/40) | 80.0% (32/40) | 71.0% (174/245) |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 0.4% | 100.0% (219/219) | 0.0% (0/219) | 70.0% (28/40) | 0.0% (0/40) | 0.8% (2/245) |
 | pii-guard audit (rules + NER v2 + LLM) | 0.0% | 100.0% (9/9) | 0.0% (0/9) | 100.0% (2/2) | 0.0% (0/2) | 0.0% (0/16) |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 0.4% | 100.0% (219/219) | 0.0% (0/219) | 77.5% (31/40) | 2.5% (1/40) | 0.4% (1/245) |
 | Presidio | 36.5% | 11.4% (25/219) | 80.4% (176/219) | 40.0% (16/40) | 0.0% (0/40) | 3.3% (8/245) |
 | LLM Guard | 75.8% | 11.0% (24/219) | 88.6% (194/219) | 0.0% (0/40) | 57.5% (23/40) | 67.3% (165/245) |
 | PrivAiTe | 4.4% | 10.5% (23/219) | 6.4% (14/219) | 50.0% (20/40) | 0.0% (0/40) | 3.3% (8/245) |
@@ -304,10 +360,15 @@ hand-written; documents: hu 44.
 | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 44 | 74.4% | 100.0% | 85.3% | 0.0% | 2.5% | 1.6% | 100.0% | 22 ms | 2026-10-27 | `e126829` |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 44 | 70.5% | 97.9% | 82.0% | 0.0% | 2.5% | 1.6% | 100.0% | 15 ms | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 44 | 78.8% | 95.7% | 86.4% | 0.0% | 2.5% | 5.6% | 100.0% | 28 ms | 2026-10-27 | `910a6a2` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 44 | 74.4% | 96.8% | 84.1% | 0.0% | 2.5% | 5.7% | 100.0% | 28 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 44 | 74.4% | 96.8% | 84.1% | 0.0% | 2.5% | 5.7% | 100.0% | 19 ms | 2026-10-27 | `477196a` |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 44 | 64.4% | 98.9% | 78.0% | 0.0% | 2.5% | 12.0% | 100.0% | 57 ms | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 13 ms | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 44 | 71.5% | 100.0% | 83.4% | 0.0% | 2.5% | 7.3% | 100.0% | 16 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 44 | 70.5% | 100.0% | 82.7% | 0.0% | 2.5% | 1.6% | 100.0% | 13 ms | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 12 ms | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 44 | 72.8% | 94.6% | 82.3% | 0.0% | 2.5% | 0.0% | 100.0% | 12 ms | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 44 | 72.9% | 100.0% | 84.3% | 0.0% | 2.5% | 0.0% | 100.0% | 14 ms | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 44 | 72.1% | 100.0% | 83.8% | 0.0% | 2.5% | 0.0% | 100.0% | 17 ms | 2026-10-27 | `477196a` |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 44 | 83.2% | 78.5% | 80.8% | 0.0% | 2.5% | 4.5% | 97.7% | 21 ms | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 44 | 77.0% | 72.0% | 74.4% | 0.0% | 2.5% | 4.5% | 97.7% | 21 ms | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 3.1% | 100.0% | 21 ms | 2026-10-27 | `910a6a2` |
@@ -329,6 +390,11 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 78.0% | 0.0% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 84.2% | 0.0% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 83.4% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 82.7% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 84.2% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 82.3% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 84.3% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 83.8% | 0.0% |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 80.8% | 0.0% |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 74.4% | 0.0% |
 | pii-guard fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150) | 84.2% | 0.0% |
@@ -411,13 +477,14 @@ On an earlier version of a fixture file (current: en `b13f9983ca99`, hu `f6dca4b
 
 ### `gretel-finance`
 
-hand-written; documents: de 200 + en 200.
+mixed; documents: de 200 + en 200.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 400 | 75.2% | 12.2% | 21.0% | 80.7% | 5.6% | 23.8% | 100.0% | 2.2 ms | 2026-10-27 | `18b15fa` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 400 | 73.1% | 69.0% | 71.0% | 19.1% | 2.6% | 23.9% | 99.2% | 65 ms | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 400 | 73.1% | 69.0% | 71.0% | 19.1% | 2.6% | 23.9% | 99.2% | 35 ms* | 2026-10-27 | `477196a` |
 | pii-guard audit (rules + NER v2 + LLM) | 20 | 62.2% | 75.0% | 68.0% | 26.7% | 0.0% | 36.6% | 100.0% | 2.2 s | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 400 | 73.7% | 69.1% | 71.3% | 19.9% | 3.5% | 24.4% | 99.0% | 29 ms* | 2026-10-27 | `477196a` |
 | Presidio | 400 | 19.1% | 64.3% | 29.4% | 18.8% | 16.8% | 75.4% | — | 25 ms | 2026-10-27 | `18b15fa` |
 | LLM Guard | 400 | 76.0% | 27.7% | 40.6% | 59.3% | 8.3% | 17.0% | 100.0% | 130 ms | 2026-10-27 | `18b15fa` |
 | PrivAiTe | 400 | 46.6% | 48.9% | 47.8% | 27.7% | 5.8% | 46.5% | 94.8% | 180 ms | 2026-10-27 | `18b15fa` |
@@ -430,6 +497,7 @@ By language:
 | **pii-guard rules** | 20.0% | 22.3% | 82.7% | 78.0% |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 63.6% | 79.0% | 29.1% | 5.1% |
 | pii-guard audit (rules + NER v2 + LLM) | 75.7% | 56.3% | 35.7% | 11.8% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 66.6% | 76.4% | 30.4% | 5.3% |
 | Presidio | 22.9% | 41.3% | 20.2% | 16.7% |
 | LLM Guard | 40.3% | 41.2% | 61.2% | 56.7% |
 | PrivAiTe | 45.1% | 51.1% | 36.1% | 16.0% |
@@ -444,6 +512,7 @@ By language:
 | **pii-guard rules** | 80.7% | 98.0% (50/51) | 2.3% (1/44) | 57.6% (38/66) | 37.7% (23/61) | 88.0% (738/839) |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 19.1% | 96.1% (49/51) | 2.3% (1/44) | 90.9% (60/66) | 4.9% (3/61) | 21.0% (176/839) |
 | pii-guard audit (rules + NER v2 + LLM) | 26.7% | 0.0% (0/1) | 0.0% (0/1) | 100.0% (3/3) | 0.0% (0/3) | 29.3% (12/41) |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 19.9% | 98.0% (50/51) | 2.3% (1/44) | 89.4% (59/66) | 8.2% (5/61) | 21.7% (182/839) |
 | Presidio | 18.8% | 66.7% (34/51) | 13.6% (6/44) | 43.9% (29/66) | 26.2% (16/61) | 18.5% (155/839) |
 | LLM Guard | 59.3% | 90.2% (46/51) | 6.8% (3/44) | 34.8% (23/66) | 41.0% (25/61) | 63.4% (532/839) |
 | PrivAiTe | 27.7% | 82.4% (42/51) | 6.8% (3/44) | 54.5% (36/66) | 9.8% (6/61) | 30.0% (252/839) |
@@ -470,13 +539,14 @@ By language:
 
 ### `nemotron-pii`
 
-hand-written; documents: en 300.
+mixed; documents: en 300.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 300 | 98.9% | 36.8% | 53.6% | 56.0% | 8.6% | 0.8% | 100.0% | 1.2 ms | 2026-10-27 | `18b15fa` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 300 | 90.8% | 87.9% | 89.3% | 0.7% | 0.6% | 1.6% | 100.0% | 36 ms | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 300 | 90.8% | 87.9% | 89.3% | 0.7% | 0.6% | 1.6% | 100.0% | 27 ms | 2026-10-27 | `477196a` |
 | pii-guard audit (rules + NER v2 + LLM) | 10 | 97.6% | 100.0% | 98.8% | 0.0% | 0.0% | 0.0% | 100.0% | 2.0 s | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 300 | 91.8% | 86.8% | 89.2% | 0.7% | 0.4% | 2.4% | 99.7% | 19 ms | 2026-10-27 | `477196a` |
 | Presidio | 300 | 58.7% | 76.3% | 66.4% | 12.8% | 5.3% | 32.0% | — | 16 ms | 2026-10-27 | `18b15fa` |
 | LLM Guard | 300 | 93.8% | 59.7% | 72.9% | 28.8% | 4.6% | 0.6% | 100.0% | 62 ms | 2026-10-27 | `18b15fa` |
 | PrivAiTe | 300 | 86.3% | 76.0% | 80.8% | 4.0% | 1.9% | 5.6% | 87.0% | 99 ms | 2026-10-27 | `18b15fa` |
@@ -489,6 +559,7 @@ By language:
 | **pii-guard rules** | 53.6% | 56.0% |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 89.3% | 0.7% |
 | pii-guard audit (rules + NER v2 + LLM) | 98.8% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 89.2% | 0.7% |
 | Presidio | 66.4% | 12.8% |
 | LLM Guard | 72.9% | 28.8% |
 | PrivAiTe | 80.8% | 4.0% |
@@ -503,6 +574,7 @@ By language:
 | **pii-guard rules** | 56.0% | 100.0% (139/139) | 0.0% (0/115) | 40.0% (38/95) | 59.8% (52/87) | 68.3% (338/495) |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 0.7% | 100.0% (139/139) | 0.0% (0/115) | 60.0% (57/95) | 3.4% (3/87) | 0.4% (2/495) |
 | pii-guard audit (rules + NER v2 + LLM) | 0.0% | 100.0% (5/5) | 0.0% (0/5) | 100.0% (7/7) | 0.0% (0/6) | 0.0% (0/14) |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 0.7% | 100.0% (139/139) | 0.0% (0/115) | 60.0% (57/95) | 1.1% (1/87) | 0.8% (4/495) |
 | Presidio | 12.8% | 91.4% (127/139) | 2.6% (3/115) | 14.7% (14/95) | 35.6% (31/87) | 11.1% (55/495) |
 | LLM Guard | 28.8% | 96.4% (134/139) | 2.6% (3/115) | 30.5% (29/95) | 51.7% (45/87) | 30.9% (153/495) |
 | PrivAiTe | 4.0% | 77.7% (108/139) | 0.9% (1/115) | 65.3% (62/95) | 4.6% (4/87) | 4.6% (23/495) |
@@ -556,10 +628,15 @@ generated by muse-spark-1.3-contributor; documents: en 10 + hu 20.
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 30 | 96.9% | 93.9% | 95.3% | 9.1% | 0.0% | 3.2% | 100.0% | 28 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + NER (fine-tuned) | 30 | 99.2% | 96.2% | 97.7% | 5.9% | 1.2% | 0.6% | 100.0% | 28 ms* | 2026-10-26 | `0ba3c1a` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 30 | 96.2% | 96.2% | 96.2% | 0.0% | 1.2% | 0.0% | 100.0% | 30 ms* | 2026-10-27 | `910a6a2` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 30 | 96.4% | 96.4% | 96.4% | 0.0% | 1.2% | 0.0% | 100.0% | 28 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 30 | 96.4% | 96.4% | 96.4% | 0.0% | 1.2% | 0.0% | 100.0% | 48 ms* | 2026-10-27 | `477196a` |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 30 | 74.5% | 96.4% | 84.1% | 0.0% | 1.2% | 23.3% | 63.3% | 298 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 30 | 97.2% | 97.2% | 97.2% | 0.0% | 1.2% | 0.0% | 100.0% | 26 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 30 | 96.4% | 96.4% | 96.4% | 0.0% | 1.2% | 0.0% | 100.0% | 26 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 30 | 95.7% | 95.9% | 95.8% | 0.0% | 1.2% | 0.3% | 100.0% | 24 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 30 | 95.7% | 96.2% | 95.9% | 0.0% | 1.2% | 0.5% | 100.0% | 23 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 30 | 96.7% | 96.7% | 96.7% | 0.0% | 1.2% | 0.0% | 100.0% | 23 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 30 | 96.9% | 96.9% | 96.9% | 0.0% | 1.2% | 0.0% | 100.0% | 33 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 30 | 96.4% | 96.4% | 96.4% | 0.0% | 1.2% | 0.0% | 100.0% | 29 ms* | 2026-10-27 | `477196a` |
 | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 2.0 s* | 2026-10-27 | `4f84c6a` |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 30 | 95.9% | 95.9% | 95.9% | 0.0% | 1.2% | 0.0% | 100.0% | 60 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 30 | 96.9% | 96.9% | 96.9% | 0.0% | 1.2% | 0.0% | 100.0% | 63 ms* | 2026-10-27 | `910a6a2` |
@@ -590,6 +667,11 @@ By language:
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 82.2% | 85.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 100.0% | 95.9% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 100.0% | 94.8% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 100.0% | 93.9% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 100.0% | 94.1% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 100.0% | 95.2% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | 100.0% | 95.6% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 100.0% | 94.8% | 0.0% | 0.0% |
 | pii-guard audit (rules + NER + Muse Spark Open, Baseten) | 98.8% | 99.8% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 large (xlm-roberta-large, LAB-1150) | 100.0% | 94.1% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 large + hard negatives (LAB-1150) | 100.0% | 95.6% | 0.0% | 0.0% |
@@ -870,6 +952,94 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-ner-v21-de-gretel-finance-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | gretel-finance | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-gretel-finance-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | gretel-finance | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-nemotron-pii-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | nemotron-pii | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-cee-pii-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | cee-pii | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-cee-pii-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | cee-pii | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-agent-traffic-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | agent-traffic | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 7.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-agent-traffic-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | agent-traffic | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-agent-traffic-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | agent-traffic | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-gretel-finance-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | gretel-finance | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-gretel-finance-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | gretel-finance | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-nemotron-pii-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | nemotron-pii | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-cee-pii-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | cee-pii | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-cee-pii-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | cee-pii | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-agent-traffic-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-agent-traffic-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-agent-traffic-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 9.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-agent-traffic-dev-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | agent-traffic-dev | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-agent-traffic-dev-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | agent-traffic-dev | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-agent-traffic-dev-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | agent-traffic-dev | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-ai4privacy-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | ai4privacy | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-ai4privacy-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | ai4privacy | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-ai4privacy-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | ai4privacy | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-company-names-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | company-names | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-synth-sample-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | synth-sample | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-synth-sample-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | synth-sample | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-smoke-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | smoke | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-smoke-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | smoke | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-smoke-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | smoke | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-agent-traffic-dev-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | agent-traffic-dev | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-agent-traffic-dev-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | agent-traffic-dev | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-agent-traffic-dev-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | agent-traffic-dev | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-ai4privacy-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | ai4privacy | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-ai4privacy-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | ai4privacy | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-ai4privacy-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | ai4privacy | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-company-names-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | company-names | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-synth-sample-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | synth-sample | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-synth-sample-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | synth-sample | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-smoke-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | smoke | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-smoke-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | smoke | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-smoke-xlmr-base-v21-hn-e4` | pii-guard fast, NER v2.1 base, epoch 4 of 5 (LAB-1306) | smoke | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.2 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-agent-traffic-dev-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | agent-traffic-dev | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 10.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-agent-traffic-dev-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | agent-traffic-dev | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-agent-traffic-dev-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | agent-traffic-dev | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-ai4privacy-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | ai4privacy | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-ai4privacy-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | ai4privacy | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-ai4privacy-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | ai4privacy | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-company-names-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | company-names | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-synth-sample-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | synth-sample | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-synth-sample-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | synth-sample | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-smoke-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | smoke | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-smoke-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | smoke | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-smoke-xlmr-base-v21-hn-e3` | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | smoke | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 11.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-agent-traffic-dev-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | agent-traffic-dev | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-agent-traffic-dev-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | agent-traffic-dev | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 12.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-agent-traffic-dev-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | agent-traffic-dev | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-ai4privacy-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | ai4privacy | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 13.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-ai4privacy-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | ai4privacy | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-ai4privacy-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | ai4privacy | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-company-names-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | company-names | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-synth-sample-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | synth-sample | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-synth-sample-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | synth-sample | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-smoke-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | smoke | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-smoke-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | smoke | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-smoke-xlmr-base-v21-hn-e2` | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | smoke | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 14.9 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-agent-traffic-dev-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | agent-traffic-dev | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 16.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-agent-traffic-dev-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | agent-traffic-dev | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 16.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-agent-traffic-dev-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | agent-traffic-dev | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 17.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-ai4privacy-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | ai4privacy | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-ai4privacy-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | ai4privacy | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.3 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-ai4privacy-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | ai4privacy | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 19.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-company-names-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | company-names | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 20.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-synth-sample-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | synth-sample | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 20.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-synth-sample-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | synth-sample | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 20.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-smoke-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | smoke | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 20.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-smoke-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | smoke | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 22.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-smoke-xlmr-base-v21-hn-e1` | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | smoke | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 22.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-agent-traffic-dev-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic-dev | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 26.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-agent-traffic-dev-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic-dev | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 26.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-agent-traffic-dev-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic-dev | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 28.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-ai4privacy-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 28.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-ai4privacy-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 30.4 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-ai4privacy-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 21.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-company-names-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | company-names | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 22.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-synth-sample-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | synth-sample | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 22.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-synth-sample-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | synth-sample | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 23.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-de-smoke-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | smoke | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 23.7 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-en-smoke-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | smoke | en | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 25.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v21-hu-smoke-xlmr-base-v2-hn` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | smoke | hu | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 25.0 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-datasets-nemotron-pii-audit-n10` | pii-guard audit (rules + NER v2 + LLM) | nemotron-pii | en | recorded | `18b15fa` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-datasets-gretel-finance-audit-n10` | pii-guard audit (rules + NER v2 + LLM) | gretel-finance | de, en | recorded | `18b15fa` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-datasets-nemotron-pii-privaite` | PrivAiTe | nemotron-pii | en | recorded | `18b15fa` (dirty) | arm64, 10 CPUs, CPU only | — |
