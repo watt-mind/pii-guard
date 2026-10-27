@@ -1,8 +1,8 @@
 # Models and partners
 
-> Status: partly verified (2026-10-26). The Meta Model API facts below were checked with live
-> calls on fictional text; the Baseten Muse Spark Open endpoint is configured but not yet
-> called (no key yet). Credit amounts: see [roadmap.md](roadmap.md).
+> Status: partly verified. The Meta Model API facts below were checked with live calls on
+> fictional text (2026-10-26); Muse Spark Open on Baseten Model APIs was called, recorded and
+> evaluated on fictional text (2026-10-27). Credit amounts: see [roadmap.md](roadmap.md).
 
 ## Which model does what
 
@@ -161,11 +161,15 @@ disagreements.
 | Base URL | `PII_GUARD_LLM_DETECTOR_URL` | `https://inference.baseten.co/v1` |
 | API key | `PII_GUARD_LLM_DETECTOR_API_KEY` | unset |
 | Model | `PII_GUARD_LLM_DETECTOR_MODEL` | `meta-models/muse-spark-open-1026` |
+| Reasoning effort (`reasoning_effort`) | `PII_GUARD_LLM_DETECTOR_REASONING_EFFORT` | unset (not sent); use `low` on Baseten |
 | Glimmer reasoning strength (`chat_template_kwargs.reasoning_strength`) | `PII_GUARD_LLM_DETECTOR_REASONING_STRENGTH` | unset (not sent) |
 
 Constructor keywords (`base_url`, `api_key`, `model`, `timeout`, `max_retries`,
 `reasoning_effort`, `json_mode`, `chunk_size`, `chunk_overlap`, `score`, `transport`) override
-them. Prompts live in `src/pii_guard/detect/prompts/`.
+them. Model and reasoning effort are read from the process environment only (not from
+`.env`). `LlmDetector.usage` counts requests, reported tokens (prompt, cached, completion,
+reasoning), invalid outputs and refusals per instance, for cost and refusal reporting; it never
+holds text. Prompts live in `src/pii_guard/detect/prompts/`.
 
 **Languages.** `detect(text, language)` picks a language profile (`LANGUAGES` in
 `detect/llm.py`): Hungarian (`hu`) and English (`en`) today. A profile sets the language notes
@@ -185,6 +189,47 @@ which is what lets it see real data. **Muse Glimmer** (30B, open weights, Apache
 the smaller candidate. It is too slow for the request path (about 9 s per document at low
 reasoning), so it serves as the teacher for the distilled NER model (see "Distilled from Muse
 Glimmer" above).
+
+### Baseten Model APIs (production detector)
+
+Muse Spark Open runs on Baseten's shared **Model APIs** (no dedicated deployment, so no GPU
+type or scale-to-zero to choose). Verified on 2026-10-27 with live calls on fictional text:
+
+```bash
+export PII_GUARD_LLM_DETECTOR_API_KEY=$BASETEN_API_KEY     # URL and model are the defaults
+export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low          # required, see below
+```
+
+- Base URL `https://inference.baseten.co/v1`, Bearer key, OpenAI-compatible
+  `POST /chat/completions`. The model id must be exactly `meta-models/muse-spark-open-1026`
+  (Baseten's docs show `muse-spark-open`, which hackathon keys reject).
+- **Set `reasoning_effort: "low"`.** At the default effort the model spent all of a 2,048-token
+  `max_tokens` budget on reasoning and returned empty `content` (the detector then fails
+  closed: `finish_reason=length`). `low` is honoured. `chat_template_kwargs.reasoning_strength`
+  (the Glimmer knob) has no effect here. With the detector's prompt, `low` still reasons about
+  400–500 tokens per short document.
+- The message carries `content` (the JSON answer) and a separate `reasoning_content`; the
+  detector parses `content` only. `response_format: {"type": "json_object"}` and
+  `temperature: 0` are accepted; usage reports `prompt_tokens_details.cached_tokens` (the
+  system prompt is cached across requests) and `completion_tokens_details.reasoning_tokens`.
+- Refusals: a bare extraction prompt with no system framing was refused once in probing. With
+  the detector's system prompt, 0 of 213 requests over three eval runs were refused or invalid.
+- Price (Baseten pricing page, 2026-10-27): $1.25 per million input tokens, $0.15 cached input,
+  $4.25 output (reasoning tokens are output tokens). Measured cost and latency:
+  [eval/results/2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md).
+- Recorded responses: `tests/detect/fixtures/muse_spark_open_baseten_recorded.json` (response
+  bodies only). Live check: `BASETEN_API_KEY=... uv run pytest -m live tests/detect/test_llm.py`.
+
+**Data handling on Baseten (as of 2026-10-27).** Baseten's security documentation states that
+Baseten "does not store model inputs, outputs, or weights by default" and that this zero data
+retention policy applies to synchronous inference
+([docs.baseten.co/observability/security](https://docs.baseten.co/observability/security)).
+The page does not say whether that covers the shared Model APIs as well as dedicated
+deployments, and does not say anything about training on customer traffic. **Until that is
+confirmed in writing with Baseten (for example in a DPA), treat the Baseten Model API like any
+hosted API: fictional or masked data only.** For real data, run the same open weights on an
+endpoint you control (a dedicated deployment whose terms you have checked, or your own GPUs).
+Everything in this repository sent to Baseten so far is fictional.
 
 ### Serving Muse Glimmer on Modal
 
@@ -237,8 +282,8 @@ analysed only by open-weights models on endpoints you control (Muse Spark Open o
 hardware, or a dedicated partner deployment whose terms exclude training on your data). The
 recorded test fixtures in `tests/detect/fixtures/` are responses to fictional text.
 
-Tests mock HTTP with recorded responses; `uv run pytest -m live` (with `META_API_KEY` set) runs
-the one live check against the Meta Model API.
+Tests mock HTTP with recorded responses; `uv run pytest -m live` runs the live checks against
+the Meta Model API (with `META_API_KEY` set) and Baseten (with `BASETEN_API_KEY` set).
 
 ## Hackathon partners
 
