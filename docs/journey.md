@@ -68,7 +68,7 @@ and embed them here (keep the table as the accessible fallback). -->
 
 ### Spend so far
 
-About **$10** of compute for everything measured here.
+About **$12** of compute for everything measured here.
 
 | What | Where | Cost | Source |
 |---|---|---:|---|
@@ -77,6 +77,7 @@ About **$10** of compute for everything measured here.
 | Glimmer zero-shot evaluation (about 1 GPU hour) | Modal (H100) | ~$4 (estimate) | *(ticket comment, LAB-1109)* |
 | Visual eval on specimen IDs (505 live SAM calls) | Meta Model API, SAM 3.1 | ~$1.26 | *(ticket comment, LAB-1120)* |
 | Production detector: four eval runs + tests | Baseten Model APIs | ~$0.84 of the $100 credit | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md#spend) |
+| Re-identification red team (four runs + pilots) | Baseten Model APIs; Meta Model API | ~$1.9 Baseten; 343k Meta API tokens (price not published to us) | [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md#spend) |
 
 Early development calls to the Meta Model API (the first corpus samples, live tests) were not
 metered separately and are not included.
@@ -340,6 +341,33 @@ requests. Source: [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README
   confirmed in writing, so only fictional or masked data goes there until they are (LAB-1139,
   [models.md](models.md#baseten-model-apis-production-detector)). For real data, run the same
   open weights on hardware you control.
+
+### 16. Re-identification red team with Muse (2026-10-27)
+
+PR [#PR](https://github.com/watt-mind/pii-guard/pulls), LAB-1088.
+
+Meta's own model against the guard: Muse Spark Open (Baseten) gets the masked text and tries
+to recover every masked value, with and without a candidate list (the true value and 4 decoys).
+81 fictional documents in Hungarian, English and German, 426 values.
+
+| Masking | Context | Re-id | Chance | Exposure (leak score) |
+|---|---|---:|---:|---:|
+| rules | masked text only | 1.6 % | – | 43.7 % |
+| rules | with 5 candidates | 42.2 % | 20.0 % | 66.9 % |
+| rules + Muse Spark Open | masked text only | **0.2 %** | – | **1.4 %** |
+| rules + Muse Spark Open | with 5 candidates | 39.2 % | 20.0 % | 39.9 % |
+
+Muse Spark 1.3 on the Meta API as the attacker (51 smoke documents) did the same: 0.0 % from
+the masked text alone, 41.8 % with candidates (chance 20.3 %). Cost: about $1.9 of Baseten
+credit; the Muse Spark 1.3 run used 343,208 Meta API tokens. NER was not measured (no
+published checkpoint). Source:
+[2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md).
+
+- **Decision:** publish exposure next to the leak rate, and describe masking as
+  pseudonymisation: placeholders hold against reconstruction, but someone holding a short
+  candidate list links a masked document to the right person about twice as often as chance.
+  Reducing that would take generalising the context (roles, dates, places) rather than better
+  detection; filed as a follow-up (LAB-1152).
 
 ## How pii-guard uses Meta's models
 
