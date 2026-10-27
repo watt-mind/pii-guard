@@ -51,7 +51,7 @@ __all__ = [
     "run_check",
 ]
 
-MUSE_VERSION_CHECKED = "1.4.13-R6996.1"
+MUSE_VERSION_CHECKED = "1.4.14-R7309.1"
 SCHEMA_VERSION = 1
 MODE_NOTE = (
     "Muse Code can't send X-PII-Guard-Mode: start the gateway with PII_GUARD_GATEWAY_MODE=fast "
