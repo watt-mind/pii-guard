@@ -1,0 +1,97 @@
+{
+  "base_model": "FacebookAI/xlm-roberta-base",
+  "base_revision": null,
+  "teacher": null,
+  "labels": [
+    "O",
+    "B-PERSON",
+    "I-PERSON",
+    "B-ADDRESS",
+    "I-ADDRESS",
+    "B-ORGANIZATION",
+    "I-ORGANIZATION",
+    "B-DATE_OF_BIRTH",
+    "I-DATE_OF_BIRTH"
+  ],
+  "settings": {
+    "epochs": 4,
+    "batch_size": 16,
+    "lr": 5e-05,
+    "weight_decay": 0.01,
+    "warmup": 0.1,
+    "max_length": 512,
+    "stride": 128,
+    "seed": 13,
+    "teacher_threshold": 0.6,
+    "precision": "bf16"
+  },
+  "device": "cuda",
+  "train": {
+    "eval/generated/distill-s11/labelled/hu-distill-train.jsonl": "3784482de825b207",
+    "eval/generated/distill-s11/labelled/en-distill-train.jsonl": "cc9af7113b5cd89b"
+  },
+  "dev": {
+    "eval/generated/distill-s11/labelled/hu-distill-dev.jsonl": "f6dca4b60ca8dfa5",
+    "eval/generated/distill-s11/labelled/en-distill-dev.jsonl": "b13f9983ca99ade6"
+  },
+  "train_docs": 4223,
+  "train_windows": 4808,
+  "best": {
+    "pred": 4178,
+    "gold": 4188,
+    "f1_exact": 0.9818,
+    "p_overlap": 0.9993,
+    "r_overlap": 0.9964,
+    "f1_overlap": 0.9978,
+    "epoch": 3,
+    "loss": 0.0012,
+    "minutes": 3.8
+  },
+  "history": [
+    {
+      "pred": 4186,
+      "gold": 4188,
+      "f1_exact": 0.9795,
+      "p_overlap": 0.9976,
+      "r_overlap": 0.9964,
+      "f1_overlap": 0.997,
+      "epoch": 1,
+      "loss": 0.1674,
+      "minutes": 1.4
+    },
+    {
+      "pred": 4188,
+      "gold": 4188,
+      "f1_exact": 0.9783,
+      "p_overlap": 0.9971,
+      "r_overlap": 0.9967,
+      "f1_overlap": 0.9969,
+      "epoch": 2,
+      "loss": 0.0016,
+      "minutes": 2.6
+    },
+    {
+      "pred": 4178,
+      "gold": 4188,
+      "f1_exact": 0.9818,
+      "p_overlap": 0.9993,
+      "r_overlap": 0.9964,
+      "f1_overlap": 0.9978,
+      "epoch": 3,
+      "loss": 0.0012,
+      "minutes": 3.8
+    },
+    {
+      "pred": 4192,
+      "gold": 4188,
+      "f1_exact": 0.9814,
+      "p_overlap": 0.9976,
+      "r_overlap": 0.9976,
+      "f1_overlap": 0.9976,
+      "epoch": 4,
+      "loss": 0.0008,
+      "minutes": 5.0
+    }
+  ],
+  "minutes": 5.0
+}

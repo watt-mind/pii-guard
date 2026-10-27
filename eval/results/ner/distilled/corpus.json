@@ -1,0 +1,224 @@
+{
+  "corpus": "training/distill/corpus.py --seed 11 --n 2500 (per language), fictional data only",
+  "writer_model": "muse-spark-1.3-contributor (reasoning_effort minimal, temperature 0.9)",
+  "teacher": {
+    "teacher": {
+      "model": "muse-glimmer",
+      "reasoning_strength": "low"
+    },
+    "counts": {
+      "adopted_organization": 145,
+      "adopted_person": 319,
+      "agree": 29230,
+      "disagree": 499,
+      "documents": 4964,
+      "gold_found_by_teacher": 26406,
+      "gold_missed_by_teacher": 393,
+      "new_address_ignored": 32,
+      "teacher_overlap_ignored": 1
+    }
+  },
+  "corpus_stats": {
+    "hu": {
+      "requested": 2500,
+      "accepted": 2472,
+      "discarded": 28,
+      "discard_reasons": {
+        "missing_value": 17,
+        "unsupplied_value": 11
+      },
+      "by_kind": {
+        "chat": {
+          "accepted": 158,
+          "discarded": 1
+        },
+        "court-notice": {
+          "accepted": 75,
+          "discarded": 0
+        },
+        "csv": {
+          "accepted": 58,
+          "discarded": 0
+        },
+        "email": {
+          "accepted": 162,
+          "discarded": 12
+        },
+        "form": {
+          "accepted": 154,
+          "discarded": 0
+        },
+        "invoice": {
+          "accepted": 80,
+          "discarded": 0
+        },
+        "land-registry": {
+          "accepted": 74,
+          "discarded": 0
+        },
+        "lease": {
+          "accepted": 185,
+          "discarded": 0
+        },
+        "letter": {
+          "accepted": 69,
+          "discarded": 0
+        },
+        "log": {
+          "accepted": 189,
+          "discarded": 0
+        },
+        "meeting-notes": {
+          "accepted": 81,
+          "discarded": 0
+        },
+        "mixed-confusables": {
+          "accepted": 147,
+          "discarded": 0
+        },
+        "negative-ops": {
+          "accepted": 147,
+          "discarded": 11
+        },
+        "negative-prose": {
+          "accepted": 164,
+          "discarded": 0
+        },
+        "power-of-attorney": {
+          "accepted": 81,
+          "discarded": 0
+        },
+        "sale-contract": {
+          "accepted": 154,
+          "discarded": 0
+        },
+        "sms": {
+          "accepted": 171,
+          "discarded": 4
+        },
+        "support-chat": {
+          "accepted": 160,
+          "discarded": 0
+        },
+        "tool-output": {
+          "accepted": 163,
+          "discarded": 0
+        }
+      },
+      "usage": {
+        "completion_tokens": 2203041,
+        "prompt_tokens": 1466217,
+        "reasoning_tokens": 1211747,
+        "total_tokens": 3669258
+      }
+    },
+    "en": {
+      "requested": 2500,
+      "accepted": 2492,
+      "discarded": 8,
+      "discard_reasons": {
+        "missing_value": 8
+      },
+      "by_kind": {
+        "chat": {
+          "accepted": 170,
+          "discarded": 0
+        },
+        "court-notice": {
+          "accepted": 75,
+          "discarded": 0
+        },
+        "csv": {
+          "accepted": 89,
+          "discarded": 0
+        },
+        "email": {
+          "accepted": 145,
+          "discarded": 7
+        },
+        "form": {
+          "accepted": 174,
+          "discarded": 0
+        },
+        "invoice": {
+          "accepted": 97,
+          "discarded": 0
+        },
+        "lease": {
+          "accepted": 139,
+          "discarded": 1
+        },
+        "letter": {
+          "accepted": 84,
+          "discarded": 0
+        },
+        "log": {
+          "accepted": 164,
+          "discarded": 0
+        },
+        "meeting-notes": {
+          "accepted": 88,
+          "discarded": 0
+        },
+        "mixed-confusables": {
+          "accepted": 186,
+          "discarded": 0
+        },
+        "negative-ops": {
+          "accepted": 178,
+          "discarded": 0
+        },
+        "negative-prose": {
+          "accepted": 166,
+          "discarded": 0
+        },
+        "power-of-attorney": {
+          "accepted": 80,
+          "discarded": 0
+        },
+        "sale-contract": {
+          "accepted": 166,
+          "discarded": 0
+        },
+        "sms": {
+          "accepted": 187,
+          "discarded": 0
+        },
+        "support-chat": {
+          "accepted": 149,
+          "discarded": 0
+        },
+        "tool-output": {
+          "accepted": 155,
+          "discarded": 0
+        }
+      },
+      "usage": {
+        "completion_tokens": 1708896,
+        "prompt_tokens": 1248050,
+        "reasoning_tokens": 1072768,
+        "total_tokens": 2956946
+      }
+    }
+  },
+  "sha256_16": {
+    "eval/generated/distill-s11/en-distill-dev.jsonl": "52844202fd84cac1",
+    "eval/generated/distill-s11/en-distill-train.jsonl": "77577902e0c6baf5",
+    "eval/generated/distill-s11/hu-distill-dev.jsonl": "cf04e3fb4e479738",
+    "eval/generated/distill-s11/hu-distill-train.jsonl": "70b407868dd87da4",
+    "eval/generated/distill-s11/labelled/en-distill-dev.jsonl": "b13f9983ca99ade6",
+    "eval/generated/distill-s11/labelled/en-distill-train.jsonl": "cc9af7113b5cd89b",
+    "eval/generated/distill-s11/labelled/hu-distill-dev.jsonl": "f6dca4b60ca8dfa5",
+    "eval/generated/distill-s11/labelled/hu-distill-train.jsonl": "3784482de825b207",
+    "eval/generated/distill-s11/teacher-cache.jsonl": "527a346ad12542de"
+  },
+  "spend": {
+    "meta_api_usd": 1.05,
+    "meta_api_calls_billed": 5004,
+    "modal_gpu_minutes": {
+      "H100 (Glimmer serving)": 38,
+      "A10G (base)": 8,
+      "L40S (large)": 10
+    }
+  }
+}

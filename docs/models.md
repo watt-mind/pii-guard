@@ -77,6 +77,73 @@ is the set to watch.
 CPU p50 46 ms / p95 53 ms; MPS p50 17 ms / p95 23 ms (same for both models). CUDA hasn't been
 measured.
 
+### Distilled from Muse Glimmer
+
+A bigger, more varied corpus labelled by Muse Glimmer 30B (low reasoning) as the teacher, used
+to retrain the student. Everything is fictional and reproducible from the seed; data and
+weights stay out of git (`eval/generated/`, `models/` are ignored), and the hashes of every
+corpus, label and cache file are in `eval/results/ner/distilled/corpus.json` and each model's
+`training_meta.json`.
+
+1. **Corpus** (`training/distill/corpus.py --seed 11 --n 2500` per language): the generator's
+   kinds plus ten more per language (`training/distill/templates/<lang>.toml`): tool output,
+   forms, logs, CSV, support chat, SMS, meeting notes, messages full of look-alike words, and
+   two hard-negative kinds with no personal data at all. Written by
+   `muse-spark-1.3-contributor` (fictional data, so any tier is fine) through the response
+   cache, with a hard cost cap. 4,964 of 5,000 accepted (hu 2,472, en 2,492), none duplicated.
+2. **Teacher labels** (`training/distill/label.py`, 64 requests in flight): rules + Glimmer
+   (`reasoning_strength` low, served as below) over every document. Planted gold always wins;
+   where Glimmer's span runs past gold or has another type, those characters are excluded from
+   the loss (`meta.loss_ignore`) rather than guessed. New names Glimmer found are adopted
+   (319 people, 145 organizations); new addresses and dates are ignored. Of 26,799 planted
+   values Glimmer found 26,406; 499 disagreements were excluded.
+3. **Student** (`training/distill/modal_train.py`, `training/ner/distilled-{base,large}.toml`):
+   4 epochs, bf16 autocast on CUDA. xlm-roberta-base on an A10G took 5 minutes,
+   xlm-roberta-large on an L40S 6 minutes.
+
+Results, rules + NER (overlap F1 / recall / leak / over-masking, %). The evaluation sets are
+the hand-written smoke sets, which the generator did not write, plus the distillation dev
+split. Scorecards are in `eval/results/ner/distilled/`. *Fine-tuned* is the LAB-1106
+checkpoint above.
+
+| Fixture | fine-tuned | distilled base | distilled large |
+|---|---|---|---|
+| hu-smoke | 94.3 / 89.2 / 12.4 / 0.0 | 92.9 / 88.3 / 13.4 / 1.2 | 93.5 / 90.1 / 10.3 / 2.2 |
+| en-smoke | 86.5 / 94.1 / 3.3 / **16.2** | 98.5 / 97.1 / 3.3 / **0.0** | 98.5 / 97.1 / 0.0 / **0.0** |
+| hu distill dev (seed 11) | – | 97.7 / 96.3 / 5.2 / 0.5 | 97.5 / 96.3 / 5.2 / 0.9 |
+| en distill dev (seed 11) | – | 99.3 / 99.8 / 0.1 / 1.3 | 98.2 / 99.8 / 0.1 / 3.4 |
+
+- On English the over-masking problem is gone (16 % → 0 %) and recall went up for both
+  sizes.
+- On hu-smoke the base model finds one name fewer than the fine-tuned one (98 of 111 gold
+  spans vs 99). The large model finds one more (100) and leaks fewer people, but masks two
+  harmless spans.
+- Most of what still leaks in Hungarian is ID document and parcel numbers, which are for the
+  rules, not the NER model. With the Hungarian ID and parcel rules (LAB-1127) also on, hu-smoke
+  scores 97.5 / 96.7 / 3.8 / 1.0 with base and 97.9 / 98.3 / 0.9 / 0.9 with large. The table
+  keeps the earlier rules so the comparison with the fine-tuned model is like for like.
+
+**Recommendation:** use the distilled large model where its latency fits and the base model
+otherwise. Neither becomes the built-in default: the weights aren't published yet, so you
+point `PII_GUARD_NER_MODEL` at a checkpoint you trained.
+
+**Latency**, per ~400-character message (`eval/results/ner/distilled/latency-*.json`, M1 Max).
+The machine was under heavy unrelated load (load average 30–50), so read these as relative
+numbers:
+
+| Model | MPS p50 / p95 | CPU p50 / p95 |
+|---|---|---|
+| distilled base | 24 / 41 ms | 76–98 / 106–200 ms |
+| distilled large | 36 / 54 ms | 241 / 323 ms |
+
+Large costs about 1.5× base on MPS and 2.5× on CPU. Base has the same architecture as the
+fine-tuned model, so with the machine idle it should match that model's 17 ms (MPS) and
+46 ms (CPU).
+
+**Spend:** Meta Model API $1.05 (5,004 billed calls, contributor tier at $0.10 per million
+input and $0.20 per million output tokens). Modal GPU about 38 H100 minutes for Glimmer, plus
+about 8 A10G and 10 L40S minutes for training: roughly $3 in total.
+
 ## LLM detector
 
 `pii_guard.detect.llm.LlmDetector` (registry name `llm`) talks to any OpenAI-compatible Chat
@@ -94,6 +161,7 @@ disagreements.
 | Base URL | `PII_GUARD_LLM_DETECTOR_URL` | `https://inference.baseten.co/v1` |
 | API key | `PII_GUARD_LLM_DETECTOR_API_KEY` | unset |
 | Model | `PII_GUARD_LLM_DETECTOR_MODEL` | `meta-models/muse-spark-open-1026` |
+| Glimmer reasoning strength (`chat_template_kwargs.reasoning_strength`) | `PII_GUARD_LLM_DETECTOR_REASONING_STRENGTH` | unset (not sent) |
 
 Constructor keywords (`base_url`, `api_key`, `model`, `timeout`, `max_retries`,
 `reasoning_effort`, `json_mode`, `chunk_size`, `chunk_overlap`, `score`, `transport`) override
@@ -113,8 +181,35 @@ error: it gets language-neutral notes, the generic types, and suffix-tolerant al
 **Target: Muse Spark Open.** Meta's open-weight Muse Spark, served by Baseten
 (`meta-models/muse-spark-open-1026`, OpenAI-compatible). Because the weights are open, the same
 detector can run on your own GPUs (vLLM or similar: point `PII_GUARD_LLM_DETECTOR_URL` at it),
-which is what lets it see real data. **Muse Glimmer** is the candidate for a smaller,
-CPU/edge-friendly local detector; not yet evaluated.
+which is what lets it see real data. **Muse Glimmer** (30B, open weights, Apache-2.0) is
+the smaller candidate. It is too slow for the request path (about 9 s per document at low
+reasoning), so it serves as the teacher for the distilled NER model (see "Distilled from Muse
+Glimmer" above).
+
+### Serving Muse Glimmer on Modal
+
+`deploy/modal/glimmer.py` serves Glimmer with vLLM on one H100 (image
+`vllm/vllm-openai:muse-glimmer`). It is an OpenAI-compatible endpoint, model name
+`muse-glimmer`. Glimmer ignores `reasoning_effort`, so set
+`PII_GUARD_LLM_DETECTOR_REASONING_STRENGTH=low`.
+
+```
+modal secret create pii-guard-glimmer GLIMMER_API_KEY=$(openssl rand -hex 24)   # once
+modal deploy deploy/modal/glimmer.py
+# PII_GUARD_LLM_DETECTOR_URL=https://<workspace>--pii-guard-glimmer-serve.<region>.modal.run/v1
+# PII_GUARD_LLM_DETECTOR_MODEL=muse-glimmer
+# PII_GUARD_LLM_DETECTOR_API_KEY=<the secret's value>
+modal app stop pii-guard-glimmer --yes   # always, when done
+```
+
+- The key reaches vLLM as `VLLM_API_KEY`, never `--api-key`: vLLM logs its command line.
+- Weights and the compile cache live on the volumes `pii-guard-hf-cache` and
+  `pii-guard-vllm-cache`. The first start takes about 26 minutes; later starts take about
+  3 minutes.
+- The container scales to zero after 300 s idle, and the next request pays another cold
+  start. Stop the app as soon as the job is done.
+- Keep the key somewhere local: a Modal secret can't be read back. If the key is lost,
+  overwrite the secret and redeploy.
 
 **Development: Meta Model API.** Verified on 2026-10-26:
 
