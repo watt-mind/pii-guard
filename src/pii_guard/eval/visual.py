@@ -5,7 +5,8 @@ pii-guard eval visual --specimens data/specimens [--manifest eval/visual/manifes
                       [--labels eval/visual/labels.json] [--cache data/visual-cache]
                       [--offline] [--max-live-calls 800] [--no-ocr] [--country HU,DE]
                       [--detectors rules[,ner,llm]] [--no-captions] [--ocr-upscale 2000]
-                      [--prompts JSON] [--prompt-study JSON] [--json OUT] [--markdown OUT]
+                      [--prompts JSON] [--prompt-study JSON] [--baseline NAME]
+                      [--json OUT] [--markdown OUT]
 ```
 
 The specimens are fetched by ``eval/visual/fetch_specimens.py`` into a gitignored directory and
@@ -26,6 +27,10 @@ nothing. ``--max-live-calls`` caps network calls per run; ``--offline`` forbids 
 report counts SAM calls (live and cached), estimates their cost and reports latency (the SAM
 latency recorded when each response was first fetched, plus local OCR/detection time).
 
+``--baseline NAME`` scores an open-source image redaction tool instead of pii-guard, with the
+same images and the same scorer (:mod:`pii_guard.eval.baselines.image`): each tool runs in its
+own pinned environment and returns the boxes it would black out.
+
 Results contain numbers, region types, countries and specimen ids only, never images or text.
 """
 
@@ -41,7 +46,7 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 from PIL import Image, ImageDraw
@@ -91,6 +96,8 @@ PROMPT_TARGETS: dict[EntityType, tuple[str, ...]] = {
     EntityType.SIGNATURE: ("signature",),
 }
 _LANGUAGE = {"HU": "hu"}
+#: Baselines get each document's own language where a tool has a model for it.
+_BASELINE_LANGUAGE = {"HU": "hu", "DE": "de", "AT": "de", "GB": "en"}
 
 
 # --- SAM response cache --------------------------------------------------------------------
@@ -351,19 +358,25 @@ class SpecimenResult:
 def evaluate(
     specimens: Sequence[Specimen],
     *,
-    sam: SamClient,
-    transport: CachingTransport,
+    sam: SamClient | None,
+    transport: CachingTransport | None,
     ocr: OcrEngine | None,
     detector: Detector | None,
     entity_types: Sequence[EntityType] = EVAL_SAM_TYPES,
     captions: bool = True,
     max_side: int = DEFAULT_MAX_SIDE,
     log: Callable[[str], None] = lambda _msg: None,
+    baseline: ImageBaseline | None = None,
 ) -> list[SpecimenResult]:
     """Run the masking pipeline on every specimen and score it. Never raises on one image:
     a failure (fail closed: nothing would have been sent) is recorded as that image's error
-    and its regions count as missed.
+    and its regions count as missed. With ``baseline``, that tool masks the images instead
+    (``sam``, ``transport``, ``ocr`` and ``detector`` are not used).
     """
+    if baseline is not None:
+        return _evaluate_baseline(specimens, baseline, max_side=max_side, log=log)
+    if sam is None or transport is None:
+        raise ValueError("evaluate() needs a SAM client and its transport")
     from pii_guard.api.routes.image_masking import ImageMasker
 
     masker = ImageMasker(
@@ -405,6 +418,78 @@ def evaluate(
     return results
 
 
+class ImageBaseline(Protocol):
+    """An image redaction tool (:class:`~pii_guard.eval.baselines.image.ImageWorkerBaseline`)."""
+
+    name: str
+    info: dict[str, Any]
+    supports: set[str]
+
+    def mask(self, image: bytes, language: str) -> tuple[list[Region], float]: ...
+
+
+def _evaluate_baseline(
+    specimens: Sequence[Specimen],
+    baseline: ImageBaseline,
+    *,
+    max_side: int,
+    log: Callable[[str], None],
+) -> list[SpecimenResult]:
+    results: list[SpecimenResult] = []
+    for specimen in specimens:
+        result = SpecimenResult(specimen)
+        data = prepare_image(specimen.path.read_bytes(), max_side)
+        size = load_image(data).size
+        language = specimen.language or _BASELINE_LANGUAGE.get(specimen.country, "en")
+        try:
+            regions, tool_ms = baseline.mask(data, language)
+        except PiiGuardError as exc:
+            result.error = exc.code
+            regions, tool_ms = [], 0.0
+        # The same 2 px padding pii-guard's covered boxes get.
+        covered = [Region(r.entity_type, _pad(r.box, 2, size), None, r.source) for r in regions]
+        result.local_ms = tool_ms
+        result.regions_masked = len(covered)
+        result.scores, result.over_masking = score_regions(specimen.regions, covered, size)
+        results.append(result)
+        log(f"{specimen.id}: {sum(s.hit_iou for s in result.scores)}/{len(result.scores)}")
+    return results
+
+
+def build_baseline_report(
+    results: Sequence[SpecimenResult], baseline: ImageBaseline, *, max_side: int
+) -> dict[str, Any]:
+    """The report for a baseline run: region types the tool can't mask are left out of the
+    per-type breakdowns (``unsupported_region_types``) and stay in ``overall``."""
+    report = build_report(
+        results,
+        transport=None,
+        sam=None,
+        entity_types=(),
+        ocr_engine=None,
+        detector_name=None,
+        sam_cost=0.0,
+        max_side=max_side,
+    )
+    unsupported = [t for t in REGION_TYPES if t not in baseline.supports]
+    for t in unsupported:
+        report["by_region_type"].pop(t, None)
+        for group in report["by_country"].values():
+            group["by_type"].pop(t, None)
+    report["pipeline"] = {
+        "baseline": baseline.name,
+        "info": baseline.info,
+        "unsupported_region_types": unsupported,
+        "max_side": max_side,
+        "iou_threshold": IOU_THRESHOLD,
+        "coverage_threshold": COVERAGE_THRESHOLD,
+    }
+    report.pop("sam")
+    for key in [k for k in report["latency_ms"] if k.startswith("sam_")]:
+        report["latency_ms"].pop(key)
+    return report
+
+
 def _ratio(numerator: int, denominator: int) -> float | None:
     return round(numerator / denominator, 4) if denominator else None
 
@@ -430,8 +515,8 @@ def _percentile(values: Sequence[float], q: float) -> float | None:
 def build_report(
     results: Sequence[SpecimenResult],
     *,
-    transport: CachingTransport,
-    sam: SamClient,
+    transport: CachingTransport | None,
+    sam: SamClient | None,
     entity_types: Sequence[EntityType],
     ocr_engine: str | None,
     detector_name: str | None,
@@ -467,13 +552,17 @@ def build_report(
     total_calls = sum(r.sam_calls for r in results)
     sam_ms = [r.sam_ms for r in results]
     local_ms = [r.local_ms for r in results]
-    per_call = transport.recorded_ms
+    total_ms = [r.sam_ms + r.local_ms for r in results]
+    per_call = transport.recorded_ms if transport is not None else []
+    live_calls = transport.live_calls if transport is not None else 0
     return {
         "suite": "visual-specimens",
         "pipeline": {
-            "sam_model": sam.model,
+            "sam_model": sam.model if sam is not None else None,
             "sam_types": [t.value for t in entity_types],
-            "sam_prompts": {t.value: list(sam.prompts[t]) for t in entity_types},
+            "sam_prompts": {t.value: list(sam.prompts[t]) for t in entity_types}
+            if sam is not None
+            else {},
             "ocr_engine": ocr_engine,
             "text_detector": detector_name,
             "captions": captions if ocr_engine else False,
@@ -494,11 +583,11 @@ def build_report(
         "sam": {
             "calls": total_calls,
             "calls_per_image": round(total_calls / len(results), 2) if results else None,
-            "live_calls_this_run": transport.live_calls,
-            "cached_calls_this_run": transport.cached_calls,
+            "live_calls_this_run": live_calls,
+            "cached_calls_this_run": transport.cached_calls if transport is not None else 0,
             "cost_per_call_usd": sam_cost,
             "estimated_cost_usd": round(total_calls * sam_cost, 4),
-            "spent_this_run_usd": round(transport.live_calls * sam_cost, 4),
+            "spent_this_run_usd": round(live_calls * sam_cost, 4),
         },
         "latency_ms": {
             "sam_call_p50": _percentile(per_call, 0.5),
@@ -507,6 +596,8 @@ def build_report(
             "sam_per_image_p95": _percentile(sam_ms, 0.95),
             "local_per_image_p50": _percentile(local_ms, 0.5),
             "local_per_image_p95": _percentile(local_ms, 0.95),
+            "total_per_image_p50": _percentile(total_ms, 0.5),
+            "total_per_image_p95": _percentile(total_ms, 0.95),
         },
         "per_specimen": [
             {
@@ -533,18 +624,29 @@ def _pct(value: float | None) -> str:
 
 def render_markdown(report: dict[str, Any]) -> str:
     pipe = report["pipeline"]
+    if "baseline" in pipe:
+        unsupported = pipe.get("unsupported_region_types") or []
+        system = (
+            f"{report['specimens']} specimen images, baseline `{pipe['baseline']}` "
+            f"({pipe['info'].get('tool')}"
+            + (f"; can't mask {', '.join(unsupported)}" if unsupported else "")
+            + ")"
+        )
+    else:
+        system = (
+            f"{report['specimens']} specimen images, SAM `{pipe['sam_model']}` "
+            f"({', '.join(pipe['sam_types'])}), OCR `{pipe['ocr_engine'] or 'off'}`, "
+            f"text detector `{pipe['text_detector'] or 'off'}`"
+            + (
+                f" (OCR on images enlarged to {pipe['ocr_upscale_to']} px)"
+                if pipe.get("ocr_upscale_to")
+                else ""
+            )
+        )
     lines = [
         f"# {report.get('title') or 'Visual recall on official specimen ID documents'}",
         "",
-        f"{report['specimens']} specimen images, SAM `{pipe['sam_model']}` "
-        f"({', '.join(pipe['sam_types'])}), OCR `{pipe['ocr_engine'] or 'off'}`, "
-        f"text detector `{pipe['text_detector'] or 'off'}`"
-        + (
-            f" (OCR on images enlarged to {pipe['ocr_upscale_to']} px)"
-            if pipe.get("ocr_upscale_to")
-            else ""
-        )
-        + f". A region is a hit at IoU ≥ "
+        system + f". A region is a hit at IoU ≥ "
         f"{pipe['iou_threshold']} with one covered box; coverage is the share of its pixels "
         f"under any mask (cov ≥ {pipe['coverage_threshold']} = fully covered).",
         "",
@@ -578,19 +680,34 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {doc_type} | {group['specimens']} | {group['regions']} | "
             f"{_pct(group['recall_iou50'])} | {_pct(group['recall_cov90'])} |"
         )
-    sam, lat = report["sam"], report["latency_ms"]
+    sam, lat = report.get("sam"), report["latency_ms"]
     lines += [
         "",
         f"Over-masking (covered area outside every labelled region, mean share of the image): "
         f"{_pct(report['over_masking_mean'])} %. Errors: {report['errors'] or 'none'}.",
         "",
+    ]
+    if sam is None:
+        lines += [
+            f"Latency (the tool's own time per image, without the worker pipe): p50 "
+            f"{lat['local_per_image_p50']} ms / p95 {lat['local_per_image_p95']} ms.",
+            "",
+        ]
+        return "\n".join(lines)
+    lines += [
         f"SAM: {sam['calls']} calls ({sam['calls_per_image']} per image), estimated "
         f"${sam['estimated_cost_usd']:.2f} at ${sam['cost_per_call_usd']}/call; this run "
         f"{sam['live_calls_this_run']} live, {sam['cached_calls_this_run']} cached.",
         f"Latency: SAM per call p50 {lat['sam_call_p50']} ms / p95 {lat['sam_call_p95']} ms; "
         f"SAM per image p50 {lat['sam_per_image_p50']} ms / p95 {lat['sam_per_image_p95']} ms "
         f"(sequential calls); OCR + detection per image p50 {lat['local_per_image_p50']} ms / "
-        f"p95 {lat['local_per_image_p95']} ms.",
+        f"p95 {lat['local_per_image_p95']} ms"
+        + (
+            f"; total per image p50 {lat['total_per_image_p50']} ms / p95 "
+            f"{lat['total_per_image_p95']} ms."
+            if "total_per_image_p50" in lat
+            else "."
+        ),
         "",
     ]
     return "\n".join(lines)
@@ -746,6 +863,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--limit", type=int, help="prompt study: at most this many images per entity type"
     )
+    parser.add_argument(
+        "--baseline",
+        metavar="NAME",
+        help="score this open-source image redaction tool instead of pii-guard "
+        "(presidio-image, presidio-image-tuned, eka, eka-tuned)",
+    )
     parser.add_argument("--title", help="report heading (default: the official specimen set)")
     parser.add_argument("--json", type=Path, metavar="OUT")
     parser.add_argument("--markdown", type=Path, metavar="OUT")
@@ -785,6 +908,54 @@ def _ocr_and_detector(
     return ocr, detector, "+".join(loaded)
 
 
+def _write(args: argparse.Namespace, output: dict[str, Any], markdown: str) -> None:
+    sys.stdout.write(markdown)
+    if args.markdown:
+        args.markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown.write_text(markdown, encoding="utf-8")
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
+
+
+def _run_baseline(
+    args: argparse.Namespace,
+    specimens: Sequence[Specimen],
+    log: Callable[[str], None],
+    *,
+    factory: Callable[[str], ImageBaseline] | None = None,
+) -> int:
+    from pii_guard.eval.baselines.base import BaselineUnavailable
+
+    if factory is None:
+        from pii_guard.eval.baselines.image import create_image_baseline as factory
+    try:
+        baseline = factory(args.baseline)
+    except BaselineUnavailable as exc:
+        log(f"baseline {args.baseline} unavailable: {exc.reason}")
+        return 2
+    try:
+        results = evaluate(
+            specimens,
+            sam=None,
+            transport=None,
+            ocr=None,
+            detector=None,
+            max_side=args.max_side,
+            log=log,
+            baseline=baseline,
+        )
+    finally:
+        close = getattr(baseline, "close", None)
+        if close is not None:
+            close()
+    output = build_baseline_report(results, baseline, max_side=args.max_side)
+    if args.title:
+        output = {"title": args.title, **output}
+    _write(args, output, render_markdown(output))
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None, *, inner_transport: httpx.BaseTransport | None = None
 ) -> int:
@@ -803,6 +974,9 @@ def main(
     if not specimens:
         log("no labelled specimen images found (run eval/visual/fetch_specimens.py first)")
         return 2
+
+    if args.baseline:
+        return _run_baseline(args, specimens, log)
 
     transport = CachingTransport(
         args.cache, inner_transport, max_live_calls=0 if args.offline else args.max_live_calls
@@ -872,11 +1046,5 @@ def main(
         transport.close()
 
     log(f"SAM calls this run: {transport.live_calls} live, {transport.cached_calls} cached")
-    sys.stdout.write(markdown)
-    if args.markdown:
-        args.markdown.parent.mkdir(parents=True, exist_ok=True)
-        args.markdown.write_text(markdown, encoding="utf-8")
-    if args.json:
-        args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
+    _write(args, output, markdown)
     return 0
