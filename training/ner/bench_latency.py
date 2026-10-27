@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import statistics
 import sys
@@ -50,10 +51,21 @@ def percentile(values: list[float], q: float) -> float:
     return ordered[lo] + (ordered[hi] - ordered[lo]) * (k - lo)
 
 
-def bench(model: str | None, device: str, msgs: list[tuple[str, str]], threads: int | None) -> dict:
+def bench(
+    model: str | None,
+    device: str,
+    msgs: list[tuple[str, str]],
+    threads: int | None,
+    backend: str = "transformers",
+) -> dict:
     if threads:
         torch.set_num_threads(threads)
-    detector = NerDetector(model=model, device=device, preload=True)
+    if backend == "gliner":
+        from pii_guard.detect.ner_gliner import GlinerDetector
+
+        detector: NerDetector = GlinerDetector(model=model, device=device, preload=True)
+    else:
+        detector = NerDetector(model=model, device=device, preload=True)
     for language, text in msgs[:5]:
         detector.detect(text, language)
     times: list[float] = []
@@ -71,6 +83,7 @@ def bench(model: str | None, device: str, msgs: list[tuple[str, str]], threads: 
         "p50_ms": round(percentile(times, 0.50), 1),
         "p95_ms": round(percentile(times, 0.95), 1),
         "mean_ms": round(statistics.mean(times), 1),
+        "load_average": [round(x, 2) for x in os.getloadavg()],
     }
 
 
@@ -87,6 +100,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--chars", type=int, default=400)
     parser.add_argument("--n", type=int, default=200)
     parser.add_argument("--threads", type=int, help="torch CPU threads (default: torch's)")
+    parser.add_argument(
+        "--backend",
+        choices=("transformers", "gliner"),
+        default="transformers",
+        help="gliner: a GLiNER hub id or directory (LAB-1150)",
+    )
     parser.add_argument("--json", type=Path)
     args = parser.parse_args(argv)
     paths = args.fixtures or [
@@ -94,7 +113,10 @@ def main(argv: list[str] | None = None) -> int:
         "eval/fixtures/en-synth-sample.jsonl",
     ]
     msgs = messages(paths, args.chars, args.n)
-    results = [bench(args.model, d.strip(), msgs, args.threads) for d in args.devices.split(",")]
+    results = [
+        bench(args.model, d.strip(), msgs, args.threads, args.backend)
+        for d in args.devices.split(",")
+    ]
     report = {
         "model": args.model or "default",
         "machine": f"{platform.machine()} {platform.platform()}",

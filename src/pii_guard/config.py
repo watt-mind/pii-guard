@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     # vLLM reads this instead of reasoning_effort; unset sends nothing.
     llm_detector_reasoning_strength: str | None = None
     sam_url: str | None = None
+    # NER detector (fast mode). "transformers": a token-classification checkpoint
+    # (PII_GUARD_NER_MODEL); "gliner": a GLiNER checkpoint, default the public zero-shot
+    # urchade/gliner_multi-v2.1 (needs the gliner extra). See docs/models.md.
+    ner_backend: Literal["transformers", "gliner"] = "transformers"
 
     # Corpus generation only (fictional data). Not prefixed: the provider's own name.
     meta_api_key: SecretStr | None = Field(

@@ -2,8 +2,11 @@
 
 The fast-mode complement to the rules: rules find structured identifiers (checksums, formats),
 this detector finds ``PERSON``, ``ADDRESS``, ``ORGANIZATION`` and, with a model trained for it,
-``DATE_OF_BIRTH``, in any language the encoder covers. It runs in-process (CPU, Apple MPS or
-CUDA), so the text never leaves the guard. See ``docs/models.md``.
+``DATE_OF_BIRTH``, in any language the encoder covers. A v2 checkpoint (LAB-1150) also
+proposes ``EMAIL``, ``PHONE``, ``ID_DOCUMENT``, the Hungarian tax and TAJ numbers and
+``BANK_ACCOUNT``, so a number whose checksum fails or whose format no rule knows is still
+masked; validated rule spans keep their boundaries and win in the resolver. It runs
+in-process (CPU, Apple MPS or CUDA), so the text never leaves the guard. See ``docs/models.md``.
 
 - **Model.** Any Hugging Face token-classification checkpoint (BIO labels): a hub id or a local
   directory, from ``model=`` or ``PII_GUARD_NER_MODEL`` (default :data:`DEFAULT_MODEL`). The
@@ -50,6 +53,7 @@ from typing import Any, Protocol
 from pii_guard.types import DetectionError, EntityType, Span
 
 __all__ = [
+    "BACKEND_ENV_VAR",
     "DEFAULT_MODEL",
     "DEFAULT_REVISION",
     "DEFAULT_THRESHOLDS",
@@ -57,6 +61,7 @@ __all__ = [
     "LABEL_MAP",
     "MODEL_ENV_VAR",
     "NER_ENTITY_TYPES",
+    "NER_V1_ENTITY_TYPES",
     "NerBackend",
     "NerDetector",
     "RawEntity",
@@ -78,10 +83,29 @@ DEFAULT_REVISION = "253f557bd8249b8515114cfd7f71974fe5fa4d2f"
 MODEL_ENV_VAR = "PII_GUARD_NER_MODEL"
 REVISION_ENV_VAR = "PII_GUARD_NER_REVISION"
 DEVICE_ENV_VAR = "PII_GUARD_NER_DEVICE"
+#: ``transformers`` (default) or ``gliner`` (:mod:`pii_guard.detect.ner_gliner`; the default
+#: model is then the public zero-shot GLiNER multi checkpoint).
+BACKEND_ENV_VAR = "PII_GUARD_NER_BACKEND"
+BACKENDS = ("transformers", "gliner")
 
-#: The types this detector reports. Structured identifiers are left to the rules.
-NER_ENTITY_TYPES: frozenset[EntityType] = frozenset(
+#: The v1 types (names, addresses, organisations, dates of birth): what a generic NER
+#: checkpoint or a pii-guard v1 checkpoint (LAB-1106, LAB-1128) reports.
+NER_V1_ENTITY_TYPES: frozenset[EntityType] = frozenset(
     {EntityType.PERSON, EntityType.ADDRESS, EntityType.ORGANIZATION, EntityType.DATE_OF_BIRTH}
+)
+#: The types this detector can report. A v2 checkpoint (LAB-1150) also proposes identifiers
+#: (emails, phones, ID and tax numbers, bank accounts and cards); the rules still validate
+#: those and keep their own scores and boundaries, and the resolver and policy decide
+#: (``docs/entities.md``, "NER label set").
+NER_ENTITY_TYPES: frozenset[EntityType] = NER_V1_ENTITY_TYPES | frozenset(
+    {
+        EntityType.EMAIL,
+        EntityType.PHONE,
+        EntityType.ID_DOCUMENT,
+        EntityType.NATIONAL_ID_HU_TAX,
+        EntityType.NATIONAL_ID_HU_TAJ,
+        EntityType.BANK_ACCOUNT,
+    }
 )
 
 #: Model label (without ``B-``/``I-``) → entity type. Labels not listed are ignored (for
@@ -94,16 +118,17 @@ LABEL_MAP: dict[str, EntityType] = {
     "LOC": EntityType.ADDRESS,
     "ADDRESS": EntityType.ADDRESS,
     "DATE_OF_BIRTH": EntityType.DATE_OF_BIRTH,
+    "EMAIL": EntityType.EMAIL,
+    "PHONE": EntityType.PHONE,
+    "ID_DOCUMENT": EntityType.ID_DOCUMENT,
+    "NATIONAL_ID_HU_TAX": EntityType.NATIONAL_ID_HU_TAX,
+    "NATIONAL_ID_HU_TAJ": EntityType.NATIONAL_ID_HU_TAJ,
+    "BANK_ACCOUNT": EntityType.BANK_ACCOUNT,
 }
 
 #: Minimum span score per language and type. ``"default"`` applies to every other language.
 DEFAULT_THRESHOLDS: dict[str, dict[EntityType, float]] = {
-    "default": {
-        EntityType.PERSON: 0.5,
-        EntityType.ADDRESS: 0.5,
-        EntityType.ORGANIZATION: 0.5,
-        EntityType.DATE_OF_BIRTH: 0.5,
-    },
+    "default": {t: 0.5 for t in sorted(NER_ENTITY_TYPES)},
 }
 
 # Trimmed off span ends. Dots are kept: they belong to "Kft.", "Ltd." and Hungarian dates and
@@ -339,6 +364,10 @@ class NerDetector:
     - ``model`` / ``revision``: hub id or local directory, default ``PII_GUARD_NER_MODEL`` then
       :data:`DEFAULT_MODEL` (pinned to :data:`DEFAULT_REVISION`), and ``PII_GUARD_NER_REVISION``.
     - ``device``: ``auto`` (default, ``PII_GUARD_NER_DEVICE``), ``cpu``, ``mps``, ``cuda``.
+    - ``backend_kind``: ``transformers`` (default) or ``gliner`` (``PII_GUARD_NER_BACKEND``):
+      a GLiNER checkpoint, by default the public zero-shot
+      :data:`pii_guard.detect.ner_gliner.DEFAULT_MODEL`. A local directory with a
+      ``gliner_config.json`` uses the GLiNER backend whatever this says.
     - ``thresholds``: ``{language: {entity_type: min_score}}``, merged over
       :data:`DEFAULT_THRESHOLDS`.
     - ``entity_types``: which of :data:`NER_ENTITY_TYPES` to report (default all).
@@ -368,13 +397,24 @@ class NerDetector:
         aggregation: str | None = None,
         backend: NerBackend | Callable[[], NerBackend] | None = None,
         preload: bool = True,
+        backend_kind: str | None = None,
     ) -> None:
+        kind = (backend_kind or os.environ.get(BACKEND_ENV_VAR) or "transformers").strip().lower()
+        if kind not in BACKENDS:
+            raise ValueError(f"ner backend must be one of {BACKENDS}")
+        self.backend_kind = kind
         env_model = os.environ.get(MODEL_ENV_VAR)
-        self.model = model or env_model or DEFAULT_MODEL
+        if kind == "gliner":
+            from pii_guard.detect import ner_gliner
+
+            default_model, default_revision = ner_gliner.DEFAULT_MODEL, ner_gliner.DEFAULT_REVISION
+        else:
+            default_model, default_revision = DEFAULT_MODEL, DEFAULT_REVISION
+        self.model = model or env_model or default_model
         self.revision = (
             revision
             or os.environ.get(REVISION_ENV_VAR)
-            or (DEFAULT_REVISION if self.model == DEFAULT_MODEL else None)
+            or (default_revision if self.model == default_model else None)
         )
         self.device = device
         self.thresholds = _normalize_thresholds(thresholds)
@@ -411,6 +451,16 @@ class NerDetector:
                 try:
                     if self._factory is not None:
                         backend = self._factory()
+                    elif self.backend_kind == "gliner" or os.path.isfile(
+                        os.path.join(self.model, "gliner_config.json")
+                    ):
+                        from pii_guard.detect import ner_gliner
+
+                        if not ner_gliner.dependencies_available():
+                            raise DetectionError("ner gliner backend needs the 'gliner' extra")
+                        backend = ner_gliner.GlinerBackend(
+                            self.model, revision=self.revision, device=self.device
+                        )
                     else:
                         if not dependencies_available():
                             raise DetectionError(

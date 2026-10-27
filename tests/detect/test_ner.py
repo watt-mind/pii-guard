@@ -171,7 +171,7 @@ def test_entity_types_filter_and_validation() -> None:
     detector = NerDetector(backend=FakeBackend(raw), entity_types=["PERSON"])
     assert [s.entity_type for s in detector.detect(text)] == [EntityType.PERSON]
     with pytest.raises(ValueError, match="subset"):
-        NerDetector(backend=FakeBackend(), entity_types=["EMAIL"])
+        NerDetector(backend=FakeBackend(), entity_types=["VEHICLE_PLATE"])
 
 
 def test_custom_label_map() -> None:
