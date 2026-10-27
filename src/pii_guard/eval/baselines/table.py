@@ -20,6 +20,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from pii_guard.eval.stats import fmt_ms, fmt_pct
+
 __all__ = ["main", "render_table", "rows"]
 
 _NAMES = {
@@ -35,17 +37,6 @@ ORDER = [
     "llm-guard",
     "privaite",
 ]
-
-
-def _pct(value: object) -> str:
-    return "-" if value is None else f"{float(value) * 100:.1f}"  # type: ignore[arg-type]
-
-
-def _ms(value: object) -> str:
-    if value is None:
-        return "-"
-    v = float(value)  # type: ignore[arg-type]
-    return f"{v:,.0f}" if v >= 100 else f"{v:.1f}"
 
 
 def rows(cards: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -104,22 +95,22 @@ def render_table(cards: Sequence[dict[str, Any]]) -> str:
         "|---|---|---:|" + "---:|" * 11,
     ]
     for r in rows(cards):
-        rt = _pct(r["roundtrip"]) if r["reversible"] else "n/a"
+        rt = fmt_pct(r["roundtrip"]) if r["reversible"] else "n/a"
         usd = "-" if r["usd_per_1k"] is None else f"{r['usd_per_1k']:.2f}"
         cells = [
             f"`{r['fixture']}`",
             r["system"],
             str(r["documents"]),
-            _pct(r["precision"]),
-            _pct(r["recall"]),
-            _pct(r["f1"]),
-            _pct(r["f1_exact"]),
-            _pct(r["leak"]),
-            _pct(r["partial_leak"]),
-            _pct(r["over_masking"]),
+            fmt_pct(r["precision"]),
+            fmt_pct(r["recall"]),
+            fmt_pct(r["f1"]),
+            fmt_pct(r["f1_exact"]),
+            fmt_pct(r["leak"]),
+            fmt_pct(r["partial_leak"]),
+            fmt_pct(r["over_masking"]),
             rt,
-            _ms(r["p50_ms"]),
-            _ms(r["p95_ms"]),
+            fmt_ms(r["p50_ms"], whole_from=100),
+            fmt_ms(r["p95_ms"], whole_from=100),
             usd,
         ]
         lines.append("| " + " | ".join(cells) + " |")

@@ -75,6 +75,7 @@ import httpx
 from pii_guard.eval.fixtures import Document, GoldSpan
 from pii_guard.eval.forms import find_surface_forms, language_forms
 from pii_guard.eval.scorer import DEFAULT_POLICY, DocumentResult, leak_report
+from pii_guard.eval.stats import fmt_pct
 from pii_guard.types import EntityType, PiiGuardError
 from pii_guard.vault import PLACEHOLDER_RE, normalize_value
 
@@ -736,10 +737,6 @@ def redteam_breakdown(outcomes: Iterable[AttackOutcome]) -> dict[str, Any]:
     return out
 
 
-def _pct(value: float | None) -> str:
-    return "-" if value is None else f"{value * 100:.1f}"
-
-
 def render_redteam_table(breakdown: Mapping[str, Any]) -> str:
     """Markdown: per context the total, then per language and per entity type."""
     header = (
@@ -755,8 +752,8 @@ def render_redteam_table(breakdown: Mapping[str, Any]) -> str:
         for name, b in rows:
             lines.append(
                 f"| `{context}` | {name} | {b['values']} | {b['leaked']} | {b['masked']} | "
-                f"{b['recovered']} | {_pct(b['reid_rate'])} | {_pct(b['partial_rate'])} | "
-                f"{_pct(b['chance_rate'])} | {_pct(b['exposure'])} | {b['failed']} |"
+                f"{b['recovered']} | {fmt_pct(b['reid_rate'])} | {fmt_pct(b['partial_rate'])} | "
+                f"{fmt_pct(b['chance_rate'])} | {fmt_pct(b['exposure'])} | {b['failed']} |"
             )
     return "\n".join(lines) + "\n"
 

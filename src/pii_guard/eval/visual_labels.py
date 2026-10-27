@@ -63,6 +63,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from pii_guard.api.routes.image_masking import ImageMasker
 from pii_guard.detect.rules import RuleDetector
+from pii_guard.eval.stats import percentile
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, Vault, VaultSession, normalize_value
@@ -371,7 +372,6 @@ class _Tally:
     gold: int = 0
     matched: int = 0
     false_merges: int = 0
-    merged_to_existing: int = 0
     uncertain: int = 0
     leaked: int = 0
     swept: int = 0
@@ -491,10 +491,8 @@ def _block(t: _Tally) -> dict[str, Any]:
             k: {"values": g, "matched": tp, "false_merges": fp}
             for k, (g, tp, fp) in sorted(t.by_type.items())
         },
-        "match_ms_p50": round(statistics.median(t.match_ms), 1) if t.match_ms else None,
-        "match_ms_p95": (
-            round(sorted(t.match_ms)[int(0.95 * (len(t.match_ms) - 1))], 1) if t.match_ms else None
-        ),
+        "match_ms_p50": percentile(t.match_ms, 0.5, 1),
+        "match_ms_p95": percentile(t.match_ms, 0.95, 1),
     }
 
 

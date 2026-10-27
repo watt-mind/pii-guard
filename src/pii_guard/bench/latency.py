@@ -39,6 +39,7 @@ import httpx
 
 from pii_guard import __version__
 from pii_guard.bench.mock_upstream import create_mock_upstream
+from pii_guard.eval import stats
 from pii_guard.observability import Observability, ObservabilitySettings, TrafficLevel
 from pii_guard.observability.timing import STAGES
 
@@ -90,17 +91,12 @@ _PCTS = (50, 95, 99)
 
 
 def percentiles(values: Sequence[float]) -> dict[str, float] | None:
-    """p50 / p95 / p99 (linear interpolation) and the mean, rounded to 0.001 ms."""
-    if not values:
+    """p50 / p95 / p99 (:func:`pii_guard.eval.stats.percentile`) and the mean, to 0.001 ms."""
+    pcts = stats.percentiles(values, _PCTS)
+    if pcts is None:
         return None
-    data = sorted(values)
-    out: dict[str, float] = {}
-    for p in _PCTS:
-        pos = (len(data) - 1) * p / 100
-        lo = int(pos)
-        hi = min(lo + 1, len(data) - 1)
-        out[f"p{p}"] = round(data[lo] + (data[hi] - data[lo]) * (pos - lo), 3)
-    out["mean"] = round(sum(data) / len(data), 3)
+    out = {k: round(v, 3) for k, v in pcts.items()}
+    out["mean"] = round(sum(values) / len(values), 3)
     return out
 
 

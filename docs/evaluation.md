@@ -59,6 +59,13 @@ neither credited nor charged: it is left out of precision and over-masking and c
 regions existed falls back to a per-type rule (`scorer.LEGACY_UNSCORED_TYPES`:
 `DATE_OF_BIRTH` on Ai4Privacy).
 
+**Percentiles.** Every latency percentile the harnesses write (text and visual evals, segmenter
+eval, `pii-guard bench latency`) uses one definition, `pii_guard.eval.stats.percentile`:
+linear interpolation between the closest ranks, numpy's default, so p50 is the median and
+`[10, 20, 30, 40, 100, 200]` gives p50 35.0 and p95 175.0. Run records committed before
+LAB-1273 used nearest rank (text eval) or a rounded or truncated index (visual evals) and keep
+the values they were recorded with.
+
 **Pooling** over languages or runs sums the counts and then divides, so every pooled rate is
 **micro-averaged**: each span, value or document weighs the same and a language with more
 documents weighs more. Macro F1 (the mean over entity types) is reported separately.

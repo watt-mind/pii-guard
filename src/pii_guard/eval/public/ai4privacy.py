@@ -71,7 +71,6 @@ REVISION = "ecfdc547f4a0955600cfe6ab98ba2a162207fcc0"
 FILE = "data/validation.jsonl"
 #: Git LFS object id (SHA-256) of ``FILE`` at ``REVISION``; the download is checked against it.
 FILE_SHA256 = "f945f662cab477e8aef02ce6d9a5525d8b9d4ff6436809649d8c398156fea010"
-FILE_SIZE = 920_284_464
 LICENSE = "CC-BY-4.0"
 ATTRIBUTION = "Ai4Privacy / Ai Suisse SA"
 

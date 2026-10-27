@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-import os
-import platform
 import re
-import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from pii_guard.eval.fixtures import Document
+from pii_guard.eval.record import host_info
 from pii_guard.eval.scorer import DocumentResult, summarize
 from pii_guard.types import Span
 
@@ -113,15 +111,4 @@ def baseline_section(
         "unmapped_labels": dict(sorted(unmapped.items())),
         "overall": summarize(results),
         "languages": {lang: summarize(by_language[lang]) for lang in sorted(by_language)},
-    }
-
-
-def host_info() -> dict[str, Any]:
-    """Where the latency numbers were measured."""
-    return {
-        "platform": platform.platform(),
-        "machine": platform.machine(),
-        "processor": platform.processor() or None,
-        "cpu_count": os.cpu_count(),
-        "python": sys.version.split()[0],
     }

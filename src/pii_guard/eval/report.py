@@ -24,6 +24,7 @@ from typing import Any
 from pii_guard import __version__
 from pii_guard.eval.fixtures import file_sha256
 from pii_guard.eval.scorer import DocumentResult, summarize
+from pii_guard.eval.stats import fmt_ms, fmt_pct
 
 __all__ = ["SCHEMA_VERSION", "build_scorecard", "git_commit", "render_markdown"]
 
@@ -92,14 +93,6 @@ def build_scorecard(
 # --- Markdown ----------------------------------------------------------------------------
 
 
-def _pct(value: object) -> str:
-    return "-" if value is None else f"{float(value) * 100:.1f}"  # type: ignore[arg-type]
-
-
-def _ms(value: object) -> str:
-    return "-" if value is None else f"{float(value):.2f}"  # type: ignore[arg-type]
-
-
 def _summary_row(name: str, block: dict[str, Any]) -> str:
     ex = block["detection"]["exact"]["micro"]
     ov = block["detection"]["overlap"]["micro"]
@@ -109,20 +102,20 @@ def _summary_row(name: str, block: dict[str, Any]) -> str:
         str(block["documents"]),
         str(block["gold_spans"]),
         str(block["predicted_spans"]),
-        _pct(ex["precision"]),
-        _pct(ex["recall"]),
-        _pct(ex["f1"]),
-        _pct(ov["precision"]),
-        _pct(ov["recall"]),
-        _pct(ov["f1"]),
-        _pct(block["detection"]["overlap"]["macro"]["f1"]),
-        _pct(leak["rate"]),
-        _pct(leak["partial_rate"]),
-        _pct(over["rate"]),
-        _pct(block["roundtrip"]["rate"]),
-        _pct((block.get("consistency") or {}).get("rate")),
-        _ms(block["latency_ms"]["detect"]["p50"]),
-        _ms(block["latency_ms"]["detect"]["p95"]),
+        fmt_pct(ex["precision"]),
+        fmt_pct(ex["recall"]),
+        fmt_pct(ex["f1"]),
+        fmt_pct(ov["precision"]),
+        fmt_pct(ov["recall"]),
+        fmt_pct(ov["f1"]),
+        fmt_pct(block["detection"]["overlap"]["macro"]["f1"]),
+        fmt_pct(leak["rate"]),
+        fmt_pct(leak["partial_rate"]),
+        fmt_pct(over["rate"]),
+        fmt_pct(block["roundtrip"]["rate"]),
+        fmt_pct((block.get("consistency") or {}).get("rate")),
+        fmt_ms(block["latency_ms"]["detect"]["p50"], 2),
+        fmt_ms(block["latency_ms"]["detect"]["p95"], 2),
     ]
     return "| " + " | ".join(cells) + " |"
 
@@ -139,14 +132,14 @@ def _type_rows(block: dict[str, Any]) -> list[str]:
             f"`{name}`",
             str(ex["gold"]),
             str(ex["pred"]),
-            _pct(ex["precision"]),
-            _pct(ex["recall"]),
-            _pct(ex["f1"]),
-            _pct(ov["precision"]),
-            _pct(ov["recall"]),
-            _pct(ov["f1"]),
-            _pct(leak["rate"]) if leak else "keep",
-            _pct(leak["partial_rate"]) if leak else "keep",
+            fmt_pct(ex["precision"]),
+            fmt_pct(ex["recall"]),
+            fmt_pct(ex["f1"]),
+            fmt_pct(ov["precision"]),
+            fmt_pct(ov["recall"]),
+            fmt_pct(ov["f1"]),
+            fmt_pct(leak["rate"]) if leak else "keep",
+            fmt_pct(leak["partial_rate"]) if leak else "keep",
         ]
         rows.append("| " + " | ".join(cells) + " |")
     micro_ex = block["detection"]["exact"]["micro"]
@@ -157,14 +150,14 @@ def _type_rows(block: dict[str, Any]) -> list[str]:
             [
                 str(micro_ex["gold"]),
                 str(micro_ex["pred"]),
-                _pct(micro_ex["precision"]),
-                _pct(micro_ex["recall"]),
-                _pct(micro_ex["f1"]),
-                _pct(micro_ov["precision"]),
-                _pct(micro_ov["recall"]),
-                _pct(micro_ov["f1"]),
-                _pct(block["leak"]["rate"]),
-                _pct(block["leak"]["partial_rate"]),
+                fmt_pct(micro_ex["precision"]),
+                fmt_pct(micro_ex["recall"]),
+                fmt_pct(micro_ex["f1"]),
+                fmt_pct(micro_ov["precision"]),
+                fmt_pct(micro_ov["recall"]),
+                fmt_pct(micro_ov["f1"]),
+                fmt_pct(block["leak"]["rate"]),
+                fmt_pct(block["leak"]["partial_rate"]),
             ]
         )
         + " |"
