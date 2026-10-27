@@ -34,8 +34,11 @@ loaded and any inference error raise `DetectionError` (fail closed).
 
 | Setting | Env var | Default |
 |---|---|---|
-| Model (hub id or directory) | `PII_GUARD_NER_MODEL` | `Davlan/xlm-roberta-base-ner-hrl` (pinned revision) |
-| Revision | `PII_GUARD_NER_REVISION` | pinned for the default model |
+| Model (hub id or directory) | `PII_GUARD_NER_MODEL` | unset: the published checkpoint, else the public fallback ([below](#which-ner-model-fast-mode-runs)) |
+| Revision | `PII_GUARD_NER_REVISION` | pinned for the published and fallback models |
+| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `hdkiller/pii-guard-ner-xlmr-base`, used once pinned (LAB-1306); `repo` or `repo@revision` |
+| Fallback | `PII_GUARD_NER_FALLBACK` | `download`: fetch it on first use; `cached`: only if already downloaded; `off`: never |
+| Model cache | `PII_GUARD_MODELS_DIR` | `~/.cache/pii-guard/models` |
 | Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
 | Backend | `PII_GUARD_NER_BACKEND` | `transformers`; `gliner` runs a GLiNER model instead (needs the `gliner` extra) |
 | GLiNER model | `PII_GUARD_GLINER_MODEL` | `urchade/gliner_multi-v2.1` (pinned revision) |
@@ -43,14 +46,88 @@ loaded and any inference error raise `DetectionError` (fail closed).
 Constructor keywords: `thresholds` (`{language: {type: min_score}}`, default 0.5), `entity_types`,
 `label_map`, `max_length`/`stride` (token windows for long inputs), `aggregation`, `preload`.
 Offsets come from the fast tokenizer's offset mapping (code points), so they are exact for any
-Unicode input. Warm the cache with `uv run --extra ner python -m pii_guard.detect.ner download`.
+Unicode input. Fetch the model ahead of time with
+`uv run --extra ner python -m pii_guard.detect.ner_resolve fetch` (`status` prints which model
+would run, without downloading).
 
-**Models and licences.**
+### Which NER model fast mode runs
 
-- Zero-shot default: [`Davlan/xlm-roberta-base-ner-hrl`](https://huggingface.co/Davlan/xlm-roberta-base-ner-hrl)
+`pii_guard.detect.ner_resolve` picks the model, first match wins (LAB-1192):
+
+1. **`PII_GUARD_NER_MODEL`**, a local directory or a hub id (with `PII_GUARD_NER_REVISION`).
+   If it is set and can't load, startup stops (fail closed, ADR 0006).
+2. **The published pii-guard checkpoint**, `hdkiller/pii-guard-ner-xlmr-base`
+   (`PII_GUARD_NER_PUBLISHED_MODEL`). The owner decided to publish the trained XLM-R base
+   NER there; LAB-1306 trains it and pins its revision and SHA-256 in
+   `pii_guard.detect.ner_resolve.PUBLISHED`. A checkpoint is never loaded unpinned, so until
+   that lands this step is skipped (or set `repo@revision` yourself).
+3. **The public fallback**, a **stop-gap** so that fast mode is rules + NER from a clean
+   checkout until step 2 is pinned:
+   [`bardsai/eu-pii-anonimization-multilang`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang)
+   at revision `62ca5712368705bac11b8fea19e42e65cce088dd`. It leaks little but **over-masks:
+   about 23 % on en-smoke** (below).
+
+`make demo`, `make smoke-fast`, `docker compose --profile demo up` and the banners print the
+line `rules + NER: <model>@<revision> (public fallback, Apache-2.0)`, or why it is rules only.
+The fallback is downloaded on first use with `huggingface_hub.snapshot_download` at the pinned
+revision, only the four files the detector reads (1.1 GB, mostly `model.safetensors`), into
+`~/.cache/pii-guard/models/ner/bardsai--eu-pii-anonimization-multilang-62ca57123687/`. The
+weights are then checked against their pinned SHA-256 and loaded from that directory, so later
+runs are offline. No weights are committed to this repository. `PII_GUARD_NER_FALLBACK=off`
+(what `make demo MODE=rules` and `make smoke` set) keeps fast mode rules only.
+
+**Licence and attribution.** The model card at the pinned revision declares
+`license: apache-2.0`. The model is by [bards.ai](https://bards.ai): XLM-RoBERTa base
+(FacebookAI, MIT) fine-tuned for 36 PII classes in the 24 official EU languages, Hungarian,
+English and German among them. Its card names the training data:
+`ai4privacy/pii-masking-openpii-1m`, `piimb/privy` and `nvidia/Nemotron-PII`, plus proprietary
+data. Its labels are mapped in `LABEL_MAP` (`src/pii_guard/detect/ner.py`): `PERSON_NAME` →
+`PERSON`, `ORGANIZATION_NAME` → `ORGANIZATION`, `POSTAL_ADDRESS` and `LOCATION` → `ADDRESS`,
+`EMAIL_ADDRESS`, `PHONE_NUMBER`, `DOCUMENT_IDENTIFIER` and `PERSON_IDENTIFIER` →
+`ID_DOCUMENT`, `BANK_ACCOUNT_IDENTIFIER` and `PAYMENT_CARD` → `BANK_ACCOUNT`, `DATE_OF_BIRTH`.
+Its other classes (health data, IP addresses, amounts…) are not pii-guard types and are
+ignored.
+
+**Why this model.** The ticket's three options were GLiNER multi v2.1 through the `gliner`
+extra, Davlan's XLM-R through the existing `ner` extra, or another Apache/MIT token
+classifier. All three run zero-shot here (rules + model, the LAB-1150 fixture list,
+[eval/results/2026-10-27-fast-demo-ner/](../eval/results/2026-10-27-fast-demo-ner/README.md)):
+
+| | bardsai EU PII v1 (chosen) | GLiNER multi v2.1 | Davlan XLM-R base (old default) |
+|---|---:|---:|---:|
+| smoke leak, hu / en / de | **1.9 / 0.0 / 0.0 %** | 2.8 / 3.3 / 5.4 % | 7.5 / 10.0 / 8.1 % |
+| smoke F1, hu / en / de | 91.7 / 88.3 / 98.8 | 95.1 / 94.4 / 91.6 | 93.7 / 90.7 / 96.1 |
+| smoke over-masking, max | 23.1 % (en) | 10.0 % | 10.8 % |
+| ai4privacy leak, pooled | **10.4 %**\* | 22.5 % | 28.7 % |
+| ai4privacy F1, mean | **84.6**\* | 75.9 | 77.0 |
+| NER per ~400-char message, M1 Max CPU p50 / p95 | 54 / 101 ms† | 107 / 126 ms | 48 / 56 ms† |
+| Installs with | `ner` extra | `gliner` extra (conflicts with `ner`) | `ner` extra |
+| Licence | Apache-2.0 | Apache-2.0 | AFL-3.0 |
+
+\* Not an out-of-distribution check: its card lists OpenPII among its training data, and the
+ai4privacy fixtures are OpenPII validation rows. The hand-written smoke sets are the fair
+comparison, and it leaks least there too.
+† Same session, machine loaded (load average 70–100 from other jobs); MPS p50 16.7 vs
+16.4 ms. GLiNER's figure is from LAB-1150 on an idle machine.
+
+Leak is the selection rule, so it wins on every set. It also installs with the existing `ner`
+extra, so `uvx`, `make demo` and the demo image need no second environment, unlike GLiNER
+(`gliner` 0.2.29 pins `transformers<5.17`). The cost is over-masking on the English smoke set
+(23.1 %): 9 of its 39 masked spans there are not in the gold (4 place names as `ADDRESS`,
+3 `PERSON`, 2 `ID_DOCUMENT`). Not chosen:
+
+- its v2 and v3 successors (Apache-2.0, mmBERT base, 1.2 GB) score higher on their own card,
+  but need the card's word-level decoder; with pii-guard's first-sub-token decoder they cut
+  names into fragments (LAB-1192 sanity check), so they would need a decoder change first;
+- `iiiorg/piiranha-v1-detect-personal-information`: CC BY-NC-ND 4.0, not open for this use.
+
+**Older models and licences.**
+
+- Previous zero-shot default (until LAB-1192):
+  [`Davlan/xlm-roberta-base-ner-hrl`](https://huggingface.co/Davlan/xlm-roberta-base-ner-hrl)
   (AFL-3.0; XLM-RoBERTa-base trained on PER/ORG/LOC/DATE in ten languages, none of them
   Hungarian). `LOC` maps to `ADDRESS`, so addresses come out as fragments. It doesn't find
-  dates of birth.
+  dates of birth. It still loads with `PII_GUARD_NER_MODEL=Davlan/xlm-roberta-base-ner-hrl`.
 - Fine-tuned: [`FacebookAI/xlm-roberta-base`](https://huggingface.co/FacebookAI/xlm-roberta-base)
   (MIT) trained with `training/ner/train.py` (`training/ner/config.toml`) on 223 synthetic hu+en
   documents (`pii-guard eval generate --n 160 --seed 7`, train split). Labels are the pii-guard
@@ -195,16 +272,19 @@ ablation, which never saw those rows, is the held-out figure.
 - Use `xlmr-base-v2-hn` for fast mode. It meets the ~150 ms CPU p95 limit everywhere,
   including 85 ms on a 4-vCPU T4 container.
 - Use large + hard negatives on GPU or MPS hosts.
-- Neither checkpoint is published (the owner decides), so point `PII_GUARD_NER_MODEL` at one you trained.
+- Neither checkpoint is published yet. The owner decided to publish the trained base model as
+  `hdkiller/pii-guard-ner-xlmr-base` (LAB-1306, step 2 of [the resolution order](#which-ner-model-fast-mode-runs));
+  until then point `PII_GUARD_NER_MODEL` at one you trained.
 
 **GLiNER:**
 - GLiNER is not adopted as the default. It leaks and over-masks more zero-shot, over-masks
   21 % on en-smoke fine-tuned, and is 2–5× slower.
 - Adding GLiNER's spans to the default's in a union doesn't lower the leak, but it raises
   smoke over-masking to 9.5 %.
-- It is still the best public **fallback** when no trained checkpoint exists. Zero-shot it
-  leaks 22.5 % vs Davlan's 28.7 % on ai4privacy, and 2.8–5.4 % vs 7.5–10 % on smoke. It is
-  Apache-2.0. LAB-1192 wires it into `make demo`.
+- LAB-1150 named it the best public **fallback** of the two it compared: zero-shot it leaks
+  22.5 % vs Davlan's 28.7 % on ai4privacy, and 2.8–5.4 % vs 7.5–10 % on smoke. LAB-1192 then
+  measured a third, the bards.ai EU PII model, which leaks less than both and installs with the
+  `ner` extra, so that is the fallback ([above](#which-ner-model-fast-mode-runs)).
 - The `gliner` extra pins `transformers<5.17`, so it can't be installed alongside `ner`.
 
 **Spend:** about $4.85 of Modal: Glimmer for the corpus and labels, 8 XLM-R trainings, 1

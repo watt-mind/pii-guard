@@ -4,6 +4,12 @@ Used by ``scripts/demo.py`` (``make demo``) and ``scripts/smoke.py`` (``make smo
 process binds to 127.0.0.1. Nothing here prints a key: the decision "mock or real upstream" is
 made from whether variables are set, never from their values.
 
+Mode: ``fast`` (default) runs rules + the NER model that :mod:`pii_guard.detect.ner_resolve`
+picks (``PII_GUARD_NER_MODEL``, else the published checkpoint, else the public fallback,
+downloaded once into ``~/.cache/pii-guard/models``); it needs the ``ner`` extra (``make demo``
+installs it). ``rules`` runs the rules only, offline, nothing downloaded (``make demo
+MODE=rules``, ``make smoke``).
+
 Upstream, in order:
 
 1. ``--mock`` (the smoke test): always the mock upstream;
@@ -15,7 +21,6 @@ Upstream, in order:
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import secrets
 import shutil
@@ -29,10 +34,14 @@ from pathlib import Path
 
 import httpx
 
+from pii_guard.detect.ner_resolve import NerChoice, describe, ensure, extra_installed, resolve
+from pii_guard.types import DetectionError
+
 ROOT = Path(__file__).resolve().parent.parent
 BASETEN_URL = "https://inference.baseten.co/v1"
 BASETEN_MODEL = "meta-models/muse-spark-open-1026"
 MOCK_MODEL = "pii-guard-mock"
+MODES = ("fast", "rules")
 
 
 def dotenv(path: Path = ROOT / ".env") -> dict[str, str]:
@@ -62,8 +71,12 @@ class Plan:
     ui_port: int = 5173
     upstream: str = "mock"  # mock | configured | baseten
     model: str = MOCK_MODEL
+    mode: str = "fast"  # fast | rules
     ner: str | None = None
     audit: bool = False
+    #: Why fast mode runs without the NER (banner hint), when it does.
+    ner_missing: str = ""
+    ner_choice: NerChoice | None = None
     traffic_log: str = "masked"
     ui: bool = True
     env: dict[str, str] = field(default_factory=dict)
@@ -84,9 +97,12 @@ def plan(
     traffic_log: str | None = None,
     api_port: int = 8787,
     mock_port: int = 8790,
+    mode: str = "fast",
 ) -> Plan:
+    if mode not in MODES:
+        raise ValueError(f"mode must be one of {MODES}")
     env_file = dotenv()
-    p = Plan(api_port=api_port, mock_port=mock_port, ui=ui)
+    p = Plan(api_port=api_port, mock_port=mock_port, ui=ui, mode=mode)
     p.traffic_log = traffic_log or setting("PII_GUARD_TRAFFIC_LOG", env_file) or "masked"
     if p.traffic_log == "off":
         p.traffic_log = "masked"  # the demo is about watching traffic
@@ -122,14 +138,38 @@ def plan(
         env["PII_GUARD_LLM_DETECTOR_API_KEY"] = setting("BASETEN_API_KEY", env_file)
         env.setdefault("PII_GUARD_LLM_DETECTOR_REASONING_EFFORT", "low")
         p.audit = True
-    ner_model = setting("PII_GUARD_NER_MODEL", env_file)
-    if ner_model and importlib.util.find_spec("transformers") is not None:
-        p.ner = ner_model
-        env["PII_GUARD_NER_MODEL"] = ner_model
-    elif force_mock:
+    if mode == "rules":
+        # Rules only: no configured model, no fallback, nothing downloaded.
         env["PII_GUARD_NER_MODEL"] = ""
+        env["PII_GUARD_NER_FALLBACK"] = "off"
+    else:
+        choice = resolve(
+            configured=setting("PII_GUARD_NER_MODEL", env_file) or None,
+            revision=setting("PII_GUARD_NER_REVISION", env_file) or None,
+            published=setting("PII_GUARD_NER_PUBLISHED_MODEL", env_file) or None,
+            fallback=setting("PII_GUARD_NER_FALLBACK", env_file) or None,
+        )
+        if not extra_installed():
+            p.ner_missing = "the 'ner' extra is not installed: `make demo` installs it"
+            env["PII_GUARD_NER_MODEL"] = ""
+            env["PII_GUARD_NER_FALLBACK"] = "off"
+        elif choice.model is None:
+            p.ner_missing = choice.reason
+        else:
+            p.ner = describe(choice).removeprefix("rules + NER: ")
+            p.ner_choice = choice
     p.env = env
     return p
+
+
+def prepare_ner(p: Plan) -> None:
+    """Download a missing pinned NER model before the API starts (progress on stderr)."""
+    if p.ner_choice is not None and not p.ner_choice.ready:
+        try:
+            ensure(p.ner_choice)
+        except DetectionError as exc:
+            raise RuntimeError(exc.message) from None
+        p.ner = p.ner.replace(", downloads on first run", "")
 
 
 def ocr_status() -> str:
@@ -157,7 +197,12 @@ def banner(p: Plan) -> str:
         "configured": "PII_GUARD_UPSTREAM_BASE_URL from your environment / .env",
         "baseten": f"Baseten Model APIs ({p.model}), key from BASETEN_API_KEY",
     }[p.upstream]
-    fast = f"rules + NER ({Path(p.ner).name})" if p.ner else "rules only (set PII_GUARD_NER_MODEL)"
+    if p.ner:
+        fast = f"rules + NER: {p.ner}"
+    elif p.mode == "rules":
+        fast = "rules only (MODE=rules: offline, no NER model; `make demo` for rules + NER)"
+    else:
+        fast = f"rules only: {p.ner_missing}"
     audit = (
         "rules + NER + LLM detector, opt in with X-PII-Guard-Mode: audit (quality checks)"
         if p.audit

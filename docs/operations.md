@@ -67,8 +67,12 @@ What it does:
   upstream (the one below, on a random loopback port) echoes the masked text, and both the
   banner and a strip above the UI say so. `--mock` forces it.
 - **Mode.** Fast: rules, plus NER when the `ner` extra is installed (it pulls torch). The
-  strip and the banner list the active detectors, and the banner prints the exact
-  `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up` line to add NER.
+  NER model resolves as in [models.md](models.md#which-ner-model-fast-mode-runs): on the
+  first run the published checkpoint or the public fallback is downloaded once (about 1.1 GB)
+  before the server starts. The strip and the banner list the active detectors, the banner
+  names the NER model (`NER model  …@… (public fallback, Apache-2.0)`), and without the extra
+  it prints the exact `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up`
+  line to add NER.
   `PII_GUARD_GATEWAY_MODE` overrides the mode.
 - **Images.** They need OCR (the `ocr` extra plus the Tesseract binary) and face detection (the
   `local-vision` extra with its model, or `META_API_KEY` for SAM 3.1; see
@@ -100,13 +104,25 @@ workflow `release.yml` and environment `pypi`; on GitHub, an environment named `
 
 Prerequisites: [uv](https://docs.astral.sh/uv/) and, for the UI, Node 22+ with
 [pnpm](https://pnpm.io) (the first run installs the UI dependencies, which needs the network
-once). No key and no model download are needed.
+once). No key is needed.
 
 ```bash
-make demo           # mock upstream + API/gateway + UI, prints where to go
-make demo-traffic   # in a second terminal: scripted fictional requests through the gateway
-make smoke          # start, send the traffic, assert, stop (what CI runs)
+make demo             # mock upstream + API/gateway + UI in fast mode (rules + NER), prints where to go
+make demo MODE=rules  # the same, rules only: offline, no NER extra, no model download
+make demo-traffic     # in a second terminal: scripted fictional requests through the gateway
+make smoke            # start, send the traffic, assert, stop; rules only (what CI runs)
+make smoke-fast       # the same in fast mode with the NER (local)
 ```
+
+**First run of `make demo`.** It installs the `ner` extra (torch, transformers) and, unless
+`PII_GUARD_NER_MODEL` is set, downloads the NER model before the API starts, printing
+`ner: downloading … (Apache-2.0, about 1110 MB, first run only)`. The model is the published
+pii-guard checkpoint once it is pinned (LAB-1306), until then the public fallback of
+[models.md](models.md#which-ner-model-fast-mode-runs), a stop-gap that over-masks (about 23 % on
+en-smoke), pinned to a hub revision and
+checked against its SHA-256, stored in `~/.cache/pii-guard/models/ner/`
+(`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK=cached`
+uses it only if it is already there; `off` (what `MODE=rules` sets) never uses it.
 
 `make demo` starts, all bound to 127.0.0.1:
 
@@ -123,8 +139,11 @@ It prints a banner with the URLs and what it found:
   Muse Spark Open). `uv run python scripts/demo.py --mock` forces the mock. `make demo-traffic`
   sends `model: pii-guard-mock`; set `PII_GUARD_DEMO_MODEL` for a real upstream. The demo
   traffic is fictional, so it may go to a hosted model.
-- **Fast mode** uses rules + the distilled NER when `PII_GUARD_NER_MODEL` points to a checkpoint
-  and the `ner` extra is installed (`uv sync --extra ner`), else rules only.
+- **Fast mode** uses rules + the NER model that resolves (`PII_GUARD_NER_MODEL`, else the
+  published pii-guard checkpoint once it is pinned, else the public fallback) and names it,
+  for example `fast mode  rules + NER: bardsai/eu-pii-anonimization-multilang@62ca57123687
+  (public fallback, Apache-2.0)`. Rules only with `MODE=rules`, or when the `ner` extra is
+  missing (the banner says so).
 - **Audit mode** (opt in with the header `X-PII-Guard-Mode: audit`) is available when an LLM
   detector key is set (`PII_GUARD_LLM_DETECTOR_API_KEY`, or `BASETEN_API_KEY`).
 
@@ -161,25 +180,31 @@ the model except in the one labelled scenario:
   `make demo-traffic` prints it as such, and the Live traffic tab marks the call
   "needs fast mode (NER) · expected miss" with the reason.
 
-**In fast mode with the NER** (`PII_GUARD_NER_MODEL` set, `uv sync --extra ner`) the labelled
-name is masked too, and the tab says the NER ran.
+**In fast mode with the NER** (`make demo`, the default) the labelled name is masked too, and
+the tab says the NER ran. With `make demo MODE=rules` it is the expected miss described above.
 
 ### Smoke test
 
-`make smoke` (`scripts/smoke.py`) starts the mock upstream and the API on ports 18790 / 18787
-(the UI is not needed), sends the demo traffic and fails unless:
+`make smoke` (`scripts/smoke.py --mode rules`) starts the mock upstream and the API on ports
+18790 / 18787 (the UI is not needed), rules only, sends the demo traffic and fails unless:
 
 1. every answer comes back restored **exactly** (`Echo: <the original message>`, or tool
    arguments equal to `{"text": <the original message>}`);
 2. no gold value of any scenario reached the upstream, raw, JSON-escaped or without spaces
    (the mock keeps what it received, `GET /_mock/received`). In rules-only mode that covers
    every scenario except the one labelled "needs fast mode (NER)": its name is printed as an
-   expected miss, not a failure. With `PII_GUARD_NER_MODEL` set, its name must be masked too;
+   expected miss, not a failure;
 3. every call has a traffic event with a timing breakdown, and the log holds no raw session
    id and no credentials.
 
-It runs in CI on every pull request. The same checks run in-process in
-`tests/bench/test_bench.py`.
+It runs in CI on every pull request, rules only to keep CI light (no torch, no model). The
+same checks run in-process in `tests/bench/test_bench.py`.
+
+`make smoke-fast` (`scripts/smoke.py --mode fast`, local) runs the same traffic in fast mode
+with the resolved NER model (downloaded once on the first run, as for `make demo`). It also
+fails unless the NER ran on the call labelled "needs fast mode (NER)" (its traffic event lists
+`ner`) and that call's name was masked: no expected misses. A fresh cache
+(`PII_GUARD_MODELS_DIR=$(mktemp -d) make smoke-fast`) checks the clean-checkout path.
 
 ### Docker
 
@@ -188,8 +213,16 @@ docker compose --profile demo up --build
 ```
 
 starts the same stack in containers: `mock-upstream`, `demo-api` on
-`http://127.0.0.1:8788` (traffic log `masked`, `fast` mode) and `ui` on
-`http://localhost:5173`, next to the plain `api` service on 8787. A real upstream:
+`http://127.0.0.1:8788` (traffic log `masked`, `fast` mode with the NER) and `ui` on
+`http://localhost:5173`, next to the plain `api` service on 8787. The demo services use their
+own image, `pii-guard:demo`, built with the `ner` extra (`PII_GUARD_EXTRAS` build argument;
+the plain `pii-guard:dev` image stays without torch). It is large: 9.6 GB on arm64, because
+the locked torch wheel pulls the CUDA libraries even there (`pii-guard:dev` is 268 MB;
+LAB-1308). On the first start `demo-api` downloads the NER model into the `pii-guard-models` volume before the server listens (`docker compose
+logs -f demo-api` shows `ner: downloading …`); its healthcheck allows 15 minutes for that, and
+the UI waits until `demo-api` is healthy. Later starts reuse the volume (`docker compose down
+-v` drops it). Rules only, offline, no download:
+`PII_GUARD_DEMO_NER_FALLBACK=off docker compose --profile demo up --build`. A real upstream:
 `PII_GUARD_DEMO_UPSTREAM_URL` and `PII_GUARD_DEMO_UPSTREAM_API_KEY`. Inside a container the
 server binds `0.0.0.0`, so the traffic log can only be `masked` there (see below). Send the demo
 traffic with `uv run python scripts/demo_traffic.py --url http://127.0.0.1:8788`.

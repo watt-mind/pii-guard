@@ -142,17 +142,22 @@ without the UI. To put an agent behind it, run `pii-guard connect pi` with the s
 From a checkout:
 
 ```bash
-make demo           # API + gateway + UI on a mock upstream: http://localhost:5173
+make demo           # API + gateway + UI on a mock upstream, fast mode (rules + NER): http://localhost:5173
 make demo-traffic   # second terminal: fictional calls (with tools and streaming) through the gateway
-make smoke          # the same as a pass/fail check (CI runs it)
+make smoke-fast     # the same as a pass/fail check, with the NER
+make smoke          # rules only, offline (CI runs it)
 ```
 
-Without a NER checkpoint, fast mode is rules only and free-text names need known values. With
-`uv sync --extra ner` and `PII_GUARD_NER_MODEL` pointing at one
-([models.md](docs/models.md#ner-detector)) it masks names too, in the gateway and on the Mask
-and Images screens alike (the screenshots use one). A set `PII_GUARD_NER_MODEL` without the
-extra stops startup instead of quietly running rules only. Docker:
-`docker compose --profile demo up --build`. More: [docs/operations.md](docs/operations.md).
+`make demo` runs **fast mode with the NER** from a clean checkout: it installs the `ner` extra
+and, without `PII_GUARD_NER_MODEL`, downloads a NER model once (about 1.1 GB, pinned
+revision, into `~/.cache/pii-guard/models`; the banner says which model runs). Until the
+trained pii-guard checkpoint is published, that is a public Apache-2.0 PII model: a stop-gap
+that over-masks (about 23 % on the English smoke set). Free-text names are then masked with no known values, in the gateway and on the Mask and
+Images screens alike. `make demo MODE=rules` is rules only: offline, no download, names need
+known values. Which model and why: [models.md](docs/models.md#which-ner-model-fast-mode-runs).
+A set `PII_GUARD_NER_MODEL` without the extra stops startup instead of quietly running rules
+only. Docker: `docker compose --profile demo up --build`. More:
+[docs/operations.md](docs/operations.md).
 
 ## How it works
 

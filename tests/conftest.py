@@ -41,6 +41,10 @@ def clean_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]
     for key in list(os.environ):
         if key.startswith("PII_GUARD_") or key == "META_API_KEY":
             monkeypatch.delenv(key, raising=False)
+    # No NER model download from a test: an empty model cache, the fallback used only if cached
+    # (so with the `ner` extra installed the default stack is still rules only; LAB-1192).
+    monkeypatch.setenv("PII_GUARD_MODELS_DIR", str(tmp_path / "models"))
+    monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "cached")
     monkeypatch.chdir(tmp_path)
     get_settings.cache_clear()
     yield

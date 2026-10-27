@@ -50,6 +50,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from pii_guard.detect import ner_resolve
 from pii_guard.types import DetectionError, EntityType, Span
 
 __all__ = [
@@ -74,12 +75,16 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-#: Zero-shot default: XLM-RoBERTa-base fine-tuned for PER/ORG/LOC/DATE NER on ten high-resource
-#: languages (AFL-3.0). Hungarian is not among them; it works cross-lingually. Point
+#: Default without ``PII_GUARD_NER_MODEL``: the public fallback of
+#: :mod:`pii_guard.detect.ner_resolve` (an Apache-2.0 multilingual PII token classifier,
+#: LAB-1192), loaded from the pii-guard model cache and downloaded there on first use. Point
 #: ``PII_GUARD_NER_MODEL`` at the fine-tuned model (``training/ner/``) for better results.
-DEFAULT_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
+DEFAULT_MODEL = ner_resolve.PUBLIC_FALLBACK.repo_id
 #: Pinned hub revision of :data:`DEFAULT_MODEL` (used only when the default model is used).
-DEFAULT_REVISION = "253f557bd8249b8515114cfd7f71974fe5fa4d2f"
+DEFAULT_REVISION = ner_resolve.PUBLIC_FALLBACK.revision
+#: The previous zero-shot default (LAB-1106 to LAB-1150): XLM-RoBERTa base NER on ten
+#: high-resource languages, AFL-3.0. Still loads with ``PII_GUARD_NER_MODEL``.
+DAVLAN_MODEL = "Davlan/xlm-roberta-base-ner-hrl"
 MODEL_ENV_VAR = "PII_GUARD_NER_MODEL"
 REVISION_ENV_VAR = "PII_GUARD_NER_REVISION"
 DEVICE_ENV_VAR = "PII_GUARD_NER_DEVICE"
@@ -124,6 +129,17 @@ LABEL_MAP: dict[str, EntityType] = {
     "NATIONAL_ID_HU_TAX": EntityType.NATIONAL_ID_HU_TAX,
     "NATIONAL_ID_HU_TAJ": EntityType.NATIONAL_ID_HU_TAJ,
     "BANK_ACCOUNT": EntityType.BANK_ACCOUNT,
+    # The public fallback's labels (bardsai/eu-pii-anonimization-multilang, LAB-1192).
+    "PERSON_NAME": EntityType.PERSON,
+    "ORGANIZATION_NAME": EntityType.ORGANIZATION,
+    "POSTAL_ADDRESS": EntityType.ADDRESS,
+    "LOCATION": EntityType.ADDRESS,
+    "EMAIL_ADDRESS": EntityType.EMAIL,
+    "PHONE_NUMBER": EntityType.PHONE,
+    "DOCUMENT_IDENTIFIER": EntityType.ID_DOCUMENT,
+    "PERSON_IDENTIFIER": EntityType.ID_DOCUMENT,
+    "BANK_ACCOUNT_IDENTIFIER": EntityType.BANK_ACCOUNT,
+    "PAYMENT_CARD": EntityType.BANK_ACCOUNT,
 }
 
 #: Minimum span score per language and type. ``"default"`` applies to every other language.
@@ -376,8 +392,12 @@ class NerDetector:
 
     Every argument is optional:
 
-    - ``model`` / ``revision``: hub id or local directory, default ``PII_GUARD_NER_MODEL`` then
-      :data:`DEFAULT_MODEL` (pinned to :data:`DEFAULT_REVISION`), and ``PII_GUARD_NER_REVISION``.
+    - ``model`` / ``revision``: hub id or local directory, default ``PII_GUARD_NER_MODEL``, then
+      the published checkpoint, then the public fallback :data:`DEFAULT_MODEL` from the model
+      cache (:mod:`pii_guard.detect.ner_resolve`; downloaded on first load), and
+      ``PII_GUARD_NER_REVISION``.
+    - ``published`` / ``fallback``: ``PII_GUARD_NER_PUBLISHED_MODEL`` and
+      ``PII_GUARD_NER_FALLBACK`` (``download`` | ``cached`` | ``off``) for that resolution.
     - ``device``: ``auto`` (default, ``PII_GUARD_NER_DEVICE``), ``cpu``, ``mps``, ``cuda``.
     - ``backend_kind``: ``transformers`` (default) or ``gliner`` (``PII_GUARD_NER_BACKEND``):
       a GLiNER checkpoint, by default the public zero-shot
@@ -414,19 +434,34 @@ class NerDetector:
         backend: NerBackend | Callable[[], NerBackend] | None = None,
         preload: bool = True,
         backend_kind: str | None = None,
+        published: str | None = None,
+        fallback: str | None = None,
     ) -> None:
         kind = (backend_kind or os.environ.get(BACKEND_ENV_VAR) or "transformers").strip().lower()
         if kind not in BACKENDS:
             raise ValueError(f"ner backend must be one of {BACKENDS}")
         self.backend_kind = kind
+        self._published, self._fallback = published, fallback
         env_model = os.environ.get(MODEL_ENV_VAR)
+        default_revision: str | None
+        #: How the model was picked (:func:`pii_guard.detect.ner_resolve.resolve`); ``None``
+        #: for an explicit or GLiNER model.
+        self.choice: ner_resolve.NerChoice | None = None
         if kind == "gliner":
             from pii_guard.detect import ner_gliner
 
             default_model, default_revision = ner_gliner.DEFAULT_MODEL, ner_gliner.DEFAULT_REVISION
-        else:
+            self.model = model or env_model or default_model
+        elif model or env_model:
             default_model, default_revision = DEFAULT_MODEL, DEFAULT_REVISION
-        self.model = model or env_model or default_model
+            self.model = model or env_model or default_model
+        else:
+            # Published pii-guard checkpoint, else the public fallback (LAB-1192).
+            # Nothing resolved: load() refuses (an injected backend still works).
+            choice = ner_resolve.resolve(published=published, fallback=fallback)
+            self.choice = choice
+            self.model = choice.model or DEFAULT_MODEL
+            default_model, default_revision = self.model, choice.revision
         self.revision = (
             revision
             or os.environ.get(REVISION_ENV_VAR)
@@ -512,6 +547,14 @@ class NerDetector:
         else:
             if not dependencies_available():
                 raise DetectionError("ner detector needs the 'ner' extra (torch, transformers)")
+            if self.choice is not None and self.choice.model is None:
+                raise DetectionError(f"no ner model: {self.choice.reason}")
+            if self.choice is not None and not self.choice.ready:
+                # The published checkpoint or the public fallback, first use: fetch it (LAB-1192).
+                self.model = ner_resolve.ensure(self.choice)
+                self.choice = ner_resolve.resolve(
+                    published=self._published, fallback=self._fallback
+                )
             backend = TransformersBackend(
                 self.model,
                 revision=self.revision,

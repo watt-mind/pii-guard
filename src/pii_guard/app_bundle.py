@@ -27,6 +27,7 @@ from starlette.types import Scope
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
+from pii_guard.detect import ner_resolve
 
 __all__ = [
     "UI_DIR",
@@ -57,6 +58,8 @@ class Status:
     detectors: list[str] = field(default_factory=list)
     #: What images still need (empty: images work): "ocr", "tesseract", "segmenter".
     image_gaps: list[str] = field(default_factory=list)
+    #: Which NER model runs, or why none does (:func:`pii_guard.detect.ner_resolve.describe`).
+    ner: str = ""
 
     @property
     def mock(self) -> bool:
@@ -336,9 +339,19 @@ def _banner(opts: UpOptions, status: Status, traffic_log: str, *, ui: bool) -> s
         f"  upstream       {upstream}",
         f"  detectors      {detectors}   (gateway fast mode)",
     ]
-    if "ner" not in status.detectors:
-        lines.append(f"{pad}free-text names need NER (pulls torch, ~1 GB):")
-        lines.append(f"{pad}{launcher('ner')} up")
+    if "ner" in status.detectors and status.ner:
+        lines.append(f"  NER model      {status.ner.removeprefix('rules + NER: ')}")
+    elif "ner" not in status.detectors:
+        if status.ner and ner_resolve.extra_installed():
+            # The extra is there, but no model resolved (fallback off, or not cached).
+            lines.append(f"{pad}{status.ner}")
+            lines.append(f"{pad}PII_GUARD_NER_FALLBACK=download downloads the NER model once")
+        else:
+            lines.append(
+                f"{pad}free-text names need NER (pulls torch, then downloads the model "
+                "once, ~1 GB each):"
+            )
+            lines.append(f"{pad}{launcher('ner')} up")
     lines.append(f"  traffic log    {traffic_log}   (live: {url}/v1/traffic/stream)")
     lines.append(f"  images         {status.images}")
     lines += [f"{pad}{hint}" for hint in _image_hints(status.image_gaps)]
@@ -446,11 +459,18 @@ def run_up(opts: UpOptions) -> int:
     try:
         try:
             settings = get_settings()
+            from pii_guard.detect.stack import ner_choice
+
+            choice = ner_choice(settings)
             status = Status(
                 upstream=upstream,
                 detectors=active_detectors(settings),
                 image_gaps=image_gaps(settings),
+                ner=ner_resolve.describe(choice),
             )
+            if "ner" in status.detectors and not choice.ready:
+                # Loading the app fetches it (progress on stderr): say why startup waits.
+                print("pii-guard up: first run, fetching the NER model", file=sys.stderr)
             app = create_bundle_app(status, settings)
         except Exception as exc:  # configuration errors: say so, don't dump a traceback
             print(f"pii-guard up: {exc}", file=sys.stderr)

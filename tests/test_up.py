@@ -240,3 +240,31 @@ def test_up_process_serves_everything_and_stops_on_sigint(tmp_path: Path) -> Non
     assert "offline mock model" in out.decode()
     assert "pii-guard stopped" in out.decode()
     assert "Traceback" not in out.decode()
+
+
+def test_banner_names_the_ner_model_or_why_there_is_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LAB-1192: the banner says which NER model fast mode runs."""
+    from pii_guard.detect import ner_resolve
+
+    line = "rules + NER: fictional/pii-ner@0123456789ab (public fallback, Apache-2.0)"
+    status = Status(upstream="mock", detectors=["rules", "ner"], ner=line)
+    text = _banner(UpOptions(port=18999), status, "masked", ui=True)
+    assert "NER model      fictional/pii-ner@0123456789ab (public fallback" in text
+    off = "rules only (no NER model configured and PII_GUARD_NER_FALLBACK=off)"
+    monkeypatch.setattr(ner_resolve, "extra_installed", lambda: True)
+    text = _banner(
+        UpOptions(port=18999),
+        Status(upstream="mock", detectors=["rules"], ner=off),
+        "masked",
+        ui=True,
+    )
+    assert "PII_GUARD_NER_FALLBACK=off" in text
+    assert "PII_GUARD_NER_FALLBACK=download downloads the NER model once" in text
+    assert "[ner]" not in text
+    monkeypatch.setattr(ner_resolve, "extra_installed", lambda: False)
+    text = _banner(
+        UpOptions(port=18999), Status(upstream="mock", detectors=["rules"]), "masked", ui=True
+    )
+    assert "free-text names need NER" in text and "[ner]" in text

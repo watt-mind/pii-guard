@@ -9,19 +9,26 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Dependencies first, so code changes don't invalidate this layer. The `ocr` extra
-# (pytesseract) reads the text in images; without it image parts are refused (ADR 0006).
-# The `local-vision` extra (OpenCV headless) runs YuNet, the on-device face and ID-photo
-# detector of the default hybrid segmenter (PII_GUARD_SEGMENTER, LAB-1245).
+# Extras installed into the image. The `ocr` extra (pytesseract) reads the text in images;
+# without it image parts are refused (ADR 0006). The `local-vision` extra (OpenCV headless)
+# runs YuNet, the on-device face and ID-photo detector of the default hybrid segmenter
+# (PII_GUARD_SEGMENTER, LAB-1245). The demo image (compose.yaml, profile demo) adds `ner`
+# (torch + transformers) for fast mode with the NER; its model is fetched at run time into a
+# volume, never baked in (LAB-1192).
+ARG PII_GUARD_EXTRAS="ocr local-vision"
+
+# Dependencies first, so code changes don't invalidate this layer.
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-dev --extra ocr --extra local-vision --no-install-project
+    uv sync --locked --no-dev $(for e in $PII_GUARD_EXTRAS; do printf -- '--extra %s ' "$e"; done) \
+        --no-install-project
 
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --extra ocr --extra local-vision --no-editable
+    uv sync --locked --no-dev $(for e in $PII_GUARD_EXTRAS; do printf -- '--extra %s ' "$e"; done) \
+        --no-editable
 
 # The YuNet model (0.23 MB, MIT, OpenCV model zoo): fetched from its pinned URL and checked
 # against its pinned SHA-256 (pii_guard.visual.segment.YUNET); the build fails on a mismatch.
@@ -43,6 +50,9 @@ RUN groupadd --system --gid 10001 piiguard \
 
 COPY --from=build --chown=piiguard:piiguard /app/.venv /app/.venv
 COPY --from=build --chown=piiguard:piiguard /app/models /app/models
+# Writable mount point for downloaded models (the demo's NER volume), owned by the app user so
+# a fresh named volume mounted here is too.
+RUN mkdir -p /app/cache && chown piiguard:piiguard /app/cache
 
 # 0.0.0.0 inside the container: publish the port on 127.0.0.1 only (compose.yaml does). The API
 # has no authentication unless PII_GUARD_API_TOKEN is set (docs/operations.md, Exposure).

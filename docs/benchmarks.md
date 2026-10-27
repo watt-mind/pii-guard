@@ -69,6 +69,7 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | pii-guard Muse Glimmer (low) † | 10 | 97.1% | 97.1% | 97.1% | 0.0% | 3.3% | 0.0% | 100.0% | 7.7 s | 2026-10-27 | `c759b54` |
 | pii-guard Muse Glimmer (medium) † | 10 | 84.6% | 97.1% | 90.4% | 0.0% | 3.3% | 11.8% | 100.0% | 13.1 s | 2026-10-27 | `c759b54` |
 | pii-guard rules + Muse Spark 1.3 † | 10 | 94.4% | 100.0% | 97.1% | 0.0% | 3.3% | 3.2% | 100.0% | 7.0 s | 2026-10-26 | `62b64fc` |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 51 | 87.6% | 97.9% | 92.5% | 1.2% | 4.6% | 12.2% | 100.0% | 21 ms* | 2026-10-27 | `e126829` |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 51 | 94.4% | 92.8% | 93.6% | 8.1% | 4.6% | 5.7% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + NER (distilled base) † | 10 | 100.0% | 97.1% | 98.5% | 3.3% | 3.3% | 0.0% | 100.0% | 35 ms | 2026-10-27 | `c611f99` |
 | pii-guard rules + NER (fine-tuned) † | 10 | 80.0% | 94.1% | 86.5% | 3.3% | 6.7% | 16.2% | 100.0% | 14 ms | 2026-10-26 | `0ba3c1a` |
@@ -105,6 +106,7 @@ By language:
 | pii-guard Muse Glimmer (low) | — | 97.1% | — | — | 0.0% | — |
 | pii-guard Muse Glimmer (medium) | — | 90.4% | — | — | 0.0% | — |
 | pii-guard rules + Muse Spark 1.3 | — | 97.1% | — | — | 0.0% | — |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 98.8% | 88.3% | 91.7% | 0.0% | 0.0% | 1.9% |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 96.1% | 90.7% | 93.7% | 8.1% | 10.0% | 7.5% |
 | pii-guard rules + NER (distilled base) | — | 98.5% | — | — | 3.3% | — |
 | pii-guard rules + NER (fine-tuned) | — | 86.5% | — | — | 3.3% | — |
@@ -173,6 +175,7 @@ mixed; documents: de 200 + en 200 + hu 200.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 600 | 98.5% | 36.3% | 53.1% | 63.1% | 1.6% | 0.1% | 100.0% | 0.40 ms | 2026-10-27 | `18b15fa` |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 600 | 92.8% | 71.7% | 80.9% | 27.6% | 1.9% | 2.4% | 100.0% | 28 ms | 2026-10-27 | `752ff9a` |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 600 | 83.1% | 85.5% | 84.3% | 10.4% | 1.5% | 9.6% | 100.0% | 32 ms* | 2026-10-27 | `e126829` |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 600 | 84.9% | 70.3% | 76.9% | 28.7% | 4.4% | 10.3% | 100.0% | 22 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 600 | 98.4% | 99.0% | 98.7% | 0.4% | 0.1% | 0.9% | 100.0% | 16 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 600 | 97.9% | 99.0% | 98.4% | 0.4% | 0.1% | 1.4% | 100.0% | 22 ms | 2026-10-27 | `18b15fa` |
@@ -200,6 +203,7 @@ By language:
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 59.0% | 49.8% | 51.4% | 57.5% | 65.2% | 65.4% |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 84.5% | 81.8% | 76.7% | 23.4% | 25.3% | 33.6% |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 88.4% | 86.2% | 79.0% | 7.8% | 11.2% | 11.8% |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 80.4% | 77.6% | 73.1% | 24.5% | 26.8% | 34.3% |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 98.6% | 98.0% | 99.4% | 0.5% | 0.2% | 0.4% |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 98.3% | 97.7% | 99.3% | 0.3% | 0.2% | 0.5% |
@@ -227,6 +231,7 @@ By language:
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 63.1% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 71.1% (907/1276) |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 27.6% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 10.4% (133/1276) |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 10.4% | 99.4% (165/166) | 0.0% (0/166) | 69.7% (518/743) | 20.7% (154/743) | 5.8% (74/1276) |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 28.7% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 12.3% (157/1276) |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 0.6% (8/1276) |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 0.6% (8/1276) |
@@ -296,6 +301,7 @@ hand-written; documents: hu 44.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 44 | 100.0% | 61.3% | 76.0% | 2.5% | 5.0% | 0.0% | 100.0% | 0.30 ms | 2026-10-27 | `7337ffa` |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 21 ms | 2026-10-27 | `910a6a2` |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 44 | 74.4% | 100.0% | 85.3% | 0.0% | 2.5% | 1.6% | 100.0% | 22 ms | 2026-10-27 | `e126829` |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 44 | 70.5% | 97.9% | 82.0% | 0.0% | 2.5% | 1.6% | 100.0% | 15 ms | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 44 | 78.8% | 95.7% | 86.4% | 0.0% | 2.5% | 5.6% | 100.0% | 28 ms | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 44 | 74.4% | 96.8% | 84.1% | 0.0% | 2.5% | 5.7% | 100.0% | 28 ms | 2026-10-27 | `910a6a2` |
@@ -316,6 +322,7 @@ By language:
 |---|---:|---:|
 | **pii-guard rules** | 76.0% | 2.5% |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 84.2% | 0.0% |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 85.3% | 0.0% |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 82.0% | 0.0% |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 86.4% | 0.0% |
 | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 84.1% | 0.0% |
@@ -545,6 +552,7 @@ generated by muse-spark-1.3-contributor; documents: en 10 + hu 20.
 | **pii-guard rules** | 30 | 100.0% | 43.5% | 60.6% | 43.1% | 8.7% | 0.0% | 100.0% | 3.8 ms | 2026-10-27 | `3d9eb8b` |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 30 | 99.0% | 100.0% | 99.5% | 0.0% | 1.2% | 1.1% | 100.0% | 72 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + Muse Spark Open (Baseten) | 30 | 100.0% | 99.5% | 99.7% | 0.8% | 2.0% | 0.0% | 100.0% | 2.1 s* | 2026-10-27 | `5dd3c23` |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 30 | 94.7% | 99.2% | 96.9% | 0.4% | 1.6% | 5.9% | 100.0% | 42 ms* | 2026-10-27 | `e126829` |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 30 | 96.9% | 93.9% | 95.3% | 9.1% | 0.0% | 3.2% | 100.0% | 28 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + NER (fine-tuned) | 30 | 99.2% | 96.2% | 97.7% | 5.9% | 1.2% | 0.6% | 100.0% | 28 ms* | 2026-10-26 | `0ba3c1a` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 30 | 96.2% | 96.2% | 96.2% | 0.0% | 1.2% | 0.0% | 100.0% | 30 ms* | 2026-10-27 | `910a6a2` |
@@ -574,6 +582,7 @@ By language:
 | **pii-guard rules** | 54.5% | 63.1% | 46.2% | 41.6% |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 98.8% | 99.8% | 0.0% | 0.0% |
 | pii-guard rules + Muse Spark Open (Baseten) | 99.2% | 100.0% | 2.5% | 0.0% |
+| pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | 97.2% | 96.8% | 1.2% | 0.0% |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 96.8% | 94.6% | 7.5% | 9.8% |
 | pii-guard rules + NER (fine-tuned) | 100.0% | 96.6% | 0.0% | 8.7% |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 100.0% | 94.5% | 0.0% | 0.0% |
@@ -850,6 +859,10 @@ What the gateway adds to an LLM call, measured by `pii-guard bench latency` agai
 | audit: rules + llm | 1 | yes | 10 | 1.3 s | 1.6 s | 1.7 s | 1.3 s | 1.3 s | 1.6 s | 50 | `2026-10-27-gateway-latency-baseten-strict` |
 | audit: rules + llm | 8 | no | 10 | 1.9 s | 2.4 s | 2.5 s | 1.9 s | — | — | 50 | `2026-10-27-gateway-latency-baseten-strict` |
 | audit: rules + llm | 8 | yes | 10 | 2.2 s | 3.0 s | 3.2 s | 2.2 s | 2.2 s | 3.0 s | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+| fast: rules + ner | 1 | no | 200 | 25 ms | 29 ms | 32 ms | 19 ms | — | — | 50 | `2026-10-27-gateway-latency-ner-fallback-fast` |
+| fast: rules + ner | 1 | yes | 200 | 26 ms | 29 ms | 31 ms | 19 ms | 25 ms | 28 ms | 50 | `2026-10-27-gateway-latency-ner-fallback-fast` |
+| fast: rules + ner | 8 | no | 200 | 73 ms | 90 ms | 99 ms | 68 ms | — | — | 50 | `2026-10-27-gateway-latency-ner-fallback-fast` |
+| fast: rules + ner | 8 | yes | 200 | 79 ms | 112 ms | 146 ms | 72 ms | 77 ms | 111 ms | 50 | `2026-10-27-gateway-latency-ner-fallback-fast` |
 
 ## Run log
 
@@ -877,6 +890,16 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-datasets-nemotron-pii-rules` | pii-guard rules | nemotron-pii | en | recorded | `18b15fa` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-datasets-gretel-finance-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | gretel-finance | de, en | recorded | `18b15fa` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-datasets-gretel-finance-rules` | pii-guard rules | gretel-finance | de, en | recorded | `18b15fa` (dirty) | — | — |
+| 2026-10-27 | `2026-10-27-gateway-latency-ner-fallback-fast` | pii-guard gateway, fast mode (rules + ner bardsai/eu-pii-anonimization-multilang) | latency-corpus | de, en, hu | recorded | `e126829` (dirty) | Apple M1 Max, 10 CPUs, local loopback | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-ai4privacy-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | ai4privacy | de | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 29.6 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-ai4privacy-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | ai4privacy | en | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 28.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-ai4privacy-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | ai4privacy | hu | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 29.0 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-company-names-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | company-names | hu | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 30.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-synth-sample-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | synth-sample | en | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 27.1 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-synth-sample-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | synth-sample | hu | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 24.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-de-smoke-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | smoke | de | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 24.5 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-en-smoke-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | smoke | en | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.8 at start (machine not idle) | — |
+| 2026-10-27 | `2026-10-27-ner-v2-hu-smoke-bardsai-eu-pii-v1` | pii-guard fast, public fallback NER (bardsai/eu-pii-anonimization-multilang) | smoke | hu | recorded | `e126829` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 18.7 at start (machine not idle) | — |
 | 2026-10-27 | `2026-10-27-datasets-ai4privacy-audit-n10` | pii-guard audit (rules + NER v2 + LLM) | ai4privacy | de, en, hu | recorded | `cd119ae` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-datasets-cee-pii-audit-n10` | pii-guard audit (rules + NER v2 + LLM) | cee-pii | en, hu | recorded | `cd119ae` (dirty) | — | — |
 | 2026-10-27 | `2026-10-27-datasets-agent-traffic-audit-n10` | pii-guard audit (rules + NER v2 + LLM) | agent-traffic | de, en, hu | recorded | `cd119ae` (dirty) | — | — |

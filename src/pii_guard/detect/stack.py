@@ -3,7 +3,8 @@
 One place decides which detectors run for a :class:`~pii_guard.config.Settings` and checks
 what they return, so ``/v1/mask`` and gateway fast mode can't drift apart:
 
-- :func:`default_detector_names` -- ``rules``, plus ``ner`` when the ``ner`` detector resolves.
+- :func:`default_detector_names` -- ``rules``, plus ``ner`` when the ``ner`` detector resolves
+  and a model does (:func:`ner_choice`: configured, published, then the public fallback).
   When ``PII_GUARD_NER_MODEL`` is set but NER can't be resolved, it raises
   :class:`~pii_guard.types.DetectionError` (fail closed, ADR 0006) instead of quietly running
   rules only. Without a configured model it falls back to rules and logs one WARNING.
@@ -29,6 +30,7 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 from pii_guard.config import Settings
+from pii_guard.detect import ner_resolve
 from pii_guard.registry import create_detector, resolve_detector
 from pii_guard.types import DetectionError, Detector, Span
 
@@ -40,6 +42,7 @@ __all__ = [
     "build_detectors",
     "check_spans",
     "default_detector_names",
+    "ner_choice",
     "rest_detector_names",
     "unavailable_reason",
     "warm_up",
@@ -88,28 +91,45 @@ def _ner_available() -> bool:
     return True
 
 
-def _warn_no_ner_once() -> None:
+def ner_choice(settings: Settings) -> ner_resolve.NerChoice:
+    """Which NER model fast mode would run for ``settings`` (LAB-1192); downloads nothing."""
+    return ner_resolve.resolve(
+        configured=settings.ner_model,
+        revision=settings.ner_revision,
+        published=settings.ner_published_model,
+        fallback=settings.ner_fallback,
+    )
+
+
+def _warn_no_ner_once(reason: str) -> None:
     global _warned_no_ner
     with _warn_lock:
         if _warned_no_ner:
             return
         _warned_no_ner = True
     logger.warning(
-        "ner detector unavailable (the 'ner' extra is not installed): running rules only; "
-        "set PII_GUARD_NER_MODEL to make a missing NER stop startup instead"
+        "ner detector unavailable (%s): running rules only; "
+        "set PII_GUARD_NER_MODEL to make a missing NER stop startup instead",
+        reason,
     )
 
 
 def default_detector_names(settings: Settings) -> tuple[str, ...]:
     """The default stack: gateway fast mode, and the REST API without ``PII_GUARD_DETECTORS``.
 
-    Raises :class:`DetectionError` when ``PII_GUARD_NER_MODEL`` is set but NER can't load.
+    ``rules`` plus ``ner`` when the ``ner`` extra is installed and a model resolves
+    (:func:`ner_choice`). Raises :class:`DetectionError` when ``PII_GUARD_NER_MODEL`` is set
+    but the extra is missing.
     """
     if _ner_available():
-        return ("rules", "ner")
+        choice = ner_choice(settings)
+        if choice.usable:
+            return ("rules", "ner")
+        _warn_no_ner_once(choice.reason)
+        return ("rules",)
     if settings.ner_model:
         raise DetectionError(NER_EXTRA_MISSING)
-    _warn_no_ner_once()
+    _warn_no_ner_once("the 'ner' extra is not installed")
     return ("rules",)
 
 
@@ -131,6 +151,8 @@ def build_detector(name: str, settings: Settings | None = None) -> Detector:
             ("model", settings.ner_model),
             ("revision", settings.ner_revision),
             ("device", settings.ner_device),
+            ("published", settings.ner_published_model),
+            ("fallback", settings.ner_fallback),
         ):
             if value:
                 kwargs[key] = value
