@@ -1,0 +1,194 @@
+{
+  "suite": "visual-ocr-robustness",
+  "set": "fictional",
+  "ticket": "LAB-1210",
+  "images": 24,
+  "scored_types": [
+    "text",
+    "mrz"
+  ],
+  "covered_at": 0.9,
+  "tool": "tests/visual/robustness.py (--before for the first run)",
+  "before": {
+    "ocr": "before LAB-1210 (no orientation, deskew or small-text pass)",
+    "transforms": {
+      "0": {
+        "regions": 116,
+        "covered": 100,
+        "covered_pct": 86.2,
+        "lost_vs_upright": 0,
+        "errors": 0,
+        "ms_p50": 1103,
+        "ms_p95": 1275
+      },
+      "90": {
+        "regions": 116,
+        "covered": 0,
+        "covered_pct": 0.0,
+        "lost_vs_upright": 100,
+        "errors": 0,
+        "ms_p50": 1170,
+        "ms_p95": 1538
+      },
+      "180": {
+        "regions": 116,
+        "covered": 0,
+        "covered_pct": 0.0,
+        "lost_vs_upright": 100,
+        "errors": 0,
+        "ms_p50": 1152,
+        "ms_p95": 1517
+      },
+      "270": {
+        "regions": 116,
+        "covered": 36,
+        "covered_pct": 31.0,
+        "lost_vs_upright": 64,
+        "errors": 0,
+        "ms_p50": 1018,
+        "ms_p95": 1256
+      },
+      "5": {
+        "regions": 116,
+        "covered": 62,
+        "covered_pct": 53.4,
+        "lost_vs_upright": 40,
+        "errors": 0,
+        "ms_p50": 1006,
+        "ms_p95": 1329
+      },
+      "-10": {
+        "regions": 116,
+        "covered": 12,
+        "covered_pct": 10.3,
+        "lost_vs_upright": 89,
+        "errors": 0,
+        "ms_p50": 657,
+        "ms_p95": 883
+      },
+      "15": {
+        "regions": 116,
+        "covered": 4,
+        "covered_pct": 3.4,
+        "lost_vs_upright": 97,
+        "errors": 0,
+        "ms_p50": 666,
+        "ms_p95": 980
+      }
+    },
+    "screenshots": [
+      {
+        "id": "screenshot-2560-11px",
+        "masked": 1,
+        "values": 2,
+        "error": null,
+        "ms": 412
+      },
+      {
+        "id": "screenshot-3840-13px",
+        "masked": 2,
+        "values": 2,
+        "error": null,
+        "ms": 649
+      },
+      {
+        "id": "screenshot-1280-11px",
+        "masked": 2,
+        "values": 2,
+        "error": null,
+        "ms": 308
+      }
+    ]
+  },
+  "after": {
+    "ocr": "LAB-1210",
+    "transforms": {
+      "0": {
+        "regions": 116,
+        "covered": 100,
+        "covered_pct": 86.2,
+        "lost_vs_upright": 0,
+        "errors": 0,
+        "ms_p50": 1139,
+        "ms_p95": 1341
+      },
+      "90": {
+        "regions": 116,
+        "covered": 100,
+        "covered_pct": 86.2,
+        "lost_vs_upright": 0,
+        "errors": 0,
+        "ms_p50": 3350,
+        "ms_p95": 4221
+      },
+      "180": {
+        "regions": 116,
+        "covered": 100,
+        "covered_pct": 86.2,
+        "lost_vs_upright": 0,
+        "errors": 0,
+        "ms_p50": 2266,
+        "ms_p95": 2888
+      },
+      "270": {
+        "regions": 116,
+        "covered": 100,
+        "covered_pct": 86.2,
+        "lost_vs_upright": 0,
+        "errors": 0,
+        "ms_p50": 2029,
+        "ms_p95": 2665
+      },
+      "5": {
+        "regions": 116,
+        "covered": 98,
+        "covered_pct": 84.5,
+        "lost_vs_upright": 4,
+        "errors": 0,
+        "ms_p50": 2246,
+        "ms_p95": 2852
+      },
+      "-10": {
+        "regions": 116,
+        "covered": 100,
+        "covered_pct": 86.2,
+        "lost_vs_upright": 2,
+        "errors": 0,
+        "ms_p50": 1938,
+        "ms_p95": 2605
+      },
+      "15": {
+        "regions": 116,
+        "covered": 104,
+        "covered_pct": 89.7,
+        "lost_vs_upright": 1,
+        "errors": 0,
+        "ms_p50": 1864,
+        "ms_p95": 2346
+      }
+    },
+    "screenshots": [
+      {
+        "id": "screenshot-2560-11px",
+        "masked": 2,
+        "values": 2,
+        "error": null,
+        "ms": 694
+      },
+      {
+        "id": "screenshot-3840-13px",
+        "masked": 2,
+        "values": 2,
+        "error": null,
+        "ms": 909
+      },
+      {
+        "id": "screenshot-1280-11px",
+        "masked": 2,
+        "values": 2,
+        "error": null,
+        "ms": 366
+      }
+    ]
+  }
+}

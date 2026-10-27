@@ -1237,7 +1237,53 @@ or Unicode form, Hungarian suffixes outside), and the longest name wins. Several
   1.4.13. These runs used 1.4.14 without changing the pin.
 - **Cost:** $0, all local.
 
-### 43. The gateway stops rebuilding its HTTP client: overhead 5.2 → 1.0 ms (2026-10-27)
+### 43. Turned, skewed and small-text images get masked (2026-10-27)
+
+LAB-1210, from the 2026-10-27 code review. **A document photographed sideways, upside down or
+at an angle went upstream with its text unmasked:** Tesseract read it in the default page mode,
+with no orientation detection and no deskew. A fictional TAJ card turned 90° came back with no
+regions at all. Small text in large screenshots failed too: an image 2,000 px or wider is never
+enlarged, so 11 px text came back as 8 px boxes and was misread (`123 458788`).
+
+The OCR now reads every page upright and straight, and maps the boxes back:
+
+- **Orientation.** Each reading is scored by its share of confidently read characters. Upright
+  fictional documents score 0.72–1.0 and turned ones 0.03–0.28. If the words stand upright
+  (text running up or down), the page is read again a quarter turn each way. A poor reading is
+  read again upside down. A middling one asks Tesseract's orientation detection (OSD). The
+  best reading wins, so a wrong guess costs a pass, never the upright reading.
+- **Deskew.** A projection profile (pure Pillow, about 30 rotations of a 600 px copy) finds
+  skews of 1–20°. The page is straightened before reading.
+- **Captions and MRZ zones are found in the straightened frame**, where the layout rules hold.
+  Only then do the boxes go back to the input, as the bounding box of each turned box.
+- **Small text.** A line under 12 px at OCR resolution is read again on a tile enlarged to
+  40 px line height, and replaces the first reading only if it reads better.
+
+Text and MRZ regions at least 90 % covered, OCR and rules only, no SAM, with the cover turned
+back onto the upright document ([robustness-fictional.md](../eval/results/visual/robustness-fictional.md),
+[robustness-specimens.md](../eval/results/visual/robustness-specimens.md)):
+
+| Transform | Fictional (24 docs), before → after | Specimens (65, local only), before → after |
+|---|---:|---:|
+| upright | 86.2 % → 86.2 % | 14.1 % → 14.1 % |
+| 90° / 180° / 270° | 0.0 / 0.0 / 31.0 % → 86.2 % each | 0.3 / 0.0 / 4.9 % → 13.8 % each |
+| skewed 5° / −10° / 15° | 53.4 / 10.3 / 3.4 % → 84.5 / 86.2 / 89.7 % | 7.6 / 0.0 / 0.0 % → 15.1 / 13.5 / 9.9 % |
+| screenshot 2560 px, 11 px text: identifiers masked | 1 of 2 → 2 of 2 | – |
+
+- **Cost: latency on hard images.** Fictional upright p50 is unchanged (1.10 → 1.14 s). On the
+  official specimens, upright p50 goes from 1.4 s to 2.7 s (p95 2.1 → 5.9 s). Half of them read
+  only middlingly even upright, which costs an OSD check. On security print OSD often says
+  "upside down", which costs a second pass. Turned images take 2–6 s. A cheaper upright check
+  is a follow-up.
+- **Skewed specimens stay behind upright ones** (9.9–15.1 % against 14.1 %, and 23–28
+  regions lost at an angle). Straightening resamples print that Tesseract barely reads anyway.
+  The better reader (LAB-1183) is the fix for that.
+- **Measured** with `tests/visual/robustness.py` (`--before` turns the three passes off), six
+  images at a time on one machine. CI covers the logic with a fake `pytesseract`; the real
+  Tesseract tests run wherever it is installed.
+- **Cost:** $0. Tesseract runs locally, no SAM calls.
+
+### 44. The gateway stops rebuilding its HTTP client: overhead 5.2 → 1.0 ms (2026-10-27)
 
 LAB-1176, from the LAB-1268 performance audit. **Most of the gateway's own overhead wasn't
 masking at all.** Every upstream call built a new `httpx.AsyncClient`, and building one costs
@@ -1268,6 +1314,7 @@ limits are settings (`PII_GUARD_GATEWAY_UPSTREAM_MAX_CONNECTIONS`, `_MAX_KEEPALI
 - **What's left:** at 8 clients the `detect` stage is still about 4.5x its 1-client value,
   while the rules detector itself takes 0.18 ms. That queueing is LAB-1178.
 - **Cost:** $0. Local runs only.
+
 
 ## How pii-guard uses Meta's models
 
