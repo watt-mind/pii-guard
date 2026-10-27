@@ -27,8 +27,14 @@ image part (the masked transcript and document summary), inserted when the body 
 Remote ``http(s)`` image URLs are rejected: the guard never
 fetches arbitrary URLs, and an image it can't see can't be masked.
 
-Fail closed (ADR 0006): content parts that can't be masked (remote images, audio, files) and
-malformed bodies are rejected; nothing is forwarded.
+Fail closed (ADR 0006): the whole request is walked against an allow-list. Every key of the
+body, of a message, of a content part, of a tool call and of the nested objects the gateway
+understands is either masked (free text: ``stop``, ``prediction.content``, reasoning text,
+audio transcripts, ``user``/``safety_identifier``/``prompt_cache_key``, ...), checked as an
+identifier (enum-like settings, ids, names), passed through (numbers, booleans, provider-signed
+blobs) or rejected. Unknown keys, content parts that can't be masked (remote images, audio,
+files) and malformed bodies are rejected with 400; nothing is forwarded. The table is in
+docs/contracts.md ("Gateway request fields").
 """
 
 from __future__ import annotations
@@ -187,9 +193,7 @@ def collect_texts(body: object) -> CollectedTexts:
         if not isinstance(message, dict):
             raise InvalidChatRequestError(f"messages.{index} must be an object")
         _collect_message(message, index, out)
-    if isinstance(body.get("user"), str):
-        out.slots.append(TextSlot(body["user"], _setter(body, "user"), "user"))
-    _collect_request_metadata(body, out)
+    _collect_top_level(body, out)
     return out
 
 
@@ -200,8 +204,283 @@ def _setter(container: dict[str, Any] | list[Any], key: Any) -> Callable[[str], 
     return write
 
 
+# --- the allow-list ----------------------------------------------------------------------
+#
+# Every key of the body, of a message, of a content part and of a tool call is in one of
+# the tables below; anything else is rejected (fail closed, ADR 0006). docs/contracts.md
+# ("Gateway request fields") is the same table in prose: keep them in step.
+
+#: Field names shown in errors as-is; anything else (it could be a value) by position only.
+_FIELD_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+#: Top-level fields that hold only numbers, booleans or null (sampling knobs, flags).
+_TOP_SCALAR = frozenset(
+    {
+        "frequency_penalty",
+        "logprobs",
+        "max_completion_tokens",
+        "max_tokens",
+        "n",
+        "parallel_tool_calls",
+        "presence_penalty",
+        "seed",
+        "store",
+        "stream",
+        "temperature",
+        "top_logprobs",
+        "top_p",
+        # Common sampling extensions of OpenAI-compatible servers (vLLM, Ollama, llama.cpp).
+        "min_p",
+        "repetition_penalty",
+        "top_k",
+    }
+)
+#: Top-level fields whose strings are enum-like settings: checked like identifiers (personal
+#: data in one rejects the request), never masked.
+_TOP_CHECKED = frozenset(
+    {
+        "audio",
+        "function_call",
+        "modalities",
+        "reasoning_effort",
+        "service_tier",
+        "stream_options",
+        "tool_choice",
+        "verbosity",
+    }
+)
+#: Top-level free-text strings that identify the end user or a cache entry: masked.
+_TOP_USER_TEXT = ("user", "safety_identifier", "prompt_cache_key")
+#: The other top-level fields, each with its own walker in :func:`_collect_top_level`.
+_TOP_WALKED = frozenset(
+    {
+        "functions",
+        "logit_bias",
+        "messages",
+        "metadata",
+        "model",
+        "prediction",
+        "response_format",
+        "stop",
+        "tools",
+        "web_search_options",
+    }
+)
+#: Field names and enum values the API itself defines: never personal data, so not checked.
+_STRUCTURAL_WORDS = frozenset(
+    {
+        "allowed_tools",
+        "approximate",
+        "auto",
+        "cache_control",
+        "content",
+        "custom",
+        "default",
+        "description",
+        "detail",
+        "ephemeral",
+        "flex",
+        "format",
+        "function",
+        "high",
+        "include_obfuscation",
+        "include_usage",
+        "json_object",
+        "json_schema",
+        "low",
+        "mcp",
+        "medium",
+        "minimal",
+        "mode",
+        "name",
+        "none",
+        "parameters",
+        "priority",
+        "required",
+        "schema",
+        "strict",
+        "text",
+        "tools",
+        "type",
+        "voice",
+    }
+)
+_ROLES = frozenset({"system", "developer", "user", "assistant", "tool", "function"})
+#: Message-level string fields that carry free text besides ``content``: masked.
+_TEXT_FIELDS = ("refusal", "reasoning_content", "reasoning")
+#: Message-level fields that are lists of reasoning blocks (OpenRouter ``reasoning_details``,
+#: LiteLLM ``thinking_blocks``): text keys are masked, provider-signed blobs passed as is.
+_REASONING_LISTS = ("reasoning_details", "thinking_blocks")
+_REASONING_TEXT = frozenset({"text", "summary", "thinking"})
+#: Opaque, provider-issued values (signatures, encrypted reasoning): forwarded untouched.
+_REASONING_OPAQUE = frozenset({"data", "signature", "encrypted_content"})
+_REASONING_CHECKED = frozenset({"type", "format", "id", "index"})
+_MESSAGE_KEYS = frozenset(
+    {
+        "annotations",
+        "audio",
+        "cache_control",
+        "content",
+        "function_call",
+        "name",
+        "prefix",
+        "role",
+        "tool_call_id",
+        "tool_calls",
+        *_TEXT_FIELDS,
+        *_REASONING_LISTS,
+    }
+)
+#: Allowed keys per content-part type (besides ``type``).
+_PART_KEYS = {
+    "text": frozenset({"text", "cache_control"}),
+    "refusal": frozenset({"refusal"}),
+    "image_url": frozenset({"image_url", "cache_control"}),
+}
+_IMAGE_URL_KEYS = frozenset({"url", "detail"})
+_TOOL_CALL_KEYS = frozenset({"id", "type", "index", "function", "custom"})
+_TOOL_CALL_FUNCTION_KEYS = frozenset({"name", "arguments"})
+_TOOL_CALL_CUSTOM_KEYS = frozenset({"name", "input"})
+
+
+def _field(where: str, key: object, position: int) -> str:
+    """``where.key`` if the key looks like a field name, else ``where.#position``."""
+    shown = key if isinstance(key, str) and _FIELD_NAME_RE.match(key) else f"#{position}"
+    return f"{where}.{shown}" if where else str(shown)
+
+
+def _reject_unknown(holder: dict[str, Any], allowed: frozenset[str], where: str, what: str) -> None:
+    for position, key in enumerate(holder):
+        if key not in allowed:
+            raise UnsupportedContentError(
+                f"{_field(where, key, position)}: unsupported {what} field; the gateway only "
+                "forwards fields it knows how to mask (see docs/contracts.md)"
+            )
+
+
+def _collect_top_level(body: dict[str, Any], out: CollectedTexts) -> None:
+    allowed = _TOP_SCALAR | _TOP_CHECKED | _TOP_WALKED | frozenset(_TOP_USER_TEXT)
+    _reject_unknown(body, allowed, "", "request")
+    for key in _TOP_SCALAR:
+        if key in body:
+            _require_scalars(body[key], key)
+    for key in _TOP_CHECKED:
+        if key in body:
+            _check_json(body, key, key, out)
+    for key in _TOP_USER_TEXT:
+        value = body.get(key)
+        if isinstance(value, str):
+            out.slots.append(TextSlot(value, _setter(body, key), "user"))
+        elif value is not None:
+            raise InvalidChatRequestError(f"{key} must be a string")
+    _collect_stop(body, out)
+    _collect_logit_bias(body.get("logit_bias"))
+    _collect_prediction(body, out)
+    _collect_web_search_options(body, out)
+    _collect_request_metadata(body, out)
+
+
+def _require_scalars(value: object, where: str) -> None:
+    """Numbers, booleans and null only (nested in arrays/objects with field-name keys)."""
+    if value is None or isinstance(value, bool | int | float):
+        return
+    if isinstance(value, list):
+        for i, item in enumerate(value):
+            _require_scalars(item, f"{where}.{i}")
+        return
+    raise InvalidChatRequestError(f"{where} must be a number, a boolean or null")
+
+
+def _check_json(
+    container: dict[str, Any] | list[Any], key: Any, where: str, out: CollectedTexts
+) -> None:
+    """A structural value: every string in it (object keys too) is checked as an identifier."""
+    value = container[key]
+    if isinstance(value, str):
+        _check_name(value, where, out)
+    elif isinstance(value, list):
+        for i in range(len(value)):
+            _check_json(value, i, f"{where}.{i}", out)
+    elif isinstance(value, dict):
+        for position, name in enumerate(list(value)):
+            at = _field(where, name, position)
+            _check_name(name, at, out)
+            _check_json(value, name, at, out)
+
+
+def _check_name(text: str, where: str, out: CollectedTexts) -> None:
+    """:func:`_check_text`, skipping the API's own field names and enum values."""
+    if text not in _STRUCTURAL_WORDS:
+        _check_text(text, where, out)
+
+
+def _collect_stop(body: dict[str, Any], out: CollectedTexts) -> None:
+    stop = body.get("stop")
+    if isinstance(stop, str):
+        out.slots.append(TextSlot(stop, _setter(body, "stop"), "stop"))
+    elif isinstance(stop, list):
+        for i, entry in enumerate(stop):
+            if not isinstance(entry, str):
+                raise InvalidChatRequestError(f"stop.{i} must be a string")
+            out.slots.append(TextSlot(entry, _setter(stop, i), "stop"))
+    elif stop is not None:
+        raise InvalidChatRequestError("stop must be a string, an array of strings or null")
+
+
+def _collect_logit_bias(logit_bias: object) -> None:
+    """Token ids to biases: keys must be token ids, values numbers. Nothing to mask."""
+    if logit_bias is None:
+        return
+    if not isinstance(logit_bias, dict):
+        raise InvalidChatRequestError("logit_bias must be an object")
+    for position, (token, bias) in enumerate(logit_bias.items()):
+        if not (isinstance(token, str) and token.isascii() and token.isdigit()):
+            raise InvalidChatRequestError(f"logit_bias.#{position}: keys must be token ids")
+        if isinstance(bias, bool) or not isinstance(bias, int | float):
+            raise InvalidChatRequestError(f"logit_bias.#{position}: values must be numbers")
+
+
+def _collect_prediction(body: dict[str, Any], out: CollectedTexts) -> None:
+    prediction = body.get("prediction")
+    if prediction is None:
+        return
+    if not isinstance(prediction, dict):
+        raise InvalidChatRequestError("prediction must be an object")
+    _reject_unknown(prediction, frozenset({"type", "content"}), "prediction", "prediction")
+    if "type" in prediction:
+        _check_json(prediction, "type", "prediction.type", out)
+    content = prediction.get("content")
+    if isinstance(content, str):
+        out.slots.append(TextSlot(content, _setter(prediction, "content"), "prediction"))
+    elif isinstance(content, list):
+        for i, part in enumerate(content):
+            if isinstance(part, dict) and part.get("type") != "text":
+                raise UnsupportedContentError("prediction.content: only text parts are supported")
+            _collect_part(part, f"prediction.content.{i}", out)
+    elif content is not None:
+        raise InvalidChatRequestError("prediction.content must be a string or an array")
+
+
+def _collect_web_search_options(body: dict[str, Any], out: CollectedTexts) -> None:
+    options = body.get("web_search_options")
+    if options is None:
+        return
+    if not isinstance(options, dict):
+        raise InvalidChatRequestError("web_search_options must be an object")
+    allowed = frozenset({"search_context_size", "user_location"})
+    _reject_unknown(options, allowed, "web_search_options", "web_search_options")
+    if "search_context_size" in options:
+        _check_json(options, "search_context_size", "web_search_options.search_context_size", out)
+    if "user_location" in options:
+        # A location is personal data: every string in it is masked.
+        _collect_json(options, "user_location", out, "web_search")
+
+
 def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -> None:
     where = f"messages.{index}"
+    _reject_unknown(message, _MESSAGE_KEYS, where, "message")
+    role = message.get("role")
+    if role not in _ROLES:
+        raise InvalidChatRequestError(f"{where}.role must be one of {', '.join(sorted(_ROLES))}")
     content = message.get("content")
     if isinstance(content, str):
         out.slots.append(TextSlot(content, _setter(message, "content")))
@@ -212,11 +491,24 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
         raise InvalidChatRequestError(f"{where}.content must be a string, an array or null")
 
     for name in _TEXT_FIELDS:
-        if isinstance(message.get(name), str):
-            out.slots.append(TextSlot(message[name], _setter(message, name), name))
+        value = message.get(name)
+        if isinstance(value, str):
+            out.slots.append(TextSlot(value, _setter(message, name), name))
+        elif value is not None:
+            _collect_json(message, name, out, name)
+    for name in _REASONING_LISTS:
+        if message.get(name) is not None:
+            _collect_reasoning_blocks(message, name, f"{where}.{name}", out)
+    if message.get("annotations") is not None:
+        _collect_json(message, "annotations", out, "annotations")
+    if message.get("audio") is not None:
+        _collect_message_audio(message, f"{where}.audio", out)
+    for name in ("cache_control", "prefix", "tool_call_id"):
+        if name in message:
+            _check_json(message, name, f"{where}.{name}", out)
 
     name = message.get("name")
-    if isinstance(name, str) and message.get("role") != "function":
+    if isinstance(name, str) and role != "function":
         original = name
 
         def write_name(masked: str, message: dict[str, Any] = message) -> None:
@@ -224,20 +516,98 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
                 message.pop("name", None)
 
         out.slots.append(TextSlot(name, write_name, "name"))
+    elif isinstance(name, str):
+        # A function result's name must match the call's name: it can't be dropped.
+        _check_text(name, f"{where}.name", out)
+    elif name is not None:
+        raise InvalidChatRequestError(f"{where}.name must be a string")
 
     tool_calls = message.get("tool_calls")
     if tool_calls is not None:
         if not isinstance(tool_calls, list):
             raise InvalidChatRequestError(f"{where}.tool_calls must be an array")
         for call_index, call in enumerate(tool_calls):
-            function = call.get("function") if isinstance(call, dict) else None
-            if isinstance(function, dict):
-                _collect_arguments(function, out)
-            elif call is not None and not isinstance(call, dict):
-                raise InvalidChatRequestError(f"{where}.tool_calls.{call_index} must be an object")
+            _collect_tool_call(call, f"{where}.tool_calls.{call_index}", out)
     function_call = message.get("function_call")
-    if isinstance(function_call, dict):
-        _collect_arguments(function_call, out)
+    if function_call is not None:
+        if not isinstance(function_call, dict):
+            raise InvalidChatRequestError(f"{where}.function_call must be an object")
+        _collect_call_function(function_call, f"{where}.function_call", out)
+
+
+def _collect_reasoning_blocks(
+    message: dict[str, Any], name: str, where: str, out: CollectedTexts
+) -> None:
+    blocks = message[name]
+    if not isinstance(blocks, list):
+        raise InvalidChatRequestError(f"{where} must be an array")
+    allowed = _REASONING_TEXT | _REASONING_OPAQUE | _REASONING_CHECKED
+    for i, block in enumerate(blocks):
+        at = f"{where}.{i}"
+        if not isinstance(block, dict):
+            raise InvalidChatRequestError(f"{at} must be an object")
+        _reject_unknown(block, allowed, at, "reasoning")
+        for key in list(block):
+            if key in _REASONING_TEXT:
+                _collect_json(block, key, out, "reasoning")
+            elif key in _REASONING_CHECKED:
+                _check_json(block, key, f"{at}.{key}", out)
+            elif not isinstance(block[key], str | None):  # opaque blobs are strings
+                raise InvalidChatRequestError(f"{at}.{key} must be a string")
+
+
+def _collect_message_audio(message: dict[str, Any], where: str, out: CollectedTexts) -> None:
+    """An assistant's earlier audio reply, referenced by id; its transcript is masked."""
+    audio = message["audio"]
+    if not isinstance(audio, dict):
+        raise InvalidChatRequestError(f"{where} must be an object")
+    _reject_unknown(audio, frozenset({"id", "transcript", "expires_at"}), where, "audio")
+    if "id" in audio:
+        _check_json(audio, "id", f"{where}.id", out)
+    if "expires_at" in audio:
+        _require_scalars(audio["expires_at"], f"{where}.expires_at")
+    transcript = audio.get("transcript")
+    if isinstance(transcript, str):
+        out.slots.append(TextSlot(transcript, _setter(audio, "transcript"), "audio"))
+    elif transcript is not None:
+        raise InvalidChatRequestError(f"{where}.transcript must be a string")
+
+
+def _collect_tool_call(call: object, where: str, out: CollectedTexts) -> None:
+    if call is None:
+        return
+    if not isinstance(call, dict):
+        raise InvalidChatRequestError(f"{where} must be an object")
+    _reject_unknown(call, _TOOL_CALL_KEYS, where, "tool call")
+    for key in ("id", "type"):
+        if key in call:
+            _check_json(call, key, f"{where}.{key}", out)
+    if "index" in call:
+        _require_scalars(call["index"], f"{where}.index")
+    function = call.get("function")
+    if function is not None:
+        if not isinstance(function, dict):
+            raise InvalidChatRequestError(f"{where}.function must be an object")
+        _collect_call_function(function, f"{where}.function", out)
+    custom = call.get("custom")
+    if custom is not None:
+        if not isinstance(custom, dict):
+            raise InvalidChatRequestError(f"{where}.custom must be an object")
+        _reject_unknown(custom, _TOOL_CALL_CUSTOM_KEYS, f"{where}.custom", "tool call")
+        _check_identifier(custom, "name", f"{where}.custom.name", out)
+        if custom.get("input") is not None:
+            _collect_json(custom, "input", out, "arguments")
+
+
+def _collect_call_function(function: dict[str, Any], where: str, out: CollectedTexts) -> None:
+    """``{"name": ..., "arguments": ...}`` of a tool call: name checked, arguments masked."""
+    _reject_unknown(function, _TOOL_CALL_FUNCTION_KEYS, where, "tool call")
+    name = function.get("name")
+    if isinstance(name, str):
+        _check_text(name, f"{where}.name", out)
+    elif name is not None:
+        raise InvalidChatRequestError(f"{where}.name must be a string")
+    _collect_arguments(function, where, out)
 
 
 def _collect_part(
@@ -246,16 +616,20 @@ def _collect_part(
     if not isinstance(part, dict):
         raise InvalidChatRequestError(f"{where} must be an object")
     part_type = part.get("type")
-    if part_type == "image_url":
-        _collect_image(part, where, out, content)
-        return
-    key = _TEXT_PART_TYPES.get(part_type) if isinstance(part_type, str) else None
-    if key is None:
+    allowed = _PART_KEYS.get(part_type) if isinstance(part_type, str) else None
+    if allowed is None:
         shown = part_type if isinstance(part_type, str) and len(part_type) <= 32 else "unknown"
         raise UnsupportedContentError(
             f"{where}: content parts of type {shown!r} are not supported; the gateway masks "
             "text and inline images only and does not forward what it cannot mask"
         )
+    _reject_unknown(part, allowed | {"type"}, where, "content part")
+    if "cache_control" in part:
+        _check_json(part, "cache_control", f"{where}.cache_control", out)
+    if part_type == "image_url":
+        _collect_image(part, where, out, content)
+        return
+    key = _TEXT_PART_TYPES[part_type]
     value = part.get(key)
     if not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
@@ -268,6 +642,9 @@ def _collect_image(
     image_url = part.get("image_url")
     holder: dict[str, Any]
     if isinstance(image_url, dict) and isinstance(image_url.get("url"), str):
+        _reject_unknown(image_url, _IMAGE_URL_KEYS, f"{where}.image_url", "image_url")
+        if "detail" in image_url:
+            _check_json(image_url, "detail", f"{where}.image_url.detail", out)
         holder, key = image_url, "url"
     elif isinstance(image_url, str):
         holder, key = part, "image_url"
@@ -308,10 +685,17 @@ def _collect_image(
     out.images.append(ImageSlot(data, write, where, annotate_with))
 
 
-def _collect_arguments(function: dict[str, Any], out: CollectedTexts) -> None:
+def _collect_arguments(function: dict[str, Any], where: str, out: CollectedTexts) -> None:
+    """Tool-call arguments: a JSON string (parsed, masked, re-serialised), a JSON value
+    (LiteLLM/Ollama send an object; masked in place) or absent. Anything else is rejected."""
     arguments = function.get("arguments")
-    if not isinstance(arguments, str):
+    if arguments is None:
         return
+    if isinstance(arguments, dict | list):
+        _collect_json(function, "arguments", out)
+        return
+    if not isinstance(arguments, str):
+        raise InvalidChatRequestError(f"{where}.arguments must be a JSON string or object")
     try:
         parsed = json.loads(arguments)
     except ValueError:
@@ -355,42 +739,65 @@ def _collect_json(
 
 def _collect_request_metadata(body: dict[str, Any], out: CollectedTexts) -> None:
     tools = body.get("tools")
-    if isinstance(tools, list):
+    if tools is not None:
+        if not isinstance(tools, list):
+            raise InvalidChatRequestError("tools must be an array")
         for index, tool in enumerate(tools):
             if not isinstance(tool, dict):
-                continue
+                raise InvalidChatRequestError(f"tools.{index} must be an object")
             if "name" in tool or "parameters" in tool:
                 # A flat definition: {"type": "function", "name": ..., "parameters": ...}.
                 _collect_function(tool, f"tools.{index}", out)
                 continue
-            # {"type": "function", "function": {...}} (or another tool type's own object).
-            for key, value in tool.items():
-                if key != "type" and isinstance(value, dict):
-                    _collect_function(value, f"tools.{index}.{key}", out)
+            # {"type": "function", "function": {...}} or another tool type (MCP, custom...):
+            # nested objects are definitions, every other string is free text.
+            for position, (key, value) in enumerate(list(tool.items())):
+                at = _field(f"tools.{index}", key, position)
+                _check_name(key, at, out)
+                if key == "type":
+                    _check_json(tool, key, at, out)
+                elif isinstance(value, dict):
+                    _collect_function(value, at, out)
+                elif isinstance(value, str | list):
+                    _collect_json(tool, key, out, "tools")
     functions = body.get("functions")
-    if isinstance(functions, list):
+    if functions is not None:
+        if not isinstance(functions, list):
+            raise InvalidChatRequestError("functions must be an array")
         for index, function in enumerate(functions):
-            if isinstance(function, dict):
-                _collect_function(function, f"functions.{index}", out)
-    tool_choice = body.get("tool_choice")
-    if isinstance(tool_choice, dict) and isinstance(tool_choice.get("function"), dict):
-        _check_identifier(tool_choice["function"], "name", "tool_choice.function.name", out)
-    function_call = body.get("function_call")
-    if isinstance(function_call, dict):
-        _check_identifier(function_call, "name", "function_call.name", out)
+            if not isinstance(function, dict):
+                raise InvalidChatRequestError(f"functions.{index} must be an object")
+            _collect_function(function, f"functions.{index}", out)
     response_format = body.get("response_format")
-    if isinstance(response_format, dict) and isinstance(response_format.get("json_schema"), dict):
-        _collect_function(response_format["json_schema"], "response_format.json_schema", out)
+    if response_format is not None:
+        _collect_response_format(response_format, out)
     metadata = body.get("metadata")
-    if isinstance(metadata, dict):
+    if metadata is not None:
+        if not isinstance(metadata, dict):
+            raise InvalidChatRequestError("metadata must be an object")
         _collect_metadata(metadata, out)
+
+
+def _collect_response_format(response_format: object, out: CollectedTexts) -> None:
+    where = "response_format"
+    if not isinstance(response_format, dict):
+        raise InvalidChatRequestError(f"{where} must be an object")
+    _reject_unknown(response_format, frozenset({"type", "json_schema"}), where, where)
+    if "type" in response_format:
+        _check_json(response_format, "type", f"{where}.type", out)
+    json_schema = response_format.get("json_schema")
+    if isinstance(json_schema, dict):
+        _collect_function(json_schema, f"{where}.json_schema", out)
+    elif json_schema is not None:
+        raise InvalidChatRequestError(f"{where}.json_schema must be an object")
 
 
 def _collect_function(function: dict[str, Any], where: str, out: CollectedTexts) -> None:
     """A function (or json_schema) definition: ``name`` checked, schemas walked, text masked."""
-    for key, value in function.items():
+    for position, (key, value) in enumerate(list(function.items())):
         if key in _SCHEMA_STRUCTURAL:
             continue
+        _check_name(key, _field(where, key, position), out)
         if key == "name":
             _check_identifier(function, key, f"{where}.name", out)
         elif key in ("parameters", "schema"):
