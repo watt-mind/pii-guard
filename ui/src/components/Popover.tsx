@@ -45,7 +45,7 @@ export function Popover({ anchor, children }: Props) {
       aria-hidden="true"
       data-testid="entity-popover"
       style={{ position: "fixed", ...style }}
-      className="pointer-events-none z-50 rounded-xl border border-line-strong bg-surface px-3 py-2.5 text-xs text-muted shadow-[0_12px_32px_-8px_rgb(0_0_0/0.35)]"
+      className="pointer-events-none z-50 rounded-xl border border-line-strong bg-surface px-3 py-2.5 text-xs text-muted shadow-[0_8px_24px_-12px_rgb(0_0_0/0.5)]"
     >
       {children}
     </div>,

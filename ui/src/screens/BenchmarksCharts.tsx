@@ -367,18 +367,13 @@ export function LanguageBars({
   ];
   return (
     <div className="space-y-4">
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-label="Languages">
-        {languages.map((lang, i) => (
-          <li key={lang} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className={["h-2.5 w-4 rounded-sm", LANG_BG[i % LANG_BG.length]].join(" ")} />
-            {languageName(lang)}
-          </li>
-        ))}
-      </ul>
+      <p className="text-xs text-muted">
+        Each row is one language: {languages.map((l) => `${l.toUpperCase()} ${languageName(l)}`).join(", ")}.
+      </p>
       <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
         {panels.map((panel) => (
           <div key={panel.key}>
-            <h4 className="mb-2 text-xs font-semibold tracking-wide text-faint uppercase">{panel.title}</h4>
+            <h4 className="mb-2 text-xs font-medium text-muted">{panel.title}</h4>
             <ul className="space-y-3">
               {snapshots.map((s) => (
                 <li key={s.system}>
@@ -386,16 +381,16 @@ export function LanguageBars({
                     <MarkerIcon info={systems[s.system]} />
                     {systems[s.system]?.short_label ?? s.system}
                   </p>
-                  {languages.map((lang, i) => {
+                  {languages.map((lang) => {
                     const v = s.languages[lang]?.[panel.key] ?? null;
                     return (
                       <div key={lang} className="flex items-center gap-2 text-xs">
                         <span className="w-6 shrink-0 font-mono text-faint uppercase">{lang}</span>
-                        <div className="h-3 flex-1 rounded-sm bg-surface-2 ring-1 ring-line ring-inset">
+                        <div className="h-2.5 flex-1 rounded-sm bg-surface-2">
                           {v !== null && (
                             <div
-                              className={["h-full rounded-sm", LANG_BG[i % LANG_BG.length]].join(" ")}
-                              style={{ width: v > 0 ? `${Math.max(v * 100, 0.8)}%` : "0%" }}
+                              className="h-full rounded-sm"
+                              style={{ width: v > 0 ? `${Math.max(v * 100, 0.8)}%` : "0%", background: BAR }}
                             />
                           )}
                         </div>
@@ -413,7 +408,9 @@ export function LanguageBars({
   );
 }
 
-const LANG_BG = ["bg-model", "bg-guard", "bg-warn", "bg-danger", "bg-ink"];
+// One neutral bar: the row label names the language and the heading names the system, so a
+// hue here would only compete with the system's own marker colour.
+const BAR = "color-mix(in oklab, var(--ink) 62%, var(--surface))";
 
 // --- Recall per entity type (HTML heatmap) ----------------------------------------------
 
@@ -470,7 +467,7 @@ export function TypeHeatmap({
                         v === null
                           ? undefined
                           : {
-                              background: `color-mix(in oklab, var(--model) ${Math.round(v * 92 + 4)}%, var(--surface))`,
+                              background: `color-mix(in oklab, var(--series-1) ${Math.round(v * 92 + 4)}%, var(--surface))`,
                               color: v > 0.55 ? "var(--surface)" : "var(--ink)",
                             }
                       }
@@ -489,5 +486,5 @@ export function TypeHeatmap({
 }
 
 export function ChartEmpty({ children }: { children: ReactNode }) {
-  return <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">{children}</p>;
+  return <p className="px-4 py-8 text-center text-sm text-muted">{children}</p>;
 }

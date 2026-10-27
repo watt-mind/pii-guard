@@ -148,7 +148,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
               <span>Hover, tap or tab to a highlight to see its type, detector and confidence.</span>
             ) : (
               <span id="run-hint">
-                Paste any text, or pick a sample. Only fictional data, please: this is a demo. <kbd className="rounded border border-line px-1 font-mono text-[10px]">⌘/Ctrl ↵</kbd> runs it.
+                Paste any text, or pick a sample. Only fictional data, please: this is a demo. <kbd className="rounded border border-line px-1 font-mono text-2xs">⌘/Ctrl ↵</kbd> runs it.
               </span>
             )
           }
@@ -172,7 +172,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                 }}
                 spellCheck={false}
                 rows={16}
-                className="doc block min-h-[22rem] w-full resize-y rounded-lg border border-line bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-guard focus:outline-none"
+                className="doc block min-h-[22rem] w-full resize-y rounded-lg border border-line bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-line-strong"
                 placeholder="Paste a contract, an email, a referral… (fictional data only)"
               />
             </>
@@ -215,8 +215,8 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           ) : result && fresh ? (
             <div className="space-y-4">
               {sample && result.input.startsWith(sample.text) && (
-                <p className="rounded-lg bg-model-soft px-3 py-2 text-sm text-ink">
-                  <span className="font-semibold text-model">Instruction · </span>
+                <p className="border-l-2 border-model pl-3 text-sm text-ink">
+                  <span className="font-medium text-model">Instruction: </span>
                   {sample.task}
                 </p>
               )}
@@ -237,14 +237,14 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
       </div>
 
       {result && fresh && !error && (
-        <section aria-labelledby="session-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 rounded-2xl border border-line bg-surface p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+        <section aria-labelledby="session-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-line pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
           <div className="space-y-4">
             <div>
               <h2 id="session-title" className="text-base font-semibold tracking-tight text-ink">
                 Detected entities
               </h2>
               <p className="mt-1 text-sm text-muted">
-                Colour shows the type. A dashed outline means the value was detected but kept by policy (organizations, for example, are usually not personal data and the model needs them).
+                Blue values were replaced by a placeholder. A dashed outline means a value was detected but kept by policy (organizations, for example, are usually not personal data and the model needs them).
               </p>
             </div>
             <Legend counts={counts} kept={keptTypes} activeType={info?.entityType ?? null} known={result.spans.filter((s) => s.detector === "known").length} />
@@ -279,9 +279,9 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
 /** Live mode: say exactly what this engine did, so gaps read as known scope rather than a promise. */
 function ScopeNote({ summary, detectors, demo }: { summary: Summary; detectors: string[]; demo: boolean }) {
   return (
-    <div className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink" data-testid="scope-note">
+    <div className="text-sm text-ink" data-testid="scope-note">
       <p>
-        <span className="font-semibold">
+        <span className="font-medium">
           {summary.masked} {summary.masked === 1 ? "value" : "values"} masked
         </span>
         {detectors.length > 0 && <> by {joinList(detectors)}</>}
@@ -310,7 +310,7 @@ function Intro() {
 function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (s: Sample) => void }) {
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples</legend>
+      <legend className="mb-2 text-xs font-medium text-muted">Fictional samples</legend>
       <div className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4 sm:px-0 sm:pb-0">
         {SAMPLES.map((s) => {
           const on = s.id === selected;
@@ -324,14 +324,12 @@ function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (
                 onPick(s);
               }}
               className={[
-                "group flex w-[15rem] shrink-0 snap-start items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors sm:w-auto",
-                on ? "border-ink bg-surface shadow-sm" : "border-line bg-surface/60 hover:border-line-strong hover:bg-surface",
+                "group flex w-[15rem] shrink-0 snap-start items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-colors sm:w-auto",
+                on ? "border-ink bg-surface" : "border-line hover:border-line-strong hover:bg-surface",
               ].join(" ")}
             >
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-ink" lang={s.language}>
-                  {s.title}
-                </span>
+                <span className="block truncate text-sm font-medium text-ink">{s.title}</span>
                 <span className="block truncate text-xs text-muted">{s.subtitle}</span>
               </span>
               <span

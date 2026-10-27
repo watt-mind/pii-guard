@@ -76,7 +76,7 @@ describe("App in demo mode", () => {
       unmask: blocked,
     };
     render(<App api={api} mock={createMockClient()} />);
-    expect(await screen.findByText("API v0.1.0")).toBeInTheDocument();
+    expect(await screen.findByText("v0.1.0")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /mask document/i }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Blocked. Nothing was sent to the model.");
@@ -117,7 +117,7 @@ describe("App against a live API", () => {
   it("states what the engine did instead of claiming everything was masked, and shows details on hover", async () => {
     const user = userEvent.setup();
     render(<App api={liveApi()} mock={createMockClient()} />);
-    expect(await screen.findByText("Live")).toBeInTheDocument();
+    expect(await screen.findByText("Live API", { selector: "span" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /mask document/i }));
     const note = await screen.findByTestId("scope-note");
     expect(note).toHaveTextContent(/\d+ values masked by /);

@@ -6,6 +6,7 @@ import {
   headline,
   type HeadlineSide,
   languageName,
+  FAST_MODE_SYSTEM,
   loadBenchmarks,
   originLabel,
   pick,
@@ -18,6 +19,7 @@ import {
   type Metrics,
   type Snapshot,
 } from "../api/benchmarks";
+import { Button } from "../components/ui";
 import { LanguageBars, LeakLatencyChart, MarkerIcon, ProgressChart, TypeHeatmap } from "./BenchmarksCharts";
 
 type Load = { state: "loading" } | { state: "ready"; index: BenchmarkIndex } | { state: "error"; message: string };
@@ -95,7 +97,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
 
       <Headline index={index} set={set} lang={lang} />
 
-      <section aria-label="Filters" className="space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5">
+      <section aria-label="Filters" className="space-y-4 rounded-xl border border-line bg-surface p-4 sm:p-5">
         <Segmented
           label="Fixture set"
           value={set}
@@ -112,7 +114,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
           onChange={setLang}
         />
         <fieldset className="min-w-0">
-          <legend className="mb-2 flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold tracking-[0.08em] text-faint uppercase">
+          <legend className="mb-2 flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-muted">
             Systems
             <span className="flex gap-1 font-medium tracking-normal normal-case">
               <button type="button" className="rounded px-1.5 py-0.5 text-muted underline-offset-2 hover:text-ink hover:underline" onClick={() => setChosen(null)}>
@@ -145,8 +147,8 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
                         <input type="checkbox" className="sr-only" checked={on} onChange={() => toggle(k)} />
                         <MarkerIcon info={sys} />
                         {sys?.short_label ?? k}
-                        {sys?.default && (
-                          <span title="The rules-only pipeline: no model call. Used by the gateway's Fast mode." className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-muted uppercase ring-1 ring-line">
+                        {k === FAST_MODE_SYSTEM && (
+                          <span title="Rules + the on-device NER: the gateway's fast mode, its production path. Without a NER checkpoint, fast mode runs the rules alone." className="rounded-sm bg-surface-2 px-1 font-mono text-2xs text-muted ring-1 ring-line">
                             fast mode
                           </span>
                         )}
@@ -218,7 +220,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         </Section>
       )}
 
-      <details className="group rounded-2xl border border-line bg-surface">
+      <details className="group rounded-xl border border-line bg-surface">
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-ink sm:px-5">
           <span className="mr-1.5 inline-block transition-transform group-open:rotate-90" aria-hidden="true">
             ›
@@ -243,17 +245,17 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
   const kind = info?.origin === "generated" ? "model-generated" : "hand-written";
   const scope = `${docs ?? "?"} ${kind} fictional ${lang === "all" ? "" : `${languageName(lang)} `}documents`;
   const pct = (x: HeadlineSide) => <strong className="font-semibold tabular-nums text-ink">{formatPct(x.leak)}</strong>;
-  const demo = index.snapshots.find((x) => x.fixture_set === set && /muse spark open/i.test(index.systems[x.system]?.label ?? ""));
+  const demo = index.snapshots.find((x) => x.fixture_set === set && x.system === FAST_MODE_SYSTEM);
   const demoLeak = demo ? pick(demo, lang)?.leak : null;
   const speed = (x: HeadlineSide) => (x.p50 === null ? "" : `${x.label}: ${formatMs(x.p50)} per document${x.hardware ? ` (${x.hardware})` : ""}`);
   return (
-    <div className="rounded-2xl border border-guard/30 bg-guard-soft/60 px-4 py-3" data-testid="bench-headline">
+    <div className="border-l-2 border-guard py-1 pl-4" data-testid="bench-headline">
       <p className="text-base text-pretty text-ink sm:text-lg">
         On {scope}, pii-guard lets {pct(h.ours)} of personal values through, against {pct(h.theirs)} for the best open-source tool.
         {demo && demoLeak !== null && demoLeak !== undefined && demo.system !== h.ours.system && (
           <>
             {" "}
-            The configuration this demo runs (rules + Muse Spark Open): <strong className="font-semibold tabular-nums text-ink">{formatPct(demoLeak)}</strong>.
+            Fast mode, the production path (rules + on-device NER): <strong className="font-semibold tabular-nums text-ink">{formatPct(demoLeak)}</strong>.
           </>
         )}
       </p>
@@ -268,7 +270,7 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
 function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col-reverse">
-      <dt className="text-[10px] tracking-wide text-faint uppercase">{label}</dt>
+      <dt className="text-2xs text-muted">{label}</dt>
       <dd className="font-semibold tabular-nums text-ink">{value}</dd>
     </div>
   );
@@ -287,7 +289,7 @@ function Segmented<T extends string>({
 }) {
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">{label}</legend>
+      <legend className="mb-2 text-xs font-medium text-muted">{label}</legend>
       <div className="flex flex-wrap gap-1.5">
         {options.map((o) => (
           <label
@@ -309,7 +311,7 @@ function Segmented<T extends string>({
 
 function Section({ id, title, note, children }: { id: string; title: string; note: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-title`} className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
+    <section aria-labelledby={`${id}-title`} className="rounded-xl border border-line bg-surface p-4 sm:p-5">
       <h2 id={`${id}-title`} className="text-base font-semibold tracking-tight text-ink">
         {title}
       </h2>
@@ -365,7 +367,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
           Results per system, sorted by {COLUMNS.find((c) => c.key === sort.key)!.label}, {sort.dir === "asc" ? "lowest" : "highest"} first
         </caption>
         <thead>
-          <tr className="border-b border-line text-left text-xs text-faint">
+          <tr className="border-b border-line text-left text-xs text-muted">
             <th scope="col" className="sticky left-0 z-10 bg-surface py-2 pr-3 font-semibold">
               System
             </th>
@@ -382,7 +384,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                   className={["inline-flex items-center gap-1 rounded hover:text-ink", c.key === sort.key ? "text-ink" : ""].join(" ")}
                 >
                   {c.label}
-                  <span aria-hidden="true" className={["w-2.5 text-[10px]", c.key === sort.key ? "" : "opacity-0"].join(" ")}>
+                  <span aria-hidden="true" className={["w-2.5 text-2xs", c.key === sort.key ? "" : "opacity-0"].join(" ")}>
                     {sort.dir === "asc" ? "▲" : "▼"}
                   </span>
                 </button>
@@ -402,8 +404,8 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                   <span className="flex items-center gap-1.5">
                     <MarkerIcon info={sys} />
                     {sys?.short_label ?? s.system}
-                    {sys?.default && (
-                      <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-muted uppercase ring-1 ring-line">
+                    {s.system === FAST_MODE_SYSTEM && (
+                      <span className="rounded-sm bg-surface-2 px-1 font-mono text-2xs text-muted ring-1 ring-line">
                         fast mode
                       </span>
                     )}
@@ -465,9 +467,18 @@ function RunNotes({ snapshots, index, open }: { snapshots: Snapshot[]; index: Be
   );
 }
 
+const VISUAL_ROWS = 8;
+
 function VisualTable({ index }: { index: BenchmarkIndex }) {
+  const [all, setAll] = useState(false);
   const types = [...new Set(index.visual.flatMap((r) => Object.keys(r.by_region_type)))];
+  // Best runs first within each set, so the short view is the useful one.
+  const sorted = [...index.visual].sort(
+    (a, b) => (a.fixture_set ?? "").localeCompare(b.fixture_set ?? "") || (b.overall.recall_iou50 ?? 0) - (a.overall.recall_iou50 ?? 0),
+  );
+  const shown = all ? sorted : sorted.slice(0, VISUAL_ROWS);
   return (
+    <>
     <div
       role="region"
       aria-label="Image masking table, scrolls sideways"
@@ -476,11 +487,11 @@ function VisualTable({ index }: { index: BenchmarkIndex }) {
     >
       <table className="w-full min-w-max text-sm">
         <thead>
-          <tr className="border-b border-line text-left text-xs text-faint">
-            <th scope="col" className="py-2 pr-3 font-semibold">
+          <tr className="border-b border-line text-left text-xs text-muted">
+            <th scope="col" className="py-2 pr-3 font-medium">
               Run
             </th>
-            <th scope="col" className="px-2 py-2 text-right font-semibold">
+            <th scope="col" className="px-2 py-2 text-right font-medium">
               Images
             </th>
             {types.map((t) => (
@@ -488,13 +499,13 @@ function VisualTable({ index }: { index: BenchmarkIndex }) {
                 {t}
               </th>
             ))}
-            <th scope="col" className="px-2 py-2 text-right font-semibold">
+            <th scope="col" className="px-2 py-2 text-right font-medium">
               All regions
             </th>
           </tr>
         </thead>
         <tbody>
-          {index.visual.map((r) => (
+          {shown.map((r) => (
             <tr key={r.run_id} className="border-b border-line last:border-0">
               <th scope="row" className="py-2 pr-3 text-left font-normal">
                 <span className="block font-medium text-ink">{r.run_id.replace(`${r.date}-`, "").replace(/-/g, " ")}</span>
@@ -514,6 +525,12 @@ function VisualTable({ index }: { index: BenchmarkIndex }) {
         </tbody>
       </table>
     </div>
+    {sorted.length > VISUAL_ROWS && (
+      <Button variant="ghost" className="mt-2 -ml-3" aria-expanded={all} onClick={() => setAll((v) => !v)}>
+        {all ? `Show the best ${VISUAL_ROWS}` : `Show all ${sorted.length} runs`}
+      </Button>
+    )}
+    </>
   );
 }
 
@@ -528,8 +545,8 @@ function RunLog({ index }: { index: BenchmarkIndex }) {
             {r.languages.length > 0 && <span className="text-muted">({r.languages.join(", ")})</span>}
             <span
               className={[
-                "rounded px-1.5 text-[10px] font-semibold uppercase",
-                r.source === "imported" ? "bg-surface-2 text-muted ring-1 ring-line" : "bg-guard-soft text-guard-ink",
+                "rounded-sm px-1.5 font-mono text-2xs",
+                r.source === "imported" ? "bg-surface-2 text-muted ring-1 ring-line" : "text-muted ring-1 ring-line-strong",
               ].join(" ")}
             >
               {r.source}

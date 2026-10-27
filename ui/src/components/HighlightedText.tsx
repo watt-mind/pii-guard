@@ -31,10 +31,10 @@ export function HighlightedText({ text, spans, activeKey, onActivate }: Props) {
         onFocus={(e) => onActivate(key, e.currentTarget)}
         onBlur={() => onActivate(null)}
         className={[
-          "rounded-[5px] px-0.5 -mx-0.5 ring-1 ring-inset transition-shadow cursor-help",
+          "rounded-md px-0.5 -mx-0.5 ring-1 ring-inset transition-shadow cursor-help",
           meta.mark,
           kept ? "bg-transparent! ring-0! outline outline-1 -outline-offset-1 outline-dashed outline-current/45" : "",
-          active ? "ring-2 shadow-[0_0_0_3px_var(--canvas),0_0_0_5px_currentColor]" : "",
+          active ? "ring-2 outline-2 outline-offset-2 outline-current" : "",
         ].join(" ")}
       >
         {text.slice(span.start, span.end)}
@@ -53,7 +53,7 @@ export function HighlightedText({ text, spans, activeKey, onActivate }: Props) {
           key={`known-${span.start}`}
           aria-hidden="true"
           data-known
-          className="ml-1 inline-block translate-y-[-1px] rounded bg-guard-soft px-1 align-middle font-sans text-[10px] leading-4 font-semibold tracking-wide text-guard-ink uppercase ring-1 ring-guard/40"
+          className="ml-1 inline-block -translate-y-px rounded-sm bg-surface-2 px-1 align-middle font-mono text-2xs leading-4 text-muted ring-1 ring-line-strong"
         >
           known
         </span>,

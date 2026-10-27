@@ -244,3 +244,10 @@ export function headline(index: BenchmarkIndex, set: string, lang: LanguageFilte
   const theirs = best("comparison");
   return ours && theirs ? { ours, theirs } : null;
 }
+
+/**
+ * The system the gateway's fast mode runs: rules + the distilled on-device NER (the production
+ * path). The index's own `default` flag still marks the rules-only baseline, which is what fast
+ * mode falls back to without a NER checkpoint.
+ */
+export const FAST_MODE_SYSTEM = "rules+ner:xlmr-large-distilled-glimmer";

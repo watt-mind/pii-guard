@@ -66,6 +66,8 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [active, setActive] = useState<number | null>(null);
   const [showRegions, setShowRegions] = useState(true);
+  // Samples carry their language; an upload defaults to English and can be switched (LAB-1242).
+  const [language, setLanguage] = useState<"hu" | "en">(DEFAULT_IMAGE_SAMPLE.language);
   const runId = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const uploadSeq = useRef(0);
@@ -86,6 +88,7 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
     runId.current++; // a pending run for the previous image is ignored
     setRunning(false);
     setSelection(next);
+    setLanguage(next.kind === "sample" ? next.sample.language : "en");
     setError(null);
     setActive(null);
   };
@@ -104,7 +107,7 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
     select({ kind: "upload", key: `upload:${++uploadSeq.current}`, name: file.name, blob: file, url: URL.createObjectURL(file) });
   };
 
-  const run = async (target: Selection = selection) => {
+  const run = async (target: Selection = selection, lang: "hu" | "en" = language) => {
     const id = ++runId.current;
     setRunning(true);
     setError(null);
@@ -115,7 +118,7 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
         return client.maskImage({
           image: blob,
           sampleId: target.kind === "sample" ? target.sample.id : null,
-          language: "hu",
+          language: lang,
         });
       });
       if (id !== runId.current) return;
@@ -146,8 +149,8 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
       </p>
 
       <fieldset className="min-w-0">
-        <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples, or your own image</legend>
-        <div className="relative -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
+        <legend className="mb-2 text-xs font-medium text-muted">Fictional samples, or your own image</legend>
+        <div className="relative -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-5">
           {IMAGE_SAMPLES.map((s) => {
             const on = selection.kind === "sample" && selection.sample.id === s.id;
             return (
@@ -159,16 +162,16 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
                   e.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
                   const next = sampleSelection(s);
                   select(next);
-                  void run(next); // one click: pick and mask
+                  void run(next, s.language); // one click: pick and mask
                 }}
                 className={[
-                  "flex w-[15rem] shrink-0 snap-start items-center gap-3 rounded-xl border p-2 pr-3 text-left transition-colors sm:w-auto",
-                  on ? "border-ink bg-surface shadow-sm" : "border-line bg-surface/60 hover:border-line-strong hover:bg-surface",
+                  "flex w-[15rem] shrink-0 snap-start items-center gap-3 rounded-lg border p-2 pr-3 text-left transition-colors sm:w-auto",
+                  on ? "border-ink bg-surface" : "border-line hover:border-line-strong hover:bg-surface",
                 ].join(" ")}
               >
                 <img src={s.src} alt="" aria-hidden="true" className="size-12 shrink-0 rounded-md border border-line bg-surface-2 object-cover" />
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-ink">{s.title}</span>
+                  <span className="block text-sm font-medium text-ink">{s.title}</span>
                   <span className="block text-xs text-muted">{s.subtitle}</span>
                 </span>
               </button>
@@ -190,11 +193,11 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
             />
             <Button
               variant={selection.kind === "upload" ? "primary" : "secondary"}
-              className="h-auto min-h-16 w-full flex-col !items-start gap-0 rounded-xl px-4 py-2 text-left"
+              className="h-auto min-h-16 w-full flex-col !items-start gap-0 rounded-lg border-dashed px-3.5 py-2 text-left"
               aria-describedby="upload-hint"
               onClick={() => fileInput.current?.click()}
             >
-              <span className="text-sm font-semibold">{selection.kind === "upload" ? "Upload another image" : "Upload an image"}</span>
+              <span className="text-sm font-medium">{selection.kind === "upload" ? "Upload another image" : "Upload an image"}</span>
               <span id="upload-hint" className="max-w-full truncate text-xs font-normal opacity-75">
                 {selection.kind === "upload" ? selection.name : demo ? "Needs the live API: SAM runs on the server." : "PNG or JPEG, up to 10 MB. Fictional only."}
               </span>
@@ -217,6 +220,19 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
           className="lg:flex-1"
           actions={
             <>
+              <label className="sr-only" htmlFor="image-language">
+                Language of the text in the image
+              </label>
+              <select
+                id="image-language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as "hu" | "en")}
+                className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                title="Language of the text printed in the image: decides which rules run on its OCR text"
+              >
+                <option value="hu">Hungarian</option>
+                <option value="en">English</option>
+              </select>
               {data && data.regions.length > 0 && (
                 <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm text-muted hover:text-ink">
                   <input type="checkbox" checked={showRegions} onChange={(e) => setShowRegions(e.target.checked)} className="size-4 accent-[var(--guard)]" />
@@ -307,7 +323,7 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
       </div>
 
       {data && result && !error && (
-        <section aria-labelledby="regions-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 rounded-2xl border border-line bg-surface p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+        <section aria-labelledby="regions-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 rounded-xl border border-line bg-surface p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
           <div className="space-y-4">
             <div>
               <h2 id="regions-title" className="text-base font-semibold tracking-tight text-ink">
@@ -385,7 +401,7 @@ function RegionBox({
       onFocus={() => onActive(index)}
       onBlur={() => onActive(null)}
       onClick={() => onActive(active ? null : index)}
-      className="absolute rounded-[3px] transition-[box-shadow,background-color] focus-visible:outline-offset-1"
+      className="absolute rounded-sm transition-[box-shadow,background-color] focus-visible:outline-offset-1"
       style={{
         ...percentBox(region.box, width, height, MASK_PADDING),
         border: `2px ${region.source === "ocr" ? "dashed" : "solid"} ${color}`,
@@ -399,7 +415,7 @@ function RegionBox({
           "absolute px-1 font-mono",
           tag.startsWith("top") ? "-top-[1.15rem] rounded-t" : "-bottom-[1.15rem] rounded-b",
           tag.endsWith("left") ? "left-[-2px]" : "right-[-2px]",
-          " text-[10px] leading-[1.1rem] font-semibold whitespace-nowrap text-white",
+          " text-2xs leading-[1.1rem] font-semibold whitespace-nowrap text-white",
           // Text regions sit between lines of text: their tag would hide the line above.
           region.source === "ocr" && !active ? "hidden" : "",
         ].join(" ")}
@@ -417,7 +433,7 @@ function Highlight({ region, width, height }: { region: ImageRegion; width: numb
   return (
     <span
       aria-hidden="true"
-      className="pointer-events-none absolute rounded-[3px]"
+      className="pointer-events-none absolute rounded-sm"
       style={{ ...percentBox(region.box, width, height, MASK_PADDING + 2), boxShadow: `0 0 0 3px ${color}` }}
     />
   );
@@ -440,11 +456,11 @@ function ImageLegend({ regions, activeType }: { regions: ImageRegion[]; activeTy
           <span className="font-medium text-ink">{metaFor(row.type).label}</span>
           <span className="tabular-nums">{row.count}</span>
           {row.sources.map((s) => (
-            <span key={s} className="rounded bg-surface-2 px-1 text-[10px] font-semibold tracking-wide text-faint uppercase">
+            <span key={s} className="rounded bg-surface-2 px-1 font-mono text-2xs text-muted">
               {s === "sam" ? "SAM" : s === "local" ? "On-device" : "OCR"}
             </span>
           ))}
-          {row.kept && <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold tracking-wide text-faint uppercase">kept</span>}
+          {row.kept && <span className="rounded bg-surface-2 px-1 font-mono text-2xs text-muted">kept</span>}
         </li>
       ))}
     </ul>
@@ -463,7 +479,7 @@ function RegionTable({
   onActive: (i: number | null) => void;
 }) {
   if (regions.length === 0) {
-    return <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing to list: the image went out re-encoded but otherwise unchanged.</p>;
+    return <p className="py-4 text-sm text-muted">Nothing to list: the image went out re-encoded but otherwise unchanged.</p>;
   }
   return (
     <div role="region" aria-label="Region list (scrolls sideways)" tabIndex={0} className="overflow-x-auto rounded-lg border border-line focus-visible:outline-2 focus-visible:outline-ink">
