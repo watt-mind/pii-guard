@@ -26,7 +26,7 @@ export function Inspector({ info, hint }: Props) {
           </span>
           <span>{info.placeholder ? <>masked as <code className="font-mono text-ink">{info.placeholder}</code></> : "kept (policy: keep)"}</span>
           {info.detector && <span>found by {detectorLabel(info.detector, { types: info.entityType ? [info.entityType] : [] })}</span>}
-          {info.score !== undefined && (
+          {info.score !== undefined && info.detector !== "demo" && (
             <span className="inline-flex items-center gap-1.5">
               confidence
               <span aria-hidden="true" className="inline-block h-1.5 w-12 overflow-hidden rounded-full bg-line">

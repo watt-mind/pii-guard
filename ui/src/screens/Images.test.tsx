@@ -82,7 +82,7 @@ describe("Images screen", () => {
   it("tells a user who chose the demo engine with the API up to switch to Live API", async () => {
     localStorage.setItem("pii-guard:mode", "mock");
     const { user, panel } = await openImages(liveApi(vi.fn()));
-    await screen.findByText("API v0.1.0");
+    await screen.findByText(/^API v0.1.0/);
     const input = panel.querySelector<HTMLInputElement>("#image-upload")!;
     await user.upload(input, new File([new Uint8Array([0x89, 0x50])], "mine.png", { type: "image/png" }));
     expect(within(panel).getByText("Nothing has been sent yet")).toBeInTheDocument();

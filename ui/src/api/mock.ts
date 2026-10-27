@@ -253,6 +253,9 @@ export interface MockClientOptions {
 
 export const MOCK_SESSION_PREFIX = "s_demo_";
 
+/** The detector name the demo engine reports for everything it finds (not a real detector). */
+export const DEMO_DETECTOR = "demo";
+
 export function createMockClient(options: MockClientOptions = {}): GuardClient {
   const latency = options.latencyMs ?? 0;
   const sessions = new Map<string, MockSession>();
@@ -266,7 +269,8 @@ export function createMockClient(options: MockClientOptions = {}): GuardClient {
       end: cp(s.end),
       entity_type: s.entity_type,
       score: s.score,
-      detector: s.detector,
+      // Honest attribution: every non-known span comes from the in-browser demo rules.
+      detector: s.detector === "known" ? "known" : DEMO_DETECTOR,
     }));
   }
 

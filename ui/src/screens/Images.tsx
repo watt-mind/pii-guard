@@ -466,7 +466,7 @@ function RegionTable({
     return <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing to list: the image went out re-encoded but otherwise unchanged.</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-lg border border-line">
+    <div role="region" aria-label="Region list (scrolls sideways)" tabIndex={0} className="overflow-x-auto rounded-lg border border-line focus-visible:outline-2 focus-visible:outline-ink">
       <table className="w-full min-w-[30rem] text-left text-sm">
         <thead className="bg-surface-2 text-xs text-muted">
           <tr>

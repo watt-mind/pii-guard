@@ -152,7 +152,8 @@ export function describeSpan(span: LocalSpan): string {
   const meta = metaFor(span.entityType);
   const detector = detectorLabel(span.detector, { types: [span.entityType] });
   const action = span.placeholder ? `masked as ${span.placeholder}` : "kept by policy";
-  return `${meta.label}, ${action}, found by ${detector}, confidence ${Math.round(span.score * 100)}%`;
+  const confidence = span.detector === "demo" ? "" : `, confidence ${Math.round(span.score * 100)}%`;
+  return `${meta.label}, ${action}, found by ${detector}${confidence}`;
 }
 
 

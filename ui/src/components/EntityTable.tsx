@@ -45,7 +45,8 @@ export function EntityTable({ entities, spans, activeKey, onActivate }: Props) {
           {entities.map((e) => {
             const own = spans.filter((s) => s.placeholder === e.placeholder);
             const detectors = [...new Set(own.map((s) => detectorLabel(s.detector, { types: [s.entityType] })))];
-            const best = own.length ? Math.max(...own.map((s) => s.score)) : null;
+            const scored = own.filter((s) => s.detector !== "demo");
+            const best = scored.length ? Math.max(...scored.map((s) => s.score)) : null;
             const active = activeKey === e.placeholder;
             return (
               <tr

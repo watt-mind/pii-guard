@@ -106,7 +106,13 @@ function EngineBadge({ state, engine, onRecheck }: { state: EngineState; engine:
   const reason = engineReason(state);
   const status = state.status;
   const apiLabel =
-    status.state === "online" ? `API v${status.version}` : status.state === "checking" ? "API …" : "API offline";
+    status.state === "online"
+      ? engine === "mock"
+        ? `API v${status.version} · not in use`
+        : `API v${status.version}`
+      : status.state === "checking"
+        ? "API …"
+        : "API offline";
   const dot =
     status.state === "online" ? "bg-guard" : status.state === "checking" ? "bg-faint animate-pulse" : "bg-danger";
 

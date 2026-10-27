@@ -217,5 +217,6 @@ export function detectorLabel(detector: string, options: DetectorLabelOptions = 
   if (detector === "llm") return options.model ? modelLabel(options.model) : "LLM detector";
   if (detector === "ner") return "Multilingual NER";
   if (detector === "known") return "Known value (pre-loaded)";
+  if (detector === "demo") return "Demo rules (in browser)";
   return detector;
 }

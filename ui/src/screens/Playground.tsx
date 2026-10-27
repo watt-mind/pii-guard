@@ -11,7 +11,7 @@ import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
 import { Popover } from "../components/Popover";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
-import { SAMPLES, type Sample } from "../content/samples";
+import { SAMPLES, sampleBehind, type Sample } from "../content/samples";
 import { detectorsUsed, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
 import type { RunError, RunResult } from "../lib/run";
 
@@ -45,7 +45,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
 
   const fresh = result !== null && result.input === text && result.language === language && result.knownSignature === knownSignature;
   const showHighlighted = fresh && !editing;
-  const sample = SAMPLES.find((s) => s.id === sampleId);
+  const sample = SAMPLES.find((s) => s.id === sampleId) ?? sampleBehind(text);
 
   const summary = useMemo(() => (result ? summarize(result.spans, result.mask) : null), [result]);
   const counts = useMemo(() => {
@@ -213,13 +213,13 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
             <SkeletonLines />
           ) : result && fresh ? (
             <div className="space-y-4">
-              {sample && sample.text === result.input && (
+              {sample && result.input.startsWith(sample.text) && (
                 <p className="rounded-lg bg-model-soft px-3 py-2 text-sm text-ink">
                   <span className="font-semibold text-model">Instruction · </span>
                   {sample.task}
                 </p>
               )}
-              {summary && <ScopeNote summary={summary} detectors={detectorsUsed(result.spans)} />}
+              {summary && <ScopeNote summary={summary} detectors={detectorsUsed(result.spans)} demo={result.engine === "mock"} />}
               <MaskedText text={result.mask.masked_text} activeKey={activeKey} onActivate={activate} />
             </div>
           ) : (
@@ -276,7 +276,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
 }
 
 /** Live mode: say exactly what this engine did, so gaps read as known scope rather than a promise. */
-function ScopeNote({ summary, detectors }: { summary: Summary; detectors: string[] }) {
+function ScopeNote({ summary, detectors, demo }: { summary: Summary; detectors: string[]; demo: boolean }) {
   return (
     <div className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink" data-testid="scope-note">
       <p>
@@ -287,7 +287,7 @@ function ScopeNote({ summary, detectors }: { summary: Summary; detectors: string
         {summary.kept > 0 && <>, {summary.kept} kept by policy</>}.
       </p>
       <p className="mt-0.5 text-muted">
-        Only highlighted values were replaced. Anything without a highlight on the left was not detected by the detectors running on this API and reached the model as written.
+        Only highlighted values were replaced. Anything without a highlight on the left was not detected {demo ? "by the in-browser demo rules" : "by the detectors running on this API"} and reached the model as written.
       </p>
     </div>
   );

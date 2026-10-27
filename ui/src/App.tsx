@@ -5,7 +5,7 @@ import { createHttpClient, type HttpGuardClient } from "./api/http";
 import { createMockClient } from "./api/mock";
 import type { GuardClient } from "./api/types";
 import { Header, type Screen } from "./components/Header";
-import { DEFAULT_SAMPLE, SAMPLES, type Sample } from "./content/samples";
+import { DEFAULT_SAMPLE, SAMPLES, sampleBehind, type Sample } from "./content/samples";
 import type { BenchmarkLoader } from "./api/benchmarks";
 import { useEngine } from "./hooks/useEngine";
 import { useTheme } from "./hooks/useTheme";
@@ -180,7 +180,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
               );
             }}
             onContinue={() => {
-              const sample = SAMPLES.find((s) => s.id === sampleId && s.text === text);
+              const sample = sampleBehind(text);
               setChatDraft({ text: sample ? `${sample.task}\n\n${text}` : text, language, nonce: Date.now() });
               setScreen("chat");
               window.scrollTo?.({ top: 0 });
