@@ -7,6 +7,7 @@ and errors carry entity types, counts and placeholder ids only (AGENTS.md, ADR 0
 
 from __future__ import annotations
 
+import bisect
 import copy
 import hashlib
 import heapq
@@ -23,6 +24,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pii_guard.detect.normalize import INVISIBLE_CHARS
 from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
 from pii_guard.vault.fold import FoldedText, fold_value, fold_views
 from pii_guard.vault.inflection import (
@@ -121,6 +123,9 @@ class MaskResult:
 
     text: str
     replacements: tuple[tuple[int, int, str], ...]
+    #: The session's entry generation (:attr:`VaultSession.generation`) every entry up to which
+    #: this text was scanned with: pass it as ``since`` to a later remask of the output.
+    generation: int = 0
 
     def __repr__(self) -> str:
         return f"MaskResult(text=<redacted>, replacements={len(self.replacements)})"
@@ -153,8 +158,10 @@ class _Entry:
         "alias_patterns",
         "aliases",
         "casing",
+        "changed",
         "count",
         "entity_type",
+        "initials",
         "language",
         "needles",
         "normalized",
@@ -181,10 +188,15 @@ class _Entry:
         self.normalized = normalized
         self.language = language
         self.count = 0
+        # The session generation at which this entry was created or its patterns last
+        # changed (a new surface or alias): see :attr:`VaultSession.generation`.
+        self.changed = 0
         self.patterns: dict[str, re.Pattern[str]] = {}
         # Per language, the literal prefilter of :meth:`pattern` (see :func:`_needles`).
         self.needles: dict[str, tuple[str, ...] | None] = {}
         self.alias_patterns: dict[str, list[tuple[str, re.Pattern[str], _Needles]]] = {}
+        # Per language, the folded first characters a match of any pattern can start with.
+        self.initials: dict[str, frozenset[str]] = {}
         self.surfaces: dict[str, None] = {}
         self.aliases: dict[str, None] = {}
         self.seen: dict[str, str] = {}
@@ -195,16 +207,24 @@ class _Entry:
     def __repr__(self) -> str:
         return f"_Entry(placeholder={self.placeholder!r}, value=<redacted>, count={self.count})"
 
-    def add_surface(self, surface: str) -> None:
+    def add_surface(self, surface: str) -> bool:
+        """Split ``surface`` onto this entry; ``True`` if that changed its pattern."""
         if surface != self.original and surface not in self.surfaces:
             self.surfaces[surface] = None
             self.patterns.clear()
             self.needles.clear()
+            self.initials.clear()
+            return True
+        return False
 
-    def add_alias(self, lemma: str) -> None:
+    def add_alias(self, lemma: str) -> bool:
+        """Add an unconfirmed lemma; ``True`` if that changed the alias patterns."""
         if lemma != self.original and lemma not in self.aliases:
             self.aliases[lemma] = None
             self.alias_patterns.clear()
+            self.initials.clear()
+            return True
+        return False
 
     def remember(self, suffix: str, stem: str) -> None:
         if suffix:
@@ -235,6 +255,25 @@ class _Entry:
     def prefilter(self, language: str) -> _Needles:
         """The literal prefilter of :meth:`pattern` (call that first): see :func:`_needles`."""
         return self.needles.get(language)
+
+    def initial_chars(self, language: str) -> frozenset[str]:
+        """The folded characters a match of :meth:`pattern` or an alias pattern starts with.
+
+        Each alternative starts with its literal's first character (``i`` standing for both
+        case-ambiguous ones, see :func:`_initial`).
+        """
+        cached = self.initials.get(language)
+        if cached is None:
+            matcher = inflection_for(language)
+            values = [self.original, *self.surfaces, *self.aliases]
+            cached = frozenset(
+                _initial(literal)
+                for value in values
+                for _, literal in _literal_forms(matcher, fold_value(value), self.entity_type)
+                if literal
+            )
+            self.initials[language] = cached
+        return cached
 
     def alias_pattern_list(self, language: str) -> list[tuple[str, re.Pattern[str], _Needles]]:
         """``(alias, pattern of its forms, its prefilter)`` per alias, like :meth:`pattern`."""
@@ -280,6 +319,12 @@ def _needles(literals: Iterable[str]) -> _Needles:
     return tuple(found)
 
 
+def _initial(literal: str) -> str:
+    """The index key of ``literal``'s first character: ``i`` for either case-ambiguous one."""
+    char = literal[0]
+    return "i" if _CASE_AMBIGUOUS.match(char) else char
+
+
 def _absent(needles: _Needles, views: tuple[FoldedText, ...]) -> bool:
     """No needle is in any view, so the pattern they filter cannot match there."""
     if needles is None or not _PREFILTER:
@@ -289,6 +334,9 @@ def _absent(needles: _Needles, views: tuple[FoldedText, ...]) -> bool:
 
 #: Off only in tests, to check the prefilter changes no output.
 _PREFILTER = True
+
+#: Off only in tests and benchmarks, to check ``since`` remasks change no output (LAB-1278).
+_REMASK_SINCE = True
 
 #: Bounds of a session's fold memo: texts, and their characters in all. A folded view keeps
 #: an offset map per character, so the character bound is what caps the memory.
@@ -388,6 +436,13 @@ class VaultSession:
         # same texts come back every turn (LAB-1277). Bounded; forgotten with the session.
         self._folds: OrderedDict[str, tuple[FoldedText, ...]] = OrderedDict()
         self._folded_chars = 0
+        # Bumped whenever an entry is created or its patterns change (LAB-1278): a remask
+        # ``since`` a text's generation scans only the entries changed after it.
+        self._generation = 0
+        # (generation, language) -> folded initial -> entries (see :meth:`_starting_with`).
+        self._initials: tuple[int, str, dict[str, list[_Entry]]] | None = None
+        #: Entries scanned for occurrences, over every mask call (a cost counter for tests).
+        self.entries_scanned = 0
 
     def __repr__(self) -> str:
         return (
@@ -455,6 +510,7 @@ class VaultSession:
             fork._by_key = copy.deepcopy(self._by_key, memo)
             fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
             fork._reserved = set(self._reserved)
+            fork._generation = self._generation
             fork._known = self._known
             fork._journal = []
             fork._parent = self
@@ -486,6 +542,7 @@ class VaultSession:
         *,
         language: str = "hu",
         remask: bool = False,
+        since: int | None = None,
     ) -> str:
         """Replace each span, and every other occurrence of a confirmed value, by its placeholder.
 
@@ -514,12 +571,18 @@ class VaultSession:
         token is reserved: left as it is and never issued as a placeholder later.
         ``remask=True`` is for text this session's own :meth:`mask` produced (a second pass
         that catches values confirmed later): its issued placeholders are expected there.
+        ``since`` (with ``remask``, no spans): the :attr:`MaskResult.generation` that text was
+        masked at. Only entries created or changed after it are scanned, since every older one
+        already scanned the text and its occurrences are placeholders now; with no such entry
+        the text is returned as it is (LAB-1278).
 
         Raises :class:`MaskingError` for invalid, out-of-range or overlapping spans, and
         :class:`SessionNotFoundError` once the session has expired. Nothing is recorded when
         it raises.
         """
-        return self.mask_with_report(text, spans, language=language, remask=remask).text
+        return self.mask_with_report(
+            text, spans, language=language, remask=remask, since=since
+        ).text
 
     def mask_with_report(
         self,
@@ -528,19 +591,31 @@ class VaultSession:
         *,
         language: str = "hu",
         remask: bool = False,
+        since: int | None = None,
     ) -> MaskResult:
         """Like :meth:`mask`, also returning where each placeholder went."""
+        if since is not None and (not remask or spans):
+            raise ValueError("since is only for a remask without spans")
+        if not _REMASK_SINCE:
+            since = None
         with self._lock:
             self._check_alive()
+            if since is not None and not self._edges_unchanged(text, since, language):
+                since = None
+            if since is not None and since >= self._generation:
+                # Nothing changed since the text was masked: no scan can find anything.
+                return MaskResult(text, (), self._generation)
             ordered = _validated(text, spans)
             foreign = self._foreign_tokens(text, remask)
             added = foreign - self._reserved
             self._reserved |= added
             try:
-                result = self._mask_validated(text, ordered, language)
+                result = self._mask_validated(text, ordered, language, since)
             except BaseException:
                 self._reserved -= added
                 raise
+            # A fork's journal is replayed as a full remask: ``since`` is in the fork's
+            # numbering, and the replay must come out the same either way (else it fails).
             if self._journal is not None:
                 self._journal.append((text, tuple(spans), language, remask, result.text))
             return result
@@ -564,21 +639,89 @@ class VaultSession:
             )
         return foreign
 
-    def _mask_validated(self, text: str, ordered: Sequence[Span], language: str) -> MaskResult:
+    def _edges_unchanged(self, text: str, since: int, language: str) -> bool:
+        """Whether no entry changed at or before ``since`` can match ``text`` anywhere new.
+
+        Such an entry scanned the text ``text`` was masked from and its occurrences are
+        placeholders now; what is left of that text is unchanged, so it can only match where
+        a placeholder put a new boundary next to a word: right before one
+        (``…0101[[PERSON_x]]``, the lookahead after the match changed) or right after one
+        (``[[PERSON_x]]nak``, the lookbehind before it). The first is rare: then ``False``
+        (scan every entry). For the second, every such entry starting with that character
+        is tried at that position, which is exact and cheap.
+        """
+        views: tuple[FoldedText, ...] | None = None
+        n = len(text)
+        for match in PLACEHOLDER_RE.finditer(text):
+            if match.group(0) not in self._by_placeholder:
+                continue  # a token from the input itself: its neighbourhood did not change
+            before = match.start() - 1
+            while before >= 0 and text[before] in INVISIBLE_CHARS:
+                before -= 1
+            if before >= 0 and (_is_word_char(text[before]) or _is_mark(text[before])):
+                return False
+            after = match.end()
+            while after < n and text[after] in INVISIBLE_CHARS:
+                after += 1
+            if after >= n or not (_is_word_char(text[after]) or _is_mark(text[after])):
+                continue
+            if _is_mark(text[after]):
+                return False
+            if views is None:
+                views = self._fold_views(text)
+            for view in views:
+                index = _folded_index(view, after)
+                if index is None:
+                    return False
+                for entry in self._starting_with(language).get(_initial(view.text[index]), ()):
+                    if entry.changed > since:
+                        continue  # scanned in full anyway
+                    if entry.pattern(language).match(view.text, index):
+                        return False
+                    for _, alias_pattern, _ in entry.alias_pattern_list(language):
+                        if alias_pattern.match(view.text, index):
+                            return False
+        return True
+
+    def _starting_with(self, language: str) -> dict[str, list[_Entry]]:
+        """Entries by the folded characters their matches can start with, for this generation."""
+        cached = self._initials
+        if cached is not None and cached[0] == self._generation and cached[1] == language:
+            return cached[2]
+        index: dict[str, list[_Entry]] = {}
+        for entry in self._by_key.values():
+            for char in entry.initial_chars(language):
+                index.setdefault(char, []).append(entry)
+        self._initials = (self._generation, language, index)
+        return index
+
+    def _mask_validated(
+        self, text: str, ordered: Sequence[Span], language: str, since: int | None = None
+    ) -> MaskResult:
         matcher = inflection_for(language)
         taken = bytearray(len(text))
         replacements: list[tuple[int, int, _Entry]] = []
         for plan in self._plans(text, ordered, matcher):
             span, end = plan.span, plan.span.start + plan.stem_length
             entry = self._entry_for(span.entity_type, plan.lemma, language)
-            entry.add_surface(span.text)
+            if entry.add_surface(span.text):
+                self._touch(entry)
             for alias in plan.aliases:
-                entry.add_alias(alias)
+                if entry.add_alias(alias):
+                    self._touch(entry)
             replacements.append((span.start, end, self._cased(entry, text[span.start : end])))
             taken[span.start : end] = b"\x01" * (end - span.start)
         folded = self._fold_views(text)
+        # Every entry up to here scans this text below; one created during the scan (an
+        # alias's own entry) is newer, so a remask since this generation still scans it.
+        generation = self._generation
         # Longest values first, so "Teszt Elek" wins over a separately confirmed "Elek".
-        entries = sorted(self._by_key.values(), key=lambda e: len(e.normalized), reverse=True)
+        entries = sorted(
+            (e for e in self._by_key.values() if since is None or e.changed > since),
+            key=lambda e: len(e.normalized),
+            reverse=True,
+        )
+        self.entries_scanned += len(entries)
         for entry in entries:
             pattern = entry.pattern(language)
             # Skipping a scan that can find nothing changes no output, only its cost: each
@@ -627,6 +770,7 @@ class VaultSession:
         return MaskResult(
             "".join(parts),
             tuple((start, end, entry.placeholder) for start, end, entry in replacements),
+            generation,
         )
 
     def _fold_views(self, text: str) -> tuple[FoldedText, ...]:
@@ -746,7 +890,13 @@ class VaultSession:
         entry = _Entry(placeholder, entity_type, value, normalized, language)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
+        self._touch(entry)
         return entry
+
+    def _touch(self, entry: _Entry) -> None:
+        """A new entry, or new patterns of one: a newer generation (see :attr:`generation`)."""
+        self._generation += 1
+        entry.changed = self._generation
 
     def _form(self, value: str) -> str:
         """The variant key of ``value``: its casing class (case-sensitive mode) and layout.
@@ -837,6 +987,11 @@ class VaultSession:
             return UnmaskResult(result, tuple(unresolved))
 
     @property
+    def generation(self) -> int:
+        """Grows whenever an entry is created or its patterns change; never goes back."""
+        return self._generation
+
+    @property
     def entry_count(self) -> int:
         """How many placeholders this session has issued (casing and layout variants too)."""
         return len(self._by_placeholder)
@@ -863,6 +1018,21 @@ class VaultSession:
                 dict.fromkeys(v.value for v in self._known.values() if v.entity_type in types)
             )
             return list(found)
+
+
+def _folded_index(view: FoldedText, position: int) -> int | None:
+    """The first index in ``view.text`` folded from original character ``position``; ``None``
+    if it has none of its own (dropped, or composed with the character before it)."""
+    if not view.starts:
+        return position if position < len(view.text) else None
+    index = bisect.bisect_left(view.starts, position)
+    if index < len(view.starts) and view.starts[index] == position:
+        return index
+    return None
+
+
+def _is_mark(char: str) -> bool:
+    return unicodedata.category(char) in ("Mn", "Mc", "Me")
 
 
 def _occurrences(pattern: re.Pattern[str], views: tuple[FoldedText, ...]) -> list[tuple[int, int]]:

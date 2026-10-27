@@ -455,3 +455,217 @@ def test_prefix_helper() -> None:
         assert is_placeholder_prefix(prefix)
     for other in ("", "x[", "[x", "[[p", "[[PERSON_7f3a]]", "[[PERSON-", "[[[", "[[" + "A" * 200):
         assert not is_placeholder_prefix(other)
+
+
+# --- remask since a generation (LAB-1278) ------------------------------------------------
+
+
+def _requests(
+    session: VaultSession, turns: list[tuple[str, list[Span], str]], requests: int
+) -> list[str]:
+    """Gateway-like requests over a growing history: every text masked, then remasked
+    ``since`` the generation it was masked at (the gateway's two passes)."""
+    out: list[str] = []
+    step = max(1, len(turns) // requests)
+    for end in [*range(step, len(turns), step), len(turns), len(turns)]:
+        history = turns[:end]
+        first = [
+            session.mask_with_report(text, spans, language=lang) for text, spans, lang in history
+        ]
+        out += [
+            session.mask(r.text, [], language=lang, remask=True, since=r.generation)
+            for r, (_, _, lang) in zip(first, history, strict=True)
+        ]
+    return out
+
+
+def _canonical(texts: list[str]) -> list[str]:
+    ids: dict[str, str] = {}
+    return [
+        PLACEHOLDER_RE.sub(lambda m: ids.setdefault(m.group(0), f"<{len(ids)}>"), text)
+        for text in texts
+    ]
+
+
+def _session(case_sensitive: bool) -> VaultSession:
+    """A session with a fixed id: two runs issue the same placeholders."""
+    return Vault(TEST_KEY, case_sensitive_placeholders=case_sensitive).session_or_create("s1")[0]
+
+
+def _late_turns() -> list[tuple[str, list[Span], str]]:
+    """The LAB-1277 corpus with the span-less later mentions moved first: every value is
+    confirmed after a text that holds it was masked."""
+    from test_vault_prefilter import _turns
+
+    turns = _turns()
+    return [t for t in turns if not t[1]] + [t for t in turns if t[1]]
+
+
+@pytest.mark.parametrize("case_sensitive", [False, True])
+@pytest.mark.parametrize("late", [False, True])
+def test_remask_since_changes_no_output(
+    monkeypatch: pytest.MonkeyPatch, case_sensitive: bool, late: bool
+) -> None:
+    from test_vault_prefilter import _turns
+
+    turns = _late_turns() if late else _turns()
+
+    def run() -> tuple[list[str], list[str], int]:
+        session = _session(case_sensitive)
+        masked = _requests(session, turns, 4)
+        return masked, [session.unmask(t) for t in masked], session.entries_scanned
+
+    fast = run()
+    monkeypatch.setattr(vault_module, "_REMASK_SINCE", False)
+    full = run()
+    assert fast[0] == full[0]  # the same session id and key: byte-identical placeholders
+    assert fast[1] == full[1]
+    assert fast[2] < full[2]
+    assert sum(text.count("[[") for text in fast[0]) > 300
+
+
+#: Fictional values: Hungarian names in inflected forms, e-mails, phones (several layouts).
+_NAMES = {
+    "Próba Zsuzsanna": ["Próba Zsuzsanna", "Próba Zsuzsannának", "Próba Zsuzsannát"],
+    "Kovács Béla": ["Kovács Béla", "Kovács Bélával", "KOVÁCS BÉLA", "Kovács Bélának"],
+    "Kiss Elek": ["Kiss Elek", "Kiss Eleknek", "Kiss Eleket", "kiss elek"],
+    "Jane Placeholder": ["Jane Placeholder", "Jane Placeholdert", "Placeholder"],
+    "Elek": ["Elek", "Eleknek"],
+}
+_OTHER = {
+    "EMAIL": ["zsuzsa.proba@example.com", "ZSUZSA.PROBA@EXAMPLE.COM", "bela.kovacs@example.org"],
+    "PHONE": ["+36 30 555 0101", "+36 30 555\n0101", "+44 20 7946 0958", "555 0101"],
+}
+#: Between two mentions: prose, and values glued together (a placeholder then borders a word,
+#: which changes regex boundaries: :meth:`VaultSession._edges_unchanged`).
+_SEPARATORS = [" Írj: ", ", ", " és ", "", "-", "\n", "nak ", "\u200b", "\u00ad", "\u0301", "("]
+
+
+@st.composite
+def _session_turns(draw: st.DrawFn) -> list[tuple[str, list[Span], str]]:
+    """Turns mentioning the values above; a random subset of mentions is labelled, so many
+    values are confirmed only after an earlier text that holds them was masked."""
+    forms = [(form, "PERSON") for values in _NAMES.values() for form in values]
+    forms += [(form, kind) for kind, values in _OTHER.items() for form in values]
+    turns = []
+    for _ in range(draw(st.integers(2, 6))):
+        picks = draw(st.lists(st.sampled_from(forms), min_size=1, max_size=4))
+        labels = draw(st.lists(st.booleans(), min_size=len(picks), max_size=len(picks)))
+        text, spans = "Szia!", []
+        for (form, kind), labelled in zip(picks, labels, strict=True):
+            text += draw(st.sampled_from(_SEPARATORS))
+            if labelled:
+                spans.append(Span(len(text), len(text) + len(form), EntityType(kind), form, 1, "t"))
+            text += form + "."
+        turns.append((text, spans, "hu"))
+    return turns
+
+
+@settings(max_examples=300, deadline=None)
+@given(turns=_session_turns(), case_sensitive=st.booleans())
+def test_remask_since_matches_a_full_remask(
+    turns: list[tuple[str, list[Span], str]], case_sensitive: bool
+) -> None:
+    outputs = []
+    for shortcut in (True, False):
+        previous = vault_module._REMASK_SINCE
+        vault_module._REMASK_SINCE = shortcut
+        try:
+            session = _session(case_sensitive)
+            masked = _requests(session, turns, len(turns))
+            outputs.append((masked, [session.unmask(t) for t in masked], session.entities()))
+        finally:
+            vault_module._REMASK_SINCE = previous
+    assert outputs[0] == outputs[1]
+
+
+def test_generation_grows_with_new_entries_and_patterns(vault: Vault) -> None:
+    session = vault.session()
+    assert session.generation == 0
+    text = f"{NAME} írt."
+    first = session.mask_with_report(text, [span_of(text, NAME, "PERSON")])
+    assert session.generation == first.generation == 1
+    # The same value again changes nothing.
+    again = session.mask_with_report(text, [span_of(text, NAME, "PERSON")])
+    assert session.generation == again.generation == 1
+    # A new surface split onto the entry is a pattern change.
+    inflected = "Teszt Eleknek írt."
+    session.mask(inflected, [span_of(inflected, "Teszt Eleknek", "PERSON")])
+    assert session.generation == 2
+
+
+def test_remask_since_the_current_generation_scans_nothing(vault: Vault) -> None:
+    session = vault.session()
+    text = f"{NAME} és {OTHER_NAME} írt, {EMAIL}."
+    spans = [span_of(text, v, t) for v, t in ((NAME, "PERSON"), (OTHER_NAME, "PERSON"))]
+    result = session.mask_with_report(text, spans)
+    scanned = session.entries_scanned
+    assert session.mask(result.text, [], remask=True, since=result.generation) == result.text
+    assert session.entries_scanned == scanned
+    # A value confirmed later is caught, scanning only its own entry.
+    later = f"Írj: {EMAIL}"
+    session.mask(later, [span_of(later, EMAIL, "EMAIL")])
+    scanned = session.entries_scanned
+    remasked = session.mask(result.text, [], remask=True, since=result.generation)
+    assert EMAIL not in remasked
+    assert session.entries_scanned == scanned + 1
+
+
+def test_remask_since_needs_remask_without_spans(vault: Vault) -> None:
+    session = vault.session()
+    with pytest.raises(ValueError, match="since"):
+        session.mask(NAME, [], since=0)
+    with pytest.raises(ValueError, match="since"):
+        session.mask(NAME, [span_of(NAME, NAME, "PERSON")], remask=True, since=0)
+
+
+def test_alias_entry_created_mid_scan_is_newer_than_the_text(vault: Vault) -> None:
+    # "Minta Kendét" is unsplit: "Minta Kende" is only an alias of it. A bare "Minta Kende"
+    # found by the alias scan of another text gets an entry of its own, created during that
+    # scan: newer than the text's generation, so a remask since then still scans it.
+    session = vault.session()
+    first = "Minta Kendét hívtuk."
+    session.mask(first, [span_of(first, "Minta Kendét", "PERSON")])
+    text = "Minta Kende írt. Minta Kendének is szóltunk."
+    result = session.mask_with_report(text, [])
+    assert session.generation > result.generation
+    remasked = session.mask(result.text, [], remask=True, since=result.generation)
+    vault_module._REMASK_SINCE = False
+    try:
+        assert session.mask(result.text, [], remask=True) == remasked
+    finally:
+        vault_module._REMASK_SINCE = True
+
+
+@pytest.mark.parametrize(
+    ("known", "text", "value"),
+    [
+        # After a placeholder: "[[PHONE_x]]Placeholder" is a word of its own now.
+        ("Placeholder", "Hívd: 555 0101Placeholder.", "555 0101"),
+        # Before one: "Kiss Elek[[PHONE_x]]" ends the name now.
+        ("Kiss Elek", "Kiss Elek555 0101 hívott.", "555 0101"),
+        # A suffix-like run after one: "[[PERSON_x]]nak" ("Kiss Eleknak") borders "nak".
+        ("nak", "Kiss Eleknak írt.", "Kiss Elek"),
+        # With an invisible character in between, the same.
+        ("Placeholder", "Hívd: 555 0101\u200bPlaceholder.", "555 0101"),
+    ],
+)
+def test_remask_since_finds_matches_a_placeholder_boundary_opened(
+    known: str, text: str, value: str
+) -> None:
+    # The text glues values together. The full second pass finds an older value where a new
+    # placeholder put a word boundary; the shortcut must find it too.
+    outputs = []
+    for shortcut in (True, False):
+        vault_module._REMASK_SINCE = shortcut
+        try:
+            session = Vault(TEST_KEY).session_or_create("s1")[0]
+            session.mask(known, [span_of(known, known, "PERSON")])
+            kind = "PHONE" if value[0].isdigit() else "PERSON"
+            first = session.mask_with_report(text, [span_of(text, value, kind)])
+            remasked = session.mask(first.text, [], remask=True, since=first.generation)
+            outputs.append((first.text, remasked))
+        finally:
+            vault_module._REMASK_SINCE = True
+    assert outputs[0] == outputs[1]
+    assert outputs[1][0] != outputs[1][1]  # the full pass found more

@@ -522,12 +522,17 @@ class Gateway:
         # one this session already has ("1,Jane Placeholder" with only "Placeholder" detected).
         texts = [slot.text for slot in slots]
         spans = widen_request(texts, spans, session.confirmed_values(WIDENED_TYPES), language)
-        masked = [
-            session.mask(text, found, language=language)
+        results = [
+            session.mask_with_report(text, found, language=language)
             for text, found in zip(texts, spans, strict=True)
         ]
-        # Second pass: values confirmed in a later text are masked in earlier ones too.
-        return [session.mask(text, [], language=language, remask=True) for text in masked]
+        # Second pass: values confirmed in a later text are masked in earlier ones too. Only
+        # entries created or changed after a text was masked can find anything new in it; a
+        # request that adds no value skips the pass (LAB-1278).
+        return [
+            session.mask(r.text, [], language=language, remask=True, since=r.generation)
+            for r in results
+        ]
 
     @staticmethod
     def _write(
@@ -536,9 +541,16 @@ class Gateway:
         session: VaultSession,
         language: str,
         remask: bool,
+        since: int | None = None,
     ) -> None:
-        if remask:  # values first seen in an image are masked in the texts too
-            masked = [session.mask(text, [], language=language, remask=True) for text in masked]
+        """Write ``masked`` back. With ``remask``, values first seen in an image are masked in
+        the texts too; ``since`` (the session generation before the images) scans only the
+        entries the images added (LAB-1278)."""
+        if remask:
+            masked = [
+                session.mask(text, [], language=language, remask=True, since=since)
+                for text in masked
+            ]
         for slot, text in zip(slots, masked, strict=True):
             slot.write(text)
 
@@ -681,6 +693,9 @@ class Gateway:
         try:
             with timer.span("detect"):
                 spans = await self._detect_all(collected.slots, detector, session, language, stats)
+            # Every older entry has scanned every text by the end of _mask: an image's remask
+            # needs only the entries this request added (LAB-1278).
+            generation = session.generation
             before = _counts_of(session)
             with timer.span("mask"):
                 masked = self._mask(collected.slots, spans, session, language)
@@ -690,7 +705,8 @@ class Gateway:
                     await self._mask_images(collected.images, detector, language, stats, session)
             before = _counts_of(session)
             with timer.span("mask"):
-                self._write(collected.slots, masked, session, language, bool(collected.images))
+                remask = bool(collected.images)
+                self._write(collected.slots, masked, session, language, remask, since=generation)
                 collected.finalize()
             _count_masked(stats, before, session)
         except BaseException:
