@@ -24,6 +24,11 @@ if ! unzip -Z1 "$wheel" | grep -c 'pii_guard/_ui/index.html' >/dev/null; then
   echo "wheel-smoke: the web UI is not bundled (pii_guard/_ui/index.html missing)" >&2
   exit 1
 fi
+# The benchmark index is generated at UI build time (pii-guard eval report --print-index, LAB-1269).
+if ! unzip -Z1 "$wheel" | grep -cE 'pii_guard/_ui/assets/benchmarks-index-[^/]+\.js$' >/dev/null; then
+  echo "wheel-smoke: the UI was built without the benchmark index" >&2
+  exit 1
+fi
 $size_only && exit 0
 
 port="${PII_GUARD_SMOKE_PORT:-18999}"

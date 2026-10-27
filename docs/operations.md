@@ -84,7 +84,7 @@ What it does:
 
 **Building the wheel.** `make wheel` builds the UI (`pnpm build`, API mode), copies `ui/dist`
 to `src/pii_guard/_ui/` (git-ignored, shipped as a hatch artifact) and runs `uv build --wheel`;
-it fails above 5 MiB or without the UI. `make wheel-smoke` (`scripts/ci/wheel_smoke.sh`)
+the UI build generates the benchmark index (`pii-guard eval report --print-index`), and it fails above 5 MiB or without the UI or the index. `make wheel-smoke` (`scripts/ci/wheel_smoke.sh`)
 installs `dist/*.whl` with `uv tool run --isolated`, starts `pii-guard up` on port 18999
 (`PII_GUARD_SMOKE_PORT`), checks `/healthz`, `/`, a client-side route, one chat call on the
 mock (restored) and the masked traffic log, then stops it. CI runs both (job `wheel`); the
