@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-visual-fictional-rules-llm",
+  "kind": "visual",
+  "date": "2026-10-27",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard image masking (sam-3.1 + tesseract + rules+llm) on specimens",
+  "notes": [
+    "LAB-1125 'before': the same commit with --no-captions --ocr-upscale 0, i.e. develop's behaviour.",
+    "LLM detector: Muse Spark Open (meta-models/muse-spark-open-1026) on Baseten, reasoning_effort low; runs are not deterministic."
+  ],
+  "code": {
+    "commit": "dbe5c8ea99f35ee716a6c534e9aa8d18461aee17",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": "LAB-1125 branch commit; the eval ran on a working tree with this commit's code"
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": null,
+    "detectors": [
+      {
+        "name": "sam",
+        "model": "sam-3.1",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "prompts": "{\"FACE\": [\"face\"], \"ID_PHOTO\": [\"photo of a person\"], \"SIGNATURE\": [\"signature\", \"squiggly line\"]}"
+        },
+        "serving": "Meta Model API"
+      },
+      {
+        "name": "ocr",
+        "model": "tesseract",
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "llm",
+        "model": "muse-spark-open",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "reasoning_effort": "low"
+        },
+        "serving": "Baseten Model APIs"
+      }
+    ],
+    "key": "visual:sam-3.1+tesseract+rules+llm:muse-spark-open",
+    "label": "pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open)"
+  },
+  "fixture_set": "specimens",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/visual/manifest.json",
+      "sha256": null,
+      "set": "fictional-specimens",
+      "language": null,
+      "origin": "generated",
+      "generator": "muse-image",
+      "documents": 24
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten)",
+    "platform": "darwin",
+    "machine": "arm64",
+    "cpu_count": null,
+    "accelerator": null,
+    "python": "3.12"
+  },
+  "cost": {
+    "usd": null,
+    "estimated": true,
+    "gpu_minutes": null,
+    "model_calls": 96,
+    "tokens": null,
+    "shared_with": [],
+    "note": "SAM sam-3.1: 96 calls at $0.0025/call (planning estimate). Served from the response cache filled by 2026-10-27-visual-fictional-rules; no SAM spend. Baseten tokens for the LLM detector are not metered by the harness."
+  },
+  "metrics": {
+    "specimens": 24,
+    "overall": {
+      "regions": 149,
+      "recall_iou50": 0.9195,
+      "recall_cov90": 0.8993,
+      "mean_coverage": 0.9011
+    },
+    "by_region_type": {
+      "portrait": {
+        "regions": 18,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9893
+      },
+      "signature": {
+        "regions": 15,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9706
+      },
+      "mrz": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9823
+      },
+      "text": {
+        "regions": 110,
+        "recall_iou50": 0.8909,
+        "recall_cov90": 0.8636,
+        "mean_coverage": 0.8728
+      }
+    },
+    "by_doc_type": {
+      "badge": {
+        "regions": 12,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9887,
+        "specimens": 3
+      },
+      "driving_licence": {
+        "regions": 15,
+        "recall_iou50": 1.0,
+        "recall_cov90": 0.8,
+        "mean_coverage": 0.9042,
+        "specimens": 3
+      },
+      "form": {
+        "regions": 27,
+        "recall_iou50": 0.8889,
+        "recall_cov90": 0.8889,
+        "mean_coverage": 0.867,
+        "specimens": 3
+      },
+      "id_card": {
+        "regions": 29,
+        "recall_iou50": 0.7931,
+        "recall_cov90": 0.8276,
+        "mean_coverage": 0.8117,
+        "specimens": 6
+      },
+      "letter": {
+        "regions": 24,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9898,
+        "specimens": 3
+      },
+      "member_card": {
+        "regions": 15,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9869,
+        "specimens": 3
+      },
+      "passport": {
+        "regions": 27,
+        "recall_iou50": 0.8889,
+        "recall_cov90": 0.8519,
+        "mean_coverage": 0.864,
+        "specimens": 3
+      }
+    },
+    "by_country": {
+      "DE": {
+        "regions": 50,
+        "recall_iou50": 0.94,
+        "recall_cov90": 0.92,
+        "mean_coverage": 0.9176,
+        "specimens": 8
+      },
+      "GB": {
+        "regions": 49,
+        "recall_iou50": 0.9184,
+        "recall_cov90": 0.898,
+        "mean_coverage": 0.8944,
+        "specimens": 8
+      },
+      "HU": {
+        "regions": 50,
+        "recall_iou50": 0.9,
+        "recall_cov90": 0.88,
+        "mean_coverage": 0.8911,
+        "specimens": 8
+      }
+    },
+    "over_masking_mean": 0.0089,
+    "errors": 0,
+    "latency_ms": {
+      "sam_call_p50": 1420.0,
+      "sam_call_p95": 2608.7,
+      "sam_per_image_p50": 6045.3,
+      "sam_per_image_p95": 7615.7,
+      "local_per_image_p50": 3930.4,
+      "local_per_image_p95": 6409.3
+    }
+  }
+}

@@ -730,9 +730,9 @@ def visual_recall(index: Mapping[str, Any]) -> str:
     color = {sk: palette[k % len(palette)] for k, sk in enumerate(systems)}
     px0, py0, px1, py1 = 150, 230, 1540, 680
     gw = (px1 - px0) / max(len(groups), 1)
-    gap = 0.6  # bar widths between the sets inside a group
+    gap = 0.4  # bar widths between the sets inside a group
     slots = len(runs) + gap * (len(set_order) - 1)
-    bw = min(90, (gw - 50) / max(slots, 1))
+    bw = min(90, (gw - 24) / max(slots, 1))
 
     def sy(v: float) -> float:
         return py1 - v * (py1 - py0)
@@ -785,7 +785,7 @@ def visual_recall(index: Mapping[str, Any]) -> str:
             )
             body.append(
                 _text(
-                    x + bw / 2, sy(v) - 10, _pct(v, 0), size=19 if bw >= 34 else 15, anchor="middle"
+                    x + bw / 2, sy(v) - 10, _pct(v, 0), size=19 if bw >= 34 else 18, anchor="middle"
                 )
             )
         body.append(
