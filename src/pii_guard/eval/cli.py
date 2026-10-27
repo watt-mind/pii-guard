@@ -185,7 +185,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pii_guard.eval.redteam import redteam_section
 
         try:
-            scorecard["redteam"], section = redteam_section(results, args, attacker)
+            scorecard["redteam"], section = redteam_section(
+                results, args, attacker, analyzer=analyzer
+            )
         except PiiGuardError as exc:
             print(f"pii-guard eval: red team failed: {exc.code}: {exc.message}", file=sys.stderr)
             return 1

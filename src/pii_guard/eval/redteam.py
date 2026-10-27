@@ -826,7 +826,11 @@ def attacker_from_args(args: argparse.Namespace) -> Attacker:
 
 
 def redteam_section(
-    results: Sequence[DocumentResult], args: argparse.Namespace, attacker: Attacker
+    results: Sequence[DocumentResult],
+    args: argparse.Namespace,
+    attacker: Attacker,
+    *,
+    analyzer: Any = None,
 ) -> tuple[dict[str, Any], str]:
     """Run the attack for ``pii-guard eval --redteam``: the scorecard block and Markdown."""
     outcomes = run_redteam(
@@ -845,6 +849,10 @@ def redteam_section(
         "results": breakdown,
         "usage": dict(attacker.usage),
     }
+    if analyzer is not None:  # the masking side's token counters (the LLM detector), for cost
+        from pii_guard.eval.injection import _usage
+
+        block["detector_usage"] = _usage(analyzer)
     markdown = (
         "\n## Re-identification red team\n\n"
         f"Attacker `{attacker.model}` (reasoning `{attacker.reasoning_effort or '-'}`), "

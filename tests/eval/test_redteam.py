@@ -332,6 +332,7 @@ def test_cli_redteam_writes_the_scorecard_block(
     assert block["attacker"]["model"] == "meta-models/muse-spark-open-1026"
     assert block["results"]["masked-only"]["all"]["recovered"] == 1
     assert block["usage"]["requests"] == 4
+    assert block["detector_usage"] == {}  # the rules keep no token counters
     assert EMAIL_A not in out.read_text()
 
 
