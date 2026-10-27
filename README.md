@@ -79,8 +79,12 @@ from openai import OpenAI
 
 client = OpenAI(base_url="http://127.0.0.1:8787/v1", api_key="unused")
 stream = client.chat.completions.create(
-    model="muse-spark-1.3", stream=True, tools=my_tools,  # your agent's tools, unchanged
-    messages=[{"role": "user", "content": "Refund Jane Placeholder, jane.placeholder@example.net."}],
+    model="muse-spark-1.3",
+    stream=True,
+    tools=my_tools,  # your agent's tools, unchanged
+    messages=[
+        {"role": "user", "content": "Refund Jane Placeholder, jane.placeholder@example.net."}
+    ],
     extra_headers={"X-PII-Guard-Mode": "fast"},
 )  # the model sees [[PERSON_…]] and [[EMAIL_…]]; your code gets the real values back
 ```
