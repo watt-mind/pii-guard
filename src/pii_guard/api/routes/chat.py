@@ -19,9 +19,9 @@ from starlette.responses import Response
 
 from pii_guard.api.deps import get_max_text_chars, get_vault
 from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
-from pii_guard.api.routes.image_masking import image_workers_for
 from pii_guard.gateway import Gateway, InvalidChatRequestError
 from pii_guard.gateway.sessions import path_session
+from pii_guard.visual.masking import image_workers_for
 
 __all__ = ["get_gateway", "router"]
 

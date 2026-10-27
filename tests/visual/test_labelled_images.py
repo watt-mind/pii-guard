@@ -29,7 +29,6 @@ from visual_helpers import (
 )
 
 from pii_guard.api.app import create_app
-from pii_guard.api.routes.image_masking import ImageMasker
 from pii_guard.config import Settings
 from pii_guard.detect.rules import RuleDetector
 from pii_guard.gateway import Gateway, GatewayConfig
@@ -40,6 +39,7 @@ from pii_guard.vault import PLACEHOLDER_RE, Vault, VaultSession
 from pii_guard.visual import labels as labels_module
 from pii_guard.visual.image import load_image
 from pii_guard.visual.labels import VaultMatcher
+from pii_guard.visual.masking import ImageMasker
 from pii_guard.visual.ocr import OcrWord
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.render import LABEL_FILL, LabelBox, render_labels

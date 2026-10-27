@@ -55,13 +55,17 @@ from pii_guard.api.deps import (
     get_vault,
 )
 from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
-from pii_guard.api.routes.image_masking import (
+from pii_guard.policy import BlockedEntityError, Policy
+from pii_guard.types import PiiGuardError
+from pii_guard.vault import Vault, VaultSession
+from pii_guard.visual.masking import (
     DEFAULT_MAX_IMAGE_BYTES,
     RENDER_MODES,
     AnalyzerDetector,
     ImageMasker,
     ImageMaskOutcome,
     InvalidImageError,
+    Render,
     UnsupportedImageError,
     decode_base64_image,
     default_ocr_engine,
@@ -69,20 +73,17 @@ from pii_guard.api.routes.image_masking import (
     mask_images_bounded,
     require_ocr,
 )
-from pii_guard.policy import BlockedEntityError, Policy
-from pii_guard.types import PiiGuardError
-from pii_guard.vault import Vault, VaultSession
 from pii_guard.visual.ocr import OcrEngine
 from pii_guard.visual.segment import Segmenter
 from pii_guard.visual.segmenters import build_segmenter
+from pii_guard.visual.summary import ExpiryPolicy
 
 __all__ = ["ImageMaskResponse", "get_image_masker", "max_image_bytes", "router"]
 
 _RAW_TYPES = frozenset({"image/png", "image/jpeg", "image/jpg"})
 _JSON_OVERHEAD_BYTES = 16_384
 _lock = threading.Lock()
-_UNSET = object()
-_EXPIRY_MODES = ("reduce", "keep")
+_EXPIRY_MODES: tuple[ExpiryPolicy, ...] = ("reduce", "keep")
 
 
 def max_image_bytes(request: Request) -> int:
@@ -165,8 +166,8 @@ class ImageOptions(BaseModel):
 
     language: str | None = None
     session_id: str | None = None
-    render: str | None = None
-    expiry: str = "reduce"
+    render: Render | None = None
+    expiry: ExpiryPolicy = "reduce"
 
 
 def _sam_client(request: Request) -> Segmenter:
@@ -183,11 +184,10 @@ def _sam_client(request: Request) -> Segmenter:
 
 def _ocr_engine(request: Request) -> OcrEngine | None:
     state = request.app.state
-    ocr = getattr(state, "ocr_engine", _UNSET)
-    if ocr is _UNSET:
-        ocr = default_ocr_engine()
-        state.ocr_engine = ocr
-    return ocr  # type: ignore[return-value]
+    if not hasattr(state, "ocr_engine"):
+        state.ocr_engine = default_ocr_engine()
+    ocr: OcrEngine | None = state.ocr_engine
+    return ocr
 
 
 def get_image_masker(request: Request) -> ImageMasker:
@@ -238,14 +238,20 @@ def _option(value: object, name: str, allowed: tuple[str, ...] | None = None) ->
     return value
 
 
+def _choice[C: str](value: object, name: str, allowed: tuple[C, ...]) -> C | None:
+    """:func:`_option` for a closed set, typed as that set's ``Literal``."""
+    checked = _option(value, name, allowed)
+    return next((choice for choice in allowed if choice == checked), None)
+
+
 async def _image_from_request(request: Request) -> tuple[bytes, ImageOptions]:
     content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
     image_limit = max_image_bytes(request)
     query = request.query_params
     options = ImageOptions(
         session_id=_option(query.get("session_id"), "session_id"),
-        render=_option(query.get("render"), "render", RENDER_MODES),
-        expiry=_option(query.get("expiry"), "expiry", _EXPIRY_MODES) or "reduce",
+        render=_choice(query.get("render"), "render", RENDER_MODES),
+        expiry=_choice(query.get("expiry"), "expiry", _EXPIRY_MODES) or "reduce",
     )
     if content_type in _RAW_TYPES:
         return await _read_body(request, image_limit), options
@@ -262,8 +268,8 @@ async def _image_from_request(request: Request) -> tuple[bytes, ImageOptions]:
             raise InvalidImageError("language must be a short language tag")
         options.language = language
         options.session_id = _option(body.get("session_id"), "session_id") or options.session_id
-        options.render = _option(body.get("render"), "render", RENDER_MODES) or options.render
-        options.expiry = _option(body.get("expiry"), "expiry", _EXPIRY_MODES) or options.expiry
+        options.render = _choice(body.get("render"), "render", RENDER_MODES) or options.render
+        options.expiry = _choice(body.get("expiry"), "expiry", _EXPIRY_MODES) or options.expiry
         return decode_base64_image(body["image"]), options
     raise UnsupportedImageError(
         "send the image as the body (Content-Type: image/png or image/jpeg) "
@@ -282,7 +288,7 @@ def _response(outcome: ImageMaskOutcome, session_id: str | None = None) -> Image
         media_type="image/png",
         width=outcome.width,
         height=outcome.height,
-        regions=[ImageRegionOut(**r.to_public_dict()) for r in outcome.regions],  # type: ignore[arg-type]
+        regions=[ImageRegionOut.model_validate(r.to_public_dict()) for r in outcome.regions],
         masked=_counts(outcome.counts(Policy.MASK)),
         kept=_counts(outcome.counts(Policy.KEEP)),
         analysis=Analysis(
@@ -303,7 +309,7 @@ def _response(outcome: ImageMaskOutcome, session_id: str | None = None) -> Image
     )
 
 
-def _render_and_vault(request: Request, requested: str | None) -> tuple[str, Vault | None]:
+def _render_and_vault(request: Request, requested: Render | None) -> tuple[Render, Vault | None]:
     """The render mode and, for ``labels``, the vault. The default falls back to ``opaque``
     when no vault is configured; an explicit ``labels`` fails closed instead."""
     state = request.app.state
@@ -348,9 +354,9 @@ async def mask_image_endpoint(
             lang,
             workers=image_workers_for(request.app.state, settings.image_concurrency),
             timeout=settings.image_timeout,
-            render=render,  # type: ignore[arg-type]
+            render=render,
             session=session,
-            expiry=options.expiry,  # type: ignore[arg-type]
+            expiry=options.expiry,
         )
     except BaseException as exc:
         if session is not None and vault is not None and options.session_id is None:

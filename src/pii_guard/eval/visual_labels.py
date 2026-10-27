@@ -61,7 +61,6 @@ from typing import Any, ClassVar
 
 from PIL import Image, ImageDraw, ImageFont
 
-from pii_guard.api.routes.image_masking import ImageMasker
 from pii_guard.detect.rules import RuleDetector
 from pii_guard.eval.stats import percentile
 from pii_guard.policy import Policy, PolicySet
@@ -71,6 +70,7 @@ from pii_guard.visual.captions import caption_values
 from pii_guard.visual.fuzzy import Candidate, Match
 from pii_guard.visual.image import encode_image, load_image
 from pii_guard.visual.labels import VaultMatcher
+from pii_guard.visual.masking import ImageMasker
 from pii_guard.visual.ocr import OcrWord
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.summary import field_name

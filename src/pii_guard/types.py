@@ -13,10 +13,12 @@ from typing import Protocol, runtime_checkable
 __all__ = [
     "TEXT_ENTITY_TYPES",
     "VISUAL_ENTITY_TYPES",
+    "Analyzer",
     "DetectionError",
     "Detector",
     "EntityType",
     "MaskingError",
+    "PayloadTooLargeError",
     "PiiGuardError",
     "Span",
 ]
@@ -157,6 +159,13 @@ class Detector(Protocol):
     def detect(self, text: str, language: str = "hu") -> list[Span]: ...
 
 
+@runtime_checkable
+class Analyzer(Protocol):
+    """Detection as the API sees it: non-overlapping spans sorted by ``start``."""
+
+    def analyze(self, text: str, language: str) -> list[Span]: ...
+
+
 class PiiGuardError(Exception):
     """Base class for every error pii-guard raises on purpose.
 
@@ -190,3 +199,10 @@ class MaskingError(PiiGuardError):
 
     code = "masking_failed"
     status_code = 500
+
+
+class PayloadTooLargeError(PiiGuardError):
+    """The request body, a text or an image is larger than the configured limit."""
+
+    code = "payload_too_large"
+    status_code = 413

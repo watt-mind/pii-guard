@@ -45,14 +45,6 @@ import httpx
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
-from pii_guard.api.deps import PayloadTooLargeError
-from pii_guard.api.routes.image_masking import (
-    ImageMasker,
-    ImageMaskOutcome,
-    default_ocr_engine,
-    mask_images_bounded,
-    require_ocr,
-)
 from pii_guard.config import Settings
 from pii_guard.detect.known import KNOWN_DETECTOR, WIDENED_TYPES, merge_known, widen_request
 from pii_guard.gateway.cache import DetectionCache
@@ -75,9 +67,16 @@ from pii_guard.gateway.stream import DONE, SseRestorer, error_event, iter_sse_da
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
-from pii_guard.types import DetectionError, PiiGuardError, Span
+from pii_guard.types import DetectionError, PayloadTooLargeError, PiiGuardError, Span
 from pii_guard.vault import Vault, VaultSession
 from pii_guard.vault.known import KnownValues
+from pii_guard.visual.masking import (
+    ImageMasker,
+    ImageMaskOutcome,
+    default_ocr_engine,
+    mask_images_bounded,
+    require_ocr,
+)
 from pii_guard.visual.ocr import OcrEngine
 from pii_guard.visual.segment import Segmenter
 from pii_guard.visual.segmenters import build_segmenter

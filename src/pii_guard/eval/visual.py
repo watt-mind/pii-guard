@@ -12,7 +12,7 @@ pii-guard eval visual --specimens data/specimens [--manifest eval/visual/manifes
 The specimens are fetched by ``eval/visual/fetch_specimens.py`` into a gitignored directory and
 never committed (ADR 0005); ``labels.json`` holds the expected regions per image SHA-256
 (boxes only). Each image runs through the same pipeline as ``POST /v1/mask/image``
-(:class:`~pii_guard.api.routes.image_masking.ImageMasker`: SAM 3.1 + OCR + text detectors,
+(:class:`~pii_guard.visual.masking.ImageMasker`: SAM 3.1 + OCR + text detectors,
 ``FACE`` growth, policies), and every expected region is scored against the boxes that were
 actually covered:
 
@@ -57,7 +57,7 @@ from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import DetectionError, Detector, EntityType, PiiGuardError
 from pii_guard.visual.image import encode_image, load_image
 from pii_guard.visual.ocr import DEFAULT_UPSCALE_TO, OcrEngine
-from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.regions import Box, Region, iou
 from pii_guard.visual.sam import DEFAULT_PROMPTS, SamClient
 
 __all__ = [
@@ -263,15 +263,6 @@ def prepare_image(raw: bytes, max_side: int = DEFAULT_MAX_SIDE) -> bytes:
 # --- scoring ---------------------------------------------------------------------------------
 
 
-def iou(a: Box, b: Box) -> float:
-    ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
-    iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
-    if ix <= 0 or iy <= 0:
-        return 0.0
-    inter = ix * iy
-    return inter / (a.width * a.height + b.width * b.height - inter)
-
-
 def _mask(size: tuple[int, int], boxes: Sequence[Box]) -> Image.Image:
     mask = Image.new("L", size, 0)
     draw = ImageDraw.Draw(mask)
@@ -379,7 +370,7 @@ def evaluate(
         return _evaluate_baseline(specimens, baseline, max_side=max_side, log=log)
     if sam is None or transport is None:
         raise ValueError("evaluate() needs a SAM client and its transport")
-    from pii_guard.api.routes.image_masking import ImageMasker
+    from pii_guard.visual.masking import ImageMasker
 
     masker = ImageMasker(
         sam=sam,
@@ -720,7 +711,7 @@ def prompt_study(
     Each entity type's prompts run on the specimens that contain one of its target region
     types (at most ``limit`` of them, evenly spread), so every prompt sees the same images.
     """
-    from pii_guard.api.routes.image_masking import _grow_face
+    from pii_guard.visual.masking import grow_face
 
     rows: list[dict[str, Any]] = []
     cache: dict[str, bytes] = {}
@@ -753,7 +744,7 @@ def prompt_study(
                 except PiiGuardError:
                     errors += 1
                     regions = []
-                regions = [_grow_face(r, *size) for r in regions]
+                regions = [grow_face(r, *size) for r in regions]
                 found += len(regions)
                 image_scores, _ = score_regions(expected, regions, size)
                 scores.extend(image_scores)
@@ -894,8 +885,8 @@ def _ocr_and_detector(
         detector: Detector = create_detector(names[0])
         loaded = [getattr(detector, "name", names[0])]
     else:
-        from pii_guard.api.routes.image_masking import AnalyzerDetector
         from pii_guard.eval.scorer import DetectorAnalyzer
+        from pii_guard.visual.masking import AnalyzerDetector
 
         analyzer = DetectorAnalyzer(names)
         if analyzer.skipped:

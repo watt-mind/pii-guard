@@ -1,7 +1,11 @@
-"""Image masking with entity policies, shared by ``POST /v1/mask/image`` and the gateway.
+"""Image masking with entity policies: the one image pipeline behind ``POST /v1/mask/image``,
+the gateway's image parts and the visual evaluation.
 
-Not a router (it defines no ``router``), so :func:`pii_guard.api.routes.include_routers`
-imports it but mounts nothing.
+A domain component with no HTTP in it, so every embedder (the API route, the gateway, eval, a
+CLI) imports it from here (LAB-1271). Exposes :class:`ImageMasker` and its outcome
+(:class:`ImageMaskOutcome`, :class:`PolicedRegion`), :func:`mask_images_bounded` (the
+deadline-bounded worker pool), the input checks (:func:`sniff_media_type`,
+:func:`decode_base64_image`, :func:`require_ocr`) and their errors.
 
 :class:`ImageMasker` runs the visual pipeline (:func:`pii_guard.visual.analyze_image`):
 
@@ -53,9 +57,16 @@ from typing import Any, Literal
 
 from PIL import Image
 
-from pii_guard.api.deps import PayloadTooLargeError
 from pii_guard.policy import BlockedEntityError, Policy, PolicySet
-from pii_guard.types import DetectionError, Detector, EntityType, PiiGuardError, Span
+from pii_guard.types import (
+    Analyzer,
+    DetectionError,
+    Detector,
+    EntityType,
+    PayloadTooLargeError,
+    PiiGuardError,
+    Span,
+)
 from pii_guard.vault import VaultSession
 from pii_guard.visual.image import load_image, mask_image
 from pii_guard.visual.labels import RegionLabel, VaultMatcher, label_image
@@ -68,7 +79,7 @@ from pii_guard.visual.ocr import (
     tesseract_available,
 )
 from pii_guard.visual.pipeline import ImageAnalysis, analyze_image_text
-from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.regions import Box, Region, intersection, iou
 from pii_guard.visual.render import LabelBox, render_labels
 from pii_guard.visual.segment import Segmenter
 from pii_guard.visual.segmenters import default_entity_types
@@ -89,6 +100,7 @@ __all__ = [
     "UnsupportedImageError",
     "decode_base64_image",
     "default_ocr_engine",
+    "grow_face",
     "image_workers_for",
     "mask_images_bounded",
     "require_ocr",
@@ -114,7 +126,7 @@ Origin = Literal["sam", "local", "ocr"]
 _SEGMENTER_ORIGINS: dict[str, Origin] = {"sam": "sam", "yunet": "local"}
 #: ``labels``: placeholder-labelled boxes + transcript + summary; ``opaque``: solid boxes.
 Render = Literal["labels", "opaque"]
-RENDER_MODES: tuple[str, ...] = ("labels", "opaque")
+RENDER_MODES: tuple[Render, ...] = ("labels", "opaque")
 
 #: How far a ``FACE`` box is grown before masking: (up, sides, down), fractions of its size.
 FACE_PADDING: tuple[float, float, float] = (0.40, 0.10, 0.05)
@@ -235,18 +247,18 @@ class ImageMaskOutcome:
 
 
 class AnalyzerDetector:
-    """Adapts anything with ``analyze(text, language)`` (the API's analyzer) to a Detector.
+    """Adapts an :class:`~pii_guard.types.Analyzer` (the API's analyzer) to a Detector.
 
     Spans keep their own ``detector`` names (``rules``, ``llm``), so OCR regions report them.
     """
 
     name = "analyzer"
 
-    def __init__(self, analyzer: object) -> None:
+    def __init__(self, analyzer: Analyzer) -> None:
         self.analyzer = analyzer
 
     def detect(self, text: str, language: str = "hu") -> list[Span]:
-        return self.analyzer.analyze(text, language)  # type: ignore[attr-defined]
+        return self.analyzer.analyze(text, language)
 
 
 def default_ocr_engine() -> OcrEngine | None:
@@ -384,7 +396,7 @@ class ImageMasker:
                         ocr_text.words, ocr_text.findings + found, ocr_text.zones, ocr_text.fields
                     ),
                 )
-        regions = [_grow_face(r, width, height) for r in analysis.regions]
+        regions = [grow_face(r, width, height) for r in analysis.regions]
         policed = _merge([self._police(r) for r in regions])
         blocked = Counter(r.entity_type for r in policed if r.policy is Policy.BLOCK)
         if blocked:
@@ -527,16 +539,10 @@ def _visible_words(analysis: ImageAnalysis, covered: list[PolicedRegion]) -> lis
     out: list[Box] = []
     for word in analysis.ocr.words:
         area = word.box.width * word.box.height
-        hidden = any(_intersection(word.box, r.region.box) >= 0.3 * area for r in covered)
+        hidden = any(intersection(word.box, r.region.box) >= 0.3 * area for r in covered)
         if not hidden:
             out.append(word.box)
     return out
-
-
-def _intersection(a: Box, b: Box) -> int:
-    ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
-    iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
-    return ix * iy if ix > 0 and iy > 0 else 0
 
 
 def _with_box(item: PolicedRegion, box: Box | None) -> PolicedRegion:
@@ -548,7 +554,7 @@ def _with_box(item: PolicedRegion, box: Box | None) -> PolicedRegion:
     return PolicedRegion(item.region, item.origin, item.policy, item.label, box)
 
 
-def _grow_face(region: Region, width: int, height: int) -> Region:
+def grow_face(region: Region, width: int, height: int) -> Region:
     """A ``FACE`` region grown by :data:`FACE_PADDING` (clamped); other regions unchanged."""
     if region.entity_type is not EntityType.FACE:
         return region
@@ -563,22 +569,13 @@ def _grow_face(region: Region, width: int, height: int) -> Region:
     return Region(region.entity_type, grown, region.score, region.source, mask=region.mask)
 
 
-def _iou(a: Box, b: Box) -> float:
-    ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
-    iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
-    if ix <= 0 or iy <= 0:
-        return 0.0
-    inter = ix * iy
-    return inter / (a.width * a.height + b.width * b.height - inter)
-
-
 def _merge(regions: list[PolicedRegion], threshold: float = 0.5) -> list[PolicedRegion]:
     """Merge same-type, same-origin regions that mostly overlap into their union box."""
     out: list[PolicedRegion] = []
     for item in regions:
         for index, other in enumerate(out):
             same = other.entity_type is item.entity_type and other.origin == item.origin
-            if same and _iou(other.region.box, item.region.box) >= threshold:
+            if same and iou(other.region.box, item.region.box) >= threshold:
                 a, b = other.region, item.region
                 scores = [s for s in (a.score, b.score) if s is not None]
                 merged = Region(

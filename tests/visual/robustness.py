@@ -55,10 +55,10 @@ _MASKER: Any = None
 def _masker(before: bool) -> Any:
     global _MASKER
     if _MASKER is None:
-        from pii_guard.api.routes.image_masking import ImageMasker
         from pii_guard.detect.rules import RuleDetector
         from pii_guard.policy import PolicySet
         from pii_guard.types import EntityType
+        from pii_guard.visual.masking import ImageMasker
         from pii_guard.visual.ocr import TesseractOcr
 
         class NoSam:

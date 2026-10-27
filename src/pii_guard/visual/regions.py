@@ -1,13 +1,20 @@
-"""Typed image regions: what the visual pipeline finds and what ``mask_image`` covers."""
+"""Typed image regions: what the visual pipeline finds and what ``mask_image`` covers.
+
+Also the one overlap measure every visual component uses: :func:`intersection` and
+:func:`iou` of two :class:`Box` es (inclusive pixel corners), and :func:`iou_xyxy` for raw
+detector boxes in continuous ``(x1, y1, x2, y2)`` coordinates (a :class:`Box` is the
+continuous box ``(x1, y1, x2 + 1, y2 + 1)``, so the two agree).
+"""
 
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from pii_guard.types import EntityType
 
-__all__ = ["Box", "Region", "SamMask"]
+__all__ = ["Box", "Region", "SamMask", "intersection", "iou", "iou_xyxy"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,3 +132,25 @@ class Region:
             "score": self.score,
             "source": self.source,
         }
+
+
+def intersection(a: Box, b: Box) -> int:
+    """The number of pixels ``a`` and ``b`` share (``0`` when they don't overlap)."""
+    ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
+    iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
+    return ix * iy if ix > 0 and iy > 0 else 0
+
+
+def iou(a: Box, b: Box) -> float:
+    """Intersection over union of two boxes, in ``[0, 1]``."""
+    return iou_xyxy((a.x1, a.y1, a.x2 + 1, a.y2 + 1), (b.x1, b.y1, b.x2 + 1, b.y2 + 1))
+
+
+def iou_xyxy(a: Sequence[float], b: Sequence[float]) -> float:
+    """Intersection over union of two continuous ``(x1, y1, x2, y2, ...)`` boxes (extra items,
+    such as a detector's score, are ignored); ``0.0`` for empty boxes."""
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0

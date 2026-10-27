@@ -37,7 +37,6 @@ import httpx
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
-from pii_guard.api.deps import PayloadTooLargeError
 from pii_guard.detect.known import KNOWN_DETECTOR
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
@@ -62,7 +61,7 @@ from pii_guard.gateway.service import (
 )
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import RequestTimer
-from pii_guard.types import PiiGuardError, Span
+from pii_guard.types import PayloadTooLargeError, PiiGuardError, Span
 from pii_guard.vault.placeholders import normalize_value
 
 __all__ = [

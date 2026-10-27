@@ -21,16 +21,16 @@ from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from pii_guard.api.app import create_app
-from pii_guard.api.routes.image_masking import (
-    ImageMasker,
-    _grow_face,
-    decode_base64_image,
-    sniff_media_type,
-)
 from pii_guard.config import Settings
 from pii_guard.policy import PolicySet
 from pii_guard.types import DetectionError, EntityType
 from pii_guard.visual import OcrWord, SamClient
+from pii_guard.visual.masking import (
+    ImageMasker,
+    decode_base64_image,
+    grow_face,
+    sniff_media_type,
+)
 from pii_guard.visual.regions import Box
 
 W, H = 400, 260
@@ -467,12 +467,12 @@ def test_image_masker_validates_its_configuration() -> None:
 def test_face_boxes_grow_to_cover_hair_and_ears_clamped_to_the_image() -> None:
     from pii_guard.visual import Region
 
-    grown = _grow_face(Region(EntityType.FACE, Box(100, 100, 199, 199), None, "sam"), 400, 260)
+    grown = grow_face(Region(EntityType.FACE, Box(100, 100, 199, 199), None, "sam"), 400, 260)
     assert grown.box == Box(90, 60, 209, 204)
-    edge = _grow_face(Region(EntityType.FACE, Box(0, 5, 99, 255), None, "sam"), 400, 260)
+    edge = grow_face(Region(EntityType.FACE, Box(0, 5, 99, 255), None, "sam"), 400, 260)
     assert edge.box == Box(0, 0, 109, 259)
     other = Region(EntityType.SIGNATURE, Box(1, 1, 5, 5), None, "sam")
-    assert _grow_face(other, 400, 260) is other
+    assert grow_face(other, 400, 260) is other
 
 
 def test_model_backed_detectors_are_reported_for_labels() -> None:
