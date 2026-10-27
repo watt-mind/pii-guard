@@ -2,13 +2,14 @@ import type { KeyboardEvent } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 
-export type Screen = "playground" | "chat" | "images" | "benchmarks";
+export type Screen = "playground" | "chat" | "images" | "benchmarks" | "traffic";
 
-const SCREENS: { id: Screen; step: string; label: string }[] = [
+const SCREENS: { id: Screen; step: string; label: string; short?: string }[] = [
   { id: "playground", step: "1", label: "Mask" },
   { id: "chat", step: "2", label: "Chat" },
   { id: "images", step: "3", label: "Images" },
   { id: "benchmarks", step: "4", label: "Benchmarks" },
+  { id: "traffic", step: "5", label: "Live traffic", short: "Traffic" },
 ];
 
 interface Props {
@@ -61,8 +62,8 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
                 onClick={() => onScreen(s.id)}
                 onKeyDown={onTabKey}
                 className={[
-                  "flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-1.5 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors sm:px-3.5 sm:py-1.5 sm:text-sm md:flex-none",
-                  selected ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-muted hover:text-ink",
+                  "flex min-w-0 flex-auto items-center justify-center gap-2 rounded-lg px-1.5 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors sm:px-3.5 sm:py-1.5 sm:text-sm md:flex-none",
+                  selected ? "bg-surface text-ink shadow-sm ring-1 ring-line dark:bg-line-strong dark:ring-faint/40" : "text-muted hover:text-ink",
                 ].join(" ")}
               >
                 <span
@@ -74,7 +75,14 @@ export function Header({ screen, onScreen, engineState, engine, onPreference, on
                 >
                   {s.step}
                 </span>
-                {s.label}
+                {s.short ? (
+                  <>
+                    <span className="lg:hidden">{s.short}</span>
+                    <span className="hidden lg:inline">{s.label}</span>
+                  </>
+                ) : (
+                  s.label
+                )}
               </button>
             );
           })}

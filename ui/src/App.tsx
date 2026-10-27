@@ -15,13 +15,14 @@ import { Benchmarks } from "./screens/Benchmarks";
 import { Images } from "./screens/Images";
 import { RoundTrip } from "./screens/RoundTrip";
 import { Chat, type ChatDraft } from "./screens/Chat";
+import { Traffic, type TrafficProps } from "./screens/Traffic";
 import type { KnownRow } from "./lib/knownRows";
 import { knownSignatureOf, type KnownSession } from "./lib/run";
 import { newKnownRow } from "./lib/knownRows";
 
 // The open tab lives in the URL hash, so a reload (or a shared link) lands on the same screen.
-const HASH_TO_SCREEN: Record<string, Screen> = { "#mask": "playground", "#chat": "chat", "#images": "images", "#benchmarks": "benchmarks" };
-const SCREEN_TO_HASH: Record<Screen, string> = { playground: "#mask", chat: "#chat", images: "#images", benchmarks: "#benchmarks" };
+const HASH_TO_SCREEN: Record<string, Screen> = { "#mask": "playground", "#chat": "chat", "#images": "images", "#benchmarks": "benchmarks", "#traffic": "traffic" };
+const SCREEN_TO_HASH: Record<Screen, string> = { playground: "#mask", chat: "#chat", images: "#images", benchmarks: "#benchmarks", traffic: "#traffic" };
 const screenFromHash = (): Screen => HASH_TO_SCREEN[globalThis.location?.hash ?? ""] ?? "playground";
 
 export interface AppProps {
@@ -34,9 +35,11 @@ export interface AppProps {
   loadBenchmarks?: BenchmarkLoader;
   /** Gateway chat clients (Chat screen); injectable for tests. */
   chat?: { api?: ChatClient; mock?: ChatClient };
+  /** Live traffic screen options; injectable for tests. */
+  traffic?: Omit<TrafficProps, "forceFixture">;
 }
 
-export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks, chat }: AppProps) {
+export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks, chat, traffic }: AppProps) {
   const apiClient = useMemo(() => api ?? createHttpClient(), [api]);
   const mockClient = useMemo(() => mock ?? createMockClient({ latencyMs: 220 }), [mock]);
   const engine = useEngine(apiClient, mockClient, envMode);
@@ -48,8 +51,11 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
   const [screen, setScreenState] = useState<Screen>(screenFromHash);
   // Benchmarks load their data lazily on first open, then stay mounted (filters survive tab switches).
   const [benchmarksOpened, setBenchmarksOpened] = useState(() => screenFromHash() === "benchmarks");
+  // Live traffic connects on first open, then keeps collecting in the background.
+  const [trafficOpened, setTrafficOpened] = useState(() => screenFromHash() === "traffic");
   const setScreen = useCallback((s: Screen) => {
     if (s === "benchmarks") setBenchmarksOpened(true);
+    if (s === "traffic") setTrafficOpened(true);
     setScreenState(s);
     try {
       if (globalThis.location.hash !== SCREEN_TO_HASH[s]) history.replaceState(null, "", SCREEN_TO_HASH[s]);
@@ -140,7 +146,9 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
               ? "Images replay regions recorded from a real SAM 3.1 run on the built-in samples; uploads need the API."
               : screen === "benchmarks"
                 ? "Benchmarks are bundled with this page, so they are the same with or without the API."
-                : "Detection runs in your browser with a small built-in rule set, so results are illustrative."}{" "}
+                : screen === "traffic"
+                  ? "Live traffic replays calls recorded from the demo stack (masked level, no original values)."
+                  : "Detection runs in your browser with a small built-in rule set, so results are illustrative."}{" "}
             {engine.state.status.state === "online" ? (
               engine.state.preference === "mock" ? (
                 <>Switch the engine to Auto or Live API for the real pipeline.</>
@@ -210,6 +218,9 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
         </div>
         <div id="panel-benchmarks" role="tabpanel" aria-labelledby="tab-benchmarks" hidden={screen !== "benchmarks"}>
           {benchmarksOpened && <Benchmarks load={loadBenchmarks} />}
+        </div>
+        <div id="panel-traffic" role="tabpanel" aria-labelledby="tab-traffic" hidden={screen !== "traffic"}>
+          {trafficOpened && <Traffic forceFixture={engine.state.preference === "mock"} {...traffic} />}
         </div>
       </main>
 

@@ -201,3 +201,18 @@ describe("Known values example", () => {
     expect(await within(panel).findByText(/None of your known values appear in this document/)).toBeInTheDocument();
   });
 });
+
+describe("Live traffic tab", () => {
+  it("opens from the tab bar and the #traffic hash, and replays recorded traffic with the demo engine", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("pii-guard:mode", "mock");
+    const connect = vi.fn(() => ({ close() {} }));
+    render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect, fixtureIntervalMs: 60_000 }} />);
+    await user.click(screen.getByRole("tab", { name: /traffic/i }));
+    expect(location.hash).toBe("#traffic");
+    const panel = screen.getByRole("tabpanel", { name: /traffic/i });
+    expect(await within(panel).findByText("Recorded demo traffic.")).toBeInTheDocument();
+    expect(connect).not.toHaveBeenCalled();
+    expect(within(panel).getAllByText(/never holds original values/).length).toBeGreaterThan(0);
+  });
+});

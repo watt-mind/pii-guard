@@ -605,6 +605,32 @@ Sources: [2026-10-27-comparison](../eval/results/2026-10-27-comparison/README.md
   failed closed). 0 refusals, 0 invalid outputs, 0 blocked documents in the 682 committed
   requests. Ran on develop with LAB-1149 (company names) included.
 
+### 25. Watching every call cross the guard, live (2026-10-27)
+
+LAB-1167.
+
+The traffic log from milestone 21 had no screen. The demo UI now has a fifth tab, **Live
+traffic**, fed by `GET /v1/traffic/stream` (SSE, with polling of `/v1/traffic` as fallback):
+every call through the gateway as it happens, with what was masked, the request exactly as
+the model received it (tools and other fields included), the answer from the model and as
+restored for the app, and a waterfall of the event's own per-stage timing. Live charts show
+the overhead per call with rolling p50/p95, by mode, by stage and the values masked per
+minute. Originals appear only when the server runs `full` *and* the page is on localhost;
+offline, the tab replays calls recorded at level `masked`. "Send demo traffic" runs the
+`make demo-traffic` scenarios from the browser against the offline mock upstream.
+
+- **What it shows on the demo stack** (`make demo`, rules only, mock upstream, Apple M1 Max,
+  64 calls): pii-guard overhead p50 **6.0 ms**, p95 14.7 ms; most of it is the `forward`
+  stage (a new HTTP client per upstream call, 4.1 of 5.4 ms on a typical call), as milestone
+  21 measured. Screenshots: [docs/assets/demo](assets/demo/) (`6-traffic`, `7-traffic-charts`,
+  `8-traffic-mobile`).
+- **What the critic caught:** two rounds at 375 and 1280 px, light and dark (verdict SHIP).
+  The major one: with rules only, the names in the demo traffic go to the model as written,
+  and the tab didn't say so; each masked request now says which detectors ran and that rules
+  don't find names. The demo traffic itself is a follow-up (LAB-1190), as are a masked-image
+  thumbnail in the log (LAB-1188), streamed tool-call arguments in the log (LAB-1189) and the
+  card number typed as an IBAN (LAB-1187).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an
