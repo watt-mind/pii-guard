@@ -422,14 +422,16 @@ class CaptionValue:
 
     - ``caption``: the caption as written in the lexicon (``"Date of birth"``), never the OCR
       text; ``language`` its language.
-    - ``entity_type``: the type the caption gives the value.
+    - ``entity_type``: the type the caption gives the value; ``None`` for a caption whose
+      value is not personal data (``Expiry``), returned only by
+      ``caption_values(..., include_non_personal=True)`` and never masked.
     - ``box``: the value's pixel box (one line); ``caption_box``: where the caption is.
     - ``words``: the value's OCR words; ``text`` joins them. ``repr()`` omits both.
     """
 
     caption: str
     language: str
-    entity_type: EntityType
+    entity_type: EntityType | None
     box: Box
     caption_box: Box
     words: tuple[OcrWord, ...] = field(default=())
@@ -440,7 +442,8 @@ class CaptionValue:
 
     def __repr__(self) -> str:
         return (
-            f"CaptionValue(caption={self.caption!r}, entity_type={self.entity_type.value}, "
+            f"CaptionValue(caption={self.caption!r}, "
+            f"entity_type={self.entity_type.value if self.entity_type else None}, "
             f"box={self.box!r}, words={len(self.words)}, text=<redacted>)"
         )
 
@@ -471,9 +474,17 @@ class _Group:
 
 
 def caption_values(
-    words: Sequence[OcrWord], lexicon: CaptionLexicon | None = None
+    words: Sequence[OcrWord],
+    lexicon: CaptionLexicon | None = None,
+    *,
+    include_non_personal: bool = False,
 ) -> list[CaptionValue]:
-    """Pair every personal-data caption found in ``words`` with the value next to it."""
+    """Pair every personal-data caption found in ``words`` with the value next to it.
+
+    ``include_non_personal`` also pairs the captions whose value is not personal data
+    (``Expiry``, ``Nationality``), with ``entity_type`` ``None``: the document summary reads
+    them (:mod:`pii_guard.visual.summary`); they are never masked.
+    """
     lexicon = lexicon if lexicon is not None else default_lexicon()
     if not words:
         return []
@@ -497,7 +508,7 @@ def caption_values(
     values: list[CaptionValue] = []
     for group in groups:
         entity_type = group.entity_type
-        if entity_type is None:
+        if entity_type is None and not include_non_personal:
             continue
         found = _same_line_value(group, lines[group.line], groups, caption_word_ids)
         if not found:
@@ -520,6 +531,7 @@ def caption_value_regions(
     return [
         Region(value.entity_type, value.box, SCORE, SOURCE)
         for value in caption_values(words, lexicon)
+        if value.entity_type is not None
     ]
 
 

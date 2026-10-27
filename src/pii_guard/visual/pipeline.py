@@ -12,11 +12,11 @@ from dataclasses import dataclass
 
 from pii_guard.types import DetectionError, Detector, EntityType, PiiGuardError
 from pii_guard.visual.image import DEFAULT_FILL, load_image, mask_image
-from pii_guard.visual.ocr import OcrEngine, text_regions
+from pii_guard.visual.ocr import OcrEngine, OcrText, ocr_text
 from pii_guard.visual.regions import Region
 from pii_guard.visual.sam import SamClient
 
-__all__ = ["VisualResult", "analyze_image", "mask_visual"]
+__all__ = ["ImageAnalysis", "VisualResult", "analyze_image", "analyze_image_text", "mask_visual"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +28,19 @@ class VisualResult:
 
     def __repr__(self) -> str:
         return f"VisualResult(image=<{len(self.image)} bytes>, regions={len(self.regions)})"
+
+
+@dataclass(frozen=True, slots=True)
+class ImageAnalysis:
+    """What :func:`analyze_image_text` found: every region (SAM's first, then OCR's, in the
+    order :func:`analyze_image` returns them) and the OCR pass behind the text regions
+    (``None`` when OCR did not run). Holds OCR text in memory; ``repr()`` shows counts."""
+
+    regions: list[Region]
+    ocr: OcrText | None
+
+    def __repr__(self) -> str:
+        return f"ImageAnalysis(regions={len(self.regions)}, ocr={self.ocr!r})"
 
 
 def analyze_image(
@@ -47,6 +60,29 @@ def analyze_image(
     the values next to known field captions (:mod:`pii_guard.visual.captions`). At least one
     of SAM and OCR must be configured.
     """
+    return analyze_image_text(
+        image,
+        sam=sam,
+        entity_types=entity_types,
+        ocr=ocr,
+        detectors=detectors,
+        language=language,
+        captions=captions,
+    ).regions
+
+
+def analyze_image_text(
+    image: bytes,
+    *,
+    sam: SamClient | None = None,
+    entity_types: Sequence[EntityType | str] | None = None,
+    ocr: OcrEngine | None = None,
+    detectors: Sequence[Detector] = (),
+    language: str = "hu",
+    captions: bool = True,
+) -> ImageAnalysis:
+    """Like :func:`analyze_image`, also returning the OCR words and the text of every OCR
+    finding, which placeholder labelling needs (:mod:`pii_guard.visual.labels`)."""
     if sam is None and ocr is None:
         raise DetectionError("no visual detector configured (need SAM and/or OCR)")
     if ocr is not None and not detectors:
@@ -57,18 +93,18 @@ def analyze_image(
         raise DetectionError("image could not be decoded") from exc
 
     regions: list[Region] = []
+    found: OcrText | None = None
     try:
         if sam is not None:
             regions.extend(sam.segment(image, entity_types))
         if ocr is not None:
-            regions.extend(
-                text_regions(decoded, detectors, ocr=ocr, language=language, captions=captions)
-            )
+            found = ocr_text(decoded, detectors, ocr=ocr, language=language, captions=captions)
+            regions.extend(finding.region for finding in found.findings)
     except PiiGuardError:
         raise
     except Exception as exc:
         raise DetectionError(f"visual detection failed ({type(exc).__name__})") from exc
-    return regions
+    return ImageAnalysis(regions, found)
 
 
 def mask_visual(

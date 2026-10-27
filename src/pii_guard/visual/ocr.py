@@ -24,16 +24,29 @@ from typing import Protocol, runtime_checkable
 from PIL import Image
 
 from pii_guard.types import DetectionError, Detector, PiiGuardError
-from pii_guard.visual.captions import CaptionLexicon, caption_value_regions
+from pii_guard.visual.captions import (
+    SCORE as CAPTION_SCORE,
+)
+from pii_guard.visual.captions import (
+    SOURCE as CAPTION_SOURCE,
+)
+from pii_guard.visual.captions import (
+    CaptionLexicon,
+    CaptionValue,
+    caption_values,
+)
 from pii_guard.visual.image import load_image
-from pii_guard.visual.mrz import mrz_regions
+from pii_guard.visual.mrz import MrzZone, mrz_zones
 from pii_guard.visual.regions import Box, Region
 
 __all__ = [
     "OcrEngine",
+    "OcrText",
     "OcrWord",
     "TesseractOcr",
+    "TextFinding",
     "join_words",
+    "ocr_text",
     "tesseract_available",
     "text_regions",
 ]
@@ -183,6 +196,47 @@ def join_words(words: Sequence[OcrWord]) -> tuple[str, list[tuple[int, int]]]:
     return "".join(parts), offsets
 
 
+@dataclass(frozen=True, slots=True)
+class TextFinding:
+    """One masking region found in OCR text, with the text it covers (kept in memory only).
+
+    ``origin`` is ``"detector"`` (a text detector's span), ``"caption"`` (the value next to a
+    field caption; ``caption`` says which) or ``"mrz"`` (a machine-readable zone found by its
+    layout; ``text`` is its lines, newline-joined) or ``"vault"`` (a value of the vault
+    session found on the image, :meth:`~pii_guard.visual.labels.VaultMatcher.find`).
+    ``repr()`` omits ``text``.
+    """
+
+    region: Region
+    text: str
+    origin: str
+    caption: str | None = None
+
+    def __repr__(self) -> str:
+        return (
+            f"TextFinding(region={self.region!r}, origin={self.origin!r}, "
+            f"caption={self.caption!r}, text=<redacted>)"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OcrText:
+    """Everything one OCR pass found: the words, the masking findings (in the order
+    :func:`text_regions` returns their regions), the MRZ zones, and the values of the
+    non-personal captions (``Expiry``), which the document summary reads and nothing masks."""
+
+    words: list[OcrWord]
+    findings: list[TextFinding]
+    zones: list[MrzZone]
+    fields: list[CaptionValue]
+
+    def __repr__(self) -> str:
+        return (
+            f"OcrText(words={len(self.words)}, findings={len(self.findings)}, "
+            f"zones={len(self.zones)}, fields={len(self.fields)})"
+        )
+
+
 def text_regions(
     image: bytes | Image.Image,
     detectors: Sequence[Detector],
@@ -200,7 +254,22 @@ def text_regions(
       birth``; :func:`~pii_guard.visual.captions.caption_value_regions`), unless
       ``captions`` is ``False``. A :class:`~pii_guard.visual.captions.CaptionLexicon` replaces
       the language packs' captions.
+
+    :func:`ocr_text` returns the same regions with the text they cover.
     """
+    found = ocr_text(image, detectors, ocr=ocr, language=language, captions=captions)
+    return [finding.region for finding in found.findings]
+
+
+def ocr_text(
+    image: bytes | Image.Image,
+    detectors: Sequence[Detector],
+    *,
+    ocr: OcrEngine,
+    language: str = "hu",
+    captions: bool | CaptionLexicon = True,
+) -> OcrText:
+    """Like :func:`text_regions`, keeping the words and the text of every finding."""
     if not detectors:
         raise DetectionError("no text detector configured for OCR text")
     if isinstance(image, Image.Image):
@@ -217,15 +286,24 @@ def text_regions(
     except Exception as exc:
         raise DetectionError(f"OCR failed ({type(exc).__name__})") from exc
     if not words:
-        return []
+        return OcrText([], [], [], [])
     text, offsets = join_words(words)
 
     # Layout-found MRZ zones: one box per zone, whatever the text detectors make of it.
-    regions: list[Region] = mrz_regions(words)
+    zones = mrz_zones(words)
+    findings: list[TextFinding] = [
+        TextFinding(zone.region, "\n".join(zone.lines), "mrz") for zone in zones
+    ]
     # Values next to known field captions, whatever the text detectors make of them.
+    fields: list[CaptionValue] = []
     if captions is not False:
         lexicon = captions if isinstance(captions, CaptionLexicon) else None
-        regions.extend(caption_value_regions(words, lexicon))
+        for value in caption_values(words, lexicon, include_non_personal=True):
+            if value.entity_type is None:
+                fields.append(value)
+                continue
+            region = Region(value.entity_type, value.box, CAPTION_SCORE, CAPTION_SOURCE)
+            findings.append(TextFinding(region, value.text, "caption", value.caption))
     for detector in detectors:
         try:
             spans = detector.detect(text, language)
@@ -241,8 +319,11 @@ def text_regions(
                     by_line[word.line] = word.box if current is None else current.union(word.box)
             if not by_line:
                 raise DetectionError("detected span does not map to any OCR word")
-            regions.extend(
-                Region(span.entity_type, box, span.score, span.detector) for box in by_line.values()
+            findings.extend(
+                TextFinding(
+                    Region(span.entity_type, box, span.score, span.detector), span.text, "detector"
+                )
+                for box in by_line.values()
             )
-    logger.debug("ocr: %d word(s), %d text region(s)", len(words), len(regions))
-    return regions
+    logger.debug("ocr: %d word(s), %d text region(s)", len(words), len(findings))
+    return OcrText(words, findings, zones, fields)

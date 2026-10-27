@@ -22,7 +22,9 @@ restrict it to ``[A-Za-z0-9_-]``), so it is removed instead.
 
 Images: ``image_url`` parts whose URL is an inline ``data:image/png|jpeg;base64,...`` URL are
 returned as :class:`ImageSlot` objects; the gateway masks them with the visual pipeline and
-writes a masked PNG data URL back. Remote ``http(s)`` image URLs are rejected: the guard never
+writes a masked PNG data URL back. :meth:`ImageSlot.annotate` adds a text part right after the
+image part (the masked transcript and document summary), inserted when the body is finalized.
+Remote ``http(s)`` image URLs are rejected: the guard never
 fetches arbitrary URLs, and an image it can't see can't be masked.
 
 Fail closed (ADR 0006): content parts that can't be masked (remote images, audio, files) and
@@ -145,9 +147,19 @@ class ImageSlot:
     data: bytes = field(repr=False)
     write: Callable[[str], None] = field(repr=False)
     where: str = ""
+    #: Adds a text part after the image part (``None``: the image is not in a content array).
+    annotate_with: Callable[[str], None] | None = field(default=None, repr=False)
 
     def __repr__(self) -> str:  # never the bytes
         return f"ImageSlot(where={self.where!r}, bytes={len(self.data)})"
+
+    def annotate(self, text: str) -> bool:
+        """Add a ``{"type": "text", "text": text}`` part right after this image's part, when
+        the body is finalized. ``False`` if the image is not in a content array."""
+        if self.annotate_with is None:
+            return False
+        self.annotate_with(text)
+        return True
 
 
 @dataclass(slots=True)
@@ -195,7 +207,7 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
         out.slots.append(TextSlot(content, _setter(message, "content")))
     elif isinstance(content, list):
         for part_index, part in enumerate(content):
-            _collect_part(part, f"{where}.content.{part_index}", out)
+            _collect_part(part, f"{where}.content.{part_index}", out, content)
     elif content is not None:
         raise InvalidChatRequestError(f"{where}.content must be a string, an array or null")
 
@@ -228,12 +240,14 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
         _collect_arguments(function_call, out)
 
 
-def _collect_part(part: object, where: str, out: CollectedTexts) -> None:
+def _collect_part(
+    part: object, where: str, out: CollectedTexts, content: list[Any] | None = None
+) -> None:
     if not isinstance(part, dict):
         raise InvalidChatRequestError(f"{where} must be an object")
     part_type = part.get("type")
     if part_type == "image_url":
-        _collect_image(part, where, out)
+        _collect_image(part, where, out, content)
         return
     key = _TEXT_PART_TYPES.get(part_type) if isinstance(part_type, str) else None
     if key is None:
@@ -248,7 +262,9 @@ def _collect_part(part: object, where: str, out: CollectedTexts) -> None:
     out.slots.append(TextSlot(value, _setter(part, key)))
 
 
-def _collect_image(part: dict[str, Any], where: str, out: CollectedTexts) -> None:
+def _collect_image(
+    part: dict[str, Any], where: str, out: CollectedTexts, content: list[Any] | None = None
+) -> None:
     image_url = part.get("image_url")
     holder: dict[str, Any]
     if isinstance(image_url, dict) and isinstance(image_url.get("url"), str):
@@ -278,7 +294,18 @@ def _collect_image(part: dict[str, Any], where: str, out: CollectedTexts) -> Non
     def write(masked_url: str) -> None:
         holder[key] = masked_url
 
-    out.images.append(ImageSlot(data, write, where))
+    annotate_with: Callable[[str], None] | None = None
+    if content is not None:
+        container = content
+
+        def annotate_with(text: str) -> None:
+            def insert() -> None:
+                index = next(i for i, p in enumerate(container) if p is part)
+                container.insert(index + 1, {"type": "text", "text": text})
+
+            out.finalizers.append(insert)
+
+    out.images.append(ImageSlot(data, write, where, annotate_with))
 
 
 def _collect_arguments(function: dict[str, Any], out: CollectedTexts) -> None:

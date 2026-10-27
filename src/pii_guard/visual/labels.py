@@ -1,0 +1,550 @@
+"""Session placeholders for image regions, the masked transcript and the document summary.
+
+:func:`label_image` takes what the visual pipeline found in one image (the OCR text with its
+findings, the regions that will be covered) and the request's vault session, and returns:
+
+- a **label** per covered region: the placeholder the session uses for the value there
+  (``[[PERSON_a1b2c3]]``), or the region's kind plus the document holder's placeholder for
+  faces, signatures and the MRZ (``PHOTO · [[PERSON_a1b2c3]]``);
+- the **masked transcript**: the OCR text with every covered word replaced by its region's
+  placeholder, then swept by the session for every value it already knows;
+- the **document summary** (:mod:`pii_guard.visual.summary`).
+
+Values are registered in the session exactly as text values are (:meth:`VaultSession.mask
+<pii_guard.vault.VaultSession.mask>`), so a value on a card and the same value in a contract
+of the same session share a placeholder, and the upstream answer unmasks with the session
+as usual. OCR noise is bridged by :mod:`pii_guard.visual.fuzzy`: before a card value is
+registered, it is matched against the session's values (and its pre-loaded known values); an
+accepted match reuses that placeholder, an uncertain one gets a new placeholder and is
+flagged (``match: "uncertain"``), never merged.
+
+The holder of an ID document is the surname and given-name fields read together (``FIKTÍV`` +
+``MÁRIA``), else a full-name field, else the MRZ name; its placeholder labels both name
+fields, the portrait, the signature and the MRZ.
+
+Fail closed (ADR 0006): a session error propagates, and a transcript or summary that still
+contains a covered value raises :class:`~pii_guard.types.MaskingError`.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import logging
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any
+
+from pii_guard.policy import Policy
+from pii_guard.types import EntityType, MaskingError, Span
+from pii_guard.vault import PLACEHOLDER_RE, VaultSession, normalize_value
+from pii_guard.visual.fuzzy import Candidate, Match, match_value, name_tokens
+from pii_guard.visual.mrz import MrzData, parse_mrz
+from pii_guard.visual.ocr import OcrText, OcrWord, TextFinding
+from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.summary import (
+    ID_DOCUMENTS,
+    ExpiryPolicy,
+    SummaryField,
+    build_summary,
+    document_type,
+    field_name,
+)
+
+__all__ = [
+    "KIND_LABELS",
+    "ImageLabels",
+    "RegionLabel",
+    "VaultMatcher",
+    "label_image",
+]
+
+logger = logging.getLogger(__name__)
+
+#: What a covered visual region is called on its label.
+KIND_LABELS: dict[EntityType, str] = {
+    EntityType.FACE: "PHOTO",
+    EntityType.ID_PHOTO: "PHOTO",
+    EntityType.SIGNATURE: "SIGNATURE",
+    EntityType.STAMP: "STAMP",
+}
+#: A word is replaced in the transcript when this share of its box is under a covered box.
+WORD_COVER = 0.3
+#: The detector name of values registered from an image.
+IMAGE_DETECTOR = "image"
+#: Values shorter than this (folded, letters and digits) are not checked for leaks (``M``).
+MIN_LEAK_CHECK = 4
+#: Longest run of OCR words :meth:`VaultMatcher.find` matches against one session value.
+MAX_FIND_WORDS = 4
+#: ``Region.source`` of a session value found on the image.
+VAULT_SOURCE = "vault"
+#: Shortest number (letters and digits, separators dropped) also looked for across tokens.
+MIN_COMPACT_LEAK_CHECK = 6
+
+
+@dataclass(frozen=True, slots=True)
+class RegionLabel:
+    """What is printed on a covered region, and the vault match behind it.
+
+    ``placeholder``: the session placeholder of the value (``None`` for a face or signature
+    with no known holder). ``match``: ``"exact"``, ``"fuzzy"`` (an existing placeholder was
+    reused), ``"new"`` (no existing value came close) or ``"uncertain"`` (a close value
+    exists, but not close enough: a new placeholder). ``confidence`` is the match's.
+    """
+
+    label: str | None
+    placeholder: str | None
+    match: str | None = None
+    confidence: float | None = None
+
+
+@dataclass(slots=True)
+class ImageLabels:
+    """The outcome of :func:`label_image`. Holds no raw value."""
+
+    labels: list[RegionLabel]
+    transcript: str
+    summary: dict[str, Any]
+    matches: dict[str, int] = field(default_factory=dict)
+
+    def __repr__(self) -> str:
+        return f"ImageLabels(labels={len(self.labels)}, matches={self.matches})"
+
+
+class VaultMatcher:
+    """Assigns session placeholders to OCR'd values, fuzzy-matching the session's values.
+
+    One per request: it reads the session's values (and known values) once and remembers
+    every value it registers, so the same name on a card front, back and MRZ, or on two
+    images of one request, gets one placeholder.
+    """
+
+    def __init__(self, session: VaultSession, language: str = "hu") -> None:
+        self.session = session
+        self.language = language
+        self._candidates: list[Candidate] = []
+        self._known: dict[str, tuple[str, EntityType]] = {}
+        for placeholder, entity_type, _count in session.entities():
+            value = session.unmask(placeholder)
+            if value != placeholder:
+                self._candidates.append(Candidate(placeholder, entity_type, value))
+        issued = {(c.entity_type, normalize_value(c.value)) for c in self._candidates}
+        for index, known in enumerate(session.known_values.values()):
+            if (known.entity_type, normalize_value(known.value)) in issued:
+                continue  # already masked in this session: its placeholder is a candidate
+            token = f"known:{index}"
+            self._known[token] = (known.value, known.entity_type)
+            self._candidates.append(Candidate(token, known.entity_type, known.value))
+
+    def __repr__(self) -> str:
+        return f"VaultMatcher(candidates={len(self._candidates)})"
+
+    def match(self, value: str, entity_type: EntityType) -> Match:
+        return match_value(value, entity_type, self._candidates)
+
+    def match_one(self, value: str, candidate: Candidate) -> Match:
+        """``value`` against one session value of its type (:meth:`find`)."""
+        return match_value(value, candidate.entity_type, [candidate])
+
+    def assign(self, value: str, entity_type: EntityType) -> RegionLabel:
+        """The placeholder for ``value``: an accepted match's, else a newly registered one."""
+        found = self.match(value, entity_type)
+        if found.accepted and found.candidate is not None:
+            placeholder = found.candidate.placeholder
+            if placeholder in self._known:
+                known_value, known_type = self._known.pop(placeholder)
+                placeholder = self._register(known_value, known_type)
+                self._retarget(found.candidate, placeholder)
+            return RegionLabel(placeholder, placeholder, found.status, found.confidence)
+        placeholder = self._register(value, entity_type)
+        status = "uncertain" if found.status == "uncertain" else "new"
+        confidence = found.confidence if found.status == "uncertain" else None
+        return RegionLabel(placeholder, placeholder, status, confidence)
+
+    def _retarget(self, old: Candidate, placeholder: str) -> None:
+        self._candidates = [
+            Candidate(placeholder, c.entity_type, c.value) if c is old else c
+            for c in self._candidates
+        ]
+
+    def find(
+        self, ocr: OcrText, masked_types: frozenset[EntityType] | None = None
+    ) -> list[TextFinding]:
+        """The session's values printed on the image where no detector found them.
+
+        A badge prints the visitor's name with no caption and no detector finds it; the
+        conversation already named that person, so the vault knows what to look for. Every
+        run of up to :data:`MAX_FIND_WORDS` words on one OCR line, not already covered by a
+        finding, is fuzzy-matched against the session's values (a name only by a run of as
+        many words as it has: a lone surname in a footer is not the person). Accepted matches
+        only, best first, never overlapping; an uncertain one is never a finding (guessing
+        would cover the wrong person's placeholder). ``origin`` is ``"vault"``.
+        """
+        candidates = [
+            c for c in self._candidates if masked_types is None or c.entity_type in masked_types
+        ]
+        if not candidates:
+            return []
+        covered = [f.region.box for f in ocr.findings]
+        free = [
+            w
+            for w in ocr.words
+            if not any(
+                _overlap(w.box, box) >= WORD_COVER * w.box.width * w.box.height for box in covered
+            )
+        ]
+        lines: dict[tuple[int, ...], list[OcrWord]] = {}
+        for word in free:
+            lines.setdefault(word.line, []).append(word)
+        hits: list[tuple[float, int, tuple[int, ...], int, Candidate]] = []
+        for key, words in lines.items():
+            for start in range(len(words)):
+                for size in range(1, min(MAX_FIND_WORDS, len(words) - start) + 1):
+                    run = words[start : start + size]
+                    text = " ".join(w.text for w in run)
+                    if sum(c.isalnum() for c in text) < MIN_LEAK_CHECK:
+                        continue
+                    for candidate in candidates:
+                        if (
+                            candidate.entity_type is EntityType.PERSON
+                            and len(name_tokens(candidate.value)) != size
+                        ):
+                            continue
+                        found = self.match_one(text, candidate)
+                        if found.accepted:
+                            hits.append((found.confidence, -size, key, start, candidate))
+        hits.sort(key=lambda h: (h[0], h[1]), reverse=True)
+        taken: set[tuple[tuple[int, ...], int]] = set()
+        out: list[TextFinding] = []
+        for _confidence, negative_size, key, start, candidate in hits:
+            span = [(key, i) for i in range(start, start - negative_size)]
+            if any(item in taken for item in span):
+                continue
+            taken.update(span)
+            run = lines[key][start : start - negative_size]
+            box = Box(
+                min(w.box.x1 for w in run),
+                min(w.box.y1 for w in run),
+                max(w.box.x2 for w in run),
+                max(w.box.y2 for w in run),
+            )
+            region = Region(candidate.entity_type, box, None, VAULT_SOURCE)
+            out.append(TextFinding(region, " ".join(w.text for w in run), "vault"))
+        return out
+
+    def sweep(self, text: str, masked_types: frozenset[EntityType] | None = None) -> str:
+        """``text`` with every session value it spells out (whole tokens, case- and
+        accent-insensitive; a number also with other separators) replaced by its placeholder.
+
+        The transcript's backstop for values the image detectors missed but the conversation
+        already named: a letter's signer named in the contract is masked in the transcript
+        even when no detector found it on the image. Known values not yet issued get their
+        placeholder here. ``masked_types``: only these types (``None``: all).
+        """
+        tokens = [_token_span(m) for m in _TOKEN_RE.finditer(text)]
+        values = [(c.value, c.entity_type, c.placeholder) for c in self._candidates]
+        values += [(v, t, token) for token, (v, t) in self._known.items()]
+        values.sort(key=lambda item: -len(item[0]))
+        cuts: list[tuple[int, int, str]] = []
+        taken: set[int] = set()
+        for value, entity_type, placeholder in values:
+            if masked_types is not None and entity_type not in masked_types:
+                continue
+            needle = _alnum_tokens(value)
+            if not needle or sum(len(t) for t in needle) < MIN_LEAK_CHECK:
+                continue
+            compact = "".join(needle)
+            n = len(needle)
+            for i in range(len(tokens)):
+                run = None
+                if [t for _s, _e, t in tokens[i : i + n]] == needle:
+                    run = (i, i + n)
+                elif n > 1 and any(c.isdigit() for c in compact) and tokens[i][2] == compact:
+                    run = (i, i + 1)
+                if run is None or any(j in taken for j in range(*run)):
+                    continue
+                if placeholder in self._known:
+                    known_value, known_type = self._known.pop(placeholder)
+                    placeholder = self._register(known_value, known_type)
+                taken.update(range(*run))
+                cuts.append((tokens[run[0]][0], tokens[run[1] - 1][1], placeholder))
+        for start, end, placeholder in sorted(cuts, reverse=True):
+            text = text[:start] + placeholder + text[end:]
+        return text
+
+    def _register(self, value: str, entity_type: EntityType) -> str:
+        value = value.strip()
+        if not value or entity_type.is_visual:
+            raise MaskingError(f"cannot register an empty {entity_type.value} value")
+        span = Span(0, len(value), entity_type, value, 1.0, IMAGE_DETECTOR)
+        result = self.session.mask_with_report(value, [span], language=self.language)
+        placeholder = next(p for start, _end, p in result.replacements if start == 0)
+        if not any(c.placeholder == placeholder for c in self._candidates):
+            self._candidates.append(Candidate(placeholder, entity_type, value))
+        return placeholder
+
+
+@dataclass(frozen=True, slots=True)
+class _Holder:
+    label: RegionLabel
+    tokens: frozenset[str]
+
+
+def _person_fields(findings: Sequence[TextFinding]) -> dict[str, list[TextFinding]]:
+    out: dict[str, list[TextFinding]] = {}
+    for finding in findings:
+        if finding.origin == "caption" and finding.region.entity_type is EntityType.PERSON:
+            name = field_name(finding.caption, EntityType.PERSON) or "name"
+            out.setdefault(name, []).append(finding)
+    return out
+
+
+def _holder_text(fields: dict[str, list[TextFinding]], mrz: MrzData | None) -> str | None:
+    """Surname + given names read together, else a full name, else the MRZ name."""
+    given = fields.get("given_names")
+    surname = fields.get("surname") or fields.get("name")
+    if given and surname:
+        return f"{surname[0].text} {given[0].text}"
+    for name in ("name", "surname"):
+        if fields.get(name):
+            return fields[name][0].text
+    if mrz is not None and mrz.name:
+        return mrz.name
+    return None
+
+
+def _overlap(a: Box, b: Box) -> int:
+    ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
+    iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
+    return ix * iy if ix > 0 and iy > 0 else 0
+
+
+def _best_finding(region: Region, labelled: Sequence[tuple[TextFinding, RegionLabel]]) -> int:
+    best, best_area = -1, 0
+    for index, (finding, _label) in enumerate(labelled):
+        if finding.region.entity_type is not region.entity_type:
+            continue
+        area = _overlap(finding.region.box, region.box)
+        if area > best_area:
+            best, best_area = index, area
+    return best
+
+
+def _kind_label(entity_type: EntityType, holder: _Holder | None) -> RegionLabel:
+    kind = KIND_LABELS.get(entity_type, entity_type.value)
+    if holder is None or holder.label.placeholder is None:
+        return RegionLabel(kind, None)
+    placeholder = holder.label.placeholder
+    return RegionLabel(f"{kind} · {placeholder}", placeholder, holder.label.match)
+
+
+def _transcript(words: Sequence[OcrWord], covered: Sequence[tuple[Box, RegionLabel]]) -> str:
+    """The OCR text, lines kept, with every covered word replaced by its region's token
+    (the placeholder, or ``[PHOTO · [[PERSON_x]]]`` for a labelled visual region / MRZ).
+    Consecutive words of one region collapse into one token."""
+    parts: list[str] = []
+    previous_line: tuple[int, ...] | None = None
+    previous_token: str | None = None
+    for word in words:
+        area = word.box.width * word.box.height
+        best: RegionLabel | None = None
+        best_area = 0
+        for box, label in covered:
+            inter = _overlap(word.box, box)
+            if inter > best_area:
+                best, best_area = label, inter
+        replaced = best is not None and best_area >= WORD_COVER * area
+        token = word.text
+        if replaced and best is not None:
+            if best.placeholder is not None and best.label == best.placeholder:
+                token = best.placeholder
+            else:
+                token = f"[{best.label or 'MASKED'}]"
+        if word.line != previous_line:
+            if parts:
+                parts.append("\n")
+        elif replaced and token == previous_token:
+            continue
+        else:
+            parts.append(" ")
+        parts.append(token)
+        previous_line, previous_token = word.line, (token if replaced else None)
+    return "".join(parts)
+
+
+_TOKEN_RE = re.compile(r"\[\[[A-Z0-9_]+\]\]|[^\s<]+")
+
+
+def _token_span(match: re.Match[str]) -> tuple[int, int, str]:
+    """A token's offsets without its leading and trailing punctuation, and its folded form."""
+    token, start, end = match.group(0), match.start(), match.end()
+    while start < end and not _text_char(token[start - match.start()]):
+        start += 1
+    while end > start and not _text_char(token[end - 1 - match.start()]):
+        end -= 1
+    return start, end, _alnum_token(token)
+
+
+def _text_char(char: str) -> bool:
+    return char.isalnum() or char in "[]_"
+
+
+def _alnum_token(token: str) -> str:
+    if PLACEHOLDER_RE.fullmatch(token):
+        return ""  # never part of a value
+    return "".join(c for c in "".join(name_tokens(token)) if c.isalnum())
+
+
+def _alnum_tokens(text: str) -> list[str]:
+    tokens = ("".join(c for c in t if c.isalnum()) for t in name_tokens(text))
+    return [t for t in tokens if t]
+
+
+def _leaks(text: str, values: Sequence[str]) -> bool:
+    """Whether any value (as a run of whole tokens, accent- and case-insensitive) is in
+    ``text``. Checked: values with a digit or of two or more tokens, of at least
+    :data:`MIN_LEAK_CHECK` characters. A one-word name alone is not (``Fiktív`` is a surname
+    on a card and a word in its footer); the sweep still masks it wherever the vault finds it.
+    """
+    haystack = _alnum_tokens(text)
+    for value in values:
+        needle = _alnum_tokens(value)
+        if not needle or sum(len(t) for t in needle) < MIN_LEAK_CHECK:
+            continue
+        if len(needle) < 2 and not any(c.isdigit() for c in needle[0]):
+            continue
+        n = len(needle)
+        if any(haystack[i : i + n] == needle for i in range(len(haystack) - n + 1)):
+            return True
+        compact = "".join(needle)
+        # A number written with other separators (123-456-788): fail closed.
+        if (
+            any(c.isdigit() for c in compact)
+            and len(compact) >= MIN_COMPACT_LEAK_CHECK
+            and compact in "".join(haystack)
+        ):
+            return True
+    return False
+
+
+def label_image(
+    ocr: OcrText | None,
+    covered: Sequence[tuple[Region, Policy]],
+    matcher: VaultMatcher,
+    *,
+    expiry: ExpiryPolicy = "reduce",
+    today: dt.date | None = None,
+    masked_types: frozenset[EntityType] | None = None,
+) -> ImageLabels:
+    """Label every ``covered`` region (``(region, policy)``, in output order) and build the
+    transcript and summary. Regions whose policy is not ``mask`` get an empty label.
+
+    ``masked_types``: the text types whose policy is ``mask``; findings of other types
+    (``keep``) are not registered in the session. ``None``: every type is masked.
+    """
+    findings = ocr.findings if ocr is not None else []
+    if masked_types is not None:
+        findings = [f for f in findings if f.region.entity_type in masked_types]
+    words = ocr.words if ocr is not None else []
+    text = " ".join(w.text for w in words)
+    mrz_data: MrzData | None = None
+    if ocr is not None:
+        for zone in ocr.zones:
+            mrz_data = parse_mrz(zone.lines)
+            if mrz_data is not None:
+                break
+    is_id = document_type(text, mrz_data) in ID_DOCUMENTS or mrz_data is not None
+
+    labelled: list[tuple[TextFinding, RegionLabel]] = []
+    summary_fields: list[SummaryField] = []
+    matches: dict[str, int] = {}
+    holder: _Holder | None = None
+    person_fields = _person_fields(findings)
+    holder_value = _holder_text(person_fields, mrz_data) if is_id else None
+    holder_findings: set[int] = set()
+    if holder_value:
+        label = matcher.assign(holder_value, EntityType.PERSON)
+        holder = _Holder(label, frozenset(name_tokens(holder_value)))
+        matches[label.match or "new"] = matches.get(label.match or "new", 0) + 1
+        for name in ("surname", "given_names", "name"):
+            for finding in person_fields.get(name, ()):
+                if set(name_tokens(finding.text)) <= holder.tokens:
+                    holder_findings.add(id(finding))
+                    summary_fields.append(
+                        SummaryField(name, label.placeholder or "", label.match or "new")
+                    )
+    mrz_document: str | None = None
+    if mrz_data is not None and mrz_data.document_number:
+        # A valid zone's number is registered; a misread one is only matched, never stored.
+        if mrz_data.valid:
+            mrz_document = matcher.assign(
+                mrz_data.document_number, EntityType.ID_DOCUMENT
+            ).placeholder
+        else:
+            found = matcher.match(mrz_data.document_number, EntityType.ID_DOCUMENT)
+            if (
+                found.accepted
+                and found.candidate is not None
+                and not found.candidate.placeholder.startswith("known:")
+            ):
+                mrz_document = found.candidate.placeholder
+    for finding in findings:
+        if id(finding) in holder_findings and holder is not None:
+            labelled.append((finding, holder.label))
+            continue
+        if finding.origin == "mrz":
+            target = mrz_document or (holder.label.placeholder if holder else None)
+            text_label = f"MRZ · {target}" if target else "MRZ"
+            labelled.append((finding, RegionLabel(text_label, target, None)))
+            continue
+        label = matcher.assign(finding.text, finding.region.entity_type)
+        matches[label.match or "new"] = matches.get(label.match or "new", 0) + 1
+        labelled.append((finding, label))
+        name = field_name(finding.caption, finding.region.entity_type) if finding.caption else None
+        if finding.origin == "caption" and name is not None and label.placeholder:
+            summary_fields.append(SummaryField(name, label.placeholder, label.match or "new"))
+    if mrz_document is not None and not any(f.name == "document_number" for f in summary_fields):
+        summary_fields.append(SummaryField("document_number", mrz_document, "new"))
+
+    region_labels: list[RegionLabel] = []
+    covered_boxes: list[tuple[Box, RegionLabel]] = []
+    for region, policy in covered:
+        if policy is not Policy.MASK:
+            region_labels.append(RegionLabel(None, None))
+            continue
+        if region.entity_type.is_visual:
+            label = _kind_label(region.entity_type, holder)
+        else:
+            index = _best_finding(region, labelled)
+            label = (
+                labelled[index][1] if index >= 0 else RegionLabel(region.entity_type.value, None)
+            )
+        region_labels.append(label)
+        covered_boxes.append((region.box, label))
+
+    transcript = _transcript(words, covered_boxes)
+    transcript = matcher.sweep(transcript, masked_types)
+    transcript = matcher.session.mask(transcript, [], language=matcher.language, remask=True)
+    summary = build_summary(
+        text=text,
+        fields=summary_fields,
+        caption_fields=ocr.fields if ocr is not None else [],
+        mrz=mrz_data,
+        holder=(
+            SummaryField("holder", holder.label.placeholder or "", holder.label.match or "new")
+            if holder is not None
+            else None
+        ),
+        holder_confidence=holder.label.confidence if holder is not None else None,
+        expiry=expiry,
+        today=today,
+    )
+    values = [f.text for f, _ in labelled if f.origin != "mrz"]
+    if holder_value:
+        values.append(holder_value)
+    if mrz_data is not None:
+        values.extend(v for v in (mrz_data.document_number, mrz_data.name) if v)
+    if _leaks(transcript, values) or _leaks(repr(summary), values):
+        raise MaskingError("image transcript or summary would contain a covered value")
+    logger.debug("image labels: %d region(s), matches=%s", len(region_labels), matches)
+    return ImageLabels(region_labels, transcript, summary, matches)

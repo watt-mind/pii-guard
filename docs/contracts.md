@@ -423,6 +423,18 @@ Request, either form:
   optional `?language=hu`. `curl --data-binary @card.png -H 'Content-Type: image/png' …`
 - **JSON**: `{"image": "<base64>" | "data:image/png;base64,…", "language": "hu"}`.
 
+Options (JSON fields, or query parameters with a raw upload):
+
+- `render`: `labels` (default, `PII_GUARD_IMAGE_RENDER`) prints each covered region's vault
+  placeholder in its box and returns a masked transcript and a document summary; `opaque`
+  fills boxes solid black and returns neither. Without a tenant key the default falls back
+  to `opaque`; an explicit `labels` is then `500 vault_not_configured`.
+- `session_id`: the vault session to mask in (`labels` only), shared with `/v1/mask` and the
+  gateway, so the same person gets the same placeholder in text and in images. Omitted: a new
+  session is created and returned. Unknown: `404 session_not_found`.
+- `expiry`: `reduce` (default; the summary says `expired: true|false` only) or `keep` (the
+  summary also carries the ISO expiry date).
+
 The format is sniffed from the bytes; anything but PNG/JPEG is `415 unsupported_media_type`.
 Images up to 10 MiB decoded (`app.state.max_image_bytes`); larger is `413`. Multipart form
 uploads are not accepted (they would need an extra dependency).
@@ -447,6 +459,53 @@ uploads are not accepted (they would need an extra dependency).
 }
 ```
 
+With `render: "labels"` (the default) the response also carries:
+
+```json
+{
+  "render": "labels",
+  "session_id": "s_3f2a…",
+  "regions": [
+    {"entity_type": "PERSON", "box": [310, 92, 402, 112], "source": "ocr", "detector": "captions", "score": 0.8, "policy": "mask",
+     "placeholder": "[[PERSON_a1b2c3]]", "label": "[[PERSON_a1b2c3]]", "match": "fuzzy", "match_confidence": 0.93,
+     "cover_box": [308, 90, 452, 114]},
+    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "sam", "detector": "sam", "score": null, "policy": "mask",
+     "placeholder": "[[PERSON_a1b2c3]]", "label": "PHOTO · [[PERSON_a1b2c3]]", "match": "fuzzy", "match_confidence": 0.93,
+     "cover_box": [70, 114, 190, 264]}
+  ],
+  "transcript": "AZONOSÍTÓ KÁRTYA / IDENTITY CARD\nCsaládi név / Surname\n[[PERSON_a1b2c3]]\n…",
+  "summary": {
+    "document_type": "id_card", "holder": "[[PERSON_a1b2c3]]", "holder_match": "fuzzy",
+    "holder_confidence": 0.93, "document_number": "[[ID_DOCUMENT_d4e5f6]]",
+    "issuing_country": "UTO", "expiry": null, "expired": false, "mrz_present": true,
+    "mrz_valid": true, "fields_found": {"date_of_birth": "[[DATE_OF_BIRTH_0a1b2c]]", "…": "…"},
+    "fields_uncertain": []
+  },
+  "matches": {"exact": 1, "fuzzy": 2, "new": 3, "uncertain": 0}
+}
+```
+
+- `placeholder` is the session placeholder of the covered value; `label` is what is printed in
+  the box (`PHOTO · [[PERSON_x]]` on a portrait of the card's holder, `SIGNATURE`, `STAMP`).
+  `match` says how the value was tied to the session: `exact` or `fuzzy` (it reuses a value
+  the conversation already named, `match_confidence` in `[0, 1]`), `new` (first seen here,
+  registered in the session) or `uncertain` (close to a session value but not accepted: a
+  **new** placeholder, never a guess; the summary lists it in `fields_uncertain`).
+- Fuzzy matching (`pii_guard.visual.fuzzy`) is case-, accent- and token-order-insensitive
+  (`FIKTIV<<MARIA` is `Fiktív Mária`) and treats OCR confusions (`0`/`o`, `1`/`l`/`i`, `5`/`s`)
+  as cheap, but one real letter of difference (`Mustermonn`) keeps two names apart.
+  Identifiers match across separators and confusions only.
+- Session values printed where no detector found them (a visitor badge's name) are also
+  covered and labelled (`detector: "vault"`), for accepted matches only.
+- `cover_box` is the area actually painted: the box grown by 2 px and, when the label would
+  not fit legibly, extended to the right into free space (never over visible words or another
+  box). `box` stays the detected area in both render modes, so coverage is identical.
+- `transcript` is the OCR text with every covered value replaced by its placeholder (or
+  `[PHOTO]`, `[SIGNATURE]`); values the session knows are also replaced wherever they appear.
+  Before the response is returned, the transcript and summary are checked against every
+  covered value; one found there fails closed with `500 masking_failed`. Text the detectors
+  did not find stays in the transcript exactly as it stays visible in the image.
+
 - `box` is `[x1, y1, x2, y2]`, inclusive pixel corners in the image after EXIF orientation.
   `source` is `sam` (SAM 3.1 segmentation) or `ocr` (OCR word boxes of a span a text detector
   found); `detector` is `sam`, the text detector's registry name, or `captions` for a value
@@ -459,7 +518,8 @@ uploads are not accepted (they would need an extra dependency).
   label regions by what actually ran.
 - Regions never carry the covered text or pixels. Overlapping regions of the same type and
   source are merged into their union (SAM's `signature` and `squiggly line` prompts).
-- Policies apply per region: `mask` regions are filled solid black (plus 2 px), `keep` regions
+- Policies apply per region: `mask` regions are covered (plus 2 px; solid black with `opaque`,
+  a neutral labelled box with `labels`), `keep` regions
   (`STAMP` by default) are reported and left visible, any `block` region is
   `422 blocked_entity` with no image.
 - SAM segments every visual type it has a prompt for (one Meta API request per prompt:
@@ -480,7 +540,11 @@ for OCR text, and forwards a masked PNG data URL in its place (other part fields
 `detail` are kept). Remote `http(s)` and other URLs are `400 unsupported_content`: the guard
 never fetches URLs. Limits: `PII_GUARD_GATEWAY_MAX_IMAGES` (4) images of
 `PII_GUARD_GATEWAY_MAX_IMAGE_BYTES` (10 MiB) each, `PII_GUARD_GATEWAY_IMAGE_TIMEOUT` (120 s)
-for all of a request's images. Responses to requests with images carry `X-PII-Guard-Images`,
+for all of a request's images. With `PII_GUARD_IMAGE_RENDER=labels` (the default) images are
+masked in the request's vault session after its text, so a name in the message and on a card
+share one placeholder, and a text part follows each image part: `[pii-guard: image N was
+masked; …]`, its document summary (JSON) and its masked transcript. The model's answer is
+unmasked as usual. Responses to requests with images carry `X-PII-Guard-Images`,
 `X-PII-Guard-Image-Regions-Masked` and `X-PII-Guard-Image-OCR: on|off`.
 
 ## Vault (implemented)

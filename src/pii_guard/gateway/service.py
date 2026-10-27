@@ -10,7 +10,12 @@ Order of operations (fail closed at every step, ADR 0006):
 3. mask with the conversation's vault session: spans first, then a sweep for every value the
    session already knows (so a value found in one message is masked in all of them); inline
    images are masked with the visual pipeline (SAM 3.1 + OCR text through this mode's
-   detectors + policies) and replaced by a masked PNG data URL;
+   detectors + policies) and replaced by a masked PNG data URL. With placeholder labels
+   (``PII_GUARD_IMAGE_RENDER=labels``, the default) the images' values join the same session
+   (fuzzy-matched to the text's values, :mod:`pii_guard.visual.labels`), each covered region
+   shows its placeholder, and a text part with the image's masked transcript and document
+   summary follows the image; the texts are then swept once more for values first seen in an
+   image;
 4. forward the masked body; restore the answer (streamed: chunk by chunk);
 5. seed the detection cache with the restored answer, which comes back as history next turn.
 
@@ -38,7 +43,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
 from pii_guard.api.deps import PayloadTooLargeError
-from pii_guard.api.routes.image_masking import ImageMasker, default_ocr_engine
+from pii_guard.api.routes.image_masking import ImageMasker, ImageMaskOutcome, default_ocr_engine
 from pii_guard.config import Settings
 from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.gateway.cache import DetectionCache
@@ -58,6 +63,7 @@ from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PiiGuardError, Span
 from pii_guard.vault import Vault, VaultSession
 from pii_guard.vault.known import KnownValues
+from pii_guard.visual.labels import VaultMatcher
 from pii_guard.visual.ocr import OcrEngine
 from pii_guard.visual.sam import SamClient
 
@@ -180,6 +186,34 @@ class RequestStats:
 
 def _counts(counter: Mapping[str, int]) -> str:
     return ",".join(f"{k}:{v}" for k, v in sorted(counter.items()) if v) or "-"
+
+
+def _counts_of(session: VaultSession) -> Counter[str]:
+    return Counter({p: c for p, _, c in session.entities()})
+
+
+def _count_masked(stats: RequestStats, before: Counter[str], session: VaultSession) -> None:
+    """Add the text occurrences masked since ``before`` to ``stats.masked`` (by type)."""
+    for placeholder, entity_type, count in session.entities():
+        delta = count - before.get(placeholder, 0)
+        if delta > 0:
+            stats.masked[entity_type.value] += delta
+
+
+def image_annotation(number: int, outcome: ImageMaskOutcome) -> str:
+    """The text part sent after a labelled image: its summary and masked transcript.
+
+    Placeholders only (the transcript and summary are checked for covered values before they
+    get here, :func:`pii_guard.visual.labels.label_image`)."""
+    summary = json.dumps(outcome.summary, ensure_ascii=False, sort_keys=True)
+    lines = [
+        f"[pii-guard: image {number} was masked; each covered region shows the placeholder "
+        "of its value, the same placeholders as in the text]",
+        f"Document summary: {summary}",
+    ]
+    if outcome.transcript:
+        lines += ["Masked transcript:", outcome.transcript]
+    return "\n".join(lines)
 
 
 class Gateway:
@@ -388,21 +422,26 @@ class Gateway:
         spans: list[list[Span]],
         session: VaultSession,
         language: str,
-        stats: RequestStats,
-    ) -> None:
-        before = Counter({p: c for p, _, c in session.entities()})
+    ) -> list[str]:
         masked = [
             session.mask(slot.text, found, language=language)
             for slot, found in zip(slots, spans, strict=True)
         ]
         # Second pass: values confirmed in a later text are masked in earlier ones too.
-        masked = [session.mask(text, [], language=language, remask=True) for text in masked]
+        return [session.mask(text, [], language=language, remask=True) for text in masked]
+
+    @staticmethod
+    def _write(
+        slots: list[TextSlot],
+        masked: list[str],
+        session: VaultSession,
+        language: str,
+        remask: bool,
+    ) -> None:
+        if remask:  # values first seen in an image are masked in the texts too
+            masked = [session.mask(text, [], language=language, remask=True) for text in masked]
         for slot, text in zip(slots, masked, strict=True):
             slot.write(text)
-        for placeholder, entity_type, count in session.entities():
-            delta = count - before.get(placeholder, 0)
-            if delta > 0:
-                stats.masked[entity_type.value] += delta
 
     def _seed_cache(
         self,
@@ -429,27 +468,31 @@ class Gateway:
         detector: ModeDetector,
         language: str,
         stats: RequestStats,
+        session: VaultSession,
     ) -> None:
-        """Mask every inline image (fail closed) and write masked PNG data URLs back."""
+        """Mask every inline image (fail closed) and write masked PNG data URLs back; with
+        placeholder labels, also add each image's transcript and summary after it."""
         masker = self.image_masker(detector)
         stats.image_ocr = masker.ocr is not None
+        render = self.settings.image_render
         started = time.perf_counter()
 
-        def run_all() -> list[bytes]:
-            out: list[bytes] = []
+        def run_all() -> list[ImageMaskOutcome]:
+            matcher = VaultMatcher(session, language) if render == "labels" else None
+            out: list[ImageMaskOutcome] = []
             for slot in images:
-                outcome = masker.mask(slot.data, language)
+                outcome = masker.mask(slot.data, language, render=render, matcher=matcher)
                 stats.image_masked.update(
                     {t.value: n for t, n in outcome.counts(Policy.MASK).items()}
                 )
                 stats.image_kept.update(
                     {t.value: n for t, n in outcome.counts(Policy.KEEP).items()}
                 )
-                out.append(outcome.image)
+                out.append(outcome)
             return out
 
         try:
-            masked = await asyncio.wait_for(
+            outcomes = await asyncio.wait_for(
                 asyncio.to_thread(run_all), timeout=self.config.image_timeout
             )
         except TimeoutError:
@@ -462,8 +505,10 @@ class Gateway:
             raise DetectionError(f"image masking failed ({type(exc).__name__})") from exc
         finally:
             stats.image_ms = (time.perf_counter() - started) * 1000
-        for slot, png in zip(images, masked, strict=True):
-            slot.write("data:image/png;base64," + base64.b64encode(png).decode("ascii"))
+        for number, (slot, outcome) in enumerate(zip(images, outcomes, strict=True), start=1):
+            slot.write("data:image/png;base64," + base64.b64encode(outcome.image).decode("ascii"))
+            if outcome.summary is not None:
+                slot.annotate(image_annotation(number, outcome))
 
     # --- the endpoint --------------------------------------------------------------------
 
@@ -534,12 +579,18 @@ class Gateway:
         try:
             with timer.span("detect"):
                 spans = await self._detect_all(collected.slots, detector, session, language, stats)
+            before = _counts_of(session)
+            with timer.span("mask"):
+                masked = self._mask(collected.slots, spans, session, language)
+            _count_masked(stats, before, session)
             if collected.images:
                 with timer.span("image"):
-                    await self._mask_images(collected.images, detector, language, stats)
+                    await self._mask_images(collected.images, detector, language, stats, session)
+            before = _counts_of(session)
             with timer.span("mask"):
-                self._mask(collected.slots, spans, session, language, stats)
+                self._write(collected.slots, masked, session, language, bool(collected.images))
                 collected.finalize()
+            _count_masked(stats, before, session)
         except BaseException:
             stats.log("blocked")
             if created:
