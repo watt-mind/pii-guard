@@ -33,6 +33,9 @@ _HU_SUFFIXES: tuple[str, ...] = (
 _HU_VOWELS = frozenset("aáeéiíoóöőuúüű")
 # Digraphs double their first letter (``Kovács`` -> ``Kováccsal``), so the stem changes.
 _HU_DIGRAPHS = ("cs", "dz", "gy", "ly", "ny", "sz", "ty", "zs")
+# Old-orthography endings (``Tóth``, ``Kovácz``) sound like ``t``/``c``: the assimilated
+# ``-val``/``-vel`` is ``-tal`` (``Tóthtal``) / ``-cal`` (``Kováczcal``), not ``-hal``/``-zal``.
+_HU_OLD_DIGRAPHS = ("th", "cz")
 
 
 # Suffixes after a lengthened final vowel (``Zsuzsanná|nak``, ``Kendé|t``). ``-ként`` keeps
@@ -66,6 +69,14 @@ def _alternation(suffixes: Iterable[str]) -> str:
 def _hu_digraph(value: str) -> str | None:
     folded = value.casefold()
     for digraph in _HU_DIGRAPHS:
+        if folded.endswith(digraph) and len(value) > len(digraph):
+            return digraph
+    return None
+
+
+def _hu_old_digraph(value: str) -> str | None:
+    folded = value.casefold()
+    for digraph in _HU_OLD_DIGRAPHS:
         if folded.endswith(digraph) and len(value) > len(digraph):
             return digraph
     return None
@@ -110,6 +121,9 @@ class HungarianSuffixMatcher:
         last = value[-1:].casefold()
         if last in _HU_VOWELS:
             suffixes |= {"val", "vel", "vá", "vé"}
+        elif _hu_old_digraph(value) is not None:
+            sound = value.casefold()[-2]  # Tóth -> t, Kovácz -> c
+            suffixes |= {f"{sound}al", f"{sound}el", f"{sound}á", f"{sound}é"}
         elif last.isalpha() and not value.casefold().endswith(_HU_DIGRAPHS):
             suffixes |= {f"{last}al", f"{last}el", f"{last}á", f"{last}é"}
         plain = "|".join(re.escape(s) for s in sorted(suffixes, key=len, reverse=True))
@@ -179,6 +193,13 @@ class HungarianSuffixMatcher:
                 if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
                     found.append(Split(lemma, stem, surface[len(stem) :]))
                 continue
+            # Tóth|tal -> Tóth, Kovácz|cal -> Kovácz: the sound of the old digraph is doubled.
+            lemma = stem[:-1]
+            old = _hu_old_digraph(lemma)
+            if old is not None and stem[-1].casefold() == old[0]:
+                if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
+                    found.append(Split(lemma, lemma, surface[len(lemma) :]))
+                continue
             # Elek|kel -> Elek: a single final consonant doubled into the suffix.
             if (
                 len(stem) >= 2
@@ -210,8 +231,14 @@ class HungarianSuffixMatcher:
     def restore(self, lemma: str, suffix: str, entity_type: EntityType) -> str:
         """``lemma`` inflected for ``suffix`` as it follows a placeholder: ``stem + suffix``.
 
-        ``Próba Zsuzsanna`` + ``nak`` -> ``Próba Zsuzsannának``; ``Kovács`` + ``al`` or ``val``
-        -> ``Kováccsal``; ``Elek`` + ``vel`` -> ``Elekkel``. Anything else is ``lemma + suffix``.
+        ``Próba Zsuzsanna`` + ``nak`` -> ``Próba Zsuzsannának`` (also when the model already
+        wrote the long vowel: ``ának``); ``Kovács`` + ``al`` or ``val`` -> ``Kováccsal``;
+        ``Kiss Tóth`` + ``val`` -> ``Kiss Tóthtal``; ``Elek`` + ``vel`` -> ``Elekkel``. Anything
+        else is ``lemma + suffix``.
+
+        Known limitation: a value the detector only saw inflected (``Teszt Zoltánt``) has no
+        confirmed lemma, so a suffix the model adds is appended to the whole word. Choosing
+        between candidate lemmas (``Zoltán`` vs ``Zoltánt``) is a guess; it is not made here.
         """
         if not suffix or suffix.startswith("-") or not lemma or not lemma[-1].isalpha():
             return lemma + suffix
@@ -219,6 +246,17 @@ class HungarianSuffixMatcher:
         long_vowel = _HU_LONG.get(lemma[-1])
         if long_vowel is not None and _HU_LENGTHENING_RE.fullmatch(folded):
             return lemma[:-1] + long_vowel + suffix
+        if (
+            long_vowel is not None
+            and suffix[0].casefold() == long_vowel.casefold()
+            and _HU_LENGTHENING_RE.fullmatch(folded[1:])
+        ):
+            return lemma[:-1] + suffix  # the model wrote the long vowel itself (ának)
+        if _hu_old_digraph(lemma) is not None and folded in {
+            "al", "el", "á", "val", "vel", "vá", "vé",
+        }:  # fmt: skip
+            ending = suffix[1:] if folded.startswith("v") else suffix
+            return lemma + lemma[-2] + ending  # Tóth + val -> Tóthtal
         digraph = _hu_digraph(lemma)
         if digraph is not None and folded in {"al", "el", "á", "val", "vel", "vá", "vé"}:
             ending = suffix[1:] if folded.startswith("v") else suffix
