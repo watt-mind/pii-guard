@@ -238,6 +238,25 @@ raw `text` of a span is **not** returned (the caller already has it; it can slic
 `Span.to_public_dict()` plus `policy`, the type's effective policy. Every span is returned,
 including `keep` and `block` ones: analyze never refuses on policy.
 
+Optional `session_id` (1-128 characters, as on `/v1/mask`) previews the session's pre-loaded
+known values: the spans the `known` detector adds are merged in exactly as `/v1/mask` does and
+come back with `"detector": "known"`, covering the stem (an inflectional suffix stays outside).
+
+```json
+// request
+{"text": "Üdv, Gyakorló Tihamérnak!", "session_id": "s_..."}
+// response 200
+{"spans": [{"start": 5, "end": 21, "entity_type": "PERSON", "score": 1.0, "detector": "known", "policy": "mask"}]}
+```
+
+- A known value reports `policy: "mask"` even when its type's policy is `keep` (`/v1/mask`
+  masks it); a `block` type reports `block` (analyze still does not refuse).
+- Unknown or expired `session_id`: `404 not_found`, no text in the body. A session is never
+  created and nothing is stored (the session's counters and entities are unchanged); its
+  sliding TTL is extended as for any use.
+- Without `session_id` the vault is not touched, so no tenant key is needed.
+- The access log gets `known=<count>` and `session=<bool>`, never values or the session id.
+
 ### `POST /v1/mask`
 
 ```json
