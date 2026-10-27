@@ -649,6 +649,77 @@ Treatments:
 | content part | `{"type": "image_url"}` | inline PNG/JPEG data URL masked as an image (above); `image_url.detail` and `cache_control` check |
 | content part | any other type (`input_audio`, `file`, ...) | `400 unsupported_content` |
 
+## Responses API (implemented)
+
+`POST /v1/responses` is the gateway for clients that speak the OpenAI **Responses API**, such
+as Muse Code (docs/integrations/muse-code.md). It gives the same guarantees as
+`/v1/chat/completions` and uses the same headers (`X-PII-Guard-Mode`, `-Language`, `-Session`,
+`-Echo`), detectors, cache and vault (`pii_guard.gateway.responses`). The masked body goes to
+the upstream's own `{PII_GUARD_UPSTREAM_BASE_URL}/responses` (a `/chat/completions` suffix is
+dropped first). Nothing is translated to Chat Completions: an upstream that answers that path
+with 404 or 405 gets **`501 responses_unsupported`**. Other upstream errors keep their status
+and only the upstream's `type`/`code` tokens, never its message.
+
+**Request fields.** These are walked against an allow-list (`pii_guard.gateway.responses_request`),
+with the treatments of the table above. Any other key, item type or part type is
+`400 unsupported_content`, and nothing is forwarded.
+
+| Where | Key | Treatment |
+| --- | --- | --- |
+| body | `model` | pass (non-empty string, required) |
+| body | `input` | a string (mask), or a non-empty array of items, below (required) |
+| body | `instructions` | mask |
+| body | `temperature`, `top_p`, `top_logprobs`, `max_output_tokens`, `max_tool_calls`, `parallel_tool_calls`, `store`, `stream`, `background` | pass |
+| body | `reasoning`, `include`, `tool_choice`, `truncation`, `service_tier`, `stream_options` | check |
+| body | `user`, `safety_identifier`, `prompt_cache_key` | mask |
+| body | `metadata` | keys check; values mask JSON |
+| body | `text` | `verbosity` check; `format` (`type`, `name`, `schema`, `description`, `strict`) as a definition |
+| body | `tools` | `function` and `custom` tools as definitions (as for chat); `namespace` tools: `name` check, `description` mask, `tools` (function/custom only) walked; hosted tools (`web_search`, `file_search`, `mcp`, ...) `400` |
+| body | `previous_response_id`, `conversation`, `prompt` | `400`: server-side state would hold another vault session's placeholders; send the whole `input` with `store: false` |
+| every item | `type`, `id`, `call_id`, `status`, `phase` | check |
+| `message` item (or `{role, content}` without `type`) | `role` | one of `system`, `developer`, `user`, `assistant` |
+| `message` item | `content` | string mask; or parts: `input_text`/`output_text` (`text` mask, `annotations`/`logprobs` mask JSON), `refusal` (`refusal` mask); `input_image`/`input_file`/`input_audio` `400` |
+| `function_call` item | `name` check; `arguments` | as a chat tool call's `arguments` (JSON parsed, mask JSON, re-serialised) |
+| `function_call_output` item | `output` | string mask, or text parts as above |
+| `custom_tool_call` item | `name` check; `input` | mask |
+| `custom_tool_call_output` item | `output` | as `function_call_output` |
+| `reasoning` item | `summary[]` (`summary_text`), `content[]` (`reasoning_text`) | `text` mask |
+| `reasoning` item | `encrypted_content` | pass (opaque, provider-encrypted) |
+| other items (`item_reference`, `web_search_call`, ...) | | `400` |
+
+A **line-number gutter** at the start of a line of message text or tool output (`12|`, as Muse
+Code's `read_file` prints files) is shown to the detectors as spaces of the same length and
+kept in the forwarded text, so the first word of the line is detected on its own.
+
+**Restore.** In a whole `response` object, every string the upstream returns is restored
+(output text, refusals, reasoning summaries, and the request fields it echoes back).
+`arguments` get JSON-escaped values, as chat tool-call arguments do. `encrypted_content` is
+left as is. `X-PII-Guard-Unresolved` counts unknown placeholders.
+
+**Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
+stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
+`summary_index`: `response.output_text.delta`, `response.refusal.delta`,
+`response.function_call_arguments.delta` (JSON-escaped), `response.reasoning_summary_text.delta`,
+`response.reasoning_text.delta` and `response.custom_tool_call_input.delta`. A placeholder split
+across deltas is held back until it is complete. When the stream's `.done` event arrives (or the
+stream ends), what is held back goes out as one more delta event just before it, so the joined
+deltas equal the restored `.done` text. Every other event (`response.created`,
+`response.output_item.added`/`.done`, `response.content_part.*`, `response.completed`, ...) is
+restored whole. `sequence_number` is renumbered so it stays strictly increasing. An upstream
+`error` event becomes `{"type": "error", "code": "upstream_error", ...}`, and
+`response.failed` keeps its status with a generic `error`. `data: [DONE]` is passed on.
+
+**Echo.** `X-PII-Guard-Echo: masked` works on non-streamed calls: the answer gets
+`pii_guard: {masked_input: [{role, content}], masked_output: [{index, content}]}` (placeholders
+only). With `stream: true` the header is `400 invalid_request`.
+
+**`GET /muse-code/models`** is Muse Code's catalog, served at the gateway root. With
+`PII_GUARD_UPSTREAM_MODELS` set, it is those ids. Otherwise it is the upstream's
+`{scheme://host}/muse-code/models` with only `id`, `object`, `created`, `owned_by` and
+`metadata["muse-code"]` kept per model. On a 404 it is `GET /v1/models` with default client
+settings (`tool_call`, text in and out, a 128k context). Upstream errors keep their status
+(5xx becomes 502), never their message.
+
 ## Vault (implemented)
 
 Package: `pii_guard.vault`. Implements [ADR 0007](decisions/0007-keyed-pseudonyms.md). The

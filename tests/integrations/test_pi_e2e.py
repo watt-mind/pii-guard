@@ -33,7 +33,7 @@ def pi_bin(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def test_pi_through_gateway_masks_upstream_and_restores_files(pi_bin: Path) -> None:
     result = run(pi_bin=pi_bin, timeout=300)
-    assert result.pi_exit == 0, result.pi_output
+    assert result.client_exit == 0, result.client_output
     assert result.requests >= 5  # read, read, read, write, final answer
     assert result.refused == 0, result.gateway_statuses  # nothing hit the fail-closed allow-list
     assert result.gold_upstream == []
