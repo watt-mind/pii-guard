@@ -70,6 +70,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
       kept: first ? isKept(first) : false,
       detector: first?.detector,
       score: own.length ? Math.max(...own.map((s) => s.score)) : undefined,
+      subtype: first?.subtype,
       occurrences: entity?.count ?? own.length,
     };
   }, [result, activeKey]);

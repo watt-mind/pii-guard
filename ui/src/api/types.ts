@@ -15,6 +15,7 @@ export const TEXT_ENTITY_TYPES = [
   "ORGANIZATION",
   "PARCEL_NUMBER_HU",
   "VEHICLE_PLATE",
+  "SECRET",
 ] as const;
 
 export const VISUAL_ENTITY_TYPES = ["FACE", "SIGNATURE", "ID_PHOTO", "STAMP"] as const;
@@ -32,6 +33,8 @@ export interface PublicSpan {
   detector: string;
   /** The type's effective policy (`/v1/analyze`); absent from older APIs and the demo engine. */
   policy?: "mask" | "keep" | "block";
+  /** Refines a type that covers several shapes: a `SECRET` span says `github_token`, `jwt` … (LAB-1257). */
+  subtype?: string;
 }
 
 export interface AnalyzeRequest {

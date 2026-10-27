@@ -131,6 +131,12 @@ const ENTITY_DEFS: Record<EntityType, EntityDef> = {
     policy: "mask",
     group: "identifier",
   },
+  SECRET: {
+    label: "Secret",
+    short: "KEY",
+    policy: "mask",
+    group: "identifier",
+  },
   FACE: {
     label: "Face",
     short: "FCE",
@@ -173,6 +179,27 @@ export function groupOf(type: EntityType | null | undefined) {
   return ENTITY_GROUPS.find((g) => g.id === id)!;
 }
 
+/** `Span.subtype` of a SECRET span as a person reads it ("github_token" -> "GitHub token"). */
+const SUBTYPE_LABEL: Record<string, string> = {
+  aws_access_key_id: "AWS access key id",
+  github_token: "GitHub token",
+  slack_token: "Slack token",
+  stripe_key: "Stripe key",
+  api_key: "API key",
+  google_api_key: "Google API key",
+  jwt: "JWT",
+  private_key: "Private key",
+  url_password: "Password in a URL",
+  url_user: "User name in a URL",
+  bearer_token: "Bearer token",
+  assignment: "Value of a secret setting",
+};
+
+export function subtypeLabel(subtype: string | null | undefined): string | null {
+  if (!subtype) return null;
+  return SUBTYPE_LABEL[subtype] ?? subtype.replace(/_/g, " ");
+}
+
 export function metaFor(type: EntityType | null | undefined): EntityMeta {
   return type ? ENTITY_META[type] : UNKNOWN_META;
 }
@@ -193,7 +220,7 @@ const TEXT_TYPES = Object.keys(ENTITY_DEFS).filter((t) => !["FACE", "SIGNATURE",
  */
 export const DETECTOR_TYPES: Record<string, { types: readonly EntityType[]; partly?: readonly EntityType[] }> = {
   rules: {
-    types: ["EMAIL", "PHONE", "NATIONAL_ID_HU_TAX", "NATIONAL_ID_HU_TAJ", "BANK_ACCOUNT", "COMPANY_ID_HU", "ID_DOCUMENT", "VEHICLE_PLATE"],
+    types: ["EMAIL", "PHONE", "NATIONAL_ID_HU_TAX", "NATIONAL_ID_HU_TAJ", "BANK_ACCOUNT", "COMPANY_ID_HU", "ID_DOCUMENT", "VEHICLE_PLATE", "SECRET"],
     partly: ["ADDRESS"],
   },
   ner: { types: ["PERSON", "ORGANIZATION", "ADDRESS"] },

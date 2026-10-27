@@ -39,6 +39,7 @@ async function openImages(api: HttpGuardClient) {
 
 beforeEach(() => {
   localStorage.clear();
+  history.replaceState(null, "", "#playground/text");
   loadImage.mockClear();
   window.matchMedia ??= vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} });
   URL.createObjectURL ??= vi.fn(() => "blob:fake");
@@ -76,7 +77,7 @@ describe("Images screen", () => {
 
   it("marks the upload tile as needing the live API in demo mode", async () => {
     const { panel } = await openImages(offlineApi());
-    await waitFor(() => expect(within(panel).getByText("Needs the live API: SAM runs on the server.")).toBeInTheDocument());
+    await waitFor(() => expect(within(panel).getByText("Needs the live API: masking runs on the server.")).toBeInTheDocument());
   });
 
   it("tells a user who chose the demo engine with the API up to switch to Live API", async () => {
@@ -175,10 +176,13 @@ describe("Images screen", () => {
     expect(alert).toHaveTextContent("Blocked. Nothing was sent to the model.");
     expect(alert).toHaveTextContent("detection_failed");
     expect(within(panel).queryByTestId("masked-image")).toBeNull();
-    // The way out: switch to the demo engine and replay the recorded run on the same sample.
+    // The way out: replay the recorded run on the same sample, without leaving the live API (LAB-1265).
     await user.click(within(panel).getByRole("button", { name: "Replay the recorded run instead" }));
     expect(await within(panel).findByTestId("demo-masked-image")).toBeInTheDocument();
     expect(maskImage).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("API up", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Engine")).toHaveValue("auto");
+    expect(screen.queryByText("Demo mode.")).toBeNull();
   });
 
   it("drops the result when an upload replaces the sample, and waits for a click", async () => {

@@ -23,10 +23,10 @@ your network, then restored in the answer, even mid-stream and inside tool calls
 then open http://localhost:5173. [More ways to run it](#try-it).
 
 <p align="center">
-  <img src="docs/assets/demo/demo.webp" alt="Demo in the dark theme with fictional English data: a support e-mail is masked, a chat goes through the gateway and comes back restored, then the live traffic view shows each call, its masks and its latency" width="100%">
+  <img src="docs/assets/demo/demo.webp" alt="Demo of the console in the dark theme with fictional English data: the Overview counts real gateway calls, a support e-mail is masked in the Playground, the same session continues in Chat and comes back restored, Logs shows each call, and Connect gives the commands for a client" width="100%">
 </p>
 
-<p align="center"><sub>Recorded from <code>make demo</code> in fast mode; the offline mock upstream echoes the masked text back (with a key, the same flow runs on Muse Spark). <b>▶ Video walkthrough:</b> <i>link coming with the submission</i><!-- LAB-1123: video link --></sub></p>
+<p align="center"><sub>Recorded from <code>pii-guard up</code> in fast mode (rules only, no NER, so free-text names pass); the offline mock upstream echoes the masked text back (with a key, the same flow runs on Muse Spark). <b>▶ Video walkthrough:</b> <i>link coming with the submission</i><!-- LAB-1123: video link --></sub></p>
 
 ## Meta's large models teach, Meta's small open model runs
 
@@ -114,14 +114,14 @@ All 13 differentiators, with evidence and status: **[docs/why-pii-guard.md](docs
 
 | **Text:** every value found, and what the model saw | **Gateway:** a chat, masked out and restored back |
 |---|---|
-| [![Mask screen: a fictional English support e-mail with each personal value highlighted, and the placeholders the model sees](docs/assets/demo/1-mask.webp)](docs/assets/demo/1-mask.webp) | [![Chat screen: an English message sent through the gateway in fast mode; the model received placeholders and the answer came back restored](docs/assets/demo/2-chat.webp)](docs/assets/demo/2-chat.webp) |
-| **Images:** face, photo, signature and printed values covered | **Live traffic:** every call, its masks and its timing |
-| [![Images screen: a fictional English ID card; SAM 3.1 and OCR found the face, photo, signature, name, birth date and document number, and the model saw them filled](docs/assets/demo/3-images.webp)](docs/assets/demo/3-images.webp) | [![Live traffic screen: calls through the gateway with their entity types, an English call's details and its timing waterfall](docs/assets/demo/6-traffic.webp)](docs/assets/demo/6-traffic.webp) |
-| **Latency, live:** overhead per call, stages, values per minute | **Benchmarks:** leak against latency, from the run records |
-| [![Live latency charts: overhead per call with rolling p50 and p95, overhead by mode, time per stage and values masked per minute](docs/assets/demo/7-traffic-charts.webp)](docs/assets/demo/7-traffic-charts.webp) | [![Benchmarks screen: results table and the leak rate versus latency chart for pii-guard and the open-source tools](docs/assets/demo/4-benchmarks.webp)](docs/assets/demo/4-benchmarks.webp) |
+| [![Playground, Text tab: a fictional English support e-mail with each value the rules found highlighted, and the placeholders the model sees](docs/assets/demo/1-mask.webp)](docs/assets/demo/1-mask.webp) | [![Playground, Chat tab: the same e-mail sent through the gateway in the same session; a note says names are not detected without NER, and the model received placeholders](docs/assets/demo/2-chat.webp)](docs/assets/demo/2-chat.webp) |
+| **Images:** face, photo, signature and printed values covered | **Logs:** every call, its masks and its timing |
+| [![Playground, Images tab: this server refuses images (no OCR, no face detector), so a fictional visitor badge replays regions recorded from a real SAM 3.1 run, and the model saw the face filled](docs/assets/demo/3-images.webp)](docs/assets/demo/3-images.webp) | [![Logs: calls through the gateway with their entity types, a call's details (mock upstream, session from the X-PII-Guard-Session header) and its timing waterfall](docs/assets/demo/6-traffic.webp)](docs/assets/demo/6-traffic.webp) |
+| **Overview:** what the guard protected, from real calls only | **Evaluation:** leak against latency, from the run records |
+| [![Overview: requests, values masked, requests blocked and pii-guard overhead counted from the traffic log, top entity types and latency per stage](docs/assets/demo/7-traffic-charts.webp)](docs/assets/demo/7-traffic-charts.webp) | [![Evaluation: the benchmark headline, fixture sets, languages and systems to compare](docs/assets/demo/4-benchmarks.webp)](docs/assets/demo/4-benchmarks.webp) |
 
-At phone width: [Mask](docs/assets/demo/5-mask-mobile.webp) ·
-[Live traffic](docs/assets/demo/8-traffic-mobile.webp). The screens: [ui/README.md](ui/README.md#screens).
+At phone width: [Text](docs/assets/demo/5-mask-mobile.webp) ·
+[Logs](docs/assets/demo/8-traffic-mobile.webp). Connect: [copyable commands per client](docs/assets/demo/9-connect.webp). The screens: [ui/README.md](ui/README.md#screens).
 
 ## Try it
 

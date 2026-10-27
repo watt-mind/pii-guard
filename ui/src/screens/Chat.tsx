@@ -3,9 +3,11 @@ import { DEFAULT_CHAT_MODEL, SYSTEM_PROMPT, type ChatClient, type ChatMessage, t
 import { MaskedText } from "../components/MaskedText";
 import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
+import { NerHint } from "../components/NerHint";
 import { BlockedNotice, Button } from "../components/ui";
 import { CHAT_SAMPLES } from "../content/chatSamples";
 import { metaFor } from "../lib/entities";
+import { SESSION_SOURCE_LABEL } from "../lib/traffic";
 import { alignLoose, alignRestored, tokenize, type RestoredSegment } from "../lib/placeholders";
 import { toRunError, type RunError } from "../lib/run";
 
@@ -14,6 +16,8 @@ export interface ChatDraft {
   language: "hu" | "en";
   /** Changes every time a new draft is handed over, so the same text can be sent twice. */
   nonce: number;
+  /** The Text screen's vault session: reusing it keeps every placeholder number (LAB-1261). */
+  sessionId?: string | null;
 }
 
 interface Turn {
@@ -36,7 +40,10 @@ interface Props {
   /** The live API is up but no upstream may be configured; shown as a hint only. */
   live: boolean;
   draft: ChatDraft | null;
-  replay: ReactNode;
+  /** Whether the server runs the NER (`/v1/status`); null when unknown. False: names pass unmasked. */
+  ner?: boolean | null;
+  /** The server's upstream is the offline mock model, which echoes (LAB-1264). */
+  mockUpstream?: boolean;
 }
 
 const MODES: { id: ChatMode; label: string; hint: string }[] = [
@@ -52,14 +59,16 @@ const MODES: { id: ChatMode; label: string; hint: string }[] = [
   },
 ];
 
-export function Chat({ client, live, draft, replay }: Props) {
-  const [view, setView] = useState<"chat" | "replay">("chat");
+export function Chat({ client, live, draft, ner = null, mockUpstream = false }: Props) {
   const [mode, setMode] = useState<ChatMode>("fast");
   const [language, setLanguage] = useState<"hu" | "en">(CHAT_SAMPLES[0]!.language);
   const [model, setModel] = useState(DEFAULT_CHAT_MODEL);
   const [text, setText] = useState(CHAT_SAMPLES[0]!.text);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionSource, setSessionSource] = useState<string | null>(null);
+  /** The conversation continues the Text screen's session (same placeholders). */
+  const [handedOver, setHandedOver] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -79,6 +88,8 @@ export function Chat({ client, live, draft, replay }: Props) {
     abortRef.current?.abort();
     setTurns([]);
     setSessionId(null);
+    setSessionSource(null);
+    setHandedOver(false);
     activate(null);
   };
 
@@ -93,7 +104,7 @@ export function Chat({ client, live, draft, replay }: Props) {
   const update = (id: number, patch: Partial<Turn>) =>
     setTurns((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
-  const send = async (override?: { text: string; language: "hu" | "en" }) => {
+  const send = async (override?: { text: string; language: "hu" | "en"; sessionId?: string | null }) => {
     const message = (override?.text ?? text).trim();
     const lang = override?.language ?? language;
     const fresh = override !== undefined;
@@ -124,7 +135,7 @@ export function Chat({ client, live, draft, replay }: Props) {
         model,
         mode,
         language: lang,
-        sessionId: fresh ? null : sessionId,
+        sessionId: fresh ? (override.sessionId ?? null) : sessionId,
         signal: controller.signal,
         onMaskedRequest: (msgs) =>
           update(id, {
@@ -136,6 +147,7 @@ export function Chat({ client, live, draft, replay }: Props) {
         onThinking: () => update(id, { thinking: true }),
       });
       setSessionId(result.sessionId);
+      setSessionSource(result.sessionSource ?? null);
       update(id, {
         status: "done",
         answer: result.answer,
@@ -165,10 +177,10 @@ export function Chat({ client, live, draft, replay }: Props) {
   useEffect(() => {
     if (!draft || draft.nonce === lastDraft.current) return;
     lastDraft.current = draft.nonce;
-    setView("chat");
     setLanguage(draft.language);
-    setSessionId(null);
-    void send({ text: draft.text, language: draft.language });
+    setSessionId(draft.sessionId ?? null);
+    setHandedOver(Boolean(draft.sessionId));
+    void send({ text: draft.text, language: draft.language, sessionId: draft.sessionId ?? null });
     requestAnimationFrame(() => conversationRef.current?.focus({ preventScroll: true }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per handed-over draft
   }, [draft]);
@@ -185,35 +197,26 @@ export function Chat({ client, live, draft, replay }: Props) {
             streamed answer is restored on the way back, with the same placeholder for the same person in every turn.
           </p>
         </div>
-        <div role="group" aria-label="Chat view" className="flex rounded-lg border border-line bg-surface p-0.5 text-sm">
-          {(
-            [
-              ["chat", client.kind === "mock" ? "Chat" : "Live chat"],
-              ["replay", "Replay a document"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={view === id}
-              onClick={() => setView(id)}
-              className={["rounded-md px-3 py-1.5 font-medium", view === id ? "bg-ink text-canvas" : "text-muted hover:text-ink"].join(" ")}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {view === "replay" ? (
-        replay
-      ) : (
-        <>
+      <>
           {client.kind === "mock" && (
             <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
               <strong className="font-semibold text-warn">Simulated model.</strong> The demo engine masks in your browser and a scripted
               reply stands in for the LLM.{" "}
               {live ? "Switch the engine to Auto or Live API to chat with the real model." : "Start the API with an upstream model to chat for real."}
+            </p>
+          )}
+          {client.kind === "api" && ner === false && (
+            <p role="note" data-testid="rules-only-note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+              <strong className="font-semibold text-warn">Names are not detected.</strong> This server runs fast mode with the rules only, so e-mail addresses, phone numbers,
+              IBANs and IDs are masked but free-text names reach the model as written. Names need <NerHint />.
+            </p>
+          )}
+          {client.kind === "api" && mockUpstream && (
+            <p role="note" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+              <strong className="font-semibold">Mock upstream.</strong> The server's model is the offline mock: it answers by echoing the masked text it received, whatever model
+              is named. Start pii-guard with <code className="font-mono text-xs">--upstream-url</code> for a real one.
             </p>
           )}
 
@@ -257,9 +260,11 @@ export function Chat({ client, live, draft, replay }: Props) {
             mock={client.kind === "mock"}
             sessionId={sessionId}
             onReset={turns.length ? reset : undefined}
+            mockUpstream={mockUpstream}
+            sessionSource={sessionSource}
+            handedOver={handedOver}
           />
         </>
-      )}
 
       <Popover anchor={activeKey ? anchor : null}>{activeKey && <PlaceholderInfo placeholder={activeKey} />}</Popover>
     </div>
@@ -452,9 +457,12 @@ interface ComposerProps {
   mock: boolean;
   sessionId: string | null;
   onReset?: () => void;
+  mockUpstream: boolean;
+  sessionSource: string | null;
+  handedOver: boolean;
 }
 
-function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, onLanguage, model, onModel, mock, sessionId, onReset }: ComposerProps) {
+function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, onLanguage, model, onModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
   const modeHint = mock
     ? "The demo engine runs a small rule set in your browser in both modes; the AI detector and the real model need the live API."
     : MODES.find((m) => m.id === mode)!.hint;
@@ -549,6 +557,8 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
           <dd>
             {mock ? (
               "Simulated (demo engine)"
+            ) : mockUpstream ? (
+              "Mock upstream (echo): the model name is ignored"
             ) : (
               <>
                 <label htmlFor="chat-model" className="sr-only">
@@ -566,7 +576,11 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
           <dt>Endpoint</dt>
           <dd className="font-mono">POST /v1/chat/completions (stream)</dd>
           <dt>Session</dt>
-          <dd className="truncate font-mono">{sessionId ?? "new on first message"}</dd>
+          <dd className="min-w-0">
+            <span className="block truncate font-mono">{sessionId ?? "new on first message"}</span>
+            {handedOver && <span className="block">Continued from Text: the same values keep the same placeholders.</span>}
+            {sessionSource && <span className="block">Picked by the gateway from: {SESSION_SOURCE_LABEL[sessionSource] ?? sessionSource}</span>}
+          </dd>
         </dl>
       </details>
     </section>

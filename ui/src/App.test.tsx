@@ -13,6 +13,8 @@ function offlineApi(): HttpGuardClient {
 
 beforeEach(() => {
   localStorage.clear();
+  // Most tests start on the Playground's Text tab; the console's own routes are tested below.
+  history.replaceState(null, "", "#playground/text");
   window.matchMedia ??= vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} });
 });
 
@@ -29,15 +31,14 @@ describe("App in demo mode", () => {
     render(<App api={offlineApi()} mock={createMockClient()} />);
 
     await user.click(screen.getByRole("button", { name: /mask document/i }));
-    const playground = screen.getByRole("tabpanel", { name: /mask/i });
+    const playground = screen.getByRole("tabpanel", { name: "Text" });
     const masked = await within(playground).findByTestId("masked-text");
     expect(masked).toHaveTextContent(/\[\[PERSON_[0-9a-f]{4,}\]\]/);
     expect(masked).not.toHaveTextContent("Bárdos Kinga");
     expect(within(playground).getByRole("table")).toHaveTextContent("Tax ID (HU)");
 
-    await user.click(screen.getByRole("button", { name: /send it to the model/i }));
-    const panel = screen.getByRole("tabpanel", { name: /chat/i });
-    await user.click(within(panel).getByRole("button", { name: "Replay a document" }));
+    await user.click(screen.getByRole("button", { name: "Round trip" }));
+    const panel = screen.getByRole("tabpanel", { name: "Text" });
     const answer = within(panel).getByRole("textbox", { name: "Simulated model answer" }) as HTMLTextAreaElement;
     expect(answer.value).toMatch(/Seller: \[\[PERSON_[0-9a-f]{4,}\]\]/);
     expect(answer.value).not.toContain("Bárdos Kinga");
@@ -52,11 +53,10 @@ describe("App in demo mode", () => {
     const user = userEvent.setup();
     render(<App api={offlineApi()} mock={createMockClient()} />);
     await user.click(screen.getByRole("button", { name: /mask document/i }));
-    await within(screen.getByRole("tabpanel", { name: /mask/i })).findByTestId("masked-text");
-    await user.click(screen.getByRole("tab", { name: /chat/i }));
+    await within(screen.getByRole("tabpanel", { name: "Text" })).findByTestId("masked-text");
+    await user.click(screen.getByRole("button", { name: "Round trip" }));
 
-    const panel = screen.getByRole("tabpanel", { name: /chat/i });
-    await user.click(within(panel).getByRole("button", { name: "Replay a document" }));
+    const panel = screen.getByRole("tabpanel", { name: "Text" });
     await user.click(within(panel).getByRole("button", { name: /invented placeholder/i }));
     await user.selectOptions(within(panel).getByLabelText("Stream speed"), "fast");
     await user.click(within(panel).getByRole("button", { name: /stream/i }));
@@ -124,15 +124,14 @@ describe("App against a live API", () => {
     expect(note).toHaveTextContent("Anything without a highlight on the left was not detected");
     expect(screen.queryByText(/The model never sees the originals/)).toBeNull();
 
-    const playground = screen.getByRole("tabpanel", { name: /mask/i });
+    const playground = screen.getByRole("tabpanel", { name: "Text" });
     const firstMark = playground.querySelector("mark")!;
     await user.hover(firstMark);
     expect(await screen.findByTestId("entity-popover")).toHaveTextContent(/found by/);
     await user.unhover(firstMark);
     expect(screen.queryByTestId("entity-popover")).toBeNull();
 
-    await user.click(screen.getByRole("tab", { name: /chat/i }));
-    await user.click(screen.getByRole("button", { name: "Replay a document" }));
+    await user.click(screen.getByRole("button", { name: "Round trip" }));
     expect(screen.getByRole("heading", { level: 2, name: /masked values restored/ })).toBeInTheDocument();
   });
 });
@@ -147,7 +146,7 @@ describe("Known values and Chat in demo mode", () => {
     await user.clear(input);
     await user.type(input, "Kedves Gyakorló Tihamérnak küldöm.");
     await user.click(screen.getByRole("button", { name: /mask document/i }));
-    const panel = screen.getByRole("tabpanel", { name: /mask/i });
+    const panel = screen.getByRole("tabpanel", { name: "Text" });
     const masked = await within(panel).findByTestId("masked-text");
     expect(masked).toHaveTextContent(/Kedves \[\[PERSON_[0-9a-f]{4,}\]\] \(Person placeholder\)nak küldöm\./);
     expect(panel.querySelector("[data-known]")).not.toBeNull();
@@ -191,7 +190,7 @@ describe("Known values example", () => {
     await user.click(screen.getByRole("button", { name: "Try a fictional example" }));
     expect((screen.getByLabelText("Document text") as HTMLTextAreaElement).value).toContain("Gyakorló Tihamérnak");
     await user.click(screen.getByRole("button", { name: /mask document/i }));
-    const panel = screen.getByRole("tabpanel", { name: /mask/i });
+    const panel = screen.getByRole("tabpanel", { name: "Text" });
     await within(panel).findByTestId("masked-text");
     expect(panel.querySelector("[data-known]")).not.toBeNull();
     // Editing a known value makes the result stale.
@@ -202,17 +201,3 @@ describe("Known values example", () => {
   });
 });
 
-describe("Live traffic tab", () => {
-  it("opens from the tab bar and the #traffic hash, and replays recorded traffic with the demo engine", async () => {
-    const user = userEvent.setup();
-    localStorage.setItem("pii-guard:mode", "mock");
-    const connect = vi.fn(() => ({ close() {} }));
-    render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect, fixtureIntervalMs: 60_000 }} />);
-    await user.click(screen.getByRole("tab", { name: /traffic/i }));
-    expect(location.hash).toBe("#traffic");
-    const panel = screen.getByRole("tabpanel", { name: /traffic/i });
-    expect(await within(panel).findByText("Recorded demo traffic.")).toBeInTheDocument();
-    expect(connect).not.toHaveBeenCalled();
-    expect(within(panel).getAllByText(/never holds original values/).length).toBeGreaterThan(0);
-  });
-});
