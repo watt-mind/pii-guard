@@ -3,6 +3,7 @@
 
 import type { EntityType } from "../api/types";
 import type { TrafficEvent, TrafficTiming } from "../api/traffic";
+import { detectorLabel } from "./entities";
 import { alignLoose, isEntityType, type RestoredSegment } from "./placeholders";
 
 // --- Waterfall ----------------------------------------------------------------------------
@@ -331,4 +332,61 @@ export function formatMsShort(ms: number | null | undefined): string {
   if (ms >= 100) return `${Math.round(ms)} ms`;
   if (ms >= 10) return `${ms.toFixed(1)} ms`;
   return `${ms.toFixed(2)} ms`;
+}
+
+/** How the gateway picked the session, as a person reads it (LAB-1286). */
+export const SESSION_SOURCE_LABEL: Record<string, string> = {
+  header: "X-PII-Guard-Session header",
+  path: "session in the base URL",
+  prompt_cache_key: "one per conversation (prompt_cache_key)",
+  default: "this client's default session",
+};
+
+/** Detector names as the other screens show them; "visual" is the image pipeline. */
+export const detectorName = (d: string) => (d === "visual" ? "Image pipeline" : detectorLabel(d));
+
+export const clock = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
+
+/** "fast: Rules + Multilingual NER" from what the calls actually ran. */
+export function modeNote(events: TrafficEvent[]): string {
+  const by = new Map<string, Set<string>>();
+  for (const e of events) {
+    const m = e.mode ?? "unknown";
+    const set = by.get(m) ?? new Set<string>();
+    e.detectors.forEach((d) => set.add(d));
+    by.set(m, set);
+  }
+  if (!by.size) return "Detectors per mode appear with the first call.";
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  return (
+    "Detectors seen in the shown calls. " +
+    [...by.entries()].map(([m, d]) => `${cap(m)}: ${[...d].map((x) => detectorName(x)).join(" + ") || "none reported"}`).join(". ") +
+    "."
+  );
+}
+
+/** Why a call stopped before the model, from its error code (the traffic event carries no message). */
+export function refusalReason(code: string | undefined, image: boolean): string {
+  switch (code) {
+    case "detection_unavailable":
+      return "The requested mode can't run on this server (audit mode needs the LLM detector's key), so pii-guard refused instead of masking with less.";
+    case "detection_failed":
+      return `A detector failed${image ? " (or the image pipeline is missing OCR or a face detector)" : ""}, so pii-guard refused instead of sending the text unmasked.`;
+    case "blocked_entity":
+      return "A detected type has the policy block (see Policy), so the request stopped.";
+    case "not_found":
+      return "Unknown or expired session: drop the X-PII-Guard-Session header, or reuse the one from an earlier answer. Sessions live in the server's memory, so a restart clears them.";
+    case "invalid_request":
+    case "unsupported_content":
+      return "pii-guard couldn't read the request body, so it sent nothing rather than guess what to mask.";
+    case "payload_too_large":
+      return "The request is larger than the server accepts.";
+    case "unauthorized":
+      return "The server needs a bearer token (PII_GUARD_API_TOKEN).";
+    default:
+      return "pii-guard fails closed: when it can't mask a request, the request stops instead of going out unmasked.";
+  }
 }

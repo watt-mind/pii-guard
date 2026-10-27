@@ -1,6 +1,6 @@
 import type { EntityType, MaskResponse, PublicSpan } from "../api/types";
 import { codePointIndex } from "./codepoints";
-import { CHECKSUM_TYPES, detectorLabel, metaFor } from "./entities";
+import { CHECKSUM_TYPES, detectorLabel, metaFor, subtypeLabel } from "./entities";
 import { alignRestored, tokenize } from "./placeholders";
 
 /** A detected span in UTF-16 indices, ready to slice a JS string. */
@@ -14,6 +14,8 @@ export interface LocalSpan {
   placeholder: string | null;
   /** The type's effective policy from `/v1/analyze`, when the API reports it. */
   policy?: "mask" | "keep" | "block";
+  /** A SECRET span's kind (`github_token` …), when the API reports it. */
+  subtype?: string;
 }
 
 /**
@@ -39,7 +41,7 @@ export function toLocalSpans(text: string, spans: readonly PublicSpan[]): LocalS
     const start = map[s.start];
     const end = map[s.end];
     if (start === undefined || end === undefined || start >= end) continue;
-    out.push({ start, end, entityType: s.entity_type, score: s.score, detector: s.detector, placeholder: null, ...(s.policy ? { policy: s.policy } : {}) });
+    out.push({ start, end, entityType: s.entity_type, score: s.score, detector: s.detector, placeholder: null, ...(s.policy ? { policy: s.policy } : {}), ...(s.subtype ? { subtype: s.subtype } : {}) });
   }
   return out.sort((a, b) => a.start - b.start);
 }
@@ -175,10 +177,11 @@ export function spanKey(span: LocalSpan): string {
 
 export function describeSpan(span: LocalSpan): string {
   const meta = metaFor(span.entityType);
+  const kind = subtypeLabel(span.subtype);
   const detector = detectorLabel(span.detector, { types: [span.entityType] });
   const action = span.placeholder ? `masked as ${span.placeholder}` : isKept(span) ? "kept by policy" : "masked";
   const confidence = span.detector === "demo" ? "" : `, confidence ${Math.round(span.score * 100)}%`;
-  return `${meta.label}, ${action}, found by ${detector}${confidence}`;
+  return `${meta.label}${kind ? ` (${kind})` : ""}, ${action}, found by ${detector}${confidence}`;
 }
 
 

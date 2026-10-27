@@ -19,8 +19,8 @@ function offlineApi(): HttpGuardClient {
 async function openBenchmarks(loader: BenchmarkLoader = load) {
   const user = userEvent.setup();
   render(<App api={offlineApi()} mock={createMockClient()} loadBenchmarks={loader} />);
-  await user.click(screen.getByRole("tab", { name: /benchmarks/i }));
-  const panel = screen.getByRole("tabpanel", { name: /benchmarks/i });
+  await user.click(screen.getByRole("link", { name: /evaluation/i }));
+  const panel = screen.getByRole("region", { name: "Evaluation" });
   return { user, panel };
 }
 
@@ -50,20 +50,21 @@ const pct = (v: number | null) => `${((v ?? 0) * 100).toFixed(1)}%`;
 
 beforeEach(() => {
   localStorage.clear();
+  history.replaceState(null, "", "#playground/text");
   load.mockClear();
   window.matchMedia ??= vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} });
 });
 
 describe("Benchmarks screen", () => {
-  it("is the fourth tab, reachable with the arrow keys, and loads lazily", async () => {
+  it("opens as Evaluation from the sidebar, and loads lazily", async () => {
     const user = userEvent.setup();
     render(<App api={offlineApi()} mock={createMockClient()} loadBenchmarks={load} />);
     expect(load).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("tab", { name: /images/i }));
-    await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: /benchmarks/i })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("link", { name: /evaluation/i }));
+    expect(screen.getByRole("link", { name: /evaluation/i })).toHaveAttribute("aria-current", "page");
+    expect(location.hash).toBe("#evaluation");
     expect(load).toHaveBeenCalledTimes(1);
-    const panel = screen.getByRole("tabpanel", { name: /benchmarks/i });
+    const panel = screen.getByRole("region", { name: "Evaluation" });
     expect(await within(panel).findByRole("region", { name: "Results" })).toBeInTheDocument();
   });
 
@@ -123,12 +124,12 @@ describe("Benchmarks screen", () => {
     // locally and over 5 s on CI runners.
   }, 20_000);
 
-  it("keeps its filters when switching tabs", async () => {
+  it("keeps its filters when switching sections", async () => {
     const { user, panel } = await openBenchmarks();
     await within(panel).findByRole("region", { name: "Results" });
     await user.click(within(panel).getByRole("radio", { name: "English" }));
-    await user.click(screen.getByRole("tab", { name: /mask/i }));
-    await user.click(screen.getByRole("tab", { name: /benchmarks/i }));
+    await user.click(screen.getByRole("link", { name: /playground/i }));
+    await user.click(screen.getByRole("link", { name: /evaluation/i }));
     expect(within(panel).getByRole("radio", { name: "English" })).toBeChecked();
     expect(load).toHaveBeenCalledTimes(1);
   });

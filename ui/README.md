@@ -2,7 +2,7 @@
 
 A small web app that makes the guard visible: **what the model saw** next to **what you got
 back**. It talks only to the pii-guard REST API (`/healthz`, `/v1/analyze`, `/v1/mask`,
-`/v1/unmask`, `/v1/mask/image`, `/v1/traffic`, see [docs/contracts.md](../docs/contracts.md)). It never calls a
+`/v1/unmask`, `/v1/mask/image`, `/v1/traffic`, `/v1/status`, see [docs/contracts.md](../docs/contracts.md)). It never calls a
 model provider and holds no secrets (SAM 3.1 is called by the pii-guard server).
 
 ## Run it
@@ -20,7 +20,7 @@ The dev server proxies `/v1` and `/healthz` to `http://127.0.0.1:8787`. To use t
 pipeline, start the API in another terminal from the repository root:
 
 ```bash
-uv run pii-guard serve        # http://127.0.0.1:8787
+uv run pii-guard up --no-browser   # http://127.0.0.1:8787, mock upstream by default
 ```
 
 Point the proxy somewhere else with `PII_GUARD_API_URL=http://host:port pnpm dev`.
@@ -30,13 +30,13 @@ Point the proxy somewhere else with `PII_GUARD_API_URL=http://host:port pnpm dev
 The UI works without the API. A built-in **demo engine** (a few checksum-validated rules and a
 gazetteer of the fictional names in the samples, all in the browser) stands in when:
 
-- the engine selector in the header is set to **Demo engine**, or
+- the **Engine** selector at the bottom of the sidebar is set to **Demo engine**, or
 - it is set to **Auto** (the default) and `/healthz` doesn't answer, or the `/v1` routes return
   404 because they haven't landed yet.
 
 A **Demo mode** badge and banner are shown whenever the demo engine is in use; the dot next to
 it shows the API status from `/healthz` (checked every 15 s, click to re-check). Set the
-default at build time with `VITE_PII_GUARD_MODE=auto|api|mock`; a choice made in the header is
+default at build time with `VITE_PII_GUARD_MODE=auto|api|mock`; a choice made in the sidebar is
 remembered per browser.
 
 A contract error from a live endpoint (for example `503 detection_failed`) is **not** a reason
@@ -44,59 +44,64 @@ to fall back: the guard failed closed, and the UI says that nothing was sent.
 
 ## Screens
 
-1. **Mask** (`#mask`). Load a fictional sample (Hungarian contract, insurance claim email,
-   medical referral, an English support email) or paste text, pick the language, then mask
-   it. Your document is shown with every detected entity highlighted by type; *What the model
-   saw* shows the masked text with typed placeholders. Hover or tab to any highlight to see its
-   type, detector and confidence; the matching placeholder lights up on the other side. Below:
-   the entity legend and the placeholder map. **Known values** pre-loads values the
-   application already knows (`POST /v1/sessions/{id}/known-values`); they are masked in any
-   inflected form and marked *known*. **Send it to the model** hands the document to Chat.
-2. **Chat** (`#chat`). A live chat through the gateway (`POST /v1/chat/completions` with
-   `X-PII-Guard-Echo: masked`): per turn, *You wrote* / *What the model received* and *What the
-   model answered* / *What you got back*, with the same placeholder for the same person in
-   every turn. The model is real only when the API runs with an upstream
-   (`PII_GUARD_UPSTREAM_BASE_URL`); the demo engine uses a simulated answer. *Replay a
-   document* is the old round trip: a simulated answer, restored in one go or streamed in
-   chunks, with unknown placeholders flagged.
-3. **Images** (`#images`). Pick a fictional specimen document (ID card, health card, signed letter with a
-   company stamp, visitor badge) or upload a PNG/JPEG, then mask it. *Your image* shows every region the API
-   found, outlined in its type's colour (solid: SAM 3.1 segmentation, dashed: OCR text found by
-   a detector; a tag on each SAM box, OCR tags on hover/focus); *What the model saw* shows the
-   masked PNG exactly as `/v1/mask/image` returned it. Below: a legend (type, count, SAM/OCR,
-   kept) and the region list (type, source, policy, box). Hover, tap or tab to a region to link
-   both sides. Overlapping FACE and ID_PHOTO boxes are both drawn by design (two detections of
-   the same photo); tags are placed so they do not cover each other. A note says what ran, and what did not: OCR off on the API host, or names not
-   looked for because only the rules detector runs.
+A console with a sidebar (a **Menu** button below 1024 px). Every section has its own hash, so
+links, new tabs and the back button work; the old tab links (`#mask`, `#chat`, `#images`,
+`#benchmarks`, `#traffic`) redirect to their new place.
 
-   In demo mode the samples replay regions **recorded from a real run** (SAM 3.1 on the Meta
-   API + Tesseract + rules, `src/content/imageRecordings.json`) and the black boxes are drawn
-   in the browser; uploads are refused, because SAM runs on the server.
+1. **Overview** (`#overview`). What the guard protected, counted from the gateway's traffic log
+   (`GET /v1/traffic` plus the live stream): requests, values masked, requests blocked,
+   pii-guard's overhead (p50 and p95), the top entity types, latency per stage, and the live
+   latency charts. Next to them, read from `GET /v1/status`: where the gateway forwards (the
+   offline mock model or a real upstream, with the last call's HTTP status) and which detectors
+   each mode runs (a warning when only the rules run, so free-text names are not masked). With
+   no calls yet it says so and points to **Connect**, **Send demo traffic** and the Playground;
+   nothing is estimated. **Watch a recorded demo** replays recorded calls in the browser,
+   labelled as recorded, without the server's own panels next to them.
+2. **Playground** (`#playground/text`, `/chat`, `/images`). Three tabs:
+   - **Text**. *Mask a document*: load a fictional sample (Hungarian contract, insurance claim
+     email, medical referral, an English support email) or paste text, pick the language, then
+     mask it. Your document is shown with every detected entity highlighted by type; *What the
+     model saw* shows the masked text with typed placeholders. Hover or tab to a highlight for
+     its type, detector, subtype (for example the kind of secret) and confidence. **Known
+     values** pre-loads values the application already knows
+     (`POST /v1/sessions/{id}/known-values`). **Send it to the model** hands the document to
+     Chat in the same session, so the same values keep the same placeholders. *Round trip*: a
+     simulated answer, restored in one go or streamed in chunks, with unknown placeholders
+     flagged.
+   - **Chat**. A live chat through the gateway (`POST /v1/chat/completions` with
+     `X-PII-Guard-Echo: masked`): per turn, *You wrote* / *What the model received* and *What
+     the model answered* / *What you got back*. It says when the upstream is the offline mock
+     (the model name is ignored) and warns when the server runs the rules only. The connection
+     details show the session and how the gateway picked it (`X-PII-Guard-Session-Source`).
+   - **Images**. Pick a fictional specimen document (ID card, health card, signed letter with
+     a company stamp, visitor badge) or upload a PNG/JPEG, then mask it with
+     `/v1/mask/image`. *Your image* outlines every region in its type's colour (solid: a
+     segmenter, dashed: OCR text found by a detector); *What the model saw* is the masked PNG.
+     A note says what ran and what did not (no OCR, no face detector, names not looked for).
+     When the server can't mask images, the samples show regions recorded from a
+     real SAM 3.1 run on the built-in samples (**Replay the recorded run instead**), without switching the engine.
+3. **Logs** (`#logs`). Every call through the gateway as it happens: `GET /v1/traffic` for the
+   backlog, then `GET /v1/traffic/stream` (SSE), falling back to polling. Per call: time, mode,
+   entity chips, blocked/refused badges and the overhead; pick one for its details (mode,
+   model, session and where it came from, detectors, detection cache), a timing waterfall, the
+   **original request** (only at `PII_GUARD_TRAFFIC_LOG=full` *and* on localhost), the **masked
+   request as sent upstream**, and the **response**, masked and restored. Pause, Clear (the
+   server keeps its log), filters by mode, entity type and blocked/failed, and **Send demo
+   traffic** (model `pii-guard-mock` by default, `VITE_PII_GUARD_DEMO_MODEL`).
+4. **Connect** (`#connect`). The gateway base URL this server reports, and copyable steps per
+   client: pi and Muse Code (`pii-guard connect … --gateway <url>`, then `--check`), the OpenAI
+   SDK (`OPENAI_BASE_URL`), and curl. Claude Code is listed as not supported yet: it speaks the
+   Anthropic Messages API, which the gateway doesn't serve.
+5. **Policy** (`#policy`). Read-only, from `GET /v1/status`: the default mode, what fast and
+   audit mode run (and why audit is unavailable), images, traffic log level, authentication,
+   upstream, and the policy for every entity type (overrides from
+   `PII_GUARD_POLICY_OVERRIDES` are marked *changed*). Without `/v1/status` it shows the
+   documented defaults and says so.
+6. **Evaluation** (`#evaluation`). The published benchmark results: the headline, charts and
+   the results table per set and language.
 
-   For the live pipeline the API needs `META_API_KEY` (SAM 3.1) and, for text in images,
-   `uv sync --extra ocr` plus the `tesseract` binary with `hun` and `eng` data.
-
-4. **Benchmarks** (`#benchmarks`). The published evaluation results: a one-sentence headline
-   (how many personal values pii-guard lets through against the best open-source tool), charts
-   and the results table per set and language.
-
-5. **Live traffic** (`#traffic`). Every call through the gateway as it happens, from the
-   traffic log ([docs/operations.md](../docs/operations.md#traffic-log)): `GET /v1/traffic` for
-   the backlog, then `GET /v1/traffic/stream` (SSE), falling back to polling `/v1/traffic?after=`
-   when the stream fails. Per call: time, mode, entity chips, blocked/refused badges and the
-   overhead; pick one for three panes (the **original request**, only when the server runs
-   `PII_GUARD_TRAFFIC_LOG=full` *and* this page is on localhost; the **masked request as sent
-   upstream**, tools and other fields included; the **response**, masked from the model and
-   restored for your app) and a **timing waterfall** of the event's `timing` block. Below, live
-   charts: overhead per call with rolling p50/p95, overhead by mode, pii-guard's own stages, and
-   values masked per minute by type. Pause holds new calls, Clear empties the view (the server
-   keeps its log), filters by mode, entity type and blocked/failed. **Send demo traffic** sends
-   the `make demo-traffic` scenarios from the browser (model `VITE_PII_GUARD_DEMO_MODEL`, default
-   `pii-guard-mock`, which the `make demo` mock upstream answers offline).
-
-   When the API is unreachable (or the engine is set to Demo engine, or on request when the log
-   is off) the tab replays calls recorded from `make demo` + `make demo-traffic` at level
-   `masked` (`src/content/trafficFixture.json`): no original values, ever.
+When the API is unreachable (or the engine is set to Demo engine), Overview and Logs replay
+calls recorded at level `masked` (`src/content/trafficFixture.json`): no original values, ever.
 
 All sample data is fictional ([ADR 0005](../docs/decisions/0005-synthetic-data-only.md)).
 Never paste real personal data into the demo.
@@ -129,7 +134,11 @@ pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test --run
 | `src/lib/analysis.ts` | Code-point offsets, span ↔ placeholder linking, answer templates |
 | `src/lib/stream.ts` | Chunked streaming simulation |
 | `src/components/` | Highlighting, placeholders, legend, entity table, panes |
-| `src/screens/` | Mask (`Playground.tsx`), Chat, Round trip replay, Images, Benchmarks |
+| `src/lib/routes.ts` | Sections, Playground tabs, hash routing and the old-link redirects |
+| `src/components/Sidebar.tsx` | The sidebar: sections, engine badge and selector, theme |
+| `src/api/status.ts`, `src/hooks/useServerStatus.ts` | `GET /v1/status`: what the server runs |
+| `src/screens/Overview.tsx`, `Connect.tsx`, `Policy.tsx` | The Overview, Connect and Policy sections |
+| `src/screens/` | Text (`Playground.tsx`), Chat, Round trip, Images, Benchmarks (Evaluation) |
 | `src/api/chat.ts` | Gateway chat client (SSE + echo events) and the simulated demo chat |
 | `src/components/KnownValues.tsx` | The known-values panel on the Mask screen |
 | `src/content/samples.ts` | Fictional Hungarian sample documents and answers |
@@ -139,9 +148,9 @@ pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test --run
 | `src/lib/imageRegions.ts` | Region geometry, labels, legend rows, coverage notes |
 | `src/screens/Images.tsx` | The Images screen |
 | `src/api/traffic.ts` | Traffic log client: backlog, SSE stream, polling fallback, recorded-traffic replay |
-| `src/hooks/useTraffic.ts` | Live traffic state: source (API or recording), pause, clear |
+| `src/hooks/useTraffic.ts` | Traffic state shared by Overview and Logs: source (API or recording), pause, clear |
 | `src/lib/traffic.ts` | Timing waterfall, rolling percentiles, entity counts, reading event payloads |
-| `src/screens/Traffic.tsx`, `TrafficCharts.tsx` | The Live traffic screen and its charts |
+| `src/screens/Traffic.tsx`, `TrafficCharts.tsx` | The Logs section, and the latency charts Overview shows |
 | `src/api/demoTraffic.ts` | "Send demo traffic": the demo scenarios, sent from the browser |
 | `src/content/trafficFixture.json` | Recorded masked-level traffic events for offline mode |
 

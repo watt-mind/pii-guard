@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { effectiveEngine, type EngineKind, type EngineState, type RoutingClient } from "../api/engine";
 import { DemoImageUnavailableError, IMAGE_RECORDINGS } from "../api/imageMock";
-import type { ImageMaskResponse, ImageRegion } from "../api/types";
+import type { ServerStatus } from "../api/status";
+import type { ImageMaskRequest, ImageMaskResponse, ImageRegion } from "../api/types";
 import { Boundary } from "../components/Boundary";
 import { Pane } from "../components/Pane";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
@@ -17,6 +18,7 @@ import {
   policyLabel,
   regionLabel,
   samTargets,
+  segmenterLabel,
   sourceLabel,
   summarizeRegions,
   tagPlacements,
@@ -43,8 +45,13 @@ interface Props {
   engineState?: EngineState;
   /** Fetches a sample's bytes. Injectable for tests (jsdom has no static server). */
   loadImage?: (src: string) => Promise<Blob>;
-  /** Switches the engine to the demo replay: the way out when the live pipeline refuses. */
-  onUseDemo?: () => void;
+  /**
+   * Replays a sample's recorded regions (the demo engine's image call), without switching the
+   * app's engine: the way out when the live pipeline refuses (LAB-1265).
+   */
+  replayRecorded?: (req: ImageMaskRequest) => Promise<ImageMaskResponse>;
+  /** What the server's image pipeline can do (`/v1/status`), for honest copy (LAB-1294). */
+  serverImages?: ServerStatus["images"] | null;
 }
 
 async function fetchImage(src: string): Promise<Blob> {
@@ -61,7 +68,7 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }>
 
 const sampleSelection = (sample: ImageSample): Selection => ({ kind: "sample", key: `sample:${sample.id}`, sample });
 
-export function Images({ client, engineState, loadImage = fetchImage, onUseDemo }: Props) {
+export function Images({ client, engineState, loadImage = fetchImage, replayRecorded, serverImages = null }: Props) {
   const [selection, setSelection] = useState<Selection>(() => sampleSelection(DEFAULT_IMAGE_SAMPLE));
   const [result, setResult] = useState<ImageResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -135,14 +142,25 @@ export function Images({ client, engineState, loadImage = fetchImage, onUseDemo 
     }
   };
 
-  // "Replay the recorded run instead": mask again once the demo engine has taken over.
-  const replayAfterSwitch = useRef(false);
-  useEffect(() => {
-    if (!replayAfterSwitch.current || !demo) return;
-    replayAfterSwitch.current = false;
-    void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the engine switch lands
-  }, [demo]);
+  // "Replay the recorded run instead": this sample only, from the bundled recording. The app's
+  // engine stays as it is, so Text and Chat keep using the live API.
+  const replay = async () => {
+    if (!replayRecorded || selection.kind !== "sample") return;
+    const target = selection;
+    const id = ++runId.current;
+    setRunning(true);
+    setError(null);
+    try {
+      const { value, ms } = await timed(async () => replayRecorded({ image: await loadImage(target.sample.src), sampleId: target.sample.id, language }));
+      if (id !== runId.current) return;
+      setResult({ key: target.key, data: value, engine: "mock", ms });
+    } catch (err) {
+      if (id !== runId.current) return;
+      setError(toRunError(err));
+    } finally {
+      if (id === runId.current) setRunning(false);
+    }
+  };
 
   const data = fresh ? result.data : null;
   const summary = useMemo(() => (data ? summarizeRegions(data.regions) : null), [data]);
@@ -152,9 +170,21 @@ export function Images({ client, engineState, loadImage = fetchImage, onUseDemo 
       <div className="max-w-3xl">
         <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Faces, signatures and ID numbers, covered before the image leaves.</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          SAM 3.1 segments faces, signatures, ID photos and stamps; OCR plus the text detectors find identifiers printed in the image. Every masked region is filled solid, and the image is rebuilt from pixels, so no metadata leaves either.
+          {serverImages && !demo
+            ? serverImages.sam
+              ? "SAM 3.1 segments signatures and stamps, an on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
+              : "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image. Signatures and stamps need SAM 3.1 (META_API_KEY on the server)."
+            : "Faces, ID photos, signatures and stamps are segmented on the pii-guard server; OCR plus the text detectors find identifiers printed in the image."}{" "}
+          Every masked region is filled solid, and the image is rebuilt from pixels, so no metadata leaves either.
         </p>
       </div>
+
+      {serverImages && !serverImages.available && !demo && (
+        <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+          <strong className="font-semibold text-warn">This server refuses images right now (fail closed).</strong> {imageNeeds(serverImages.gaps)} The samples can still replay a
+          recorded run.
+        </p>
+      )}
 
       <p className="sr-only" aria-live="polite">
         {running ? "Masking the image" : summary ? `Image masked: ${summary.masked} regions covered, ${summary.kept} kept` : ""}
@@ -211,7 +241,7 @@ export function Images({ client, engineState, loadImage = fetchImage, onUseDemo 
             >
               <span className="text-sm font-medium">{selection.kind === "upload" ? "Upload another image" : "Upload an image"}</span>
               <span id="upload-hint" className="max-w-full truncate text-xs font-normal opacity-75">
-                {selection.kind === "upload" ? selection.name : demo ? "Needs the live API: SAM runs on the server." : "PNG or JPEG, up to 10 MB. Fictional only."}
+                {selection.kind === "upload" ? selection.name : demo ? "Needs the live API: masking runs on the server." : "PNG or JPEG, up to 10 MB. Fictional only."}
               </span>
             </Button>
           </div>
@@ -259,7 +289,7 @@ export function Images({ client, engineState, loadImage = fetchImage, onUseDemo 
           }
           footer={
             data && data.regions.length > 0 ? (
-              <span>Solid outlines: found by SAM 3.1. Dashed: text found by OCR and a detector. Hover, tap or tab to a region for its type.</span>
+              <span>Solid outlines: found by the segmenter. Dashed: text found by OCR and a detector. Hover, tap or tab to a region for its type.</span>
             ) : (
               <span>
                 {error ? "Nothing left your network for this image." : src ? "Mask the image to see what the model would get." : "Pick a sample or upload a fictional image, then mask it."}
@@ -310,13 +340,9 @@ export function Images({ client, engineState, loadImage = fetchImage, onUseDemo 
             ) : (
               <div className="space-y-3">
                 <BlockedNotice error={error} />
-                {onUseDemo && selection.kind === "sample" && !demo && (
-                  <Button
-                    onClick={() => {
-                      replayAfterSwitch.current = true;
-                      onUseDemo();
-                    }}
-                  >
+                {serverImages && !serverImages.available && <p className="text-sm text-muted">{imageNeeds(serverImages.gaps)}</p>}
+                {replayRecorded && selection.kind === "sample" && !demo && (
+                  <Button onClick={() => void replay()} title="Shows the regions recorded from a live run on this sample. The engine stays on the live API.">
                     Replay the recorded run instead
                   </Button>
                 )}
@@ -558,7 +584,7 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
     <div className="space-y-2" data-testid="image-scope-note">
       <div className="text-sm text-ink">
         <p>
-          <span className="font-semibold">SAM 3.1</span> looked for {samTargets(data.analysis)}
+          <span className="font-semibold">{segmenterLabel(data.analysis.sam.model)}</span> looked for {samTargets(data.analysis)}
           {ocr.ran ? (
             <>
               ; <span className="font-semibold">OCR</span> ({ocr.engine}) read the text for the detectors
@@ -592,13 +618,13 @@ function DemoUploadNotice({ switchEngine }: { switchEngine: boolean }) {
   return (
     <div role="alert" className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
       <p className="font-semibold text-warn">Uploads need the live API.</p>
-      <p className="mt-1 text-ink">SAM 3.1 runs on the pii-guard server, not in your browser. Your image was not sent anywhere.</p>
+      <p className="mt-1 text-ink">Image masking runs on the pii-guard server, not in your browser. Your image was not sent anywhere.</p>
       <p className="mt-2 text-muted">
         {switchEngine ? (
           <>The API is up: switch <strong className="font-semibold text-ink">Engine</strong> in the header to <strong className="font-semibold text-ink">Live API</strong>, then mask the image again.</>
         ) : (
           <>
-            Start it with <code className="rounded bg-surface px-1 font-mono text-xs">uv run pii-guard serve</code> (with <code className="font-mono text-xs">META_API_KEY</code> set), or try one of the samples, which replay a recorded run.
+            Start it with <code className="rounded bg-surface px-1 font-mono text-xs">pii-guard up</code>, or try one of the samples, which replay a recorded run.
           </>
         )}
       </p>
@@ -620,7 +646,17 @@ function Running() {
   return (
     <div className="space-y-3" role="status">
       <div aria-hidden="true" className="aspect-[16/10] w-full rounded-lg bg-line motion-safe:animate-pulse" />
-      <p className="text-sm text-muted">Segmenting with SAM 3.1 (one request per concept: face, signature, ID photo, stamp) and reading the text. This takes a few seconds.</p>
+      <p className="text-sm text-muted">Segmenting the image and reading its text. This can take a few seconds.</p>
     </div>
   );
+}
+
+/** What the server's image pipeline is missing, phrased for a checkout and for `uvx` alike. */
+function imageNeeds(gaps: readonly string[]): string {
+  const parts: string[] = [];
+  if (gaps.includes("ocr")) parts.push("the ocr extra");
+  if (gaps.includes("tesseract")) parts.push("Tesseract (brew install tesseract, apt install tesseract-ocr)");
+  if (gaps.includes("segmenter")) parts.push("a face detector (the local-vision extra, or META_API_KEY for SAM 3.1)");
+  if (!parts.length) return "";
+  return `It needs ${parts.join(", ")}. Restart with those extras; the pii-guard up banner prints the exact command.`;
 }

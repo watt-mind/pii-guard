@@ -1,11 +1,13 @@
 import type { EntityType } from "../api/types";
-import { detectorLabel, metaFor } from "../lib/entities";
+import { detectorLabel, metaFor, subtypeLabel } from "../lib/entities";
 
 export interface InspectorInfo {
   entityType: EntityType | null;
   placeholder: string | null;
   detector?: string;
   score?: number;
+  /** A SECRET span's kind, e.g. "github_token". */
+  subtype?: string;
   occurrences?: number;
   /** False when the value was masked even though no placeholder could be linked to it. */
   kept?: boolean;
@@ -25,6 +27,7 @@ export function Inspector({ info, hint }: Props) {
           <span className="inline-flex items-center gap-1.5 font-medium text-ink">
             <span aria-hidden="true" className={["size-2 rounded-full", metaFor(info.entityType).swatch].join(" ")} />
             {metaFor(info.entityType).label}
+            {info.subtype && <span className="font-normal text-muted">· {subtypeLabel(info.subtype)}</span>}
           </span>
           <span>{info.placeholder ? <>masked as <code className="font-mono text-ink">{info.placeholder}</code></> : info.kept === false ? "masked" : "kept (policy: keep)"}</span>
           {info.detector && <span>found by {detectorLabel(info.detector, { types: info.entityType ? [info.entityType] : [] })}</span>}

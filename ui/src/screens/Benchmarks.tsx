@@ -17,6 +17,8 @@ import {
   textSets,
   type BenchmarkIndex,
   type BenchmarkLoader,
+  readerNote,
+  visualRunLabel,
   type LanguageFilter,
   type Metrics,
   type Snapshot,
@@ -459,8 +461,8 @@ function RunNotes({ snapshots, index, open }: { snapshots: Snapshot[]; index: Be
   const items = snapshots
     .map((s) => {
       const rs = s.run_ids.map((id) => runs.get(id)).filter((r) => r !== undefined);
-      const hardware = [...new Set(rs.map((r) => r.hardware).filter((h): h is string => !!h))];
-      const notes = [...new Set(rs.flatMap((r) => r.notes))];
+      const hardware = [...new Set(rs.map((r) => r.hardware).filter((h): h is string => !!h).map(readerNote))];
+      const notes = [...new Set(rs.flatMap((r) => r.notes).map(readerNote))];
       return { s, hardware, notes };
     })
     .filter((i) => i.hardware.length || i.notes.length);
@@ -526,9 +528,9 @@ function VisualTable({ index }: { index: BenchmarkIndex }) {
           {shown.map((r) => (
             <tr key={r.run_id} className="border-b border-line last:border-0">
               <th scope="row" className="py-2 pr-3 text-left font-normal">
-                <span className="block font-medium text-ink">{r.run_id.replace(`${r.date}-`, "").replace(/-/g, " ")}</span>
+                <span className="block font-medium text-ink">{visualRunLabel(r.system)}</span>
                 <span className="text-xs text-muted">
-                  {r.fixture_set ?? "specimens"} · {r.date} · {r.countries} countries
+                  {r.fixture_set ?? "specimens"} · {r.date} · {r.countries} countries · <code className="font-mono text-2xs" title="Run record id">{r.run_id.replace(`${r.date}-`, "")}</code>
                 </span>
               </th>
               <td className="px-2 py-2 text-right tabular-nums">{r.specimens}</td>

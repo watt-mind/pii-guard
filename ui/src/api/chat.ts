@@ -43,6 +43,8 @@ export interface ChatTurnResult {
   maskedMessages: ChatMessage[];
   /** Values masked in this request (`X-PII-Guard-Masked`). */
   masked: number | null;
+  /** How the gateway picked the session (`X-PII-Guard-Session-Source`, LAB-1286); null from the demo engine. */
+  sessionSource?: string | null;
   mode: ChatMode;
   ms: number;
 }
@@ -203,6 +205,7 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
         maskedAnswer,
         maskedMessages,
         masked: maskedHeader === null ? null : Number(maskedHeader),
+        sessionSource: res.headers.get("x-pii-guard-session-source"),
         mode: req.mode,
         ms: Math.round(performance.now() - started),
       };

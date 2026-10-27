@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { LABELLED_SCENARIOS, labelledScenarioFor, sendDemoTraffic, type DemoProgress, type LabelledMatch } from "../api/demoTraffic";
 import { ApiError } from "../api/http";
 import type { TrafficConnectOptions, TrafficEvent, TrafficStatus } from "../api/traffic";
@@ -6,13 +6,16 @@ import type { EntityType } from "../api/types";
 import { MaskedText } from "../components/MaskedText";
 import { RestoredText } from "../components/RestoredText";
 import { Button } from "../components/ui";
-import { useTraffic, type TrafficSource } from "../hooks/useTraffic";
-import { ENTITY_META, detectorLabel, metaFor } from "../lib/entities";
+import { useTraffic, type TrafficHandle, type TrafficSource } from "../hooks/useTraffic";
+import { ENTITY_META, metaFor } from "../lib/entities";
 import { tokenize } from "../lib/placeholders";
 import {
   OUTCOME_LABEL,
+  SESSION_SOURCE_LABEL,
   alignValues,
   canShowOriginals,
+  clock,
+  detectorName,
   formatMsShort,
   maskedCounts,
   modeOrder,
@@ -21,10 +24,12 @@ import {
   requestMessages,
   requestTools,
   responseChoices,
+  refusalReason,
   totalMasked,
   type Message,
 } from "../lib/traffic";
-import { EntitiesChart, ModeChart, OverheadChart, StageChart, TimingWaterfall } from "./TrafficCharts";
+import { NerHint } from "../components/NerHint";
+import { TimingWaterfall } from "./TrafficCharts";
 
 export interface TrafficProps {
   /** Replay the recorded demo traffic (the header's engine is set to Demo engine). */
@@ -37,32 +42,28 @@ export interface TrafficProps {
   pageHost?: string;
 }
 
-type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
-
-/** Detector names as the other screens show them; "visual" is the image pipeline. */
-const detectorName = (d: string) => (d === "visual" ? "Image pipeline" : detectorLabel(d));
-
-const clock = (iso: string) => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-};
-
-function useNow(ms = 10_000) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(t);
-  }, [ms]);
-  return now;
+export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureIntervalMs"> {
+  t: TrafficHandle;
+  /** The server's upstream is the offline mock (`/v1/status`): its "model" only echoes. */
+  mockUpstream?: boolean;
+  /** Open this call (from an Overview chart); a new nonce re-opens the same one. */
+  focus?: { id: string; nonce: number } | null;
 }
 
-export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraffic, fixtureIntervalMs, pageHost = globalThis.location?.hostname ?? "" }: TrafficProps) {
+
+type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
+
+/** The Logs screen with its own traffic connection (tests, and embedding on its own). */
+export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps) {
   const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
+  return <Logs t={t} forceFixture={forceFixture} {...rest} />;
+}
+
+export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null }: LogsProps) {
   const [filters, setFilters] = useState<Filters>({ mode: "all", type: "all", problems: false });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cleared, setCleared] = useState(0);
   const detailRef = useRef<HTMLDivElement>(null);
-  const now = useNow();
   const lastTime = t.events.length ? Date.parse(t.events[t.events.length - 1]!.time) : 0;
 
   const filtered = useMemo(
@@ -90,6 +91,14 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
     if (scroll && window.matchMedia?.("(max-width: 1023px)").matches) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // A call opened from the Overview: select it, with the filters cleared so it is in the list.
+  const [focused, setFocused] = useState<number | null>(null);
+  if (focus && focus.nonce !== focused) {
+    setFocused(focus.nonce);
+    setSelectedId(focus.id);
+    setFilters({ mode: "all", type: "all", problems: false });
+  }
+
   const overheads = filtered.map((e) => e.timing.overhead_ms);
   const p50 = percentile(overheads, 50);
   const p95 = percentile(overheads, 95);
@@ -99,9 +108,9 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
   return (
     <div className="space-y-6">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Every LLM call, as it crosses the guard.</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Logs</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          Each call through the gateway, live: what was found and masked, the request exactly as the model received it, the answer before and after restoring, and how many milliseconds pii-guard added.
+          {t.source === "fixture" ? "Recorded calls, replayed in your browser." : "Every call through the gateway, live."} Pick one to see what your client sent, what the model received, and what your client got back with the values restored.
         </p>
       </div>
 
@@ -199,7 +208,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
             <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
               {[...filtered].reverse().map((e) => (
                 <li key={e.id}>
-                  <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} />
+                  <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} />
                 </li>
               ))}
             </ul>
@@ -208,7 +217,7 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
 
         <div ref={detailRef} className="min-w-0 scroll-mt-4 space-y-6">
           {selected ? (
-            <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)} />
+            <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)} mockUpstream={mockUpstream} />
           ) : (
             <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-xl border border-line px-6 py-10 text-center">
               <p className="text-sm font-semibold text-ink">No call selected</p>
@@ -218,32 +227,6 @@ export function Traffic({ forceFixture = false, connect, sendDemo = sendDemoTraf
         </div>
       </div>
 
-      <section aria-labelledby="latency-title" className="space-y-4">
-        <div>
-          <h2 id="latency-title" className="text-lg font-semibold tracking-tight text-ink">
-            Latency, live
-          </h2>
-          <p className="text-sm text-muted">From the timing block of each event shown above: the overhead is the call's total time minus the time spent waiting on the model.</p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <ChartCard id="chart-overhead" title="Overhead per call" note="What pii-guard added to each call, with the rolling p50 and p95.">
-            <OverheadChart events={filtered} />
-          </ChartCard>
-          <ChartCard id="chart-mode" title="Overhead by mode" note={modeNote(filtered)}>
-            <ModeChart events={filtered} />
-          </ChartCard>
-          <ChartCard
-            id="chart-stages"
-            title="Where the time goes"
-            note="pii-guard's own stages, last 30 calls; the model's time is not included. Forward is serialising the masked body and opening the HTTP connection to the model. Pick a column to open that call."
-          >
-            <StageChart events={filtered} onSelect={(id) => pick(id, true)} />
-          </ChartCard>
-          <ChartCard id="chart-entities" title="Values masked per minute" note="Text values and image regions by kind, last 10 minutes. Hover or tap a column for the exact types.">
-            <EntitiesChart events={filtered} now={Math.max(now, lastTime)} />
-          </ChartCard>
-        </div>
-      </section>
     </div>
   );
 }
@@ -281,12 +264,14 @@ function SourceBanner({
             ? "The engine is set to Demo engine, so these are calls recorded from the demo stack, replayed in your browser. Switch the engine to Auto or Live API to follow the gateway."
             : apiStatus.state === "disabled"
               ? "The API's traffic log is off, so these are calls recorded from the demo stack, replayed in your browser."
-              : "The API isn't reachable, so these are calls recorded from the demo stack, replayed in your browser."}{" "}
-          Recorded at level {code("masked")}: they hold only what the model received. To watch your own: {code("make demo")}, then {code("make demo-traffic")}.
+              : apiStatus.state === "offline"
+                ? "The API isn't reachable, so these are calls recorded from the demo stack, replayed in your browser."
+                : "You picked the recorded demo: these are calls recorded from the demo stack, replayed in your browser. Your server's own log is one click away."}{" "}
+          Recorded at level {code("masked")}: they hold only what the model received.
         </p>
         {!forced && (
           <Button onClick={onRetry} className="h-8">
-            Connect to the API
+            Back to the live log
           </Button>
         )}
         <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 border-t border-warn/30 pt-2">
@@ -392,7 +377,7 @@ const LABELLED_NOTE = LABELLED_SCENARIOS.length
   ? `; ${LABELLED_SCENARIOS.length} labelled “${LABELLED_SCENARIOS[0]!.label}”: in rules-only mode its name is an expected miss`
   : "";
 
-function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
+export function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
   const [state, setState] = useState<{ running: boolean; progress: DemoProgress | null; error: string | null }>({ running: false, progress: null, error: null });
   const run = async () => {
     setState({ running: true, progress: null, error: null });
@@ -478,7 +463,7 @@ function LabelledNote({ match }: { match: LabelledMatch }) {
           <>
             This call names a person in free text, with no pre-loaded known value and nothing a rule can recognise, so the name ({match.missed.join(", ")}) reached the
             mock model as written. Every other demo call masks its names, because they are pre-loaded as session known values. This one is kept on purpose, to show what
-            the NER adds: run fast mode with <code className="font-mono text-xs">PII_GUARD_NER_MODEL</code> set, or audit mode, and it is masked too.
+            the NER adds. With <NerHint />, it is masked too.
           </>
         ) : (
           <>Without the NER this free-text name would reach the model as written: no known value and no rule covers it.</>
@@ -507,7 +492,14 @@ function EntityChips({ counts }: { counts: Partial<Record<EntityType, number>> }
   );
 }
 
-function CallRow({ event: e, selected, onSelect }: { event: TrafficEvent; selected: boolean; onSelect: () => void }) {
+/** The model a call went to; the offline mock upstream only echoes, whatever model was asked for (LAB-1264). */
+function modelOf(e: TrafficEvent, mockUpstream: boolean): string {
+  if (e.outcome === "blocked" || e.outcome === "refused") return "not forwarded";
+  if (mockUpstream) return "mock upstream (echo)";
+  return e.upstream?.model ?? e.model ?? "–";
+}
+
+function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: TrafficEvent; selected: boolean; onSelect: () => void; mockUpstream: boolean }) {
   const hasTools = requestTools(e.request?.masked ?? e.request?.original).length > 0;
   const hasImage = (e.entities?.images?.count ?? 0) > 0;
   const labelled = labelledScenarioFor(e);
@@ -541,7 +533,7 @@ function CallRow({ event: e, selected, onSelect }: { event: TrafficEvent; select
         ) : (
           <EntityChips counts={maskedCounts(e)} />
         )}
-        <span className="shrink-0 truncate text-xs text-faint">{e.model ?? ""}</span>
+        <span className="shrink-0 truncate text-xs text-faint">{e.outcome === "blocked" || e.outcome === "refused" ? "not forwarded" : mockUpstream ? "mock upstream" : (e.model ?? "")}</span>
       </span>
     </button>
   );
@@ -555,12 +547,14 @@ function CallDetail({
   source,
   pageHost,
   onFollow,
+  mockUpstream,
 }: {
   event: TrafficEvent;
   following: boolean;
   source: TrafficSource;
   pageHost: string;
   onFollow: () => void;
+  mockUpstream: boolean;
 }) {
   const showOriginals = canShowOriginals(e, pageHost, source);
   const maskedBody = e.request?.masked;
@@ -586,9 +580,10 @@ function CallDetail({
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
           <Meta label="Mode" value={e.mode ?? "–"} />
-          <Meta label="Model" value={e.upstream?.model ?? e.model ?? "–"} />
+          <Meta label="Model" value={modelOf(e, mockUpstream)} />
           <Meta label="Language" value={e.language ?? "auto"} />
           <Meta label="Session" value={e.session_ref ? `${e.session_new ? "new" : "continued"} · ${e.session_ref}` : "–"} />
+          <Meta label="Session from" value={e.session_source ? (SESSION_SOURCE_LABEL[e.session_source] ?? e.session_source) : "–"} />
           <Meta label="Detectors" value={e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "–"} />
           <Meta label="Upstream" value={e.upstream?.status ? `HTTP ${e.upstream.status}` : "not called"} />
           <Meta label="Tokens" value={e.usage?.total_tokens !== undefined ? `${e.usage.prompt_tokens ?? "?"} in · ${e.usage.completion_tokens ?? "?"} out` : "–"} />
@@ -616,7 +611,7 @@ function CallDetail({
             {e.error?.entity_types ? ` · ${Object.entries(e.error.entity_types).map(([k, n]) => `${metaFor(k as EntityType).label} ×${n}`).join(", ")}` : ""}
           </p>
           <p className="mt-2 text-muted">
-            pii-guard fails closed: when detection fails (here{e.entities?.images ? ", the image pipeline without SAM configured" : ""}) or a policy blocks a type, the request stops instead of going out unmasked.
+            {refusalReason(e.error?.code, Boolean(e.entities?.images))}
           </p>
         </div>
       )}
@@ -815,33 +810,15 @@ function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
       {free ? null : e.detectors.includes("known") ? (
         <>
           This call ran {e.detectors.map((d) => detectorName(d)).join(", ")}: pre-loaded known values (names included) and structured values (e-mail, phone, IBAN, IDs) are
-          masked; other names need the NER (<code className="font-mono">PII_GUARD_NER_MODEL</code>) or audit mode's LLM detector.
+          masked; other names need <NerHint />.
         </>
       ) : (
         <>
           This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (e-mail, phone, IBAN, IDs) but{" "}
-          <strong className="font-semibold text-ink">not names</strong>: names need the NER (<code className="font-mono">PII_GUARD_NER_MODEL</code>) or audit mode's LLM detector.
+          <strong className="font-semibold text-ink">not names</strong>: names need <NerHint />.
         </>
       )}
     </p>
-  );
-}
-
-/** "fast: Rules + Multilingual NER" from what the calls actually ran. */
-function modeNote(events: TrafficEvent[]): string {
-  const by = new Map<string, Set<string>>();
-  for (const e of events) {
-    const m = e.mode ?? "unknown";
-    const set = by.get(m) ?? new Set<string>();
-    e.detectors.forEach((d) => set.add(d));
-    by.set(m, set);
-  }
-  if (!by.size) return "Detectors per mode appear with the first call.";
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  return (
-    "Detectors seen in the shown calls. " +
-    [...by.entries()].map(([m, d]) => `${cap(m)}: ${[...d].map((x) => detectorName(x)).join(" + ") || "none reported"}`).join(". ") +
-    "."
   );
 }
 
@@ -915,7 +892,7 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
 
 // --- Bits ---------------------------------------------------------------------------------
 
-function Fact({ label, value }: { label: string; value: number | string }) {
+export function Fact({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="flex flex-col-reverse">
       <dt className="text-xs text-muted">{label}</dt>
@@ -924,7 +901,7 @@ function Fact({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-function ChartCard({ id, title, note, children }: { id: string; title: string; note: string; children: ReactNode }) {
+export function ChartCard({ id, title, note, children }: { id: string; title: string; note: string; children: ReactNode }) {
   return (
     <section aria-labelledby={`${id}-title`} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
       <h3 id={`${id}-title`} className="text-base font-semibold tracking-tight text-ink">

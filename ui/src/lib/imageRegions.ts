@@ -109,6 +109,7 @@ export const TEXT_TYPE_NOUN: Partial<Record<EntityType, string>> = {
   ORGANIZATION: "organization names",
   PARCEL_NUMBER_HU: "parcel numbers",
   VEHICLE_PLATE: "vehicle plates",
+  SECRET: "secrets (API keys, tokens, passwords)",
 };
 
 function joinNouns(items: readonly string[]): string {
@@ -122,7 +123,7 @@ function joinNouns(items: readonly string[]): string {
  */
 export function coverageGaps(analysis: ImageAnalysis): string[] {
   if (!analysis.ocr.ran) {
-    return ["Text in this image was not checked at all: OCR (Tesseract) is not installed on the API host, so only SAM 3.1 ran."];
+    return [`Text in this image was not checked at all: OCR (Tesseract) is not installed on the API host, so only ${segmenterLabel(analysis.sam.model).replace(/^The /, "the ")} ran.`];
   }
   const full = new Set<EntityType>();
   const partly = new Set<EntityType>();
@@ -149,6 +150,14 @@ const VISUAL_LABEL: Partial<Record<EntityType, string>> = {
   ID_PHOTO: "ID photos",
   STAMP: "stamps",
 };
+
+/** The segmenter that ran, from `analysis.sam.model` ("yunet-2023mar+sam-3.1"), never assumed. */
+export function segmenterLabel(model: string | null | undefined): string {
+  if (!model || model === "off") return "No segmenter";
+  const parts = model.split("+").map((p) => (p.startsWith("sam-") ? `SAM ${p.slice(4)}` : p.startsWith("yunet") ? "the on-device face detector (YuNet)" : p));
+  const text = joinNouns(parts);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export function samTargets(analysis: ImageAnalysis): string {
   const names = analysis.sam.entity_types.map((t) => VISUAL_LABEL[t] ?? metaFor(t).label.toLowerCase());

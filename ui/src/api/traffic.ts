@@ -50,6 +50,8 @@ export interface TrafficEvent {
   model: string | null;
   session_ref: string | null;
   session_new: boolean;
+  /** How the gateway picked the vault session (LAB-1286): `header`, `path`, `prompt_cache_key` or `default`. */
+  session_source: string | null;
   detectors: string[];
   entities: TrafficEntities | null;
   cache: { hits: number; misses: number; seeded: number } | null;
@@ -96,6 +98,7 @@ export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
     model: typeof raw.model === "string" ? raw.model : null,
     session_ref: typeof raw.session_ref === "string" ? raw.session_ref : null,
     session_new: raw.session_new === true,
+    session_source: typeof raw.session_source === "string" ? raw.session_source : null,
     detectors: Array.isArray(raw.detectors) ? raw.detectors.filter((d): d is string => typeof d === "string") : [],
     entities: isRecord(raw.entities) ? (raw.entities as unknown as TrafficEntities) : null,
     cache: isRecord(raw.cache) ? (raw.cache as TrafficEvent["cache"]) : null,

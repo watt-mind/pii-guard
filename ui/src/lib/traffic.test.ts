@@ -3,6 +3,7 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { parseTrafficEvent, type TrafficEvent } from "../api/traffic";
 import {
+  refusalReason,
   OWN_STAGES,
   alignValues,
   canShowOriginals,
@@ -150,5 +151,14 @@ describe("originals", () => {
     expect(isLoopbackHost("[::1]")).toBe(true);
     expect(isLoopbackHost("app.localhost")).toBe(true);
     expect(isLoopbackHost("10.0.0.2")).toBe(false);
+  });
+});
+
+describe("refusalReason (LAB-1287)", () => {
+  it("names the cause from the error code instead of always blaming detection", () => {
+    expect(refusalReason("not_found", false)).toMatch(/Unknown or expired session/);
+    expect(refusalReason("detection_unavailable", false)).toMatch(/audit mode/);
+    expect(refusalReason("blocked_entity", false)).toMatch(/policy block/);
+    expect(refusalReason(undefined, false)).toMatch(/fails closed/);
   });
 });

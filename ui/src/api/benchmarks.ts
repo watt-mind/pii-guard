@@ -279,3 +279,46 @@ export function tidyLabels(index: BenchmarkIndex): BenchmarkIndex {
   );
   return { ...index, systems };
 }
+
+/**
+ * A run-record note or hardware line as a reader of the Evaluation screen reads it: ticket ids
+ * and internal machine notes ("shared with parallel agent runs") are maintainer context
+ * (LAB-1266). The run log keeps the notes as recorded; the generator should grow a public
+ * `display_note` so this stays a fallback.
+ */
+export function readerNote(note: string): string {
+  const s = note
+    .replace(/machine shared with parallel agent runs/gi, "machine shared with other jobs")
+    .replace(/\s*\(LAB-\d+\)/g, "")
+    .replace(/^LAB-\d+:?\s+/, "")
+    .trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const VISUAL_PART: Record<string, string> = {
+  tesseract: "Tesseract",
+  rules: "rules",
+  captions: "captions",
+  eka: "EKA",
+  "presidio-image": "Presidio Image Redactor",
+  "efficientsam-vitt": "EfficientSAM",
+  "yolos-tiny-signature": "YOLOS-tiny (signatures)",
+};
+
+function visualPart(p: string): string {
+  if (p.startsWith("sam-")) return `SAM ${p.slice(4)}`;
+  if (p.startsWith("yunet")) return "YuNet";
+  if (p.startsWith("llm:")) return `LLM (${p.slice(4).split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")})`;
+  const tuned = p.endsWith("-tuned");
+  const base = tuned ? p.slice(0, -6) : p;
+  return `${VISUAL_PART[base] ?? base}${tuned ? " (tuned)" : ""}`;
+}
+
+/** "visual:sam-3.1+tesseract+rules" -> "pii-guard: SAM 3.1 + Tesseract + rules" (LAB-1266). */
+export function visualRunLabel(system: string): string {
+  const [kind, rest = ""] = system.includes(":") ? [system.slice(0, system.indexOf(":")), system.slice(system.indexOf(":") + 1)] : ["visual", system];
+  const parts = rest.split("+").filter(Boolean).map(visualPart);
+  const joined = parts.join(" + ");
+  if (kind === "visual-segment") return `Segmenter: ${joined}`;
+  return rest.startsWith("sam-") ? `pii-guard: ${joined}` : joined;
+}
