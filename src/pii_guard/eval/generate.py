@@ -4,7 +4,11 @@ For every document index the generator, deterministically from ``(seed, language
 
 1. picks a document template (``templates/<language>.toml``: sale contract, lease, power of
    attorney, land registry extract, court notice, invoice, letter, informal e-mail, chat);
-2. draws fictional identities for its parties (:mod:`pii_guard.eval.identities`);
+2. draws fictional identities for its parties (:mod:`pii_guard.eval.identities`: names and
+   places sampled from the language pack's lexicons, :mod:`pii_guard.lang`) and a few
+   **hard negatives**, ordinary phrases that look like personal data but aren't (a surname
+   that is a common word, used as the word; a town outside an address; "Eladó lakás"), which
+   the prompt asks for and which are never labelled;
 3. asks a Muse model (any OpenAI-compatible Chat Completions endpoint; by default the Meta
    Model API) to write the document using exactly those values;
 4. **locates every value** in the output, all occurrences and inflected forms
@@ -70,6 +74,7 @@ import httpx
 from pii_guard.eval.fixtures import Document, FixtureError, GoldSpan, parse_document, write_fixtures
 from pii_guard.eval.forms import find_surface_forms
 from pii_guard.eval.identities import Value, identity_generator
+from pii_guard.lang import LexiconUnavailable, available_kinds, lexicon, lexicon_digest
 from pii_guard.types import EntityType
 
 __all__ = [
@@ -83,6 +88,7 @@ __all__ = [
     "DocumentPlan",
     "DocumentTemplate",
     "GenerationError",
+    "HardNegatives",
     "LanguagePack",
     "ModelError",
     "Outcome",
@@ -103,7 +109,9 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-GENERATOR_VERSION = 1
+#: Bumped whenever the same seed would plan different documents (2: names and places drawn from
+#: the language-pack lexicons, hard negatives in the prompt).
+GENERATOR_VERSION = 2
 DEFAULT_BASE_URL = "https://api.meta.ai/v1"
 #: The corpus is entirely fictional, so it may use the contributor tier (cheaper; its traffic
 #: may be used by Meta to improve its products). Never use this tier for real or masked data:
@@ -166,6 +174,50 @@ class DocumentTemplate:
 
 
 @dataclass(frozen=True, slots=True)
+class HardNegatives:
+    """Ordinary phrases a document must contain that look like personal data but aren't."""
+
+    instruction: str
+    phrases: tuple[str, ...] = ()
+    settlement_phrases: tuple[str, ...] = ()
+
+    def pick(self, rng: random.Random, language: str, values: Sequence[Value]) -> list[str]:
+        """Up to three phrases for one document, none sharing a word with its values.
+
+        A surname used as a common word (``common_word_surnames``), a settlement outside an
+        address, and a capitalised phrase; kinds the language pack lacks are skipped.
+        """
+        used = {w.casefold() for v in values for w in re.findall(r"\w+", v.text)}
+
+        def free(phrase: str) -> bool:
+            return not any(w.casefold() in used for w in re.findall(r"\w+", phrase))
+
+        picked: list[str] = []
+        try:
+            rows = [r for r in lexicon("common_word_surnames", language).rows if len(r) > 2]
+            options = [r[2] for r in rows if free(r[2])]
+            if options:
+                picked.append(rng.choice(options))
+        except LexiconUnavailable:
+            pass
+        if self.settlement_phrases:
+            try:
+                places = lexicon("settlements", language)
+                for _ in range(20):
+                    town = places.sample(rng, 0.5)
+                    phrase = rng.choice(self.settlement_phrases).replace("{settlement}", town)
+                    if free(phrase):
+                        picked.append(phrase)
+                        break
+            except LexiconUnavailable:
+                pass
+        options = [p for p in self.phrases if free(p)]
+        if options and rng.random() < 0.6:
+            picked.append(rng.choice(options))
+        return picked
+
+
+@dataclass(frozen=True, slots=True)
 class LanguagePack:
     language: str
     language_name: str
@@ -173,6 +225,7 @@ class LanguagePack:
     typos: str
     field_labels: Mapping[str, str]
     kinds: tuple[DocumentTemplate, ...]
+    hard_negatives: HardNegatives | None = None
 
     def kind(self, kind_id: str) -> DocumentTemplate:
         for template in self.kinds:
@@ -224,6 +277,17 @@ def load_language(language: str) -> LanguagePack:
         typos=raw.get("typos", ""),
         field_labels=dict(raw["field_labels"]),
         kinds=kinds,
+        hard_negatives=_hard_negatives(raw.get("hard_negatives")),
+    )
+
+
+def _hard_negatives(raw: Mapping[str, Any] | None) -> HardNegatives | None:
+    if not raw:
+        return None
+    return HardNegatives(
+        instruction=" ".join(raw["instruction"].split()),
+        phrases=tuple(raw.get("phrases", ())),
+        settlement_phrases=tuple(raw.get("settlement_phrases", ())),
     )
 
 
@@ -241,6 +305,8 @@ class DocumentPlan:
     kind: str
     values: tuple[Value, ...]
     messages: tuple[Mapping[str, str], ...]
+    #: Ordinary phrases the prompt asks for that are *not* personal data (never labelled).
+    hard_negatives: tuple[str, ...] = ()
 
     def __repr__(self) -> str:
         return (
@@ -281,6 +347,13 @@ def plan_document(language: str, seed: int, index: int, kind: str | None = None)
         blocks.append("\n".join(lines))
         values.extend(party_values)
 
+    hard = pack.hard_negatives
+    negatives = hard.pick(rng, pack.language, values) if hard else []
+    negatives_text = ""
+    if hard and negatives:
+        quoted = ", ".join(f'"{p}"' for p in negatives)
+        negatives_text = f" {hard.instruction} {quoted}."
+
     system = (
         _template_text("system.md")
         .replace("{language_name}", pack.language_name)
@@ -293,6 +366,7 @@ def plan_document(language: str, seed: int, index: int, kind: str | None = None)
         .replace("{register}", template.register)
         .replace("{length}", template.length)
         .replace("{typos}", pack.typos if template.typos else "")
+        .replace("{hard_negatives}", negatives_text)
         .replace("{values}", "\n\n".join(blocks))
     )
     return DocumentPlan(
@@ -306,6 +380,7 @@ def plan_document(language: str, seed: int, index: int, kind: str | None = None)
             {"role": "system", "content": system.strip()},
             {"role": "user", "content": user.strip()},
         ),
+        hard_negatives=tuple(negatives),
     )
 
 
@@ -533,6 +608,12 @@ def locate_values(
 
 
 @cache
+def _lexicon_digest(language: str) -> str:
+    """Which lexicon contents planned this corpus (empty for a language without a pack)."""
+    return lexicon_digest(language) if available_kinds(language) else ""
+
+
+@cache
 def _rules() -> Any:
     from pii_guard.detect.rules import RuleDetector
 
@@ -620,7 +701,10 @@ def generate_document(
         "index": plan.index,
         "model": completion.model or client.model,
         "prompt_sha256": key[:16],
+        "lexicons": _lexicon_digest(plan.language),
     }
+    if plan.hard_negatives:
+        meta["hard_negatives"] = list(plan.hard_negatives)
     if split:
         meta["split"] = split
     record = {

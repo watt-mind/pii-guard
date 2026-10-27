@@ -394,12 +394,12 @@ def test_phone_followed_by_other_number(detector: RuleDetector) -> None:
 # --- Postcode -------------------------------------------------------------------
 
 
+# A postcode inside a full address is covered by the address span (tests/detect/rules/).
 @pytest.mark.parametrize(
     "text",
     [
-        "1051 Budapest, Minta utca 1.",
-        "Lakcím: 6720 Szeged, Kitalált tér 2.",
         "3300 Eger",
+        "Lakcím: 6720 Szeged.",
         "H-4026 Debrecen",
         "irányítószám: 8200",
     ],
@@ -510,7 +510,7 @@ def test_mixed_document_offsets(detector: RuleDetector) -> None:
         grouped(make_iban()): E.BANK_ACCOUNT,
         "teszt.elek@example.com": E.EMAIL,
         "+36 30 123 4567": E.PHONE,
-        "1051": E.ADDRESS,
+        "1051 Budapest, Kitalált utca 1.": E.ADDRESS,
         "AA BC-123": E.VEHICLE_PLATE,
         make_tax_number(): E.COMPANY_ID_HU,
     }
@@ -518,7 +518,7 @@ def test_mixed_document_offsets(detector: RuleDetector) -> None:
     text = (
         f"Alulírott Teszt Elek (adóazonosító jel: {v[0]}, TAJ: {v[1]}) "
         f"bankszámlája: {v[2]}. E-mail: {v[3]}, telefon: {v[4]}. "
-        f"Lakcím: {v[5]} Budapest, Kitalált utca 1. Gépjármű: {v[6]}. "
+        f"Lakcím: {v[5]} Gépjármű: {v[6]}. "
         f"A Példa Kft. adószáma {v[7]}, kelt 2026. október 26."
     )
     spans = detector.detect(text)

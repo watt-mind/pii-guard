@@ -1,0 +1,7 @@
+# Rows shaped like the KSH Helységnévtár "Helységek" sheet (name, code, status, county, ..., population in column 11)
+Helység megnevezése	KSH kód	Jogállás	Vármegye	x	x	x	x	x	x	Lakónépesség
+Budapest	13578	főváros	Budapest	x	x	x	x	x	x	1671004
+Budapest 05. ker.	16337	fővárosi kerület	Budapest	x	x	x	x	x	x	25000
+Szeged	33367	vármegyeszékhely, megyei jogú város	Csongrád-Csanád	x	x	x	x	x	x	157695
+Algyő	03267	nagyközség	Csongrád-Csanád	x	x	x	x	x	x	4864
+Összesen						x	x	x	x	9599744

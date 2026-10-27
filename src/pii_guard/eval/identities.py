@@ -2,8 +2,10 @@
 
 Everything here is generated from a :class:`random.Random`: people, addresses, dates of birth,
 checksum-valid Hungarian tax IDs / TAJ numbers / giro accounts / IBANs, phone numbers,
-e-mail addresses, licence plates, companies, land parcels and institutions. Nothing is looked
-up; no real person is referenced. Names are common first and last names combined at random,
+e-mail addresses, licence plates, companies, land parcels and institutions. No person record
+is looked up; no real person is referenced. Names are common first and last names combined at
+random (Hungarian ones drawn by frequency from the language pack's lexicons, ADR 0009, with
+real settlements and their own postcodes),
 e-mail addresses use the reserved ``example.*`` domains (RFC 2606), English phone numbers come
 from the ranges Ofcom sets aside for drama, and checksummed identifiers are valid in form but
 issued to nobody.
@@ -35,6 +37,7 @@ from pii_guard.detect.checksums import (
     iban_check_digits,
     taj_check_digit,
 )
+from pii_guard.lang import lexicon, postcode_index
 from pii_guard.types import EntityType
 
 __all__ = [
@@ -305,6 +308,7 @@ class IdentityGenerator:
     rng: random.Random
     language: str = ""
     _used_names: set[str] = field(default_factory=set)
+    _street_tokens: set[str] = field(default_factory=set)
 
     # Hooks -------------------------------------------------------------------------------
     def person(self, gender: str | None = None) -> Person:  # pragma: no cover - abstract
@@ -351,32 +355,24 @@ class IdentityGenerator:
 
 # --- Hungarian --------------------------------------------------------------------------------
 
-_HU_FAMILY = (
-    "Kovács", "Szabó", "Horváth", "Varga", "Tóth", "Molnár", "Németh", "Farkas", "Balogh",
-    "Papp", "Takács", "Juhász", "Lakatos", "Mészáros", "Oláh", "Rácz", "Pintér", "Szűcs",
-    "Hegedűs", "Bodnár", "Szalai", "Kocsis", "Fodor", "Sipos", "Lukács", "Gulyás", "Bíró",
-    "Kiss", "Bognár", "Halász", "Somogyi", "Fazekas", "Orosz", "Vass", "Dudás", "Bakos",
-    "Hajdu", "Lengyel", "Csonka", "Kelemen", "Boros", "Pásztor", "Vincze", "Kozma", "Bencze",
-    "Szilágyi", "Deák", "Fülöp", "Erdős", "Gál", "Mohácsi", "Szekeres", "Bárány", "Szénási",
-)  # fmt: skip
-_HU_GIVEN_F = (
-    "Anna", "Mária", "Zsuzsanna", "Katalin", "Erzsébet", "Éva", "Ilona", "Judit", "Ágnes",
-    "Andrea", "Krisztina", "Eszter", "Réka", "Dóra", "Petra", "Nóra", "Viktória", "Hanna",
-    "Lilla", "Boglárka", "Tímea", "Edit", "Erika", "Gabriella", "Szilvia", "Orsolya",
-)  # fmt: skip
-_HU_GIVEN_M = (
-    "László", "István", "Zoltán", "Gábor", "Attila", "Péter", "Tamás", "Zsolt", "Dávid",
-    "Bence", "Máté", "Ádám", "Levente", "Csaba", "Gergely", "Norbert", "Róbert", "Miklós",
-    "Imre", "Krisztián", "Dániel", "Botond", "Kristóf", "Viktor",
-)  # fmt: skip
-# Given names never appear in a street name below (Petőfi Sándor utca), so a given name used
-# alone is never confused with part of an address.
+# Names and places come from the language pack's lexicons (pii_guard.lang, ADR 0009): given
+# names and surnames are drawn by frequency and combined at random, so no generated person is
+# a real one. A temperature below 1 flattens the long tail: more distinct values per document
+# set than the raw frequencies would give.
+_HU_NAME_TEMPERATURE = 0.5
+_HU_PLACE_TEMPERATURE = 0.6
+# Flattening leaves Budapest at ~2% of addresses; about a sixth of Hungarians live there.
+_HU_BUDAPEST_SHARE = 0.17
+# Public-space types that real street addresses use, with rough relative frequencies (the OSM
+# counts in the street_types lexicon, capped so "utca" doesn't drown the rest).
+_HU_STREET_TYPES = ("utca", "út", "tér", "köz", "sor", "körút", "sétány", "fasor", "rakpart")
+_HU_STREET_TYPE_WEIGHTS = (60, 20, 6, 6, 3, 2, 1, 1, 1)
 _HU_MONTHS = (
     "január", "február", "március", "április", "május", "június", "július", "augusztus",
     "szeptember", "október", "november", "december",
 )  # fmt: skip
 
-# (town, adjective form for institution names, postcodes)
+# Court and office towns: (town, adjective form for institution names, postcodes)
 _HU_TOWNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Budapest", "Budai Központi Kerületi", ("1027", "1051", "1072", "1083", "1114", "1138")),
     ("Budapest", "Pesti Központi Kerületi", ("1095", "1106", "1141", "1155", "1181", "1203")),
@@ -399,13 +395,6 @@ _HU_TOWNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Siófok", "Siófoki", ("8600",)),
     ("Baja", "Bajai", ("6500",)),
 )
-_HU_STREETS = (
-    "Kossuth Lajos utca", "Petőfi Sándor utca", "Rákóczi út", "Ady Endre utca", "Fő utca",
-    "Rózsa utca", "Akácfa utca", "Jókai Mór utca", "Arany János utca", "Dózsa György út",
-    "Bartók Béla út", "Széchenyi tér", "Hunyadi utca", "Táncsics Mihály utca", "Malom utca",
-    "Kölcsey Ferenc utca", "Vasút utca", "Liget sor", "Mátyás király utca", "Diófa köz",
-    "Hársfa utca", "Szőlőhegy utca", "Batthyány tér", "Bem József utca", "Damjanich utca",
-)  # fmt: skip
 _HU_COMPANY_A = (
     "Napfény", "Tölgyfa", "Zöldmező", "Rózsakert", "Csillagvirág", "Délibáb", "Fenyőliget",
     "Kristálypatak", "Ezüstnyír", "Hajnalpír", "Kékfelhő", "Gyöngyház", "Szélmalom",
@@ -425,12 +414,28 @@ class HungarianIdentities(IdentityGenerator):
     def __init__(self, rng: random.Random) -> None:
         super().__init__(rng, "hu")
 
+    def _given(self, gender: str, avoid: str = "") -> str:
+        kind = "given_names_f" if gender == "f" else "given_names_m"
+        for _ in range(20):
+            given = lexicon(kind, "hu").sample(self.rng, _HU_NAME_TEMPERATURE)
+            # A given name that is part of a street in this document (Petőfi Sándor utca)
+            # would be labelled inside the address.
+            if given != avoid and given not in self._street_tokens:
+                return given
+        return given  # pragma: no cover - the lists are much larger than one document
+
+    def _surname(self, avoid: str = "") -> str:
+        for _ in range(20):
+            family = lexicon("surnames", "hu").sample(self.rng, _HU_NAME_TEMPERATURE)
+            if family != avoid and family not in self._street_tokens:
+                return family
+        return family  # pragma: no cover
+
     def _name(self, gender: str) -> tuple[str, str, str]:
-        given = self.rng.choice(_HU_GIVEN_F if gender == "f" else _HU_GIVEN_M)
-        family = self.rng.choice(_HU_FAMILY)
+        given = self._given(gender)
+        family = self._surname()
         if self.rng.random() < 0.08:  # a second given name
-            pool = _HU_GIVEN_F if gender == "f" else _HU_GIVEN_M
-            second = self.rng.choice([g for g in pool if g != given])
+            second = self._given(gender, avoid=given)
             return given, family, f"{family} {given} {second}"
         return given, family, f"{family} {given}"
 
@@ -445,10 +450,23 @@ class HungarianIdentities(IdentityGenerator):
         return day.isoformat()
 
     def address(self, town_index: int | None = None) -> str:
-        town, _, codes = (
-            _HU_TOWNS[town_index] if town_index is not None else self.rng.choice(_HU_TOWNS)
-        )
-        street = self.rng.choice(_HU_STREETS)
+        """``<postcode> <settlement>, <street> <type> <number>[ <floor/door>]``.
+
+        The settlement is Budapest about as often as in real life, otherwise drawn from the
+        gazetteer (population-weighted, flattened), with one of its own postcodes, so every
+        generated address passes the rule detector's postcode check; ``town_index`` pins one
+        of the court towns instead.
+        """
+        if town_index is not None:
+            town = _HU_TOWNS[town_index][0]
+            code = self.rng.choice(_HU_TOWNS[town_index][2])
+        elif self.rng.random() < _HU_BUDAPEST_SHARE:
+            town = "Budapest"
+            code = self._postcode(town)
+        else:
+            town = lexicon("settlements", "hu").sample(self.rng, _HU_PLACE_TEMPERATURE)
+            code = self._postcode(town)
+        street = self._street()
         number = str(self.rng.randint(1, 120))
         if self.rng.random() < 0.15:
             number += "/" + self.rng.choice("ABC")
@@ -461,7 +479,31 @@ class HungarianIdentities(IdentityGenerator):
                     f" fszt. {self.rng.randint(1, 6)}.",
                 ]
             )
-        return f"{self.rng.choice(codes)} {town}, {street} {number}"
+        return f"{code} {town}, {street} {number}"
+
+    def _postcode(self, town: str) -> str:
+        index = postcode_index("hu")
+        prefix = index.structural.get(town.casefold())
+        if prefix is not None and self.rng.random() < 0.8:
+            # Large cities: a street-level code (Budapest 1 + district + digit, Debrecen 40xx)
+            for _ in range(50):
+                if prefix == "1":
+                    code = f"1{self.rng.randint(1, 23):02d}{self.rng.randint(0, 9)}"
+                else:
+                    code = prefix + _digits(self.rng, 4 - len(prefix))
+                if index.consistent(code, town):
+                    return code
+        codes = sorted(index.by_settlement.get(town.casefold(), ()))
+        return self.rng.choice(codes)
+
+    def _street(self) -> str:
+        for _ in range(20):
+            name = lexicon("street_names", "hu").sample(self.rng, _HU_NAME_TEMPERATURE)
+            if not (set(name.split()) & self._used_names):
+                break
+        street_type = self.rng.choices(_HU_STREET_TYPES, weights=_HU_STREET_TYPE_WEIGHTS)[0]
+        self._street_tokens.update(name.split())
+        return f"{name} {street_type}"
 
     def phone(self) -> str:
         rng = self.rng
@@ -494,8 +536,8 @@ class HungarianIdentities(IdentityGenerator):
     def person(self, gender: str | None = None) -> Person:
         gender = gender or self.rng.choice("fm")
         given, family, full = self._unique_name(lambda: self._name(gender))
-        mother_given = self.rng.choice(_HU_GIVEN_F)
-        mother_family = self.rng.choice([f for f in _HU_FAMILY if f != family])
+        mother_given = self._given("f")
+        mother_family = self._surname(avoid=family)
         birth = self._birth_date()
         return Person(
             given=given,
@@ -520,12 +562,11 @@ class HungarianIdentities(IdentityGenerator):
         b = self.rng.choice(_HU_COMPANY_B)
         form, form_code = self.rng.choice(_HU_FORMS)
         short = f"{a} {b}"
-        town_index = self.rng.randrange(len(_HU_TOWNS))
-        court = f"{town_index % 20 + 1:02d}"
+        court = f"{self.rng.randint(1, 20):02d}"
         return Company(
             org_name=f"{short} {form}",
             short_name=short,
-            address=self.address(town_index),
+            address=self.address(),
             email=f"{self.rng.choice(['info', 'iroda', 'ugyfelszolgalat'])}@"
             f"{_slug(short, '-')}.example",
             phone=self.phone(),
