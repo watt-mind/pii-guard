@@ -35,6 +35,7 @@ class Span:
     text: str                 # the raw value. Never log it.
     score: float              # detector confidence in [0, 1]
     detector: str             # registry name of the detector, e.g. "rules"
+    forced_by: str | None = None  # resolver debug metadata, see "Policies"; not compared
 
     length: int               # property, end - start
     def overlaps(self, other: Span) -> bool
@@ -44,6 +45,8 @@ class Span:
 - Construction validates: `0 <= start < end`, `len(text) == end - start`,
   `0 <= score <= 1`, non-empty `detector`, known `entity_type`. Violations raise
   `ValueError`.
+- `forced_by` is set only by the resolver (below) and is left out of equality, hashing and
+  `to_public_dict()`.
 - `repr()` / `str()` **omit `text`** (`text=<redacted>`), so spans can be logged or appear in
   assertion messages without leaking the value. Spans are hashable and compare by value.
 - Offsets are Python `str` indices (code points), not bytes or UTF-16 units.
@@ -265,7 +268,15 @@ class BlockedEntityError(PiiGuardError): code = "blocked_entity"; status_code = 
 
 Policies are applied **after** the resolver: `keep` types lose overlaps against masked types
 (`DetectionPipeline(keep_types=policies.keep_types)`), so a name inside a sole trader's
-company name is still masked, and are then left in place. `BlockedEntityError` carries types
+company name is still masked, and are then left in place. **A detector that says mask wins
+over a kept type** (fail closed, [ADR 0006](decisions/0006-fail-closed.md)): when an
+authoritative rule span has a `keep` type (`COMPANY_ID_HU` on an adószám) and a span of a
+masked type from any detector (NER, LLM, another rule) overlaps it, the resolver keeps the
+rule's boundaries and takes the masked type, so a sole trader's tax number that the LLM calls
+`NATIONAL_ID_HU_TAX` is masked. The masked type comes from an authoritative span first, then
+the adjudicator, then the largest overlap, score and detector order, and `Span.forced_by`
+names the detector it came from. Only a `keep` policy for that masked type as well leaves the
+value in place. `BlockedEntityError` carries types
 and counts (`counts`), never values. The REST API, the gateway and the eval share the
 resolver (`DetectionPipeline`) and the defaults. The gateway's `PII_GUARD_GATEWAY_KEEP_TYPES`
 is a deprecated alias: when set, it is the exact keep set; `PII_GUARD_POLICY_OVERRIDES` wins.

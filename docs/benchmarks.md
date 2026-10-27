@@ -62,8 +62,8 @@ hand-written; documents: de 10 + en 10 + hu 31.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 51 | 100.0% | 54.1% | 70.2% | 41.6% | 6.4% | 0.0% | 100.0% | 0.68 ms | 2026-10-27 | `dd35916` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 51 | 98.5% | 98.5% | 98.5% | 0.6% | 2.9% | 0.6% | 100.0% | 94 ms | 2026-10-27 | `dd35916` |
+| **pii-guard rules** | 51 | 100.0% | 54.1% | 70.2% | 41.6% | 6.4% | 0.0% | 100.0% | 0.76 ms | 2026-10-27 | `7337ffa` |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 51 | 98.5% | 98.5% | 98.5% | 0.6% | 2.9% | 0.6% | 100.0% | 137 ms | 2026-10-27 | `7337ffa` |
 | pii-guard rules + Muse Spark Open (Baseten) † | 41 | 98.1% | 99.4% | 98.7% | 0.7% | 1.5% | 0.0% | 100.0% | 1.5 s* | 2026-10-27 | `9fad0fa` |
 | pii-guard rules + Muse Glimmer (low) † | 10 | 100.0% | 100.0% | 100.0% | 0.0% | 3.3% | 0.0% | 100.0% | 7.6 s | 2026-10-27 | `c759b54` |
 | pii-guard Muse Glimmer (low) † | 10 | 97.1% | 97.1% | 97.1% | 0.0% | 3.3% | 0.0% | 100.0% | 7.7 s | 2026-10-27 | `c759b54` |
@@ -121,8 +121,8 @@ mixed; documents: de 200 + en 200 + hu 200.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 600 | 98.5% | 36.3% | 53.1% | 63.1% | 1.6% | 0.1% | 100.0% | 0.40 ms | 2026-10-27 | `71943c9` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 600 | 92.8% | 71.7% | 80.9% | 27.6% | 1.9% | 2.4% | 100.0% | 53 ms | 2026-10-27 | `71943c9` |
+| **pii-guard rules** | 600 | 98.5% | 36.3% | 53.1% | 63.1% | 1.6% | 0.1% | 100.0% | 1.7 ms | 2026-10-27 | `7337ffa` |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 600 | 92.8% | 71.7% | 80.9% | 27.6% | 1.9% | 2.4% | 100.0% | 64 ms | 2026-10-27 | `7337ffa` |
 | pii-guard strict (rules + NER + Muse Spark Open, Baseten) ‡ | 600 | 92.5% | 93.9% | 93.2% | 3.9% | 0.1% | 2.4% | 100.0% | 2.1 s* | 2026-10-27 | `4f84c6a` |
 | Presidio ‡ | 600 | 38.6% | 49.5% | 43.4% | 29.6% | 7.8% | 49.1% | — | 36 ms* | 2026-10-27 | `8944f96` |
 | LLM Guard ‡ | 600 | 79.3% | 53.7% | 64.0% | 43.8% | 1.8% | 18.2% | 100.0% | 66 ms* | 2026-10-27 | `8944f96` |
@@ -166,8 +166,8 @@ hand-written; documents: hu 44.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 44 | 100.0% | 61.3% | 76.0% | 2.5% | 5.0% | 0.0% | 100.0% | 0.16 ms | 2026-10-27 | `9d133c0` |
-| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 22 ms | 2026-10-27 | `9d133c0` |
+| **pii-guard rules** | 44 | 100.0% | 61.3% | 76.0% | 2.5% | 5.0% | 0.0% | 100.0% | 0.30 ms | 2026-10-27 | `7337ffa` |
+| pii-guard rules + ner (xlmr-large-distilled-glimmer) | 44 | 72.7% | 100.0% | 84.2% | 0.0% | 2.5% | 0.0% | 100.0% | 27 ms | 2026-10-27 | `7337ffa` |
 
 
 By language:
@@ -420,6 +420,18 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-company-names-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-company-names-rules` | pii-guard rules | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-after-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-company-names-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-smoke-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | smoke | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-company-names-rules` | pii-guard rules | company-names | hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `7337ffa` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
+| 2026-10-27 | `2026-10-27-keep-vs-mask-before-smoke-rules` | pii-guard rules | smoke | de, en, hu | recorded | `7337ffa` | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-rules-resolve-after-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-rules-resolve-after-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; machine shared with parallel agent runs, so latency is not comparable between records | — |
 | 2026-10-27 | `2026-10-27-rules-resolve-before-ai4privacy-fast` | pii-guard rules + ner (xlmr-large-distilled-glimmer) | ai4privacy | de, en, hu | recorded | `71943c9` (dirty) | arm64, 10 CPUs, macOS; NER on PyTorch device auto; machine shared with parallel agent runs, so latency is not comparable between records | — |
