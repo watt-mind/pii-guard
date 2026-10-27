@@ -229,6 +229,9 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
           </span>
           Run log ({index.runs.length} runs)
         </summary>
+        <p className="mt-2 text-xs text-muted">
+          Audit mode was called <code className="font-mono">strict</code> until LAB-1186: runs recorded before the rename keep it in their IDs and keys.
+        </p>
         <RunLog index={index} />
       </details>
       <p className="text-xs text-faint">

@@ -53,7 +53,7 @@ from pii_guard.api.routes.image_masking import (
 from pii_guard.config import Settings
 from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.gateway.cache import DetectionCache
-from pii_guard.gateway.config import GatewayConfig, Mode
+from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
 from pii_guard.gateway.request import (
     ImageSlot,
@@ -119,6 +119,8 @@ class RequestStats:
     """Counts only. Rendered into response headers and the gateway log line."""
 
     mode: Mode
+    #: The deprecated mode name the request asked for (``strict``), if any.
+    mode_alias: str | None = None
     texts: int = 0
     cache_hits: int = 0
     cache_misses: int = 0
@@ -145,6 +147,12 @@ class RequestStats:
             "X-PII-Guard-Cache-Misses": str(self.cache_misses),
             "X-PII-Guard-Masked": str(sum(self.masked.values())),
         }
+        if self.mode_alias:
+            out["Deprecation"] = "true"
+            out["Warning"] = (
+                f'299 pii-guard "{MODE_HEADER}: {self.mode_alias} is deprecated, '
+                f'use {self.mode.value}"'
+            )
         if self.images:
             out["X-PII-Guard-Images"] = str(self.images)
             out["X-PII-Guard-Image-Regions-Masked"] = str(sum(self.image_masked.values()))
@@ -253,7 +261,7 @@ class Gateway:
         self.cache = cache or DetectionCache(self.config.cache_size)
         self._transport = transport
         # Blocking detector calls run on one bounded pool per mode (LAB-1207): a slot stays
-        # taken until the thread finishes, so a hung strict-mode detector can't starve fast.
+        # taken until the thread finishes, so a hung audit-mode detector can't starve fast.
         self._detect_workers: dict[Mode, BoundedWorkers] = {}
         self._image_workers = image_workers
         self._sam = sam
@@ -290,11 +298,17 @@ class Gateway:
         if raw is None or not raw.strip():
             return self.config.mode
         try:
-            return Mode(raw.strip().lower())
+            return parse_mode(raw)[0]
         except ValueError:
             raise InvalidChatRequestError(
                 f"{MODE_HEADER} must be one of: {', '.join(m.value for m in Mode)}"
             ) from None
+
+    @staticmethod
+    def _mode_alias(headers: Mapping[str, str]) -> str | None:
+        """The deprecated mode name in the request header (``strict``), else ``None``."""
+        raw = (headers.get(MODE_HEADER) or "").strip().lower()
+        return raw if raw in DEPRECATED_MODE_ALIASES else None
 
     def _language(self, headers: Mapping[str, str]) -> str:
         raw = headers.get(LANGUAGE_HEADER)
@@ -563,7 +577,7 @@ class Gateway:
         language = self._language(headers)
         trace.mode, trace.language = mode.value, language
         echo = self._echo(headers)
-        stats = RequestStats(mode=mode)
+        stats = RequestStats(mode=mode, mode_alias=self._mode_alias(headers))
         trace.stats = stats
         collected = collect_texts(body)
         body = cast(dict[str, Any], body)  # collect_texts checked it

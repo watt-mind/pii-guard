@@ -14,14 +14,14 @@ An open-source privacy firewall for AI agents: reversible, grammar-aware masking
 ## Description
 
 ```text
-pii-guard sits between an application and an LLM. It finds personal data in text and images, replaces each value with a reversible placeholder that stays the same for the whole conversation, sends only the masked request on, and puts the real values back into the answer, even while it streams. It is an OpenAI-compatible proxy, so adopting it is a change of API base URL. It is built for languages where existing tools break: in Hungarian a name changes with every grammatical case, so pii-guard keeps case endings outside the placeholder and re-inflects the name on the way back. On our hand-written test sets, rules alone let 52.6 % (Hungarian) and 46.7 % (English) of labelled values reach the model; with Meta's open-weight Muse Spark Open as the detector that drops to 0.9 % and 0.0 %, at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. Every run is a committed record, with charts checked in CI, on fictional data only. Apache-2.0.
+pii-guard sits between an application and an LLM. It finds personal data in text and images, replaces each value with a reversible placeholder that stays the same for the whole conversation, sends only the masked request on, and puts the real values back into the answer, even while it streams. It is an OpenAI-compatible proxy, so adopting it is a change of API base URL. It is built for languages where existing tools break: in Hungarian a name changes with every grammatical case, so pii-guard keeps case endings outside the placeholder and re-inflects the name on the way back. On our hand-written test sets, rules alone let 52.6 % (Hungarian) and 46.7 % (English) of labelled values reach the model; the default fast mode (rules + an NER distilled from Meta's Muse Glimmer) runs on the machine at $0 and brings that to 0.6 % pooled over German, English and Hungarian, and the optional audit mode, a second opinion from Meta's open-weight Muse Spark Open for quality checks, reaches 0.9 % and 0.0 % at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. Every run is a committed record, with charts checked in CI, on fictional data only. Apache-2.0.
 ```
 
 ## How we used Meta models
 
 ```text
 One rule decides where each model runs: anything that sees real personal data is an open-weights model you can host yourself; hosted models only see fictional or masked data.
-- Muse Spark Open (open weights, on Baseten Model APIs or your own GPUs) is the production detector in strict mode: 0.9 % Hungarian and 0.0 % English leak.
+- Muse Spark Open (open weights, on Baseten Model APIs or your own GPUs) is the LLM detector of audit mode, the optional second opinion for quality checks and the benchmark upper bound: 0.9 % Hungarian and 0.0 % English leak. Production traffic runs fast mode (rules + the distilled NER, local, about 36 ms, $0, nothing leaves the machine).
 - Muse Glimmer 30B (open weights, Apache-2.0) was the best zero-shot detector we measured (F1 99.3, 0.0 % leak) but takes 9.4 s per document, so we used it as the teacher: it labelled a 4,964-document fictional corpus, and we distilled it into XLM-RoBERTa, which runs in-process in tens of milliseconds for fast mode. A LoRA fine-tune of Glimmer is in progress.
 - Muse Spark 1.3 wrote the synthetic Hungarian and English benchmark and the distillation corpus around fictional identities ($1.05 for 5,004 calls), and is the downstream model in the demo, which only ever sees placeholders.
 - Muse Spark Open and Muse Spark 1.3 are also the attackers in our red teams: prompt injection against the detector, and re-identification of masked documents.
@@ -54,7 +54,7 @@ One rule decides where each model runs: anything that sees real personal data is
 ## What's next
 
 ```text
-- A fresh, reproducible comparison against Presidio, LLM Guard and PrivAiTe with today's fast and strict modes, including the public ai4privacy OpenPII-1M benchmark (in progress).
+- A fresh, reproducible comparison against Presidio, LLM Guard and PrivAiTe with today's fast and audit modes, including the public ai4privacy OpenPII-1M benchmark (in progress).
 - Masking printed names and numbers on ID cards (in progress), then placeholder-labelled images that share the text session's placeholders, so an assistant can answer "which parties have an ID on file?" without seeing a value (planned). As far as we found in a survey on 2026-10-27, no open-source tool shares placeholders between images and the text session.
 - An image baseline against Presidio Image Redactor (planned).
 - A LoRA fine-tune of Muse Glimmer as a request-path detector (in progress), and publishing the distilled NER weights.

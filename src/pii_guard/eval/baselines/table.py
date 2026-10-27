@@ -25,12 +25,12 @@ __all__ = ["main", "render_table", "rows"]
 _NAMES = {
     "pii-guard rules": "pii-guard rules",
     "pii-guard rules+ner": "pii-guard fast",
-    "pii-guard rules+ner+llm": "pii-guard strict",
+    "pii-guard rules+ner+llm": "pii-guard audit",
 }
 ORDER = [
     "pii-guard rules",
     "pii-guard fast",
-    "pii-guard strict",
+    "pii-guard audit",
     "presidio",
     "llm-guard",
     "privaite",

@@ -230,7 +230,9 @@ unset. Secrets are `SecretStr`.
 One factory, `pii_guard.detect.stack`, picks the detectors for both the REST API and the
 gateway (LAB-1270). Without `PII_GUARD_DETECTORS` the REST API runs the gateway fast-mode stack:
 `rules`, plus `ner` when the `ner` extra is installed. An explicit `PII_GUARD_DETECTORS`
-(`rules,llm`, say) wins for the REST API only; the gateway keeps its per-mode set. NER fails
+(`rules,llm`, say) wins for the REST API only; the gateway keeps its per-mode set: `fast`, the
+default, or `audit`, which adds the LLM detector, chosen by `PII_GUARD_GATEWAY_MODE` or the
+`X-PII-Guard-Mode` header (old mode names: [operations.md](operations.md#modes)). NER fails
 closed (ADR 0006): with `PII_GUARD_NER_MODEL` set but the extra missing, startup raises
 `DetectionError` ("ner configured but the 'ner' extra is not installed") in both; with neither,
 NER is skipped and one WARNING is logged. `NerDetector` gets its model, revision and device

@@ -10,7 +10,7 @@
 |---|---|---|---|
 | Structured identifiers | Rules (no model) | pii-guard container | yes (inside the boundary) |
 | Names, organizations, addresses, dates of birth and (NER v2) contact and ID numbers the rules can't validate | Multilingual NER encoder (XLM-RoBERTa-base, open; GLiNER as an alternative backend) | pii-guard container (CPU / MPS / CUDA) | yes |
-| Second-pass detection and adjudication | **Muse Spark Open** (open weights), optionally fine-tuned; **Muse Glimmer** as a smaller local candidate | Baseten (`meta-models/muse-spark-open-1026`), or your own hardware | yes |
+| Second-pass detection and adjudication (audit mode, opt-in; fast mode, rules + NER, is the production default) | **Muse Spark Open** (open weights), optionally fine-tuned; **Muse Glimmer** as a smaller local candidate | Baseten (`meta-models/muse-spark-open-1026`), or your own hardware | yes |
 | Faces, ID photos | **YuNet** (OpenCV model zoo, 0.23 MB, MIT; the default `hybrid` segmenter, see [Local segmentation](#local-segmentation)) | pii-guard container (CPU) | yes |
 | Signatures (and faces with `PII_GUARD_SEGMENTER=sam-api`) | **SAM 3.1** | Meta Model API, or a GPU endpoint (`PII_GUARD_SAM_URL`) | yes |
 | OCR | Open OCR engine | pii-guard container or GPU endpoint | yes |
@@ -213,7 +213,7 @@ GLiNER fine-tune and a T4 latency bench.
 ## LLM detector
 
 `pii_guard.detect.llm.LlmDetector` (registry name `llm`) talks to any OpenAI-compatible Chat
-Completions endpoint. It asks for strict JSON (`{"entities": [{"type", "text"}]}`), finds every
+Completions endpoint. It asks for JSON only (`{"entities": [{"type", "text"}]}`), finds every
 returned surface string in the input itself (Unicode-safe, NFC/NFD tolerant, whitespace
 tolerant, never inside a longer word), and drops values that are not in the text. It never
 uses model offsets. Long inputs are split into overlapping chunks. Timeouts, HTTP errors and
@@ -259,7 +259,9 @@ the smaller candidate. It is too slow for the request path (about 9 s per docume
 reasoning), so it serves as the teacher for the distilled NER model (see "Distilled from Muse
 Glimmer" above).
 
-### Baseten Model APIs (production detector)
+<a id="baseten-model-apis-production-detector"></a>
+
+### Baseten Model APIs (the audit-mode detector)
 
 Muse Spark Open runs on Baseten's shared **Model APIs** (no dedicated deployment, so no GPU
 type or scale-to-zero to choose). Verified on 2026-10-27 with live calls on fictional text:

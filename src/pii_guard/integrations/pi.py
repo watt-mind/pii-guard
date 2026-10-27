@@ -7,7 +7,7 @@ default ``~/.pi/agent``). :func:`provider_entry` builds a ``pii-guard`` provider
 - ``apiKey``: ``$PII_GUARD_API_TOKEN`` when the gateway requires a token (pi resolves ``$NAME``
   from the environment at request time), else a placeholder pi needs to list the models; the
   gateway sends its own ``PII_GUARD_UPSTREAM_API_KEY`` upstream;
-- ``headers``: ``X-PII-Guard-Mode: fast`` (rules + NER: agent turns are many and long, strict
+- ``headers``: ``X-PII-Guard-Mode: fast`` (rules + NER: agent turns are many and long, audit
   mode's LLM detector would add its latency to every one) and ``X-PII-Guard-Language``;
 - ``compat``: ``supportsDeveloperRole: false`` (system prompts go as ``system``, which every
   OpenAI-compatible server accepts) and ``supportsStore: false`` (pi otherwise sends
