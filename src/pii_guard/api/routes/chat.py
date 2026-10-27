@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 import threading
+import time
 
 from fastapi import Request
 from starlette.responses import Response
@@ -51,6 +52,7 @@ def get_gateway(request: Request) -> Gateway:
                     config=getattr(state, "gateway_config", None),
                     detectors=getattr(state, "gateway_detectors", None),
                     transport=getattr(state, "gateway_transport", None),
+                    observability=getattr(state, "observability", None),
                 )
                 state.gateway = gateway
     return gateway
@@ -60,13 +62,17 @@ def get_gateway(request: Request) -> Gateway:
 async def chat_completions(request: Request) -> Response:
     gateway = get_gateway(request)
     raw = await request.body()
+    received_at = time.perf_counter()  # timing starts once the body is in
     try:
         body = json.loads(raw)
     except (ValueError, UnicodeDecodeError):
         # Never the decoder's message: it quotes the body.
         raise InvalidChatRequestError("request body is not valid JSON") from None
     response, stats = await gateway.chat_completions(
-        body, request.headers, max_text_chars=get_max_text_chars(request)
+        body,
+        request.headers,
+        max_text_chars=get_max_text_chars(request),
+        received_at=received_at,
     )
     log_extra(request, **stats.log_fields())
     return response

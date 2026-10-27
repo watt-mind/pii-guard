@@ -1,0 +1,513 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-gateway-latency-ner-fast",
+  "kind": "latency",
+  "date": "2026-10-27",
+  "recorded_at": "2026-10-27T10:56:14+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "Gateway overhead, fast mode, mock upstream at 50 ms",
+  "notes": [
+    "Mock upstream with a fixed 50 ms delay on loopback; overhead = gateway total - time waiting on the upstream.",
+    "Each request is a new session (no detection cache hits); one user message per request from the fixed fictional corpus.",
+    "Fast mode with the distilled XLM-R large NER checkpoint (LAB-1128), run in-process."
+  ],
+  "code": {
+    "commit": "4ee1b15bf070dccf7d024cf5dd0b1c838133dfd9",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "key": "gateway-latency:fast:rules+ner:pii-guard-ner-xlmr-large-distilled",
+    "label": "pii-guard gateway, fast mode (rules + ner pii-guard-ner-xlmr-large-distilled)",
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": "0.1.0",
+    "detectors": [
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "ner",
+        "model": "pii-guard-ner-xlmr-large-distilled",
+        "model_ref": "training/ner (distilled from Muse Glimmer, XLM-R large)",
+        "revision": null,
+        "settings": {},
+        "serving": "in-process, PyTorch on Apple MPS"
+      }
+    ]
+  },
+  "fixture_set": "latency-corpus",
+  "fixtures": [
+    {
+      "path": "src/pii_guard/bench/latency.py#CORPUS",
+      "sha256": "d34e57033f2db058a1ab1a8e72b375bec2e3447528f7de09118319e000048d4f",
+      "set": "latency-corpus",
+      "language": null,
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 8
+    }
+  ],
+  "languages": [
+    "de",
+    "en",
+    "hu"
+  ],
+  "hardware": {
+    "description": "Apple M1 Max, 10 CPUs, local loopback",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": null,
+  "metrics": {
+    "upstream_delay_ms": 50.0,
+    "cells": [
+      {
+        "mode": "fast",
+        "concurrency": 1,
+        "stream": false,
+        "requests": 200,
+        "errors": 0,
+        "throughput_rps": 10.793,
+        "overhead_ms": {
+          "p50": 35.624,
+          "p95": 44.74,
+          "p99": 50.851,
+          "mean": 36.332
+        },
+        "total_ms": {
+          "p50": 89.606,
+          "p95": 98.663,
+          "p99": 112.866,
+          "mean": 90.325
+        },
+        "upstream_ms": {
+          "p50": 53.641,
+          "p95": 54.961,
+          "p99": 57.252,
+          "mean": 53.994
+        },
+        "added_ttft_ms": null,
+        "client_ms": {
+          "p50": 91.268,
+          "p95": 100.727,
+          "p99": 114.336,
+          "mean": 92.024
+        },
+        "client_ttft_ms": null,
+        "stages_ms": {
+          "parse": {
+            "p50": 0.111,
+            "p95": 0.176,
+            "p99": 0.2,
+            "mean": 0.116
+          },
+          "detect": {
+            "p50": 30.544,
+            "p95": 39.699,
+            "p99": 45.894,
+            "mean": 31.342
+          },
+          "image": {
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "mean": 0.0
+          },
+          "mask": {
+            "p50": 0.172,
+            "p95": 0.402,
+            "p99": 0.476,
+            "mean": 0.2
+          },
+          "forward": {
+            "p50": 4.415,
+            "p95": 5.322,
+            "p99": 6.269,
+            "mean": 4.519
+          },
+          "upstream_ttfb": {
+            "p50": 53.273,
+            "p95": 54.633,
+            "p99": 56.961,
+            "mean": 53.631
+          },
+          "upstream": {
+            "p50": 53.641,
+            "p95": 54.961,
+            "p99": 57.252,
+            "mean": 53.994
+          },
+          "unmask": {
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "mean": 0.0
+          },
+          "response": {
+            "p50": 0.123,
+            "p95": 0.183,
+            "p99": 0.297,
+            "mean": 0.135
+          }
+        },
+        "detectors_ms": {
+          "ner": {
+            "p50": 29.941,
+            "p95": 39.062,
+            "p99": 44.286,
+            "mean": 30.766
+          },
+          "rules": {
+            "p50": 0.144,
+            "p95": 0.209,
+            "p99": 0.298,
+            "mean": 0.15
+          }
+        }
+      },
+      {
+        "mode": "fast",
+        "concurrency": 1,
+        "stream": true,
+        "requests": 200,
+        "errors": 0,
+        "throughput_rps": 10.568,
+        "overhead_ms": {
+          "p50": 38.925,
+          "p95": 47.042,
+          "p99": 56.808,
+          "mean": 38.904
+        },
+        "total_ms": {
+          "p50": 93.2,
+          "p95": 101.68,
+          "p99": 111.788,
+          "mean": 93.298
+        },
+        "upstream_ms": {
+          "p50": 54.357,
+          "p95": 55.584,
+          "p99": 56.278,
+          "mean": 54.394
+        },
+        "added_ttft_ms": {
+          "p50": 37.316,
+          "p95": 45.999,
+          "p99": 55.65,
+          "mean": 37.521
+        },
+        "client_ms": {
+          "p50": 94.41,
+          "p95": 102.764,
+          "p99": 113.431,
+          "mean": 94.59
+        },
+        "client_ttft_ms": {
+          "p50": 92.117,
+          "p95": 100.42,
+          "p99": 110.573,
+          "mean": 91.935
+        },
+        "stages_ms": {
+          "parse": {
+            "p50": 0.166,
+            "p95": 0.224,
+            "p99": 0.268,
+            "mean": 0.171
+          },
+          "detect": {
+            "p50": 32.409,
+            "p95": 39.001,
+            "p99": 45.418,
+            "mean": 32.362
+          },
+          "image": {
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "mean": 0.0
+          },
+          "mask": {
+            "p50": 0.173,
+            "p95": 0.396,
+            "p99": 0.485,
+            "mean": 0.2
+          },
+          "forward": {
+            "p50": 4.511,
+            "p95": 5.598,
+            "p99": 6.78,
+            "mean": 4.726
+          },
+          "upstream_ttfb": {
+            "p50": 1.894,
+            "p95": 2.409,
+            "p99": 3.026,
+            "mean": 1.965
+          },
+          "upstream": {
+            "p50": 54.357,
+            "p95": 55.584,
+            "p99": 56.278,
+            "mean": 54.394
+          },
+          "unmask": {
+            "p50": 0.372,
+            "p95": 0.523,
+            "p99": 0.594,
+            "mean": 0.366
+          },
+          "response": {
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "mean": 0.0
+          }
+        },
+        "detectors_ms": {
+          "ner": {
+            "p50": 31.883,
+            "p95": 38.444,
+            "p99": 44.743,
+            "mean": 31.791
+          },
+          "rules": {
+            "p50": 0.146,
+            "p95": 0.214,
+            "p99": 0.268,
+            "mean": 0.145
+          }
+        }
+      },
+      {
+        "mode": "fast",
+        "concurrency": 8,
+        "stream": false,
+        "requests": 200,
+        "errors": 0,
+        "throughput_rps": 35.151,
+        "overhead_ms": {
+          "p50": 165.692,
+          "p95": 182.161,
+          "p99": 203.013,
+          "mean": 163.837
+        },
+        "total_ms": {
+          "p50": 222.469,
+          "p95": 243.828,
+          "p99": 260.603,
+          "mean": 220.631
+        },
+        "upstream_ms": {
+          "p50": 56.498,
+          "p95": 60.642,
+          "p99": 64.199,
+          "mean": 56.793
+        },
+        "added_ttft_ms": null,
+        "client_ms": {
+          "p50": 225.249,
+          "p95": 249.739,
+          "p99": 266.029,
+          "mean": 223.719
+        },
+        "client_ttft_ms": null,
+        "stages_ms": {
+          "parse": {
+            "p50": 0.242,
+            "p95": 0.347,
+            "p99": 1.967,
+            "mean": 0.286
+          },
+          "detect": {
+            "p50": 160.368,
+            "p95": 176.468,
+            "p99": 197.03,
+            "mean": 158.517
+          },
+          "image": {
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "mean": 0.0
+          },
+          "mask": {
+            "p50": 0.158,
+            "p95": 0.363,
+            "p99": 0.401,
+            "mean": 0.179
+          },
+          "forward": {
+            "p50": 4.579,
+            "p95": 5.375,
+            "p99": 6.733,
+            "mean": 4.723
+          },
+          "upstream_ttfb": {
+            "p50": 56.059,
+            "p95": 60.102,
+            "p99": 63.136,
+            "mean": 56.303
+          },
+          "upstream": {
+            "p50": 56.498,
+            "p95": 60.642,
+            "p99": 64.199,
+            "mean": 56.793
+          },
+          "unmask": {
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "mean": 0.0
+          },
+          "response": {
+            "p50": 0.113,
+            "p95": 0.156,
+            "p99": 0.188,
+            "mean": 0.116
+          }
+        },
+        "detectors_ms": {
+          "ner": {
+            "p50": 112.041,
+            "p95": 122.844,
+            "p99": 137.051,
+            "mean": 110.919
+          },
+          "rules": {
+            "p50": 0.142,
+            "p95": 0.213,
+            "p99": 0.335,
+            "mean": 0.146
+          }
+        }
+      },
+      {
+        "mode": "fast",
+        "concurrency": 8,
+        "stream": true,
+        "requests": 200,
+        "errors": 0,
+        "throughput_rps": 33.524,
+        "overhead_ms": {
+          "p50": 173.384,
+          "p95": 183.136,
+          "p99": 188.893,
+          "mean": 172.306
+        },
+        "total_ms": {
+          "p50": 232.339,
+          "p95": 242.812,
+          "p99": 246.664,
+          "mean": 231.559
+        },
+        "upstream_ms": {
+          "p50": 59.046,
+          "p95": 62.896,
+          "p99": 67.966,
+          "mean": 59.254
+        },
+        "added_ttft_ms": {
+          "p50": 171.615,
+          "p95": 182.066,
+          "p99": 187.471,
+          "mean": 170.906
+        },
+        "client_ms": {
+          "p50": 234.839,
+          "p95": 245.982,
+          "p99": 251.806,
+          "mean": 234.596
+        },
+        "client_ttft_ms": {
+          "p50": 232.636,
+          "p95": 244.663,
+          "p99": 250.392,
+          "mean": 232.027
+        },
+        "stages_ms": {
+          "parse": {
+            "p50": 0.283,
+            "p95": 0.47,
+            "p99": 1.13,
+            "mean": 0.313
+          },
+          "detect": {
+            "p50": 166.493,
+            "p95": 176.653,
+            "p99": 181.97,
+            "mean": 165.747
+          },
+          "image": {
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "mean": 0.0
+          },
+          "mask": {
+            "p50": 0.158,
+            "p95": 0.369,
+            "p99": 0.431,
+            "mean": 0.177
+          },
+          "forward": {
+            "p50": 4.563,
+            "p95": 4.97,
+            "p99": 5.584,
+            "mean": 4.613
+          },
+          "upstream_ttfb": {
+            "p50": 4.809,
+            "p95": 6.241,
+            "p99": 12.582,
+            "mean": 4.765
+          },
+          "upstream": {
+            "p50": 59.046,
+            "p95": 62.896,
+            "p99": 67.966,
+            "mean": 59.254
+          },
+          "unmask": {
+            "p50": 0.307,
+            "p95": 0.445,
+            "p99": 0.469,
+            "mean": 0.305
+          },
+          "response": {
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "mean": 0.0
+          }
+        },
+        "detectors_ms": {
+          "ner": {
+            "p50": 116.924,
+            "p95": 124.727,
+            "p99": 127.333,
+            "mean": 116.369
+          },
+          "rules": {
+            "p50": 0.142,
+            "p95": 0.191,
+            "p99": 0.207,
+            "mean": 0.139
+          }
+        }
+      }
+    ]
+  }
+}

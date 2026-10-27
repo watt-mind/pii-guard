@@ -15,6 +15,9 @@ Order of operations (fail closed at every step, ADR 0006):
 5. seed the detection cache with the restored answer, which comes back as history next turn.
 
 Nothing in this module logs or raises with request text, values, masked bodies or keys.
+
+Every call is timed per stage (:class:`~pii_guard.observability.RequestTimer`) and, when the
+traffic log or the metrics are on, recorded as one event (:mod:`pii_guard.gateway.trace`).
 """
 
 from __future__ import annotations
@@ -49,6 +52,8 @@ from pii_guard.gateway.request import (
 )
 from pii_guard.gateway.restore import restore_completion, restore_text
 from pii_guard.gateway.stream import SseRestorer, error_event, iter_sse_data, sse_event
+from pii_guard.gateway.trace import CallTrace
+from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PiiGuardError, Span
 from pii_guard.vault import Vault, VaultSession
@@ -59,6 +64,7 @@ from pii_guard.visual.sam import SamClient
 __all__ = [
     "LANGUAGE_HEADER",
     "MODE_HEADER",
+    "REQUEST_ID_HEADER",
     "SESSION_HEADER",
     "Gateway",
     "UpstreamError",
@@ -68,6 +74,7 @@ __all__ = [
 logger = logging.getLogger("pii_guard.gateway")
 
 SESSION_HEADER = "X-PII-Guard-Session"
+REQUEST_ID_HEADER = "X-PII-Guard-Request-Id"
 MODE_HEADER = "X-PII-Guard-Mode"
 LANGUAGE_HEADER = "X-PII-Guard-Language"
 
@@ -185,9 +192,12 @@ class Gateway:
         transport: httpx.AsyncBaseTransport | None = None,
         sam: SamClient | None = None,
         ocr: OcrEngine | None = _UNSET,
+        observability: Observability | None = None,
     ) -> None:
         """``sam`` / ``ocr`` mask inline images: default a :class:`SamClient` from the
-        settings and Tesseract when installed; ``ocr=None`` turns OCR off (SAM only)."""
+        settings and Tesseract when installed; ``ocr=None`` turns OCR off (SAM only).
+        ``observability`` receives one traffic event per call (none: nothing recorded)."""
+        self.observability = observability
         self.settings = settings
         self.vault = vault
         self.config = config or GatewayConfig()
@@ -336,10 +346,13 @@ class Gateway:
         known = session.known_values
         if known:
             # After the cache: values pre-loaded later still apply to cached detections.
+            started = time.perf_counter()
             out = [
                 self._with_known(slot.text, spans, known, detector, language)
                 for slot, spans in zip(slots, out, strict=True)
             ]
+            elapsed = (time.perf_counter() - started) * 1000
+            stats.detector_ms[KNOWN_DETECTOR] = stats.detector_ms.get(KNOWN_DETECTOR, 0) + elapsed
         for spans in out:
             stats.spans.update(s.entity_type.value for s in spans)
         return out
@@ -443,12 +456,45 @@ class Gateway:
     # --- the endpoint --------------------------------------------------------------------
 
     async def chat_completions(
-        self, body: object, headers: Mapping[str, str], *, max_text_chars: int | None = None
+        self,
+        body: object,
+        headers: Mapping[str, str],
+        *,
+        max_text_chars: int | None = None,
+        received_at: float | None = None,
+    ) -> tuple[Response, RequestStats]:
+        """Mask, forward, restore. ``received_at`` (``perf_counter``) starts the timer."""
+        timer = RequestTimer(received_at)
+        trace = CallTrace(self.observability, timer, body)
+        try:
+            response, stats = await self._chat_completions(
+                body, headers, max_text_chars=max_text_chars, timer=timer, trace=trace
+            )
+        except BaseException as exc:
+            trace.fail(exc)
+            raise
+        response.headers[REQUEST_ID_HEADER] = trace.request_id
+        if self.observability is not None and self.observability.server_timing:
+            response.headers["Server-Timing"] = timer.server_timing()
+        if not trace.streaming:
+            trace.finish()
+        return response, stats
+
+    async def _chat_completions(
+        self,
+        body: object,
+        headers: Mapping[str, str],
+        *,
+        max_text_chars: int | None,
+        timer: RequestTimer,
+        trace: CallTrace,
     ) -> tuple[Response, RequestStats]:
         url = self._upstream_url()
         mode = self._mode(headers)
         language = self._language(headers)
+        trace.mode, trace.language = mode.value, language
         stats = RequestStats(mode=mode)
+        trace.stats = stats
         collected = collect_texts(body)
         body = cast(dict[str, Any], body)  # collect_texts checked it
         too_long = max_text_chars is not None and any(
@@ -466,16 +512,21 @@ class Gateway:
             )
         detector = self.detectors[mode]
         session, created = self._session(headers)
+        trace.session_id, trace.session_new = session.session_id, created
         stream = bool(body.get("stream"))
         stats.stream = stream
         stats.texts = len(collected.slots)
         stats.images = len(collected.images)
+        timer.add("parse", time.perf_counter() - timer.started)
         try:
-            spans = await self._detect_all(collected.slots, detector, session, language, stats)
+            with timer.span("detect"):
+                spans = await self._detect_all(collected.slots, detector, session, language, stats)
             if collected.images:
-                await self._mask_images(collected.images, detector, language, stats)
-            self._mask(collected.slots, spans, session, language, stats)
-            collected.finalize()
+                with timer.span("image"):
+                    await self._mask_images(collected.images, detector, language, stats)
+            with timer.span("mask"):
+                self._mask(collected.slots, spans, session, language, stats)
+                collected.finalize()
         except BaseException:
             stats.log("blocked")
             if created:
@@ -483,7 +534,10 @@ class Gateway:
                 self.cache.drop_session(session.session_id)
             raise
 
+        forwarding = time.perf_counter()
         payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        if trace.payloads:
+            trace.masked_request = payload
         client = httpx.AsyncClient(
             timeout=httpx.Timeout(self.config.upstream_timeout, connect=10.0),
             transport=self._transport,
@@ -492,12 +546,17 @@ class Gateway:
             "POST", url, content=payload, headers=self._upstream_headers(headers)
         )
         started = time.perf_counter()
+        timer.add("forward", started - forwarding)
+        timer.upstream_sent = started
         try:
             response = await client.send(request, stream=True)
         except httpx.HTTPError as exc:
             await client.aclose()
+            timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")
             raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
+        timer.add("upstream_ttfb", time.perf_counter() - started)
+        timer.add("upstream", time.perf_counter() - started)
 
         stats.upstream_status = response.status_code
         out_headers = stats.headers(session.session_id)
@@ -508,6 +567,7 @@ class Gateway:
                 await response.aclose()
                 await client.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
             stats.log("upstream_error")
             return _upstream_error(response.status_code, raw, out_headers), stats
 
@@ -521,6 +581,10 @@ class Gateway:
                 await response.aclose()
                 await client.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+            if trace.payloads:
+                trace.upstream_body = raw
+            building = time.perf_counter()
             try:
                 answer = json.loads(raw)
             except ValueError:
@@ -533,17 +597,48 @@ class Gateway:
             self._seed_cache(session, language, detector, report.restored_spans, stats)
             out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
             stats.log("ok")
-            return JSONResponse(answer, headers=out_headers), stats
+            if trace.full:
+                trace.answer = answer
+            elif trace.recording and isinstance(answer.get("usage"), dict):
+                trace.usage = answer["usage"]
+            result = JSONResponse(answer, headers=out_headers)
+            timer.add("response", time.perf_counter() - building)
+            timer.finish()
+            return result, stats
 
         restorer = SseRestorer(session)
+        trace.streaming = True
+
+        async def timed_lines() -> AsyncIterator[str]:
+            """The upstream's lines; time spent waiting on them counts as upstream time."""
+            lines = response.aiter_lines().__aiter__()
+            while True:
+                waiting = time.perf_counter()
+                try:
+                    line = await lines.__anext__()
+                except StopAsyncIteration:
+                    timer.add("upstream", time.perf_counter() - waiting)
+                    return
+                timer.add("upstream", time.perf_counter() - waiting)
+                if line.startswith("data:"):
+                    timer.mark_first_data()
+                yield line
 
         async def events() -> AsyncIterator[bytes]:
             outcome = "ok"
             try:
-                async for data in iter_sse_data(response.aiter_lines()):
-                    for out in restorer.process(data):
+                async for data in iter_sse_data(timed_lines()):
+                    unmasking = time.perf_counter()
+                    outs = restorer.process(data)
+                    timer.add("unmask", time.perf_counter() - unmasking)
+                    trace.scan_usage(data)
+                    for out in outs:
+                        timer.mark_first_event()
                         yield sse_event(out)
-                for out in restorer.finish():
+                unmasking = time.perf_counter()
+                outs = restorer.finish()
+                timer.add("unmask", time.perf_counter() - unmasking)
+                for out in outs:
                     yield sse_event(out)
             except Exception as exc:
                 # Fail closed: stop the stream with an error event, no exception text.
@@ -560,7 +655,16 @@ class Gateway:
                         text, spans, _ = restore_text(session, masked)
                         restored[index] = (text, spans)
                     self._seed_cache(session, language, detector, restored, stats)
+                    if trace.full:
+                        trace.stream_restored = {i: t for i, (t, _) in restored.items()}
                 stats.log(outcome)
+                if trace.payloads:
+                    trace.stream_masked = restorer.masked_content()
+                    trace.stream_chunks = restorer.chunks
+                if outcome == "ok":
+                    trace.finish()
+                else:
+                    trace.finish(outcome="stream_error", error={"code": "stream_failed"})
 
         return (
             StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),

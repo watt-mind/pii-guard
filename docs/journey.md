@@ -473,6 +473,40 @@ every span back to the original text, invisible characters included.
   better.
 - **Cost:** two Baseten runs, about $0.30.
 
+### 21. One-command demo, live traffic log and the gateway's measured overhead (2026-10-27)
+
+LAB-1166.
+
+Trying the gateway took five manual steps and a key, and nobody could see what it did to a
+call or what it cost in latency. `make demo` now starts the API, the gateway and the UI on a
+local mock upstream (offline, free), `make demo-traffic` sends fictional hu / en / de
+requests through it (streaming, tool calls, known values, an image that is refused fail
+closed), and `make smoke` checks in CI that every answer comes back restored exactly and that
+no gold value reached the upstream. Every call becomes one in-memory traffic event
+(`GET /v1/traffic`, live over SSE) with what was masked, what went upstream and a per-stage
+timing breakdown; `full` mode with the originals is refused off localhost
+([operations.md](operations.md)).
+
+- **Measured overhead** (`pii-guard bench latency`, mock upstream with a fixed 50 ms delay, a
+  new session per request, Apple M1 Max; p50 / p95 of total minus upstream wait):
+
+  | Mode | c=1 | c=1, streamed (added time to first token) | c=8 |
+  |---|---:|---:|---:|
+  | fast, rules | **5.2 / 7.8 ms** | 6.5 / 8.1 ms (5.3 / 6.6 ms) | 11 / 26 ms |
+  | fast, rules + distilled NER (XLM-R large, MPS) | **36 / 45 ms** | 39 / 47 ms (37 / 46 ms) | 166 / 182 ms |
+  | strict, rules + Muse Spark Open on Baseten | **1.23 / 1.79 s** | 1.32 / 1.58 s (1.32 / 1.58 s) | 1.90 / 2.44 s |
+
+  Source: run records `2026-10-27-gateway-latency-{rules-fast,ner-fast,baseten-strict}` in
+  [benchmarks.md](benchmarks.md#gateway-latency) (200 requests per fast cell, 10 per strict
+  cell).
+- **What the breakdown showed:** in rules-only fast mode detection and masking take about
+  0.7 ms; **4.4 of the 5.2 ms** are the `forward` stage, a new HTTP client (and TLS context)
+  built for every upstream call. Under concurrency the NER is serialised behind one lock (p50
+  36 → 166 ms at c=8), and strict mode queues behind the gateway's detection limit
+  (`PII_GUARD_GATEWAY_CONCURRENCY`, 4). Each is now a follow-up with a number to beat.
+- **Cost:** 44 Muse Spark Open calls on Baseten for the strict cells, about $0.10; everything
+  else ran locally.
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

@@ -16,6 +16,8 @@ Headline fixture set: **smoke** (hand-written; documents: en 10 + hu 31). Defaul
 
 ![Visual recall on image documents](benchmarks/visual-recall.svg)
 
+![Gateway overhead](benchmarks/latency.svg)
+
 ## How to read this
 
 - **Leak rate** is the share of labelled values that still appear, in any surface form, in
@@ -197,12 +199,34 @@ Share of labelled regions masked with IoU >= 0.5. `specimens` are official speci
 | `2026-10-27-visual-specimens-id-photo-prompt` | `specimens` | 65 | 24 | 76.9% | 83.8% | 0.0% | 0.4% | 20.2% | 1.5% |
 | `2026-10-27-visual-specimens-person-prompt` | `specimens` | 65 | 24 | 90.8% | 83.8% | 0.0% | 0.4% | 22.4% | 2.1% |
 
+## Gateway latency
+
+What the gateway adds to an LLM call, measured by `pii-guard bench latency` against the mock upstream with a fixed delay, so the upstream's own time is taken out: overhead = gateway total - time waiting on the upstream. Streams also report the added time to the first token. Each request is a new session (no cache hits). Stages and fields: [operations.md](operations.md#timing).
+
+| System | Concurrency | Stream | n | Overhead p50 | p95 | p99 | Detect p50 | Added TTFT p50 | p95 | Upstream delay ms | Run |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| fast: rules | 1 | no | 200 | 5.2 ms | 7.8 ms | 8.9 ms | 0.45 ms | — | — | 50 | `2026-10-27-gateway-latency-rules-fast` |
+| fast: rules | 1 | yes | 200 | 6.5 ms | 8.1 ms | 8.4 ms | 0.43 ms | 5.3 ms | 6.6 ms | 50 | `2026-10-27-gateway-latency-rules-fast` |
+| fast: rules | 8 | no | 200 | 11 ms | 26 ms | 32 ms | 6.2 ms | — | — | 50 | `2026-10-27-gateway-latency-rules-fast` |
+| fast: rules | 8 | yes | 200 | 12 ms | 27 ms | 37 ms | 5.0 ms | 10 ms | 24 ms | 50 | `2026-10-27-gateway-latency-rules-fast` |
+| fast: rules + ner | 1 | no | 200 | 36 ms | 45 ms | 51 ms | 31 ms | — | — | 50 | `2026-10-27-gateway-latency-ner-fast` |
+| fast: rules + ner | 1 | yes | 200 | 39 ms | 47 ms | 57 ms | 32 ms | 37 ms | 46 ms | 50 | `2026-10-27-gateway-latency-ner-fast` |
+| fast: rules + ner | 8 | no | 200 | 166 ms | 182 ms | 203 ms | 160 ms | — | — | 50 | `2026-10-27-gateway-latency-ner-fast` |
+| fast: rules + ner | 8 | yes | 200 | 173 ms | 183 ms | 189 ms | 166 ms | 172 ms | 182 ms | 50 | `2026-10-27-gateway-latency-ner-fast` |
+| strict: rules + llm | 1 | no | 10 | 1.2 s | 1.8 s | 2.1 s | 1.2 s | — | — | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+| strict: rules + llm | 1 | yes | 10 | 1.3 s | 1.6 s | 1.7 s | 1.3 s | 1.3 s | 1.6 s | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+| strict: rules + llm | 8 | no | 10 | 1.9 s | 2.4 s | 2.5 s | 1.9 s | — | — | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+| strict: rules + llm | 8 | yes | 10 | 2.2 s | 3.0 s | 3.2 s | 2.2 s | 2.2 s | 3.0 s | 50 | `2026-10-27-gateway-latency-baseten-strict` |
+
 ## Run log
 
 Newest first. `imported` runs were converted from earlier scorecards and Linear/PR notes; `recorded` ones were written by `pii-guard eval --record`.
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-27 | `2026-10-27-gateway-latency-baseten-strict` | pii-guard gateway, strict mode (rules + llm muse-spark-open) | latency-corpus | de, en, hu | recorded | `4ee1b15` | Apple M1 Max, 10 CPUs, local loopback | — |
+| 2026-10-27 | `2026-10-27-gateway-latency-ner-fast` | pii-guard gateway, fast mode (rules + ner pii-guard-ner-xlmr-large-distilled) | latency-corpus | de, en, hu | recorded | `4ee1b15` | Apple M1 Max, 10 CPUs, local loopback | — |
+| 2026-10-27 | `2026-10-27-gateway-latency-rules-fast` | pii-guard gateway, fast mode (rules) | latency-corpus | de, en, hu | recorded | `4ee1b15` | Apple M1 Max, 10 CPUs, local loopback | — |
 | 2026-10-27 | `2026-10-27-injection-spark-open-after-normalise` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | recorded | `fb1502e` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.15 |
 | 2026-10-27 | `2026-10-27-injection-rules-after-normalise` | pii-guard rules | injection | en, hu | recorded | `fb1502e` | Apple Silicon arm64, macOS 26.5, 10 CPUs, CPU only | — |
 | 2026-10-27 | `2026-10-27-injection-spark-open-before-normalise` | pii-guard rules + Muse Spark Open (Baseten) | injection | en, hu | recorded | `7e328ad` | Apple Silicon arm64 client; the LLM detector is Baseten Model APIs (remote) | ≈ $0.15 |
