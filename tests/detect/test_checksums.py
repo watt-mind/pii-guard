@@ -9,14 +9,19 @@ from hypothesis import strategies as st
 from pii_guard.detect.checksums import (
     IBAN_LENGTHS,
     giro_check_digit,
+    hu_personal_id_check_digit,
     hu_tax_id_check_digit,
     hu_tax_number_check_digit,
     iban_check_digits,
     is_valid_giro,
+    is_valid_hu_personal_id,
     is_valid_hu_tax_id,
     is_valid_hu_tax_number,
     is_valid_iban,
+    is_valid_mrz_td1,
+    is_valid_mrz_td3,
     is_valid_taj,
+    mrz_check_digit,
     taj_check_digit,
 )
 
@@ -148,3 +153,124 @@ def test_iban_round_trip_and_single_error(country: str, data: st.DataObject) -> 
     index = data.draw(st.sampled_from(positions))
     replacement = data.draw(st.sampled_from("0123456789").filter(lambda ch: ch != value[index]))
     assert not is_valid_iban(value[:index] + replacement + value[index + 1 :])
+
+
+# --- Personal identification number (személyi azonosító) --------------------
+
+
+def test_personal_id_known_vectors() -> None:
+    # Born 1971-03-04 (before 1997): weights 1..10.
+    # 1*1 + 7*2 + 1*3 + 0*4 + 3*5 + 0*6 + 4*7 + 1*8 + 2*9 + 3*10 = 117; 117 mod 11 = 7
+    assert hu_personal_id_check_digit("1710304123") == 7
+    assert is_valid_hu_personal_id("17103041237")
+    # Born 2005-06-07 (from 1997): weights 10..1.
+    # 5*10 + 0*9 + 5*8 + 0*7 + 6*6 + 0*5 + 7*4 + 0*3 + 1*2 + 2*1 = 158; 158 mod 11 = 4
+    assert hu_personal_id_check_digit("5050607012") == 4
+    assert is_valid_hu_personal_id("50506070124")
+    # The same digits with the other weighting are not valid.
+    assert not is_valid_hu_personal_id("17103041230")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "0710304123",  # 0 and 9 are not sex/century digits
+        "9710304123",
+        "1711304123",  # month 13
+        "1710231123",  # 31 February
+        "1710229123",  # 1971 is not a leap year
+    ],
+)
+def test_personal_id_rejects_impossible_payloads(payload: str) -> None:
+    assert hu_personal_id_check_digit(payload) is None
+    assert not any(is_valid_hu_personal_id(payload + str(d)) for d in range(10))
+
+
+@pytest.mark.parametrize(
+    "value", ["", "1710304123", "171030412370", "1710304123a", "1-710304-1237"]
+)
+def test_personal_id_rejects_malformed(value: str) -> None:
+    assert not is_valid_hu_personal_id(value)
+
+
+def test_personal_id_malformed_payload_raises() -> None:
+    with pytest.raises(ValueError):
+        hu_personal_id_check_digit("171030412")
+
+
+@given(
+    first=st.sampled_from("12345678"),
+    born=st.dates(),
+    serial=digits(3),
+    index=st.integers(7, 10),
+    offset=st.integers(1, 9),
+)
+def test_personal_id_detects_any_single_digit_error_in_serial_and_check(
+    first: str, born, serial: str, index: int, offset: int
+) -> None:
+    payload = f"{first}{born:%y%m%d}{serial}"
+    check = hu_personal_id_check_digit(payload)
+    if check is None:
+        return
+    value = payload + str(check)
+    assert is_valid_hu_personal_id(value)
+    assert not is_valid_hu_personal_id(_replace_digit(value, index, offset))
+
+
+# --- Machine-readable zones (ICAO 9303) -------------------------------------
+
+# The specimen zones printed in ICAO Doc 9303 for the fictional state of Utopia.
+TD3 = (
+    "P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<",
+    "L898902C36UTO7408122F1204159ZE184226B<<<<<10",
+)
+TD1 = (
+    "I<UTOD231458907<<<<<<<<<<<<<<<",
+    "7408122F1204159UTO<<<<<<<<<<<6",
+    "ERIKSSON<<ANNA<MARIA<<<<<<<<<<",
+)
+
+
+def test_mrz_known_vectors() -> None:
+    assert mrz_check_digit("L898902C3") == 6
+    assert mrz_check_digit("740812") == 2
+    assert mrz_check_digit("<<<<<<") == 0
+    assert is_valid_mrz_td3(*TD3)
+    assert is_valid_mrz_td1(*TD1)
+
+
+def test_mrz_rejects_wrong_shape() -> None:
+    assert not is_valid_mrz_td3(TD3[0][:-1], TD3[1])
+    assert not is_valid_mrz_td3(TD3[0], TD3[1].lower())
+    assert not is_valid_mrz_td1(TD1[0], TD1[1], TD1[2] + "<")
+    with pytest.raises(ValueError):
+        mrz_check_digit("ab")
+    with pytest.raises(ValueError):
+        mrz_check_digit("")
+
+
+@given(index=st.sampled_from([i for i, ch in enumerate(TD3[1]) if ch.isdigit()]), data=st.data())
+def test_td3_detects_any_single_digit_error(index: int, data: st.DataObject) -> None:
+    line2 = TD3[1]
+    replacement = data.draw(st.sampled_from("0123456789").filter(lambda ch: ch != line2[index]))
+    assert not is_valid_mrz_td3(TD3[0], line2[:index] + replacement + line2[index + 1 :])
+
+
+@given(line=st.integers(0, 1), data=st.data())
+def test_td1_detects_any_single_digit_error(line: int, data: st.DataObject) -> None:
+    lines = list(TD1)
+    index = data.draw(st.sampled_from([i for i, ch in enumerate(lines[line]) if ch.isdigit()]))
+    replacement = data.draw(
+        st.sampled_from("0123456789").filter(lambda ch: ch != lines[line][index])
+    )
+    lines[line] = lines[line][:index] + replacement + lines[line][index + 1 :]
+    assert not is_valid_mrz_td1(*lines)
+
+
+def test_td3_empty_optional_data_may_have_a_filler_check_digit() -> None:
+    head = TD3[1][:28] + "<" * 14 + "<"
+    composite = mrz_check_digit(head[0:10] + head[13:20] + head[21:43])
+    assert is_valid_mrz_td3(TD3[0], head + str(composite))
+    # A filler check digit is only allowed for an empty field.
+    filled = TD3[1][:42] + "<"
+    assert not is_valid_mrz_td3(TD3[0], filled + TD3[1][43])

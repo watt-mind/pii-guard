@@ -22,9 +22,11 @@ from pathlib import Path
 
 from pii_guard.detect.checksums import (
     giro_check_digit,
+    hu_personal_id_check_digit,
     hu_tax_id_check_digit,
     hu_tax_number_check_digit,
     iban_check_digits,
+    mrz_check_digit,
     taj_check_digit,
 )
 from pii_guard.eval import Document, from_markup, label, write_fixtures
@@ -89,6 +91,26 @@ def company_tax_number(base7: str, vat: str = "2", area: str = "42") -> str:
 
 def bad_company_tax_number(base7: str) -> str:
     return f"{base7}{(hu_tax_number_check_digit(base7) + 1) % 10}-2-42"
+
+
+def personal_id(payload10: str) -> str:
+    """A checksum-valid személyi azonosító, written ``S-YYMMDD-NNNC``."""
+    check = hu_personal_id_check_digit(payload10)
+    if check is None:
+        raise ValueError("payload has no valid check digit; pick another")
+    return f"{payload10[0]}-{payload10[1:7]}-{payload10[7:]}{check}"
+
+
+def mrz_td1(doc: str, born: str, sex: str, expires: str, surname: str, given: str) -> str:
+    """A TD1 (ID card) machine-readable zone with valid check digits, issued by ``HUN``."""
+    number = doc.ljust(9, "<")
+    line1 = f"I<HUN{number}{mrz_check_digit(number)}".ljust(30, "<")
+    head = f"{born}{mrz_check_digit(born)}{sex}{expires}{mrz_check_digit(expires)}HUN"
+    head = head.ljust(29, "<")
+    composite = line1[5:30] + head[0:7] + head[8:15] + head[18:29]
+    line2 = head + str(mrz_check_digit(composite))
+    line3 = f"{surname}<<{given}".ljust(30, "<")
+    return "\n".join((line1, line2, line3))
 
 
 # Shorthands for inline labels.
@@ -378,6 +400,33 @@ def hu_documents() -> list[Document]:
             f"a következő szerepel: {E('kata.sz.m@example.org')}, {PH('+36 20 111 2233')}, "
             f"{A('4025 Debrecen, Mintás tér 6.')}. Kérjük, jelezze, ha változott.",
             {"kind": "email"},
+        ),
+        (
+            "hu-idcard-0029",
+            "SZEMÉLYAZONOSÍTÓ IGAZOLVÁNY (beolvasott másolat)\n"
+            f"Név: {P('Próba Piroska')}\nSzemélyi azonosító: {IDD(personal_id('2950817124'))}\n"
+            f"Okmányazonosító: {IDD('765432KL')}\n"
+            f"{IDD(mrz_td1('765432KL', '950817', 'F', '310817', 'PROBA', 'PIROSKA'))}",
+            {"kind": "id_scan"},
+        ),
+        (
+            "hu-contract-0030",
+            "TULAJDONJOG-BEJEGYZÉSI KÉRELEM\n\n"
+            f"Alulírott {P('Minta Márton')}, a {IDD('345678MN')} számú személyi igazolvánnyal "
+            f"és a {IDD('AB2345678')} sz. útlevéllel rendelkező kérelmező kérem, hogy a Vác "
+            f"belterület, hrsz.: {HRSZ('0123/4/A/12')} és {HRSZ('0123/4/A/13')} ingatlanokra "
+            "1/2 arányú tulajdoni hányadomat jegyezzék be. A kérelem 3/5. oldalán szereplő "
+            "adatok a 2026/10. havi állapotot tükrözik.",
+            {"kind": "contract"},
+        ),
+        (
+            "hu-court-0031",
+            "VÉGZÉS\n\nÜgyszám: 12.P.21.345/2025/7.\nA bíróság a 2025.10.27. napján kelt "
+            "keresetlevelet a 3/2025. (X. 27.) számú rendelkezés alapján áttette. A felperes "
+            "tulajdoni hányada 1/4, az alperesé 3/4. Az iratok 14/22. oldalán szereplő "
+            "számla száma 2026/0042, a rendelésszám AB1234567. Az ingatlan helyrajzi számának "
+            "megállapítása folyamatban van.",
+            {"kind": "court_notice"},
         ),
     ]
     return [from_markup(doc_id, text, language="hu", meta=meta) for doc_id, text, meta in docs]
