@@ -46,7 +46,7 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
             {title}
           </h2>
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
       </header>
       <div className="min-h-0 flex-1 px-4 py-4 sm:px-5">{children}</div>
       {footer && <footer className="border-t border-line px-4 py-2.5 text-xs text-muted sm:px-5">{footer}</footer>}

@@ -30,11 +30,15 @@ export interface PublicSpan {
   entity_type: EntityType;
   score: number;
   detector: string;
+  /** The type's effective policy (`/v1/analyze`); absent from older APIs and the demo engine. */
+  policy?: "mask" | "keep" | "block";
 }
 
 export interface AnalyzeRequest {
   text: string;
   language?: string;
+  /** Previews the session's known values (spans with `detector: "known"`). */
+  session_id?: string | null;
 }
 
 export interface AnalyzeResponse {
@@ -57,6 +61,20 @@ export interface MaskResponse {
   masked_text: string;
   session_id: string;
   entities: MaskedEntity[];
+  /** Detected but left in place by a `keep` policy: type and count only. */
+  kept?: TypeCount[];
+}
+
+/** A value the application already knows is sensitive (`POST /v1/sessions`). */
+export interface KnownValue {
+  value: string;
+  entity_type: TextEntityType;
+}
+
+export interface KnownValuesResponse {
+  session_id: string;
+  added: number;
+  total: number;
 }
 
 export interface UnmaskRequest {
@@ -129,4 +147,8 @@ export interface GuardClient {
   unmask(req: UnmaskRequest): Promise<UnmaskResponse>;
   /** Optional so text-only engines (and test doubles) still fit. */
   maskImage?(req: ImageMaskRequest): Promise<ImageMaskResponse>;
+  /** `POST /v1/sessions` with pre-loaded known values. */
+  createSession?(known_values: KnownValue[]): Promise<KnownValuesResponse>;
+  /** `POST /v1/sessions/{id}/known-values`. */
+  addKnownValues?(session_id: string, known_values: KnownValue[]): Promise<KnownValuesResponse>;
 }

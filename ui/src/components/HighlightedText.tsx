@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { describeSpan, spanKey, type LocalSpan } from "../lib/analysis";
+import { describeSpan, isKept, spanKey, type LocalSpan } from "../lib/analysis";
 import { metaFor } from "../lib/entities";
 
 interface Props {
@@ -19,7 +19,7 @@ export function HighlightedText({ text, spans, activeKey, onActivate }: Props) {
     const meta = metaFor(span.entityType);
     const key = spanKey(span);
     const active = key === activeKey;
-    const kept = span.placeholder === null;
+    const kept = isKept(span);
     parts.push(
       <mark
         key={`${span.start}-${i}`}
@@ -42,6 +42,24 @@ export function HighlightedText({ text, spans, activeKey, onActivate }: Props) {
       </mark>,
     );
     cursor = span.end;
+    if (span.detector === "known") {
+      // The badge goes after the whole word, so an inflectional suffix stays visibly outside the value.
+      const suffix = /^\p{L}*/u.exec(text.slice(span.end))?.[0] ?? "";
+      const next = spans[i + 1];
+      const keep = next && next.start < span.end + suffix.length ? "" : suffix;
+      if (keep) parts.push(keep);
+      parts.push(
+        <span
+          key={`known-${span.start}`}
+          aria-hidden="true"
+          data-known
+          className="ml-1 inline-block translate-y-[-1px] rounded bg-guard-soft px-1 align-middle font-sans text-[10px] leading-4 font-semibold tracking-wide text-guard-ink uppercase ring-1 ring-guard/40"
+        >
+          known
+        </span>,
+      );
+      cursor += keep.length;
+    }
   });
   if (cursor < text.length) parts.push(text.slice(cursor));
   return <div className="doc text-ink">{parts}</div>;

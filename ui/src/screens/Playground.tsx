@@ -4,13 +4,15 @@ import { Boundary } from "../components/Boundary";
 import { EntityTable } from "../components/EntityTable";
 import { HighlightedText } from "../components/HighlightedText";
 import { Inspector, type InspectorInfo } from "../components/Inspector";
+import { KnownValues } from "../components/KnownValues";
+import type { KnownRow } from "../lib/knownRows";
 import { Legend } from "../components/Legend";
 import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
 import { Popover } from "../components/Popover";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
-import { SAMPLES, type Sample } from "../content/samples";
-import { detectorsUsed, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
+import { SAMPLES, sampleBehind, type Sample } from "../content/samples";
+import { detectorsUsed, isKept, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
 import type { RunError, RunResult } from "../lib/run";
 
 interface Props {
@@ -23,9 +25,16 @@ interface Props {
   error: RunError | null;
   onRun: () => void;
   onContinue: () => void;
+  language: "hu" | "en";
+  onLanguage: (l: "hu" | "en") => void;
+  known: KnownRow[];
+  onKnown: (rows: KnownRow[]) => void;
+  onTryKnown: () => void;
+  /** Known-value rows as they were when `result` was made; a change makes the result stale. */
+  knownSignature: string;
 }
 
-export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue }: Props) {
+export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue, language, onLanguage, known, onKnown, onTryKnown, knownSignature }: Props) {
   const [editing, setEditing] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -34,9 +43,9 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
     setAnchor(key ? (el ?? null) : null);
   };
 
-  const fresh = result !== null && result.input === text;
+  const fresh = result !== null && result.input === text && result.language === language && result.knownSignature === knownSignature;
   const showHighlighted = fresh && !editing;
-  const sample = SAMPLES.find((s) => s.id === sampleId);
+  const sample = SAMPLES.find((s) => s.id === sampleId) ?? sampleBehind(text);
 
   const summary = useMemo(() => (result ? summarize(result.spans, result.mask) : null), [result]);
   const counts = useMemo(() => {
@@ -45,7 +54,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
     return m;
   }, [result]);
   const keptTypes = useMemo(
-    () => new Set<EntityType>(result?.spans.filter((s) => s.placeholder === null).map((s) => s.entityType) ?? []),
+    () => new Set<EntityType>(result?.spans.filter(isKept).map((s) => s.entityType) ?? []),
     [result],
   );
 
@@ -58,6 +67,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
     return {
       entityType: first?.entityType ?? entity?.entity_type ?? null,
       placeholder: first?.placeholder ?? entity?.placeholder ?? null,
+      kept: first ? isKept(first) : false,
       detector: first?.detector,
       score: own.length ? Math.max(...own.map((s) => s.score)) : undefined,
       occurrences: entity?.count ?? own.length,
@@ -72,8 +82,20 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
   return (
     <div className="space-y-6">
       <Intro />
+      <p className="sr-only" aria-live="polite">
+        {running ? "Masking the document" : error ? "" : fresh && summary ? `Done: ${summary.masked} values masked, ${summary.kept} kept by policy` : ""}
+      </p>
 
       <SamplePicker selected={sampleId} onPick={(s) => { setEditing(false); onSample(s); }} />
+
+      <KnownValues
+        rows={known}
+        onRows={onKnown}
+        onTry={onTryKnown}
+        found={fresh && result ? result.spans.filter((s) => s.detector === "known").length : null}
+        counts={fresh ? (result?.known ?? null) : null}
+        error={error?.code === "invalid_known_value" && error.knownIndex !== undefined ? { index: error.knownIndex, message: error.message } : null}
+      />
 
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         <Pane
@@ -84,6 +106,19 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           className="lg:flex-1"
           actions={
             <>
+              <label className="sr-only" htmlFor="doc-language">
+                Document language
+              </label>
+              <select
+                id="doc-language"
+                value={language}
+                onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
+                className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                title="Language of the document: decides which rules and inflections apply"
+              >
+                <option value="hu">Hungarian</option>
+                <option value="en">English</option>
+              </select>
               {showHighlighted && (
                 <Button variant="ghost" onClick={() => setEditing(true)}>
                   Edit text
@@ -168,10 +203,8 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           footer={
             result && fresh && summary ? (
               result.engine === "mock" ? (
-                <span>Every value was swapped for a typed, keyed placeholder. The model never sees the originals.</span>
-              ) : (
-                <span>{liveScope(summary, detectorsUsed(result.spans))}</span>
-              )
+                <span>Demo engine: a small rule set running in your browser, so it misses more than the live pipeline.</span>
+              ) : undefined
             ) : undefined
           }
         >
@@ -181,18 +214,18 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
             <SkeletonLines />
           ) : result && fresh ? (
             <div className="space-y-4">
-              {sample && sample.text === result.input && (
+              {sample && result.input.startsWith(sample.text) && (
                 <p className="rounded-lg bg-model-soft px-3 py-2 text-sm text-ink">
                   <span className="font-semibold text-model">Instruction · </span>
                   {sample.task}
                 </p>
               )}
-              {result.engine === "api" && summary && <ScopeNote summary={summary} detectors={detectorsUsed(result.spans)} />}
+              {summary && <ScopeNote summary={summary} detectors={detectorsUsed(result.spans)} demo={result.engine === "mock"} />}
               <MaskedText text={result.mask.masked_text} activeKey={activeKey} onActivate={activate} />
             </div>
           ) : (
             <EmptyState
-              title={result ? "The document changed" : "Nothing has been sent yet"}
+              title={result ? (result.input === text ? "The settings changed" : "The document changed") : "Nothing has been sent yet"}
               body={
                 result
                   ? "Run the guard again to see what the model would get for this version."
@@ -214,7 +247,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                 Colour shows the type. A dashed outline means the value was detected but kept by policy (organizations, for example, are usually not personal data and the model needs them).
               </p>
             </div>
-            <Legend counts={counts} kept={keptTypes} activeType={info?.entityType ?? null} />
+            <Legend counts={counts} kept={keptTypes} activeType={info?.entityType ?? null} known={result.spans.filter((s) => s.detector === "known").length} />
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted">
               <dt>Session</dt>
               <dd className="truncate font-mono text-ink" title={result.mask.session_id}>
@@ -243,14 +276,8 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
   );
 }
 
-function liveScope(summary: Summary, detectors: string[]): string {
-  const by = detectors.length ? ` by ${joinList(detectors)}` : "";
-  const kept = summary.kept ? ` ${summary.kept} kept by policy.` : "";
-  return `${summary.masked} ${summary.masked === 1 ? "value" : "values"} masked${by}.${kept} Text without a highlight was not detected and was sent as written.`;
-}
-
 /** Live mode: say exactly what this engine did, so gaps read as known scope rather than a promise. */
-function ScopeNote({ summary, detectors }: { summary: Summary; detectors: string[] }) {
+function ScopeNote({ summary, detectors, demo }: { summary: Summary; detectors: string[]; demo: boolean }) {
   return (
     <div className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink" data-testid="scope-note">
       <p>
@@ -261,7 +288,7 @@ function ScopeNote({ summary, detectors }: { summary: Summary; detectors: string
         {summary.kept > 0 && <>, {summary.kept} kept by policy</>}.
       </p>
       <p className="mt-0.5 text-muted">
-        Only highlighted values were replaced. Anything without a highlight on the left was not detected by the detectors running on this API and reached the model as written.
+        Only highlighted values were replaced. Anything without a highlight on the left was not detected {demo ? "by the in-browser demo rules" : "by the detectors running on this API"} and reached the model as written.
       </p>
     </div>
   );
@@ -284,7 +311,7 @@ function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (
   return (
     <fieldset className="min-w-0">
       <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples</legend>
-      <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
+      <div className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4 sm:px-0 sm:pb-0">
         {SAMPLES.map((s) => {
           const on = s.id === selected;
           return (
@@ -292,14 +319,17 @@ function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (
               key={s.id}
               type="button"
               aria-pressed={on}
-              onClick={() => onPick(s)}
+              onClick={(e) => {
+                e.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
+                onPick(s);
+              }}
               className={[
                 "group flex w-[15rem] shrink-0 snap-start items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors sm:w-auto",
                 on ? "border-ink bg-surface shadow-sm" : "border-line bg-surface/60 hover:border-line-strong hover:bg-surface",
               ].join(" ")}
             >
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-ink" lang="hu">
+                <span className="block truncate text-sm font-semibold text-ink" lang={s.language}>
                   {s.title}
                 </span>
                 <span className="block truncate text-xs text-muted">{s.subtitle}</span>

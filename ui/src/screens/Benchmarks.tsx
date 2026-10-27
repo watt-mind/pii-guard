@@ -3,6 +3,8 @@ import {
   documentCount,
   formatMs,
   formatPct,
+  headline,
+  type HeadlineSide,
   languageName,
   loadBenchmarks,
   originLabel,
@@ -91,6 +93,8 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         <Fact label="Latest run" value={lastRun} />
       </dl>
 
+      <Headline index={index} set={set} lang={lang} />
+
       <section aria-label="Filters" className="space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-5">
         <Segmented
           label="Fixture set"
@@ -141,7 +145,11 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
                         <input type="checkbox" className="sr-only" checked={on} onChange={() => toggle(k)} />
                         <MarkerIcon info={sys} />
                         {sys?.short_label ?? k}
-                        {sys?.default && <span className="rounded bg-guard-soft px-1 text-[10px] font-semibold text-guard-ink uppercase">default</span>}
+                        {sys?.default && (
+                          <span title="The rules-only pipeline: no model call. Used by the gateway's Fast mode." className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-muted uppercase ring-1 ring-line">
+                            fast mode
+                          </span>
+                        )}
                       </label>
                     );
                   })}
@@ -224,6 +232,36 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         <code className="font-mono">pii-guard eval --record &lt;slug&gt;</code>.
       </p>
     </>
+  );
+}
+
+function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; lang: LanguageFilter }) {
+  const h = headline(index, set, lang);
+  if (!h) return null;
+  const docs = documentCount(index.fixture_sets[set], lang);
+  const info = index.fixture_sets[set];
+  const kind = info?.origin === "generated" ? "model-generated" : "hand-written";
+  const scope = `${docs ?? "?"} ${kind} fictional ${lang === "all" ? "" : `${languageName(lang)} `}documents`;
+  const pct = (x: HeadlineSide) => <strong className="font-semibold tabular-nums text-ink">{formatPct(x.leak)}</strong>;
+  const demo = index.snapshots.find((x) => x.fixture_set === set && /muse spark open/i.test(index.systems[x.system]?.label ?? ""));
+  const demoLeak = demo ? pick(demo, lang)?.leak : null;
+  const speed = (x: HeadlineSide) => (x.p50 === null ? "" : `${x.label}: ${formatMs(x.p50)} per document${x.hardware ? ` (${x.hardware})` : ""}`);
+  return (
+    <div className="rounded-2xl border border-guard/30 bg-guard-soft/60 px-4 py-3" data-testid="bench-headline">
+      <p className="text-base text-pretty text-ink sm:text-lg">
+        On {scope}, pii-guard lets {pct(h.ours)} of personal values through, against {pct(h.theirs)} for the best open-source tool.
+        {demo && demoLeak !== null && demoLeak !== undefined && demo.system !== h.ours.system && (
+          <>
+            {" "}
+            The configuration this demo runs (rules + Muse Spark Open): <strong className="font-semibold tabular-nums text-ink">{formatPct(demoLeak)}</strong>.
+          </>
+        )}
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        Best pii-guard configuration: {h.ours.label}. Best tool: {h.theirs.label}. Leak = labelled personal values still readable after masking. Speed was
+        measured where each ran, so it isn't a like-for-like test: {[speed(h.ours), speed(h.theirs)].filter(Boolean).join("; ")}.
+      </p>
+    </div>
   );
 }
 
@@ -364,7 +402,11 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                   <span className="flex items-center gap-1.5">
                     <MarkerIcon info={sys} />
                     {sys?.short_label ?? s.system}
-                    {sys?.default && <span className="sr-only"> (default pipeline)</span>}
+                    {sys?.default && (
+                      <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-muted uppercase ring-1 ring-line">
+                        fast mode
+                      </span>
+                    )}
                   </span>
                 </th>
                 {COLUMNS.map((c) => {

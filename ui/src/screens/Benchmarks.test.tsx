@@ -29,7 +29,7 @@ function resultsTable(panel: HTMLElement) {
   return within(section).getByRole("table");
 }
 
-const nameOf = (h: HTMLElement | null) => h?.textContent?.replace("(default pipeline)", "").trim();
+const nameOf = (h: HTMLElement | null) => h?.textContent?.replace(/fast mode$/, "").trim();
 
 function rowNames(table: HTMLElement) {
   return within(table).getAllByRole("rowheader").map(nameOf);
@@ -125,7 +125,7 @@ describe("Benchmarks screen", () => {
     const { user, panel } = await openBenchmarks();
     await within(panel).findByRole("region", { name: "Results" });
     await user.click(within(panel).getByRole("radio", { name: "English" }));
-    await user.click(screen.getByRole("tab", { name: /playground/i }));
+    await user.click(screen.getByRole("tab", { name: /mask/i }));
     await user.click(screen.getByRole("tab", { name: /benchmarks/i }));
     expect(within(panel).getByRole("radio", { name: "English" })).toBeChecked();
     expect(load).toHaveBeenCalledTimes(1);

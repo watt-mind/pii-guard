@@ -190,6 +190,7 @@ export const DETECTOR_TYPES: Record<string, { types: readonly EntityType[]; part
 };
 
 const KNOWN_MODELS: { prefix: string; label: (version: string) => string }[] = [
+  { prefix: "muse-spark-open", label: () => "Muse Spark Open" },
   { prefix: "muse-spark-", label: (v) => `Muse Spark ${v} (Meta API)` },
 ];
 
@@ -215,5 +216,7 @@ export function detectorLabel(detector: string, options: DetectorLabelOptions = 
   }
   if (detector === "llm") return options.model ? modelLabel(options.model) : "LLM detector";
   if (detector === "ner") return "Multilingual NER";
+  if (detector === "known") return "Known value (pre-loaded)";
+  if (detector === "demo") return "Demo rules (in browser)";
   return detector;
 }

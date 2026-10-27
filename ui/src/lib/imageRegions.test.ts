@@ -47,3 +47,14 @@ describe("image regions", () => {
     expect(samTargets(analysis({}))).toBe("faces, signatures, ID photos and stamps");
   });
 });
+
+describe("tagPlacements", () => {
+  it("moves the tag of a region nested in another off the shared corner", async () => {
+    const { tagPlacements } = await import("./imageRegions");
+    const region = (box: [number, number, number, number]) =>
+      ({ entity_type: "FACE", box, source: "sam", detector: "sam", score: 0.9, policy: "mask" }) as const;
+    const tags = tagPlacements([region([100, 100, 300, 400]), region([110, 110, 290, 380])], 1000, 600);
+    expect(tags[0]).toBe("top-left");
+    expect(tags[1]).not.toBe("top-left");
+  });
+});

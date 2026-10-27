@@ -42,6 +42,9 @@
   --warn-soft: #2e2210;
   --danger: #ff8a8f;
   --danger-soft: #341517;
+  /* Benchmark system colours that are too dark on this canvas (LAB-1155). */
+  --sys-882255: #88ccee;
+  --sys-332288: #ddcc77;
   color-scheme: dark;
 }
 

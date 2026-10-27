@@ -18,6 +18,8 @@ import {
   samTargets,
   sourceLabel,
   summarizeRegions,
+  tagPlacements,
+  type TagPlacement,
 } from "../lib/imageRegions";
 import { toRunError, type RunError } from "../lib/run";
 
@@ -139,9 +141,13 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
         </p>
       </div>
 
+      <p className="sr-only" aria-live="polite">
+        {running ? "Masking the image" : summary ? `Image masked: ${summary.masked} regions covered, ${summary.kept} kept` : ""}
+      </p>
+
       <fieldset className="min-w-0">
         <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-faint uppercase">Fictional samples, or your own image</legend>
-        <div className="relative -mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
+        <div className="relative -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4">
           {IMAGE_SAMPLES.map((s) => {
             const on = selection.kind === "sample" && selection.sample.id === s.id;
             return (
@@ -149,7 +155,8 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
                 key={s.id}
                 type="button"
                 aria-pressed={on}
-                onClick={() => {
+                onClick={(e) => {
+                  e.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
                   const next = sampleSelection(s);
                   select(next);
                   void run(next); // one click: pick and mask
@@ -226,15 +233,15 @@ export function Images({ client, engineState, loadImage = fetchImage }: Props) {
             data && data.regions.length > 0 ? (
               <span>Solid outlines: found by SAM 3.1. Dashed: text found by OCR and a detector. Hover, tap or tab to a region for its type.</span>
             ) : (
-              <span>Pick a sample or upload a fictional image, then mask it.</span>
+              <span>{src ? "Mask the image to see what the model would get." : "Pick a sample or upload a fictional image, then mask it."}</span>
             )
           }
         >
           <Figure src={src} alt={alt}>
             {data &&
               showRegions &&
-              data.regions.map((r, i) => (
-                <RegionBox key={i} region={r} models={data.analysis.ocr.models} index={i} width={data.width} height={data.height} active={active === i} onActive={setActive} />
+              data.regions.map((r, i, all) => (
+                <RegionBox key={i} region={r} models={data.analysis.ocr.models} index={i} width={data.width} height={data.height} active={active === i} onActive={setActive} tag={tagPlacements(all, data.width, data.height)[i] ?? "top-left"} />
               ))}
           </Figure>
         </Pane>
@@ -353,6 +360,7 @@ function RegionBox({
   height,
   active,
   onActive,
+  tag,
 }: {
   region: ImageRegion;
   models?: Record<string, string>;
@@ -361,6 +369,7 @@ function RegionBox({
   height: number;
   active: boolean;
   onActive: (i: number | null) => void;
+  tag: TagPlacement;
 }) {
   const meta = metaFor(region.entity_type);
   const color = REGION_COLOR[region.entity_type];
@@ -387,13 +396,16 @@ function RegionBox({
       <span
         aria-hidden="true"
         className={[
-          "absolute -top-[1.15rem] left-[-2px] rounded-t px-1 font-mono text-[10px] leading-[1.1rem] font-semibold whitespace-nowrap text-white",
+          "absolute px-1 font-mono",
+          tag.startsWith("top") ? "-top-[1.15rem] rounded-t" : "-bottom-[1.15rem] rounded-b",
+          tag.endsWith("left") ? "left-[-2px]" : "right-[-2px]",
+          " text-[10px] leading-[1.1rem] font-semibold whitespace-nowrap text-white",
           // Text regions sit between lines of text: their tag would hide the line above.
           region.source === "ocr" && !active ? "hidden" : "",
         ].join(" ")}
         style={{ backgroundColor: color }}
       >
-        {meta.short}
+        {meta.label}
         {kept ? " · kept" : ""}
       </span>
     </button>
@@ -454,7 +466,7 @@ function RegionTable({
     return <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing to list: the image went out re-encoded but otherwise unchanged.</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-lg border border-line">
+    <div role="region" aria-label="Region list (scrolls sideways)" tabIndex={0} className="overflow-x-auto rounded-lg border border-line focus-visible:outline-2 focus-visible:outline-ink">
       <table className="w-full min-w-[30rem] text-left text-sm">
         <thead className="bg-surface-2 text-xs text-muted">
           <tr>

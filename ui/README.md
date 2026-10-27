@@ -44,23 +44,29 @@ to fall back: the guard failed closed, and the UI says that nothing was sent.
 
 ## Screens
 
-1. **Playground.** Load a fictional sample (property sale contract, insurance claim email,
-   medical referral) or paste text, then mask it. Your document is shown with every detected
-   entity highlighted by type; *What the model saw* shows the masked text with typed
-   placeholders. Hover or tab to any highlight to see its type, detector and confidence; the
-   matching placeholder lights up on the other side. Below: the entity legend and the
-   placeholder map (placeholder ↔ type ↔ count). Original values appear only in the input pane.
-2. **Round trip.** A simulated model answer that refers to people only by placeholders (edit
-   it freely, or add a placeholder the model "invented"). **Restore** unmasks it in one go;
-   **Stream** feeds it in small chunks and shows placeholders split across chunks being held
-   back, then restored, as they arrive. Unknown placeholders are left visible and flagged.
-3. **Images.** Pick a fictional specimen document (ID card, health card, signed letter with a
+1. **Mask** (`#mask`). Load a fictional sample (Hungarian contract, insurance claim email,
+   medical referral, an English support email) or paste text, pick the language, then mask
+   it. Your document is shown with every detected entity highlighted by type; *What the model
+   saw* shows the masked text with typed placeholders. Hover or tab to any highlight to see its
+   type, detector and confidence; the matching placeholder lights up on the other side. Below:
+   the entity legend and the placeholder map. **Known values** pre-loads values the
+   application already knows (`POST /v1/sessions/{id}/known-values`); they are masked in any
+   inflected form and marked *known*. **Send it to the model** hands the document to Chat.
+2. **Chat** (`#chat`). A live chat through the gateway (`POST /v1/chat/completions` with
+   `X-PII-Guard-Echo: masked`): per turn, *You wrote* / *What the model received* and *What the
+   model answered* / *What you got back*, with the same placeholder for the same person in
+   every turn. The model is real only when the API runs with an upstream
+   (`PII_GUARD_UPSTREAM_BASE_URL`); the demo engine uses a simulated answer. *Replay a
+   document* is the old round trip: a simulated answer, restored in one go or streamed in
+   chunks, with unknown placeholders flagged.
+3. **Images** (`#images`). Pick a fictional specimen document (ID card, health card, signed letter with a
    company stamp, visitor badge) or upload a PNG/JPEG, then mask it. *Your image* shows every region the API
    found, outlined in its type's colour (solid: SAM 3.1 segmentation, dashed: OCR text found by
    a detector; a tag on each SAM box, OCR tags on hover/focus); *What the model saw* shows the
    masked PNG exactly as `/v1/mask/image` returned it. Below: a legend (type, count, SAM/OCR,
    kept) and the region list (type, source, policy, box). Hover, tap or tab to a region to link
-   both sides. A note says what ran, and what did not: OCR off on the API host, or names not
+   both sides. Overlapping FACE and ID_PHOTO boxes are both drawn by design (two detections of
+   the same photo); tags are placed so they do not cover each other. A note says what ran, and what did not: OCR off on the API host, or names not
    looked for because only the rules detector runs.
 
    In demo mode the samples replay regions **recorded from a real run** (SAM 3.1 on the Meta
@@ -69,6 +75,10 @@ to fall back: the guard failed closed, and the UI says that nothing was sent.
 
    For the live pipeline the API needs `META_API_KEY` (SAM 3.1) and, for text in images,
    `uv sync --extra ocr` plus the `tesseract` binary with `hun` and `eng` data.
+
+4. **Benchmarks** (`#benchmarks`). The published evaluation results: a one-sentence headline
+   (how many personal values pii-guard lets through against the best open-source tool), charts
+   and the results table per set and language.
 
 All sample data is fictional ([ADR 0005](../docs/decisions/0005-synthetic-data-only.md)).
 Never paste real personal data into the demo.
@@ -101,7 +111,9 @@ pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test --run
 | `src/lib/analysis.ts` | Code-point offsets, span ↔ placeholder linking, answer templates |
 | `src/lib/stream.ts` | Chunked streaming simulation |
 | `src/components/` | Highlighting, placeholders, legend, entity table, panes |
-| `src/screens/` | Playground and Round trip |
+| `src/screens/` | Mask (`Playground.tsx`), Chat, Round trip replay, Images, Benchmarks |
+| `src/api/chat.ts` | Gateway chat client (SSE + echo events) and the simulated demo chat |
+| `src/components/KnownValues.tsx` | The known-values panel on the Mask screen |
 | `src/content/samples.ts` | Fictional Hungarian sample documents and answers |
 | `src/content/imageSamples.ts` | The fictional sample images (`public/samples/*.png`) |
 | `src/content/imageRecordings.json` | Recorded `/v1/mask/image` regions for the demo engine |

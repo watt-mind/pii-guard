@@ -21,7 +21,7 @@ leak 52.6 % (Hungarian) and 46.7 % (English) of labelled values. Rules plus Muse
 Baseten leak 0.9 % and 0.0 %, at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. A
 fast mode with no LLM call (rules plus a small NER model distilled from Muse Glimmer) gets
 Hungarian down to 0.9 % and English to 0.0 % at tens of milliseconds per message. On a public benchmark
-(Ai4Privacy OpenPII, 600 documents, milestone 23) strict mode leaks 3.9 % and fast mode 38.0 %:
+(Ai4Privacy OpenPII, 600 documents, milestone 24) strict mode leaks 3.9 % and fast mode 38.0 %:
 fast mode suits text like ours, not unfamiliar number formats.
 
 | Language | Mode | Best configuration | Leak | F1 (overlap) | p50 latency | $ / 1k msgs | Source |
@@ -32,11 +32,11 @@ fast mode suits text like ours, not unfamiliar number formats.
 | English | fast | rules + distilled NER, large | **0.0 %** | 98.5 | 36 ms (MPS) | no API call | [distilled/large/en-smoke.md](../eval/results/ner/distilled/large/en-smoke.md), [latency-large.json](../eval/results/ner/distilled/latency-large.json) |
 | either | none | rules only (baseline) | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [distilled/rules/](../eval/results/ner/distilled/rules/) `hu-smoke.md`, `en-smoke.md` |
 
-¹ Measured in the 2026-10-27 comparison (milestone 23), which confirmed the 0.9 % figure
+¹ Measured in the 2026-10-27 comparison (milestone 24), which confirmed the 0.9 % figure
 that milestone 14 had only stated in docs/models.md: 1 of 106 labelled values, F1 97.9. That
 run's machine was under unrelated load too (load average about 15 on 10 cores), so read
 the latency as relative. On the public Ai4Privacy set the same fast mode leaks 35–40 %
-(milestone 23); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
+(milestone 24); strict mode leaks 3.5–4.8 %. The distilled weights are not published yet:
 you train them yourself (see [models.md](models.md#ner-detector)).
 
 Leak = share of labelled values that still appear, in any surface form, in the text the
@@ -552,7 +552,17 @@ below what it reads, so before this it returned no caption to pair with.
   `--no-captions --ocr-upscale 0`. Source: run records `2026-10-27-visual-{fictional,specimens}-rules{,-llm}{,-captions}`
   in [benchmarks.md](benchmarks.md) and the reports in `eval/results/visual/*-captions*.md`.
 
-### 23. Fresh comparison: fast and strict vs Presidio, LLM Guard, PrivAiTe, on a public set too (2026-10-27)
+### 23. The demo UI, polished by critique rounds (2026-10-27)
+
+LAB-1151 (with LAB-1135, LAB-1132, LAB-1154, LAB-1155, LAB-1159).
+
+The demo became four steps: Mask (with a language choice and pre-loaded known values), Chat
+through the real gateway (a new opt-in `X-PII-Guard-Echo: masked` header returns what the
+model saw and said, masked), Images and Benchmarks (a one-sentence headline). Five rounds of an
+end-user critic at 375 and 1280 px, light and dark, found 10 major issues, all fixed in the
+UI; backend findings were filed as tickets. Screenshots: [docs/assets/demo](assets/demo/).
+
+### 24. Fresh comparison: fast and strict vs Presidio, LLM Guard, PrivAiTe, on a public set too (2026-10-27)
 
 PR [#45](https://github.com/watt-mind/pii-guard/pull/45), LAB-1148.
 
