@@ -25,6 +25,35 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=None, help="port (env: PII_GUARD_PORT)")
     serve.add_argument("--reload", action="store_true", help="auto-reload on code changes")
 
+    up = sub.add_parser(
+        "up",
+        help="API + gateway + web UI on one port, mock upstream unless one is set (default 8787)",
+        description="Start everything in one process: the REST API, the OpenAI-compatible "
+        "gateway (fast mode) and the bundled web UI at /. Without --upstream-url (or "
+        "PII_GUARD_UPSTREAM_BASE_URL) a built-in offline mock upstream answers.",
+    )
+    up.add_argument("--host", default="127.0.0.1", help="bind address (default 127.0.0.1)")
+    up.add_argument("--port", type=int, default=8787, help="port (default 8787)")
+    up.add_argument("--no-browser", action="store_true", help="don't open the browser")
+    up.add_argument(
+        "--upstream-url",
+        default=None,
+        help="OpenAI-compatible upstream base URL (env: PII_GUARD_UPSTREAM_BASE_URL)",
+    )
+    up.add_argument(
+        "--api-key-env",
+        default=None,
+        metavar="VAR",
+        help="name of the environment variable holding the upstream key, e.g. OPENAI_API_KEY",
+    )
+    up.add_argument("--mock", action="store_true", help="the mock upstream even if one is set")
+    up.add_argument(
+        "--traffic-log",
+        choices=["masked", "full"],
+        default=None,
+        help="live traffic log level (default masked; full only on a loopback bind)",
+    )
+
     ev = sub.add_parser(
         "eval",
         help="run the evaluation set and print the scorecard",
@@ -92,6 +121,22 @@ def _serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _up(args: argparse.Namespace) -> int:
+    from pii_guard.app_bundle import UpOptions, run_up
+
+    return run_up(
+        UpOptions(
+            host=args.host,
+            port=args.port,
+            browser=not args.no_browser,
+            upstream_url=args.upstream_url,
+            api_key_env=args.api_key_env,
+            mock=args.mock,
+            traffic_log=args.traffic_log,
+        )
+    )
+
+
 def _eval(args: argparse.Namespace) -> int:
     from pii_guard.eval.cli import main as eval_main
 
@@ -147,6 +192,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "serve":
         return _serve(args)
+    if args.command == "up":
+        return _up(args)
     if args.command == "baselines":
         return _baselines(args, parser)
     parser.print_help()

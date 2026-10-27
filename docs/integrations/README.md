@@ -11,6 +11,9 @@ answer (tool-call arguments included) comes back restored.
 | [Muse Code](muse-code.md) (Meta's coding agent) | Supported through `/v1/responses`, tested end to end on a mock upstream and on the Meta Model API | `pii-guard connect muse-code` |
 | Any OpenAI-compatible client (OpenAI SDKs, LangChain, LiteLLM, Open WebUI, ...) | Supported | Base URL `http://127.0.0.1:8787/v1`, see below |
 
+The quickest way to get one running is `pii-guard up` (API, gateway and UI on port 8787, mock
+upstream unless `--upstream-url` is given; [operations.md](../operations.md#one-command-pii-guard-up)).
+
 ## 1. Point the gateway at an upstream
 
 The gateway forwards to **any OpenAI-compatible endpoint**. You set three things, in `.env`

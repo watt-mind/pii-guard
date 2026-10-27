@@ -4,10 +4,61 @@ How to run pii-guard end to end on one machine, watch what the gateway does to e
 and measure the latency it adds. Everything here works offline and free: a mock upstream
 stands in for the model unless you configure a real one.
 
+- [One command](#one-command-pii-guard-up): `uvx ... pii-guard up`, the release wheel, `make wheel`
 - [The demo stack](#the-demo-stack): `make demo`, `make demo-traffic`, `make smoke`, Docker
 - [Traffic log](#traffic-log): `GET /v1/traffic`, the live stream, the privacy model
 - [Timing](#timing): per-stage spans, overhead, `Server-Timing`, `/metrics`
 - [Latency benchmark](#latency-benchmark): `pii-guard bench latency`
+
+## One command: `pii-guard up`
+
+`pii-guard up` runs everything in one process on one port (default 8787, `--port`): the REST
+API, the OpenAI-compatible gateway (fast mode) and the built web UI at `/`. It needs only
+[uv](https://docs.astral.sh/uv/); uv fetches Python.
+
+```bash
+# Today: the wheel attached to a GitHub release (the web UI is bundled in it)
+uvx --from https://github.com/watt-mind/pii-guard/releases/download/vX.Y.Z/wattmind_pii_guard-X.Y.Z-py3-none-any.whl pii-guard up
+# Once published to PyPI
+uvx --from wattmind-pii-guard pii-guard up
+# From source: API + gateway only (a git build has no UI; / says how to get it)
+uvx --from git+https://github.com/watt-mind/pii-guard pii-guard up
+```
+
+The distribution is `wattmind-pii-guard` (the name `pii-guard` on PyPI is an unrelated
+project); the command is `pii-guard` and the import package `pii_guard`.
+
+What it does:
+
+- **Upstream.** `--upstream-url` (or `PII_GUARD_UPSTREAM_BASE_URL` in the environment or
+  `.env`) names a real OpenAI-compatible upstream; `--api-key-env OPENAI_API_KEY` names the
+  variable that holds its key (the value is never printed). Without one, a built-in mock
+  upstream (the one below, on a random loopback port) echoes the masked text, and both the
+  banner and a strip above the UI say so. `--mock` forces it.
+- **Mode.** Fast: rules, plus NER when the `ner` extra is installed (the strip and the banner
+  list the active detectors). `PII_GUARD_GATEWAY_MODE` overrides it.
+- **Images.** Without Tesseract, image parts are refused (503 `ocr_unavailable`, fail closed)
+  and the banner says how to install it (`brew install tesseract` / `apt install
+  tesseract-ocr`, and the `ocr` extra: `uvx --from '<wheel>[ocr]' pii-guard up`). Text works
+  regardless.
+- **Traffic log** `masked` by default (the dashboard needs it); `--traffic-log full` only on a
+  loopback bind, as everywhere. A fresh tenant key per run unless `PII_GUARD_TENANT_KEY` is set.
+- It opens the browser (`--no-browser` to skip), prints the gateway base URL and the
+  `pii-guard connect pi` line, and Ctrl-C stops everything, open live streams included.
+
+**Building the wheel.** `make wheel` builds the UI (`pnpm build`, API mode), copies `ui/dist`
+to `src/pii_guard/_ui/` (git-ignored, shipped as a hatch artifact) and runs `uv build --wheel`;
+it fails above 5 MiB or without the UI. `make wheel-smoke` (`scripts/ci/wheel_smoke.sh`)
+installs `dist/*.whl` with `uv tool run --isolated`, starts `pii-guard up` on port 18999
+(`PII_GUARD_SMOKE_PORT`), checks `/healthz`, `/`, a client-side route, one chat call on the
+mock (restored) and the masked traffic log, then stops it. CI runs both (job `wheel`); the
+release workflow runs them on `v*` tags and attaches the wheel and sdist to the release.
+
+**PyPI.** `release.yml` has a `pypi` job that publishes the release's files with trusted
+publishing (OIDC, no stored token). It is off until the repository variable `PYPI_PUBLISH` is
+`true`, and skips pre-releases (`v1.2.3-rc1`). Setup, once: on PyPI, a pending trusted
+publisher for project `wattmind-pii-guard` with owner `watt-mind`, repository `pii-guard`,
+workflow `release.yml` and environment `pypi`; on GitHub, an environment named `pypi`.
 
 ## The demo stack
 

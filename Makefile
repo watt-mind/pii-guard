@@ -1,5 +1,5 @@
 .PHONY: help setup lint format test test-all types gate serve check docker docker-smoke audit licences \
-	pii-diff gitleaks links baselines demo demo-traffic smoke bench
+	pii-diff gitleaks links baselines demo demo-traffic smoke bench wheel wheel-smoke
 
 help: ## list targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-13s %s\n", $$1, $$2}'
@@ -83,3 +83,13 @@ smoke: ## start the stack on the mock upstream, send the demo traffic, assert no
 
 bench: ## gateway latency benchmark on the mock upstream (fast mode, concurrency 1 and 8)
 	uv run pii-guard bench latency
+
+wheel: ## release wheel with the web UI bundled (needs pnpm): dist/*.whl for `uvx --from`
+	cd ui && pnpm install --frozen-lockfile && VITE_PII_GUARD_MODE=api pnpm build
+	rm -rf src/pii_guard/_ui dist
+	cp -R ui/dist src/pii_guard/_ui
+	uv build --wheel
+	scripts/ci/wheel_smoke.sh --size-only dist/*.whl
+
+wheel-smoke: ## install dist/*.whl in a throwaway tool env, run `pii-guard up`, check UI + gateway
+	scripts/ci/wheel_smoke.sh dist/*.whl

@@ -1,5 +1,7 @@
 [project]
-name = "pii-guard"
+# The PyPI distribution (`pii-guard` there is an unrelated project). The command stays
+# `pii-guard` and the import package `pii_guard`; pii_guard.__version__ looks this name up.
+name = "wattmind-pii-guard"
 version = "0.1.0"
 description = "An open-source privacy firewall for AI agents: reversible PII masking for text, documents and images."
 readme = "README.md"
@@ -75,6 +77,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pii_guard"]
+# The built web UI (`make wheel` copies ui/dist here). Git ignores it, so it is an artifact:
+# shipped when present, and a wheel built without it still runs `pii-guard up` (LAB-1276).
+artifacts = ["src/pii_guard/_ui/**"]
 
 [dependency-groups]
 dev = [

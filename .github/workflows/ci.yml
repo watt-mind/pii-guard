@@ -30,6 +30,7 @@ jobs:
     outputs:
       ui: ${{ steps.filter.outputs.ui }}
       docker: ${{ steps.filter.outputs.docker }}
+      wheel: ${{ steps.filter.outputs.wheel }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,14 +46,16 @@ jobs:
         run: |
           # Only pull requests are filtered; pushes, merge queue, nightly and manual runs check
           # everything.
-          ui=true docker=true
+          ui=true docker=true wheel=true
           if [ "$EVENT" = pull_request ]; then
             git diff --name-only "$BASE...HEAD" > changed.txt
             grep -qE '^(ui/|\.github/workflows/ci\.yml$|scripts/ci/licenses\.py$)' changed.txt || ui=false
             # What the image is built from (Dockerfile COPY lines) and how it is smoke-tested.
             grep -qE '^(src/|Dockerfile$|\.dockerignore$|pyproject\.toml$|uv\.lock$|README\.md$|LICENSE$|scripts/ci/docker_smoke\.sh$|\.github/workflows/ci\.yml$)' changed.txt || docker=false
+            # What the release wheel is built from (`make wheel`: the package and the UI).
+            grep -qE '^(src/|ui/|pyproject\.toml$|uv\.lock$|Makefile$|README\.md$|scripts/ci/wheel_smoke\.sh$|\.github/workflows/(ci|release)\.yml$)' changed.txt || wheel=false
           fi
-          { echo "ui=$ui"; echo "docker=$docker"; } | tee -a "$GITHUB_OUTPUT"
+          { echo "ui=$ui"; echo "docker=$docker"; echo "wheel=$wheel"; } | tee -a "$GITHUB_OUTPUT"
 
   lint:
     name: lint
@@ -238,6 +241,34 @@ jobs:
           pnpm licenses list --prod --json > "$RUNNER_TEMP/ui-licenses.json"
           python3 ../scripts/ci/licenses.py --pnpm-json "$RUNNER_TEMP/ui-licenses.json"
 
+  # The release wheel path (LAB-1276): `make wheel` bundles the built UI, then the wheel is
+  # installed in a throwaway environment and `pii-guard up` is smoke-tested on the mock upstream.
+  wheel:
+    name: wheel
+    needs: changes
+    if: needs.changes.outputs.wheel == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: ui/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+      - name: Build the wheel with the web UI (size budget 5 MiB, UI present)
+        run: make wheel
+      - name: uv tool run --from dist/*.whl pii-guard up, then /healthz, /, one chat, traffic log
+        run: scripts/ci/wheel_smoke.sh dist/*.whl
+
   workflows:
     name: workflows
     runs-on: ubuntu-latest
@@ -314,6 +345,7 @@ jobs:
         docker,
         audit,
         ui,
+        wheel,
         workflows,
         pii-in-diff,
         gitleaks,
