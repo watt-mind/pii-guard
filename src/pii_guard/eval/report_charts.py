@@ -965,7 +965,7 @@ def latency(index: Mapping[str, Any]) -> str:
             )
             if w >= 70:
                 ink = BG if name in ("detect", "unmask") else INK
-                body.append(_text(x + w / 2, ry + 40, _ms(v), size=17, fill=ink, anchor="middle"))
+                body.append(_text(x + w / 2, ry + 40, _ms(v), size=18, fill=ink, anchor="middle"))
             x += w
         ry += 110
     lx, ly = float(rx0 - 20), float(max(ry, 560))
@@ -979,8 +979,8 @@ def latency(index: Mapping[str, Any]) -> str:
     delays = sorted({f"{r['upstream_delay_ms']:g} ms" for r in runs})
     hardware = sorted({str(r["hardware"]) for r in runs if r.get("hardware")})
     caption = [
-        f"pii-guard bench latency: fixed fictional corpus, a new session per request, mock "
-        f"upstream delay {', '.join(delays) or 'n/a'}; c = concurrent requests.",
+        "Fixture set 'latency-corpus' (hand-written, fictional hu/en/de messages), a new session "
+        f"per request, mock upstream delay {', '.join(delays) or 'n/a'}; c = concurrent requests.",
         "Overhead = gateway total - time waiting on the upstream; 'other' = untimed work (HTTP, "
         "scheduling). Hardware: " + ("; ".join(hardware) or "n/a") + ".",
         (
