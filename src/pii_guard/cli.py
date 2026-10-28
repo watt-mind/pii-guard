@@ -8,6 +8,7 @@ import sys
 from collections.abc import Sequence
 
 from pii_guard import __version__
+from pii_guard.upstreams import PRESETS
 
 __all__ = ["build_parser", "main"]
 
@@ -25,12 +26,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="start here: API, gateway and web UI on one port (8787), offline mock model",
         description="Start everything in one process: the REST API, the OpenAI-compatible "
         "gateway and the bundled web UI at /. The gateway masks in fast mode (local rules, plus "
-        "NER when the ner extra is installed; no LLM call). Without --upstream-url (or "
-        "PII_GUARD_UPSTREAM_BASE_URL) an offline mock model answers by echoing what it receives.",
+        "NER when the ner extra is installed; no LLM call). Without --upstream or --upstream-url "
+        "(or PII_GUARD_UPSTREAM_BASE_URL) an offline mock model answers by echoing what it "
+        "receives. --upstream meta: the Meta Model API with the key in $META_API_KEY.",
     )
     up.add_argument("--host", default="127.0.0.1", help="bind address (default 127.0.0.1)")
     up.add_argument("--port", type=int, default=8787, help="port (default 8787)")
     up.add_argument("--no-browser", action="store_true", help="don't open the browser")
+    up.add_argument(
+        "--upstream",
+        choices=sorted(PRESETS),
+        default=None,
+        help="a real model provider by name: "
+        + ", ".join(f"{p.id} ({p.label}, key in ${p.key_env})" for p in PRESETS.values()),
+    )
     up.add_argument(
         "--upstream-url",
         default=None,
@@ -81,7 +90,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     connect = sub.add_parser(
         "connect",
-        help="put a coding agent (pi, Muse Code) behind the gateway (docs/integrations/)",
+        help="put a coding agent (Muse Code, pi, Codex, OpenCode) behind the gateway "
+        "(docs/integrations/)",
         add_help=False,
     )
     connect.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
@@ -125,16 +135,55 @@ def _serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _dotenv_value(name: str) -> str | None:
+    """``name`` from ``./.env`` (where the settings read theirs), or ``None``."""
+    try:
+        from dotenv import dotenv_values
+    except ImportError:  # pragma: no cover - a pydantic-settings dependency
+        return None
+    return dotenv_values(".env").get(name) or None
+
+
+def _preset(args: argparse.Namespace) -> tuple[str | None, str | None] | int:
+    """``(upstream_url, api_key_env)`` for ``up``, from ``--upstream`` or the plain flags.
+
+    A preset's key variable may also live in ``./.env``; it is then exported for this process.
+    Only the variable's name is ever printed, never its value.
+    """
+    if args.upstream is None:
+        return args.upstream_url, args.api_key_env
+    if args.upstream_url:
+        print("pii-guard up: pass --upstream or --upstream-url, not both", file=sys.stderr)
+        return 2
+    preset = PRESETS[args.upstream]
+    key_env = args.api_key_env or preset.key_env
+    if not os.environ.get(key_env):
+        value = _dotenv_value(key_env)
+        if value is None:
+            print(
+                f"pii-guard up: --upstream {preset.id} needs the {preset.label} key in "
+                f"${key_env}: export {key_env}=<your-key> (or put it in .env)",
+                file=sys.stderr,
+            )
+            return 2
+        os.environ[key_env] = value
+    return preset.base_url, key_env
+
+
 def _up(args: argparse.Namespace) -> int:
     from pii_guard.app_bundle import UpOptions, run_up
 
+    resolved = _preset(args)
+    if isinstance(resolved, int):
+        return resolved
+    upstream_url, api_key_env = resolved
     return run_up(
         UpOptions(
             host=args.host,
             port=args.port,
             browser=not args.no_browser,
-            upstream_url=args.upstream_url,
-            api_key_env=args.api_key_env,
+            upstream_url=upstream_url,
+            api_key_env=api_key_env,
             mock=args.mock,
             traffic_log=args.traffic_log,
         )

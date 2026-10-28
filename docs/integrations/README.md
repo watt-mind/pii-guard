@@ -5,14 +5,52 @@ The gateway is an OpenAI-compatible endpoint: `POST /v1/chat/completions`,
 client that lets you set a base URL for either API works through it. The client sends real data, the model gets placeholders, and the
 answer (tool-call arguments included) comes back restored.
 
-| Client | Status | Setup |
-|---|---|---|
-| [pi](pi.md) (coding agent) | Supported, tested end to end in CI (mock upstream) and on the Meta Model API | `pii-guard connect pi` |
-| [Muse Code](muse-code.md) (Meta's coding agent) | Supported through `/v1/responses`, tested end to end on a mock upstream and on the Meta Model API | `pii-guard connect muse-code` |
-| Any OpenAI-compatible client (OpenAI SDKs, LangChain, LiteLLM, Open WebUI, ...) | Supported | Base URL `http://127.0.0.1:8787/v1`, see below |
+| Tool | API it uses | Setup | Tested version | End-to-end test |
+|---|---|---|---|---|
+| [Muse Code](muse-code.md) (Meta's coding agent) | Responses (`/v1/responses`) | `pii-guard connect muse-code` (writes `settings.json`) | 1.4.14-R7309.1 | [`test_muse_e2e.py`](../../tests/integrations/test_muse_e2e.py) |
+| [pi](pi.md) (coding agent) | Chat Completions | `pii-guard connect pi` (writes `models.json`) | 1.4.0 | [`test_pi_e2e.py`](../../tests/integrations/test_pi_e2e.py) |
+| [Codex](codex.md) (OpenAI's coding agent) | Responses (`/v1/responses`) | a launch command with `-c` flags, no config file | 0.163.0 | [`test_codex_e2e.py`](../../tests/integrations/test_codex_e2e.py) |
+| [OpenCode](opencode.md) | Chat Completions | one variable, `OPENCODE_CONFIG_CONTENT`, no config file | 1.19.3 | [`test_opencode_e2e.py`](../../tests/integrations/test_opencode_e2e.py) |
+| cURL, Python (OpenAI SDK), LangChain, LiteLLM, Open WebUI, ... | Chat Completions or Responses | base URL `http://127.0.0.1:8787/v1`, see below | | |
+| Claude Code | Anthropic Messages (`/v1/messages`) | not supported yet: the gateway serves the OpenAI APIs only | | |
 
-The quickest way to get one running is `pii-guard up` (API, gateway and UI on port 8787, mock
-upstream unless `--upstream-url` is given; [operations.md](../operations.md#one-command-pii-guard-up)).
+Each end-to-end test installs the pinned version into a throwaway directory, runs one task on
+the fictional mini-repo through the gateway against a scripted upstream (CI), and asserts that
+no gold value reached the upstream and that the files the agent wrote hold the real values
+again. With `META_API_KEY` in the environment the Codex and OpenCode tests also run live
+against the Meta Model API.
+
+## Quickstart (the Connect page)
+
+```bash
+export META_API_KEY=<your-key>
+pii-guard up --upstream meta        # also: openai, fireworks, openrouter (key in $<NAME>_API_KEY)
+```
+
+Then open **Connect** in the console (<http://127.0.0.1:8787/#connect>), pick your tool, and
+paste its block in a terminal. The block has the gateway URL, a vault session for that tool
+(`/s/<session>/v1`, so the same value keeps the same placeholder in every turn) and a model
+from `GET /v1/models` filled in. Step 3 turns green with the first request from that tool:
+"first request from Codex: 3 values masked, 0 reached the model", with a link to the call in
+Logs. The same block in a terminal:
+
+```bash
+pii-guard connect codex --print     # muse-code, pi, codex, opencode, curl, python
+```
+
+Both read `GET /v1/connect/snippets` ([`snippets.py`](../../src/pii_guard/integrations/snippets.py)
+is the one place the text lives). No block carries a key: keys appear as `$VARIABLE` or
+`<your-key>`.
+
+| `--upstream` | Base URL | Key variable | Suggested model |
+|---|---|---|---|
+| `meta` | `https://api.meta.ai/v1` | `META_API_KEY` | `muse-spark-1.3` |
+| `openai` | `https://api.openai.com/v1` | `OPENAI_API_KEY` | the first listed |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | the first listed |
+| `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | the first listed |
+
+`--upstream-url` and `--api-key-env` still work for any other OpenAI-compatible endpoint; the
+key variable may also be in `./.env`.
 
 ## 1. Point the gateway at an upstream
 

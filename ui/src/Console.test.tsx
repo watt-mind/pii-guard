@@ -213,31 +213,14 @@ describe("Overview", () => {
 });
 
 describe("Connect", () => {
-  it("shows copyable commands for each client with the gateway URL the server reports", async () => {
-    const user = userEvent.setup();
-    const writeText = vi.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  it("shows the quickstart and the gateway URL the server reports", async () => {
     history.replaceState(null, "", "#connect");
     render(<App api={liveApi()} mock={createMockClient()} loadStatus={statusOf()} />);
     const connect = region("Connect");
     expect(await within(connect).findByTestId("gateway-url")).toHaveTextContent("http://127.0.0.1:8899/v1");
-    expect(within(connect).getByText("pii-guard connect pi --gateway http://127.0.0.1:8899/v1")).toBeInTheDocument();
-    await user.click(within(connect).getAllByRole("button", { name: "Copy" })[0]!);
-    expect(writeText).toHaveBeenCalledWith("pii-guard connect pi --gateway http://127.0.0.1:8899/v1");
-    expect(await within(connect).findByText("Copied")).toBeInTheDocument();
-
-    await user.click(within(connect).getByRole("radio", { name: /Muse Code/ }));
-    expect(within(connect).getByText("pii-guard connect muse-code --gateway http://127.0.0.1:8899/v1 --check")).toBeInTheDocument();
-
-    await user.click(within(connect).getByRole("radio", { name: /Claude Code/ }));
-    expect(within(connect).getByText("Claude Code can't go through pii-guard yet.")).toBeInTheDocument();
-
-    await user.click(within(connect).getByRole("radio", { name: /OpenAI SDK/ }));
-    expect(within(connect).getByText(/export OPENAI_BASE_URL=http:\/\/127\.0\.0\.1:8899\/v1/)).toBeInTheDocument();
-
-    await user.click(within(connect).getByRole("radio", { name: /curl/ }));
-    // The mock upstream answers any model name; the command uses the mock's own.
-    expect(within(connect).getByText(/curl -si http:\/\/127\.0\.0\.1:8899\/v1\/chat\/completions/)).toHaveTextContent('"model":"pii-guard-mock"');
+    expect(within(connect).getByRole("tablist", { name: "Your tool" })).toBeInTheDocument();
+    // The blocks come from GET /v1/connect/snippets (screens/Connect.test.tsx); unreachable here.
+    expect(await within(connect).findByText(/isn't reachable from this page/)).toBeInTheDocument();
   });
 
   it("falls back to the default address, and says so, when the server can't be asked", async () => {
@@ -246,16 +229,6 @@ describe("Connect", () => {
     const connect = region("Connect");
     expect(await within(connect).findByText(/the pii-guard API isn't reachable/)).toBeInTheDocument();
     expect(within(connect).getByTestId("gateway-url")).toHaveTextContent("http://127.0.0.1:8787/v1");
-  });
-
-  it("adds the token to the commands when the server needs one", async () => {
-    history.replaceState(null, "", "#connect");
-    const user = userEvent.setup();
-    render(<App api={liveApi()} mock={createMockClient()} loadStatus={statusOf({ auth: { token_required: true } })} />);
-    const connect = region("Connect");
-    await within(connect).findByText(/This server needs a token/);
-    await user.click(within(connect).getByRole("radio", { name: /curl/ }));
-    expect(within(connect).getByText(/curl -si/)).toHaveTextContent('Authorization: Bearer $PII_GUARD_API_TOKEN');
   });
 });
 
