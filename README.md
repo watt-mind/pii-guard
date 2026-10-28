@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="pii-guard: a privacy firewall for AI agents. You send 'Email Jane Placeholder: jane@example.net', the model sees 'Email [[PERSON_7f3a]]: [[EMAIL_20c2]]', you get the real name back." width="100%">
+  <img src="docs/assets/banner.svg" alt="pii-guard: a privacy gateway for AI agents. You send 'Email Jane Placeholder: jane@example.net', the model sees 'Email [[PERSON_7f3a]]: [[EMAIL_20c2]]', you get the real name back." width="100%">
 </p>
 
 <p align="center"><b>Mask personal data before it reaches the LLM, and put it back in the answer. Built on Meta's open models; runs on your machine.</b></p>
@@ -60,11 +60,11 @@ with 95 % intervals there.
 
 | Leak | Hand-written (de+en+hu, 51 docs) | Agent traffic (990) | Nemotron-PII (300) | CEE-PII (451) | Gretel finance (400) | Ai4Privacy (600) |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard fast** (rules + NER, on-device, $0) | **0.0 %** | 2.6 % | **0.7 %** | **0.4 %** | 19.1 % | 0.4 % † |
-| PrivAiTe | 12.7 % | **2.4 %** | 4.0 % | 4.4 % | 27.6 % | 9.5 % |
+| **pii-guard fast** (rules + NER, on-device, $0) | **0.0 %** | **0.2 %** | **0.7 %** | **0.4 %** | 19.0 % | 0.4 % † |
+| PrivAiTe | 12.7 % | 2.4 % | 4.0 % | 4.4 % | 27.7 % | 9.5 % |
 | Presidio | 24.3 % | 12.4 % | 12.8 % | 36.5 % | **18.8 %** | 29.6 % |
 | LLM Guard | 45.1 % | 20.2 % | 28.8 % | 75.8 % | 59.3 % | 43.8 % ‡ |
-| pii-guard rules only (no name detection) | 41.6 % | 45.3 % | 56.0 % | 40.9 % | 80.7 % | 63.1 % |
+| pii-guard rules only (no name detection) | 41.6 % | 45.3 % | 56.0 % | 41.3 % | 80.8 % | 62.9 % |
 
 † **In-distribution:** the NER was trained on other rows of the same dataset (the OpenPII
 train split; no evaluated row was trained on). The same recipe trained without those rows
@@ -72,8 +72,8 @@ leaks **13.8 %** ([ablation](docs/benchmarks.md#ai4privacy)), so on unseen text 
 **PrivAiTe leaks less than fast mode** (9.5 %). ‡ LLM Guard's model was fine-tuned on
 Ai4Privacy data too ([configurations](eval/results/2026-10-27-comparison/README.md#systems)).
 
-- **Where fast mode is weak:** finance text (19.1 %, level with Presidio), and over-masking:
-  1.1 % on the hand-written set, but 14.0 % on agent traffic and 39.4 % on CEE-PII, where
+- **Where fast mode is weak:** finance text (19.0 %, level with Presidio's 18.8 %), and over-masking:
+  1.1 % on the hand-written set and 1.7 % on agent traffic, but 26.4 % on CEE-PII, where
   reference numbers without a cue word come out as IDs
   ([model card](training/ner/model-card.md#limitations)).
 - **Audit mode** (opt-in: rules + NER + Muse Spark Open, one hosted Baseten call per message,

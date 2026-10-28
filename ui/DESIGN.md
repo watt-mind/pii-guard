@@ -233,14 +233,21 @@ merged.
   reachable.").
 - **Page header bar:** 48 px with the section (and Playground tab) over the accent hairline, from
   1024 px. Below that width the menu's top bar names the section and the hairline sits under it.
-- **Hosted landing:** the console's tokens (`.hosted` maps its variables onto `--ink`,
-  `--surface` and the rest), so it follows the light and dark theme; body 14 px, section titles
-  24/500 with no tracking, and the same `Button`, `ButtonLink`, `Field` and `Select`.
-  The hosted build follows the system theme until a visitor picks one (the local console
-  starts light). The landing's demo marks what happened to each value with its own three
-  highlights: personal data in your text on `--danger-soft`, the placeholder the model sees in
-  plum (`--accent-soft` / `--accent-ink`) and the value put back on `--guard-soft`; steps 2 and 3
-  sit inside a dashed `--model` band labelled as the model boundary.
+- **Hosted landing:** composed from the console's own components, so it can't drift from the
+  dashboard: `Logo` and the 56/48 px header over the `header-hairline`, `Card`, `Pane` and
+  `Boundary` for the demo (your text → pii-guard → sent to the model, then the model's answer →
+  pii-guard → restored), `MaskedText`, `RestoredText`, `Placeholder` and `Legend` for values,
+  `Notice`, `Metric`, `KeyValues`, `Badge`, `Field`, `SegmentedControl` and `ThemeToggle`.
+  Values are marked exactly as in the Playground: a value in your text and its placeholder are
+  masked blue (`meta.mark`, `<Placeholder>`), a value put back is restored green. The image
+  showcase draws regions like the Images screen. Layout is Tailwind only (`max-w-[1280px] px-4
+  sm:px-6`, `gap-6` between cards, `space-y-16 lg:space-y-24` between sections); there is no
+  landing stylesheet. Section titles are the console's 24/500; the one landing-only size is the
+  hero `h1`, `text-3xl sm:text-5xl font-medium leading-tight` (30→48 / 1.25 / 500, no tracking,
+  all ink). One primary button per card or hero; the header's sign-in is secondary. Below 1024 px
+  the hero's mini flow is hidden (the demo follows). Below-the-fold modules that weigh more (the
+  image showcase, the comparison chart) are lazy-loaded. The hosted build follows the system
+  theme until a visitor picks one in the footer (the local console starts light).
 
 ## Motion
 
