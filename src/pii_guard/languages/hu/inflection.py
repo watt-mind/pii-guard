@@ -56,10 +56,23 @@ _HU_SHORT = {v: k for k, v in _HU_LONG.items()}
 # Endings after a doubled final consonant or digraph (``Elek|kel``, ``Kováccs|al``).
 _HU_DOUBLED_ENDINGS = ("al", "el", "á", "é")
 _HU_HYPHENATED = ("val", "vel", "vá", "vé")
-_HU_LENGTHENING_RE = re.compile(
-    "|".join(re.escape(s) for s in sorted(_HU_LENGTHENING, key=len, reverse=True))
-)
 _MIN_LEMMA_LETTERS = 2
+# Stacked suffixes (LAB-1337): the possessive ``-é`` (``Ottóé``, "Ottó's"), the family plural
+# ``-ék`` (``Ottóék``, "the Ottós") and the plural possessive ``-éi`` (``Ottóéi``) take a case
+# ending of their own: ``Kerekes Ottóéknál``, ``Teszt Hajnáéknak``, ``Tihaméréit``. The ending
+# keeps the name's vowel harmony (``Ottóéknál``, ``Péteréknél``), so both are listed. After the
+# vowel of ``-é``/``-éi`` the instrumental keeps its ``v`` (``Ottóéval``); after ``-ék`` it
+# doubles the ``k`` (``Ottóékkal``) and the accusative takes a linking vowel (``Ottóékat``).
+_HU_AFTER_VOWEL: tuple[str, ...] = (
+    "nak", "nek", "ban", "ben", "ba", "be", "ból", "ből", "hoz", "hez", "höz", "nál", "nél",
+    "tól", "től", "ra", "re", "ról", "ről", "n", "ig", "ért", "ként", "t", "val", "vel", "vá",
+    "vé",
+)  # fmt: skip
+_HU_AFTER_EK: tuple[str, ...] = (
+    "nak", "nek", "ban", "ben", "ba", "be", "ból", "ből", "hoz", "hez", "höz", "nál", "nél",
+    "tól", "től", "ra", "re", "ról", "ről", "on", "en", "ön", "ig", "ért", "ként", "at", "et",
+    "kal", "kel", "ká", "ké", "é",
+)  # fmt: skip
 # Case endings after an unchanged stem that no Hungarian name ends in, so a detector span
 # ending in one is trimmed without a confirmed lemma (LAB-1174). Not ``-nél`` (Kornél),
 # ``-ért`` (Gellért), ``-ra``/``-re`` (Klára, Imre), ``-on``/``-en`` (Márton, Kelemen),
@@ -72,6 +85,15 @@ _HU_UNAMBIGUOUS_ENDINGS = frozenset({
 
 def _alternation(suffixes: Iterable[str]) -> str:
     return "|".join(re.escape(s) for s in sorted(set(suffixes), key=len, reverse=True))
+
+
+#: ``-é``/``-ék``/``-éi`` with an optional case ending after them (no capturing group).
+_HU_STACKED = (
+    f"é(?:k(?:{_alternation(_HU_AFTER_EK)})?|i(?:{_alternation(_HU_AFTER_VOWEL)})?"
+    f"|(?:{_alternation(_HU_AFTER_VOWEL)}))?"
+)
+_HU_LENGTHENING_RE = re.compile(f"{_HU_STACKED}|{_alternation(_HU_LENGTHENING)}")
+_HU_STACKED_RE = re.compile(_HU_STACKED)
 
 
 def _hu_digraph(value: str) -> str | None:
@@ -151,7 +173,11 @@ class HungarianSuffixMatcher:
             suffixes |= set(_HU_DOUBLED_ENDINGS)
         elif last.isalpha() and not value.casefold().endswith(_HU_DIGRAPHS):
             suffixes |= {f"{last}al", f"{last}el", f"{last}á", f"{last}é"}
-        plain = "|".join(re.escape(s) for s in sorted(suffixes, key=len, reverse=True))
+        plain = (
+            _HU_STACKED
+            + "|"
+            + "|".join(re.escape(s) for s in sorted(suffixes, key=len, reverse=True))
+        )
         after_hyphen = "|".join(
             re.escape(s) for s in sorted(suffixes | hyphenated, key=len, reverse=True)
         )
@@ -165,7 +191,9 @@ class HungarianSuffixMatcher:
         variants: list[tuple[str, str]] = []
         long_vowel = _HU_LONG.get(value[-1])
         if long_vowel is not None:
-            variants.append((value[:-1] + long_vowel, _alternation(_HU_LENGTHENING)))
+            variants.append(
+                (value[:-1] + long_vowel, f"{_HU_STACKED}|{_alternation(_HU_LENGTHENING)}")
+            )
         digraph = _hu_digraph(value)
         if digraph is not None:
             stem = value[:-2] + value[-2] + value[-2:]  # Kovács -> Kováccs (case kept)
@@ -209,6 +237,18 @@ class HungarianSuffixMatcher:
                 continue
             strong = suffix in _HU_STRONG[short.casefold()]
             found.append(Split(lemma, stem, surface[cut:], strong))
+        # Stacked: Kerekes Ottó|éknál, Teszt Hajná|éknak -> Teszt Hajna, Tihamér|éit (LAB-1337).
+        last_start = len(surface) - len(surface.split()[-1])
+        for cut in range(len(surface) - 2, last_start, -1):
+            if folded[cut] != "é" or not _HU_STACKED_RE.fullmatch(folded[cut:]):
+                continue
+            stem = surface[:cut]
+            if not stem[-1].isalpha():
+                continue
+            short = _HU_SHORT.get(stem[-1])
+            lemma = stem if short is None else stem[:-1] + short
+            if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
+                found.append(Split(lemma, stem, surface[cut:]))
         for ending in _HU_DOUBLED_ENDINGS:
             if not folded.endswith(ending):
                 continue
@@ -318,14 +358,15 @@ class HungarianSuffixMatcher:
             return lemma + suffix
         folded = suffix.casefold()
         long_vowel = _HU_LONG.get(lemma[-1])
+        wrote_long = long_vowel is not None and suffix[0].casefold() == long_vowel.casefold()
+        if wrote_long and folded[1:] in _HU_AFTER_VOWEL:
+            # The model wrote the long vowel itself (Kende + ének -> Kendének), not the
+            # possessive -é before a case ending (Kendéének): that reading needs the input.
+            return lemma[:-1] + suffix
         if long_vowel is not None and _HU_LENGTHENING_RE.fullmatch(folded):
             return lemma[:-1] + long_vowel + suffix
-        if (
-            long_vowel is not None
-            and suffix[0].casefold() == long_vowel.casefold()
-            and _HU_LENGTHENING_RE.fullmatch(folded[1:])
-        ):
-            return lemma[:-1] + suffix  # the model wrote the long vowel itself (ának)
+        if wrote_long and _HU_LENGTHENING_RE.fullmatch(folded[1:]):
+            return lemma[:-1] + suffix  # the model wrote the long vowel itself (áéknak)
         if _hu_old_digraph(lemma) is not None and folded in {
             "al", "el", "á", "val", "vel", "vá", "vé",
         }:  # fmt: skip

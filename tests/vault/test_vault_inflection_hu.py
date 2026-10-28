@@ -373,3 +373,112 @@ def test_property_hu_forms_round_trip_and_share_a_placeholder(
         by_name.setdefault(name, set()).update(hits)
     assert all(len(ids) == 1 for ids in by_name.values())
     assert len(set().union(*by_name.values())) == len(by_name)
+
+
+# --- stacked suffixes: -é / -ék / -éi, then a case ending (LAB-1337) -------------------------
+
+
+@pytest.mark.parametrize(
+    ("value", "stem", "chain"),
+    [
+        ("Kerekes Ottó", "Ottó", "éknál"),  # the ticket's repro: family + adessive
+        ("Kerekes Ottó", "Ottó", "ékkal"),  # instrumental doubles the k
+        ("Kerekes Ottó", "Ottó", "ékat"),  # accusative takes a linking vowel
+        ("Kerekes Ottó", "Ottó", "éval"),  # possessive + instrumental keeps the v
+        ("Kerekes Ottó", "Ottó", "éké"),  # the Ottós' (possessive of the family)
+        ("Teszt Hajna", "Hajná", "éknál"),  # lengthened stem, then the chain
+        ("Teszt Hajna", "Hajná", "éit"),
+        ("Gyakorló Tihamér", "Tihamér", "éknek"),  # front harmony
+        ("Gyakorló Tihamér", "Tihamér", "éitől"),
+        ("Minta Kende", "Kendé", "éktől"),
+        ("Kovács", "Kovács", "éknál"),  # a digraph-final value keeps its stem here
+    ],
+)
+def test_stacked_suffixes_are_masked_and_round_trip(
+    vault: Vault, value: str, stem: str, chain: str
+) -> None:
+    surface = value.rsplit(" ", 1)[0] + " " + stem if " " in value else stem
+    text = f"{value} írt. Tegnap {surface}{chain} voltunk."
+    session = vault.session()
+    masked = session.mask(text, [span_of(text, value, PERSON)])
+    (placeholder,) = set(placeholders(masked))
+    assert masked == f"{placeholder} írt. Tegnap {placeholder}{chain} voltunk."
+    assert session.unmask(masked) == text
+
+
+def test_stacked_suffix_after_an_inflected_detection(vault: Vault) -> None:
+    # The ticket's repro: the detector labelled the first, inflected occurrence. On its own
+    # the vault keeps that span whole (the detectors' suffix trim ends it at the stem first);
+    # the stacked form is still read onto the same lemma.
+    text = "Kerekes Ottótól jött, Kerekes Ottóéknál lakik."
+    session = vault.session()
+    masked = session.mask(text, [span_of(text, "Kerekes Ottótól", PERSON)])
+    (placeholder,) = set(placeholders(masked))
+    assert masked == f"{placeholder} jött, {placeholder}éknál lakik."
+    assert session.unmask(masked) == text
+
+
+@pytest.mark.parametrize(
+    ("lemma", "suffix", "expected"),
+    [
+        ("Teszt Hajna", "éknak", "Teszt Hajnáéknak"),  # a chain the model added
+        ("Teszt Hajna", "áéknak", "Teszt Hajnáéknak"),  # ... with the long vowel written
+        ("Kerekes Ottó", "éknál", "Kerekes Ottóéknál"),
+        ("Minta Kende", "éktől", "Minta Kendééktől"),
+        ("Minta Kende", "ének", "Minta Kendének"),  # still the long vowel + dative
+        ("Minta Kende", "ék", "Minta Kendéék"),
+    ],
+)
+def test_restore_stacked(lemma: str, suffix: str, expected: str) -> None:
+    assert restore(HungarianSuffixMatcher(), lemma, suffix, PERSON) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        # A held value followed by letters that are not an inflection stays apart.
+        ("Kerekes", "Kerekes jött, egy kerekesszék állt az ajtóban."),
+        ("Bál", "Bál úr írt, Bálint is ott volt."),
+        ("Kis", "Kis úr szerint a kisebb csomag jobb."),
+        ("Fehér", "Fehér úr szerint a fehérje fontos."),
+        ("Minta", "Minta úr a mintaképe volt mindenkinek."),
+        ("Teszt Ottó", "Teszt Ottó írt; Teszt Ottóékszer nem szó."),
+        ("Teszt Hajna", "Teszt Hajna írt; Teszt Hajnáékszám nem szó."),
+        ("Teszt Ottó", "Teszt Ottó írt; Teszt Ottóénekes nem szó."),
+    ],
+)
+def test_stacked_suffixes_do_not_over_mask(vault: Vault, value: str, text: str) -> None:
+    session = vault.session()
+    masked = session.mask(text, [span_of(text, value, PERSON)])
+    assert len(placeholders(masked)) == 1
+    assert session.unmask(masked) == text
+
+
+# The LAB-1337 probe: 10 fictional given names x 13 chains x 5 surnames (650 cases), forms
+# written out from the grammar here, not from the matcher. (lemma, possessive stem, back?)
+_STACKED_NAMES = [
+    ("Ottó", "Ottó", True), ("Hajna", "Hajná", True), ("Tihamér", "Tihamér", False),
+    ("Kende", "Kendé", False), ("Csongor", "Csongor", True), ("Emese", "Emesé", False),
+    ("Bendegúz", "Bendegúz", True), ("Gyöngyi", "Gyöngyi", False), ("Huba", "Hubá", True),
+    ("Ildikó", "Ildikó", True),
+]  # fmt: skip
+_STACKED_CHAINS = [
+    ("éknál", "éknél"), ("éknak", "éknek"), ("ékhoz", "ékhez"), ("éktól", "éktől"),
+    ("ékkal", "ékkel"), ("ékat", "éket"), ("ékban", "ékben"), ("éké", "éké"), ("ét", "ét"),
+    ("éval", "ével"), ("énál", "énél"), ("éit", "éit"), ("éinak", "éinek"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("surname", ["Kerekes", "Teszt", "Gyakorló", "Minta", "Próba"])
+def test_stacked_suffix_probe(vault: Vault, surname: str) -> None:
+    for lemma, stem, back in _STACKED_NAMES:
+        for chains in _STACKED_CHAINS:
+            chain = chains[0] if back else chains[1]
+            value = f"{surname} {lemma}"
+            text = f"{value} írt nekünk. Tegnap {surname} {stem}{chain} voltunk."
+            session = vault.session()
+            masked = session.mask(text, [span_of(text, value, PERSON)])
+            (placeholder,) = set(placeholders(masked))
+            assert masked.count(placeholder) == 2, text
+            assert stem.casefold() not in PLACEHOLDER_RE.sub(" ", masked).casefold(), text
+            assert session.unmask(masked) == text
