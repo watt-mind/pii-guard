@@ -129,9 +129,11 @@ Before enabling automatic dev releases, prove valid-shaped forged identity heade
 anonymous/refused through the **whole** proxy/ACA/sidecar chain, Google sign-in/callback works,
 wrong-origin cookie mutation is refused and cross-owner/API-key access is denied. Test duplicate
 security headers too. The direct-ACA `aca_xff_rightmost` client-IP assumption is unproven for
-this additional proxy; dev forces `PII_GUARD_HOSTED_CLIENT_IP_SOURCE=off`. Anonymous sponsored
-admission therefore fails closed until a separate attribution contract is reviewed; authenticated
-owner admission remains available. Do not describe the router's address as an individual user.
+this additional proxy; dev forces `PII_GUARD_HOSTED_CLIENT_IP_SOURCE=off`, disabling the
+network limiter rather than attributing all users to the router. This setting does not require
+Google sign-in: reachable guests can use curated demos under guest/global quotas and approved
+finite authority. Zero sponsorship or an unavailable ledger refuses sponsored work. Tailnet ACLs
+bound dev reachability. Do not describe the router's address as an individual user.
 
 Scale the app to zero and issue a private request through the still-running proxy. Confirm
 HTTP autoscaling wakes it and required local NER reaches readiness before processing. A sleeping
