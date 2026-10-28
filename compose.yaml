@@ -37,6 +37,9 @@ services:
       PII_GUARD_HOST: 0.0.0.0
       PII_GUARD_PORT: "8787"
     read_only: true
+    # pytesseract hands Tesseract the image through a temp file: OCR needs a writable /tmp.
+    tmpfs:
+      - /tmp
     restart: unless-stopped
 
   mock-upstream:
@@ -98,6 +101,26 @@ services:
       # "ocr on|off". Images are refused (503 ocr_unavailable) without it (ADR 0006).
       test: ["CMD", "python", "-c", "import os, sys, urllib.request; from pii_guard.visual.ocr import tesseract_available as t; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2); ok = t(); print('ocr', 'on' if ok else 'off'); sys.exit(0 if ok or os.environ.get('PII_GUARD_IMAGE_REQUIRE_OCR', 'true').lower() in ('false', '0', 'no', 'off') else 1)"]
 
+  # The Benchmarks view's index, built once per start from the committed run records (the Node
+  # image has no Python): the UI's Vite plugin reads it from the shared volume (LAB-1356).
+  benchmarks-index:
+    profiles: [demo]
+    <<: *demo-image
+    command:
+      - sh
+      - -c
+      - >-
+        python -m pii_guard.eval.report_cli --print-index > /app/cache/benchmarks-index.json.tmp
+        && mv /app/cache/benchmarks-index.json.tmp /app/cache/benchmarks-index.json
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./eval:/app/eval:ro
+      - ./docs:/app/docs:ro
+      # /app/cache is owned by the app user in the image, so a fresh volume here is too.
+      - pii-guard-benchmarks:/app/cache
+
   ui:
     profiles: [demo]
     image: node:22-slim
@@ -107,15 +130,22 @@ services:
       PII_GUARD_API_URL: http://demo-api:8787
       VITE_PII_GUARD_MODE: api
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      # Prebuilt by benchmarks-index: only ui/ is mounted here, and there is no Python.
+      PII_GUARD_BENCHMARKS_INDEX: /benchmarks/benchmarks-index.json
     volumes:
       - ./ui:/app
       - /app/node_modules
+      - pii-guard-benchmarks:/benchmarks:ro
     ports:
       - "127.0.0.1:5173:5173"
     depends_on:
+      benchmarks-index:
+        condition: service_completed_successfully
       demo-api:
         condition: service_healthy
 
 volumes:
   # Downloaded models (the NER fallback), kept across `docker compose down`; `down -v` drops it.
   pii-guard-models:
+  # The demo UI's prebuilt benchmark index (rebuilt by benchmarks-index on every start).
+  pii-guard-benchmarks:
