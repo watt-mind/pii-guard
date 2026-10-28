@@ -20,6 +20,7 @@ const SESSIONS: VaultSessionSummary[] = [
     ttl_left_seconds: 3500,
     generation: 4,
     entries: 2,
+    occurrences: 4,
     known_values: 0,
     entity_counts: { EMAIL: 1, PERSON: 1 },
   },
@@ -32,6 +33,7 @@ const SESSIONS: VaultSessionSummary[] = [
     ttl_left_seconds: 1200,
     generation: 1,
     entries: 1,
+    occurrences: 1,
     known_values: 1,
     entity_counts: { PHONE: 1 },
   },
@@ -113,7 +115,7 @@ describe("Vault", () => {
     const detail = screen.getByRole("region", { name: "Session detail" });
     expect(await within(detail).findByText("T•••• E•••")).toBeInTheDocument();
     expect(within(detail).getByText("[[PERSON_7f3a9c]]")).toBeInTheDocument();
-    expect(within(detail).getByText("Known value")).toBeInTheDocument();
+    expect(within(detail).getByRole("cell", { name: "Known value" })).toBeInTheDocument();
     // masked: no reveal control, never a value
     expect(within(detail).queryByRole("button", { name: /Reveal values/ })).toBeNull();
     expect(document.body).not.toHaveTextContent("Teszt Elek");
@@ -146,6 +148,22 @@ describe("Vault", () => {
     rerender(<Vault status={statusOf("full")} live active={false} client={client} />);
     await waitFor(() => expect(document.body).not.toHaveTextContent("Teszt Elek"));
     expect(client.detail).toHaveBeenLastCalledWith("s_1111aaaa2222bbbb", false);
+  });
+
+  it("reloads the open session when the list shows it changed, keeping the reveal", async () => {
+    const client = fakeClient("full");
+    const user = userEvent.setup();
+    render(<Vault status={statusOf("full")} live active client={client} refreshMs={50} />);
+    await user.click(await screen.findByRole("button", { name: /s_1111aaaa2222bbbb/ }));
+    await user.click(await screen.findByRole("button", { name: "Reveal values" }));
+    await screen.findByText("Teszt Elek");
+    const calls = client.detail.mock.calls.length;
+    client.list.mockImplementation(() =>
+      Promise.resolve({ mode: "full" as const, ttl_seconds: 3600, sessions: SESSIONS.map((x) => (x.ref === "s_1111aaaa2222bbbb" ? { ...x, occurrences: 9 } : x)) }),
+    );
+    await waitFor(() => expect(client.detail.mock.calls.length).toBeGreaterThan(calls));
+    expect(client.detail).toHaveBeenLastCalledWith("s_1111aaaa2222bbbb", true);
+    expect(screen.getByText("Teszt Elek")).toBeInTheDocument();
   });
 
   it("drops a session after a confirmation", async () => {

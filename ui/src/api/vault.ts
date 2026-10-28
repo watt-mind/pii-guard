@@ -17,6 +17,7 @@ export interface VaultSessionSummary {
   ttl_left_seconds: number;
   generation: number;
   entries: number;
+  occurrences: number;
   known_values: number;
   entity_counts: Record<string, number>;
 }
@@ -56,7 +57,7 @@ export interface VaultClient {
 export const SOURCE_LABEL: Record<SessionSource, string> = {
   header: "Session header",
   path: "URL path",
-  prompt_cache_key: "prompt_cache_key",
+  prompt_cache_key: "Prompt cache key",
   default: "Client default",
   api: "REST API",
 };

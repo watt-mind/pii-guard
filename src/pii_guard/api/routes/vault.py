@@ -290,6 +290,7 @@ class SessionSummary(BaseModel):
         description="Grows whenever a placeholder is added or its patterns change."
     )
     entries: int = Field(description="Placeholders the session has issued (variants included).")
+    occurrences: int = Field(description="Occurrences masked over all its placeholders so far.")
     known_values: int = Field(description="Values pre-loaded into the session.")
     entity_counts: dict[str, int] = Field(description="Placeholders per entity type.")
 
@@ -411,6 +412,7 @@ def _summary(request: Request, session: VaultSession) -> dict[str, Any] | None:
         "ttl_left_seconds": round(view.ttl_left_seconds, 1),
         "generation": view.generation,
         "entries": view.entries,
+        "occurrences": view.occurrences,
         "known_values": view.known_values,
         "entity_counts": view.entity_counts,
     }

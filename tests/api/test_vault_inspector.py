@@ -180,7 +180,7 @@ def test_listing_reports_counts_and_source_without_extending_the_ttl() -> None:
     with TestClient(app) as client:
         first = client.get("/v1/vault/sessions").json()
         ref = first["sessions"][0]["ref"]
-        client.get(f"/v1/vault/sessions/{ref}")
+        detail = client.get(f"/v1/vault/sessions/{ref}").json()
         again = client.get("/v1/vault/sessions").json()["sessions"][0]
     summary = first["sessions"][0]
     assert first["mode"] == "masked" and first["ttl_seconds"] == 100
@@ -191,6 +191,7 @@ def test_listing_reports_counts_and_source_without_extending_the_ttl() -> None:
     assert summary["known_values"] == 2
     assert summary["entity_counts"]["PERSON"] >= 3
     assert sum(summary["entity_counts"].values()) == summary["entries"]
+    assert summary["occurrences"] == sum(i["count"] for i in detail["items"]) > 0
 
 
 # --- full: reveal on demand, loopback only ---------------------------------------------------

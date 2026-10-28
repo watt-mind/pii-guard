@@ -746,7 +746,8 @@ row links to its session.
   {"mode": "masked", "ttl_seconds": 3600, "sessions": [
     {"ref": "s_3f9a1c0b7d2e4a61", "source": "path", "client": "anonymous",
      "created": "2026-10-28T09:12:03+00:00", "last_used": "2026-10-28T09:14:40+00:00",
-     "ttl_left_seconds": 3443.2, "generation": 9, "entries": 6, "known_values": 0,
+     "ttl_left_seconds": 3443.2, "generation": 9, "entries": 6, "occurrences": 11,
+     "known_values": 0,
      "entity_counts": {"EMAIL": 2, "PERSON": 4}}]}
   ```
 

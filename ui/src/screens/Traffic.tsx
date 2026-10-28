@@ -597,9 +597,9 @@ function CallDetail({
           <Meta label="Detection cache" value={e.cache ? `${e.cache.hits} hit · ${e.cache.misses} miss` : "–"} />
         </dl>
         {e.session_ref && onOpenSession && (
-          <button type="button" onClick={() => onOpenSession(e.session_ref!)} className="mt-2 text-xs text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink">
-            Open session {e.session_ref} in Vault
-          </button>
+          <Button className="mt-3 h-8 text-xs" onClick={() => onOpenSession(e.session_ref!)}>
+            Open session <span className="font-mono">{e.session_ref}</span> in Vault
+          </Button>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
           <span>Masked:</span>

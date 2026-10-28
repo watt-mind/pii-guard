@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "../api/http";
 import type { EntityType } from "../api/types";
 import { SOURCE_LABEL, createVaultClient, type SessionSource, type VaultClient, type VaultSessionDetail, type VaultSessionList, type VaultSessionSummary } from "../api/vault";
@@ -68,6 +68,14 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
   const [handledFocus, setHandledFocus] = useState<number | null>(null);
   // The detail to load: a new object (nonce) refetches, e.g. after a drop or a reveal.
   const [want, setWant] = useState<{ ref: string; reveal: boolean; nonce: number } | null>(null);
+  // What the open detail was loaded at (generation, counts): when the list shows the session
+  // changed, the detail reloads, keeping the reveal state.
+  const [syncedAt, setSyncedAt] = useState<string | null>(null);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  // Bring the detail into view once a session the user picked has loaded (phones stack it
+  // under the list).
+  const [scrollRequest, setScrollRequest] = useState(0);
+  const scrolledFor = useRef(0);
   const now = useNow(5000);
 
   const refreshList = useCallback(async () => {
@@ -105,7 +113,16 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
     };
   }, [vault, want]);
 
+  useEffect(() => {
+    if (detail.state !== "ok" || scrollRequest === scrolledFor.current) return;
+    scrolledFor.current = scrollRequest;
+    const heading = detailHeading.current;
+    heading?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    heading?.focus({ preventScroll: true });
+  }, [detail, scrollRequest]);
+
   const open = (ref: string) => {
+    setScrollRequest((n) => n + 1);
     setSelected(ref);
     setRevealed(false);
     setConfirmDrop(false);
@@ -131,6 +148,14 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
   const shown = sessions.filter((s) => (source === "all" || s.source === source) && (query.trim() === "" || s.ref.includes(query.trim().toLowerCase())));
   const current = detail.state === "ok" && detail.detail.ref === selected ? detail.detail : null;
 
+  const latest = sessions.find((s) => s.ref === selected);
+  const latestKey = latest ? `${latest.generation}|${latest.entries}|${latest.occurrences}|${latest.known_values}` : null;
+  if (current && latestKey !== null && latestKey !== syncedAt) {
+    setSyncedAt(latestKey);
+    const loadedKey = `${current.generation}|${current.entries}|${current.occurrences}|${current.known_values}`;
+    if (loadedKey !== latestKey) setWant((w) => ({ ref: current.ref, reveal: revealed, nonce: (w?.nonce ?? 0) + 1 }));
+  }
+
   const toggleReveal = () => {
     if (!selected) return;
     const next = !revealed;
@@ -148,7 +173,8 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
       setWant(null);
       setRevealed(false);
     } catch (err) {
-      setNotice(`Couldn't drop the session: ${errorOf(err).message}`);
+      setNotice(null);
+      setDetail({ state: "error", ...errorOf(err), message: `Couldn't drop the session: ${errorOf(err).message}` });
     } finally {
       setConfirmDrop(false);
       void refreshList();
@@ -161,7 +187,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
         <h1 className="text-2xl font-medium text-balance text-ink">Vault</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
           The vault sessions this server holds: where each came from, and which placeholder stands for which value. For troubleshooting a value that was or wasn't restored. Values
-          are shown as hints (first letter and length); originals only on demand, when the server runs the inspector in full mode on localhost.
+          are shown as redacted hints; originals only on demand, when the server runs the inspector in full mode on localhost.
         </p>
       </div>
 
@@ -182,11 +208,6 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
       ) : (
         <>
           <ModeNote mode={mode === "full" ? "full" : "masked"} />
-          {notice && (
-            <p role="status" className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-ink">
-              {notice}
-            </p>
-          )}
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
             <section aria-labelledby="vault-sessions-title" className="rounded-xl border border-line bg-surface p-4">
               <div className="flex items-baseline justify-between gap-2">
@@ -251,7 +272,14 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
 
             <section aria-label="Session detail" className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
               {selected === null ? (
-                <p className="py-10 text-center text-sm text-muted">Pick a session to see its placeholders.</p>
+                <div className="py-10 text-center text-sm">
+                  {notice && (
+                    <p role="status" className="mb-2 text-ink">
+                      {notice}
+                    </p>
+                  )}
+                  <p className="text-muted">Pick a session to see its placeholders.</p>
+                </div>
               ) : detail.state === "error" ? (
                 <p role="alert" className="py-6 text-sm text-danger">
                   {detail.code === "not_found" ? "This session is gone: it expired or was dropped." : `Couldn't open the session: ${detail.message}`}
@@ -260,6 +288,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
                 <p className="py-10 text-center text-sm text-muted">Opening the session…</p>
               ) : (
                 <SessionDetail
+                  headingRef={detailHeading}
                   d={current}
                   now={now}
                   canReveal={mode === "full"}
@@ -310,6 +339,7 @@ function SessionRow({ s, now, selected, onOpen }: { s: VaultSessionSummary; now:
 }
 
 interface DetailProps {
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
   d: VaultSessionDetail;
   now: number;
   canReveal: boolean;
@@ -321,19 +351,19 @@ interface DetailProps {
   onConfirmDrop: () => void;
 }
 
-function SessionDetail({ d, now, canReveal, revealed, onReveal, confirmDrop, onDrop, onCancelDrop, onConfirmDrop }: DetailProps) {
+function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, confirmDrop, onDrop, onCancelDrop, onConfirmDrop }: DetailProps) {
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-normal text-ink">
+          <h2 ref={headingRef} tabIndex={-1} className="text-lg font-normal text-ink focus:outline-none">
             Session <span className="font-mono text-base">{d.ref}</span>
           </h2>
           {revealed && d.session_id && <p className="mt-0.5 font-mono text-xs break-all text-muted">id {d.session_id}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canReveal && (
-            <Button className="h-8" aria-pressed={revealed} onClick={onReveal}>
+            <Button className="h-8" onClick={onReveal}>
               {revealed ? "Hide values" : "Reveal values"}
             </Button>
           )}
@@ -363,7 +393,7 @@ function SessionDetail({ d, now, canReveal, revealed, onReveal, confirmDrop, onD
         <Meta label="Expires in" value={`${duration(d.ttl_left_seconds)} unless used`} />
         <Meta label="Placeholders" value={String(d.entries)} />
         <Meta label="Known values" value={String(d.known_values)} />
-        <Meta label="Generation" value={String(d.generation)} />
+        <Meta label="Masked so far" value={`${d.occurrences} occurrence${d.occurrences === 1 ? "" : "s"}`} />
       </dl>
       {confirmDrop && (
         <p className="mt-3 text-xs text-muted">
@@ -371,64 +401,74 @@ function SessionDetail({ d, now, canReveal, revealed, onReveal, confirmDrop, onD
         </p>
       )}
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4">
         {d.items.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">This session holds no placeholders yet.</p>
         ) : (
-          <table className="w-full min-w-max text-sm">
-            <caption className="sr-only">
-              Placeholders of session {d.ref}
-              {revealed ? ", with original values" : ", values as hints"}
-            </caption>
-            <thead>
-              <tr className="border-b border-line text-left text-xs text-muted">
-                <th scope="col" className="py-2 pr-3 font-medium">
-                  Placeholder
-                </th>
-                <th scope="col" className="px-2 py-2 font-medium">
-                  Type
-                </th>
-                <th scope="col" className="px-2 py-2 font-medium">
-                  Origin
-                </th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">
-                  Masked
-                </th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">
-                  Forms
-                </th>
-                <th scope="col" className="py-2 pl-2 font-medium">
-                  {revealed ? "Value" : "Hint"}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.items.map((item, i) => (
-                <tr key={item.placeholder ?? `pending-${i}`} className="border-b border-line last:border-0 align-top">
-                  <td className="py-2 pr-3 font-mono text-xs text-masked">
-                    {item.placeholder ?? <span className="font-sans text-muted">not matched yet</span>}
-                    {item.variant_of && <span className="block font-sans text-2xs text-muted">variant of {item.variant_of}</span>}
-                  </td>
-                  <td className="px-2 py-2 text-xs">{typeLabel(item.entity_type)}</td>
-                  <td className="px-2 py-2 text-xs text-muted">{item.origin === "known" ? "Known value" : "Detected"}</td>
-                  <td className="px-2 py-2 text-right font-mono text-xs tabular-nums">{item.count}</td>
-                  <td className="px-2 py-2 text-right font-mono text-xs tabular-nums">{item.forms}</td>
-                  <td className="py-2 pl-2 font-mono text-xs [overflow-wrap:anywhere]">
-                    {revealed && item.original != null ? (
-                      <>
-                        <span className="text-ink" data-original>
-                          {item.original}
-                        </span>
-                        {item.known_forms && item.known_forms.length > 0 && <span className="block text-2xs text-muted">also {item.known_forms.join(", ")}</span>}
-                      </>
-                    ) : (
-                      <span className="text-muted">{item.hint}</span>
-                    )}
-                  </td>
+          <>
+            <table className="w-full text-sm">
+              <caption className="sr-only">
+                Placeholders of session {d.ref}
+                {revealed ? ", with original values" : ", values as hints"}
+              </caption>
+              <thead>
+                <tr className="border-b border-line text-left text-xs text-muted">
+                  <th scope="col" className="py-2 pr-3 font-medium">
+                    Placeholder
+                  </th>
+                  <th scope="col" className="px-2 py-2 font-medium">
+                    {revealed ? "Value" : "Hint"}
+                  </th>
+                  <th scope="col" className="hidden px-2 py-2 font-medium sm:table-cell">
+                    Type
+                  </th>
+                  <th scope="col" className="hidden px-2 py-2 font-medium md:table-cell">
+                    Origin
+                  </th>
+                  <th scope="col" className="hidden px-2 py-2 text-right font-medium sm:table-cell">
+                    Masked
+                  </th>
+                  <th scope="col" className="hidden py-2 pl-2 text-right font-medium md:table-cell">
+                    Forms
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {d.items.map((item, i) => (
+                  <tr key={item.placeholder ?? `pending-${i}`} className="border-b border-line align-top last:border-0">
+                    <td className="py-2 pr-3 font-mono text-xs break-all text-masked">
+                      {item.placeholder ?? <span className="font-sans text-muted">not matched yet</span>}
+                      {item.variant_of && <span className="block font-sans text-2xs break-normal text-muted">variant of {item.variant_of}</span>}
+                      <span className="block font-sans text-2xs break-normal text-muted sm:hidden">
+                        {typeLabel(item.entity_type)} · {item.origin === "known" ? "known value" : "detected"} · masked {item.count}×
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs break-all">
+                      {revealed && item.original != null ? (
+                        <>
+                          <span className="text-ink" data-original>
+                            {item.original}
+                          </span>
+                          {item.known_forms && item.known_forms.length > 0 && <span className="block text-2xs text-muted">also {item.known_forms.join(", ")}</span>}
+                        </>
+                      ) : (
+                        <span className="text-muted">{item.hint}</span>
+                      )}
+                    </td>
+                    <td className="hidden px-2 py-2 text-xs sm:table-cell">{typeLabel(item.entity_type)}</td>
+                    <td className="hidden px-2 py-2 text-xs text-muted md:table-cell">{item.origin === "known" ? "Known value" : "Detected"}</td>
+                    <td className="hidden px-2 py-2 text-right font-mono text-xs tabular-nums sm:table-cell">{item.count}</td>
+                    <td className="hidden py-2 pl-2 text-right font-mono text-xs tabular-nums md:table-cell">{item.forms}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-3 text-xs text-pretty text-muted">
+              <span className="text-ink">Hint</span>: a redacted shape of the value (a word's first letter and length, a number's last two digits, nothing of a secret).{" "}
+              <span className="text-ink">Masked</span>: occurrences replaced by the placeholder so far. <span className="text-ink">Forms</span>: other written forms matched onto
+              the same value, such as inflections. <span className="text-ink">Known value</span>: pre-loaded with {mono("POST /v1/sessions")} rather than detected.
+            </p>
+          </>
         )}
       </div>
     </>

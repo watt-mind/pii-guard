@@ -36,6 +36,7 @@ class SessionView:
 
     session_id: str
     entries: int
+    occurrences: int
     known_values: int
     entity_counts: dict[str, int]
     idle_seconds: float
@@ -90,6 +91,7 @@ def view_of(session: VaultSession) -> SessionView | None:
         return SessionView(
             session_id=session.session_id,
             entries=len(session._by_placeholder),
+            occurrences=sum(e.count for e in session._by_placeholder.values()),
             known_values=len(session._known),
             entity_counts=dict(sorted(counts.items())),
             idle_seconds=max(0.0, session._ttl - ttl_left),
