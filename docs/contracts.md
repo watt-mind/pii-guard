@@ -635,6 +635,79 @@ masked; …]`, its document summary (JSON) and its masked transcript. The model'
 unmasked as usual. Responses to requests with images carry `X-PII-Guard-Images`,
 `X-PII-Guard-Image-Regions-Masked` and `X-PII-Guard-Image-OCR: on|off`.
 
+### `GET /v1/status`
+
+What this server runs, read-only, for the web UI's Overview, Connect and Policy pages
+(`pii_guard.api.routes.status`). It takes no body and no parameters, never touches a vault
+session and never calls a detector or the upstream.
+
+**Auth.** Like every route but `/healthz`: when `PII_GUARD_API_TOKEN` is set the request needs
+`Authorization: Bearer <token>` or `X-PII-Guard-Token: <token>`, otherwise
+`401 unauthorized`. With no token set the route is open. `auth.token_required` tells the UI which.
+
+**No secrets.** Configuration only: never a key, a token, a value or a session. A secret
+appears only as "set or not" (`auth.token_required`, `gateway.modes.audit.available`,
+`images.sam`), never its value. The upstream is reported by origin (`scheme://host[:port]`),
+without its path, query, user or password.
+
+```json
+// response 200 (shortened)
+{
+  "version": "0.1.0",
+  "gateway": {
+    "default_mode": "fast",
+    "url": "http://localhost:8787/v1",
+    "modes": {
+      "fast": {"detectors": ["rules", "ner"], "available": true, "reason": null},
+      "audit": {"detectors": ["rules", "ner", "llm"], "available": false,
+                "reason": "audit mode needs PII_GUARD_LLM_DETECTOR_API_KEY …", "model": null}
+    }
+  },
+  "rest": {"detectors": ["rules", "ner"]},
+  "ner": {"available": true, "model": null},
+  "upstream": {"configured": true, "mock": false, "origin": "https://models.example.com:8443"},
+  "images": {"segmenter": "hybrid", "sam": false, "ocr_required": true, "gaps": [],
+             "available": true},
+  "policies": {"PERSON": "mask", "ORGANIZATION": "keep"},
+  "auth": {"token_required": false},
+  "default_language": "hu",
+  "traffic_log": "off",
+  "metrics": false
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `version` | string | The server's version (same as `/healthz`). |
+| `gateway.default_mode` | `"fast"` \| `"audit"` | The mode a gateway request without a mode override runs in. |
+| `gateway.url` | string | This request's own base URL plus `/v1`: the address a client on the same network path (the browser that asked) reaches the gateway at. Not the upstream. |
+| `gateway.modes.fast.detectors` | string[] | Detector names the fast mode runs, in order. Empty when the stack can't be built. |
+| `gateway.modes.fast.available` | bool | The fast detectors can run. |
+| `gateway.modes.fast.reason` | string \| null | Why not (the detection error text, no values); `null` when available. |
+| `gateway.modes.audit.detectors` | string[] | The fast detectors plus `llm`. |
+| `gateway.modes.audit.available` | bool | Audit can run: the fast detectors can, and the LLM detector is configured (a key, or a keyless loopback endpoint; see `detection_unavailable`). |
+| `gateway.modes.audit.reason` | string \| null | Why not: the fast reason first, else the LLM detector's. Names the setting, never a value. |
+| `gateway.modes.audit.model` | string \| null | The LLM detector's model name; `null` if it can't be configured. |
+| `rest.detectors` | string[] | Detectors `/v1/analyze` and `/v1/mask` run (`PII_GUARD_DETECTORS`, or the fast default). |
+| `ner.available` | bool | `ner` is in the fast detectors. |
+| `ner.model` | string \| null | `PII_GUARD_NER_MODEL`, `null` when unset (the detector default). |
+| `upstream.configured` | bool | An upstream is set (or the mock one is used). |
+| `upstream.mock` | bool | The gateway answers from the built-in mock upstream. |
+| `upstream.origin` | string \| null | Origin only (`scheme://host[:port]`); `null` when unset, unparseable or mock. |
+| `images.segmenter` | `"hybrid"` \| `"sam-api"` \| `"local"` \| `"off"` | `PII_GUARD_SEGMENTER`. |
+| `images.sam` | bool | A SAM backend is configured (Meta API key or `PII_GUARD_SAM_URL`); the key itself is never returned. |
+| `images.ocr_required` | bool | `PII_GUARD_IMAGE_REQUIRE_OCR`. |
+| `images.gaps` | string[] | What image masking still needs: `ocr` (the extra), `tesseract`, `segmenter`. `["unknown"]` if it can't be checked. |
+| `images.available` | bool | `gaps` is empty: `/v1/mask/image` can run. |
+| `policies` | object | Every `EntityType` name → its effective policy (`mask`, `keep` or `block`): defaults plus `PII_GUARD_POLICY_OVERRIDES`. |
+| `auth.token_required` | bool | `PII_GUARD_API_TOKEN` is set. |
+| `default_language` | string | `PII_GUARD_DEFAULT_LANGUAGE` (`"hu"`). |
+| `traffic_log` | `"off"` \| `"masked"` \| `"full"` | `PII_GUARD_TRAFFIC_LOG` level. |
+| `metrics` | bool | Request metrics are collected (`/metrics`). |
+
+Everything but `gateway.url`, `traffic_log` and `metrics` is fixed for the life of the app and
+computed on the first call; a settings change needs a restart.
+
 ## Gateway sessions (implemented)
 
 Every gateway call (`/v1/chat/completions`, `/v1/responses`) uses one vault session, chosen in
