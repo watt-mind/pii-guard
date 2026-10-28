@@ -87,6 +87,32 @@ the database; losing either or restoring them from different points makes stored
 unavailable. Existing environment-based upstream configuration remains available for the local
 single-owner setup.
 
+The default Docker image creates `/var/lib/pii-guard/projects` and uses the same database path.
+The `api` service in `compose.yaml` mounts a named `pii-guard-projects` volume there, so
+`docker compose down` preserves project configuration and the locally generated encryption
+key. `docker compose down -v` removes that volume. If `.env` supplies
+`PII_GUARD_TENANT_KEY`, keep that key stable with the volume; back up both together if the
+configuration must be restored. Restrict access to the Docker volume and its backups.
+
+The optional `demo` Compose profile deliberately uses `/tmp/pii-guard-projects` and generates
+a new tenant key for each container. Its project configuration and credentials are ephemeral
+and are expected to be lost when the demo container is replaced.
+
+### Owner access in Docker Compose
+
+The Compose API joins a bridge network. A request reaching the container through that network
+is not a trusted loopback request, even though Compose publishes the service only on host
+loopback. Set `PII_GUARD_API_TOKEN` in the local `.env` file to authorize management requests;
+the token protects API routes other than `/healthz`. Keep `.env` private and do not commit it.
+
+In the local Projects page, expand **Local guard access**, enter the same value in **Owner API
+token**, and choose **Use owner token**. The browser keeps it in tab memory only; it clears on
+reload and is never written to browser storage or a URL. The local client attaches it only to
+recognized same-origin guard API routes. It does not send the owner token to provider origins,
+endpoint-key routes, public/account/demo routes or static assets. Use **Clear owner token** to
+remove it from the current tab. Hosted mode keeps Google/cookie authentication and does not
+show this local token control.
+
 Metadata that is durable includes project ownership and names, default-project selection,
 complete immutable policy versions, endpoint provider/URL/model/policy assignment/enabled
 state, encrypted provider credentials, and endpoint-key verifier/revocation metadata. The
