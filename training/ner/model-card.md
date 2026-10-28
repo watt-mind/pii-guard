@@ -1,4 +1,4 @@
-# pii-guard NER (`hdkiller/pii-guard-ner-xlmr-base`)
+# pii-guard NER (`watt-mind/pii-guard-ner-xlmr-base`)
 
 The token-classification encoder behind [pii-guard](https://github.com/watt-mind/pii-guard)'s
 **fast mode** (rules + one NER encoder, in process, no API call). Published release: **v2.0**,
@@ -26,7 +26,7 @@ anonymiser: on its own, without the rules, it is unmeasured.
 ```bash
 # pii-guard downloads and SHA-256-checks it itself (docs/models.md, NER resolution order);
 # by hand:
-PII_GUARD_NER_MODEL=hdkiller/pii-guard-ner-xlmr-base PII_GUARD_NER_REVISION=v2.0 pii-guard up
+PII_GUARD_NER_MODEL=watt-mind/pii-guard-ner-xlmr-base PII_GUARD_NER_REVISION=v2.0 pii-guard up
 ```
 
 ## Training data

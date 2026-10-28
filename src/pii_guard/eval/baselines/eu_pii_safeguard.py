@@ -2,7 +2,7 @@
 
 A public XLM-RoBERTa **large** token classifier (about 560M parameters) for 26 EU
 languages with 42 BIO entity labels: the closest open alternative to pii-guard's own NER
-(``hdkiller/pii-guard-ner-xlmr-base``, XLM-R base). It is never in the product's default path:
+(``watt-mind/pii-guard-ner-xlmr-base``, XLM-R base). It is never in the product's default path:
 nothing outside the evaluation imports this module, and the gateway's fast mode keeps resolving
 its NER model through :mod:`pii_guard.detect.ner_resolve`.
 
