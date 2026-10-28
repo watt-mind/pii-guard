@@ -98,6 +98,12 @@ class VenvLayerTests(unittest.TestCase):
         self.assertLess(project, ui)
         self.assertNotIn("COPY --from=python-build /app/.venv ", text)
 
+    def test_dockerfile_runtime_copies_ner_from_the_src_independent_stage(self) -> None:
+        text = DOCKERFILE.read_text(encoding="utf-8")
+        self.assertIn("COPY --from=ner-model /app/models/ner /app/models/ner", text)
+        self.assertNotIn("COPY --from=python-build /app/models /app/models", text)
+        self.assertLess(text.index("AS ner-model"), text.index("COPY src ./src"))
+
 
 if __name__ == "__main__":
     unittest.main()

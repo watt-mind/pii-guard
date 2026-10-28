@@ -9,14 +9,17 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --no-install-project
 
-FROM python-deps AS python-build
 # The pinned NER checkpoint (about 1 GB) is fetched before `COPY src`, from only the modules that
 # hold its pin and SHA-256 verifier, so a change elsewhere in src/ reuses this layer from the
-# registry cache (deploy/azure/acr_build.sh, LAB-1446). Changing the pin re-fetches it.
+# registry cache (deploy/azure/acr_build.sh, LAB-1446). Changing the pin re-fetches it. The
+# runtime copies it from this stage, so its layer does not change with src either (LAB-1449).
+FROM python-deps AS ner-model
 COPY src/pii_guard/__init__.py src/pii_guard/types.py /app/pin/pii_guard/
 COPY src/pii_guard/detect/__init__.py src/pii_guard/detect/ner_resolve.py /app/pin/pii_guard/detect/
 RUN mkdir -p /app/models && PYTHONPATH=/app/pin .venv/bin/python -c "import shutil; from pathlib import Path; from pii_guard.detect.ner_resolve import PUBLISHED, ensure, resolve; p=ensure(resolve(published=PUBLISHED.repo_id + '@' + PUBLISHED.revision, fallback='download'), base=Path('/tmp/ner-fetch')); shutil.move(p, '/app/models/ner')" \
     && rm -rf /tmp/ner-fetch /app/pin
+
+FROM ner-model AS python-build
 COPY src ./src
 COPY eval/results ./eval/results
 COPY docs/benchmarks/config.json ./docs/benchmarks/config.json
@@ -34,7 +37,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN .venv/bin/python -c "from pii_guard.detect.ner import NerDetector; NerDetector(model='/app/models/ner', device='cpu')"
 # The YuNet face/ID-photo model (0.23 MB, MIT), fetched from its pinned URL and checked against
 # its pinned SHA-256 (pii_guard.visual.segment.YUNET); the build fails on a mismatch.
-RUN PII_GUARD_MODEL_DIR=/app/models .venv/bin/python -m pii_guard.visual.segment fetch
+# The runtime copies the NER checkpoint from ner-model and only the YuNet file from here, so this
+# fails if a step above changed the checkpoint or left anything else in /app/models.
+RUN --mount=type=bind,from=ner-model,source=/app/models/ner,target=/tmp/ner-pinned \
+    PII_GUARD_MODEL_DIR=/app/models .venv/bin/python -m pii_guard.visual.segment fetch \
+    && test "$(ls -A /app/models | tr '\n' ' ')" = "face_detection_yunet_2023mar.onnx ner " \
+    && diff -r --no-dereference /tmp/ner-pinned /app/models/ner
 
 FROM node:24-trixie-slim@sha256:89c5244bc22a9bc3287d89ebc7e49b9cb5bb84cd40e6175ac3421d5a9f68b95a AS ui-build
 WORKDIR /ui
@@ -62,7 +70,8 @@ RUN groupadd --system --gid 10001 piiguard \
 WORKDIR /app
 COPY --from=python-deps /app/.venv /app/.venv
 COPY --from=python-build /app/venv-project /app/.venv
-COPY --from=python-build /app/models /app/models
+COPY --from=ner-model /app/models/ner /app/models/ner
+COPY --from=python-build /app/models/face_detection_yunet_2023mar.onnx /app/models/
 COPY --from=ui-build /ui/dist /app/.venv/lib/python3.12/site-packages/pii_guard/_ui
 COPY deploy/azure/entrypoint.py /app/entrypoint.py
 ENV PATH=/app/.venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \

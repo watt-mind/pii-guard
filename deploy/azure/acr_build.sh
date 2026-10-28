@@ -16,7 +16,8 @@
 # Cache: the agent's docker build is BuildKit with the docker driver, which exports only inline
 # cache, and inline cache covers only the stage it tags. Each stage is therefore built and pushed
 # as its own cache image (pii-guard:buildcache-<stage>), and every build reads all of them, so a
-# src-only change reuses the dependency, model and apt layers.
+# src-only change reuses the dependency, model and apt layers. python-deps and ner-model are
+# ancestors of python-build, so its cache image covers them.
 set -euo pipefail
 
 usage() {
