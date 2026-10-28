@@ -78,3 +78,55 @@ def test_stage_shares_fill_the_overhead() -> None:
     shares = dict(charts.stage_shares(cell))
     assert sum(shares.values()) >= cell["overhead_ms"]["p50"] - 1e-6
     assert shares["other"] >= 0
+
+
+def _ner_cells() -> list[CellResult]:
+    cells = []
+    for c in (1, 8):
+        cell = CellResult("fast", c, False, 3, 0, 0.5, ["rules", "ner"])
+        cell.events = [_event(v * c, stream=False) for v in (4.0, 5.0, 9.0)]
+        cell.client_ms = [55.0, 56.0, 60.0]
+        cells.append(cell)
+    return cells
+
+
+def _ner_record(slug: str, **info: Any) -> dict[str, Any]:
+    detector_info = {"ner": {"model": "fictional/ner-base", **info}}
+    (record,) = build_records(
+        _ner_cells(),
+        slug=slug,
+        delay_ms=50.0,
+        day="2026-10-28",
+        detector_info=detector_info,
+        commit=("abc1234", False),
+    )
+    return record
+
+
+def test_device_is_in_the_system_key_and_label() -> None:
+    cpu = _ner_record("cpu", serving="in-process, PyTorch on CPU")
+    mps = _ner_record("mps", serving="in-process, PyTorch on Apple MPS")
+    explicit = _ner_record("cuda", device="CUDA:0", serving="remote")
+    assert cpu["system"]["key"] == "gateway-latency:fast:rules+ner:fictional/ner-base@cpu"
+    assert mps["system"]["key"] == "gateway-latency:fast:rules+ner:fictional/ner-base@mps"
+    assert explicit["system"]["key"].endswith("fictional/ner-base@cuda:0")
+    assert mps["system"]["label"].endswith("ner fictional/ner-base on mps)")
+    assert mps["system"]["detectors"][1]["settings"] == {"device": "mps"}
+
+
+def test_unknown_device_keeps_the_old_key() -> None:
+    record = _ner_record("old", serving="remote API")
+    assert record["system"]["key"] == "gateway-latency:fast:rules+ner:fictional/ner-base"
+    assert record["system"]["detectors"][1]["settings"] == {}
+
+
+def test_cpu_and_mps_runs_both_reach_the_latency_table() -> None:
+    cpu = _ner_record("cpu", serving="in-process, PyTorch on CPU")
+    mps = _ner_record("mps", serving="in-process, PyTorch on Apple MPS")
+    old = _ner_record("old")
+    index = build_index([*load_records(REPO / "eval/results/runs"), cpu, mps, old])
+    latest = {r["run_id"]: charts.latency_label(r) for r in charts.latest_latency(index)}
+    assert latest["2026-10-28-cpu-fast"] == "fast: rules + ner (cpu)"
+    assert latest["2026-10-28-mps-fast"] == "fast: rules + ner (mps)"
+    assert latest["2026-10-28-old-fast"] == "fast: rules + ner"
+    assert "<svg" in charts.latency(index)

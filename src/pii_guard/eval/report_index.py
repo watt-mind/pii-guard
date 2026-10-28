@@ -704,6 +704,11 @@ def build_index(
             "label": rec["system"]["label"],
             "detectors": [d["name"] for d in rec["system"]["detectors"]],
             "models": [d["model"] for d in rec["system"]["detectors"] if d.get("model")],
+            "devices": [
+                (d.get("settings") or {})["device"]
+                for d in rec["system"]["detectors"]
+                if (d.get("settings") or {}).get("device")
+            ],
             "hardware": (rec.get("hardware") or {}).get("description"),
             "upstream_delay_ms": rec["metrics"]["upstream_delay_ms"],
             "cells": rec["metrics"]["cells"],

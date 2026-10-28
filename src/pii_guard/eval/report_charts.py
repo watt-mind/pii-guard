@@ -1024,11 +1024,13 @@ def latest_latency(index: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 
 def latency_label(run: Mapping[str, Any]) -> str:
-    """``fast: rules + ner`` from a latency run's system."""
+    """``fast: rules + ner (mps)`` from a latency run's system; no device, no suffix."""
     mode = str(run["system"]).split(":")[1] if ":" in str(run["system"]) else "?"
     mode = display_mode(mode)  # the key keeps a record's old mode name
     names = [d for d in run["detectors"] if d not in ("known", "visual")]
-    return f"{mode}: " + (" + ".join(names) or "none")
+    devices = list(dict.fromkeys(run.get("devices") or []))
+    suffix = f" ({', '.join(devices)})" if devices else ""
+    return f"{mode}: " + (" + ".join(names) or "none") + suffix
 
 
 def stage_shares(cell: Mapping[str, Any]) -> list[tuple[str, float]]:

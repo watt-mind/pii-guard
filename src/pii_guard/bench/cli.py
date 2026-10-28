@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     lat.add_argument(
         "--detector-info",
         type=Path,
-        help="JSON {detector: {model, model_ref, serving, settings}} for the record",
+        help="JSON {detector: {model, model_ref, serving, device, settings}} for the record",
     )
     lat.add_argument("--note", action="append", default=[], help="a note for the record")
     lat.add_argument("--json", type=Path, help="also write the cell summaries here")
