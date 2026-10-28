@@ -117,7 +117,12 @@ machine state requires a fresh approved one-use enrollment key; do not silently 
 dev. Use the same immutable image digest and normal versioned app key references, set
 `HOSTED_PUBLIC_ORIGIN=https://guard-dev.watt-mind.com`, and provide reviewed evidence containing
 `lab_1372_done`, `private_dev_reviewed`, `tailnet_acl`, `proxy_tls`, `proxy_headers` for that image.
-Keep sponsorship zero until provider authorization and approved durable authority exist.
+Keep sponsorship zero until provider authorization (or the owner's recorded LAB-1389 risk
+acceptance, `meta_proxy_owner_risk_accepted`) and approved durable authority exist. That
+waiver is a risk acceptance, not Meta authorization: it is scoped to the hackathon demo, capped
+at USD 10 with a fixed expiry, and sponsored Meta stops being the default before general
+availability unless written authorization arrives
+([hosted.md](hosted.md#owner-risk-acceptance-is-not-authorization)).
 
 ### Operator technical stage before live acceptance
 
@@ -266,8 +271,8 @@ unknown-write handling and retained limitations. Deployment compilation is not l
 App releases configure LAB-1398's `azure_blob` store and reuse the exact operator-approved
 cumulative ceiling, allocation ID and expiry. The isolated private container is
 `sponsored-allowance`, with a fixed `dev.json` object. Bootstrap creates no object/funding. An
-operator precreates/funds it only after provider permission; releases never create, reset,
-refill or extend it. Total/daily charges survive zero replicas and overlapping revisions under
+operator precreates/funds it only after provider permission or the owner's recorded LAB-1389
+risk acceptance (which is not permission); releases never create, reset, refill or extend it. Total/daily charges survive zero replicas and overlapping revisions under
 CAS. Owner sessions, mappings, profiles and API-key records remain ephemeral; LAB-1376 is not
 implemented by durable spend accounting.
 
