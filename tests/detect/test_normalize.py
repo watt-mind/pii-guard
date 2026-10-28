@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -11,6 +13,7 @@ from pii_guard.detect.normalize import (
     LOOKALIKES,
     ZERO_WIDTH_SEPARATORS,
     NormalizedText,
+    _normalize_reference,
     normalize_for_detection,
 )
 
@@ -185,3 +188,109 @@ def test_separator_elsewhere_is_dropped(text: str, expected: str) -> None:
 @pytest.mark.parametrize("joiner", [ZWJ, "\u200c"])
 def test_joiners_are_never_read_as_a_space(joiner: str) -> None:
     assert normalize_for_detection(f"Teszt{joiner}Elek").text == "TesztElek"
+
+
+# --- regrouped values: obfuscated e-mails, spelled-out and dot-regrouped values (LAB-1297) -
+
+
+def _maps_back(text: str, norm: NormalizedText, value: str) -> str:
+    start = norm.text.index(value)
+    o_start, o_end = norm.to_original(start, start + len(value))
+    return text[o_start:o_end]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("cc: vk4nt0r [at] example [dot] net, ok", "cc: vk4nt0r@example.net, ok"),
+        ("anna(at)beispiel(punkt)de bitte", "anna@beispiel.de bitte"),
+        ("írj: teszt.elek {AT} pelda (pont) hu", "írj: teszt.elek@pelda.hu"),
+        ("x [at] example.co.uk", "x@example.co.uk"),
+        ("john [ät] beispiel [punkt] de", "john@beispiel.de"),
+        ("teszt (kukac) pelda (pont) hu", "teszt@pelda.hu"),
+        ("x@example [dot] com", "x@example.com"),
+        (
+            '"email": "d4ncs.r3n4t4 [ at ] example [ dot ] com"',
+            '"email": "d4ncs.r3n4t4@example.com"',
+        ),
+    ],
+)
+def test_obfuscated_email_reads_as_an_address(text: str, expected: str) -> None:
+    norm = normalize_for_detection(text)
+    assert norm.text == expected
+    address = re.search(r"\S+@\S+\w", expected).group()  # type: ignore[union-attr]
+    original = _maps_back(text, norm, address)
+    assert original.startswith(address.split("@")[0]) and original.endswith(address[-2:])
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "meet me at [at] noon",  # no domain after it
+        "the cat [dot] com",  # no [at] and no @
+        "user [at] localhost",  # one domain label
+        "x [at] example [dot] c0m",  # the last label is not letters
+        "ping me at example dot com",  # bare words are prose
+        "write to x@example.com",  # a plain address: nothing to fold
+    ],
+)
+def test_text_that_is_not_an_obfuscated_email_is_left_alone(text: str) -> None:
+    assert normalize_for_detection(text).text == text
+
+
+@pytest.mark.parametrize(
+    ("text", "token"),
+    [
+        ('"iban": "D E 6 3 1 4 8 5 2 5 9 2 7 8 7 8 6 3 9 0 7 4"', "DE63148525927878639074"),
+        ("phone: 0 1 1 3 4 9 6 0 8 8 8,", "01134960888"),
+        ("telefon: +3 6 2 0 5 5 5 0 1 4 4", "+36205550144"),
+        ("number is a G B 2 5 T C Z S 5 6 3 3 0 4.", "GB25TCZS563304"),  # not the article
+        ("iban=GB5.4PZ.JT7.994.613.163.609.0\n", "GB54PZJT79946131636090"),
+        ("Turner,294.221.325,ORD-2026-510042", "294221325"),
+        ("szám: 363.130.412.48.", "36313041248"),
+        ("(CHE-947.235.321)", "CHE-947235321"),
+    ],
+)
+def test_regrouped_value_reads_as_one_token(text: str, token: str) -> None:
+    norm = normalize_for_detection(text)
+    assert re.search(rf"(?<![\w.]){re.escape(token)}(?![\w]|\.\w)", norm.text), norm.text
+    original = _maps_back(text, norm, token)
+    assert original.replace(" ", "").replace(".", "") == token.replace(".", "")
+    # Only the separators inside the value were dropped.
+    assert norm.text.replace(token, original) == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a b c d e f g h",  # no digits
+        "Q 1 2 3 4 5",  # five digits
+        "amount 123.456.789,00 EUR",  # an amount with a decimal part
+        "123.456.789 Ft",  # an amount with a currency
+        "€ 123.456.789",
+        "ip 192.168.100.200 up",  # an IPv4 address
+        "host www.abc.def.com",  # a dotted name without digits
+        "Dátum: 2026.10.27.",  # a date
+        "v1.2.3 and 10.0.0.1",
+        "id abc.def.ghi.jklm.123456",  # part of a longer dotted name
+        "123.456",  # two groups
+    ],
+)
+def test_text_that_is_not_regrouped_is_left_alone(text: str) -> None:
+    assert normalize_for_detection(text).text == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "cc: vk4nt0r [at] example [dot] net",
+        '"iban": "D E 6 3 1 4 8 5 2 5 9 2 7 8 7 8 6 3 9 0 7 4"',
+        "iban=GB5.4PZ.JT7.994.613.163.609.0",
+        f"T{CYR_E}szt Elek, t3szt [at] p{ZWSP}elda [dot] hu, 0 6 3 0 1 2 3 4 5 6 7",
+    ],
+)
+def test_regrouping_fast_path_matches_reference(text: str) -> None:
+    fast, slow = normalize_for_detection(text), _normalize_reference(text)
+    assert fast.text == slow.text
+    assert tuple(fast.origin) == tuple(slow.origin)
+    assert fast.ends == slow.ends

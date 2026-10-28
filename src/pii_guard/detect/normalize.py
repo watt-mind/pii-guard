@@ -43,6 +43,19 @@ The rules:
   shape of a plate, document number or IBAN), so genuine Cyrillic or Greek text is left alone.
 - **Fullwidth and mathematical alphanumerics** (``\\uff21``, ``\\U0001d400``) are folded with NFKC
   when that gives a single character.
+- **Obfuscated e-mail addresses** (``name [at] example [dot] com``, ``name(at)example.com``)
+  read as ``name@example.com``: a bracketed ``at`` (``[at]``, ``(at)``, ``{at}``, ``<at>``; also
+  ``ät``, ``kukac``) and a bracketed ``dot`` (also ``punkt``, ``pont``), with the spaces
+  around them, stand for ``@`` and ``.`` when the whole reads as an address: a local part,
+  ``@`` and at least two domain labels, the last of letters, at least one separator
+  bracketed. Bare ``at`` and ``dot`` words in prose are left alone.
+- **A value spelled out one character at a time** (``D E 6 3 1 4 ...``, ``0 1 1 3 4 9 6 ...``):
+  a run of at least six single letters or digits separated by single spaces, with at least six
+  digits, has the spaces dropped.
+- **A value regrouped in threes with dots** (``GB5.4PZ.JT7.994.613``, ``294.221.325``): at least
+  three dot-separated groups of three letters or digits (the last may be shorter), with at least
+  six digits, has the dots dropped. An amount (a decimal part after it, a currency next to it),
+  an IPv4 address and anything inside a longer dotted name are left alone.
 - **Spoofed placeholders**: a value wrapped to look like a pii-guard placeholder
   (``[[PERSON_Teszt Elek]]``) has the wrapper blanked to spaces, so the model sees the value
   and not a placeholder it was told to skip. Real placeholders (``[[PERSON_3fa2c1]]``: an
@@ -156,6 +169,33 @@ _LINE_BREAK_RE = re.compile(f"[{_LINE_BREAKS}]")
 _NUMBER_LINE_RE = re.compile(r"[ \t]*[+(]?[0-9][0-9 ()+\-./]*[ \t]*")
 # The rest of a wrapped number: digit groups and nothing else on the line but a closing mark.
 _CONTINUATION_RE = re.compile(r"[0-9]+(?:[ -][0-9]+)*[ \t]*[.,;:!?)]?[ \t]*")
+
+# Obfuscated e-mail separators: ``[at]``, ``(dot)`` ... with the spaces around them (LAB-1297).
+_OPEN, _CLOSE = r"[\[({<]", r"[\])}>]"
+_AT_WORD = rf"[ \t]*{_OPEN}[ \t]*(?:at|ät|kukac)[ \t]*{_CLOSE}[ \t]*"
+_DOT_WORD = rf"[ \t]*{_OPEN}[ \t]*(?:dot|punkt|pont)[ \t]*{_CLOSE}[ \t]*"
+_LABEL = r"[^\W_](?:[\w-]*[^\W_])?"
+_OBFUSCATED_EMAIL_RE = re.compile(
+    rf"(?<![\w.+-])[^\W_][\w.+-]*(?:{_AT_WORD}|@){_LABEL}(?:(?:{_DOT_WORD}|\.){_LABEL})+"
+    r"(?![\w-])",
+    re.IGNORECASE,
+)
+_EMAIL_SEPARATOR_RE = re.compile(rf"(?P<at>{_AT_WORD})|(?P<dot>{_DOT_WORD})", re.IGNORECASE)
+# Single letters or digits separated by single spaces: ``D E 6 3 1 4 ...``.
+_SPELLED_OUT_RE = re.compile(r"(?<![^\W_])(?:[^\W_] ){5,}[^\W_](?![^\W_])")
+# Groups of three separated by dots: ``GB5.4PZ.JT7.994``, ``294.221.325``.
+_DOTTED_GROUPS_RE = re.compile(
+    r"(?<![\w.])[^\W_]{3}(?:\.[^\W_]{3})+(?:\.[^\W_]{1,2})?(?!\w|\.[^\W_]|,[0-9])"
+)
+_CURRENCY_RE = re.compile(r"(?:[$€£¥₽]|\b(?:Ft|HUF|EUR|USD|GBP|CHF|Euro|Forint)\b)", re.IGNORECASE)
+# A cheap test for the three folds above, so plain text keeps the fast path.
+_REGROUPED_HINT_RE = re.compile(
+    rf"{_OPEN}[ \t]*(?:at|ät|kukac|dot|punkt|pont)[ \t]*{_CLOSE}|(?:[^\W_] ){{5}}[^\W_]"
+    r"|[^\W_]{3}\.[^\W_]{3}\.[^\W_]",
+    re.IGNORECASE,
+)
+#: Fewest digits in a spelled-out or dot-regrouped value (a short code stays as it is).
+_MIN_REGROUPED_DIGITS = 6
 
 
 def _is_latin(char: str) -> bool:
@@ -374,6 +414,61 @@ def _join_wrapped_numbers(chars: list[str]) -> list[int]:
     return drop
 
 
+def _fold_obfuscated_emails(chars: list[str]) -> list[int]:
+    """Read ``[at]`` / ``[dot]`` in an e-mail address as ``@`` / ``.``; the indices to drop.
+
+    Each bracketed separator, with the spaces around it, becomes its first character (set to
+    ``@`` or ``.``) and the rest is dropped, so the address maps back over all of it.
+    """
+    joined = "".join(chars)
+    drop: list[int] = []
+    for match in _OBFUSCATED_EMAIL_RE.finditer(joined):
+        value = match.group()
+        tld = re.split(_DOT_WORD + r"|\.", value, flags=re.IGNORECASE)[-1]
+        if len(tld) < 2 or not tld.isalpha():
+            continue
+        offset = match.start()
+        for sep in _EMAIL_SEPARATOR_RE.finditer(value):
+            start, end = offset + sep.start(), offset + sep.end()
+            chars[start] = "@" if sep.group("at") else "."
+            drop.extend(range(start + 1, end))
+    return drop
+
+
+def _digit_count(text: str) -> int:
+    return sum(c.isdigit() for c in text)
+
+
+def _join_spelled_out(chars: list[str]) -> list[int]:
+    """Drop the spaces of a spelled-out value and the dots of a dot-regrouped one.
+
+    ``D E 6 3 1 4 ...`` and ``GB5.4PZ.JT7.994`` read as one token. One lower-case letter before
+    upper-case letters or digits (``a G B 2 5 ...``: an article) is not joined to them.
+    """
+    joined = "".join(chars)
+    drop: list[int] = []
+    for match in _SPELLED_OUT_RE.finditer(joined):
+        start, end = match.span()
+        if _digit_count(match.group()) < _MIN_REGROUPED_DIGITS:
+            continue
+        if joined[start].islower() and not joined[start + 2].islower():
+            start += 2  # ``a G B 2 5 ...``: an article before the value
+        drop.extend(range(start + 1, end, 2))
+    for match in _DOTTED_GROUPS_RE.finditer(joined):
+        start, end = match.span()
+        groups = match.group().split(".")
+        if len(groups) < 3 or _digit_count(match.group()) < _MIN_REGROUPED_DIGITS:
+            continue
+        if all(g.isdigit() for g in groups):
+            if len(groups) == 4 and all(int(g) <= 255 for g in groups):
+                continue  # an IPv4 address
+            around = joined[max(0, start - 6) : start] + " " + joined[end : end + 8]
+            if _CURRENCY_RE.search(around):
+                continue  # an amount: 1.234.567 Ft, € 123.456.789
+        drop.extend(k for k in range(start, end) if joined[k] == ".")
+    return drop
+
+
 def _one_for_one_fold(text: str) -> tuple[dict[int, str], bool] | None:
     """How ``text`` folds when every character folds one for one, else ``None``.
 
@@ -440,15 +535,22 @@ def _normalize(text: str, *, fast: bool) -> NormalizedText:
     else:
         chars, starts, ends = _compose(text)
         _fold_lookalikes(chars)
-    if fast and folded is not None and "[[" not in folded and not _WRAPPED_NUMBER_RE.search(folded):
-        # No placeholder to blank and no wrapped number to join: the fold is final.
+    if (
+        fast
+        and folded is not None
+        and "[[" not in folded
+        and not _WRAPPED_NUMBER_RE.search(folded)
+        and not _REGROUPED_HINT_RE.search(folded)
+    ):
+        # No placeholder to blank, no wrapped number, address or regrouped value to join:
+        # the fold is final.
         if folded == text:
             return NormalizedText(text, text, starts)
         return NormalizedText(text, folded, tuple(starts))
     if folded is not None:
         chars = list(folded)
     _blank_spoofed_placeholders(chars)
-    drop = _join_wrapped_numbers(chars)
+    drop = _fold_obfuscated_emails(chars) + _join_spelled_out(chars) + _join_wrapped_numbers(chars)
     if drop:
         dropped = set(drop)
         keep = [k for k in range(len(chars)) if k not in dropped]
