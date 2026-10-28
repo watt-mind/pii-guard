@@ -531,7 +531,12 @@ def test_responses_url() -> None:
 
 def test_sse_restorer_passes_unknown_events_and_restores_whole_ones() -> None:
     class Session:
-        def unmask_with_report(self, text: str) -> Any:
+        def restore_budget(self) -> Any:
+            from pii_guard.vault import RestoreBudget
+
+            return RestoreBudget(1000)
+
+        def unmask_with_report(self, text: str, *, budget: Any = None) -> Any:
             from pii_guard.vault import UnmaskResult
 
             return UnmaskResult(text.replace("[[EMAIL_abcd12]]", "a@example.com"), ())

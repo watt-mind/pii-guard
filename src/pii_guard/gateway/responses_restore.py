@@ -35,7 +35,7 @@ from pii_guard.gateway.restore import (
     restore_arguments,
     restore_text,
 )
-from pii_guard.vault import StreamUnmasker, VaultSession
+from pii_guard.vault import RestoreBudget, StreamUnmasker, VaultSession
 
 __all__ = [
     "DONE",
@@ -68,34 +68,43 @@ _DELTAS: dict[str, tuple[str, tuple[str, ...], bool]] = {
 _DONES = {name[: -len(".delta")] + ".done": name for name in _DELTAS}
 
 
-def _restore_value(session: VaultSession, value: Any, report: RestoreReport, key: str = "") -> Any:
+def _restore_value(
+    session: VaultSession,
+    value: Any,
+    report: RestoreReport,
+    budget: RestoreBudget,
+    key: str = "",
+) -> Any:
     if isinstance(value, str):
         if key in _OPAQUE:
             return value
         if key in _JSON_FIELDS:
-            return restore_arguments(session, value, report)
-        restored, _, unresolved = restore_text(session, value)
+            return restore_arguments(session, value, report, budget)
+        restored, _, unresolved = restore_text(session, value, budget)
         report.unresolved.update(dict.fromkeys(unresolved))
         return restored
     if isinstance(value, list):
-        return [_restore_value(session, item, report, key) for item in value]
+        return [_restore_value(session, item, report, budget, key) for item in value]
     if isinstance(value, dict):
         # Keys are the upstream's own field names; values are restored.
-        return {k: _restore_value(session, v, report, str(k)) for k, v in value.items()}
+        return {k: _restore_value(session, v, report, budget, str(k)) for k, v in value.items()}
     return value
 
 
 def restore_response(session: VaultSession, body: dict[str, Any]) -> RestoreReport:
     """Restore a ``response`` object in place. ``restored_spans`` maps each ``output`` index
     holding a message to its restored text (joined ``output_text`` parts) and value spans, for
-    the detection cache (the client sends it back as history)."""
+    the detection cache (the client sends it back as history).
+
+    One :class:`~pii_guard.vault.RestoreBudget` covers the body (the cache copy has its own):
+    past it, raises :class:`~pii_guard.vault.UnmaskOutputTooLargeError` (LAB-1350)."""
     report = RestoreReport()
     for index, item in enumerate(body.get("output") or []):
         text = _message_text(item)
         if text is not None:
             restored, spans, _ = restore_text(session, text)
             report.restored_spans[index] = (restored, spans)
-    restored_body = _restore_value(session, body, report)
+    restored_body = _restore_value(session, body, report, session.restore_budget())
     body.clear()
     body.update(restored_body)
     return report
@@ -151,7 +160,9 @@ class ResponsesSseRestorer:
 
     def __init__(self, session: VaultSession) -> None:
         self._session = session
-        self._json_session = JsonEscapingSession(session)
+        # One budget for every event of the stream (LAB-1350).
+        self._budget = session.restore_budget()
+        self._json_session = JsonEscapingSession(session, self._budget)
         self._unmaskers: dict[tuple[Any, ...], StreamUnmasker] = {}
         #: The last delta event of each stream: the template for a flushed remainder.
         self._last_delta: dict[tuple[Any, ...], dict[str, Any]] = {}
@@ -181,7 +192,7 @@ class ResponsesSseRestorer:
         unmasker = self._unmaskers.get(key)
         if unmasker is None:
             session: Any = self._json_session if json_safe else self._session
-            unmasker = StreamUnmasker(session)
+            unmasker = StreamUnmasker(session, self._budget)
             self._unmaskers[key] = unmasker
         return unmasker
 
@@ -220,7 +231,7 @@ class ResponsesSseRestorer:
             extra = self._flush(self._key(_DONES[event_type], parsed))
             if extra is not None:
                 out.append(self._emit(extra))
-        restored = _restore_value(self._session, parsed, self._report)
+        restored = _restore_value(self._session, parsed, self._report, self._budget)
         if event_type == "response.failed":
             response = restored.get("response")
             if isinstance(response, dict) and isinstance(response.get("error"), dict):

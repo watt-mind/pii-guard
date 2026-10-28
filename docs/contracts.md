@@ -221,6 +221,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` | `known_values_max_length` | `int` (characters per value) | `256` |
 | `PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS` | `vault_case_sensitive_placeholders` | `bool` | `false` |
 | `PII_GUARD_VAULT_MAX_ENTRIES` | `vault_max_entries` | `int` (≥ 1): most placeholders in one get-or-create session before it starts a new generation | `10000` |
+| `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` | `unmask_max_restored_chars` | `int` (≥ 1): most characters of original values one `/v1/unmask` call or one gateway response restores | `1000000` |
 | `PII_GUARD_VAULT_INSPECT` | `vault_inspect` | `"off"` \| `"masked"` \| `"full"`: the vault inspector (`/v1/vault/sessions*`); `full` only on a loopback bind | `masked` |
 | `PII_GUARD_LLM_DETECTOR_URL` | `llm_detector_url` | `str \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_API_KEY` | `llm_detector_api_key` | `SecretStr \| None` | unset |
@@ -347,6 +348,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 404 | `traffic_log_disabled` | `GET /v1/traffic` and `/v1/traffic/stream` while `PII_GUARD_TRAFFIC_LOG=off` (the default). |
 | 404 | `vault_inspect_disabled` | The `/v1/vault/*` routes while `PII_GUARD_VAULT_INSPECT=off`. |
 | 413 | `payload_too_large` | The body, text or image is larger than the configured limit (see docs/operations.md). |
+| 413 | `unmask_output_too_large` | Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values: one `/v1/unmask` text, or one gateway response (non-streaming: this error; streaming: the stream ends with an error event of this code). Nothing past the limit is returned. |
 | 415 | `unsupported_media_type` | `/v1/mask/image`: the image is not a PNG or JPEG (sniffed from its bytes). |
 | 422 | `invalid_request` | Body fails validation. The message lists field locations only, never values. |
 | 422 | `invalid_image` | `/v1/mask/image`: the image can't be decoded, or its base64 or JSON body is malformed. |
@@ -479,7 +481,9 @@ detector, never a requirement.
 
 `unresolved` lists placeholder-shaped tokens (`[[TYPE_id]]`) that aren't in the session
 mapping (invented or mangled by the model). They are left in `text` as is. Unknown or
-expired `session_id` → 404 `not_found`.
+expired `session_id` → 404 `not_found`. Restoring more than
+`PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (default 1 000 000) →
+413 `unmask_output_too_large`, with no text (LAB-1350).
 
 ### `POST /v1/mask/image`
 
@@ -957,9 +961,13 @@ class Vault:
         id_length: int = DEFAULT_ID_LENGTH,
         clock=time.monotonic,
         case_sensitive_placeholders: bool = False,
+        max_sessions: int = DEFAULT_MAX_SESSIONS,
+        max_entries: int = DEFAULT_MAX_ENTRIES,
+        max_restored_chars: int = DEFAULT_MAX_RESTORED_CHARS,  # 1_000_000, LAB-1350
     ) -> None: ...
 
-    # PII_GUARD_TENANT_KEY (and PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS) from Settings.
+    # PII_GUARD_TENANT_KEY (and the PII_GUARD_VAULT_* / PII_GUARD_UNMASK_MAX_RESTORED_CHARS
+    # settings) from Settings.
     @classmethod
     def from_settings(cls, settings: Settings, **kwargs) -> Vault: ...
 
@@ -992,11 +1000,19 @@ class VaultSession:
     # Same, plus (start, end, placeholder) of every replacement in input offsets.
     def mask_with_report(self, text, spans, *, language="hu", remask=False) -> MaskResult: ...
 
-    # Replace known placeholders with their original values.
-    def unmask(self, text: str) -> str: ...
+    # Replace known placeholders with their original values. Restored values are charged to
+    # budget (default: a fresh restore_budget() for this call); past its limit, raises
+    # UnmaskOutputTooLargeError (unmask_output_too_large, 413) before the output grows further.
+    def unmask(self, text: str, *, budget: RestoreBudget | None = None) -> str: ...
 
     # Same, plus the placeholder-shaped tokens that are not in the mapping.
-    def unmask_with_report(self, text: str) -> UnmaskResult: ...
+    def unmask_with_report(
+        self, text: str, *, budget: RestoreBudget | None = None
+    ) -> UnmaskResult: ...
+
+    # A RestoreBudget at max_restored_chars, for one whole output: the gateway shares one
+    # across every choice, field, tool call and stream chunk of a response.
+    def restore_budget(self) -> RestoreBudget: ...
 
     # (placeholder, entity_type, count) for every placeholder this session issued.
     def entities(self) -> list[tuple[str, EntityType, int]]: ...
@@ -1105,6 +1121,14 @@ Messages and `repr()`s carry types, counts and placeholder ids, never an origina
   with decomposed accents, after the value was confirmed in another layout gets a placeholder
   of its own (its form is mixed into the HMAC, like a casing class), so `unmask` gives it back
   as written. Runs of plain spaces count as one space and share the placeholder.
+- **Case-sensitive types** (`CASE_SENSITIVE_TYPES`, LAB-1350): `SECRET` only (tokens, API
+  keys, passwords, private keys, URL passwords). Letter case is part of a credential, so a
+  `SECRET` is keyed by its exact value (up to whitespace, invisible characters and Unicode
+  form): `AbC…1` and `aBc…1` are two secrets with two placeholders, both modes, and an
+  occurrence in another case is not masked with the confirmed secret's placeholder (the
+  detector decides about it on its own). Every other type is case-insensitive as below:
+  names and other natural-language values (with their inflection), and IBANs, plates, ID
+  numbers and e-mail addresses, which are case-insensitive by their own rules.
 - **Casing:** occurrences match case-insensitively, so `TESZT ELEK` and `teszt elek` are
   masked along with a `Teszt Elek` span. By default they share its placeholder and `unmask`
   restores the value as first written (`TESZT ELEK és Teszt Elek.` → `Teszt Elek és Teszt

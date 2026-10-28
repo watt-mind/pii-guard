@@ -51,6 +51,7 @@ class UnmaskResponse(BaseModel):
     responses=error_responses(
         "not_found",
         "payload_too_large",
+        "unmask_output_too_large",
         "invalid_request",
         "vault_not_configured",
         "masking_failed",
@@ -64,7 +65,9 @@ def unmask(
     """Replace every placeholder the session issued with its original value.
 
     Tokens shaped like a placeholder but unknown to the session are reported in
-    ``unresolved`` and left in place. Unknown or expired session: 404 ``not_found``."""
+    ``unresolved`` and left in place. Unknown or expired session: 404 ``not_found``.
+    Restoring more than ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of original values:
+    413 ``unmask_output_too_large``, nothing returned (LAB-1350)."""
     check_text_size(request, body.text)
     result = vault.session(body.session_id).unmask_with_report(body.text)
     log_extra(request, unresolved=len(result.unresolved))

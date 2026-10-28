@@ -21,23 +21,31 @@ from pii_guard.vault.inflection import (
 from pii_guard.vault.placeholders import PLACEHOLDER_RE, normalize_value
 from pii_guard.vault.stream import StreamUnmasker
 from pii_guard.vault.vault import (
+    CASE_SENSITIVE_TYPES,
     DEFAULT_MAX_ENTRIES,
+    DEFAULT_MAX_RESTORED_CHARS,
     DEFAULT_TTL_SECONDS,
+    RestoreBudget,
     SessionNotFoundError,
+    UnmaskOutputTooLargeError,
     UnmaskResult,
     Vault,
     VaultSession,
 )
 
 __all__ = [
+    "CASE_SENSITIVE_TYPES",
     "DEFAULT_MAX_ENTRIES",
+    "DEFAULT_MAX_RESTORED_CHARS",
     "DEFAULT_TTL_SECONDS",
     "PLACEHOLDER_RE",
     "ExactMatcher",
     "HungarianSuffixMatcher",
     "InflectionMatcher",
+    "RestoreBudget",
     "SessionNotFoundError",
     "StreamUnmasker",
+    "UnmaskOutputTooLargeError",
     "UnmaskResult",
     "Vault",
     "VaultSession",

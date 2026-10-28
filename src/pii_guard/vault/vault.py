@@ -24,9 +24,9 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from pii_guard.detect.normalize import INVISIBLE_CHARS
+from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
 from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
-from pii_guard.vault.fold import FoldedText, fold_value, fold_views
+from pii_guard.vault.fold import FoldedText, fold_value, fold_views, spaced
 from pii_guard.vault.inflection import (
     InflectionMatcher,
     Split,
@@ -52,13 +52,17 @@ if TYPE_CHECKING:
     from pii_guard.config import Settings
 
 __all__ = [
+    "CASE_SENSITIVE_TYPES",
     "DEFAULT_MAX_ENTRIES",
+    "DEFAULT_MAX_RESTORED_CHARS",
     "DEFAULT_MAX_SESSIONS",
     "DEFAULT_TTL_SECONDS",
     "MIN_TENANT_KEY_BYTES",
     "MaskResult",
     "PlaceholderInInputError",
+    "RestoreBudget",
     "SessionNotFoundError",
+    "UnmaskOutputTooLargeError",
     "UnmaskResult",
     "Vault",
     "VaultSession",
@@ -85,6 +89,17 @@ DEFAULT_MAX_SESSIONS = 10_000
 #: its id moves on to a new, empty generation (LAB-1286).
 DEFAULT_MAX_ENTRIES = 10_000
 MIN_TENANT_KEY_BYTES = 16
+#: Most characters of original values one unmask call, or one gateway response, restores: five
+#: times the 200,000-character text limit (LAB-1350). A placeholder of a long value repeated in
+#: a short text would otherwise expand without bound.
+DEFAULT_MAX_RESTORED_CHARS = 1_000_000
+
+#: Entity types keyed and matched by their exact value (LAB-1350). Letter case is part of a
+#: credential: ``AbC1`` and ``aBc1`` are two secrets, with two placeholders, and an occurrence in
+#: another case is not the confirmed value. Every other type is case-insensitive: names and
+#: other natural-language values (and their inflection), and IBANs, plates, ID numbers and
+#: e-mail addresses, which are case-insensitive by their own rules.
+CASE_SENSITIVE_TYPES: frozenset[EntityType] = frozenset({EntityType.SECRET})
 
 
 class SessionNotFoundError(PiiGuardError):
@@ -92,6 +107,47 @@ class SessionNotFoundError(PiiGuardError):
 
     code = "not_found"
     status_code = 404
+
+
+class UnmaskOutputTooLargeError(PiiGuardError):
+    """Restoring the placeholders would put more than the limit of original characters out (413).
+
+    Fail closed (LAB-1350): nothing is returned, and the output is never built past the limit.
+    The message names the limit only.
+    """
+
+    code = "unmask_output_too_large"
+    status_code = 413
+
+
+class RestoreBudget:
+    """The characters of original values one output may still restore (LAB-1350).
+
+    One budget covers one ``/v1/unmask`` text or one gateway response: every choice, field and
+    tool-call argument of it, streamed or not. :meth:`VaultSession.unmask_with_report` charges
+    each restored value before it writes it; going over raises
+    :class:`UnmaskOutputTooLargeError`. Not thread-safe: one response is restored in order.
+    """
+
+    __slots__ = ("limit", "spent")
+
+    def __init__(self, limit: int) -> None:
+        if limit < 0:
+            raise ValueError("the restore limit must not be negative")
+        self.limit = limit
+        self.spent = 0
+
+    def __repr__(self) -> str:
+        return f"RestoreBudget(spent={self.spent}, limit={self.limit})"
+
+    def charge(self, chars: int) -> None:
+        """Spend ``chars``; raises :class:`UnmaskOutputTooLargeError` past the limit."""
+        if self.spent + chars > self.limit:
+            raise UnmaskOutputTooLargeError(
+                f"restoring the placeholders would output more than {self.limit} characters "
+                "of original values (PII_GUARD_UNMASK_MAX_RESTORED_CHARS)"
+            )
+        self.spent += chars
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +217,7 @@ class _Entry:
         "changed",
         "count",
         "entity_type",
+        "exact",
         "initials",
         "language",
         "needles",
@@ -206,6 +263,9 @@ class _Entry:
         self.seen_folded: dict[str, str] = {}
         self.casing = casing_class(original)
         self.variants: dict[str, _Entry] = {}
+        # Case-sensitive types only (:data:`CASE_SENSITIVE_TYPES`): the exact keys
+        # (:func:`_exact`) an occurrence of this value or of a surface may be written as.
+        self.exact: frozenset[str] | None = None
 
     def __repr__(self) -> str:
         return f"_Entry(placeholder={self.placeholder!r}, value=<redacted>, count={self.count})"
@@ -214,6 +274,7 @@ class _Entry:
         """Split ``surface`` onto this entry; ``True`` if that changed its pattern."""
         if surface != self.original and surface not in self.surfaces:
             self.surfaces[surface] = None
+            self.exact = None
             self.patterns.clear()
             self.needles.clear()
             self.initials.clear()
@@ -228,6 +289,25 @@ class _Entry:
             self.initials.clear()
             return True
         return False
+
+    def written_as(self, written: str, alias: str | None = None) -> bool:
+        """Whether an occurrence written as ``written`` is this value (or ``alias``).
+
+        Always for a case-insensitive type: its patterns decide. A case-sensitive type's
+        patterns match every casing, so the occurrence must also be the value, a surface or
+        the alias exactly, up to whitespace, invisible characters and Unicode form
+        (:func:`_exact`). Its type has no changed stems (only names, addresses and
+        organisations do), so the whole occurrence is one of those.
+        """
+        if self.entity_type not in CASE_SENSITIVE_TYPES:
+            return True
+        if alias is not None:
+            allowed = frozenset({_exact(alias)})
+        else:
+            if self.exact is None:
+                self.exact = frozenset(_exact(v) for v in (self.original, *self.surfaces))
+            allowed = self.exact
+        return _exact(written) in allowed or _exact(spaced(written)) in allowed
 
     def remember(self, suffix: str, stem: str) -> None:
         if suffix:
@@ -438,9 +518,11 @@ class VaultSession:
         id_length: int,
         clock: Callable[[], float],
         case_sensitive_placeholders: bool = False,
+        max_restored_chars: int = DEFAULT_MAX_RESTORED_CHARS,
     ) -> None:
         self.session_id = session_id
         self._case_sensitive = case_sensitive_placeholders
+        self._max_restored = max_restored_chars
         self._tenant_key = tenant_key
         self._ttl = ttl_seconds
         self._id_length = id_length
@@ -541,6 +623,7 @@ class VaultSession:
                 id_length=self._id_length,
                 clock=self._clock,
                 case_sensitive_placeholders=self._case_sensitive,
+                max_restored_chars=self._max_restored,
             )
             memo: dict[int, Any] = {}
             fork._by_key = copy.deepcopy(self._by_key, memo)
@@ -774,7 +857,7 @@ class VaultSession:
             pool = [e for e in pool if e.changed > since]
         entries = sorted(pool, key=lambda e: len(e.normalized), reverse=True)
         self.entries_scanned += len(entries)
-        found = [self._found(entry, language, folded) for entry in entries]
+        found = [self._found(entry, language, folded, text) for entry in entries]
         self._take(text, found, language, replacements, taken)
         if depends is not None and key is not None:
             self._remember_masked(key, replacements, generation, depends, len(ordered))
@@ -806,7 +889,7 @@ class VaultSession:
             for start, end, _ in replacements:
                 taken[start:end] = b"\x01" * (end - start)
             folded = self._fold_views(text)
-            found = [self._found(entry, language, folded) for entry in entries]
+            found = [self._found(entry, language, folded, text) for entry in entries]
             for _, occurrences, aliases in found:
                 spans = itertools.chain(occurrences, *(o for _, o in aliases))
                 if any(any(taken[start:end]) for start, end in spans):
@@ -817,9 +900,13 @@ class VaultSession:
 
     @staticmethod
     def _found(
-        entry: _Entry, language: str, folded: tuple[FoldedText, ...]
+        entry: _Entry, language: str, folded: tuple[FoldedText, ...], text: str
     ) -> tuple[_Entry, list[tuple[int, int]], list[tuple[str, list[tuple[int, int]]]]]:
-        """``entry``'s occurrences in ``folded``, and each alias's: ``(entry, own, aliases)``."""
+        """``entry``'s occurrences in ``folded``, and each alias's: ``(entry, own, aliases)``.
+
+        ``text`` is the original the views fold: a case-sensitive entry keeps only the
+        occurrences written as its value (:meth:`_Entry.written_as`).
+        """
         pattern = entry.pattern(language)
         # Skipping a scan that can find nothing changes no output, only its cost: each
         # request re-masks the whole history against every value of the session (LAB-1277).
@@ -829,6 +916,12 @@ class VaultSession:
             for alias, alias_pattern, needles in entry.alias_pattern_list(language)
             if not _absent(needles, folded)
         ]
+        if entry.entity_type in CASE_SENSITIVE_TYPES:
+            own = [(a, b) for a, b in own if entry.written_as(text[a:b])]
+            aliases = [
+                (alias, [(a, b) for a, b in spans if entry.written_as(text[a:b], alias)])
+                for alias, spans in aliases
+            ]
         return entry, own, aliases
 
     def _take(
@@ -855,9 +948,10 @@ class VaultSession:
                         continue
                     written = text[start:end]
                     owner = entry
-                    if not following_suffix(text, end) and normalize_value(
-                        written
-                    ) == normalize_value(alias):
+                    kind = entry.entity_type
+                    if not following_suffix(text, end) and _value_key(kind, written) == _value_key(
+                        kind, alias
+                    ):
                         owner = self._entry_for(entry.entity_type, written, language)
                     replacements.append((start, end, self._cased(owner, written)))
                     taken[start:end] = b"\x01" * (end - start)
@@ -975,33 +1069,36 @@ class VaultSession:
                 )
                 lemma = agree.lemma if agree is not None else value
                 plans.append(_Plan(span, lemma, len(value)))
-                confirmed.add((span.entity_type, normalize_value(lemma)))
+                confirmed.add((span.entity_type, _value_key(span.entity_type, lemma)))
                 continue
             candidates = splits(matcher, value, span.entity_type)
             strong = next((c for c in candidates if c.strong), None)
             if strong is not None:
                 plans.append(_Plan(span, strong.lemma, len(strong.stem)))
-                confirmed.add((span.entity_type, normalize_value(strong.lemma)))
+                confirmed.add((span.entity_type, _value_key(span.entity_type, strong.lemma)))
             elif candidates:
                 plans.append(None)
                 pending[index] = candidates
-                for lemma in {normalize_value(c.lemma) for c in candidates}:
-                    votes.setdefault((span.entity_type, lemma), set()).add(normalize_value(value))
+                for lemma in {_value_key(span.entity_type, c.lemma) for c in candidates}:
+                    votes.setdefault((span.entity_type, lemma), set()).add(
+                        _value_key(span.entity_type, value)
+                    )
             else:
                 plans.append(_Plan(span, value, len(value)))
             # A span's own value is a confirmed lemma for the others ("Zoltán" for "Zoltánt").
-            confirmed.add((span.entity_type, normalize_value(value)))
+            confirmed.add((span.entity_type, _value_key(span.entity_type, value)))
         # Lemmas other spans may be inflected forms of ("Varga Bernadett" for "...Bernadettel").
         candidate_of: dict[tuple[EntityType, str], set[int]] = {}
         for index, candidates in pending.items():
             for c in candidates:
-                key = (ordered[index].entity_type, normalize_value(c.lemma))
+                kind = ordered[index].entity_type
+                key = (kind, _value_key(kind, c.lemma))
                 candidate_of.setdefault(key, set()).add(index)
                 if depends is not None and key not in confirmed:
                     depends.add(key)
         for index, candidates in pending.items():
             span = ordered[index]
-            own = (span.entity_type, normalize_value(span.text))
+            own = (span.entity_type, _value_key(span.entity_type, span.text))
             if candidate_of.get(own, set()) - {index}:
                 # Another span reads as an inflected form of this one: it is a lemma itself.
                 plans[index] = _Plan(span, span.text, span.length)
@@ -1011,7 +1108,7 @@ class VaultSession:
                 (
                     c
                     for c in candidates
-                    if (span.entity_type, normalize_value(c.lemma)) in confirmed
+                    if (span.entity_type, _value_key(span.entity_type, c.lemma)) in confirmed
                     or _occurs_alone(text, c.lemma, span)
                 ),
                 None,
@@ -1019,7 +1116,8 @@ class VaultSession:
                 (
                     c
                     for c in candidates
-                    if len(votes.get((span.entity_type, normalize_value(c.lemma)), ())) >= 2
+                    if len(votes.get((span.entity_type, _value_key(span.entity_type, c.lemma)), ()))
+                    >= 2
                 ),
                 None,
             )
@@ -1035,7 +1133,7 @@ class VaultSession:
         return [plan for plan in plans if plan is not None]
 
     def _entry_for(self, entity_type: EntityType, value: str, language: str = "hu") -> _Entry:
-        normalized = normalize_value(value)
+        normalized = _value_key(entity_type, value)
         key = (entity_type, normalized)
         entry = self._by_key.get(key)
         if entry is not None:
@@ -1055,12 +1153,15 @@ class VaultSession:
         if self._masked is not None:
             self._touched.append(entry)
 
-    def _form(self, value: str) -> str:
+    def _form(self, value: str, entity_type: EntityType) -> str:
         """The variant key of ``value``: its casing class (case-sensitive mode) and layout.
 
-        A casing-only key is the casing class itself, so those ids are derived as before.
+        A casing-only key is the casing class itself, so those ids are derived as before. A
+        case-sensitive type has no casing variants: its occurrences are written as its value.
         """
-        casing = casing_class(value) if self._case_sensitive else ""
+        casing = ""
+        if self._case_sensitive and entity_type not in CASE_SENSITIVE_TYPES:
+            casing = casing_class(value)
         layout = _layout(value)
         return f"{casing}|{layout}" if layout else casing
 
@@ -1071,8 +1172,8 @@ class VaultSession:
         layout (a line break inside it, decomposed accents) or, with case-sensitive
         placeholders, another casing class. Then that form's variant, created on first use.
         """
-        form = self._form(written)
-        if form == self._form(entry.original):
+        form = self._form(written, entry.entity_type)
+        if form == self._form(entry.original, entry.entity_type):
             return entry
         variant = entry.variants.get(form)
         if variant is None:
@@ -1080,7 +1181,7 @@ class VaultSession:
             # The value in the written form: its casing (case-sensitive mode; the whole
             # value as written, or a changed stem's lemma recased) and its layout.
             original = entry.original
-            if self._case_sensitive:
+            if self._case_sensitive and entry.entity_type not in CASE_SENSITIVE_TYPES:
                 original = _recased(original, written, entry.normalized, casing_class(written))
             original = _relaid(original, written)
             variant = _Entry(
@@ -1108,12 +1209,27 @@ class VaultSession:
 
     # --- re-identification ---------------------------------------------------------------
 
-    def unmask(self, text: str) -> str:
-        """Replace known placeholders with their original values; unknown ones stay as is."""
-        return self.unmask_with_report(text).text
+    def restore_budget(self) -> RestoreBudget:
+        """A fresh :class:`RestoreBudget` at this session's limit, for one whole output.
 
-    def unmask_with_report(self, text: str) -> UnmaskResult:
-        """Like :meth:`unmask`, also listing placeholder-shaped tokens that weren't resolved."""
+        Pass it to every :meth:`unmask_with_report` call that writes into the same response
+        (the gateway restores a response placeholder by placeholder, or chunk by chunk).
+        """
+        return RestoreBudget(self._max_restored)
+
+    def unmask(self, text: str, *, budget: RestoreBudget | None = None) -> str:
+        """Replace known placeholders with their original values; unknown ones stay as is."""
+        return self.unmask_with_report(text, budget=budget).text
+
+    def unmask_with_report(self, text: str, *, budget: RestoreBudget | None = None) -> UnmaskResult:
+        """Like :meth:`unmask`, also listing placeholder-shaped tokens that weren't resolved.
+
+        Restored values are charged to ``budget`` (default: a fresh :meth:`restore_budget` for
+        this call alone): past it, raises :class:`UnmaskOutputTooLargeError` before the output
+        grows further (LAB-1350).
+        """
+        if budget is None:
+            budget = self.restore_budget()
         with self._lock:
             self._check_alive()
             unresolved: dict[str, None] = {}
@@ -1132,7 +1248,9 @@ class VaultSession:
                     continue
                 restored += 1
                 suffix = following_suffix(text, cursor)
-                parts.append(_restored(entry, suffix))
+                value = _restored(entry, suffix)
+                budget.charge(max(0, len(value) - len(suffix)))
+                parts.append(value)
                 cursor += len(suffix)
             parts.append(text[cursor:])
             result = "".join(parts)
@@ -1175,6 +1293,24 @@ class VaultSession:
                 dict.fromkeys(v.value for v in self._known.values() if v.entity_type in types)
             )
             return list(found)
+
+
+_WHITESPACE_RUN = re.compile(r"\s+")
+
+
+def _exact(value: str) -> str:
+    """``value`` as a case-sensitive type is keyed (LAB-1350): the detection fold (invisible
+    characters dropped, accents composed, Unicode spaces and dashes folded) and its whitespace
+    collapsed, without the case fold."""
+    return _WHITESPACE_RUN.sub(" ", normalize_for_detection(value).text).strip()
+
+
+def _value_key(entity_type: EntityType, value: str) -> str:
+    """The key ``value`` is confirmed and stored under: :func:`normalize_value` (case-folded),
+    or :func:`_exact` for :data:`CASE_SENSITIVE_TYPES`."""
+    if entity_type in CASE_SENSITIVE_TYPES:
+        return _exact(value)
+    return normalize_value(value)
 
 
 def _folded_index(view: FoldedText, position: int) -> int | None:
@@ -1333,6 +1469,10 @@ class Vault:
     a rotation is re-masked from its re-sent history under the new generation; only a
     placeholder it kept from before the rotation (and no longer sends the value of) stays
     unrestored. Explicit sessions (:meth:`session`) have no cap: their client owns them.
+
+    ``max_restored_chars`` caps the characters of original values one unmask call (or one
+    :meth:`VaultSession.restore_budget`, a gateway response) restores: see
+    :class:`RestoreBudget` (LAB-1350).
     """
 
     def __init__(
@@ -1345,6 +1485,7 @@ class Vault:
         case_sensitive_placeholders: bool = False,
         max_sessions: int = DEFAULT_MAX_SESSIONS,
         max_entries: int = DEFAULT_MAX_ENTRIES,
+        max_restored_chars: int = DEFAULT_MAX_RESTORED_CHARS,
     ) -> None:
         if not isinstance(tenant_key, bytes | bytearray):
             raise TypeError("tenant_key must be bytes")
@@ -1358,6 +1499,9 @@ class Vault:
             raise ValueError("max_sessions must be at least 1")
         if max_entries < 1:
             raise ValueError("max_entries must be at least 1")
+        if max_restored_chars < 1:
+            raise ValueError("max_restored_chars must be at least 1")
+        self._max_restored = max_restored_chars
         self._max_sessions = max_sessions
         self._max_entries = max_entries
         # base id -> current generation, only for ids that rotated at least once.
@@ -1375,8 +1519,9 @@ class Vault:
         """A vault keyed by ``PII_GUARD_TENANT_KEY``. Fails closed if the key is unset.
 
         ``PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS`` sets ``case_sensitive_placeholders``
-        ``PII_GUARD_VAULT_MAX_SESSIONS`` sets ``max_sessions`` and ``PII_GUARD_VAULT_MAX_ENTRIES``
-        sets ``max_entries``, unless ``kwargs`` does.
+        ``PII_GUARD_VAULT_MAX_SESSIONS`` sets ``max_sessions``, ``PII_GUARD_VAULT_MAX_ENTRIES``
+        sets ``max_entries`` and ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` sets
+        ``max_restored_chars``, unless ``kwargs`` does.
         """
         key = settings.tenant_key_bytes()
         if key is None:
@@ -1384,6 +1529,7 @@ class Vault:
         kwargs.setdefault("case_sensitive_placeholders", settings.vault_case_sensitive_placeholders)
         kwargs.setdefault("max_sessions", settings.vault_max_sessions)
         kwargs.setdefault("max_entries", settings.vault_max_entries)
+        kwargs.setdefault("max_restored_chars", settings.unmask_max_restored_chars)
         return cls(key, **kwargs)
 
     def __repr__(self) -> str:
@@ -1469,6 +1615,7 @@ class Vault:
             id_length=self._id_length,
             clock=self._clock,
             case_sensitive_placeholders=self._case_sensitive,
+            max_restored_chars=self._max_restored,
         )
         self._sessions[session_id] = session
         return session

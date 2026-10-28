@@ -118,6 +118,10 @@ class Settings(BaseSettings):
     # and placeholders with redacted hints, never an original; "full" can also reveal originals,
     # on a loopback bind only (like PII_GUARD_TRAFFIC_LOG=full); "off": the routes answer 404.
     vault_inspect: Literal["off", "masked", "full"] = "masked"
+    # Most characters of original values one /v1/unmask call or one gateway response restores
+    # (LAB-1350): a placeholder of a long value repeated in a short text would expand without
+    # bound. Over it, 413 unmask_output_too_large (a stream ends with that error event).
+    unmask_max_restored_chars: int = Field(default=1_000_000, ge=1)
 
     # Model endpoints.
     llm_detector_url: str | None = None

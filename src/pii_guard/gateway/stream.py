@@ -54,7 +54,9 @@ class SseRestorer:
 
     def __init__(self, session: VaultSession) -> None:
         self._session = session
-        self._json_session = JsonEscapingSession(session)
+        # One budget for the whole response: every choice, field and tool call (LAB-1350).
+        self._budget = session.restore_budget()
+        self._json_session = JsonEscapingSession(session, self._budget)
         # (choice, field) or (choice, "tool", tool index) -> unmasker
         self._unmaskers: dict[tuple[Any, ...], StreamUnmasker] = {}
         self._retired_unresolved: dict[str, None] = {}
@@ -82,7 +84,7 @@ class SseRestorer:
         if unmasker is None:
             # StreamUnmasker only calls unmask_with_report(); the JSON adapter provides it.
             session: Any = self._json_session if json_safe else self._session
-            unmasker = StreamUnmasker(session)
+            unmasker = StreamUnmasker(session, self._budget)
             self._unmaskers[key] = unmasker
         return unmasker
 
