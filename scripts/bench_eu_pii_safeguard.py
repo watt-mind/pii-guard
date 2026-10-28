@@ -2,7 +2,7 @@
 
 Evaluation only: scores four configurations on the same sets and commit, fast mode, CPU.
 
-- ``ner-v20``: pii-guard's NER alone, the published ``hdkiller/pii-guard-ner-xlmr-base`` v2.0;
+- ``ner-v20``: pii-guard's NER alone, the published ``watt-mind/pii-guard-ner-xlmr-base`` v2.0;
 - ``fast-v20``: rules + that NER (pii-guard fast mode);
 - ``eu-pii-safeguard``: the comparison model alone;
 - ``fast-eu-pii-safeguard``: rules + the comparison model in place of pii-guard's NER.
@@ -64,7 +64,7 @@ _OURS_DETECTOR = {
     "name": "ner",
     "model": "xlmr-base-v2-hn",
     "model_ref": (
-        f"hdkiller/pii-guard-ner-xlmr-base v2.0 (LAB-1306), revision {_OURS.revision[:12]}; "
+        f"watt-mind/pii-guard-ner-xlmr-base v2.0 (LAB-1306), revision {_OURS.revision[:12]}; "
         "the LAB-1150 checkpoint pii-guard-ner-xlmr-base-v2-hn"
     ),
     "revision": f"sha256:{_OURS.weights_sha256}",

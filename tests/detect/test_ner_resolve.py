@@ -222,3 +222,56 @@ def test_cli_status_and_fetch(
         assert len(hub) == 1
     else:
         assert ner_resolve.main(["fetch"]) == 2
+
+
+def _write_checked(root: Path, weights: bytes = WEIGHTS) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "config.json").write_text("{}", encoding="utf-8")
+    (root / "model.safetensors").write_bytes(weights)
+    (root / ner_resolve._MARKER).write_text(hashlib.sha256(weights).hexdigest() + "\n")
+
+
+def test_published_repo_moved_to_watt_mind() -> None:
+    """LAB-1402: the checkpoint lives under ``watt-mind``; the old id names the same pin."""
+    assert ner_resolve.PUBLISHED_REPO == "watt-mind/pii-guard-ner-xlmr-base"
+    assert ner_resolve.PUBLISHED.previous_repo_ids == ("hdkiller/pii-guard-ner-xlmr-base",)
+    old = "hdkiller/pii-guard-ner-xlmr-base"
+    for published in (old, f"{old}@{ner_resolve.PUBLISHED.revision}"):
+        choice = resolve(published=published, fallback="download")
+        assert choice.pinned == ner_resolve.PUBLISHED
+
+
+def test_cache_under_the_previous_repo_id_is_reused(
+    monkeypatch: pytest.MonkeyPatch, fallback: PinnedModel, hub: list[dict[str, Any]]
+) -> None:
+    """A checked download named after the old hub id keeps working offline and under cached."""
+    moved = PinnedModel(
+        repo_id="fictional-org/pii-ner",
+        revision=PIN.revision,
+        licence="Apache-2.0",
+        size_mb=1,
+        weights_sha256=PIN.weights_sha256,
+        previous_repo_ids=(PIN.repo_id,),
+    )
+    monkeypatch.setattr(ner_resolve, "PUBLISHED", moved)
+    primary = ner_resolve.models_dir() / "ner" / "fictional-org--pii-ner-0123456789ab"
+    assert moved.local_dir() == primary and not moved.is_ready()
+    legacy = PIN.local_dir()
+    _write_checked(legacy)
+    assert moved.local_dir() == legacy and moved.is_ready()
+    # The new id and the old one both resolve to the pin, loaded from the old directory.
+    for published in (moved.repo_id, PIN.repo_id):
+        choice = resolve(published=published, fallback="cached")
+        assert (choice.source, choice.pinned) == ("published", moved)
+        assert choice.model == str(legacy) and choice.ready
+        assert ensure(choice) == str(legacy)
+    assert hub == []  # nothing downloaded
+    # An unchecked old directory (wrong marker) is not reused: cached finds nothing.
+    (legacy / ner_resolve._MARKER).write_text("0" * 64 + "\n", encoding="utf-8")
+    assert moved.local_dir() == primary and not moved.is_ready()
+    assert resolve(published=moved.repo_id, fallback="cached").model is None
+    # Download mode fetches into the new directory, which then wins over the old one.
+    path = ensure(resolve(published=moved.repo_id), progress=lambda _: None)
+    assert path == str(primary) and hub[0]["repo_id"] == moved.repo_id
+    _write_checked(legacy)
+    assert moved.local_dir() == primary
