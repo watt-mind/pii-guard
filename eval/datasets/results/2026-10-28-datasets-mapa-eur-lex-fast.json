@@ -1,0 +1,171 @@
+{
+  "run_id": "2026-10-28-datasets-mapa-eur-lex-fast",
+  "dataset": "mapa-eur-lex",
+  "split": "test",
+  "system": {
+    "key": "rules+ner:xlmr-base-v2-hn",
+    "label": "pii-guard fast, NER v2 base + hard negatives (LAB-1150)"
+  },
+  "fixtures": [
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/en-mapa-eur-lex.jsonl",
+      "sha256": "1dd287bd70b0bc60803ce39711d59712fd9897a30fbe1102a9163df2500c1b56"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/es-mapa-eur-lex.jsonl",
+      "sha256": "2550e2256b2e66134fc50669709e04484a4a47c51b2b396dfae61c1c1171615f"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/bg-mapa-eur-lex.jsonl",
+      "sha256": "e4b99051a96b6559abfdb33142b3a142c7d18f12676b731a7685d9a95ddc99d3"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/cs-mapa-eur-lex.jsonl",
+      "sha256": "222d44f6732f8ccca9ead038aeae6ce3ec6d3c3f0e9e54ccb7276c2fc6a9620e"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/da-mapa-eur-lex.jsonl",
+      "sha256": "eb9ad0539823be9ebe6adeb31f910dc450df15427e47d15ee551bbc487079b1e"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/de-mapa-eur-lex.jsonl",
+      "sha256": "1df3741dbfd775555a7161449718e6875b60238f5dfd01ad5d73a63d605ae0af"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/el-mapa-eur-lex.jsonl",
+      "sha256": "f8814274f2e9d760eecd07c5e299dbfe52d05b8296bc6bbd0f59759f977a238d"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/ga-mapa-eur-lex.jsonl",
+      "sha256": "0b49e91dece1bd9961a6216262f5c8222d1322c8cc3e83ba03eee71ebef4eb4c"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/et-mapa-eur-lex.jsonl",
+      "sha256": "1db92e050c9668df17603245330a46fe710280b2ad0e2310cc1fc5ead13e12c2"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/fi-mapa-eur-lex.jsonl",
+      "sha256": "320bdcd13949d49d197bfbc155e99b77cf3af90ed0804247a7a7daf576b7f925"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/fr-mapa-eur-lex.jsonl",
+      "sha256": "9e8c5ce80dade38f46bcb430eff9c6cbf845f1b98174d82f8593bfa0c62ba7a9"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/hu-mapa-eur-lex.jsonl",
+      "sha256": "060eb23db9a347155b85043fc8727d1942a362905528e627c3242f4ea82d8b98"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/it-mapa-eur-lex.jsonl",
+      "sha256": "cfecd5375977b3b74a1dec596443c348239159e2a192b50f74af732f3444fbc3"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/lt-mapa-eur-lex.jsonl",
+      "sha256": "cdc486bdf8e41bb84f831381203e4f72e979ca4bda05f588807e0204e0789360"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/lv-mapa-eur-lex.jsonl",
+      "sha256": "803df09e4783af26bf9e8e1fbe5a75eb4dcf6afff6abe1ab52f403ff988f355f"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/mt-mapa-eur-lex.jsonl",
+      "sha256": "5a37a979312b4bfc2aeef1c49f684f67be1a14e6c11b0cfb1aabe54505bc6768"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/nl-mapa-eur-lex.jsonl",
+      "sha256": "1d669a5ed6c55d47ddbedaa3178b348da44aa857450e5fd75a1354fd2b3330cb"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/pt-mapa-eur-lex.jsonl",
+      "sha256": "d4348561e15b0a59ab6d5218a012133421f96e67902469d12e814309f0133b10"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/ro-mapa-eur-lex.jsonl",
+      "sha256": "3c9e2e15d19deb60fbad2478908fab161da5b1246e6dfc22565ffb53b24a1dad"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/sk-mapa-eur-lex.jsonl",
+      "sha256": "fbe5f39e6417b5b905e16d96fe123455f50cdf4d28d6270d26bac4a2e96e3cf1"
+    },
+    {
+      "path": "data/datasets/fixtures/mapa-eur-lex/sv-mapa-eur-lex.jsonl",
+      "sha256": "3032a3f33f5325e4f1da3fdc48bc3664753bf0c5f901894d24faa5b539b90f00"
+    }
+  ],
+  "summary": {
+    "documents": 42,
+    "resamples": 1000,
+    "seed": 1226,
+    "leak": {
+      "value": 0.085135,
+      "low": 0.059777,
+      "high": 0.113239
+    },
+    "precision": {
+      "value": 0.418434,
+      "low": 0.306197,
+      "high": 0.54131
+    },
+    "recall": {
+      "value": 0.773279,
+      "low": 0.734769,
+      "high": 0.816555
+    },
+    "f1": {
+      "value": 0.543027,
+      "low": 0.436304,
+      "high": 0.644339
+    },
+    "over_masking": {
+      "value": 0.555507,
+      "low": 0.426597,
+      "high": 0.67402
+    },
+    "p50_ms": 1587.861,
+    "p95_ms": 2479.562
+  },
+  "documents": [
+    {"id":"mapa-eur-lex-205543_en","language":"en","gold":24,"tp_gold":19,"pred":24,"tp_pred":19,"values":16,"leaked":4,"masked":24,"over_masked":5,"detect_ms":1075.809},
+    {"id":"mapa-eur-lex-205542_en","language":"en","gold":42,"tp_gold":27,"pred":36,"tp_pred":29,"values":21,"leaked":5,"masked":36,"over_masked":7,"detect_ms":1411.269},
+    {"id":"mapa-eur-lex-205542","language":"es","gold":33,"tp_gold":22,"pred":56,"tp_pred":25,"values":18,"leaked":1,"masked":55,"over_masked":28,"detect_ms":2483.463},
+    {"id":"mapa-eur-lex-205543","language":"es","gold":24,"tp_gold":23,"pred":29,"tp_pred":22,"values":16,"leaked":1,"masked":29,"over_masked":7,"detect_ms":1105.971},
+    {"id":"mapa-eur-lex-205542_bg","language":"bg","gold":37,"tp_gold":26,"pred":63,"tp_pred":24,"values":18,"leaked":0,"masked":62,"over_masked":33,"detect_ms":2261.152},
+    {"id":"mapa-eur-lex-205543_bg","language":"bg","gold":24,"tp_gold":23,"pred":29,"tp_pred":23,"values":18,"leaked":1,"masked":25,"over_masked":2,"detect_ms":1176.019},
+    {"id":"mapa-eur-lex-205542_cs","language":"cs","gold":35,"tp_gold":23,"pred":57,"tp_pred":24,"values":20,"leaked":2,"masked":56,"over_masked":31,"detect_ms":2058.882},
+    {"id":"mapa-eur-lex-205543_cs","language":"cs","gold":24,"tp_gold":24,"pred":30,"tp_pred":23,"values":17,"leaked":0,"masked":30,"over_masked":7,"detect_ms":1210.323},
+    {"id":"mapa-eur-lex-205542_da","language":"da","gold":32,"tp_gold":24,"pred":50,"tp_pred":25,"values":18,"leaked":0,"masked":48,"over_masked":21,"detect_ms":2039.787},
+    {"id":"mapa-eur-lex-205543_da","language":"da","gold":25,"tp_gold":24,"pred":31,"tp_pred":24,"values":17,"leaked":0,"masked":31,"over_masked":7,"detect_ms":1174.85},
+    {"id":"mapa-eur-lex-205543_de","language":"de","gold":24,"tp_gold":23,"pred":30,"tp_pred":23,"values":16,"leaked":1,"masked":30,"over_masked":7,"detect_ms":1184.905},
+    {"id":"mapa-eur-lex-205542_de","language":"de","gold":35,"tp_gold":25,"pred":57,"tp_pred":25,"values":18,"leaked":1,"masked":54,"over_masked":27,"detect_ms":1960.954},
+    {"id":"mapa-eur-lex-205543_el","language":"el","gold":19,"tp_gold":18,"pred":30,"tp_pred":18,"values":16,"leaked":1,"masked":30,"over_masked":12,"detect_ms":1506.846},
+    {"id":"mapa-eur-lex-205542_el","language":"el","gold":35,"tp_gold":24,"pred":60,"tp_pred":25,"values":20,"leaked":1,"masked":59,"over_masked":32,"detect_ms":2405.447},
+    {"id":"mapa-eur-lex-205542_en_GA","language":"ga","gold":41,"tp_gold":29,"pred":48,"tp_pred":29,"values":21,"leaked":4,"masked":47,"over_masked":18,"detect_ms":2526.458},
+    {"id":"mapa-eur-lex-205543_en_GA","language":"ga","gold":24,"tp_gold":18,"pred":32,"tp_pred":18,"values":16,"leaked":5,"masked":32,"over_masked":14,"detect_ms":1327.373},
+    {"id":"mapa-eur-lex-205543_et","language":"et","gold":24,"tp_gold":23,"pred":34,"tp_pred":23,"values":17,"leaked":1,"masked":32,"over_masked":9,"detect_ms":1081.919},
+    {"id":"mapa-eur-lex-205542_et","language":"et","gold":34,"tp_gold":25,"pred":72,"tp_pred":26,"values":19,"leaked":0,"masked":71,"over_masked":41,"detect_ms":1983.379},
+    {"id":"mapa-eur-lex-205543_fi","language":"fi","gold":22,"tp_gold":21,"pred":34,"tp_pred":21,"values":15,"leaked":1,"masked":34,"over_masked":13,"detect_ms":1186.472},
+    {"id":"mapa-eur-lex-205542_fi","language":"fi","gold":29,"tp_gold":18,"pred":69,"tp_pred":19,"values":18,"leaked":2,"masked":68,"over_masked":45,"detect_ms":1960.15},
+    {"id":"mapa-eur-lex-205542_fr","language":"fr","gold":32,"tp_gold":23,"pred":62,"tp_pred":26,"values":18,"leaked":0,"masked":61,"over_masked":34,"detect_ms":2170.903},
+    {"id":"mapa-eur-lex-205543_fr","language":"fr","gold":23,"tp_gold":23,"pred":33,"tp_pred":23,"values":16,"leaked":0,"masked":33,"over_masked":10,"detect_ms":1257.29},
+    {"id":"mapa-eur-lex-205542_hu","language":"hu","gold":36,"tp_gold":24,"pred":66,"tp_pred":25,"values":19,"leaked":1,"masked":63,"over_masked":35,"detect_ms":2129.223},
+    {"id":"mapa-eur-lex-205543_hu","language":"hu","gold":24,"tp_gold":24,"pred":37,"tp_pred":23,"values":16,"leaked":0,"masked":36,"over_masked":13,"detect_ms":1246.182},
+    {"id":"mapa-eur-lex-205542_it","language":"it","gold":36,"tp_gold":26,"pred":58,"tp_pred":25,"values":18,"leaked":0,"masked":56,"over_masked":31,"detect_ms":1668.877},
+    {"id":"mapa-eur-lex-205543_it","language":"it","gold":24,"tp_gold":22,"pred":30,"tp_pred":22,"values":16,"leaked":1,"masked":30,"over_masked":8,"detect_ms":1208.606},
+    {"id":"mapa-eur-lex-205542_lt","language":"lt","gold":35,"tp_gold":22,"pred":66,"tp_pred":23,"values":19,"leaked":3,"masked":66,"over_masked":38,"detect_ms":2189.935},
+    {"id":"mapa-eur-lex-205543_lt","language":"lt","gold":24,"tp_gold":21,"pred":28,"tp_pred":21,"values":16,"leaked":3,"masked":28,"over_masked":7,"detect_ms":1166.458},
+    {"id":"mapa-eur-lex-205543_lv","language":"lv","gold":23,"tp_gold":18,"pred":30,"tp_pred":18,"values":16,"leaked":4,"masked":30,"over_masked":12,"detect_ms":1015.714},
+    {"id":"mapa-eur-lex-205542_lv","language":"lv","gold":39,"tp_gold":23,"pred":63,"tp_pred":24,"values":22,"leaked":4,"masked":62,"over_masked":35,"detect_ms":1887.901},
+    {"id":"mapa-eur-lex-205543_mt","language":"mt","gold":24,"tp_gold":17,"pred":150,"tp_pred":17,"values":17,"leaked":6,"masked":149,"over_masked":132,"detect_ms":1843.674},
+    {"id":"mapa-eur-lex-205542_mt","language":"mt","gold":34,"tp_gold":19,"pred":386,"tp_pred":22,"values":18,"leaked":3,"masked":384,"over_masked":361,"detect_ms":3416.61},
+    {"id":"mapa-eur-lex-205543_nl","language":"nl","gold":23,"tp_gold":22,"pred":27,"tp_pred":21,"values":16,"leaked":1,"masked":27,"over_masked":6,"detect_ms":1186.242},
+    {"id":"mapa-eur-lex-205542_nl","language":"nl","gold":34,"tp_gold":22,"pred":57,"tp_pred":23,"values":17,"leaked":1,"masked":56,"over_masked":31,"detect_ms":1766.927},
+    {"id":"mapa-eur-lex-205543_pt","language":"pt","gold":25,"tp_gold":22,"pred":27,"tp_pred":20,"values":18,"leaked":2,"masked":27,"over_masked":7,"detect_ms":1070.202},
+    {"id":"mapa-eur-lex-205542_pt","language":"pt","gold":35,"tp_gold":25,"pred":52,"tp_pred":26,"values":19,"leaked":0,"masked":51,"over_masked":24,"detect_ms":1995.32},
+    {"id":"mapa-eur-lex-205542_ro","language":"ro","gold":37,"tp_gold":26,"pred":60,"tp_pred":26,"values":18,"leaked":0,"masked":58,"over_masked":32,"detect_ms":2162.122},
+    {"id":"mapa-eur-lex-205543_ro","language":"ro","gold":24,"tp_gold":23,"pred":32,"tp_pred":23,"values":16,"leaked":1,"masked":32,"over_masked":9,"detect_ms":1134.335},
+    {"id":"mapa-eur-lex-205542_sk","language":"sk","gold":36,"tp_gold":26,"pred":66,"tp_pred":26,"values":18,"leaked":0,"masked":65,"over_masked":35,"detect_ms":2184.737},
+    {"id":"mapa-eur-lex-205543_sk","language":"sk","gold":23,"tp_gold":23,"pred":32,"tp_pred":22,"values":17,"leaked":0,"masked":26,"over_masked":4,"detect_ms":1268.022},
+    {"id":"mapa-eur-lex-205543_sv","language":"sv","gold":22,"tp_gold":22,"pred":30,"tp_pred":22,"values":16,"leaked":0,"masked":30,"over_masked":8,"detect_ms":1083.642},
+    {"id":"mapa-eur-lex-205542_sv","language":"sv","gold":35,"tp_gold":23,"pred":48,"tp_pred":24,"values":19,"leaked":2,"masked":47,"over_masked":23,"detect_ms":2164.501}
+  ]
+}

@@ -43,6 +43,12 @@ All training data is fictional or public synthetic text. None of it is real pers
 - **Disjointness.** None of the OpenPII rows is in pii-guard's ai4privacy evaluation sample
   (validation split). `training/ner/openpii.py` checks every uid and every text, and a test
   checks this too.
+- **Near duplicates (LAB-1392).** `training/ner/decontam.py` compared the training mix with
+  every evaluation text: word 5-gram Jaccard ≥ 0.8, or the same text hash. It dropped **0** of
+  the 25,673 train and dev documents that could be rebuilt (s11, OpenPII, negatives). No
+  training document came closer than J = 0.16 to any evaluation document. The s13 corpus
+  (2,364 train rows plus its dev rows) was not kept, so it could not be checked. The gate runs
+  by default in `train.py` from now on.
 - **Dates.** OpenPII doesn't say which dates are birth dates, so its date spans are left out
   of the loss.
 - `training_meta.json` lists every training file by repository path and SHA-256 prefix, with
@@ -72,6 +78,8 @@ the repository under `eval/results/2026-10-27-ner-v21/`.
 | cee-pii test (hu+en) | 0.4 | **39.4** |
 | nemotron-pii test (en) | 0.7 | 1.6 |
 | gretel-finance test (en+de) | **19.1** | 23.9 |
+| pl-pii-bench (LAB-1392, pl, a language it was never trained on) | 17.5 | 10.4 |
+| mapa-eur-lex (LAB-1392, 21 EU languages, real legal text, names only) | 8.5 | 55.6 |
 
 The 0.4 % ai4privacy leak is in-distribution. In LAB-1150, an ablation trained without any
 Ai4Privacy rows leaked 12.5 % (large) and 13.8 % (base) on that set; that is the honest number

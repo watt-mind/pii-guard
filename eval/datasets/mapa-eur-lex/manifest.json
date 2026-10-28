@@ -1,0 +1,747 @@
+{
+  "dataset": "mapa-eur-lex",
+  "title": "MAPA EUR-Lex PII",
+  "url": "https://huggingface.co/datasets/piimb/mapa-eur-lex-pii",
+  "revision": "a44958f9799ec2377d0e7d6ef8438411c2344449",
+  "files": [
+    {
+      "path": "test.jsonl",
+      "sha256": "7aa297f23890759a1f587a176422a24bd93d830f49ca1aa61f1efa64e13a09a3"
+    }
+  ],
+  "license": "CC-BY-4.0; texts are public EUR-Lex documents",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "camillevanhoffelen, piimb/mapa-eur-lex-pii, from the MAPA project (EUR-Lex)",
+  "synthetic": false,
+  "rows_committed": false,
+  "source_split": "test (the whole set: 2 documents x 21 languages)",
+  "split": "test",
+  "seed": 2026,
+  "sample_rule": "per language, rows ordered by sha256('<seed>:<uid>'), first n convertible",
+  "label_mapping": [
+    {
+      "label": "first_name",
+      "pii_guard_type": "PERSON",
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "last_name",
+      "pii_guard_type": "PERSON",
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "employer",
+      "pii_guard_type": "ORGANIZATION",
+      "per_language": {},
+      "part_only": false,
+      "note": "ORGANIZATION is a keep type: scored for recall, never a leak"
+    },
+    {
+      "label": "unique_id",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": "case and directive numbers, ECLI identifiers: they identify a case"
+    },
+    {
+      "label": "date",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": "no date in this set is marked as a birth date"
+    },
+    {
+      "label": "occupation",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "education_level",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "title",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": "honorifics, and in a few rows initials: policy-excluded"
+    },
+    {
+      "label": "age",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "url",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "race_ethnicity",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    },
+    {
+      "label": "nationality",
+      "pii_guard_type": null,
+      "per_language": {},
+      "part_only": false,
+      "note": ""
+    }
+  ],
+  "merge_rule": "adjacent spans of one mapped type separated by <= 3 spaces/tabs/commas",
+  "notes": [
+    "Real published documents naming real people: fixture files are rebuilt locally by fetch and never committed; no LLM or remote model is run on them.",
+    "English spans are hand-annotated; the other 20 languages are LLM-projected and not exhaustively verified.",
+    "Documents are long (35,000 to 75,000 characters)."
+  ],
+  "languages": {
+    "en": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 9,
+        "PERSON": 57
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 41,
+        "race_ethnicity": 1,
+        "title": 11,
+        "unique_id": 186,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_en",
+        "205542_en"
+      ],
+      "text_sha256": [
+        "49e788c9f4042b897f1f5db18a4ba190e253f12f225b931c64ec1c1ee74ef658",
+        "d64a4b75a1815fe40be4ba889b1708610c9cfa203520c9e6cd4912d1f1272a24"
+      ]
+    },
+    "es": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 10,
+        "PERSON": 47
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 13,
+        "nationality": 1,
+        "occupation": 39,
+        "race_ethnicity": 1,
+        "title": 8,
+        "unique_id": 144,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542",
+        "205543"
+      ],
+      "text_sha256": [
+        "4177f28e9abd1d566f836427084c1d5d67b76413c47ae2210726dba83cf6754f",
+        "5922e391bb1844b7e7b86d50160ebddcd6bc03117418f28738e51541dc8bffd0"
+      ]
+    },
+    "bg": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 11,
+        "PERSON": 50
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 39,
+        "race_ethnicity": 1,
+        "title": 11,
+        "unique_id": 187,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_bg",
+        "205543_bg"
+      ],
+      "text_sha256": [
+        "d0f649235ac4acf4840eebff9b24969866c5e53ae64898539313f4cd064fbb79",
+        "2a71b64716e136c5bb9b5895ec7848858e799654ac3e3c17625c63eccdf9b9e7"
+      ]
+    },
+    "cs": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 10,
+        "PERSON": 49
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 39,
+        "race_ethnicity": 1,
+        "title": 8,
+        "unique_id": 186,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_cs",
+        "205543_cs"
+      ],
+      "text_sha256": [
+        "2f39f460c5f39903452ddd9404b5e9bfb98f2ecbf7c2fdb4e1b151c07ce63b32",
+        "17f0e73b43e9941d5de50a9dceec363a25c55c4dfa7fd3615cc2cb98052f6d5b"
+      ]
+    },
+    "da": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 8,
+        "PERSON": 49
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 37,
+        "race_ethnicity": 1,
+        "title": 8,
+        "unique_id": 186,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_da",
+        "205543_da"
+      ],
+      "text_sha256": [
+        "832c0408329799fc442ded7c574e918580405db24391fdd1952adf1dbdfa6837",
+        "73f0b4ac5a9c34aa7969084a33238119d01fc56ec8d212ebace3c198e314c609"
+      ]
+    },
+    "de": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 9,
+        "PERSON": 50
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 42,
+        "race_ethnicity": 1,
+        "title": 11,
+        "unique_id": 186,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_de",
+        "205542_de"
+      ],
+      "text_sha256": [
+        "e40dac342d1c0e898f8c8b587afb86cfc7226176adef187bfb419d9698433b7e",
+        "56cef32f069b1a76dfaa47896e23dc54658925b9eae4ba03df849b8ce3c3190a"
+      ]
+    },
+    "el": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 10,
+        "PERSON": 44
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 13,
+        "nationality": 1,
+        "occupation": 38,
+        "race_ethnicity": 1,
+        "title": 8,
+        "unique_id": 187,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_el",
+        "205542_el"
+      ],
+      "text_sha256": [
+        "8e7c2d488033dfc0357ffe756029f8117796247db038b8096543b24b9e19db18",
+        "f418389fbaf253818bcd5dcbd53f89673d9903616cc61e1849db963f594512cf"
+      ]
+    },
+    "ga": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 8,
+        "PERSON": 57
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 41,
+        "race_ethnicity": 2,
+        "title": 10,
+        "unique_id": 185,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_en_GA",
+        "205543_en_GA"
+      ],
+      "text_sha256": [
+        "b870610bcf43ad3e98abc83cf58c3af3bffb62c985170cb3f31b1039c9b4c05a",
+        "8b001a65f3cbc2b14ab018e80b622508a8adbee0487f35f9ba4670365c886a6a"
+      ]
+    },
+    "et": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 9,
+        "PERSON": 49
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 85,
+        "education_level": 13,
+        "nationality": 1,
+        "occupation": 38,
+        "race_ethnicity": 1,
+        "title": 9,
+        "unique_id": 187,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_et",
+        "205542_et"
+      ],
+      "text_sha256": [
+        "81d2e20492a3987665e314efacea2df294836d8b91d9573bd5b260c648d7385e",
+        "6cca506a2d02c089954c1c35988ca446b235e069daf4028c6b561df2de08c8d2"
+      ]
+    },
+    "fi": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 9,
+        "PERSON": 42
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 12,
+        "nationality": 1,
+        "occupation": 37,
+        "race_ethnicity": 1,
+        "title": 2,
+        "unique_id": 188,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_fi",
+        "205542_fi"
+      ],
+      "text_sha256": [
+        "e202fb9b048ff6a394c7d84ded0ee3ccc322deacb0b7c5b4e3160e823891b0e9",
+        "c63d73698429ef943c2b4b6156137c7ec7440438299189b12a9d4b343546ec90"
+      ]
+    },
+    "fr": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 9,
+        "PERSON": 46
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 38,
+        "race_ethnicity": 1,
+        "title": 8,
+        "unique_id": 188,
+        "url": 1
+      },
+      "unknown_labels": {
+        "amount": 1
+      },
+      "uids": [
+        "205542_fr",
+        "205543_fr"
+      ],
+      "text_sha256": [
+        "5e0e1c902204fc50f954ff1480dbea88c9c81a798f2d18f04cd29bebc207cb07",
+        "5173cf5933b2d4dbece3d89a41c908402effcfd9c7a7ab6482f956bab47ea30b"
+      ]
+    },
+    "hu": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 11,
+        "PERSON": 49
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 80,
+        "education_level": 10,
+        "nationality": 1,
+        "occupation": 43,
+        "race_ethnicity": 1,
+        "title": 9,
+        "unique_id": 178,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_hu",
+        "205543_hu"
+      ],
+      "text_sha256": [
+        "b0a3ad87632f73cf0b839fcda78766b63d7dbc15bcd5db317f21d52f6b7f1c56",
+        "e03e592275a6ff6d997a26e24da7f65faa9964e01fa3c5cabd857f4e30d14fb2"
+      ]
+    },
+    "it": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 10,
+        "PERSON": 50
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 13,
+        "nationality": 1,
+        "occupation": 45,
+        "race_ethnicity": 1,
+        "title": 10,
+        "unique_id": 186,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_it",
+        "205543_it"
+      ],
+      "text_sha256": [
+        "10116c7bbbfdb5018d10816f8d5d48ea3ae3ae6ff9cbca433418c4353a7a7eeb",
+        "f0d4c800094282f6f1f2a32b6c14c612f19774aec1eb23cb2a3e80c9ff8f8827"
+      ]
+    },
+    "lt": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 10,
+        "PERSON": 49
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 84,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 37,
+        "race_ethnicity": 1,
+        "title": 8,
+        "unique_id": 186,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_lt",
+        "205543_lt"
+      ],
+      "text_sha256": [
+        "753df82020fd6a77ec676f238775e3cb56f2540d2dc83befcaaf13f428d269c5",
+        "7f8f3d470fa67310cc951c01c570533e5e9c388404d4df42ab9c8d1bf05dfc1d"
+      ]
+    },
+    "lv": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 11,
+        "PERSON": 51
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 80,
+        "education_level": 11,
+        "nationality": 1,
+        "occupation": 37,
+        "race_ethnicity": 1,
+        "title": 11,
+        "unique_id": 176,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_lv",
+        "205542_lv"
+      ],
+      "text_sha256": [
+        "f53657c4e75404455abca18b34aeae50a603af828b49e260aa2d448d357341f2",
+        "35cc39773eff642401747612225cc6277fd2755d5e764e030a7d925ae05392dd"
+      ]
+    },
+    "mt": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 11,
+        "PERSON": 47
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 16,
+        "nationality": 1,
+        "occupation": 42,
+        "race_ethnicity": 2,
+        "title": 9,
+        "unique_id": 185,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_mt",
+        "205542_mt"
+      ],
+      "text_sha256": [
+        "466e7cdcd1f8de6fcfdbdb06bbbda0a7441b6b378ca28ffc521bf085f95227de",
+        "ae0822e27405d6cbe2c954eac570a78d38a00705df83ee1abe30a21bdd6fa4f5"
+      ]
+    },
+    "nl": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 11,
+        "PERSON": 46
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 39,
+        "race_ethnicity": 1,
+        "title": 1,
+        "unique_id": 187,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_nl",
+        "205542_nl"
+      ],
+      "text_sha256": [
+        "4e2a402a90531875c27dcf19c60cad334adbd869a983260b10f62fc8276662b5",
+        "bc67a95ca256867e410a1e29eba82163b0e0d2eea56d633d8c8476ca73cbc45b"
+      ]
+    },
+    "pt": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 10,
+        "PERSON": 50
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 41,
+        "race_ethnicity": 1,
+        "title": 9,
+        "unique_id": 186,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_pt",
+        "205542_pt"
+      ],
+      "text_sha256": [
+        "69fcb00d5c106830b3f3dd4b239ea90709a82cab76e4810a8a11e380a5dcbf6f",
+        "344843bd18ac9e56ca24aeda8c9680059d601396369c9fe907bd353aa47091ce"
+      ]
+    },
+    "ro": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 11,
+        "PERSON": 50
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 41,
+        "race_ethnicity": 1,
+        "title": 11,
+        "unique_id": 188,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_ro",
+        "205543_ro"
+      ],
+      "text_sha256": [
+        "4bcd1e87dad1cba6efda32e57b47a1fe94c76b175bd1ffebe7bef51d75099464",
+        "0b3b27b2feabf99ae7d868192a4d1093581ef62a39ef4f1bbcb665cafb95e6c2"
+      ]
+    },
+    "sk": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 10,
+        "PERSON": 49
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 85,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 40,
+        "race_ethnicity": 1,
+        "title": 8,
+        "unique_id": 186,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205542_sk",
+        "205543_sk"
+      ],
+      "text_sha256": [
+        "915b2af2f28785cc5a40ab550316e7ac687c2a3e03a13ff297a83ad7e5fab25a",
+        "5d41d1901e5f9fe30308fae7efca20dd748bf45ca617bb5f845ae46a6eb69a04"
+      ]
+    },
+    "sv": {
+      "requested": 2,
+      "documents": 2,
+      "rows_in_split": 2,
+      "skipped_unconvertible": 0,
+      "gold_spans": {
+        "ORGANIZATION": 10,
+        "PERSON": 47
+      },
+      "policy_excluded": {
+        "age": 3,
+        "date": 86,
+        "education_level": 14,
+        "nationality": 1,
+        "occupation": 40,
+        "race_ethnicity": 1,
+        "title": 4,
+        "unique_id": 187,
+        "url": 1
+      },
+      "unknown_labels": {},
+      "uids": [
+        "205543_sv",
+        "205542_sv"
+      ],
+      "text_sha256": [
+        "34d92efea7dba39a39921d198cd84175794931673a46e2b8c96591e1078ed08b",
+        "84c5d0e9434af0b9e46bbf7da47315bc3945c54f808f9fc2ff94fb4f9ec90dff"
+      ]
+    }
+  }
+}

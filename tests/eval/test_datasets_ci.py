@@ -62,7 +62,7 @@ def test_stored_summaries_match_a_recompute(path: Path) -> None:
     counts = json.loads(path.read_text(encoding="utf-8"))
     assert counts["summary"] == summarize(counts["documents"]), counts["run_id"]
     assert counts["dataset"] in REGISTRY
-    assert "text" not in json.dumps(counts["documents"])
+    assert all("text" not in d for d in counts["documents"])  # a key; ids may say "context"
 
 
 def test_section_lists_every_dataset_with_runs() -> None:

@@ -622,6 +622,33 @@ By language:
 | pii-guard rules + Muse Spark 1.3 | 100.0% | 100.0% | 0.0% | 0.0% |
 
 
+### `mapa-eur-lex`
+
+hand-written; documents: bg 2 + cs 2 + da 2 + de 2 + el 2 + en 2 + es 2 + et 2 + fi 2 + fr 2 + ga 2 + hu 2 + it 2 + lt 2 + lv 2 + mt 2 + nl 2 + pt 2 + ro 2 + sk 2 + sv 2.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 42 | 0.0% | 0.0% | 0.0% | 99.3% | 0.4% | 100.0% | 100.0% | 190 ms | 2026-10-28 | `57ab2ed` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 1.6 s | 2026-10-28 | `57ab2ed` |
+
+
+By language:
+
+| System | bg F1 | cs F1 | da F1 | de F1 | el F1 | en F1 | es F1 | et F1 | fi F1 | fr F1 | ga F1 | hu F1 | it F1 | lt F1 | lv F1 | mt F1 | nl F1 | pt F1 | ro F1 | sk F1 | sv F1 | bg leak | cs leak | da leak | de leak | el leak | en leak | es leak | et leak | fi leak | fr leak | ga leak | hu leak | it leak | lt leak | lv leak | mt leak | nl leak | pt leak | ro leak | sk leak | sv leak |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **pii-guard rules** | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 100.0% | 94.3% | 100.0% | 100.0% | 100.0% | 100.0% | 97.2% | 93.9% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
+
+
+**Number validity.** The headline leak above, split by whether a structured identifier passes the language packs' own validators (card Luhn, IBAN, TAJ and tax-ID check digits, phone numbering plans, ID-document checksums and formats). Invalid numbers stay in the headline: a mistyped real identifier is still personal data ([evaluation.md](evaluation.md#number-validity)). Valid values per type: .
+
+![Leak rate by number validity](benchmarks/validity-mapa-eur-lex.svg)
+
+| System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
+|---|---:|---:|---:|---:|---:|---:|
+| **pii-guard rules** | 99.3% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 99.3% (735/740) |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
+
 ### `nemotron-pii`
 
 mixed; documents: en 300.
@@ -672,6 +699,33 @@ By language:
 | Presidio | 12.8% | 91.4% (127/139) | 2.6% (3/115) | 14.7% (14/95) | 35.6% (31/87) | 11.1% (55/495) |
 | LLM Guard | 28.8% | 96.4% (134/139) | 2.6% (3/115) | 30.5% (29/95) | 51.7% (45/87) | 30.9% (153/495) |
 | PrivAiTe | 4.0% | 77.7% (108/139) | 0.9% (1/115) | 65.3% (62/95) | 4.6% (4/87) | 4.6% (23/495) |
+
+### `pl-pii-bench`
+
+hand-written; documents: pl 346.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 346 | 98.5% | 12.2% | 21.8% | 84.1% | 2.3% | 0.0% | 100.0% | 0.08 ms | 2026-10-28 | `57ab2ed` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 346 | 84.4% | 75.3% | 79.6% | 17.4% | 7.8% | 10.4% | 100.0% | 21 ms | 2026-10-28 | `57ab2ed` |
+
+
+By language:
+
+| System | pl F1 | pl leak |
+|---|---:|---:|
+| **pii-guard rules** | 21.8% | 84.1% |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 79.6% | 17.4% |
+
+
+**Number validity.** The headline leak above, split by whether a structured identifier passes the language packs' own validators (card Luhn, IBAN, TAJ and tax-ID check digits, phone numbering plans, ID-document checksums and formats). Invalid numbers stay in the headline: a mistyped real identifier is still personal data ([evaluation.md](evaluation.md#number-validity)). Valid values per type: `PHONE` 7/30, `ID_DOCUMENT` 0/241, `BANK_ACCOUNT` 63/88, `VEHICLE_PLATE` 0/30.
+
+![Leak rate by number validity](benchmarks/validity-pl-pii-bench.svg)
+
+| System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
+|---|---:|---:|---:|---:|---:|---:|
+| **pii-guard rules** | 84.1% | 100.0% (70/70) | 0.0% (0/70) | 9.1% (29/319) | 89.2% (256/287) | 93.6% (438/468) |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 17.4% | 100.0% (70/70) | 0.0% (0/70) | 31.0% (99/319) | 49.5% (142/287) | 0.4% (2/468) |
 
 ### `secrets`
 
@@ -927,6 +981,20 @@ Every registered dataset ([datasets.md](datasets.md): licences, splits, label ma
 | LLM Guard | 40 | 37.4 (25.9-45.9) | 95.2 (89.1-99.4) | 18.5 (14.5-22.9) | 31.0 (25.2-36.8) | 0.0 (0.0-0.0) | 588 | 4,005 |
 | PrivAiTe | 40 | 15.0 (8.4-22.0) | 95.7 (93.1-97.8) | 31.9 (24.3-38.3) | 47.8 (38.6-54.9) | 1.7 (0.5-3.0) | 701 | 1,957 |
 
+### `pl-pii-bench`: pl-pii-bench v1.0.0 (test split)
+
+| System | Docs | Leak | Precision | Recall | F1 | Over-masking | p50 ms | p95 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| pii-guard rules | 346 | 84.1 (73.3-95.1) | 98.5 (95.3-100.0) | 12.3 (3.5-21.3) | 21.8 (6.8-35.0) | 0.0 (0.0-0.0) | 0.1 | 7.4 |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 346 | 17.5 (6.4-27.8) | 84.4 (75.9-92.6) | 75.3 (65.8-84.9) | 79.6 (72.3-86.8) | 10.4 (1.0-20.3) | 21.0 | 87.9 |
+
+### `mapa-eur-lex`: MAPA EUR-Lex PII (test split)
+
+| System | Docs | Leak | Precision | Recall | F1 | Over-masking | p50 ms | p95 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| pii-guard rules | 42 | 99.3 (98.5-100.0) | 0.0 (0.0-0.0) | 0.0 (0.0-0.0) | 0.0 (0.0-0.0) | 100.0 (100.0-100.0) | 190 | 277 |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 42 | 8.5 (6.0-11.3) | 41.8 (30.6-54.1) | 77.3 (73.5-81.7) | 54.3 (43.6-64.4) | 55.6 (42.7-67.4) | 1,588 | 2,480 |
+
 ### `agent-traffic`: pii-guard synthetic agent traffic (test split)
 
 | System | Docs | Leak | Precision | Recall | F1 | Over-masking | p50 ms | p95 ms |
@@ -1070,6 +1138,10 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-28 | `2026-10-28-datasets-pl-pii-bench-rules` | pii-guard rules | pl-pii-bench | pl | recorded | `57ab2ed` (dirty) | — | — |
+| 2026-10-28 | `2026-10-28-datasets-pl-pii-bench-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | pl-pii-bench | pl | recorded | `57ab2ed` (dirty) | — | — |
+| 2026-10-28 | `2026-10-28-datasets-mapa-eur-lex-rules` | pii-guard rules | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `57ab2ed` (dirty) | — | — |
+| 2026-10-28 | `2026-10-28-datasets-mapa-eur-lex-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `57ab2ed` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-lab-1386-gretel-finance-fast-eu-pii-safeguard` | rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) | gretel-finance | de, en | recorded | `36a78e3` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-lab-1386-cee-pii-fast-eu-pii-safeguard` | rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) | cee-pii | en, hu | recorded | `36a78e3` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-lab-1386-nemotron-pii-fast-eu-pii-safeguard` | rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) | nemotron-pii | en | recorded | `36a78e3` (dirty) | — | — |

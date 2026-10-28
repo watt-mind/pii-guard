@@ -19,6 +19,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from pii_guard.eval.datasets.mapa import LANGUAGES as MAPA_LANGUAGES
+
 ORDER = (
     "xlmr-large-v1",
     "xlmr-base-v2",
@@ -49,6 +51,8 @@ GROUPS = {
     "cee-pii (test)": ("hu-cee-pii", "en-cee-pii"),
     "nemotron-pii (test)": ("en-nemotron-pii",),
     "gretel-finance (test)": ("en-gretel-finance", "de-gretel-finance"),
+    "pl-pii-bench (test)": ("pl-pl-pii-bench",),
+    "mapa-eur-lex (test)": tuple(f"{lang}-mapa-eur-lex" for lang in MAPA_LANGUAGES),
 }
 
 

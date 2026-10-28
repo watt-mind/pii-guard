@@ -42,7 +42,14 @@ image = (
     .env({"PYTHONPATH": f"{REMOTE}/src", "TOKENIZERS_PARALLELISM": "false"})
     .add_local_dir(ROOT / "src" / "pii_guard", f"{REMOTE}/src/pii_guard", ignore=["__pycache__"])
     .add_local_dir(ROOT / "training" / "ner", f"{REMOTE}/training/ner", ignore=["__pycache__"])
+    # The decontamination gate in train.py (LAB-1392) needs every evaluation text.
+    .add_local_dir(ROOT / "eval" / "fixtures", f"{REMOTE}/eval/fixtures", ignore=["visual"])
+    .add_local_dir(ROOT / "eval" / "datasets", f"{REMOTE}/eval/datasets", ignore=["results"])
 )
+if modal.is_local() and (ROOT / "data" / "datasets" / "fixtures").is_dir():  # fetch-only sets
+    image = image.add_local_dir(
+        ROOT / "data" / "datasets" / "fixtures", f"{REMOTE}/data/datasets/fixtures"
+    )
 runs = modal.Volume.from_name("pii-guard-ner-runs", create_if_missing=True)
 app = modal.App("pii-guard-ner-train", image=image)
 

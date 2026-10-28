@@ -81,6 +81,43 @@ Each detection change reports against these:
 
 The hackathon claim is the difference between 2 and 4, on the test split.
 
+## Decontamination
+
+A held-out number only means something if the model never saw the held-out text. Exact checks
+(hash and uid) already run: `training/ner/openpii.py` refuses any uid or text of the
+evaluation sample, and `tests/eval/test_datasets_disjoint.py` checks document hashes. They
+miss near copies, though: a generated document with one word changed, or a later release of a
+dataset that extends the one we evaluate on. So training data also passes a near-duplicate
+gate, [`training/ner/decontam.py`](../training/ner/decontam.py) (LAB-1392):
+
+- **What it compares against: every evaluation text.** That is every `test` set of the
+  [dataset registry](datasets.md): Ai4Privacy OpenPII validation, Nemotron-PII, Gretel
+  finance, CEE-PII-Bench, agent traffic, pl-pii-bench and MAPA EUR-Lex. TAB and MAPA are
+  compared by text when `fetch` has rebuilt them locally, and by manifest hash always. It also
+  covers every fixture file under `eval/fixtures/`: the smoke sets, inflection, injection,
+  company and brand names, uncued numbers, known values and secrets. `dev` splits are not
+  included, because they may be tuned on.
+- **How.** Text is NFKC-normalised, case-folded and split into words. A document's shingles
+  are its word 5-grams. MinHash signatures (128 hashes) go into an LSH index of 32 bands × 4
+  rows. Every candidate pair is then checked with its exact Jaccard similarity. A training
+  document is dropped if its whitespace-folded text hash equals an evaluation document's, or
+  if its Jaccard similarity to one is **0.8 or more**. At that threshold, LSH finds a pair
+  with probability above 0.999.
+- **What 0.8 means.** On a 40-word document, a changed last word keeps J at 0.95, so the
+  document is dropped. A changed word in the middle removes five shingles and gives J = 0.76,
+  so the document is kept. The gate removes copies and light edits. It doesn't remove a
+  template filled with other values: that is the same distribution, not the same text.
+- **Where it runs.** `train.py` loads its train and dev files through the gate by default and
+  records the counts in `training_meta.json`. `decontam = false` or `--no-decontam` turns it
+  off, and the run then records `"decontam": "off"`. The gate fails closed: if it finds no
+  evaluation text (for example, when run from the wrong directory), it refuses to train. The
+  Modal image ships `eval/fixtures` and `eval/datasets` for it. On its own,
+  `uv run --no-sync python training/ner/decontam.py --config <toml> --json <report>`
+  reports the counts per file and per evaluation set, with ids only and never text.
+
+The first run, on the NER v2.0 training mix, is in
+[`eval/results/2026-10-28-decontam/`](../eval/results/2026-10-28-decontam/README.md).
+
 ## Languages
 
 Evaluation is multilingual from the start: every fixture record carries a `language`, which
