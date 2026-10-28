@@ -5,7 +5,6 @@ from __future__ import annotations
 import copy
 import json
 import os
-import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -37,15 +36,6 @@ def index(records: list[dict[str, Any]]) -> dict[str, Any]:
     return build_index(records, featured=CONFIG["featured"])
 
 
-def _copy_repo(tmp_path: Path) -> Path:
-    for rel in ("eval/results/runs", "eval/results/schema", "docs/benchmarks"):
-        shutil.copytree(REPO_ROOT / rel, tmp_path / rel)
-    for rel in ("docs/benchmarks.md",):  # the index is a build output, not committed
-        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(REPO_ROOT / rel, tmp_path / rel)
-    return tmp_path
-
-
 # --- The committed report ------------------------------------------------------------------
 
 
@@ -56,9 +46,9 @@ def test_committed_report_is_up_to_date(monkeypatch: pytest.MonkeyPatch) -> None
 
 @pytest.mark.slow
 def test_check_flags_stale_and_missing_outputs_and_a_rebuild_fixes_them(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    report_repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.chdir(_copy_repo(tmp_path))
+    monkeypatch.chdir(report_repo)
     Path("docs/benchmarks/progress.svg").write_text("<svg/>")
     assert cli.main(["eval", "report", "--check"]) == 1
     err = capsys.readouterr().err
@@ -75,8 +65,8 @@ def test_check_flags_stale_and_missing_outputs_and_a_rebuild_fixes_them(
     assert cli.main(["eval", "report", "--check"]) == 1
 
 
-def test_bad_input_exits_2(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.chdir(_copy_repo(tmp_path))
+def test_bad_input_exits_2(report_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(report_repo)
     config = json.loads(Path("docs/benchmarks/config.json").read_text())
     config["headline_set"] = "no-such-set"
     Path("docs/benchmarks/config.json").write_text(json.dumps(config))
@@ -190,9 +180,9 @@ def test_page_has_method_notes_tables_and_every_run(index: dict[str, Any]) -> No
 
 @pytest.mark.slow
 def test_print_index_is_the_compact_index_and_writes_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    report_repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.chdir(_copy_repo(tmp_path))
+    monkeypatch.chdir(report_repo)
     before = {p: p.read_bytes() for p in Path(".").rglob("*") if p.is_file()}
     assert cli.main(["eval", "report", "--print-index"]) == 0
     out = capsys.readouterr().out
@@ -203,9 +193,9 @@ def test_print_index_is_the_compact_index_and_writes_nothing(
 
 @pytest.mark.slow
 def test_validate_compares_nothing_but_rejects_bad_input(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    report_repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.chdir(_copy_repo(tmp_path))
+    monkeypatch.chdir(report_repo)
     src = Path("eval/results/runs/2026-10-26-comparison-smoke.json")
     rec = json.loads(src.read_text())
     rec["run_id"] = "2026-10-28-comparison-smoke"

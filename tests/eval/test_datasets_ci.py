@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from pii_guard.eval.datasets import REGISTRY
 from pii_guard.eval.datasets.ci import bootstrap, load_counts, render_section, summarize
 
@@ -49,13 +51,18 @@ def test_summary_splits_checksum_and_perturbation() -> None:
     assert s["p50_ms"] == 1
 
 
-def test_stored_summaries_match_a_recompute() -> None:
-    files = load_counts(COUNTS)
-    assert files, "no per-document counts committed"
-    for counts in files:
-        assert counts["summary"] == summarize(counts["documents"]), counts["run_id"]
-        assert counts["dataset"] in REGISTRY
-        assert "text" not in json.dumps(counts["documents"])
+def test_per_document_counts_are_committed() -> None:
+    assert list(COUNTS.glob("*.json")), "no per-document counts committed"
+
+
+# One item per record lets xdist distribute the expensive bootstrap recomputations.
+# Paths are sorted so every worker collects the same items in the same order.
+@pytest.mark.parametrize("path", sorted(COUNTS.glob("*.json")), ids=lambda path: path.stem)
+def test_stored_summaries_match_a_recompute(path: Path) -> None:
+    counts = json.loads(path.read_text(encoding="utf-8"))
+    assert counts["summary"] == summarize(counts["documents"]), counts["run_id"]
+    assert counts["dataset"] in REGISTRY
+    assert "text" not in json.dumps(counts["documents"])
 
 
 def test_section_lists_every_dataset_with_runs() -> None:

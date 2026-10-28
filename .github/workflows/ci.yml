@@ -15,8 +15,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Fresh PR/develop results take precedence; manual and scheduled full runs are isolated.
+  group: ci-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
 
 env:
   UV_LOCKED: "1"
@@ -40,23 +41,11 @@ jobs:
           persist-credentials: false
       - name: Which parts changed
         id: filter
+        shell: bash # pipefail: a failed diff must fail this job, even through tee
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          # Only pull requests are filtered; pushes, merge queue, nightly and manual runs check
-          # everything.
-          ui=true docker=true wheel=true
-          if [ "$EVENT" = pull_request ]; then
-            git diff --name-only "$BASE...HEAD" > changed.txt
-            # The UI bundles the benchmark index, built from the run records (LAB-1269).
-            grep -qE '^(ui/|eval/results/runs/|docs/benchmarks/config\.json$|src/pii_guard/eval/report|\.github/workflows/ci\.yml$|scripts/ci/licenses\.py$)' changed.txt || ui=false
-            # What the image is built from (Dockerfile COPY lines) and how it is smoke-tested.
-            grep -qE '^(src/|Dockerfile$|\.dockerignore$|pyproject\.toml$|uv\.lock$|README\.md$|LICENSE$|scripts/ci/docker_smoke\.sh$|\.github/workflows/ci\.yml$)' changed.txt || docker=false
-            # What the release wheel is built from (`make wheel`: the package and the UI).
-            grep -qE '^(src/|ui/|pyproject\.toml$|uv\.lock$|Makefile$|README\.md$|scripts/ci/wheel_smoke\.sh$|\.github/workflows/(ci|release)\.yml$)' changed.txt || wheel=false
-          fi
-          { echo "ui=$ui"; echo "docker=$docker"; echo "wheel=$wheel"; } | tee -a "$GITHUB_OUTPUT"
+        run: python3 scripts/ci/changes.py | tee -a "$GITHUB_OUTPUT"
 
   lint:
     name: lint
@@ -129,9 +118,9 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --no-dev
       - name: Smoke (demo stack on the mock upstream, offline)
-        run: make smoke
+        run: uv run --no-sync python scripts/smoke.py --mode rules
       # Who renders the report: CONTRIBUTING.md, "Generated files" (LAB-1269). With the
       # render-docs workflow on, the committed report is rendered after the merge, so only the
       # inputs are checked here.
@@ -140,12 +129,12 @@ jobs:
           RENDER_DOCS_ON_MERGE: ${{ vars.RENDER_DOCS_ON_MERGE }}
         run: |
           if [ "$RENDER_DOCS_ON_MERGE" = true ]; then
-            uv run pii-guard eval report --validate
+            uv run --no-sync pii-guard eval report --validate
           else
-            uv run pii-guard eval report --check
+            uv run --no-sync pii-guard eval report --check
           fi
       - name: CLI
-        run: uv run pii-guard --help
+        run: uv run --no-sync pii-guard --help
 
   eval-gate:
     name: eval-gate
@@ -158,9 +147,9 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --no-dev
       - name: Quality regression gate (rules only, offline; eval/gates.json)
-        run: uv run python -m pii_guard.eval.gate
+        run: uv run --no-sync python -m pii_guard.eval.gate
 
   docker:
     name: docker
@@ -319,11 +308,11 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --no-dev
       - name: Real-looking PII on the lines this PR adds (pii-guard rules, dogfood)
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: uv run python scripts/ci/pii_in_diff.py --base "$BASE"
+        run: uv run --no-sync python scripts/ci/pii_in_diff.py --base "$BASE"
 
   gitleaks:
     name: gitleaks
