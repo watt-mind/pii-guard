@@ -12,6 +12,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pii_guard.api.errors import error_response
+from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, easy_auth_principal
 from pii_guard.hosted.runtime import HostedService
 from pii_guard.types import PiiGuardError
@@ -143,6 +144,14 @@ class HostedMiddleware:
                     raise HostedRequestError("A same-origin request is required")
                 if headers.get("sec-fetch-site") == "cross-site":
                     raise HostedRequestError("A same-origin request is required")
+            account_inspection = canonical == "/v1/account" and scope.get("method") == "GET"
+            if not account_inspection:
+                self.service.abuse.admit(
+                    headers,
+                    principal_id=principal.id,
+                    authenticated=principal.authenticated,
+                    anonymous_sponsored=canonical == "/v1/demo" and scope.get("method") == "POST",
+                )
             raw = bytearray()
             if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}:
                 async with asyncio.timeout(min(10, self.service.settings.hosted_request_timeout)):
@@ -189,7 +198,7 @@ class HostedMiddleware:
             state["hosted_principal"] = principal
             # Account inspection remains available after exhaustion; all mutations and data
             # routes consume compute quotas. The full conservative charge survives failure.
-            if not (canonical == "/v1/account" and scope.get("method") == "GET"):
+            if not account_inspection:
                 reservation = self.service.quotas.admit(
                     principal.id,
                     authenticated=principal.authenticated,
@@ -203,7 +212,15 @@ class HostedMiddleware:
                 (k, v)
                 for k, v in scope.get("headers", [])
                 if k.lower()
-                not in {b"authorization", b"x-pii-guard-token", b"cookie", b"content-length"}
+                not in {
+                    b"authorization",
+                    b"x-pii-guard-token",
+                    b"cookie",
+                    b"content-length",
+                    b"x-forwarded-for",
+                    b"forwarded",
+                    b"x-real-ip",
+                }
                 and not k.lower().startswith(b"x-ms-")
             ]
             filtered.append((b"content-length", str(len(raw)).encode()))
@@ -222,9 +239,10 @@ class HostedMiddleware:
                 )
         except PiiGuardError as exc:
             if not started:
-                await error_response(exc.status_code, exc.code, exc.message)(
-                    scope, receive, tracked_send
-                )
+                response = error_response(exc.status_code, exc.code, exc.message)
+                if isinstance(exc, AbuseAdmissionError):
+                    response.headers["Retry-After"] = str(exc.retry_after)
+                await response(scope, receive, tracked_send)
         except TimeoutError:
             if not started:
                 await error_response(504, "hosted_timeout", "Hosted request timed out")(

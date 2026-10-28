@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     hosted_public_origin: str | None = None
     hosted_trust_easy_auth: bool = False
     hosted_single_process: bool = False
+    # Enable only after verifying direct ACA ingress and access-log privacy.
+    hosted_client_ip_source: Literal["off", "aca_xff_rightmost"] = "off"
     hosted_max_principals: int = Field(default=256, ge=1, le=10000)
     hosted_runtime_ttl: int = Field(default=3600, ge=300, le=86400)
     hosted_max_sessions: int = Field(default=20, ge=1, le=100)

@@ -17,6 +17,7 @@ from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import GatewayConfig, Mode
 from pii_guard.gateway.detection import ModeDetector
 from pii_guard.gateway.service import Gateway
+from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.connections import ConnectionStore
 from pii_guard.hosted.egress import SecureTransport
 from pii_guard.hosted.identity import ApiKeyStore, GuestIdentity, Principal
@@ -105,6 +106,7 @@ class HostedService:
         self.keys = ApiKeyStore()
         self.guests = GuestIdentity(key, ttl_seconds=settings.hosted_runtime_ttl)
         self.connections = ConnectionStore(ttl_seconds=settings.hosted_runtime_ttl)
+        self.abuse = AbuseAdmission(settings.hosted_client_ip_source)
         self.quotas = QuotaLedger(
             QuotaLimits(
                 input_microdollars_per_token=settings.hosted_input_microdollars_per_token,
@@ -169,6 +171,7 @@ class HostedService:
                     del self._runtimes[owner]
         self.keys.purge_expired()
         self.connections.purge_expired()
+        self.abuse.purge_expired()
 
     def provider_settings(self, request: Request) -> Settings:
         connection = getattr(request.state, "hosted_connection", None)

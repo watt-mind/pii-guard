@@ -19,6 +19,7 @@ from starlette.responses import StreamingResponse
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
+from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.identity import Principal
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits
 from pii_guard.hosted.runtime import HostedCapacityError
@@ -120,6 +121,83 @@ def chat(
         json={"model": "muse-spark-1.3", "messages": [{"role": "user", "content": EMAIL}]},
         headers=headers,
     )
+
+
+def test_real_demo_cookie_rotation_hits_network_burst_then_allows_sign_in(
+    boundary: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, seen = boundary
+    service = client.app.state.hosted
+    service.abuse = AbuseAdmission("aca_xff_rightmost", clock=lambda: 100.0)
+    for index in range(30):
+        client.cookies.clear()
+        response = client.post(
+            "/v1/demo",
+            json={"sample_id": "en-support"},
+            headers={
+                "origin": ORIGIN,
+                "x-forwarded-for": f"198.51.100.{index + 1}, 192.0.2.1",
+                "forwarded": "for=203.0.113.1",
+                "x-real-ip": "203.0.113.2",
+            },
+        )
+        assert response.status_code == 200, response.text
+    assert len(seen) == 30
+    client.cookies.clear()
+    denied = client.post(
+        "/v1/demo",
+        json={"sample_id": "en-support"},
+        headers={"origin": ORIGIN, "x-forwarded-for": "203.0.113.1, 192.0.2.1"},
+    )
+    assert denied.status_code == 429
+    assert denied.json()["error"]["code"] == "abuse_throttled"
+    assert denied.headers["retry-after"] == "2"
+    assert len(seen) == 30
+    spent = service.quotas._spent_allocation
+    assert client.get("/v1/account").status_code == 200
+    # Sign-in has an independent allowance and still charges the SAME total allocation.
+    signed_in = client.post("/v1/demo", json={"sample_id": "en-support"}, headers=auth())
+    assert signed_in.status_code == 200, signed_in.text
+    assert service.quotas._spent_allocation > spent
+    assert len(seen) == 31
+    assert service._ingress == service.quotas._active == 0
+    assert all(
+        header not in request.headers
+        for request in seen
+        for header in ("x-forwarded-for", "forwarded", "x-real-ip")
+    )
+
+
+def test_real_demo_keeps_five_request_guest_cap_and_shared_network_allowance(
+    boundary: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, seen = boundary
+    service = client.app.state.hosted
+    service.abuse = AbuseAdmission("aca_xff_rightmost", clock=lambda: 100.0)
+    service.quotas = QuotaLedger(
+        QuotaLimits(guest_tokens=1_000_000, global_daily_microdollars=1_000_000_000),
+        sponsored_allocation_microdollars=1_000_000_000,
+        allocation_expires_at=time.time() + 3600,
+        claim_allocation=lambda: True,
+    )
+    for _ in range(2):
+        client.cookies.clear()
+        for _ in range(5):
+            response = client.post(
+                "/v1/demo",
+                json={"sample_id": "en-support"},
+                headers={"origin": ORIGIN, "x-forwarded-for": "192.0.2.1"},
+            )
+            assert response.status_code == 200, response.text
+        denied = client.post(
+            "/v1/demo",
+            json={"sample_id": "en-support"},
+            headers={"origin": ORIGIN, "x-forwarded-for": "192.0.2.1"},
+        )
+        assert denied.status_code == 429
+        assert denied.json()["error"]["code"] == "quota_exceeded"
+    assert len(seen) == 10
+    assert len(service.abuse._networks) == 1
 
 
 def test_same_explicit_session_is_owner_scoped(
