@@ -220,6 +220,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` | `known_values_max_length` | `int` (characters per value) | `256` |
 | `PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS` | `vault_case_sensitive_placeholders` | `bool` | `false` |
 | `PII_GUARD_VAULT_MAX_ENTRIES` | `vault_max_entries` | `int` (≥ 1): most placeholders in one get-or-create session before it starts a new generation | `10000` |
+| `PII_GUARD_VAULT_INSPECT` | `vault_inspect` | `"off"` \| `"masked"` \| `"full"`: the vault inspector (`/v1/vault/sessions*`); `full` only on a loopback bind | `masked` |
 | `PII_GUARD_LLM_DETECTOR_URL` | `llm_detector_url` | `str \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_API_KEY` | `llm_detector_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_LLM_DETECTOR_MODEL` | `llm_detector_model` | `str \| None` | unset (detector default `meta-models/muse-spark-open-1026`) |
@@ -326,8 +327,11 @@ Every non-2xx response, including validation errors and unknown routes, has this
 |---|---|---|
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
+| 403 | `vault_inspect_not_local` | `PII_GUARD_VAULT_INSPECT=full` and a `/v1/vault/*` connection is not loopback on both ends. |
+| 403 | `vault_reveal_disabled` | `GET /v1/vault/sessions/{ref}?reveal=true` while `PII_GUARD_VAULT_INSPECT` is not `full`. |
 | 404 | `not_found` | Unknown route, or an unknown or expired `session_id` on any route that takes one (`/v1/analyze`, `/v1/mask`, `/v1/mask/image`, `/v1/unmask`, the session and known-values routes, the gateway) |
 | 404 | `traffic_log_disabled` | `GET /v1/traffic` and `/v1/traffic/stream` while `PII_GUARD_TRAFFIC_LOG=off` (the default). |
+| 404 | `vault_inspect_disabled` | The `/v1/vault/*` routes while `PII_GUARD_VAULT_INSPECT=off`. |
 | 413 | `payload_too_large` | The body, text or image is larger than the configured limit (see docs/operations.md). |
 | 415 | `unsupported_media_type` | `/v1/mask/image`: the image is not a PNG or JPEG (sniffed from its bytes). |
 | 422 | `invalid_request` | Body fails validation. The message lists field locations only, never values. |
@@ -677,6 +681,7 @@ without its path, query, user or password.
   "auth": {"token_required": false},
   "default_language": "hu",
   "traffic_log": "off",
+  "vault_inspect": "masked",
   "metrics": false
 }
 ```
@@ -708,10 +713,66 @@ without its path, query, user or password.
 | `auth.token_required` | bool | `PII_GUARD_API_TOKEN` is set. |
 | `default_language` | string | `PII_GUARD_DEFAULT_LANGUAGE` (`"hu"`). |
 | `traffic_log` | `"off"` \| `"masked"` \| `"full"` | `PII_GUARD_TRAFFIC_LOG` level. |
+| `vault_inspect` | `"off"` \| `"masked"` \| `"full"` | `PII_GUARD_VAULT_INSPECT`: whether the vault inspector answers, and whether it can reveal values. |
 | `metrics` | bool | Request metrics are collected (`/metrics`). |
 
 Everything but `gateway.url`, `traffic_log` and `metrics` is fixed for the life of the app and
 computed on the first call; a settings change needs a restart.
+
+### Vault inspector: `/v1/vault/sessions`
+
+For troubleshooting (LAB-1328): which vault sessions exist, where each came from and what it
+maps. `PII_GUARD_VAULT_INSPECT` sets the mode:
+
+| Mode | What the routes return |
+|---|---|
+| `off` | 404 `vault_inspect_disabled` on every route. |
+| `masked` (default) | Sessions, placeholders, counts and a redacted **hint** of each value. Never an original, a form or a session id. `reveal=true` is 403 `vault_reveal_disabled`. |
+| `full` | As `masked`; `reveal=true` also returns the originals, their other forms and the session id. Startup refuses it unless `PII_GUARD_HOST` is loopback and `PII_GUARD_ALLOWED_HOSTS` holds loopback names only (`VaultInspectConfigError`), and every `/v1/vault/*` request must be loopback on both ends (403 `vault_inspect_not_local`), like `PII_GUARD_TRAFFIC_LOG=full`. |
+
+`PII_GUARD_API_TOKEN` and the `Host` check apply as on every route. Reading never touches a
+session: no TTL is extended.
+
+A session is addressed by its **`ref`**, the traffic log's `session_ref` (`s_` + 16 hex, an
+HMAC of the session id under a per-process key that changes on restart). The session id is a
+bearer handle to the vault (`/v1/unmask` with it restores every value), so it is never listed;
+only a revealed read returns it. A traffic event's `session_ref` is the same ref, so a Logs
+row links to its session.
+
+- `GET /v1/vault/sessions[?source=header|path|prompt_cache_key|default|api]`: every live
+  session, most recently used first.
+
+  ```json
+  {"mode": "masked", "ttl_seconds": 3600, "sessions": [
+    {"ref": "s_3f9a1c0b7d2e4a61", "source": "path", "client": "anonymous",
+     "created": "2026-10-28T09:12:03+00:00", "last_used": "2026-10-28T09:14:40+00:00",
+     "ttl_left_seconds": 3443.2, "generation": 9, "entries": 6, "occurrences": 11,
+     "known_values": 0,
+     "entity_counts": {"EMAIL": 2, "PERSON": 4}}]}
+  ```
+
+  `source` is the step that chose a gateway session (see "Gateway sessions"), or `api` for one
+  created by `/v1/mask` or `/v1/sessions`; a later request that names the session in
+  `X-PII-Guard-Session` keeps its source. `client` is the first 12 hex characters of the
+  SHA-256 of the creating request's `Authorization` value, or `anonymous`; `null` (and
+  `created` `null`) for an `api` session, whose creation is not recorded.
+- `GET /v1/vault/sessions/{ref}[?reveal=true]`: the session's summary plus `mode`,
+  `revealed`, `session_id` (revealed only) and `items`: one per placeholder (casing and layout
+  variants after their value, with `variant_of`), then the known values nothing matched yet
+  (`placeholder: null`). Each item has `placeholder`, `entity_type`, `origin` (`detected`, or
+  `known` for a pre-loaded value), `count` (occurrences masked), `forms` (how many other written
+  forms matched: inflected stems, split surfaces), `hint`, and on a revealed read `original`
+  and `known_forms`. Every revealed read is logged at `WARNING` with the ref and the counts,
+  never a value or the session id.
+
+  The hint keeps each word's first character and length (`T•••• E•••`; words under three
+  characters are all bullets), a number's last two digits when it has at least six
+  (`+•• •• ••• ••67`), and the separators; a `SECRET` is up to 12 bullets.
+- `DELETE /v1/vault/sessions/{ref}`: 204; the session is dropped as if it expired. A client
+  naming it in `X-PII-Guard-Session` then gets 404; a derived gateway session (path,
+  `prompt_cache_key`, default) starts again, empty, on its next request.
+
+Unknown or expired ref: 404 `not_found`; a malformed one: 422 `invalid_request`.
 
 ## Gateway sessions (implemented)
 

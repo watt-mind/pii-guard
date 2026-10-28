@@ -152,6 +152,7 @@ def server_status(request: Request) -> dict[str, Any]:
         **cached,
         "gateway": {**cached["gateway"], "url": f"{base}/v1"},
         "traffic_log": level,
+        "vault_inspect": str(getattr(state, "vault_inspect", "masked")),
         "metrics": getattr(obs, "metrics", None) is not None,
     }
 

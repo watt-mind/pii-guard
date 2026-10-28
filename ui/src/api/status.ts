@@ -28,6 +28,8 @@ export interface ServerStatus {
   auth: { token_required: boolean };
   default_language: string;
   traffic_log: "off" | "masked" | "full" | string;
+  /** `PII_GUARD_VAULT_INSPECT`; absent on servers that predate the vault inspector. */
+  vault_inspect?: "off" | "masked" | "full";
   metrics: boolean;
 }
 

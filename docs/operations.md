@@ -377,6 +377,44 @@ Both answer `404 traffic_log_disabled` while the log is off.
 | `request` | `masked` (the body sent upstream); `original` at level `full` |
 | `response` | `masked` (the upstream's answer; streams: content per choice and the chunk count); `unmasked` at level `full` |
 
+## Vault inspector
+
+The console's **Vault** screen (Inspect group) and `GET /v1/vault/sessions*` show which vault
+sessions the server holds and what each one maps, for troubleshooting a value that was or
+wasn't restored. Routes, fields and errors: [contracts.md](contracts.md#vault-inspector-v1vaultsessions).
+
+| `PII_GUARD_VAULT_INSPECT` | What you see |
+|---|---|
+| `off` | Nothing: the routes answer `404 vault_inspect_disabled`. |
+| `masked` (default) | Sessions (source, client, created, last used, TTL left, counts) and each placeholder with its type, origin, occurrence count and a redacted hint (`T•••• E•••`). Never an original. |
+| `full` | Also a **Reveal values** button per session: the originals, their inflected forms and the session id, fetched on demand and kept only in the page's memory. Loopback only, like the `full` traffic log; every reveal is logged (ref and counts, never a value). |
+
+Troubleshooting with it:
+
+1. **Find the conversation.** On Logs, open the call and use **Open session … in Vault**: the
+   traffic log's `session_ref` is the inspector's ref. Or filter the sessions by source.
+2. **Check where the session came from.** `Session header`, `URL path`, `Prompt cache key` and
+   `Client default` are the gateway's resolution steps
+   ([architecture-gateway.md](architecture-gateway.md#sessions)); `REST API` is a session made by
+   `/v1/mask` or `/v1/sessions`. Two sessions where you expected one usually mean the client
+   changed its `Authorization` value or its `prompt_cache_key` between turns (a different
+   client identity or key derives a different session).
+3. **Read the placeholders.** A value the model echoed but that came back as a placeholder is
+   one this session never issued (the model invented it or copied it from another session):
+   it is not in the list. A value that was masked under another type, or not at all, shows in
+   the hint and type columns. `Forms` counts inflected forms matched onto a value; `Known value`
+   rows were pre-loaded, and a known value no text has matched yet is listed without a
+   placeholder.
+4. **Start over.** **Drop…** forgets a session now. A client that names it in
+   `X-PII-Guard-Session` then gets 404; a derived session (path, prompt cache key, default)
+   starts again, empty, on the next request, and earlier placeholders in its history are no
+   longer restored.
+
+Reading the inspector never extends a session's TTL. The source, client and created time come
+from the gateway's responses and are kept in memory next to the vault; a `REST API` session has
+no recorded client or creation time.
+
+## Timing
 ## Timing
 
 The gateway times every request on the monotonic clock, from the moment the body has been

@@ -48,6 +48,8 @@ export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureInterv
   mockUpstream?: boolean;
   /** Open this call (from an Overview chart); a new nonce re-opens the same one. */
   focus?: { id: string; nonce: number } | null;
+  /** Open a call's vault session in the Vault screen (by its `session_ref`). */
+  onOpenSession?: (ref: string) => void;
 }
 
 
@@ -59,7 +61,7 @@ export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...r
   return <Logs t={t} forceFixture={forceFixture} {...rest} />;
 }
 
-export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null }: LogsProps) {
+export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null, onOpenSession }: LogsProps) {
   const [filters, setFilters] = useState<Filters>({ mode: "all", type: "all", problems: false });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cleared, setCleared] = useState(0);
@@ -217,7 +219,10 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
 
         <div ref={detailRef} className="min-w-0 scroll-mt-4 space-y-6">
           {selected ? (
-            <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)} mockUpstream={mockUpstream} />
+            <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)}
+              mockUpstream={mockUpstream}
+              onOpenSession={t.source === "api" ? onOpenSession : undefined}
+            />
           ) : (
             <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-xl border border-line px-6 py-10 text-center">
               <p className="text-sm font-medium text-ink">No call selected</p>
@@ -548,6 +553,7 @@ function CallDetail({
   pageHost,
   onFollow,
   mockUpstream,
+  onOpenSession,
 }: {
   event: TrafficEvent;
   following: boolean;
@@ -555,6 +561,7 @@ function CallDetail({
   pageHost: string;
   onFollow: () => void;
   mockUpstream: boolean;
+  onOpenSession?: (ref: string) => void;
 }) {
   const showOriginals = canShowOriginals(e, pageHost, source);
   const maskedBody = e.request?.masked;
@@ -589,6 +596,11 @@ function CallDetail({
           <Meta label="Tokens" value={e.usage?.total_tokens !== undefined ? `${e.usage.prompt_tokens ?? "?"} in · ${e.usage.completion_tokens ?? "?"} out` : "–"} />
           <Meta label="Detection cache" value={e.cache ? `${e.cache.hits} hit · ${e.cache.misses} miss` : "–"} />
         </dl>
+        {e.session_ref && onOpenSession && (
+          <Button className="mt-3 h-8 text-xs" onClick={() => onOpenSession(e.session_ref!)}>
+            Open session <span className="font-mono">{e.session_ref}</span> in Vault
+          </Button>
+        )}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
           <span>Masked:</span>
           <EntityChips counts={maskedCounts(e)} />

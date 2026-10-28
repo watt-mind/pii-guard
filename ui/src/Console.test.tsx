@@ -79,12 +79,12 @@ beforeEach(() => {
 });
 
 describe("console shell", () => {
-  it("opens on the Overview, with six sections in the sidebar", async () => {
+  it("opens on the Overview, with seven sections in the sidebar", async () => {
     const f = fakeConnect();
     render(<App api={liveApi()} mock={createMockClient()} traffic={{ connect: f.connect }} loadStatus={statusOf()} />);
     const nav = screen.getByRole("navigation", { name: "Console" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(6);
-    for (const name of ["Overview", "Playground", "Logs", "Connect", "Policy", "Evaluation"]) expect(within(nav).getByRole("link", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+    expect(within(nav).getAllByRole("link")).toHaveLength(7);
+    for (const name of ["Overview", "Playground", "Logs", "Vault", "Connect", "Policy", "Evaluation"]) expect(within(nav).getByRole("link", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
     expect(region("Overview")).toBeVisible();
   });
