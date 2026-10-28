@@ -29,7 +29,6 @@ from pii_guard.eval.fixtures import FixtureError, parse_document
 from pii_guard.eval.public import ai4privacy as a4p
 from pii_guard.eval.record import (
     SCHEMA_PATH,
-    load_records,
     load_schema,
     rate_errors,
     text_metrics,
@@ -158,8 +157,10 @@ def test_pooled_charts_leave_out_partial_systems_and_say_so(mixed: list[dict[str
         assert "hu + en pooled" not in text
 
 
-def test_committed_headline_set_compares_one_version() -> None:
-    index = build_index(load_records(RUNS))
+def test_committed_headline_set_compares_one_version(
+    committed_records: list[dict[str, Any]],
+) -> None:
+    index = build_index(committed_records)
     current = index["fixture_sets"]["smoke"]["fixtures"]
     for snap in index["snapshots"]:
         if snap["fixture_set"] == "smoke":

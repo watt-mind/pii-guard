@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -103,8 +104,16 @@ def test_a_tightened_limit_fails(
     gates["suites"][0]["limits"]["leak_rate_max"] = 0.01
     path = tmp_path / "gates.json"
     path.write_text(json.dumps(gates), encoding="utf-8")
-    assert gate.main(["--gates", str(path)]) == 1
-    assert "breaks the committed leak_rate_max" in capsys.readouterr().err
+    # No run records: the absolute limit holds without a baseline, and the 700+ committed
+    # records need not be validated again (LAB-1447; test_committed_gates_pass reads them).
+    runs = tmp_path / "results" / "runs"
+    runs.mkdir(parents=True)
+    (tmp_path / "results" / "schema").mkdir()
+    shutil.copy(in_repo / "eval/results/schema/run.schema.json", tmp_path / "results" / "schema")
+    assert gate.main(["--gates", str(path), "--runs-dir", str(runs)]) == 1
+    captured = capsys.readouterr()
+    assert "breaks the committed leak_rate_max" in captured.err
+    assert "baseline -" in captured.out and "only the absolute limits apply" in captured.out
 
 
 @pytest.mark.parametrize(

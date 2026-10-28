@@ -95,6 +95,9 @@ def _session_output(*, case_sensitive: bool) -> tuple[list[str], list[str]]:
     return _canonical(masked), [session.unmask(text) for text in masked]
 
 
+# untraced: the whole corpus twice, 23-26 s each under the branch tracer on CI; the prefilter
+# and fold memo are measured by the unit tests below (LAB-1447).
+@pytest.mark.untraced
 @pytest.mark.parametrize("case_sensitive", [False, True])
 def test_prefilter_and_fold_memo_change_no_output(
     monkeypatch: pytest.MonkeyPatch, case_sensitive: bool

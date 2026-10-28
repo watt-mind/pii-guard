@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from pii_guard.eval.record import load_records
 from pii_guard.eval.report_cli import CHARTS, DEFAULT_INDEX, build_outputs
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +22,22 @@ REPORT_RUNS = (
     "2026-10-27-segment-local-fictional",
     "2026-10-27-gateway-latency-rules-fast",
 )
+
+
+@pytest.fixture(scope="session")
+def committed_record_texts() -> tuple[str, ...]:
+    """The committed run records, loaded and validated once per worker, as JSON texts.
+
+    Validating 700+ records takes seconds under the branch tracer; tests that only read them
+    share one load (LAB-1447). test_every_committed_record_is_valid still loads them itself.
+    """
+    return tuple(json.dumps(r) for r in load_records(ROOT / "eval/results/runs"))
+
+
+@pytest.fixture
+def committed_records(committed_record_texts: tuple[str, ...]) -> list[dict[str, Any]]:
+    """A fresh copy of the committed run records: a test may change it freely."""
+    return [json.loads(text) for text in committed_record_texts]
 
 
 @pytest.fixture

@@ -13,7 +13,6 @@ import pytest
 
 from pii_guard import cli
 from pii_guard.eval import report_charts as charts
-from pii_guard.eval.record import load_records
 from pii_guard.eval.report_cli import CHARTS, build_outputs, render_page
 from pii_guard.eval.report_index import build_index, compact, pool
 
@@ -27,8 +26,8 @@ RENDERED_ON_MERGE = os.environ.get("RENDER_DOCS_ON_MERGE") == "true"
 
 
 @pytest.fixture(scope="module")
-def records() -> list[dict[str, Any]]:
-    return load_records(RUNS)
+def records(committed_record_texts: tuple[str, ...]) -> list[dict[str, Any]]:
+    return [json.loads(text) for text in committed_record_texts]
 
 
 @pytest.fixture(scope="module")

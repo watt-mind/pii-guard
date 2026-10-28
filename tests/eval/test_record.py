@@ -59,6 +59,9 @@ def _workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 # --- Committed records and schema ----------------------------------------------------------
 
 
+# untraced: validating all 700+ committed records is a check of the data (12 s on CI under
+# the branch tracer); the validator is measured by the schema tests in this file (LAB-1447).
+@pytest.mark.untraced
 def test_every_committed_record_is_valid(schema: dict[str, Any]) -> None:
     records = load_records(RUNS)  # validates each and checks file name == run_id
     assert len(records) >= 33
@@ -67,8 +70,8 @@ def test_every_committed_record_is_valid(schema: dict[str, Any]) -> None:
         assert record["schema_version"] == RECORD_SCHEMA_VERSION
 
 
-def test_backfill_covers_every_earlier_result() -> None:
-    records = {r["run_id"]: r for r in load_records(RUNS)}
+def test_backfill_covers_every_earlier_result(committed_records: list[dict[str, Any]]) -> None:
+    records = {r["run_id"]: r for r in committed_records}
     imported = [r for r in records.values() if r["source"] == "imported"]
     assert len(imported) >= 33
     assert all(r["imported_from"]["path"] for r in imported)
@@ -99,8 +102,10 @@ def test_schema_uses_only_keywords_the_validator_implements(schema: dict[str, An
     assert schema["properties"]["schema_version"]["const"] == RECORD_SCHEMA_VERSION
 
 
-def test_validator_rejects_broken_records(schema: dict[str, Any]) -> None:
-    good = load_records(RUNS)[0]
+def test_validator_rejects_broken_records(
+    schema: dict[str, Any], committed_records: list[dict[str, Any]]
+) -> None:
+    good = committed_records[0]
     assert validate(good, schema) == []
 
     missing = copy.deepcopy(good)
