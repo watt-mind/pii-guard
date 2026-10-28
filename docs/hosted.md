@@ -171,6 +171,7 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` | Dedicated runtime UAMI client ID |
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
 | `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |
+| `VITE_PII_GUARD_ROBOTS` (UI build arg) | Default `disallow`: `robots.txt` keeps crawlers out. Build with `--build-arg VITE_PII_GUARD_ROBOTS=allow` only for the public production image. Dev and prod currently share one image, so prod indexing needs its own build or a runtime switch first |
 
 ## Dedicated Azure deployment
 
