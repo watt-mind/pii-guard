@@ -78,6 +78,10 @@ allocations after restart; this is not durable multi-tenant vault storage (LAB-1
 secret recovery and Azure/provider retention are separate from input retention. See
 [hosted.md](hosted.md) for actual controls, lifecycle, deployment gates and policy review.
 
+Hosted downstream privacy claims must also match the provider contract: Meta Standard's
+no-training terms do not establish zero retention or EU-only processing. Sponsored proxy use
+remains gated on written provider authorization; see [hosted.md](hosted.md).
+
 ## Guarantees
 
 1. **Fail closed.** If extraction, detection, masking or re-identification errors or times

@@ -18,8 +18,11 @@ submit editable **text** and use temporary BYOK profiles whose destinations pass
 public-HTTPS endpoint policy. Hosted uploads, images, remote LLM detection and arbitrary
 anonymous prompts remain disabled. The existing self-hosted mode stays available separately.
 
-Sponsored generation uses the Meta Model API in **Standard** mode, with the server's model
-allowlist and secret. Verify the account's actual tier and current terms before activation;
+Sponsored generation is proposed through Meta Standard, subject to the
+[written-authorization requirement](https://dev.meta.ai/legal/terms-of-service) for proxy/API
+gateway offerings in section 10.1(i). A technical launch review cannot waive that gate.
+After authorization, use the server's model allowlist and secret. Verify the account's actual
+tier and current terms before activation;
 configuration cannot prove the account's commercial terms. Contributor/data-sharing modes are
 unsuitable for real inputs, including masked inputs. Local CPU NER plus rules process originals;
 a remote detector would receive originals and requires a separate explicit trust decision.
