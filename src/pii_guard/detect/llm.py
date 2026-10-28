@@ -66,6 +66,7 @@ __all__ = [
     "LlmDetector",
     "LlmEntity",
     "chunk_text",
+    "clear_alignment_caches",
     "find_occurrences",
     "language_profile",
     "pack_profile",
@@ -420,8 +421,23 @@ def parse_entities(content: str) -> list[LlmEntity]:
 _LINE_BREAK = r"(?:-?[ \t]*\r?\n[ \t]*)?"
 _MAX_BROKEN_VALUE = 120
 
+# Alignment patterns embed the value the model reported, so they are personal data. They are
+# built per call and not cached here (LAB-1353): nothing in this module keeps a value after
+# ``align()`` returns. Python's ``re`` keeps its own bounded cache of recently compiled
+# patterns (``re._MAXCACHE``, 512 on 3.12), shared with the vault; ``clear_alignment_caches``
+# drops it.
 
-@cache
+
+def clear_alignment_caches() -> None:
+    """Drop every compiled pattern this process still holds, alignment patterns included.
+
+    The LLM detector keeps no cache of its own; this purges Python's bounded ``re`` cache,
+    the one place recently aligned values can still sit (with the vault's patterns). The cost
+    is a recompile of any pattern a later call needs.
+    """
+    re.purge()
+
+
 def _pattern(
     value: str, word_boundary: bool, allow_suffix: bool, line_breaks: bool = False
 ) -> re.Pattern[str]:
@@ -494,7 +510,6 @@ def _loose_char(c: str) -> str:
     return re.escape(c)
 
 
-@cache
 def _loose_pattern(
     value: str, word_boundary: bool, allow_suffix: bool, separators: bool
 ) -> re.Pattern[str] | None:

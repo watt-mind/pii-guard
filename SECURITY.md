@@ -35,6 +35,12 @@ the `full` traffic log, and guarded the same way (loopback bind and loopback con
 the token when set, the host check), with every reveal logged. Set it to `off` where nobody
 needs it.
 
+Values live in memory only: in the vault until their session is deleted or its TTL ends, and
+for a short while in Python's bounded `re` compile cache (at most 512 recent patterns, cleared
+by `pii_guard.detect.llm.clear_alignment_caches()` or a restart). A detector cache that keeps a
+value after its request, unbounded or past session deletion, is a security issue. Details:
+[docs/operations.md](docs/operations.md#values-held-in-memory-outside-the-vault).
+
 Reports about an open deployment that ignored this are not vulnerabilities; a way around the
 token, the host check, the loopback-only `full` log or vault inspector, or a value in a
 `masked` inspector response is.
