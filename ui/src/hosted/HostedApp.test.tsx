@@ -71,6 +71,7 @@ describe("public hosted workflow", () => {
     render(<HostedApp call={call} />);
     await screen.findByRole("heading", { name: "Projects & endpoints" });
     expect(screen.queryByRole("button", { name: "Create guard key" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Local guard access")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bring your own model key" })).toBeInTheDocument();
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects"));
     expect(call).not.toHaveBeenCalledWith("/v1/account/api-keys");

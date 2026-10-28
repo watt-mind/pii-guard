@@ -1,3 +1,4 @@
+import { useOwnerRevision } from "./api/localOwner";
 import { Workspace } from "./projects/Workspace";
 import { getSelectedProject, setSelectedProject, useSelectedScope } from "./projects/selection";
 import { HostedApp } from "./hosted/HostedApp";
@@ -52,8 +53,13 @@ export interface AppProps {
 
 /** Hosted deployment is an explicit build choice; the local console remains the default. */
 export function App(props: AppProps) {
+  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <HostedApp /> : <LocalConsole {...props} />;
+}
+
+function LocalConsole(props: AppProps) {
   const scope = useSelectedScope();
-  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <HostedApp /> : <LocalApp key={scope} {...props} />;
+  const ownerRevision = useOwnerRevision();
+  return <LocalApp key={`${scope}:${ownerRevision}`} {...props} />;
 }
 
 /** A user's navigation adds a history entry (Back returns); a redirect replaces the current one. */

@@ -2,6 +2,7 @@
 // Configuration only, never a key or a value. Older servers answer 404: the screens then say
 // what they can't know instead of guessing.
 
+import { createProjectFetch } from "./project";
 import type { EntityType } from "./types";
 import type { Policy } from "../lib/entities";
 
@@ -53,7 +54,7 @@ export function parseStatus(raw: unknown): ServerStatus | null {
 export async function fetchStatus(doFetch: typeof fetch = (...a) => fetch(...a), baseUrl = "", signal?: AbortSignal): Promise<StatusResult> {
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl.replace(/\/$/, "")}/v1/status`, { headers: { Accept: "application/json" }, signal });
+    res = await createProjectFetch(doFetch)(`${baseUrl.replace(/\/$/, "")}/v1/status`, { headers: { Accept: "application/json" }, signal });
   } catch {
     return { state: "offline" };
   }
