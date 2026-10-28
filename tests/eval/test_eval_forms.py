@@ -42,6 +42,37 @@ def test_hungarian_stem_changes_match_the_whole_word() -> None:
     assert _found("Próba Petének", "Próba Pete") == ["Próba Petének"]
 
 
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        # A lengthened stem + the family / possessive chain (LAB-1342): the whole word.
+        ("Teszt Hajnáéknál laktunk", "Teszt Hajna"),
+        ("Teszt Hajnáéktól kértük", "Teszt Hajna"),
+        ("Teszt Hajnáékat hívtuk", "Teszt Hajna"),
+        ("Teszt Hajnáékkal mentünk", "Teszt Hajna"),
+        ("Minta Kendééknek írtam", "Minta Kende"),
+        ("Minta Hubáé a kulcs", "Minta Huba"),
+        ("Minta Hubáéval szemben", "Minta Huba"),
+        ("Teszt Hajnáéit vittük", "Teszt Hajna"),
+        ("Próba Bencééké a ház", "Próba Bence"),
+    ],
+)
+def test_hungarian_stacked_chain_after_a_lengthened_stem(text: str, value: str) -> None:
+    (found,) = _found(text, value)
+    assert text.startswith(found)
+    assert found == text.split(" ")[0] + " " + text.split(" ")[1]
+
+
+def test_hungarian_stacked_chain_on_an_unchanged_stem_stays_outside() -> None:
+    assert _found("Kerekes Ottóéknál laktunk", "Kerekes Ottó") == ["Kerekes Ottó"]
+    assert _found("Gyakorló Tihaméréké a ház", "Gyakorló Tihamér") == ["Gyakorló Tihamér"]
+
+
+@pytest.mark.parametrize("text", ["Teszt Hajnáékszám nem szó", "Teszt Hajnáénekes nem szó"])
+def test_hungarian_stacked_chain_needs_a_word_end(text: str) -> None:
+    assert _found(text, "Teszt Hajna") == []
+
+
 def test_english_is_exact_without_hungarian_suffixes() -> None:
     assert _found("Jane Examplenek", "Jane Example", language="en") == []
     assert _found("Jane Example's", "Jane Example", language="en") == ["Jane Example"]

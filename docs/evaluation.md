@@ -87,9 +87,11 @@ Evaluation is multilingual from the start: every fixture record carries a `langu
 is passed to detectors and the vault, and fixtures are kept one file per language and set
 (`eval/fixtures/hu-smoke.jsonl`, `eval/fixtures/en-smoke.jsonl`;
 `eval/fixtures/hu-inflection.jsonl` holds names whose stem changes before a suffix, in several
-cases). Leak-rate matching goes
+cases, and stacked suffixes: the family `-ék` and possessive `-é`/`-éi` with a case ending
+after them, `Ottóéknál`, `Hajnáéknak`, LAB-1342). Leak-rate matching goes
 through a per-language surface-form hook (`pii_guard.eval.forms`): Hungarian case suffixes
-and stem changes (`Annának`, `Kováccsal`) for `hu`, exact matching as the default elsewhere.
+and stem changes (`Annának`, `Kováccsal`, `Hajnáéknál`) for `hu`, exact matching as the
+default elsewhere.
 The scorecard reports every metric per language and per entity type, plus an overall row.
 
 ## Leak rate in practice
