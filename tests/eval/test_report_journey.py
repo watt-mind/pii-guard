@@ -192,15 +192,12 @@ def test_committed_journey_renders_and_keeps_every_hand_written_milestone() -> N
 
 
 def test_cli_validates_journey_entries_in_every_mode_and_writes_only_with_journey(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    report_repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    for rel in ("eval/results/runs", "eval/results/schema", "docs/benchmarks"):
-        shutil.copytree(REPO_ROOT / rel, tmp_path / rel)
-    shutil.copy(REPO_ROOT / "docs" / "benchmarks.md", tmp_path / "docs" / "benchmarks.md")
-    (tmp_path / "docs" / "journey.md").write_text(DOC, encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
+    (report_repo / "docs" / "journey.md").write_text(DOC, encoding="utf-8")
+    monkeypatch.chdir(report_repo)
     assert cli.main(["eval", "report"]) == 0  # this checkout's report, whatever its state
-    _entry(tmp_path, "2026-10-28-lab-1-a.md", "# A\n\nBody.\n")
+    _entry(report_repo, "2026-10-28-lab-1-a.md", "# A\n\nBody.\n")
     # Without --journey an entry never touches docs/journey.md, and the report is current.
     assert cli.main(["eval", "report", "--check"]) == 0
     assert cli.main(["eval", "report"]) == 0
@@ -211,7 +208,7 @@ def test_cli_validates_journey_entries_in_every_mode_and_writes_only_with_journe
     assert "### 3. A" in Path("docs/journey.md").read_text()
     assert cli.main(["eval", "report", "--check", "--journey"]) == 0
     # A broken entry fails every mode, --validate included.
-    _entry(tmp_path, "2026-10-29-lab-2-b.md", "no title\n")
+    _entry(report_repo, "2026-10-29-lab-2-b.md", "no title\n")
     capsys.readouterr()
     for mode in ([], ["--check"], ["--validate"]):
         assert cli.main(["eval", "report", *mode]) == 2
@@ -242,15 +239,12 @@ def _git(cwd: Path, *args: str) -> str:
 
 @pytest.mark.slow
 def test_two_prs_adding_a_run_and_a_milestone_merge_without_conflict(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    report_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Acceptance (LAB-1269): two branches from the same base each add a run record and a
     journey entry; they merge one after the other with no conflict and nothing regenerated
     by hand. Pull requests run --validate; the render after the merge numbers the entries."""
-    repo = tmp_path / "repo"
-    for rel in ("eval/results/runs", "eval/results/schema", "docs/benchmarks"):
-        shutil.copytree(REPO_ROOT / rel, repo / rel)
-    shutil.copy(REPO_ROOT / "docs" / "benchmarks.md", repo / "docs" / "benchmarks.md")
+    repo = report_repo
     (repo / "docs" / "journey.md").write_text(DOC, encoding="utf-8")
     shutil.copy(REPO_ROOT / ".gitignore", repo / ".gitignore")
     monkeypatch.chdir(repo)

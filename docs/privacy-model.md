@@ -50,6 +50,40 @@ Hosted downstream privacy claims must also match the provider contract: Meta Sta
 no-training terms do not establish zero retention or EU-only processing. Sponsored proxy use
 remains gated on written provider authorization; see [hosted.md](hosted.md).
 
+## Local-only detection boundary
+
+Self-hosting and hosted service are the two deployment choices. A self-hosted guard can still
+send original content to a configured remote detector. The explicit
+`PII_GUARD_DETECTION_PROFILE=local-only` profile restricts the supported raw-processing
+components without changing the downstream model choice. The default `standard` profile
+retains configurable remote detection.
+
+| Stage | Local-only processing and data boundary |
+|---|---|
+| Text detection | Built-in rules and in-process Transformers NER see original text. Local checkpoint loading cannot fetch weights; missing components refuse the request. Explicit rules-only has reduced coverage. |
+| OCR | Built-in local Tesseract sees original image pixels; extracted text uses the same permitted text detectors. Missing OCR/languages refuse processing. |
+| Image segmentation | Local YuNet sees original pixels. Remote SAM and hybrid segmentation are refused; unsupported requested visual masks are refused. |
+| Mapping store | The guard's existing local vault holds reversible text mappings under the configured tenant key. The profile does not add persistence or alter retention. |
+| Downstream model | Receives masked text and re-encoded masked images. This separately selected endpoint may be external; missed entities or deliberately kept types can remain visible. |
+| Response restoration | The guard restores recognized placeholders using its mapping store before returning the response. |
+
+Model downloads are provisioning traffic, separate from inference on user content. Operators
+must provision trusted local weights and dependencies first. There is no automatic remote
+fallback. The profile enforces the supported built-in component configuration; it does not
+sandbox arbitrary Python extensions or replace host network controls. For fully local
+end-to-end inference, the downstream model must also run locally.
+
+Local image support is limited. YuNet detects faces and estimates ID-photo bounds; signatures
+and stamps are unsupported. The existing default signature mask policy causes refusal, not a
+silent coverage downgrade. In the published local segmentation evaluation, portrait-region
+recall was 100% on 24 fictional images and 92.3% on 65 official specimen images; region leak
+rates were 0% and 10.8%, respectively. These are visual-region results without OCR, not an
+end-to-end privacy guarantee. The chosen margins were evaluated on those same sets and may be
+optimistic; see [methods and limitations](models.md#local-segmentation). No detector algorithm
+or threshold changes are part of this profile.
+
+See [setup and refusal behavior](operations.md#local-only-detection).
+
 ## Guarantees
 
 1. **Fail closed.** If extraction, detection, masking or re-identification errors or times

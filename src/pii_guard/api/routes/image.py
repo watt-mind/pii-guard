@@ -62,6 +62,7 @@ from pii_guard.api.routes._common import (
     text_body_limit,
     v1_router,
 )
+from pii_guard.detection_profile import require_local_ocr, require_segmenter_instance
 from pii_guard.policy import Policy
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import Vault
@@ -277,6 +278,7 @@ def _sam_client(request: Request) -> Segmenter:
             if sam is None:
                 sam = build_segmenter(state.settings)
                 state.sam_client = sam
+    require_segmenter_instance(state.settings, sam)
     return sam
 
 
@@ -285,6 +287,7 @@ def _ocr_engine(request: Request) -> OcrEngine | None:
     if not hasattr(state, "ocr_engine"):
         state.ocr_engine = default_ocr_engine()
     ocr: OcrEngine | None = state.ocr_engine
+    require_local_ocr(state.settings, ocr)
     return ocr
 
 
@@ -499,6 +502,7 @@ _OPENAPI_EXTRA: dict[str, Any] = {
         "vault_not_configured",
         "masking_failed",
         "detection_failed",
+        "detection_profile_denied",
         "detection_unavailable",
         "detector_loading",
         "ocr_unavailable",

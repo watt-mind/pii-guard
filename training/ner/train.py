@@ -24,6 +24,11 @@ being learned as ``O``. Documents may also carry their own excluded regions in
 
 ``precision = "bf16"`` runs the forward pass under CUDA bf16 autocast (weights and optimiser
 stay fp32); ``"fp32"`` (default) everywhere else.
+
+Decontamination (LAB-1392): train and dev files are loaded through ``decontam.py``, which drops
+every document that is an exact or near duplicate (word 5-gram Jaccard >= 0.8) of an evaluation
+text, and the counts go into ``training_meta.json``. It is on by default; ``decontam = false``
+or ``--no-decontam`` turns it off, and the run then records that it was off.
 """
 
 # Seeded shuffling, not cryptography.
@@ -47,7 +52,10 @@ import torch
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 
 from pii_guard.detect.ner import RawEntity, TransformersBackend, decode_tokens
-from pii_guard.eval.fixtures import Document, load_fixtures
+from pii_guard.eval.fixtures import Document
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import decontam
 
 #: The v1 label set (LAB-1106, LAB-1128): what the NER found before LAB-1150.
 TYPES_V1 = ("PERSON", "ADDRESS", "ORGANIZATION", "DATE_OF_BIRTH")
@@ -113,6 +121,8 @@ DEFAULTS: dict[str, Any] = {
     # v2.1 (LAB-1306): also save every epoch to <out>/epoch-<n>, for selection on held-out
     # sets after training (the dev split picks the top-level checkpoint as before).
     "save_epochs": False,
+    # LAB-1392: drop train/dev documents that duplicate an evaluation text (decontam.py).
+    "decontam": True,
 }
 
 
@@ -336,6 +346,13 @@ def load_config(argv: Sequence[str] | None) -> dict[str, Any]:
     parser.add_argument("--device")
     parser.add_argument("--seed", type=int)
     parser.add_argument("--precision", choices=("fp32", "bf16"))
+    parser.add_argument(
+        "--no-decontam",
+        dest="decontam",
+        action="store_const",
+        const=False,
+        help="skip the evaluation-overlap gate (decontam.py); the run records it",
+    )
     args = parser.parse_args(argv)
     cfg = dict(DEFAULTS)
     if args.config:
@@ -356,7 +373,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     device = pick_device(cfg["device"])
     train_paths = [Path(p) for p in cfg["train"]]
     dev_paths = [Path(p) for p in cfg["dev"]]
-    train_docs, dev_docs = load_fixtures(train_paths), load_fixtures(dev_paths)
+    index = decontam.eval_corpus() if cfg["decontam"] else None
+    gate_report = decontam.Report()
+    train_docs = decontam.load_training_docs(train_paths, index, gate_report)
+    dev_docs = decontam.load_training_docs(dev_paths, index, gate_report)
+    if index is not None:
+        print(decontam.summary_line(gate_report), flush=True)
     print(f"train docs {len(train_docs)}, dev docs {len(dev_docs)}, device {device}", flush=True)
 
     tokenizer = AutoTokenizer.from_pretrained(
@@ -468,6 +490,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "train": {str(p): sha256(p) for p in train_paths},
         "dev": {str(p): sha256(p) for p in dev_paths},
         "train_docs": len(train_docs),
+        "decontam": gate_report.to_dict(index=index) if index is not None else "off",
         "train_windows": len(train_features),
         "best": best,
         "history": history,

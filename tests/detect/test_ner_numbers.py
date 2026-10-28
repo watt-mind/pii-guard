@@ -62,7 +62,9 @@ CARD = "5117 3778 4464 2943"  # made up, Luhn fails
 )
 def test_a_negative_label_drops_the_number(text: str, value: str) -> None:
     assert detect(text, (value, "ID_DOCUMENT")) == []
-    assert detect(text, (value, "ID_DOCUMENT"), checks=False) == [(E.ID_DOCUMENT, value)]
+    # Without the checks the span still covers its whole digit run (LAB-1367).
+    whole = "2024-398890" if value == "398890" else value
+    assert detect(text, (value, "ID_DOCUMENT"), checks=False) == [(E.ID_DOCUMENT, whole)]
 
 
 @pytest.mark.parametrize(
@@ -193,7 +195,7 @@ def test_shapes_that_are_never_personal_data_are_dropped(text: str, value: str) 
     [
         ("Hello 858761608507 bye", "858761608507"),  # long digits: kept without a cue
         ("Hello 38520665501 bye", "38520665501"),
-        ("Reach them on 447700900614.", "7700900614"),  # a piece of a joined phone number
+        ("Reach them on 447700900614.", "447700900614"),  # a joined phone number
         ("ID AB 123 456 here", "123"),  # a group of a spaced value
         ("x 334 y", "334"),  # short values are not judged by length
         ("Hello AB123456 bye", "AB123456"),
@@ -201,6 +203,12 @@ def test_shapes_that_are_never_personal_data_are_dropped(text: str, value: str) 
 )
 def test_everything_else_is_kept(text: str, value: str) -> None:
     assert detect(text, (value, "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, value)]
+
+
+def test_a_piece_of_a_number_is_kept_as_the_whole_number() -> None:
+    """LAB-1367: the piece is snapped to its digit run before it is judged."""
+    text = "Reach them on 447700900614."
+    assert detect(text, ("7700900614", "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, "447700900614")]
 
 
 def test_a_span_over_a_field_separator_is_split_into_fields() -> None:

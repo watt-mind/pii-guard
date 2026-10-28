@@ -27,6 +27,14 @@ them appears in:
 - the rule fixtures in `eval/fixtures/`, which rules are written and tuned against;
 - any `dev` split.
 
+Hash equality only catches exact copies. The **decontamination gate**
+([`training/ner/decontam.py`](../training/ner/decontam.py), LAB-1392) also catches near
+copies: it compares every training and dev document with every evaluation text (every `test`
+set here and every `dev` set, which NER candidates are selected on, by text where it is on disk and by manifest hash always, plus every fixture under
+`eval/fixtures/`) and drops a document whose word-5-gram Jaccard similarity to one of them is
+0.8 or more. `training/ner/train.py` runs it by default; see
+[evaluation.md](evaluation.md#decontamination).
+
 ## Datasets
 
 | Set | Source | Licence | Languages | Docs | Split | Text committed |
@@ -35,6 +43,8 @@ them appears in:
 | `gretel-finance` | [gretelai/synthetic_pii_finance_multilingual](https://huggingface.co/datasets/gretelai/synthetic_pii_finance_multilingual), `test` @ `7b844d1` | Apache-2.0 | en, de | 400 | test | yes (synthetic) |
 | `nemotron-pii` | [nvidia/Nemotron-PII](https://huggingface.co/datasets/nvidia/Nemotron-PII), `test` @ `b70ffaf` | CC-BY-4.0 | en | 300 | test | yes (synthetic) |
 | `cee-pii` | [flowxai/cee-pii-bench](https://huggingface.co/datasets/flowxai/cee-pii-bench) v0.2 @ `84ee883` | Apache-2.0 | hu, en | 451 | test | yes (synthetic) |
+| `pl-pii-bench` | [pl-pii-bench/pl-pii-bench](https://huggingface.co/datasets/pl-pii-bench/pl-pii-bench) v1.0.0 @ `bef947d` | CC-BY-4.0 | pl | 346 | test | yes (synthetic) |
+| `mapa-eur-lex` | [piimb/mapa-eur-lex-pii](https://huggingface.co/datasets/piimb/mapa-eur-lex-pii), `test.jsonl` @ `a44958f` | CC-BY-4.0 | 21 EU languages | 42 | test | **no**: real EU court documents |
 | `tab-echr` | [TAB](https://github.com/NorskRegnesentral/text-anonymization-benchmark), `echr_test.json` @ `558e09e` | MIT (annotations) | en | 40 | test | **no**: real court documents |
 | `agent-traffic` | pii-guard's seeded generator ([below](#synthetic-agent-traffic)) | Apache-2.0 | hu, en, de | 990 | test | yes (generated) |
 | `agent-traffic-dev` | the same generator, another seed | Apache-2.0 | hu, en, de | 300 | dev | yes (generated) |
@@ -46,6 +56,10 @@ Attribution, as the licences require:
 - NVIDIA Corporation, *Nemotron-PII: Synthesized Data for Privacy-Preserving AI* (2025),
   CC-BY-4.0.
 - FlowX.AI, *CEE-PII-Bench v0.2* (Apache-2.0).
+- *pl-pii-bench, version 1.0.0*, Anonimator, CC BY 4.0.
+- camillevanhoffelen, *MAPA EUR-LEX PII* (CC-BY-4.0), built from the MAPA project's EUR-Lex
+  test split (de Gibert Bonet, García Pablos, Cuadros and Melero, LREC 2022); the texts are
+  EUR-Lex documents of the Court of Justice of the EU.
 - Pilán, Lison, Øvrelid, Papadopoulou, Sánchez and Batet, *The Text Anonymization
   Benchmark (TAB)*, Computational Linguistics 48(4), 2022. Annotations MIT; the judgments are
   public ECHR documents from HUDOC.
@@ -79,6 +93,22 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
   numbers). It adds deliberate noise (stripped diacritics, OCR confusions) and unlabelled
   order and tracking numbers. Another detector's authors wrote it as their benchmark, so it
   is a fair third-party set for pii-guard.
+- **`pl-pii-bench`**: the first Polish set, and a language pii-guard has no language pack for.
+  It has complete, exhaustively annotated synthetic administrative documents, so precision is
+  meaningful. Its identifiers are checksum-valid, and a separate negative lane holds
+  same-shape values that fail their check digits. An inflection lane puts names in all seven
+  Polish cases. Five of its seven public lanes are used; the `robustness` and `pdf` lanes
+  are re-renderings of `core` and are left out. Its card asks that nobody train on it. PESEL,
+  ID card, passport, driving licence and NIP are `ID_DOCUMENT`; REGON (a business number)
+  and VIN have no pii-guard type. Its maintainer also maintains one of the systems it
+  scores.
+- **`mapa-eur-lex`**: two long Advocate General opinions in 21 EU languages, including
+  Hungarian, Czech, Slovak and Romanian. It is the only set with most EU languages, and the
+  only parallel one: the same names appear in every language. The English labels are
+  hand-made; the other languages' labels were projected by an LLM and not fully checked.
+  Names (`first_name`, `last_name`) are `PERSON` and `employer` is `ORGANIZATION`. Case
+  numbers and the demographic labels are ignore regions. Like TAB, the text is real and
+  never committed.
 - **`tab-echr`**: real, long legal text with names of applicants, lawyers, judges and
   witnesses. It is a names stressor that nobody generated.
 

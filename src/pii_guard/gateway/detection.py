@@ -199,6 +199,28 @@ def build_mode_detectors(
     """
     if base is None:
         base = build_detectors(stack.default_detector_names(settings), settings)
+    from pii_guard.detection_profile import is_local_only, require_detector_instance
+
+    if is_local_only(settings):
+        for detector in base:
+            require_detector_instance(settings, detector)
+        policies = gateway_policies(settings, config)
+        pipeline = DetectionPipeline(
+            [_Timed(_CheckedBatch(d)) for d in base], keep_types=policies.keep_types
+        )
+        return {
+            Mode.FAST: ModeDetector(
+                Mode.FAST,
+                pipeline,
+                "local-only:"
+                + ",".join(d.name for d in base)
+                + ";policies="
+                + policies.fingerprint(),
+                policies,
+                unavailable_reason(base),
+                batches=True,
+            )
+        }
     if llm_detector is None:
         from pii_guard.detect.llm import LlmDetector
 

@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
     # the gateway fast-mode stack, rules + ner when available (pii_guard.detect.stack).
     detectors: Annotated[tuple[str, ...] | None, NoDecode] = None
+    # A processing constraint, independent of the masked downstream LLM destination.
+    detection_profile: Literal["standard", "local-only"] = "standard"
     # "TYPE=mask|keep|block,..." on top of the defaults in docs/entities.md.
     policy_overrides: Annotated[dict[EntityType, Policy], NoDecode] = Field(default_factory=dict)
     # Deprecated (use policy_overrides): types to keep, the rest of the default keeps masked.
@@ -63,7 +65,7 @@ class Settings(BaseSettings):
     ner_model: str | None = None
     ner_revision: str | None = None
     ner_device: str | None = None
-    ner_published_model: str = "hdkiller/pii-guard-ner-xlmr-base"
+    ner_published_model: str = "watt-mind/pii-guard-ner-xlmr-base"
     ner_fallback: Literal["download", "cached", "off"] = "download"
     # Without ner_model, the resolved model loads (and downloads) in the background at startup
     # (LAB-1303); a detecting request that arrives meanwhile waits up to this many seconds,
