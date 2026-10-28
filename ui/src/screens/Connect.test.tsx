@@ -231,8 +231,15 @@ describe("connect api helpers", () => {
   it("tells a pass-through endpoint's client to fill in its own model (LAB-1451)", async () => {
     const load = vi.fn<SnippetsLoader>((q) => Promise.resolve({ state: "ok", snippets: snippetsFor(q.session, { model: null, models: [], endpoint: { id: "ep-one", name: "Agents", model: null } }) }));
     render(<Connect status={okStatus} traffic={live()} loadSnippets={load} />);
-    expect(await screen.findByText(/This endpoint lets your client choose the model/)).toBeInTheDocument();
+    expect(await screen.findByText(/This endpoint lets your client choose the model/)).toHaveTextContent("a model ID your endpoint serves");
     expect(screen.queryByText(/The gateway lists no model yet/)).not.toBeInTheDocument();
+  });
+
+  it("gives a pass-through endpoint's client an example model for its provider (LAB-1451)", async () => {
+    const upstream = { connected: true, mock: false, origin: null, preset: "openai", label: "OpenAI" };
+    const load = vi.fn<SnippetsLoader>((q) => Promise.resolve({ state: "ok", snippets: snippetsFor(q.session, { model: null, models: [], upstream, endpoint: { id: "ep-one", name: "Agents", model: null } }) }));
+    render(<Connect status={okStatus} traffic={live()} loadSnippets={load} />);
+    expect(await screen.findByText(/This endpoint lets your client choose the model/)).toHaveTextContent("for example gpt-4.1-mini");
   });
 });
 

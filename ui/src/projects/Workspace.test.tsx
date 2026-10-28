@@ -262,8 +262,11 @@ describe("project workspace", () => {
       const field = within(form).getByRole("textbox", { name: "Model (optional)" });
       expect(field).not.toBeRequired();
       expect(within(form).getByText("Leave empty to let your client choose, e.g. Codex or Muse Code.")).toBeInTheDocument();
-      expect(within(form).queryByRole("button", { name: /Load models/ })).not.toBeInTheDocument();
+      expect(within(form).getByRole("button", { name: "Load models from OpenAI" })).toBeDisabled();
+      expect(within(form).getByText("Enter the provider API key to load models.")).toBeInTheDocument();
       await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-fictional");
+      expect(within(form).getByRole("button", { name: "Load models from OpenAI" })).toBeEnabled();
+      expect(within(form).queryByText("Enter the provider API key to load models.")).not.toBeInTheDocument();
       await user.click(within(form).getByRole("button", { name: "Create endpoint" }));
       await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints", expect.objectContaining({ name: "Agent endpoint", model: null, api_key: "sk-test-fictional" }), "POST"));
     });
@@ -275,6 +278,7 @@ describe("project workspace", () => {
       expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/models", { provider: "openai", api_key: "sk-test-fictional" }, "POST");
       const select = await within(form).findByRole("combobox", { name: "Model (optional)" });
       expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["Client chooses (no pinned model)", "synthetic-a", "synthetic-b", "Other model ID…"]);
+      expect(within(form).getByText("Pick ‘Client chooses’ to let Codex or Muse Code send their own model.")).toBeInTheDocument();
       await user.selectOptions(select, "synthetic-b");
       await user.click(within(form).getByRole("button", { name: "Create endpoint" }));
       await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints", expect.objectContaining({ model: "synthetic-b" }), "POST"));
@@ -296,6 +300,24 @@ describe("project workspace", () => {
       await user.click(within(form).getByRole("button", { name: "Load models from OpenAI" }));
       expect(await within(form).findByText("OpenAI did not list its models. Type a model ID, or leave it empty.")).toBeInTheDocument();
       expect(within(form).getByRole("textbox", { name: "Model (optional)" })).toBeInTheDocument();
+    });
+
+    it("asks to check the API key when the provider refuses it", async () => {
+      const call = catalogFixture(new ApiError(502, "upstream_credential_rejected", "The provider refused the API key")); const { user, form } = await openCreate(call);
+      await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-wrong");
+      await user.click(within(form).getByRole("button", { name: "Load models from OpenAI" }));
+      expect(await within(form).findByText(/OpenAI refused the API key\. Check the API key/)).toBeInTheDocument();
+    });
+
+    it("names a custom provider's load button for its endpoint and waits for its base URL", async () => {
+      const call = catalogFixture(["synthetic-a"]); const { user, form } = await openCreate(call);
+      await user.selectOptions(within(form).getByRole("combobox", { name: "Provider" }), "custom");
+      await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-fictional");
+      expect(within(form).getByRole("button", { name: "Load models from this endpoint" })).toBeDisabled();
+      expect(within(form).getByText("Enter the base URL and provider API key to load models.")).toBeInTheDocument();
+      await user.type(within(form).getByLabelText(/^Upstream base URL/), "https://models.example.com/v1");
+      await user.click(within(form).getByRole("button", { name: "Load models from this endpoint" }));
+      expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/models", { provider: "custom", base_url: "https://models.example.com/v1", api_key: "sk-test-fictional" }, "POST");
     });
 
     it("edits with the stored key: asks by endpoint id and keeps the pinned model listed", async () => {
@@ -331,7 +353,7 @@ describe("project workspace", () => {
       await user.click(screen.getByRole("button", { name: "Connect & keys for Synthetic support" }));
       const panel = screen.getByRole("region", { name: "Connect Synthetic support" });
       expect(within(panel).getByText(/model="<model-id>"/)).toBeInTheDocument();
-      expect(within(panel).getByText(/has no pinned model/)).toBeInTheDocument();
+      expect(within(panel).getByText(/has no pinned model/)).toHaveTextContent("for example gpt-4.1-mini");
     });
   });
 });

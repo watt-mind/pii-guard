@@ -19,3 +19,13 @@ export const projectPath = (id: string) => `/v1/projects/${encodeURIComponent(id
 /** `POST …/endpoints/models`: model ids for the endpoint form (provider catalog or allow-list). */
 export interface EndpointModels { models: string[] }
 export interface EndpointModelsQuery { provider: string; base_url?: string; api_key?: string; endpoint_id?: string }
+
+/** An illustrative model ID per provider for pass-through hints ("for example …"); none for custom. */
+const EXAMPLE_MODEL: Record<string, string> = {
+  meta: "muse-spark-1.3",
+  sponsored: "muse-spark-1.3",
+  openai: "gpt-4.1-mini",
+  fireworks: "accounts/fireworks/models/llama-v3p1-8b-instruct",
+  openrouter: "openai/gpt-4.1-mini",
+};
+export const exampleModel = (provider: string | null | undefined): string | null => (provider ? EXAMPLE_MODEL[provider] ?? null : null);

@@ -7,7 +7,7 @@ import { localRequest } from "./request";
 import { request, recovery, type Requester } from "../hosted/api";
 import { useHostedSession } from "../hosted/session";
 import { setSelectedEndpoint } from "./selection";
-import { projectPath, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList } from "./api";
+import { exampleModel, projectPath, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList } from "./api";
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
 
@@ -368,20 +368,23 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
   const [secret, setSecret] = useState("");
   // Model choices: the provider's catalog (asked on request) or the sponsored allow-list.
   const [models, setModels] = useState<string[] | null>(null);
-  const [modelsState, setModelsState] = useState<"idle" | "loading" | "failed">("idle");
+  const [modelsState, setModelsState] = useState<"idle" | "loading" | "failed" | "rejected">("idle");
   const [typing, setTyping] = useState(false);
   const isSponsored = provider === "sponsored";
   const storedKey = Boolean(endpoint?.credential_configured && endpoint.provider === provider && (provider !== "custom" || endpoint.base_url === baseUrl));
   const canLoadModels = !isSponsored && (Boolean(secret) || storedKey) && (provider !== "custom" || Boolean(baseUrl));
+  const loadBlocked = provider === "custom" && !baseUrl ? "Enter the base URL and provider API key to load models." : "Enter the provider API key to load models.";
+  const loadLabel = provider === "custom" ? "Load models from this endpoint" : `Load models from ${providerLabel(provider)}`;
+  const listing = Boolean(models && models.length && !typing);
   async function loadModels() {
     setModelsState("loading");
     try {
       const query: EndpointModelsQuery = { provider, ...(provider === "custom" ? { base_url: baseUrl } : {}), ...(secret ? { api_key: secret } : endpoint ? { endpoint_id: endpoint.id } : {}) };
       setModels((await catalog(query)).models);
       setModelsState("idle");
-    } catch {
+    } catch (e) {
       setModels(null);
-      setModelsState("failed");
+      setModelsState(e instanceof ApiError && e.code === "upstream_credential_rejected" ? "rejected" : "failed");
     }
   }
   // Sponsored needs no key: its allow-list loads as soon as it is the provider.
@@ -446,11 +449,13 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
             </Field>
           ) : (
             <Field label="Model (optional)" hint={
-                modelsState === "failed" ? `${providerLabel(provider)} did not list its models. Type a model ID, or leave it empty.`
-                  : models && !models.length ? `${providerLabel(provider)} listed no models. Type a model ID, or leave it empty.`
-                    : "Leave empty to let your client choose, e.g. Codex or Muse Code."
+                modelsState === "rejected" ? `${providerLabel(provider)} refused the API key. Check the API key, then load again, or type a model ID.`
+                  : modelsState === "failed" ? `${providerLabel(provider)} did not list its models. Type a model ID, or leave it empty.`
+                    : models && !models.length ? `${providerLabel(provider)} listed no models. Type a model ID, or leave it empty.`
+                      : listing ? "Pick ‘Client chooses’ to let Codex or Muse Code send their own model."
+                        : "Leave empty to let your client choose, e.g. Codex or Muse Code."
               }>
-              {models && models.length && !typing ? (
+              {listing && models ? (
                 <Select value={model} onChange={(e) => { if (e.target.value === OTHER_MODEL) setTyping(true); else setModel(e.target.value); }}>
                   <option value="">Client chooses (no pinned model)</option>
                   {[...(model && !models.includes(model) ? [model] : []), ...models].map((m) => <option key={m} value={m}>{m}</option>)}
@@ -459,12 +464,11 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
               ) : (
                 <Input maxLength={256} value={model} onChange={(e) => setModel(e.target.value)} placeholder="Client chooses" />
               )}
-              {(canLoadModels || (models && models.length > 0)) && (
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {canLoadModels && <Button size="sm" busy={modelsState === "loading"} onClick={() => { setTyping(false); void loadModels(); }}>{modelsState === "loading" ? "Loading models…" : models ? "Reload models" : `Load models from ${providerLabel(provider)}`}</Button>}
-                  {models && models.length > 0 && typing && <Button size="sm" variant="ghost" onClick={() => setTyping(false)}>Choose from the list</Button>}
-                </div>
-              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button size="sm" className="max-sm:h-11" busy={modelsState === "loading"} disabled={!canLoadModels} onClick={() => { setTyping(false); void loadModels(); }}>{modelsState === "loading" ? "Loading models…" : models ? "Reload models" : loadLabel}</Button>
+                {models && models.length > 0 && typing && <Button size="sm" variant="ghost" className="max-sm:h-11" onClick={() => setTyping(false)}>Choose from the list</Button>}
+                {!canLoadModels && <p className="text-xs text-muted">{loadBlocked}</p>}
+              </div>
             </Field>
           )}
           {provider !== "sponsored" && (
@@ -641,7 +645,7 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
           <p role="status" className="text-xs text-muted">{copied}</p>
         </div>
         <pre className="overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-ui whitespace-pre text-ink sm:p-4">{snippet}</pre>
-        {!endpoint.model && <p className="text-xs text-muted">This endpoint has no pinned model: replace <span className="font-mono">&lt;model-id&gt;</span> with the model your client uses.</p>}
+        {!endpoint.model && <p className="text-xs text-muted">This endpoint has no pinned model: replace <span className="font-mono">&lt;model-id&gt;</span> with the model your client uses{exampleModel(endpoint.provider) ? <>, for example <span className="font-mono">{exampleModel(endpoint.provider)}</span></> : " (a model ID this endpoint serves)"}.</p>}
       </div>
 
       <div className="mt-6 space-y-4 border-t border-line pt-5">
