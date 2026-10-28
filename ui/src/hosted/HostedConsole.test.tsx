@@ -284,7 +284,7 @@ describe("hosted console for a signed-in owner", () => {
 
   it("keeps the public page for anonymous visitors", async () => {
     renderHosted(requester(false));
-    expect(await screen.findByRole("link", { name: "Continue with Google" })).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23overview");
+    expect((await screen.findAllByRole("link", { name: "Sign in with Google" }))[0]).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23overview");
     expect(screen.queryByRole("navigation", { name: "Console" })).not.toBeInTheDocument();
   });
 

@@ -219,6 +219,11 @@ merged.
 - **Hosted landing:** the console's tokens (`.hosted` maps its variables onto `--ink`,
   `--surface` and the rest), so it follows the light and dark theme; body 14 px, section titles
   24/500 with no tracking, and the same `Button`, `ButtonLink`, `Field` and `Select`.
+  The hosted build follows the system theme until a visitor picks one (the local console
+  starts light). The landing's demo marks what happened to each value with its own three
+  highlights: personal data in your text on `--danger-soft`, the placeholder the model sees in
+  plum (`--accent-soft` / `--accent-ink`) and the value put back on `--guard-soft`; steps 2 and 3
+  sit inside a dashed `--model` band labelled as the model boundary.
 
 ## Motion
 

@@ -9,6 +9,9 @@ import { defineConfig, type Plugin } from "vite";
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
+// index.html reads %VITE_PII_GUARD_HOSTED% (the theme default); a local build sets it to "false".
+process.env.VITE_PII_GUARD_HOSTED ??= "false";
+
 /**
  * `virtual:pii-guard/benchmarks-index`: the benchmark index, built from the committed run
  * records when the UI is built, served or tested. It used to be committed as
@@ -72,6 +75,22 @@ function benchmarksIndex(): Plugin {
   };
 }
 
+/**
+ * `robots.txt`, written at build time: `VITE_PII_GUARD_ROBOTS=allow` lets crawlers index the
+ * public landing (the production hosted build); anything else, the default, disallows all,
+ * so dev and local builds stay out of search results (docs/hosted.md, "Build and configuration").
+ */
+function robots(): Plugin {
+  return {
+    name: "pii-guard-robots",
+    apply: "build",
+    generateBundle() {
+      const allow = process.env.VITE_PII_GUARD_ROBOTS === "allow";
+      this.emitFile({ type: "asset", fileName: "robots.txt", source: `User-agent: *\n${allow ? "Allow: /" : "Disallow: /"}\n` });
+    },
+  };
+}
+
 // The UI never talks to model providers. It only reaches the pii-guard API,
 // through this proxy, so the browser stays same-origin.
 const API_TARGET = process.env.PII_GUARD_API_URL ?? "http://127.0.0.1:8787";
@@ -84,7 +103,7 @@ const proxy = {
 };
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), benchmarksIndex()],
+  plugins: [react(), tailwindcss(), benchmarksIndex(), robots()],
   server: { port: 5173, strictPort: true, proxy },
   preview: { port: 4173, proxy },
   test: {
