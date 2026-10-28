@@ -35,13 +35,26 @@ function subscribeHash(listener: () => void) {
 }
 export const useHash = () => useSyncExternalStore(subscribeHash, () => globalThis.location?.hash ?? "", () => "");
 
-// The provider connection the Playground's Chat sends through. Tab memory only, like the project.
-let connection = "";
+// The provider connection the Playground's Chat sends through. Per tab, like the project.
+// Kept in sessionStorage (an id, never the key) so a reload keeps the choice in this tab.
+const CONNECTION_KEY = "pii-guard:playground-connection";
+let connection = (() => {
+  try {
+    return globalThis.sessionStorage?.getItem(CONNECTION_KEY) ?? "";
+  } catch {
+    return "";
+  }
+})();
 const listeners = new Set<() => void>();
 export const getPlaygroundConnection = () => connection;
 export function setPlaygroundConnection(id: string) {
   if (connection === id) return;
   connection = id;
+  try {
+    globalThis.sessionStorage?.setItem(CONNECTION_KEY, id);
+  } catch {
+    // storage can be blocked; the choice still holds for this page
+  }
   for (const listener of listeners) listener();
 }
 const subscribeConnection = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };

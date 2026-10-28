@@ -104,7 +104,7 @@ describe("Benchmarks screen", () => {
   it("picks systems, sorts columns, and asks for a system when none is left", async () => {
     const { user, panel } = await openBenchmarks();
     await within(panel).findByRole("region", { name: "Results" });
-    await user.click(within(panel).getByRole("button", { name: "All" }));
+    await user.click(within(panel).getByRole("button", { name: "Select all" }));
     const all = INDEX.snapshots.filter((s) => s.fixture_set === "smoke").length;
     expect(rowNames(resultsTable(panel))).toHaveLength(all);
 
@@ -118,7 +118,7 @@ describe("Benchmarks screen", () => {
       if ((box as HTMLInputElement).checked) await user.click(box);
     }
     expect(within(panel).getByText("Pick at least one system to compare.")).toBeInTheDocument();
-    await user.click(within(panel).getByRole("button", { name: "Featured" }));
+    await user.click(within(panel).getByRole("button", { name: "Select featured" }));
     expect(within(panel).getByRole("region", { name: "Results" })).toBeInTheDocument();
     // Clicks every system checkbox: with the 13 NER v2 candidates (LAB-1150) this takes ~2 s
     // locally and over 5 s on CI runners.
@@ -168,7 +168,7 @@ describe("Benchmarks screen, critique round", () => {
     const caveats = () => within(panel).getByText("Where these ran, and caveats").closest("details")!;
     expect(caveats()).not.toHaveAttribute("open");
     await user.click(within(panel).getByRole("radio", { name: /^synth-dev/ }));
-    await user.click(within(panel).getByRole("button", { name: "All" }));
+    await user.click(within(panel).getByRole("button", { name: "Select all" }));
     expect(caveats()).toHaveAttribute("open");
     expect(caveats()).toHaveTextContent(/trained on the seed-7 synthetic split/);
     expect(within(panel).getByText(/open-source tools weren’t run on this set/)).toBeInTheDocument();

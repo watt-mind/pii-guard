@@ -26,12 +26,12 @@ export function ProfileMenu({ session }: { session: HostedSession }) {
       <button
         {...triggerProps}
         aria-label={shown ? `Account menu for ${shown}` : "Account menu"}
-        className="grid size-11 place-items-center rounded-full lg:size-9 border border-accent/25 bg-accent-soft text-sm font-medium text-accent-ink transition-shadow hover:shadow-[0_0_0_3px_var(--accent-soft)] aria-expanded:shadow-[0_0_0_3px_var(--accent-soft)]"
+        className="grid size-9 place-items-center rounded-full pointer-coarse:size-11 border border-accent/25 bg-accent-soft text-sm font-medium text-accent-ink transition-shadow hover:shadow-[0_0_0_3px_var(--accent-soft)] aria-expanded:shadow-[0_0_0_3px_var(--accent-soft)]"
       >
         {initial ? (
           <span aria-hidden="true">{initial}</span>
         ) : (
-          <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M8 8a2.75 2.75 0 1 0 0-5.5A2.75 2.75 0 0 0 8 8ZM3 13.5c.6-2.4 2.6-3.75 5-3.75s4.4 1.35 5 3.75" />
           </svg>
         )}

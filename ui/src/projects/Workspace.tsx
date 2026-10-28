@@ -5,6 +5,8 @@ import { ApiError } from "../api/http";
 import { Announcer, Button, Card, Checkbox, ConfirmAction, Field, Input, Notice, PageHeader, SecretReveal, Select } from "../components/ui";
 import { localRequest } from "./request";
 import { request, recovery, type Requester } from "../hosted/api";
+import { useHostedSession } from "../hosted/session";
+import { setSelectedEndpoint } from "./selection";
 import { projectPath, type Endpoint, type EndpointKey, type PolicyVersion, type Project, type ProjectList } from "./api";
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
@@ -15,9 +17,13 @@ const configurationRecovery = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ?
     if (error.status === 401 || error.status === 403) return "The guard refused owner access. Open Local guard access and enter the owner API token configured on this server, then retry. Check that you are using the guard’s current address.";
     if (error.status === 400 || error.status === 422) return "The guard refused these settings. Check the form and try again.";
     if (error.status === 404) return "This project or endpoint is unavailable. Reload the project list and check that the guard supports project configuration.";
+    if (error.status === 503 && error.code === "project_storage_unavailable") return "The guard is up, but its project storage is not configured or not reachable. Check the server's project storage settings, then retry.";
   }
   return "The guard could not complete this request. Check its connection and retry.";
 };
+
+/** The confirmation of a project just created, across the console's remount on the new scope. */
+let carried: string | null = null;
 
 interface Props { call?: Requester; hosted?: boolean; projectId?: string; onProject?: (project: Project) => void }
 const defaults = Object.fromEntries(TEXT_ENTITY_TYPES.map((type) => [type, ENTITY_META[type].policy])) as Record<TextEntityType, Policy>;
@@ -67,9 +73,14 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
   const [selected, setSelected] = useState(projectId ?? "");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
-  const [created, setCreated] = useState("");
+  // A new project becomes the console's scope, which remounts the console: its confirmation and
+  // the focus move are carried across that remount.
+  const [created, setCreated] = useState(() => carried ?? "");
+  const [refocus] = useState(() => carried !== null);
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(0);
+  const focusLater = useFocusLater();
+  const projectSelect = useRef<HTMLSelectElement>(null);
   useEffect(() => {
     let active = true;
     call<ProjectList>("/v1/projects").then((data) => {
@@ -83,6 +94,13 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
     return () => { active = false; };
   }, [call, projectId, onProject, retry, hosted]);
   const project = projects.find((p) => p.id === selected);
+  // Read once, at mount (above); cleared when this instance goes, so it never reaches a later mount.
+  useEffect(() => () => {
+    carried = null;
+  }, []);
+  useEffect(() => {
+    if (refocus && projects.length) projectSelect.current?.focus();
+  }, [refocus, projects.length]);
   return (
     <div className="space-y-6">
       <PageHeader title="Projects" lead="Keep each application’s endpoints, endpoint keys and policies together. Every endpoint pins one upstream, one model and one policy version." />
@@ -96,7 +114,7 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
         <Card title="Project" subtitle="Endpoints, keys and policies below belong to the current project.">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Current project">
-              <Select value={selected} disabled={busy} onChange={(e) => { const next = projects.find((p) => p.id === e.target.value)!; setSelected(next.id); setCreated(""); onProject?.(next); }}>
+              <Select ref={projectSelect} value={selected} disabled={busy} onChange={(e) => { const next = projects.find((p) => p.id === e.target.value)!; setSelected(next.id); setCreated(""); onProject?.(next); }}>
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
             </Field>
@@ -108,8 +126,12 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
                 if (!wanted) return;
                 setBusy(true); setError(""); setCreated("");
                 void call<Project>("/v1/projects", { name }).then((next) => {
-                  setProjects((prev) => [...prev, next]); setSelected(next.id); setName(""); onProject?.(next);
-                  setCreated(`Project '${next.name || wanted}' created.`);
+                  const message = `Project '${next.name || wanted}' created.`;
+                  carried = message;
+                  setProjects((prev) => [...prev, next]); setSelected(next.id); setName(""); setCreated(message);
+                  // The submit button is disabled again (empty name): focus moves to the new project.
+                  focusLater(() => projectSelect.current);
+                  onProject?.(next);
                 }).catch((e: unknown) => setError(configurationRecovery(e, hosted))).finally(() => setBusy(false));
               }}
             >
@@ -128,7 +150,7 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
   );
 }
 
-type Notified = { area: "endpoints" | "policies"; text: string } | null;
+type Notified = { area: "endpoints" | "policies"; text: string; endpointId?: string } | null;
 interface EndpointBody { name: string; provider: string; model: string; policy_version_id: string; enabled: boolean; base_url?: string; api_key?: string }
 interface PolicyBody { name: string; entity_policies: Record<TextEntityType, Policy>; language: string; mode: string }
 
@@ -174,7 +196,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted">Configuration is saved by the guard. Restoration mappings and activity remain temporary.{hosted && " This hosted preview supports text only."}</p>
+      <p className="text-sm text-muted">Configuration is saved by the guard. Restoration mappings and activity remain temporary. Create a policy first: every endpoint pins one policy version.</p>
       {error && (
         <Notice tone="danger" live action={<Button size="sm" busy={busy} onClick={() => void action(reload)}>Reload configuration</Button>}>
           {error}
@@ -183,82 +205,10 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
       {!loaded && !error && <p role="status" className="text-sm text-muted">Loading endpoints and policies…</p>}
 
       <Card
-        title="Gateway endpoints"
-        titleId={ENDPOINTS_TITLE}
-        subtitle="One upstream, model and pinned policy version per endpoint."
-        actions={
-          <Button ref={createEndpointRef} busy={busy} disabled={!loaded || !policies.length} aria-describedby={loaded && !policies.length ? noPolicyHint : undefined} onClick={() => openEndpointForm("new")}>
-            Create endpoint
-          </Button>
-        }
-      >
-        {loaded && !policies.length && <p id={noPolicyHint} className="mb-3 text-xs text-muted">Create a policy first: every endpoint pins one policy version.</p>}
-        {notice?.area === "endpoints" && <Notice tone="success" live className="mb-4">{notice.text}</Notice>}
-        {loaded && !endpoints.length && <p className="text-sm text-muted">No endpoints yet. Create one, then create an endpoint key to connect your application.</p>}
-        {endpoints.length > 0 && (
-          <ul className={LIST}>
-            {endpoints.map((endpoint) => (
-              <li key={endpoint.id} className={ROW}>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-medium text-ink break-words">
-                    {endpoint.name}
-                    {!endpoint.enabled && <span className="ml-1.5 font-normal text-muted">· Disabled</span>}
-                  </h3>
-                  <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · <span className="font-mono text-xs">{endpoint.model}</span></p>
-                  <p className="text-sm text-muted">{policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
-                    Connect & keys
-                  </Button>
-                  <Button
-                    size="sm"
-                    busy={busy}
-                    aria-label={`Edit ${endpoint.name}`}
-                    ref={(el) => { if (el) editRefs.current.set(endpoint.id, el); else editRefs.current.delete(endpoint.id); }}
-                    onClick={() => openEndpointForm(endpoint)}
-                  >
-                    Edit
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {endpointEdit && (
-        <EndpointForm
-          key={`endpoint-form-${typeof endpointEdit === "string" ? "new" : endpointEdit.id}`}
-          endpoint={endpointEdit === "new" ? undefined : endpointEdit}
-          policies={policies}
-          busy={busy}
-          hosted={hosted}
-          onCancel={closeEndpointForm}
-          onSave={(body) => action(async () => {
-            const creating = endpointEdit === "new";
-            await call(creating ? `${base}/endpoints` : `${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, body, creating ? "POST" : "PUT");
-            await reload();
-            setEndpointEdit(null);
-            setNotice({ area: "endpoints", text: `Endpoint '${body.name}' ${creating ? "created" : "saved"}.` });
-            focusLater(byId(ENDPOINTS_TITLE));
-          })}
-          onDisable={endpointEdit === "new" ? undefined : () => action(async () => {
-            await call(`${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, { name: endpointEdit.name, provider: endpointEdit.provider, model: endpointEdit.model, policy_version_id: endpointEdit.policy_version_id, enabled: false, ...(endpointEdit.provider === "custom" ? { base_url: endpointEdit.base_url } : {}) }, "PUT");
-            await reload();
-            setEndpointEdit(null); setInspect("");
-            setNotice({ area: "endpoints", text: `Endpoint '${endpointEdit.name}' disabled. Its endpoint keys are revoked.` });
-            focusLater(byId(ENDPOINTS_TITLE));
-          })}
-        />
-      )}
-      {inspected && <EndpointConnection key={`endpoint-connection-${inspect}`} endpoint={inspected} base={base} call={call} hosted={hosted} />}
-
-      <Card
         title="Reusable policies"
         titleId={POLICIES_TITLE}
         subtitle="Each saved version is immutable. Endpoints keep their assigned version until you explicitly reassign them."
-        actions={<Button ref={createPolicyRef} busy={busy} disabled={!loaded} onClick={() => openPolicyForm("new")}>Create policy</Button>}
+        actions={<Button ref={createPolicyRef} busy={busy} disabled={!loaded || policyEdit === "new"} onClick={() => openPolicyForm("new")}>Create policy</Button>}
       >
         {notice?.area === "policies" && <Notice tone="success" live className="mb-4">{notice.text}</Notice>}
         {loaded && !policies.length && <p className="text-sm text-muted">No policies yet. Create one to choose what each endpoint masks, keeps or blocks.</p>}
@@ -303,6 +253,91 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
           })}
         />
       )}
+
+      <Card
+        title="Gateway endpoints"
+        titleId={ENDPOINTS_TITLE}
+        subtitle="One upstream, model and pinned policy version per endpoint."
+        actions={
+          <Button ref={createEndpointRef} busy={busy} disabled={!loaded || !policies.length || endpointEdit === "new"} aria-describedby={loaded && !policies.length ? noPolicyHint : undefined} onClick={() => openEndpointForm("new")}>
+            Create endpoint
+          </Button>
+        }
+      >
+        {loaded && !policies.length && <p id={noPolicyHint} className="mb-3 text-xs text-muted">Create a policy first: every endpoint pins one policy version.</p>}
+        {notice?.area === "endpoints" && (
+          <Notice
+            tone="success"
+            live
+            className="mb-4"
+            action={notice.endpointId && endpoints.some((e) => e.id === notice.endpointId) ? <Button size="sm" variant="primary" onClick={() => { setInspect(notice.endpointId!); setNotice(null); }}>Create an endpoint key</Button> : undefined}
+          >
+            {notice.text}
+          </Notice>
+        )}
+        {loaded && !endpoints.length && <p className="text-sm text-muted">No endpoints yet. Create one, then create an endpoint key to connect your application.</p>}
+        {endpoints.length > 0 && (
+          <ul className={LIST}>
+            {endpoints.map((endpoint) => (
+              <li key={endpoint.id} className={ROW}>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium text-ink break-words">
+                    {endpoint.name}
+                    {!endpoint.enabled && <span className="ml-1.5 font-normal text-muted">· Disabled</span>}
+                  </h3>
+                  <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · <span className="font-mono text-xs">{endpoint.model}</span></p>
+                  <p className="text-sm text-muted">{policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
+                    Connect & keys
+                  </Button>
+                  <Button
+                    size="sm"
+                    busy={busy}
+                    aria-label={`Edit ${endpoint.name}`}
+                    ref={(el) => { if (el) editRefs.current.set(endpoint.id, el); else editRefs.current.delete(endpoint.id); }}
+                    onClick={() => openEndpointForm(endpoint)}
+                  >
+                    Edit
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {endpointEdit && (
+        <EndpointForm
+          key={`endpoint-form-${typeof endpointEdit === "string" ? "new" : endpointEdit.id}`}
+          endpoint={endpointEdit === "new" ? undefined : endpointEdit}
+          policies={policies}
+          busy={busy}
+          hosted={hosted}
+          onCancel={closeEndpointForm}
+          onSave={(body) => action(async () => {
+            const creating = endpointEdit === "new";
+            const saved = await call<Partial<Endpoint> | undefined>(creating ? `${base}/endpoints` : `${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, body, creating ? "POST" : "PUT");
+            await reload();
+            setEndpointEdit(null);
+            setNotice(
+              creating
+                ? { area: "endpoints", text: `Endpoint '${body.name}' created. Next, create an endpoint key so your application can use it.`, endpointId: saved?.id }
+                : { area: "endpoints", text: `Endpoint '${body.name}' saved.` },
+            );
+            focusLater(byId(ENDPOINTS_TITLE));
+          })}
+          onDisable={endpointEdit === "new" ? undefined : () => action(async () => {
+            await call(`${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, { name: endpointEdit.name, provider: endpointEdit.provider, model: endpointEdit.model, policy_version_id: endpointEdit.policy_version_id, enabled: false, ...(endpointEdit.provider === "custom" ? { base_url: endpointEdit.base_url } : {}) }, "PUT");
+            await reload();
+            setEndpointEdit(null); setInspect("");
+            setNotice({ area: "endpoints", text: `Endpoint '${endpointEdit.name}' disabled. Its endpoint keys are revoked.` });
+            focusLater(byId(ENDPOINTS_TITLE));
+          })}
+        />
+      )}
+      {inspected && <EndpointConnection key={`endpoint-connection-${inspect}`} endpoint={inspected} base={base} call={call} hosted={hosted} />}
     </div>
   );
 }
@@ -318,7 +353,11 @@ function useFocusOnOpen(id: string) {
 
 function EndpointForm({ endpoint, policies, busy, hosted, onSave, onCancel, onDisable }: { endpoint?: Endpoint; policies: PolicyVersion[]; busy: boolean; hosted: boolean; onSave: (body: EndpointBody) => Promise<void>; onCancel: () => void; onDisable?: () => Promise<void> }) {
   const [name, setName] = useState(endpoint?.name ?? "");
-  const [provider, setProvider] = useState(endpoint?.provider ?? "openai");
+  const session = useHostedSession();
+  const sponsored = hosted && session?.account.limits.sponsored_enabled !== false;
+  // Hosted: Sponsored Meta needs no key, so it comes first and is the default for a new endpoint.
+  const [provider, setProvider] = useState(endpoint?.provider ?? (sponsored ? "sponsored" : "openai"));
+  const connected = session?.account.connections.filter((c) => c.provider === provider) ?? [];
   const [model, setModel] = useState(endpoint?.model ?? "");
   const [baseUrl, setBaseUrl] = useState(endpoint?.base_url ?? "");
   const [secret, setSecret] = useState("");
@@ -350,7 +389,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, onSave, onCancel, onDi
           </Field>
           <Field label="Provider" required>
             <Select value={provider} onChange={(e) => { setProvider(e.target.value); setSecret(""); }}>
-              {["meta", "openai", "fireworks", "openrouter", "custom", ...(hosted ? ["sponsored"] : [])].map((value) => <option key={value} value={value}>{providerLabel(value)}</option>)}
+              {[...(hosted ? ["sponsored"] : []), "meta", "openai", "fireworks", "openrouter", "custom"].map((value) => <option key={value} value={value}>{providerLabel(value)}</option>)}
             </Select>
           </Field>
           {provider === "custom" && (
@@ -362,7 +401,13 @@ function EndpointForm({ endpoint, policies, busy, hosted, onSave, onCancel, onDi
             <Input maxLength={200} value={model} onChange={(e) => setModel(e.target.value)} placeholder="example-model-v1" />
           </Field>
           {provider !== "sponsored" && (
-            <Field label={keyLabel} required={requiresCredential} hint={endpoint?.credential_configured ? "A credential is configured. Its value cannot be retrieved." : "The credential is sent to the guard and never saved in browser storage."}>
+            <Field label={keyLabel} required={requiresCredential} hint={
+                endpoint?.credential_configured
+                  ? "A credential is configured. Its value cannot be retrieved."
+                  : connected.length
+                    ? `An endpoint keeps its own key: your ${providerLabel(provider)} connection on Connect is for the Playground only, so enter the key here too. Never saved in browser storage.`
+                    : "The credential is sent to the guard and never saved in browser storage."
+              }>
               <Input type="password" autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} />
             </Field>
           )}
@@ -487,6 +532,7 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
   const [announce, setAnnounce] = useState("");
   const keysTitle = useId();
   const disabledHint = useId();
+  const keyHint = useId();
   const focusLater = useFocusLater();
   const keyPath = `${base}/endpoints/${encodeURIComponent(endpoint.id)}/keys`;
   useEffect(() => { let active = true; call<{ keys: EndpointKey[] }>(keyPath).then((data) => { if (!Array.isArray(data.keys)) throw new Error("Invalid keys"); if (active) { setKeys(data.keys); setLoaded(true); } }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); }); return () => { active = false; }; }, [call, keyPath, hosted]);
@@ -511,9 +557,23 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => copy(url, "URL")}>Copy URL</Button>
           <Button size="sm" onClick={() => copy(snippet, "Snippet")}>Copy Python snippet</Button>
+          {hosted && (
+            <a
+              href="#connect"
+              className="text-sm text-ink underline underline-offset-4"
+              onClick={(e) => {
+                // Open Connect first, then pick this endpoint (the console remounts on the new scope).
+                e.preventDefault();
+                globalThis.location.hash = "#connect";
+                setSelectedEndpoint(endpoint.id);
+              }}
+            >
+              Client setup for this endpoint
+            </a>
+          )}
           <p role="status" className="text-xs text-muted">{copied}</p>
         </div>
-        <pre className="overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-xs whitespace-pre-wrap break-words text-ink sm:p-4">{snippet}</pre>
+        <pre className="overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-ui whitespace-pre text-ink sm:p-4">{snippet}</pre>
       </div>
 
       <div className="mt-6 space-y-4 border-t border-line pt-5">
@@ -533,13 +593,17 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
             });
           }}
         >
-          <Field label="Endpoint key name" required hint={endpoint.enabled ? "Name it after the app that uses it." : undefined} className="min-w-40 flex-1">
-            <Input maxLength={64} value={name} disabled={!endpoint.enabled} onChange={(e) => setName(e.target.value)} />
+          <Field label="Endpoint key name" required className="min-w-40 flex-1">
+            <Input maxLength={64} value={name} disabled={!endpoint.enabled} onChange={(e) => setName(e.target.value)} aria-describedby={endpoint.enabled ? keyHint : disabledHint} />
           </Field>
           <Button variant="primary" type="submit" busy={busy} disabled={!busy && (!name.trim() || !endpoint.enabled)} aria-describedby={endpoint.enabled ? undefined : disabledHint}>
             {busy ? "Working…" : "Create endpoint key"}
           </Button>
-          {!endpoint.enabled && <p id={disabledHint} className="w-full text-xs text-muted">This endpoint is disabled. Re-enable it to create endpoint keys.</p>}
+          {endpoint.enabled ? (
+            <p id={keyHint} className="w-full text-xs text-muted">Name it after the app that uses it.</p>
+          ) : (
+            <p id={disabledHint} className="w-full text-xs text-muted">This endpoint is disabled. Re-enable it to create endpoint keys.</p>
+          )}
         </form>
         {secret && <SecretReveal label={`endpoint key '${secret.name}'`} secret={secret.key} envName="PII_GUARD_ENDPOINT_KEY" onDismiss={() => setSecret(null)} />}
         <Announcer message={announce} />

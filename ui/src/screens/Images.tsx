@@ -7,6 +7,7 @@ import { Boundary } from "../components/Boundary";
 import { Pane } from "../components/Pane";
 import { BlockedNotice, Button, Checkbox, EmptyState, KeyValues, Metric, Select } from "../components/ui";
 import { useHostedSession } from "../hosted/session";
+import { plural } from "../lib/plural";
 import { DEFAULT_IMAGE_SAMPLE, IMAGE_SAMPLES, MAX_UPLOAD_BYTES, UPLOAD_TYPES, type ImageSample } from "../content/imageSamples";
 import { metaFor, modelLabel } from "../lib/entities";
 import {
@@ -213,7 +214,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
       )}
 
       <p className="sr-only" aria-live="polite">
-        {running ? "Masking the image" : summary ? `Image masked: ${summary.masked} regions covered, ${summary.kept} kept` : ""}
+        {running ? "Masking the image" : summary ? `Image masked: ${plural(summary.masked, "region")} covered, ${summary.kept} kept` : ""}
       </p>
 
       <fieldset className="min-w-0">
@@ -288,42 +289,44 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
         )}
       </fieldset>
 
+      {/* The image's controls sit above the panes, so both pane headers hold only their titles
+          and stay the same height at every width (LAB-1448). */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
+        <label htmlFor="image-language" className="text-sm text-muted">
+          Language
+        </label>
+        <div className="w-36">
+          <Select
+            id="image-language"
+            aria-label="Language of the text in the image"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as "hu" | "en")}
+            title="Language of the text printed in the image: decides which rules run on its OCR text"
+          >
+            <option value="hu">Hungarian</option>
+            <option value="en">English</option>
+          </Select>
+        </div>
+        <Button variant="primary" onClick={() => void run()} busy={running}>
+          {running ? "Masking…" : fresh ? "Run again" : "Mask image"}
+          <span aria-hidden="true">→</span>
+        </Button>
+        {data && data.regions.length > 0 && <Checkbox label="Show regions" checked={showRegions} onChange={(e) => setShowRegions(e.target.checked)} className="px-1" />}
+      </div>
+
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         <Pane
           id="image-input"
           side="you"
-          eyebrow="Inside your network"
+          eyebrow={hosted ? "Your input" : "Inside your network"}
           title="Your image"
           className="lg:flex-1"
-          actions={
-            <>
-              <label className="sr-only" htmlFor="image-language">
-                Language of the text in the image
-              </label>
-              <div className="w-32">
-                <Select
-                  id="image-language"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value as "hu" | "en")}
-                  title="Language of the text printed in the image: decides which rules run on its OCR text"
-                >
-                  <option value="hu">Hungarian</option>
-                  <option value="en">English</option>
-                </Select>
-              </div>
-              {data && data.regions.length > 0 && <Checkbox label="Show regions" checked={showRegions} onChange={(e) => setShowRegions(e.target.checked)} className="px-1" />}
-              <Button variant="primary" onClick={() => void run()} busy={running}>
-                {running ? "Masking…" : fresh ? "Run again" : "Mask image"}
-                <span aria-hidden="true">→</span>
-              </Button>
-            </>
-          }
           footer={
             data && data.regions.length > 0 ? (
               <span>Solid outlines: found by the segmenter. Dashed: text found by OCR and a detector. Hover, tap or tab to a region for its type.</span>
             ) : (
               <span>
-                {error ? "Nothing left your network for this image." : src ? "Mask the image to see what the model would get." : "Pick a sample or upload a fictional image, then mask it."}
+                {error ? (hosted ? "Nothing was sent to the model for this image." : "Nothing left your network for this image.") : src ? "Mask the image to see what the model would get." : "Pick a sample or upload a fictional image, then mask it."}
               </span>
             )
           }
@@ -384,11 +387,11 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
           ) : data && result ? (
             <div className="space-y-4">
               {result.engine === "api" && data.image ? (
-                <Figure src={`data:image/png;base64,${data.image}`} alt={`Masked image: ${summary?.masked ?? 0} regions covered.`} testId="masked-image">
+                <Figure src={`data:image/png;base64,${data.image}`} alt={`Masked image: ${plural(summary?.masked ?? 0, "region")} covered.`} testId="masked-image">
                   {active !== null && data.regions[active] && <Highlight region={data.regions[active]} width={data.width} height={data.height} />}
                 </Figure>
               ) : (
-                <Figure src={src} alt={`Masked image (drawn in the browser): ${summary?.masked ?? 0} regions covered.`} testId="demo-masked-image">
+                <Figure src={src} alt={`Masked image (drawn in the browser): ${plural(summary?.masked ?? 0, "region")} covered.`} testId="demo-masked-image">
                   {data.regions.map((r, i) =>
                     r.policy === "mask" ? (
                       <span key={i} aria-hidden="true" data-testid="demo-mask" className="absolute" style={{ ...percentBox(r.box, data.width, data.height, MASK_PADDING), backgroundColor: IMAGE_FILL }} />
@@ -400,13 +403,13 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
               <WhatRan data={data} engine={result.engine} />
             </div>
           ) : (
-            <EmptyState title="Nothing has been sent yet" body="Mask the image to see exactly what would leave your network." />
+            <EmptyState title="Nothing has been sent yet" body={hosted ? "Mask the image to see exactly what the model would get." : "Mask the image to see exactly what would leave your network."} />
           )}
         </Pane>
       </div>
 
       {data && result && !error && (
-        <section aria-labelledby="regions-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 rounded-xl border border-line bg-surface p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+        <section aria-labelledby="regions-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-line pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
           <div className="space-y-4">
             <div>
               <h2 id="regions-title" className="text-lg font-normal text-ink">
@@ -418,14 +421,14 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
             <KeyValues
               items={[
                 { label: "Engine", value: result.engine === "api" ? "pii-guard API" : "Demo engine (recorded regions)" },
-                { label: "Segmentation", value: `${data.analysis.sam.model} · ${summary?.sam ?? 0} ${summary?.sam === 1 ? "region" : "regions"}` },
-                { label: "Text (OCR)", value: data.analysis.ocr.ran ? `${data.analysis.ocr.engine} · ${summary?.ocr ?? 0} regions` : "off" },
+                { label: "Segmentation", value: `${data.analysis.sam.model} · ${plural(summary?.sam ?? 0, "region")}` },
+                { label: "Text (OCR)", value: data.analysis.ocr.ran ? `${data.analysis.ocr.engine} · ${plural(summary?.ocr ?? 0, "region")}` : "off" },
                 { label: "Image", value: <span className="tabular-nums">{data.width} × {data.height} px</span> },
               ]}
             />
           </div>
           <div className="min-w-0">
-            <h3 className="mb-2 text-sm font-medium text-ink">Region list</h3>
+            <h3 className="mb-2 text-lg font-normal text-ink">Region list</h3>
             <RegionTable regions={data.regions} models={data.analysis.ocr.models} active={active} onActive={setActive} />
           </div>
         </section>

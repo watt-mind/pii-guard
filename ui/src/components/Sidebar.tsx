@@ -1,3 +1,4 @@
+import { MENU_OPENED } from "../hooks/useMenu";
 import { useEffect, useId, useRef, useState } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
@@ -31,6 +32,25 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const menuButton = useRef<HTMLButtonElement>(null);
+
+  // A route change from outside the menu (a link, Back, a chart) closes the phone menu.
+  const routeKey = `${route.section}/${route.tab}`;
+  const [shownFor, setShownFor] = useState(routeKey);
+  if (shownFor !== routeKey) {
+    setShownFor(routeKey);
+    setOpen(false);
+  }
+  // So does another menu opening (the profile or project menu: useMenu announces it).
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener(MENU_OPENED, close);
+    window.addEventListener("hashchange", close);
+    return () => {
+      window.removeEventListener(MENU_OPENED, close);
+      window.removeEventListener("hashchange", close);
+    };
+  }, [open]);
 
   // Escape closes the phone menu and returns focus to its button.
   useEffect(() => {
@@ -71,7 +91,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
             onClick={() => setOpen((o) => !o)}
             className={buttonClass("secondary", "md", "lg:hidden")}
           >
-            <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               {open ? <path d="M4 4l8 8M12 4l-8 8" /> : <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />}
             </svg>
             Menu

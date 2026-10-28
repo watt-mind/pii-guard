@@ -135,10 +135,10 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
             Systems
             <span className="flex gap-1">
               <Button variant="ghost" size="sm" onClick={() => setChosen(null)}>
-                Featured
+                Select featured
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setChosen(available)}>
-                All
+                Select all
               </Button>
             </span>
           </legend>
@@ -157,7 +157,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
                         key={k}
                         title={sys?.label}
                         className={[
-                          "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
+                          "relative inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
                           on ? "border-ink bg-surface-2 text-ink" : "border-line text-muted hover:border-line-strong",
                         ].join(" ")}
                       >
@@ -398,16 +398,14 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                 <button
                   type="button"
                   onClick={() => onSort(c)}
-                  className={["inline-flex items-center gap-1 rounded hover:text-ink", c.key === sort.key ? "text-ink" : ""].join(" ")}
+                  className={["group inline-flex items-center gap-1 rounded hover:text-ink", c.key === sort.key ? "text-ink" : ""].join(" ")}
                 >
                   {c.label}
-                  <span aria-hidden="true" className={["w-2.5 text-2xs", c.key === sort.key ? "" : "opacity-0"].join(" ")}>
-                    {sort.dir === "asc" ? "▲" : "▼"}
-                  </span>
+                  <SortIcon state={c.key === sort.key ? sort.dir : null} />
                 </button>
               </th>
             ))}
-            <th scope="col" className="px-2 py-2 text-left font-medium">
+            <th scope="col" className="hidden px-2 py-2 text-left font-medium xl:table-cell">
               Run
             </th>
           </tr>
@@ -417,8 +415,8 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
             const sys = index.systems[s.system];
             return (
               <tr key={s.system} className="border-b border-line last:border-0">
-                <th scope="row" className="sticky left-0 z-10 bg-surface py-2 pr-3 text-left font-medium whitespace-nowrap text-ink">
-                  <span className="flex items-center gap-1.5">
+                <th scope="row" title={sys?.label ?? s.system} className="sticky left-0 z-10 max-w-[9.5rem] bg-surface py-2 pr-3 text-left font-medium whitespace-nowrap text-ink sm:max-w-none">
+                  <span className="flex items-center gap-1.5 overflow-hidden">
                     <MarkerIcon info={sys} />
                     {sys?.short_label ?? s.system}
                     {s.system === FAST_MODE_SYSTEM && (
@@ -445,8 +443,8 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                     </td>
                   );
                 })}
-                <td className="px-2 py-2 text-xs whitespace-nowrap text-muted">
-                  {s.dates.join(", ")} <code className="font-mono">{s.commits.map((c) => c.slice(0, 7)).join(", ")}</code>
+                <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted xl:table-cell" title={`Commit ${s.commits.map((c) => c.slice(0, 7)).join(", ")}`}>
+                  {s.dates.join(", ")}
                 </td>
               </tr>
             );
@@ -589,5 +587,14 @@ function RunLog({ index }: { index: BenchmarkIndex }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Sort state of a column: an up or down chevron when sorted, a faint up-down pair otherwise. */
+function SortIcon({ state }: { state: "asc" | "desc" | null }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" className={["size-3 shrink-0", state ? "" : "opacity-40 group-hover:opacity-80"].join(" ")} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {state === "asc" ? <path d="m4 10 4-4 4 4" /> : state === "desc" ? <path d="m4 6 4 4 4-4" /> : <path d="m5 6 3-3 3 3M5 10l3 3 3-3" />}
+    </svg>
   );
 }

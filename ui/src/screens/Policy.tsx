@@ -25,7 +25,8 @@ const POLICY_CLASS: Record<EntityPolicy, string> = {
   block: "bg-blocked-soft text-blocked ring-blocked/40",
 };
 
-const mono = (s: string) => <code className="font-mono text-xs">{s}</code>;
+// [overflow-wrap:anywhere]: a long override example wraps instead of widening a phone page.
+const mono = (s: string) => <code className="font-mono text-xs [overflow-wrap:anywhere]">{s}</code>;
 
 export function Policy({ status }: PolicyProps) {
   const server = status.state === "ok" && isFullStatus(status.status) ? status.status : null;

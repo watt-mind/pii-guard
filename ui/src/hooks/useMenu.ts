@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
+/** Fired on window when a menu opens, so other open menus (the phone nav) can close. */
+export const MENU_OPENED = "pii-guard-menu-opened";
+
 /** Where focus lands when a menu opens: its first item, its last (ArrowUp), or the checked one. */
 type Start = "first" | "last" | "checked";
 
@@ -25,6 +28,7 @@ export function useMenu() {
   const show = (from: Start) => {
     setStart(from);
     setOpen(true);
+    window.dispatchEvent(new Event(MENU_OPENED));
   };
 
   useEffect(() => {

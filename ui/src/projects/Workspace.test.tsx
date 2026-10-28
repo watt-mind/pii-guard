@@ -187,7 +187,7 @@ describe("project workspace", () => {
     await user.selectOptions(within(form).getByRole("combobox", { name: "Policy version" }), first.policy_version_id);
     await user.click(within(form).getByRole("button", { name: "Create endpoint" }));
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints", expect.objectContaining({ name: "Support assistant", api_key: "sk-test-fictional" }), "POST"));
-    expect(await screen.findByText("Endpoint 'Support assistant' created.")).toBeInTheDocument();
+    expect(await screen.findByText("Endpoint 'Support assistant' created. Next, create an endpoint key so your application can use it.")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("heading", { name: "Gateway endpoints" })).toHaveFocus());
   });
 

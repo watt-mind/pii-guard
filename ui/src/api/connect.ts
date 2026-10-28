@@ -7,6 +7,17 @@ import type { TrafficEvent } from "./traffic";
 
 export type ToolId = "muse-code" | "pi" | "codex" | "opencode" | "curl" | "python" | "claude-code";
 
+/** The client tools the quickstart has a block for, in tab order. */
+export const TOOLS: { id: ToolId; label: string }[] = [
+  { id: "muse-code", label: "Muse Code" },
+  { id: "pi", label: "pi" },
+  { id: "codex", label: "Codex" },
+  { id: "opencode", label: "OpenCode" },
+  { id: "curl", label: "cURL" },
+  { id: "python", label: "Python" },
+  { id: "claude-code", label: "Claude Code" },
+];
+
 export interface ToolSnippet {
   id: ToolId | string;
   label: string;

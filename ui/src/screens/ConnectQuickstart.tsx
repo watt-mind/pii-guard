@@ -1,20 +1,11 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
-import { firstRequest, loadSnippets, newSessionId, type Snippets, type SnippetsLoader, type SnippetsResult, type ToolId, type ToolSnippet } from "../api/connect";
+import { TOOLS, firstRequest, loadSnippets, newSessionId, type Snippets, type SnippetsLoader, type SnippetsResult, type ToolId, type ToolSnippet } from "../api/connect";
 import type { TrafficEvent, TrafficStatus } from "../api/traffic";
 import { Button, SegmentedControl, Select } from "../components/ui";
 import { readPref, writePref } from "../lib/storage";
 import { totalMasked } from "../lib/traffic";
 
 /** The tabs, in order, while the server can't be asked (the server's list wins when it answers). */
-const TOOLS: { id: ToolId; label: string }[] = [
-  { id: "muse-code", label: "Muse Code" },
-  { id: "pi", label: "pi" },
-  { id: "codex", label: "Codex" },
-  { id: "opencode", label: "OpenCode" },
-  { id: "curl", label: "cURL" },
-  { id: "python", label: "Python" },
-  { id: "claude-code", label: "Claude Code" },
-];
 const isTool = (v: string | null): v is ToolId => TOOLS.some((t) => t.id === v);
 const SESSION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -119,7 +110,7 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: ToolId; label: string }[
     document.getElementById(`quickstart-tab-${next.id}`)?.focus();
   };
   return (
-    <div role="tablist" aria-label="Your tool" className="-mx-1 mt-3 flex gap-1 overflow-x-auto">
+    <div role="tablist" aria-label="Your tool" className="-mx-1 mt-3 flex gap-1 overflow-x-auto [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:[mask-image:none]">
       {tabs.map((t) => {
         const selected = t.id === tool;
         return (
@@ -173,7 +164,7 @@ function StartStep({ snippets }: { snippets: Snippets }) {
         )}
       </p>
       {presets.length > 1 && preset && (
-        <SegmentedControl label="Model provider" size="sm" options={presets.map((p) => ({ value: p.id, label: p.label }))} value={preset.id} onChange={setChosen} className="flex-wrap" />
+        <SegmentedControl label="Model provider" size="sm" options={presets.map((p) => ({ value: p.id, label: p.label }))} value={preset.id} onChange={setChosen} className="overflow-x-auto" />
       )}
       {preset && <CodeBlock text={preset.command} label={`Copy the ${preset.label} start command`} />}
       {preset && (
@@ -375,11 +366,11 @@ function Step({ n, title, done = false, children }: { n: number; title: string; 
 export function CodeBlock({ text, label }: { text: string; label: string }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-line bg-surface-2">
-      <div className="flex items-center justify-between gap-2 border-b border-line py-1 pr-1 pl-3">
+      <div className="flex items-center justify-between gap-2 border-b border-line py-1 pr-1.5 pl-3 pointer-coarse:pr-2">
         <span className="text-2xs text-muted">{text.startsWith("import ") || text.startsWith("from ") ? "Python" : "Terminal"}</span>
         <CopyButton text={text} label={label} />
       </div>
-      <pre className="min-w-0 overflow-x-auto px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre text-ink">{text}</pre>
+      <pre className="min-w-0 overflow-x-auto px-3 py-2 font-mono text-ui whitespace-pre text-ink">{text}</pre>
     </div>
   );
 }

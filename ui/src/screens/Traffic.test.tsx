@@ -99,7 +99,7 @@ describe("Live traffic", () => {
     f.push([asMasked(huChat)]);
     await screen.findByTestId("masked-request");
     expect(screen.getAllByRole("heading", { level: 1 }).map((h) => h.textContent)).toEqual(["Logs"]);
-    for (const name of ["Original request", "Masked request, as sent upstream", "Response, masked → restored"]) {
+    for (const name of ["Original request", "Masked request", "Response, masked → restored"]) {
       const pane = screen.getByRole("region", { name });
       expect(pane).toHaveAttribute("data-side");
       expect(within(pane).getByRole("heading", { level: 2, name })).toBeInTheDocument();

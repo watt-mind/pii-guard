@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import { Announcer, Button, ButtonLink, ConfirmAction, Field, Input, KeyValues, Metric, Notice, Select } from "../components/ui";
+import { Announcer, Button, ConfirmAction, Field, Input, KeyValues, Metric, Notice, Select } from "../components/ui";
+import { SetupChecklist } from "./SetupChecklist";
 import { recovery, type Account, type Connection, type Requester } from "./api";
 import { getPlaygroundConnection, setPlaygroundConnection, time, useHostedSession, usePlaygroundConnection } from "./session";
 
@@ -27,7 +28,7 @@ export function Limits({ account }: { account: Account }) {
   return (
     <details className="group">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-sm text-sm text-ink pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0 text-muted transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0 text-muted transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="m6 4 4 4-4 4" />
         </svg>
         Current server limits
@@ -76,6 +77,8 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
               if (created?.id) onConnect?.(created.id);
               const label = created?.origin ? connectionLabel({ provider, origin: created.origin }) : providerLabel(provider);
               setConnected(created?.id && onConnect ? `Connected ${label}. Playground chat now sends through it.` : `Connected ${label}.`);
+              // The submit button is disabled again (empty key): move focus to the list it changed.
+              setFocusList((n) => n + 1);
             });
           }}
         >
@@ -139,7 +142,7 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
 }
 
 /** The console's account block (Overview): tier, today's usage, the reset time and the limits. */
-export function AccountSummary() {
+export function AccountSummary({ active = true, calls = 0 }: { active?: boolean; calls?: number }) {
   const session = useHostedSession();
   if (!session) return null;
   const { account, error, refresh } = session;
@@ -161,11 +164,7 @@ export function AccountSummary() {
           {error}
         </Notice>
       )}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {[["#projects", "Create a project"], ["#connect", "Add a provider connection"], ["#playground/text", "Try the playground"]].map(([href, label]) => (
-          <ButtonLink key={href} href={href}>{label}</ButtonLink>
-        ))}
-      </div>
+      <SetupChecklist call={session.call} account={account} active={active} calls={calls} />
       <p className="mt-3 text-xs text-muted">Sessions and provider connections are temporary. A guard restart loses ephemeral state. Every section shows only your own projects, activity and sessions.</p>
     </section>
   );
@@ -181,8 +180,8 @@ export function ProviderConnections() {
   return (
     <section aria-labelledby="connections-title" className="space-y-4">
       <div>
-        <h2 id="connections-title" className="text-lg font-normal text-ink">Provider connections</h2>
-        <p className="mt-0.5 text-sm text-muted">Connect your own model key for the Playground. Endpoint keys for your application are created per endpoint in <a className="underline underline-offset-4" href="#projects">Projects</a>, and shown once.</p>
+        <h2 id="connections-title" className="text-lg font-normal text-ink">Model provider keys for the Playground</h2>
+        <p className="mt-0.5 text-sm text-muted">Connect your own model key for Playground chat. Your application doesn&apos;t use these: it uses an endpoint key from <a className="underline underline-offset-4" href="#projects">Projects</a>, as above.</p>
       </div>
       <div className="space-y-6 rounded-xl border border-line bg-surface p-4 sm:p-5">
         <Field label="Playground chat sends through" className="sm:max-w-md">

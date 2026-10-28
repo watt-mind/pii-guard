@@ -11,6 +11,7 @@ import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
 import { Popover } from "../components/Popover";
 import { BlockedNotice, Button, EmptyState, KeyValues, Metric, Select, Textarea } from "../components/ui";
+import { useHostedSession } from "../hosted/session";
 import { SAMPLES, sampleBehind, type Sample } from "../content/samples";
 import { detectorsUsed, isKept, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
 import type { RunError, RunResult } from "../lib/run";
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue, language, onLanguage, known, onKnown, onTryKnown, knownSignature }: Props) {
+  const hosted = useHostedSession() !== null;
   const [editing, setEditing] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -97,42 +99,47 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
         error={error?.code === "invalid_known_value" && error.knownIndex !== undefined ? { index: error.knownIndex, message: error.message } : null}
       />
 
+      {/* The document's controls sit above the panes, so both pane headers hold only their
+          titles and stay the same height at every width (LAB-1448). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="doc-language" className="text-sm text-muted">
+          Language
+        </label>
+        <div className="w-36">
+          <Select
+            id="doc-language"
+            aria-label="Document language"
+            value={language}
+            onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
+            title="Language of the document: decides which rules and inflections apply"
+          >
+            <option value="hu">Hungarian</option>
+            <option value="en">English</option>
+          </Select>
+        </div>
+        <Button variant="primary" onClick={run} busy={running} disabled={!running && text.trim() === ""} aria-describedby="run-hint">
+          {running ? "Masking…" : fresh ? "Run again" : "Mask document"}
+          <span aria-hidden="true">→</span>
+        </Button>
+      </div>
+
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         <Pane
           id="input"
           side="you"
-          eyebrow="Inside your network"
+          eyebrow={hosted ? "Your input" : "Inside your network"}
           title="Your document"
           className="lg:flex-1"
-          actions={
-            <>
-              <label className="sr-only" htmlFor="doc-language">
-                Document language
-              </label>
-              <div className="w-32">
-                <Select
-                  id="doc-language"
-                  value={language}
-                  onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
-                  title="Language of the document: decides which rules and inflections apply"
-                >
-                  <option value="hu">Hungarian</option>
-                  <option value="en">English</option>
-                </Select>
-              </div>
-              <Button variant="primary" onClick={run} busy={running} disabled={!running && text.trim() === ""} aria-describedby="run-hint">
-                {running ? "Masking…" : fresh ? "Run again" : "Mask document"}
-                <span aria-hidden="true">→</span>
-              </Button>
-            </>
-          }
           footer={
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               {showHighlighted ? (
                 <span className="min-w-0 flex-1">Hover, tap or tab to a highlight to see its type, detector and confidence.</span>
               ) : (
                 <span id="run-hint" className="min-w-0 flex-1">
-                  Paste any text, or pick a sample. Only fictional data, please: this is a demo. <kbd className="rounded border border-line px-1 font-mono text-2xs">⌘/Ctrl ↵</kbd> runs it.
+                  Paste any text, or pick a sample. Only fictional data, please: this is a demo.<span className="pointer-coarse:hidden">
+                    {" "}
+                    <kbd className="rounded border border-line px-1 font-mono text-2xs">⌘/Ctrl ↵</kbd> runs it.
+                  </span>
                 </span>
               )}
               {(showHighlighted || text !== "") && (
@@ -237,7 +244,9 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
               body={
                 result
                   ? "Run the guard again to see what the model would get for this version."
-                  : "Mask the document to see exactly what would leave your network."
+                  : hosted
+                    ? "Mask the document to see exactly what the model would get."
+                    : "Mask the document to see exactly what would leave your network."
               }
             />
           )}
@@ -275,7 +284,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
             </Button>
           </div>
           <div>
-            <h3 className="mb-2 text-sm font-medium text-ink">Placeholder map</h3>
+            <h3 className="mb-2 text-lg font-normal text-ink">Placeholder map</h3>
             <EntityTable entities={result.mask.entities} spans={result.spans} activeKey={activeKey} onActivate={activate} />
           </div>
         </section>
@@ -315,7 +324,8 @@ function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (
           <label
             key={s.id}
             className={[
-              "group flex w-[15rem] shrink-0 cursor-pointer snap-start items-center justify-between gap-3 rounded-lg border border-line px-3.5 py-2.5 text-left transition-colors sm:w-auto",
+              // relative: the sr-only radio is absolute and must stay inside the scroller.
+              "group relative flex w-[15rem] shrink-0 cursor-pointer snap-start items-center justify-between gap-3 rounded-lg border border-line px-3.5 py-2.5 text-left transition-colors sm:w-auto",
               "hover:border-line-strong hover:bg-surface has-[:checked]:border-line-strong has-[:checked]:bg-surface has-[:checked]:shadow-[0_0_0_1px_var(--line-strong)]",
               "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus)]",
             ].join(" ")}

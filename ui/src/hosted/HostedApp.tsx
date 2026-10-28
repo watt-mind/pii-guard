@@ -91,7 +91,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <main id="main">
         <section className="intro">
           <h1>Reduce personal data<br /><span>exposure to AI.</span></h1>
-          <p>A privacy firewall between your application and an AI model. Replace detected personal data with keyed placeholders before forwarding the request, then restore the values in the answer. Built for Hungarian first. The self-hosted stack supports text and image masking; this hosted preview is text-only.</p>
+          <p>A privacy firewall between your application and an AI model. Replace detected personal data with keyed placeholders before forwarding the request, then restore the values in the answer. Built for Hungarian first. The self-hosted stack masks text and images; in this hosted preview, image masking is available after you sign in.</p>
           <p className="compliance-note">Support data minimisation in your privacy and compliance work. pii-guard does not automatically make a deployment GDPR or EU AI Act compliant.</p>
           <div className="actions"><ButtonLink variant="primary" href="#demo">Try the demo ↓</ButtonLink><a href={SOURCE}>Explore on GitHub ↗</a></div>
         </section>
@@ -125,7 +125,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <thead><tr><th scope="col">Mode and availability</th><th scope="col">Where originals are processed</th><th scope="col">Who operates it</th></tr></thead>
             <tbody>
               <tr><th scope="row">Self-hosted<span className="mode-status">Available · open source</span></th><td data-label="Originals">The guard and vault run on your infrastructure. Keeping all raw processing local requires local detectors and models. Some detector services receive originals, including remote SAM image segmentation.</td><td data-label="Operations">You operate the full stack: guard, dashboard and vault. You choose the upstream model and its data-use terms.</td></tr>
-              <tr><th scope="row">Hosted gateway<span className="mode-status">Text-only preview · not publicly live</span></th><td data-label="Originals">Our Azure-hosted guard receives raw prompts and holds the restoration mappings. It masks detected values before forwarding to the upstream model.</td><td data-label="Operations">We operate the guard. You use the hosted interface and choose an available upstream or connect a provider key. Evaluate with synthetic data.</td></tr>
+              <tr><th scope="row">Hosted gateway<span className="mode-status">Preview · text for everyone, images after sign-in</span></th><td data-label="Originals">Our Azure-hosted guard receives raw prompts and holds the restoration mappings. It masks detected values before forwarding to the upstream model.</td><td data-label="Operations">We operate the guard. You use the hosted interface and choose an available upstream or connect a provider key. Evaluate with synthetic data.</td></tr>
             </tbody>
           </table>
         </section>

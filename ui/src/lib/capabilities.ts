@@ -12,7 +12,7 @@ export type Capabilities = Readonly<Record<Capability, boolean>>;
 
 /** The server's own defaults (status.py `capabilities`): the traffic log is off unless configured. */
 export const LOCAL_CAPABILITIES: Capabilities = { text: true, chat: true, images: true, logs: false, vault: true, server_policy: true, projects: true, connect: true, evaluation: true, accounts: false };
-/** Text only, owner-scoped: no image masking and no server policy; each owner has a log and a vault. */
+/** Owner-scoped: no server policy; each owner has a log and a vault. Images only once `/v1/status` reports them. */
 export const HOSTED_CAPABILITIES: Capabilities = { ...LOCAL_CAPABILITIES, images: false, logs: true, server_policy: false, accounts: true };
 
 /**
