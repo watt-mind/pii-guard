@@ -4,6 +4,48 @@ How to run pii-guard end to end on one machine, watch what the gateway does to e
 and measure the latency it adds. Everything here works offline and free: a mock upstream
 stands in for the model unless you configure a real one.
 
+## Hosted secondary abuse admission
+
+Hosted mode has optional network admission in addition to owner/global quotas, concurrent
+work bounds and the finite sponsored allocation. Leave
+`PII_GUARD_HOSTED_CLIENT_IP_SOURCE=off` until the deployed ingress and logging checks below
+pass. The static walkthrough and account/sign-in routes remain available after exhaustion.
+Sponsored budgets remain zero until provider authorization and the separate spend/readiness
+gates are satisfied; enabling a network signal grants no spending authority.
+
+For **direct Azure Container Apps ingress only**, the optional source is
+`aca_xff_rightmost`. Azure documents that ACA appends the rightmost `X-Forwarded-For`
+address and that earlier entries are untrusted ([Azure ingress HTTP headers](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview#http-headers)).
+Do not enable it behind a CDN, another reverse proxy or an alternate direct application
+path without revisiting that trust contract. There is no fallback to the socket peer,
+`Forwarded`, `X-Real-IP` or the first forwarding hop.
+
+Before changing the setting, verify on the real ingress with synthetic requests that
+forged prefixes cannot change the selected network; duplicate, oversized and malformed
+headers fail closed; absent signals refuse anonymous live demo calls while account and
+Google sign-in remain usable; and no alternate application ingress bypasses ACA. Keep
+probe output sanitized: record verdicts and counts, never client addresses, raw headers
+or tokens. Check server, ingress, platform diagnostics, request tracing and crash-report
+logging separately, including whether ACA joins duplicate headers. Disable or redact raw
+address/header retention before enabling the source. Application bucket hashing does
+not remove addresses already captured by infrastructure. Recheck these gates whenever
+the ingress topology or logging configuration changes.
+
+With the source enabled, anonymous demo requests share a 30-request burst refilling
+30/minute and 120 requests per fixed hour starting at bucket creation. Signed-in users
+have independent 10-request bursts refilling 30/minute even on a shared judge network.
+The existing five guest requests/day and other token/cost quotas still apply. New guest
+cookies do not reset a network allowance, and sign-in cannot replenish global sponsorship.
+429 responses include `Retry-After`; hourly anonymous exhaustion asks for Google sign-in
+or the free walkthrough. Missing/untrusted address signals return sanitized 503 errors.
+
+Each in-memory network/principal table is limited to 4096 keyed digests with bounded
+counters/timestamps, one-hour idle expiry and 24-hour absolute expiry. Full tables refuse
+new entries instead of evicting allowances. The HMAC key is random and process-only;
+application abuse buckets retain no raw address. State resets on restart, while the
+separate durable allocation claim still prevents restart from replenishing sponsored
+spend. This is a secondary abuse signal, without an external CAPTCHA or bot-proof claim.
+
 - [Modes](#modes): `fast` (the default) and `audit`
 - [Local-only detection](#local-only-detection): enforced raw-processing boundary
 - [One command](#one-command-pii-guard-up): `uvx ... pii-guard up`, the release wheel, `make wheel`

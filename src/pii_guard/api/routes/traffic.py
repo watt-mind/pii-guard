@@ -44,6 +44,9 @@ class MetricsDisabledError(PiiGuardError):
 
 
 def _observability(request: Request) -> Observability:
+    runtime = getattr(getattr(request, "state", None), "hosted_runtime", None)
+    if runtime is not None:
+        return runtime.observability
     obs = getattr(request.app.state, "observability", None)
     if obs is None:
         obs = Observability()
