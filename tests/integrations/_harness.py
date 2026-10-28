@@ -19,7 +19,7 @@ def assert_scripted(result: RunResult) -> None:
     assert result.refused == 0, result.gateway_statuses  # the allow-list covers its fields
     assert result.gold_upstream == []
     assert result.placeholders_upstream > 0
-    assert result.files_written == ["reply.md"]
+    assert result.files_written == ["reply.md"], result.client_output[-3000:]
     # Tool-call arguments came back restored: the file holds the real (fictional) values.
     assert sorted(result.restored_in_files) == sorted(result.gold_checked)
     assert result.placeholders_in_files == 0

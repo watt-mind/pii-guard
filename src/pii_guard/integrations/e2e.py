@@ -1189,13 +1189,22 @@ def run_codex(
     prompt: str = PROMPT,
     timeout: float = 900,
     version: str = CODEX_VERSION,
+    sandbox: str | None = None,
 ) -> RunResult:
     """Codex through the gateway (Responses API), started with the Connect page's block plus
-    ``exec``: headless, the workspace writable, nothing outside it."""
+    ``exec``: headless, the workspace writable, nothing outside it.
+
+    ``sandbox`` is Codex's ``--sandbox`` mode. The default is ``workspace-write``, except on
+    Linux: there Codex sandboxes commands with bubblewrap, which needs unprivileged user
+    namespaces that hosted CI runners (Ubuntu 24.04's AppArmor default) refuse, so every
+    command would fail. The run happens in a throwaway directory either way, and the result
+    still records each file the agent wrote (``files_written``)."""
+    if sandbox is None:
+        sandbox = "danger-full-access" if sys.platform == "linux" else "workspace-write"
     codex_home = Path(tempfile.mkdtemp(prefix="pii-guard-codex-home-"))
     try:
         tail = (
-            "exec --skip-git-repo-check --sandbox workspace-write --color never "
+            f"exec --skip-git-repo-check --sandbox {sandbox} --color never "
             '"$PII_GUARD_E2E_PROMPT" </dev/null'
         )
         return _run_snippet_client(
