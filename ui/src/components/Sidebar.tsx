@@ -3,6 +3,8 @@ import { engineReason, type EngineDisplay, type EngineState, type ModePreference
 import type { ThemePref } from "../hooks/useTheme";
 import { SECTIONS, hashOf, type Route, type Section } from "../lib/routes";
 import { offersSection, playgroundHint, type Capabilities } from "../lib/capabilities";
+import { Select, SegmentedControl } from "./ui";
+import { buttonClass } from "./controls";
 
 interface Props {
   route: Route;
@@ -43,9 +45,6 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
   }, [open]);
 
   const current = SECTIONS.find((s) => s.id === route.section)!;
-  // 44 px targets at phone width for the hosted console, whose visitors are often on a phone.
-  const touch = caps.accounts;
-
   return (
     // The column carries the border, so it runs the full page height; the sticky panel inside
     // is only as tall as its content (at most the viewport), so nothing ends up below the fold
@@ -56,11 +55,11 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
           Skip to content
         </a>
         {/* The brand row shares the nav items' gutter (px-2 + px-3), so the mark sits over their icons. */}
-        <div className="flex items-center gap-2 px-2 py-2.5 lg:pt-3 lg:pb-2">
+        <div className="flex h-14 items-center gap-2 px-2 lg:h-12">
           {/* The 24px mark is 8px wider than the 16px nav icons, so px-2 (not px-3) keeps it centred over them. */}
           <a href="#overview" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm px-2 text-ink">
             <Logo />
-            <span className="text-[17px] font-semibold tracking-tight">PII Guard</span>
+            <span className="text-base font-medium">pii-guard</span>
           </a>
           <span className="truncate text-sm text-muted lg:hidden">{current.label}</span>
           <span className="flex-1 lg:hidden" />
@@ -70,7 +69,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
             aria-expanded={open}
             aria-controls={menuId}
             onClick={() => setOpen((o) => !o)}
-            className={`inline-flex ${touch ? "h-11" : "h-9"} items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink lg:hidden`}
+            className={buttonClass("secondary", "md", "lg:hidden")}
           >
             <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               {open ? <path d="M4 4l8 8M12 4l-8 8" /> : <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />}
@@ -105,7 +104,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                             onSection(s.id);
                           }}
                           className={[
-                            touch ? "flex min-h-11 items-center" : "flex min-h-10 items-center",
+                            "flex min-h-10 items-center pointer-coarse:min-h-11",
                             "gap-3 rounded-sm px-3 py-2 text-sm text-ink transition-colors lg:min-h-9 lg:py-1.5",
                             active ? "bg-surface-2 font-medium" : "hover:bg-surface-2",
                           ].join(" ")}
@@ -130,21 +129,21 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                 <label className="text-xs text-muted" htmlFor="engine-mode">
                   Engine
                 </label>
-                <select
+                <Select
                   id="engine-mode"
+                  size="sm"
                   value={engineState.preference}
                   onChange={(e) => onPreference(e.target.value as ModePreference)}
-                  className="h-8 min-w-0 flex-1 rounded-lg border border-field bg-surface px-2 text-xs text-ink"
                 >
                   <option value="auto">Auto</option>
                   <option value="api">Live API</option>
                   <option value="mock">Demo engine</option>
-                </select>
+                </Select>
               </div>
             )}
             <div className="flex items-center justify-between gap-2">
               <EngineStatus state={engineState} engine={engine} detail={statusDetail} onRecheck={onRecheck} />
-              <ThemeToggle theme={theme} onTheme={onTheme} touch={touch} />
+              <ThemeToggle theme={theme} onTheme={onTheme} />
             </div>
           </div>
         </div>
@@ -216,7 +215,7 @@ export function EngineStatus({ state, engine, detail, onRecheck }: { state: Engi
         type="button"
         onClick={onRecheck}
         title={`${tip}. Click to check again.`}
-        className="inline-flex h-7 max-w-full min-w-0 items-center gap-2 rounded-sm text-xs whitespace-nowrap text-muted transition-colors hover:text-ink"
+        className="inline-flex h-8 max-w-full min-w-0 items-center gap-2 pointer-coarse:h-11 rounded-sm text-xs whitespace-nowrap text-muted transition-colors hover:text-ink"
       >
         <span aria-hidden="true" className={["size-1.5 shrink-0 rounded-full", dot].join(" ")} />
         <span className={shown ? (tone === "down" ? "font-medium text-danger" : tone === "demo" ? "font-medium text-warn" : "") : "sr-only"}>{label}</span>
@@ -226,30 +225,31 @@ export function EngineStatus({ state, engine, detail, onRecheck }: { state: Engi
   );
 }
 
-function ThemeToggle({ theme, onTheme, touch }: { theme: ThemePref; onTheme: (t: ThemePref) => void; touch: boolean }) {
+function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) => void }) {
   const options: { id: ThemePref; label: string; icon: string }[] = [
     { id: "light", label: "Light theme", icon: "M8 3.5V2m0 12v-1.5M3.5 8H2m12 0h-1.5M4.8 4.8 3.8 3.8m8.4 8.4-1-1m0-6.4 1-1M3.8 12.2l1-1M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z" },
     { id: "system", label: "System theme", icon: "M2.5 3.5h11v7h-11zM6 13.5h4M8 10.5v3" },
     { id: "dark", label: "Dark theme", icon: "M13 9.6A5.5 5.5 0 0 1 6.4 3a5.5 5.5 0 1 0 6.6 6.6Z" },
   ];
   return (
-    <div role="group" aria-label="Theme" className="flex shrink-0 rounded-lg border border-line bg-surface p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          aria-pressed={theme === o.id}
-          aria-label={o.label}
-          title={o.label}
-          onClick={() => onTheme(o.id)}
-          className={["grid place-items-center", touch ? "size-11 lg:size-7" : "size-7", "rounded-md transition-colors", theme === o.id ? "bg-primary text-on-primary" : "text-muted hover:text-ink"].join(" ")}
-        >
+    <SegmentedControl
+      label="Theme"
+      size="sm"
+      square
+      className="shrink-0"
+      value={theme}
+      onChange={onTheme}
+      options={options.map((o) => ({
+        value: o.id,
+        ariaLabel: o.label,
+        title: o.label,
+        label: (
           <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d={o.icon} />
           </svg>
-        </button>
-      ))}
-    </div>
+        ),
+      }))}
+    />
   );
 }
 

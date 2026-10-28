@@ -126,7 +126,7 @@ describe("hosted console for a signed-in owner", () => {
     fail = true;
     history.replaceState(null, "", "#connect");
     act(() => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
-    await user.type(await screen.findByLabelText("Provider API key"), "sk-test-fictional");
+    await user.type(await screen.findByLabelText(/^Provider API key/), "sk-test-fictional");
     await user.click(screen.getByRole("button", { name: "Connect provider" }));
     history.replaceState(null, "", "#overview");
     act(() => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
@@ -191,7 +191,7 @@ describe("hosted console for a signed-in owner", () => {
     history.replaceState(null, "", "#playground/chat");
     renderHosted(requester(), withStatus);
     const group = await screen.findByRole("radiogroup", { name: "Detection mode" });
-    expect(within(group).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Fast"]);
+    expect(within(group).getAllByRole("radio").map((r) => r.closest("label")?.textContent)).toEqual(["Fast"]);
   });
 
   it("doesn't offer Send demo traffic on the Overview or Logs", async () => {
@@ -212,21 +212,23 @@ describe("hosted console for a signed-in owner", () => {
     const call = requester();
     const user = userEvent.setup();
     renderHosted(call);
-    await screen.findByRole("heading", { name: "Projects & endpoints" });
-    await user.type(await screen.findByLabelText("New project name"), "Example billing desk");
+    await screen.findByRole("heading", { level: 1, name: "Projects" });
+    await user.type(await screen.findByLabelText(/^New project name/), "Example billing desk");
     await user.click(screen.getByRole("button", { name: "Create project" }));
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects", { name: "Example billing desk" }));
   });
 
-  it("connects a provider on Connect and points to the endpoint snippets in Projects", async () => {
+  it("connects a provider on Connect, confirms it, selects it for chat and points to the endpoint snippets in Projects", async () => {
     history.replaceState(null, "", "#connect");
-    const call = requester();
+    const call = requester(true, (path, body) => (path === "/v1/account/connections" && body ? { ...account.connections[0] } : undefined));
     const user = userEvent.setup();
     renderHosted(call);
-    await user.type(await screen.findByLabelText("Provider API key"), "sk-test-fictional");
+    await user.type(await screen.findByLabelText(/^Provider API key/), "sk-test-fictional");
     await user.click(screen.getByRole("button", { name: "Connect provider" }));
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/account/connections", { provider: "openai", api_key: "sk-test-fictional" }));
     expect(screen.queryByText("sk-test-fictional")).not.toBeInTheDocument();
+    expect(await screen.findByText("Connected OpenAI · https://api.example.com. Playground chat now sends through it.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Playground chat sends through")).toHaveValue("conn-one");
     const connect = screen.getByRole("region", { name: "Connect" });
     for (const link of within(connect).getAllByRole("link", { name: "Projects" })) expect(link).toHaveAttribute("href", "#projects");
     expect(screen.queryByTestId("gateway-url")).not.toBeInTheDocument();
@@ -237,10 +239,32 @@ describe("hosted console for a signed-in owner", () => {
     fetchSpy.mockRestore();
   });
 
+  it("asks before disconnecting a provider, then deletes it, announces it and focuses the list", async () => {
+    history.replaceState(null, "", "#connect");
+    let connections = account.connections;
+    const call = requester(true, (path, _body, method) => {
+      if (path === "/v1/account") return { ...account, connections };
+      if (method === "DELETE") { connections = []; return null; }
+    });
+    const user = userEvent.setup();
+    renderHosted(call);
+    setPlaygroundConnection("conn-one");
+    await user.click(await screen.findByRole("button", { name: "Disconnect OpenAI · https://api.example.com" }));
+    const confirm = screen.getByRole("group", { name: "Disconnect OpenAI · https://api.example.com?" });
+    expect(confirm).toHaveTextContent("Playground chat through it stops.");
+    expect(call.mock.calls.some(([, , method]) => method === "DELETE")).toBe(false);
+    await user.click(within(confirm).getByRole("button", { name: "Disconnect" }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/account/connections/conn-one", undefined, "DELETE"));
+    expect(await screen.findByText("Disconnected OpenAI · https://api.example.com.")).toBeInTheDocument();
+    expect(await screen.findByText(/No provider connections yet/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Your connections" })).toHaveFocus());
+    expect(screen.getByLabelText("Playground chat sends through")).toHaveValue("");
+  });
+
   it("opens the Evaluation from the bundled benchmark index", async () => {
     history.replaceState(null, "", "#evaluation");
     renderHosted(requester());
-    expect(await screen.findByRole("heading", { name: /How much gets through/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Evaluation" })).toBeInTheDocument();
   });
 
   it("shows the public page on View site, with a way back to the console", async () => {

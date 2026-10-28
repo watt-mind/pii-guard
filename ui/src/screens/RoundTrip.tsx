@@ -6,7 +6,7 @@ import { Pane } from "../components/Pane";
 import { Placeholder } from "../components/Placeholder";
 import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
-import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
+import { BlockedNotice, Button, EmptyState, Metric, Notice, Select, Textarea } from "../components/ui";
 import { SAMPLES } from "../content/samples";
 import { valuesByPlaceholder } from "../lib/analysis";
 import { metaFor } from "../lib/entities";
@@ -67,7 +67,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
       <div className="space-y-6">
         <RoundTripIntro />
         <EmptyState title="No masked document yet" body="Mask a document first; its placeholders are what the model answers with.">
-          <Button variant="primary" onClick={onRun} disabled={running}>
+          <Button variant="primary" onClick={onRun} busy={running}>
             {running ? "Masking…" : "Mask the sample document"}
           </Button>
         </EmptyState>
@@ -217,13 +217,13 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
               <label htmlFor="answer-input" className="sr-only">
                 Simulated model answer
               </label>
-              <textarea
+              <Textarea
                 id="answer-input"
                 value={answer}
                 onChange={(e) => editAnswer(e.target.value)}
                 spellCheck={false}
                 rows={12}
-                className="doc block min-h-[18rem] w-full resize-y rounded-lg border border-field bg-surface-2 p-3 text-ink focus:border-model focus:outline-none"
+                className="doc block"
               />
               {answerPlaceholders.length > 0 && (
                 <div>
@@ -252,7 +252,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
 
         <Boundary direction="inbound" label="pii-guard boundary: placeholders are restored on the way back">
           <div className="flex flex-row items-center gap-2 lg:flex-col">
-            <Button variant="primary" onClick={() => void stream()} disabled={streaming || answer.trim() === ""} className="lg:w-full">
+            <Button variant="primary" onClick={() => void stream()} busy={streaming} disabled={!streaming && answer.trim() === ""} className="lg:w-full">
               <span aria-hidden="true">▶</span> Stream
             </Button>
             <Button variant="secondary" onClick={() => void restoreNow()} disabled={streaming || answer.trim() === ""} className="lg:w-full">
@@ -261,19 +261,15 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
             <label className="sr-only" htmlFor="stream-speed">
               Stream speed
             </label>
-            <select
-              id="stream-speed"
-              value={speed}
-              onChange={(e) => setSpeed(e.target.value as SpeedId)}
-              disabled={streaming}
-              className="h-9 rounded-lg border border-field bg-surface px-2 text-xs text-ink lg:h-8 lg:w-full"
-            >
-              {SPEEDS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            <div className="w-24 lg:w-full">
+              <Select id="stream-speed" size="sm" value={speed} onChange={(e) => setSpeed(e.target.value as SpeedId)} disabled={streaming}>
+                {SPEEDS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
         </Boundary>
 
@@ -287,9 +283,9 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
             restoration ? (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <dl className="flex gap-4">
-                  <Stat label="restored" value={restoredCount} />
-                  <Stat label="unknown" value={unresolved.length} />
-                  {view.kind === "streaming" && <Stat label="chunks" value={`${view.received.length}/${view.total}`} />}
+                  <Metric label="restored" value={restoredCount} className="min-w-12" />
+                  <Metric label="unknown" value={unresolved.length} className="min-w-12" />
+                  {view.kind === "streaming" && <Metric label="chunks" value={`${view.received.length}/${view.total}`} className="min-w-12" />}
                 </dl>
                 <span>Restored values are underlined and coloured by type. Hover one to see its placeholder.</span>
               </div>
@@ -303,7 +299,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
             <div className="space-y-3">
               <BlockedNotice error={view.error} phase="inbound" />
               {view.error.code === "not_found" && (
-                <Button variant="secondary" onClick={onRun} disabled={running}>
+                <Button variant="secondary" onClick={onRun} busy={running}>
                   Mask the document again
                 </Button>
               )}
@@ -313,9 +309,8 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
               <RestoredText segments={restoration.segments} activeKey={activeKey} onActivate={activate} freshFrom={freshFrom} />
               {streaming && <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 bg-ink motion-safe:animate-pulse" />}
               {unresolved.length > 0 && view.kind === "done" && (
-                <div role="note" className="rounded-xl border border-warn/40 bg-warn-soft p-3 text-sm text-ink">
-                  <p className="font-medium text-warn">Unknown placeholder left as is</p>
-                  <p className="mt-1 text-muted">
+                <Notice tone="warn" title="Unknown placeholder left as is">
+                  <p className="text-muted">
                     The model produced {unresolved.map((u, i) => (
                       <span key={u}>
                         {i > 0 && ", "}
@@ -324,7 +319,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
                     ))}
                     , which this session never issued. pii-guard doesn't guess: it leaves the token visible so a person can check it.
                   </p>
-                </div>
+                </Notice>
               )}
             </div>
           ) : (
@@ -359,11 +354,12 @@ function PlaceholderDetails({ placeholder, restored }: { placeholder: string; re
 function RoundTripIntro({ live = false }: { live?: boolean }) {
   return (
     <div className="max-w-3xl">
-      <h2 className="text-xl font-normal text-balance text-ink">
+      <h2 className="text-lg font-normal text-balance text-ink">
         {live ? "The answer comes back with the masked values restored." : "The answer comes back with the real names in it."}
       </h2>
-      <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-        A replay of the document from the Mask tab with a simulated, editable model answer. The model writes about placeholders; on the way back, pii-guard swaps them for the original values, even mid-stream, when a placeholder is split across two chunks.
+      <p className="mt-0.5 text-sm text-pretty text-muted">
+        A replay of the document from Mask a document with a simulated, editable model answer. The model writes about placeholders; on the way back, pii-guard swaps them
+        for the original values, even mid-stream, when a placeholder is split across two chunks.
       </p>
     </div>
   );

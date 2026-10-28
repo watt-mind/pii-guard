@@ -58,6 +58,9 @@
   --region-kept: #6b6e75;
   /* Focus is neutral, so it never reads as a state. */
   --focus: var(--ink);
+  /* Over an image (a light document in either theme): the demo mask fill and region tag text. */
+  --image-mask-fill: #000000;
+  --on-region: #ffffff;
   /* Categorical chart slots 1-8, fixed order (dataviz reference palette, validated
      adjacent-pair CVD and normal vision on both surfaces). */
   --series-1: #2a78d6;
@@ -276,9 +279,13 @@ body {
   }
 }
 
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+/* In the base layer, so a component's own focus utilities (focus:outline-none on a heading or
+   <main> focused by script) win. One ring everywhere: 2 px neutral ink, 2 px offset. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 }
 
 /* The accent hairline under the page header: a soft wash with the gradient over it. */

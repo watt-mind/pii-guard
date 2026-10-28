@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockChat, type ChatClient, type ChatTurnRequest, type ChatTurnResult } from "../api/chat";
@@ -138,7 +138,8 @@ describe("Chat empty reasoning answer (LAB-1335)", () => {
 });
 
 describe("Chat detection modes (LAB-1435)", () => {
-  const radios = () => screen.getAllByRole("radio").map((r) => r.textContent);
+  // Native radios: the visible text is on the wrapping label.
+  const radios = () => screen.getAllByRole("radio").map((r) => r.closest("label")?.textContent);
 
   it("offers fast and audit by default, as the local console always has", async () => {
     const { client } = liveChat();
@@ -153,9 +154,49 @@ describe("Chat detection modes (LAB-1435)", () => {
     render(<Chat client={client} live draft={null} modes={["fast"]} />);
     await screen.findByRole("combobox", { name: "Model" });
     expect(radios()).toEqual(["Fast"]);
-    expect(screen.getByRole("radio", { name: "Fast" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Fast" })).toBeChecked();
     await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]!.mode).toBe("fast");
+  });
+});
+
+describe("Chat recovery and reset (LAB-1441)", () => {
+  it("retries a refused message from the blocked notice", async () => {
+    const user = userEvent.setup();
+    let fail = true;
+    const { client, calls } = liveChat({
+      send: (req) =>
+        fail
+          ? Promise.reject(new ApiError(503, "detection_failed", "detector timed out"))
+          : Promise.resolve({ sessionId: "s_1", answer: "ok", maskedAnswer: "ok", maskedMessages: req.messages, masked: 0, mode: req.mode, ms: 1, finishReason: "stop" }),
+    });
+    render(<Chat client={client} live draft={null} />);
+    await screen.findByRole("combobox", { name: "Model" });
+    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    const alert = await screen.findByRole("alert", undefined, { timeout: 5000 });
+    fail = false;
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1]!.messages.at(-1)!.content).toBe(calls[0]!.messages.at(-1)!.content);
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("asks before New conversation clears the turns, and Cancel keeps them", async () => {
+    const user = userEvent.setup();
+    const { client } = liveChat();
+    render(<Chat client={client} live draft={null} />);
+    await screen.findByRole("combobox", { name: "Model" });
+    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await screen.findAllByRole("article", { name: "Chat turn" });
+    const trigger = await screen.findByRole("button", { name: "New conversation" });
+    await user.click(trigger);
+    expect(screen.getByRole("group", { name: "Start a new conversation?" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getAllByRole("article", { name: "Chat turn" })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "New conversation" }));
+    await user.click(screen.getByRole("button", { name: "Clear and start over" }));
+    expect(screen.queryByRole("article", { name: "Chat turn" })).not.toBeInTheDocument();
+    expect(screen.getByText("No messages yet")).toBeInTheDocument();
   });
 });

@@ -1,7 +1,8 @@
 import { useId } from "react";
 import { TEXT_ENTITY_TYPES, type KnownValuesResponse, type TextEntityType } from "../api/types";
 import { metaFor } from "../lib/entities";
-import { Button } from "./ui";
+import { buttonClass } from "./controls";
+import { Button, Input, Select } from "./ui";
 
 import type { KnownRow } from "../lib/knownRows";
 import { newKnownRow } from "../lib/knownRows";
@@ -27,16 +28,16 @@ export function KnownValues({ rows, onRows, counts, error, onTry, found }: Props
 
   return (
     <details className="group rounded-xl border border-line bg-surface" open={rows.length > 0 || undefined}>
-      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden">
-        <span>
-          <span className="block text-sm font-medium text-ink">
-            Known values{used.length > 0 && <span className="ml-1.5 font-normal text-muted">({used.length})</span>}
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-x-4 gap-y-3 p-4 sm:p-5 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1 basis-[14rem]">
+          <span className="block text-lg font-normal text-ink">
+            Known values{used.length > 0 && <span className="ml-1.5 text-muted">({used.length})</span>}
           </span>
-          <span className="block text-xs text-muted">
+          <span className="mt-0.5 block text-sm text-muted">
             Tell the guard about values you already know are sensitive (a customer record). They are masked in any inflected form, even when no detector finds them.
           </span>
         </span>
-        <span aria-hidden="true" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-medium text-ink group-hover:border-line-strong">
+        <span aria-hidden="true" className={buttonClass("secondary", "sm")}>
           <svg viewBox="0 0 16 16" className="size-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="m4 6 4 4 4-4" />
           </svg>
@@ -44,7 +45,7 @@ export function KnownValues({ rows, onRows, counts, error, onTry, found }: Props
           <span className="hidden group-open:inline">Hide</span>
         </span>
       </summary>
-      <div className="space-y-3 border-t border-line px-4 py-4 sm:px-5">
+      <div className="space-y-3 border-t border-line p-4 sm:p-5">
         {rows.length > 0 && (
           <ul className="space-y-2">
             {rows.map((r, i) => {
@@ -57,33 +58,27 @@ export function KnownValues({ rows, onRows, counts, error, onTry, found }: Props
                     <label htmlFor={valueId} className="sr-only">
                       Known value {i + 1}
                     </label>
-                    <input
+                    <Input
                       id={valueId}
                       value={r.value}
                       onChange={(e) => set(r.id, { value: e.target.value })}
                       placeholder="e.g. a full name or an ID number"
                       aria-invalid={refused || undefined}
                       aria-describedby={refused ? errId : undefined}
-                      className={[
-                        "h-9 min-w-0 flex-1 basis-40 rounded-lg border bg-surface-2 px-3 text-sm text-ink placeholder:text-faint focus:border-guard focus:outline-none",
-                        refused ? "border-danger" : "border-line",
-                      ].join(" ")}
+                      className="flex-1 basis-40"
                     />
                     <label className="sr-only" htmlFor={`${base}-t${r.id}`}>
                       Type of known value {i + 1}
                     </label>
-                    <select
-                      id={`${base}-t${r.id}`}
-                      value={r.entity_type}
-                      onChange={(e) => set(r.id, { entity_type: e.target.value as TextEntityType })}
-                      className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink"
-                    >
-                      {TEXT_ENTITY_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {metaFor(t).label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="w-48 max-w-full">
+                      <Select id={`${base}-t${r.id}`} value={r.entity_type} onChange={(e) => set(r.id, { entity_type: e.target.value as TextEntityType })}>
+                        {TEXT_ENTITY_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {metaFor(t).label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
                     <Button variant="ghost" aria-label={`Remove known value ${i + 1}`} onClick={() => onRows(rows.filter((x) => x.id !== r.id))}>
                       Remove
                     </Button>

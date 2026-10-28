@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { firstRequest, loadSnippets, newSessionId, type Snippets, type SnippetsLoader, type SnippetsResult, type ToolId, type ToolSnippet } from "../api/connect";
 import type { TrafficEvent, TrafficStatus } from "../api/traffic";
-import { Button } from "../components/ui";
+import { Button, SegmentedControl, Select } from "../components/ui";
 import { readPref, writePref } from "../lib/storage";
 import { totalMasked } from "../lib/traffic";
 
@@ -80,10 +80,10 @@ export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSessio
   return (
     <section aria-labelledby="quickstart-title" className="min-w-0 overflow-hidden rounded-xl border border-line bg-surface">
       <div className="border-b border-line px-4 pt-4 sm:px-5">
-        <h2 id="quickstart-title" className="text-base font-medium text-ink">
+        <h2 id="quickstart-title" className="text-lg font-normal text-ink">
           Start building with your coding agent
         </h2>
-        <p className="mt-1 text-sm text-muted">Three steps: a gateway with a real model, one paste in your terminal, one prompt. Every block is filled in for this server.</p>
+        <p className="mt-0.5 text-sm text-muted">Three steps: a gateway with a real model, one paste in your terminal, one prompt. Every block is filled in for this server.</p>
         <ToolTabs tabs={tabs} tool={tool} onTool={setTool} />
       </div>
       <div id={`quickstart-panel-${tool}`} role="tabpanel" aria-labelledby={`quickstart-tab-${tool}`} className="space-y-6 p-4 sm:p-5">
@@ -134,7 +134,7 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: ToolId; label: string }[
             onClick={() => onTool(t.id)}
             onKeyDown={onKey}
             className={[
-              "relative shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+              "relative shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors pointer-coarse:min-h-11",
               "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full",
               selected ? "text-ink after:bg-ink" : "text-muted after:bg-transparent hover:text-ink",
             ].join(" ")}
@@ -172,24 +172,8 @@ function StartStep({ snippets }: { snippets: Snippets }) {
           <>No model provider is configured yet. Start the gateway with one:</>
         )}
       </p>
-      {presets.length > 1 && (
-        <div role="radiogroup" aria-label="Model provider" className="flex flex-wrap gap-1.5">
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              role="radio"
-              aria-checked={p.id === preset?.id}
-              onClick={() => setChosen(p.id)}
-              className={[
-                "h-8 rounded-md border px-2.5 text-xs transition-colors",
-                p.id === preset?.id ? "border-ink bg-surface-2 text-ink" : "border-line text-muted hover:border-line-strong hover:text-ink",
-              ].join(" ")}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+      {presets.length > 1 && preset && (
+        <SegmentedControl label="Model provider" size="sm" options={presets.map((p) => ({ value: p.id, label: p.label }))} value={preset.id} onChange={setChosen} className="flex-wrap" />
       )}
       {preset && <CodeBlock text={preset.command} label={`Copy the ${preset.label} start command`} />}
       {preset && (
@@ -225,17 +209,15 @@ function PasteStep({ snippets, snippet, onModel }: { snippets: Snippets; snippet
         {snippets.models.length > 1 && snippets.model !== null && snippet.code.includes(snippets.model) && (
           <label className="flex items-center gap-2">
             Model
-            <select
-              value={snippets.model ?? ""}
-              onChange={(e) => onModel(e.target.value)}
-              className="h-8 max-w-[16rem] rounded-lg border border-field bg-surface px-2 font-mono text-xs text-ink"
-            >
-              {snippets.models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <span className="w-64 max-w-full">
+              <Select size="sm" value={snippets.model ?? ""} onChange={(e) => onModel(e.target.value)}>
+                {snippets.models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </Select>
+            </span>
           </label>
         )}
         {snippet.tested_version && <span>Tested end to end with {snippet.label} {snippet.tested_version}.</span>}
@@ -285,7 +267,12 @@ function FirstRequestStep({
         <p className="text-xs text-muted">
           {traffic?.source === "fixture"
             ? "The console plays recorded demo traffic, so it can't watch for your first request here."
-            : "The traffic log is off, so this page can't watch for the first request. `pii-guard up` turns it on; with `pii-guard serve`, set PII_GUARD_TRAFFIC_LOG=masked."}
+            : (
+              <>
+                The traffic log is off, so this page can't watch for the first request. {mono("pii-guard up")} turns it on; with {mono("pii-guard serve")}, turn it on
+                yourself ({mono("PII_GUARD_TRAFFIC_LOG=masked")}).
+              </>
+            )}
         </p>
       </Step>
     );
@@ -411,13 +398,8 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
     );
   };
   return (
-    <button
-      type="button"
-      onClick={copy}
-      aria-label={label}
-      className="inline-flex h-7 shrink-0 items-center rounded-md border border-line bg-surface px-2 text-xs font-medium text-ink transition-colors hover:border-line-strong"
-    >
+    <Button size="sm" onClick={copy} aria-label={label} className="shrink-0">
       <span aria-live="polite">{copied === "ok" ? "Copied" : copied === "failed" ? "Select and copy" : "Copy"}</span>
-    </button>
+    </Button>
   );
 }

@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { isFullStatus, type FullServerStatus } from "../api/status";
 import { recovery, request, type Requester } from "../hosted/api";
 import { projectPath, type PolicyVersion, type Project, type ProjectList } from "../projects/api";
 import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type EntityType } from "../api/types";
 import { NerHint } from "../components/NerHint";
+import { Button, ButtonLink, Card, KeyValues, Notice, PageHeader } from "../components/ui";
 import type { ServerStatusState } from "../hooks/useServerStatus";
 import { ENTITY_META, metaFor, type Policy as EntityPolicy } from "../lib/entities";
 import { detectorName } from "../lib/traffic";
@@ -30,80 +31,97 @@ export function Policy({ status }: PolicyProps) {
   const server = status.state === "ok" && isFullStatus(status.status) ? status.status : null;
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-medium text-balance text-ink">Policy</h1>
-        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          What this server does with each kind of personal data, read from its configuration. Read-only: the settings live in the server's environment, so a change here could not
-          survive a restart.
-        </p>
-      </div>
+      <PageHeader
+        title="Policy"
+        lead="What this server does with each kind of personal data, read from its configuration. Read-only: the settings live in the server's environment, so a change here could not survive a restart."
+      />
 
       {!server && (
-        <p role="status" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
+        <Notice live>
           {status.state === "loading"
             ? "Asking the server…"
             : status.state === "missing"
               ? "This pii-guard server doesn't report its configuration (it predates /v1/status). The entity table shows the documented defaults."
               : "The pii-guard API isn't reachable, so its configuration is unknown. The entity table shows the documented defaults (docs/entities.md)."}
-        </p>
+        </Notice>
       )}
 
       {server && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card title="Detection">
-            <Rows>
-              <Row label="Default mode">
-                <span className="font-medium capitalize">{server.gateway.default_mode}</span>
-                <span className="text-muted"> · per request with {mono("X-PII-Guard-Mode")}</span>
-              </Row>
-              <Row label="Fast mode">{server.gateway.modes.fast.detectors.map(detectorName).join(" + ") || "none"}</Row>
-              <Row label="Audit mode">
-                {server.gateway.modes.audit.available ? (
-                  <>Fast + the LLM detector{server.gateway.modes.audit.model ? `, ${server.gateway.modes.audit.model.split("/").pop()}` : ""}</>
-                ) : (
-                  <span className="text-muted [overflow-wrap:anywhere]">Unavailable: {server.gateway.modes.audit.reason}</span>
-                )}
-              </Row>
-              <Row label="REST API">{server.rest.detectors.map(detectorName).join(" + ") || "none"}</Row>
-              <Row label="Default language">{mono(server.default_language)}</Row>
-            </Rows>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card title="Detection" titleId="policy-detection-title" className="min-w-0">
+            <KeyValues
+              items={[
+                {
+                  label: "Default mode",
+                  value: (
+                    <>
+                      <span className="font-medium capitalize">{server.gateway.default_mode}</span>
+                      <span className="text-muted"> · a client can pick another mode per request (header {mono("X-PII-Guard-Mode")})</span>
+                    </>
+                  ),
+                },
+                { label: "Fast mode", value: server.gateway.modes.fast.detectors.map(detectorName).join(" + ") || "none" },
+                {
+                  label: "Audit mode",
+                  value: server.gateway.modes.audit.available ? (
+                    <>Fast + the LLM detector{server.gateway.modes.audit.model ? `, ${server.gateway.modes.audit.model.split("/").pop()}` : ""}</>
+                  ) : (
+                    <span className="text-muted [overflow-wrap:anywhere]">Unavailable: {server.gateway.modes.audit.reason}</span>
+                  ),
+                },
+                { label: "REST API", value: server.rest.detectors.map(detectorName).join(" + ") || "none" },
+                { label: "Default language", value: mono(server.default_language) },
+              ]}
+            />
             {!server.ner.available && (
               <p role="note" className="mt-3 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-ink">
                 <span className="font-medium text-warn">No NER: free-text names are not masked.</span> They need <NerHint />.
               </p>
             )}
           </Card>
-          <Card title="Server">
-            <Rows>
-              <Row label="Images">
-                {server.images.available ? (
-                  <>On · faces {server.images.sam ? "by SAM 3.1 and the on-device detector" : "by the on-device detector"}, text by OCR</>
-                ) : (
-                  <span className="text-muted">Refused (fail closed): {imageGaps(server)}</span>
-                )}
-              </Row>
-              <Row label="Traffic log">
-                {mono(server.traffic_log)}
-                <span className="text-muted">
-                  {server.traffic_log === "masked" ? " · placeholders only" : server.traffic_log === "full" ? " · originals too, loopback only" : " · Logs and Overview stay empty"}
-                </span>
-              </Row>
-              <Row label="Authentication">{server.auth.token_required ? "Bearer token required" : "None: keep it on localhost or behind a proxy"}</Row>
-              <Row label="Upstream">{server.upstream.mock ? "Offline mock model (echo)" : server.upstream.origin ? mono(server.upstream.origin) : "Not configured"}</Row>
-            </Rows>
+          <Card title="Server" titleId="policy-server-title" className="min-w-0">
+            <KeyValues
+              items={[
+                {
+                  label: "Images",
+                  value: server.images.available ? (
+                    <>On · faces {server.images.sam ? "by SAM 3.1 and the on-device detector" : "by the on-device detector"}, text by OCR</>
+                  ) : (
+                    <span className="text-muted">Refused (fail closed): {imageGaps(server)}</span>
+                  ),
+                },
+                {
+                  label: "Traffic log",
+                  value: (
+                    <>
+                      {server.traffic_log === "masked"
+                        ? "Placeholders only"
+                        : server.traffic_log === "full"
+                          ? "Originals too, on this machine only"
+                          : "Off: Logs and Overview stay empty"}{" "}
+                      <span className="text-muted">(level {mono(server.traffic_log)})</span>
+                    </>
+                  ),
+                },
+                { label: "Authentication", value: server.auth.token_required ? "Bearer token required" : "None: keep it on localhost or behind a proxy" },
+                { label: "Upstream", value: server.upstream.mock ? "Offline mock model (echo)" : server.upstream.origin ? mono(server.upstream.origin) : "Not configured" },
+              ]}
+            />
           </Card>
         </div>
       )}
 
-      <section aria-labelledby="policies-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
-        <h2 id="policies-title" className="text-lg font-normal text-ink">
-          Entity policies
-        </h2>
-        <p className="mt-0.5 text-sm text-muted">
-          {server ? "As this server applies them, in the gateway and the REST API." : "The documented defaults."} Changed with {mono("PII_GUARD_POLICY_OVERRIDES")}, for example{" "}
-          {mono("ORGANIZATION=mask,EMAIL=block")}.
-        </p>
-        <div className="mt-4 grid gap-x-8 gap-y-6 md:grid-cols-2">
+      <Card
+        title="Entity policies"
+        titleId="policies-title"
+        subtitle={
+          <>
+            {server ? "As this server applies them, in the gateway and the REST API." : "The documented defaults."} Change them in the server's policy overrides, for example{" "}
+            {mono("PII_GUARD_POLICY_OVERRIDES=ORGANIZATION=mask,EMAIL=block")}.
+          </>
+        }
+      >
+        <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
           <PolicyTable title="Text" types={TEXT_ENTITY_TYPES} policies={server?.policies ?? null} />
           <PolicyTable title="Image regions" types={VISUAL_ENTITY_TYPES} policies={server?.policies ?? null} />
         </div>
@@ -111,7 +129,7 @@ export function Policy({ status }: PolicyProps) {
           <span className="font-medium text-ink">Allow-list:</span> none. pii-guard has no per-value allow-list; a detected value stays in place only when its type's policy is keep.
           Values the application already knows are sensitive can be pre-loaded per session ({mono("POST /v1/sessions")}).
         </p>
-      </section>
+      </Card>
     </div>
   );
 }
@@ -164,73 +182,71 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
   const policy = state.state === "ok" ? state.policy : null;
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-medium text-balance text-ink">Policy</h1>
-        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          What happens to each kind of personal data in your project. Policies belong to projects and are versioned: each endpoint applies the version it is pinned to. Read-only
-          here; create policies and new versions under Projects.
-        </p>
-      </div>
+      <PageHeader
+        title="Policy"
+        lead="What happens to each kind of personal data in your project. Policies belong to projects and are versioned: each endpoint applies the version it is pinned to. Read-only here; create policies and new versions under Projects."
+      />
 
-      {state.state === "loading" && (
-        <p role="status" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
-          Loading your project's policy…
-        </p>
-      )}
+      {state.state === "loading" && <Notice live>Loading your project's policy…</Notice>}
       {state.state === "error" && (
-        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-ink">
-          <span>{state.message}</span>
-          <button type="button" onClick={() => {
-              setState({ state: "loading" });
-              setRetry((n) => n + 1);
-            }} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-line-strong">
-            Retry
-          </button>
-        </div>
+        <Notice
+          tone="danger"
+          live
+          action={
+            <Button
+              size="sm"
+              onClick={() => {
+                setState({ state: "loading" });
+                setRetry((n) => n + 1);
+              }}
+            >
+              Retry
+            </Button>
+          }
+        >
+          {state.message}
+        </Notice>
       )}
-      {state.state === "ok" && !policy && (
-        <p role="status" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
-          The project {state.project.name} has no default policy yet. Create one under Projects.
-        </p>
-      )}
+      {state.state === "ok" && !policy && <Notice live>The project {state.project.name} has no default policy yet. Create one under Projects.</Notice>}
 
       {state.state === "ok" && policy && (
         <>
-          <Card title="Default policy">
-            <Rows>
-              <Row label="Project">{state.project.name}</Row>
-              <Row label="Policy">
-                {policy.name} <span className="text-muted">· v{policy.version}</span>
-              </Row>
-              <Row label="Detection mode">
-                <span className="capitalize">{policy.mode}</span>
-              </Row>
-              <Row label="Language">{mono(policy.language)}</Row>
-            </Rows>
+          <Card title="Default policy" titleId="owner-policy-title" className="min-w-0">
+            <KeyValues
+              items={[
+                { label: "Project", value: state.project.name },
+                {
+                  label: "Policy",
+                  value: (
+                    <>
+                      {policy.name} <span className="text-muted">· v{policy.version}</span>
+                    </>
+                  ),
+                },
+                { label: "Detection mode", value: <span className="capitalize">{policy.mode}</span> },
+                { label: "Language", value: mono(policy.language) },
+              ]}
+            />
           </Card>
-          <section aria-labelledby="policies-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
-            <h2 id="policies-title" className="text-lg font-normal text-ink">
-              Entity policies
-            </h2>
-            <p className="mt-0.5 text-sm text-muted">
-              As {policy.name} v{policy.version} applies them. An endpoint pinned to another policy or version applies that one.
-            </p>
-            <div className="mt-4 grid gap-x-8 gap-y-6 md:grid-cols-2">
+          <Card title="Entity policies" titleId="policies-title" subtitle={`As ${policy.name} v${policy.version} applies them. An endpoint pinned to another policy or version applies that one.`}>
+            <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
               <PolicyTable title="Text" types={TEXT_ENTITY_TYPES} policies={policy.entity_policies} />
             </div>
-          </section>
+          </Card>
         </>
       )}
 
-      <a href="#projects" className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3 text-sm text-on-primary transition-colors hover:bg-primary-hover">
-        Edit policies in Projects
-      </a>
+      <div>
+        <ButtonLink variant="primary" href="#projects">
+          Edit policies in Projects
+        </ButtonLink>
+      </div>
     </div>
   );
 }
 
 function imageGaps(server: FullServerStatus): string {
-  const needs: Record<string, string> = { ocr: "no OCR (the ocr extra)", tesseract: "no Tesseract", segmenter: "no face detector (the local-vision extra, or SAM 3.1 with META_API_KEY)" };
+  const needs: Record<string, string> = { ocr: "no OCR (the ocr extra)", tesseract: "no Tesseract", segmenter: "no face detector (the local-vision extra, or SAM 3.1 with a Meta API key)" };
   return server.images.gaps.map((g) => needs[g] ?? g).join(", ");
 }
 
@@ -263,27 +279,5 @@ function PolicyTable({ title, types, policies }: { title: string; types: readonl
         })}
       </tbody>
     </table>
-  );
-}
-
-function Card({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <h2 className="mb-3 text-lg font-normal text-ink">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Rows({ children }: { children: ReactNode }) {
-  return <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">{children}</dl>;
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <>
-      <dt className="text-muted">{label}</dt>
-      <dd className="min-w-0 text-ink">{children}</dd>
-    </>
   );
 }

@@ -40,14 +40,21 @@ export const createRequester = (doFetch: typeof fetch): Requester => async <T>(p
 
 export const request = createRequester((...args) => fetch(...args));
 
-export function recovery(error: unknown): string {
+/**
+ * What to do after a failed hosted request, by status only (never server text). The console's
+ * screens get the default copy; the public page passes `"site"`, which also points to its static
+ * walkthrough, because only that page has one.
+ */
+export function recovery(error: unknown, context: "console" | "site" = "console"): string {
+  const site = context === "site";
+  const fallback = site ? " The static example remains available." : "";
   if (error instanceof ApiError) {
     if (error.status === 401 || error.status === 403) return "Your session is no longer authorized. Sign in again, then retry.";
-    if (error.status === 429) return "The live allowance is used up or requests are arriving too quickly. Check the reset time below and retry later; the static example remains available.";
+    if (error.status === 429) return site ? "The live allowance is used up or requests are arriving too quickly. Check the reset time below and retry later; the static example remains available." : "The allowance is used up or requests are arriving too quickly. Check the reset time on Overview and retry later.";
     if (error.status === 410 || /expired|session|connection/.test(error.code)) return "This session or connection has expired. Reconnect your provider or start a fresh request.";
-    if (error.status === 404) return "This hosted API feature is unavailable. Reconnect to the API or retry after the service is restored. The static example remains available.";
+    if (error.status === 404) return `This hosted API feature is unavailable. Retry after the service is restored.${fallback}`;
     if (error.status === 400 || error.status === 422) return "The request was refused. Check the input and provider settings, then retry.";
-    if (error.status === 502 || error.status === 503 || error.status === 504) return "The guard or model provider is unavailable. No completed live result is available. Retry later or inspect the static example.";
+    if (error.status === 502 || error.status === 503 || error.status === 504) return site ? "The guard or model provider is unavailable. No completed live result is available. Retry later or inspect the static example." : "The guard or model provider is unavailable. Retry later.";
   }
-  return "The hosted API could not complete this request. Check your connection and retry. The static example remains available.";
+  return `The hosted API could not complete this request. Check your connection and retry.${fallback}`;
 }

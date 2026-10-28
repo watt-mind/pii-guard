@@ -15,6 +15,7 @@ import {
   type OwnStage,
 } from "../lib/traffic";
 import { useWidth } from "../hooks/useWidth";
+import { Metric } from "../components/ui";
 import { ChartEmpty } from "./BenchmarksCharts";
 
 /* Charts for the Live traffic screen, following the Benchmarks conventions: drawn at the
@@ -127,12 +128,14 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
 
 function Figure({ label, value, strong, testId }: { label: string; value: string; strong?: boolean; testId?: string }) {
   return (
-    <div className="flex flex-col-reverse">
-      <dt className="mt-0.5 text-2xs text-muted">{label}</dt>
-      <dd data-testid={testId} className={["text-lg leading-none font-medium tabular-nums", strong ? "text-guard" : "text-ink"].join(" ")}>
-        {value}
-      </dd>
-    </div>
+    <Metric
+      label={label}
+      value={
+        <span data-testid={testId} className={strong ? "text-guard" : undefined}>
+          {value}
+        </span>
+      }
+    />
   );
 }
 
@@ -289,13 +292,21 @@ export function ModeChart({ events }: { events: TrafficEvent[] }) {
 
 // --- Stage breakdown ----------------------------------------------------------------------
 
+/** A column button is at least 24 px wide (44 px on a touch screen): fewer, wider columns on a phone. */
+const COLUMN_MIN = { fine: 24, coarse: 44 } as const;
+const isCoarse = () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
+
 export function StageChart({ events, onSelect }: { events: TrafficEvent[]; onSelect?: (id: string) => void }) {
-  const recent = events.slice(-30);
+  const [ref, width] = useWidth(560);
+  const [coarse] = useState(isCoarse);
+  // The y axis takes about 40 px; each column keeps a 2 px gap.
+  const fit = Math.floor((width - 40) / ((coarse ? COLUMN_MIN.coarse : COLUMN_MIN.fine) + 2));
+  const recent = events.slice(-Math.max(5, Math.min(30, fit)));
   if (!recent.length) return <ChartEmpty>No calls yet.</ChartEmpty>;
   const max = niceCeil(Math.max(...recent.map((e) => OWN_STAGES.reduce((s, k) => s + (e.timing.stages_ms[k] ?? 0), 0))));
   const used = OWN_STAGES.filter((k) => recent.some((e) => (e.timing.stages_ms[k] ?? 0) > 0));
   return (
-    <div>
+    <div ref={ref}>
       <div className="flex gap-2">
         <div aria-hidden="true" className="flex h-40 flex-col justify-between text-right text-xs tabular-nums text-muted">
           <span>{formatMsShort(max)}</span>

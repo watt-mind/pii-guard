@@ -5,7 +5,8 @@ import type { TrafficConnectOptions, TrafficEvent, TrafficStatus } from "../api/
 import type { EntityType } from "../api/types";
 import { MaskedText } from "../components/MaskedText";
 import { RestoredText } from "../components/RestoredText";
-import { Button } from "../components/ui";
+import { Pane } from "../components/Pane";
+import { Button, Card, Checkbox, Metric, PageHeader, Select } from "../components/ui";
 import { errorCopy } from "../lib/errorCopy";
 import { useTraffic, type TrafficHandle, type TrafficSource } from "../hooks/useTraffic";
 import { ENTITY_META, metaFor } from "../lib/entities";
@@ -112,12 +113,15 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
 
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-medium text-balance text-ink">Logs</h1>
-        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          {t.source === "fixture" ? "Recorded calls, replayed in your browser." : "Every call through the gateway, live."} Pick one to see what your client sent, what the model received, and what your client got back with the values restored.
-        </p>
-      </div>
+      <PageHeader
+        title="Logs"
+        lead={
+          <>
+            {t.source === "fixture" ? "Recorded calls, replayed in your browser." : "Every call through the gateway, live."} Pick one to see what your client sent, what the model
+            received, and what your client got back with the values restored.
+          </>
+        }
+      />
 
       <SourceBanner source={t.source} status={t.status} apiStatus={t.apiStatus} forced={forceFixture} paused={t.paused} onFixture={t.showFixture} onRetry={t.retryApi} replayDone={t.replayDone} onReplay={t.replay} />
 
@@ -156,57 +160,57 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <label className="flex items-center gap-2 text-muted">
             Mode
-            <select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })} className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink">
-              <option value="all">All</option>
-              {modes.map((m) => (
-                <option key={m} value={m}>
-                  {m.charAt(0).toUpperCase() + m.slice(1)}
-                </option>
-              ))}
-            </select>
+            <span className="w-32">
+              <Select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })}>
+                <option value="all">All</option>
+                {modes.map((m) => (
+                  <option key={m} value={m}>
+                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                  </option>
+                ))}
+              </Select>
+            </span>
           </label>
           <label className="flex items-center gap-2 text-muted">
             Entity
-            <select
-              value={filters.type}
-              onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters["type"] })}
-              className="h-9 max-w-[11rem] rounded-lg border border-field bg-surface px-2 text-sm text-ink"
-            >
-              <option value="all">All types</option>
-              {types.map((ty) => (
-                <option key={ty} value={ty}>
-                  {ENTITY_META[ty]?.label ?? ty}
-                </option>
-              ))}
-            </select>
+            <span className="w-44">
+              <Select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters["type"] })}>
+                <option value="all">All types</option>
+                {types.map((ty) => (
+                  <option key={ty} value={ty}>
+                    {ENTITY_META[ty]?.label ?? ty}
+                  </option>
+                ))}
+              </Select>
+            </span>
           </label>
-          <label className="flex min-h-9 items-center gap-2 text-ink">
-            <input type="checkbox" checked={filters.problems} onChange={(e) => setFilters({ ...filters, problems: e.target.checked })} className="size-4 accent-[var(--ink)]" />
-            Blocked or failed only
-          </label>
+          <Checkbox label="Blocked or failed only" checked={filters.problems} onChange={(e) => setFilters({ ...filters, problems: e.target.checked })} />
         </div>
       </section>
 
-      <dl className="flex flex-wrap gap-x-8 gap-y-3 text-sm" aria-label="Summary of the calls shown">
-        <Fact label={filtered.length === t.events.length ? "Calls" : `Calls (of ${t.events.length}, filtered)`} value={filtered.length} />
-        <Fact label="Overhead p50, all shown" value={formatMsShort(p50)} />
-        <Fact label="Overhead p95, all shown" value={formatMsShort(p95)} />
-        <Fact label="Values masked" value={masked} />
-        <Fact label="Blocked or failed" value={problems} />
+      <dl className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-x-8" aria-label="Summary of the calls shown">
+        <Metric label={filtered.length === t.events.length ? "Calls" : `Calls (of ${t.events.length}, filtered)`} value={filtered.length} />
+        <Metric label="Overhead p50, all shown" value={formatMsShort(p50)} />
+        <Metric label="Overhead p95, all shown" value={formatMsShort(p95)} />
+        <Metric label="Values masked" value={masked} />
+        <Metric label="Blocked or failed" value={problems} />
       </dl>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(19rem,25rem)_minmax(0,1fr)]">
         <section aria-labelledby="calls-title" className="flex min-w-0 flex-col rounded-xl border border-line bg-surface">
-          <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-            <h2 id="calls-title" className="text-lg font-normal text-ink">
-              Calls <span className="font-normal text-muted">newest first</span>
-            </h2>
-            <span aria-live="polite" className="text-xs text-muted tabular-nums">
+          <header className="flex items-start justify-between gap-2 border-b border-line p-4 sm:p-5">
+            <div className="min-w-0">
+              <h2 id="calls-title" className="text-lg font-normal text-ink">
+                Calls
+              </h2>
+              <p className="mt-0.5 text-sm text-muted">Newest first</p>
+            </div>
+            <span aria-live="polite" className="pt-1.5 text-xs whitespace-nowrap text-muted tabular-nums">
               {t.paused ? "paused" : lastTime ? `last ${clock(new Date(lastTime).toISOString())}` : ""}
             </span>
           </header>
           {filtered.length === 0 ? (
-            <div className="p-4">
+            <div className="p-4 sm:p-5">
               <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} demoTraffic={demoTraffic} />
             </div>
           ) : (
@@ -265,7 +269,7 @@ function SourceBanner({
   const code = (s: string) => <code className="rounded bg-surface px-1 font-mono text-xs">{s}</code>;
   if (source === "fixture") {
     return (
-      <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+      <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4 text-ink">
         <p className="min-w-0 flex-1">
           <strong className="font-medium text-warn">Recorded demo traffic.</strong>{" "}
           {forced
@@ -278,7 +282,7 @@ function SourceBanner({
           Recorded at level {code("masked")}: they hold only what the model received.
         </p>
         {!forced && (
-          <Button onClick={onRetry} className="h-8">
+          <Button size="sm" onClick={onRetry}>
             Back to the live log
           </Button>
         )}
@@ -292,9 +296,9 @@ function SourceBanner({
           </p>
           {/* Always rendered (aria-disabled while playing) so focus stays on it after a replay. */}
           <Button
+            size="sm"
             onClick={() => replayDone && onReplay()}
             aria-disabled={!replayDone}
-            className={`h-8 ${replayDone ? "" : "cursor-not-allowed opacity-45"}`}
             title={replayDone ? "Play the recorded calls again from the start" : "Available when the replay has finished"}
           >
             Replay again
@@ -305,18 +309,19 @@ function SourceBanner({
   }
   if (status.state === "disabled") {
     return (
-      <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+      <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-surface p-3 text-sm sm:p-4 text-ink">
         <p className="min-w-0 flex-1">
           <strong className="font-medium">The traffic log is off on this server.</strong>{" "}
           {status.reason === "off" ? (
             <>
-              Restart the API with {code("PII_GUARD_TRAFFIC_LOG=masked")} ({code("make demo")} does this), or {code("full")} on localhost to also see the original values.
+              Restart the API with its traffic log on ({code("PII_GUARD_TRAFFIC_LOG=masked")}; {code("make demo")} does this). On localhost, level {code("full")} also shows
+              the original values.
             </>
           ) : (
             <>{status.message}.</>
           )}
         </p>
-        <Button onClick={onFixture} className="h-8">
+        <Button size="sm" onClick={onFixture}>
           Show recorded demo traffic
         </Button>
       </div>
@@ -324,7 +329,7 @@ function SourceBanner({
   }
   if (status.state === "offline") {
     return (
-      <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-ink">
+      <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4 text-ink">
         <strong className="font-medium text-danger">Lost the connection to the API.</strong> Retrying every few seconds; the calls already shown stay. ({status.message})
       </div>
     );
@@ -332,14 +337,14 @@ function SourceBanner({
   if (status.state === "limited") {
     const wait = status.retryAfterMs ? ` in about ${Math.ceil(status.retryAfterMs / 1000)} s` : " shortly";
     return (
-      <div role="status" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+      <div role="status" className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4 text-ink">
         <strong className="font-medium text-warn">Too many requests just now.</strong> The API is up but asked this page to slow down; it retries{wait}. The calls already shown stay.
       </div>
     );
   }
   if (status.state === "denied") {
     return (
-      <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-ink">
+      <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4 text-ink">
         {status.reason === "signed_out" ? (
           <>
             <strong className="font-medium text-danger">You're signed out.</strong> The API is up but answered 401. Sign in again; this page reconnects by itself.
@@ -371,8 +376,8 @@ function SourceBanner({
               Live · {status.via === "sse" ? "streaming" : "polling every 2 s"}
             </span>
           )}
-          <span className="inline-flex items-center rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink">
-            Log level {status.level}
+          <span title={`Traffic log level: ${status.level}`} className="inline-flex items-center rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink">
+            {status.level === "full" ? "Originals logged" : "Placeholders only"}
           </span>
           <span className="text-xs">
             {status.level === "full" ? "Originals are kept in memory on this machine only." : "Only what left the machine is logged: placeholders, never values."}
@@ -428,7 +433,7 @@ export function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
   const p = state.progress;
   return (
     <>
-      <Button variant="primary" onClick={() => void run()} disabled={state.running}>
+      <Button variant="primary" onClick={() => void run()} busy={state.running}>
         <SendIcon /> {state.running ? "Sending…" : "Send demo traffic"}
       </Button>
       <span aria-live="polite" className="text-xs text-muted tabular-nums">
@@ -542,19 +547,19 @@ function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: Traffi
       onClick={onSelect}
       aria-current={selected ? "true" : undefined}
       className={[
-        "flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors",
+        "flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors sm:px-5",
         selected ? "bg-model-soft/70 shadow-[inset_3px_0_0_var(--model)]" : "hover:bg-surface-2",
       ].join(" ")}
     >
       <span className="flex w-full items-center gap-2 text-xs">
-        <span className="font-mono text-muted tabular-nums">{clock(e.time)}</span>
+        <span className="font-mono whitespace-nowrap text-muted tabular-nums">{clock(e.time)}</span>
         {e.mode && <Tag>{e.mode}</Tag>}
         {e.stream && <Tag>stream</Tag>}
         {hasTools && <Tag>tools</Tag>}
         {hasImage && <Tag>image</Tag>}
         {labelled && <LabelTag match={labelled} />}
         <OutcomeBadge outcome={e.outcome} />
-        <span className="ml-auto font-medium text-ink tabular-nums" title="pii-guard overhead">
+        <span className="ml-auto font-medium whitespace-nowrap text-ink tabular-nums" title="pii-guard overhead">
           +{formatMsShort(e.timing.overhead_ms)}
         </span>
       </span>
@@ -612,7 +617,7 @@ function CallDetail({
           {following ? (
             <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-muted ring-1 ring-line">Following the latest call</span>
           ) : (
-            <Button className="h-8" onClick={onFollow}>
+            <Button size="sm" onClick={onFollow}>
               Follow the latest call
             </Button>
           )}
@@ -629,7 +634,7 @@ function CallDetail({
           <Meta label="Detection cache" value={e.cache ? `${e.cache.hits} hit · ${e.cache.misses} miss` : "–"} />
         </dl>
         {e.session_ref && onOpenSession && (
-          <Button className="mt-3 h-8 text-xs" onClick={() => onOpenSession(e.session_ref!)}>
+          <Button size="sm" className="mt-3" onClick={() => onOpenSession(e.session_ref!)}>
             Open session <span className="font-mono">{e.session_ref}</span> in Vault
           </Button>
         )}
@@ -647,7 +652,7 @@ function CallDetail({
       </section>
 
       {e.outcome !== "ok" && (!forwarded || upstreamSide) && (
-        <div role="note" data-error-kind={upstreamSide ? upstreamCopy.kind : e.outcome === "blocked" ? "policy" : "fail_closed"} className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
+        <div role="note" data-error-kind={upstreamSide ? upstreamCopy.kind : e.outcome === "blocked" ? "policy" : "fail_closed"} className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4">
           <p className="font-medium text-warn">
             {upstreamSide ? upstreamCopy.title : `${e.outcome === "blocked" ? "Blocked by policy." : "Refused."} Nothing was sent to the model.`}
           </p>
@@ -663,35 +668,35 @@ function CallDetail({
       )}
 
       <section aria-labelledby="timing-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
-        <h2 id="timing-title" className="mb-3 text-lg font-normal text-ink">
+        <h2 id="timing-title" className="mb-4 text-lg font-normal text-ink">
           Timing
         </h2>
         <TimingWaterfall event={e} />
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <DetailPane eyebrow="Your app sent" title="Original request" side="you">
+      <div className="grid gap-6 md:grid-cols-2">
+        <DetailPane id="log-original" eyebrow="Your app sent" title="Original request" side="you">
           {showOriginals && e.request?.original ? (
             <OriginalView original={e.request.original} masked={maskedBody} />
           ) : (
-            <Notice>
+            <Quiet>
               {source === "fixture" ? (
                 <>Recorded demo traffic never holds original values.</>
               ) : e.level === "full" ? (
                 <>The server logged originals, but they are only shown on a page served from localhost.</>
               ) : (
                 <>
-                  Not kept. The traffic log runs at <code className="font-mono">masked</code>: only what left the machine. Run the API on localhost with{" "}
-                  <code className="font-mono">PII_GUARD_TRAFFIC_LOG=full</code> (fictional data only) to see originals here.
+                  Not kept: the traffic log holds only what left the machine (level <code className="font-mono">masked</code>). To see originals here, run the API on localhost
+                  with its traffic log at level full, with fictional data only (<code className="font-mono">PII_GUARD_TRAFFIC_LOG=full</code>).
                 </>
               )}
-            </Notice>
+            </Quiet>
           )}
         </DetailPane>
-        <DetailPane eyebrow="The model received" title="Masked request, as sent upstream" side="model">
-          {forwarded ? <MaskedRequestView body={maskedBody} event={e} /> : <Notice>Nothing was forwarded.</Notice>}
+        <DetailPane id="log-masked" eyebrow="The model received" title="Masked request, as sent upstream" side="model">
+          {forwarded ? <MaskedRequestView body={maskedBody} event={e} /> : <Quiet>Nothing was forwarded.</Quiet>}
         </DetailPane>
-        <DetailPane eyebrow="The model answered" title="Response, masked → restored" side="model" wide>
+        <DetailPane id="log-response" eyebrow="The model answered" title="Response, masked → restored" side="model" wide>
           <ResponseView event={e} showOriginals={showOriginals} />
         </DetailPane>
       </div>
@@ -702,7 +707,7 @@ function CallDetail({
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-2xs text-muted">{label}</dt>
+      <dt className="text-xs text-muted">{label}</dt>
       <dd className="truncate text-ink" title={value}>
         {value}
       </dd>
@@ -710,27 +715,18 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DetailPane({ eyebrow, title, side, wide, children }: { eyebrow: string; title: string; side: "you" | "model"; wide?: boolean; children: ReactNode }) {
+/** A request or response pane: the shared `Pane`, its body capped and scrolled. */
+function DetailPane({ id, eyebrow, title, side, wide, children }: { id: string; eyebrow: string; title: string; side: "you" | "model"; wide?: boolean; children: ReactNode }) {
   return (
-    <section
-      aria-label={title}
-      className={[
-        "flex min-w-0 flex-col overflow-hidden rounded-xl border bg-surface",
-        side === "model" ? "border-model/25" : "border-line",
-        wide ? "md:col-span-2" : "",
-      ].join(" ")}
-    >
-      <header className={["border-b px-4 py-2.5", side === "model" ? "border-model/20 bg-model-soft/60" : "border-line bg-surface-2"].join(" ")}>
-        <p className={["font-mono text-2xs", side === "model" ? "text-model" : "text-guard"].join(" ")}>{eyebrow}</p>
-        <h3 className="text-sm font-medium text-ink">{title}</h3>
-      </header>
-      <div className="max-h-[32rem] min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">{children}</div>
-    </section>
+    <Pane id={id} eyebrow={eyebrow} title={title} side={side} scroll className={wide ? "md:col-span-2" : ""}>
+      <div className="space-y-3">{children}</div>
+    </Pane>
   );
 }
 
-function Notice({ children }: { children: ReactNode }) {
-  return <p className="py-4 text-sm text-muted">{children}</p>;
+/** A quiet note inside a pane (no card inside a card). */
+function Quiet({ children }: { children: ReactNode }) {
+  return <p className="text-sm text-muted">{children}</p>;
 }
 
 function Role({ role }: { role: string }) {
@@ -873,7 +869,7 @@ const placeholdersIn = (text: string) => tokenize(text).filter((t) => t.kind ===
 function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOriginals: boolean }) {
   const masked = responseChoices(e.response?.masked);
   const unmasked = showOriginals ? responseChoices(e.response?.unmasked) : [];
-  if (!e.response) return <Notice>{e.outcome === "ok" ? "No answer was logged." : "No answer: the call did not reach the model."}</Notice>;
+  if (!e.response) return <Quiet>{e.outcome === "ok" ? "No answer was logged." : "No answer: the call did not reach the model."}</Quiet>;
   const nothing = masked.every((c) => !c.content && !c.toolCalls.length);
   const streamedTool = nothing && e.stream && e.outcome === "ok";
   const count = masked.reduce((n, c) => n + placeholdersIn(c.content ?? "") + c.toolCalls.reduce((k, t) => k + placeholdersIn(t.arguments), 0), 0);
@@ -882,7 +878,7 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
       <div data-testid="masked-response" className="min-w-0 space-y-2">
         <p className="mb-1 text-xs font-medium text-model">From the model{e.stream ? ` (streamed, ${e.response.chunks ?? "?"} chunks)` : ""}</p>
         {nothing ? (
-          <Notice>{e.stream ? "A streamed tool call: the log keeps streamed text, not tool-call arguments." : "Empty answer."}</Notice>
+          <Quiet>{e.stream ? "A streamed tool call: the log keeps streamed text, not tool-call arguments." : "Empty answer."}</Quiet>
         ) : (
           masked.map((c) => (
             <div key={c.index} className="space-y-2">
@@ -922,14 +918,14 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
             );
           })
         ) : (
-          <Notice>
+          <Quiet>
             {streamedTool
               ? "The streamed tool-call arguments were restored on the way to your app; the log doesn't keep them. "
               : count
                 ? `${count} placeholder${count === 1 ? " was" : "s were"} put back before the answer reached your app. `
                 : "Nothing to restore in this answer. "}
             {showOriginals ? "" : "The restored answer holds real values, so it is only logged at level full, on localhost."}
-          </Notice>
+          </Quiet>
         )}
       </div>
     </div>
@@ -938,24 +934,11 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
 
 // --- Bits ---------------------------------------------------------------------------------
 
-export function Fact({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="flex flex-col-reverse">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="text-lg font-medium tabular-nums text-ink">{value}</dd>
-    </div>
-  );
-}
-
 export function ChartCard({ id, title, note, children }: { id: string; title: string; note: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-title`} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <h3 id={`${id}-title`} className="text-lg font-normal text-ink">
-        {title}
-      </h3>
-      <p className="mt-0.5 mb-4 text-sm text-muted">{note}</p>
+    <Card title={title} titleId={`${id}-title`} subtitle={note} headingLevel={3} className="min-w-0">
       {children}
-    </section>
+    </Card>
   );
 }
 

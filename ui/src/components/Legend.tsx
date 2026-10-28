@@ -34,7 +34,7 @@ export function Legend({ counts, kept: keptTypes, activeType = null, known = 0 }
               className={["size-2 rounded-full", kept ? "border border-dashed border-kept" : meta.swatch].join(" ")}
             />
             <span className="font-medium text-ink">{meta.label}</span>
-            <span className="font-mono tabular-nums">{n}</span>
+            <span className="tabular-nums">{n}</span>
             {kept && (
               <span className="font-mono text-2xs text-muted">kept</span>
             )}
@@ -45,7 +45,7 @@ export function Legend({ counts, kept: keptTypes, activeType = null, known = 0 }
         <li className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs text-muted">
           <span className="rounded-sm bg-surface-2 px-1 font-mono text-2xs ring-1 ring-line-strong">known</span>
           <span className="font-medium text-ink">from your known values</span>
-          <span className="font-mono tabular-nums">{known}</span>
+          <span className="tabular-nums">{known}</span>
         </li>
       )}
     </ul>
