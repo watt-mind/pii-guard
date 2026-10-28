@@ -52,9 +52,10 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
         </a>
         {/* The brand row shares the nav items' gutter (px-2 + px-3), so the mark sits over their icons. */}
         <div className="flex items-center gap-2 px-2 py-2.5 lg:pt-3 lg:pb-2">
-          <a href="#overview" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm px-3 text-ink">
+          {/* The 24px mark is 8px wider than the 16px nav icons, so px-2 (not px-3) keeps it centred over them. */}
+          <a href="#overview" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm px-2 text-ink">
             <Logo />
-            <span className="text-base font-medium">pii-guard</span>
+            <span className="text-[17px] font-semibold tracking-tight">PII Guard</span>
           </a>
           <span className="truncate text-sm text-muted lg:hidden">{current.label}</span>
           <span className="flex-1 lg:hidden" />
@@ -245,7 +246,7 @@ function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemeP
 
 function Logo() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 shrink-0 text-ink" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round">
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6 shrink-0 text-ink" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
       <path d="M12 3 5 6v5.2c0 4.3 2.9 8 7 9.3 4.1-1.3 7-5 7-9.3V6l-7-3Z" />
       <path d="M8.6 12h6.8" strokeLinecap="round" />
     </svg>
