@@ -31,7 +31,14 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from pii_guard.api.routes._common import v1_router
 from pii_guard.gateway.service import UpstreamError, UpstreamNotConfiguredError
 
-__all__ = ["ModelsConfig", "endpoint_catalog", "models_url", "provider_catalog", "router"]
+__all__ = [
+    "ModelsConfig",
+    "UpstreamCredentialRejectedError",
+    "endpoint_catalog",
+    "models_url",
+    "provider_catalog",
+    "router",
+]
 
 router = v1_router()
 
@@ -164,6 +171,13 @@ async def list_models(request: Request) -> JSONResponse:
     return JSONResponse(_listing([m for m in found if m is not None]))
 
 
+class UpstreamCredentialRejectedError(UpstreamError):
+    """The provider refused the key (401/403) when asked for its models."""
+
+    code = "upstream_credential_rejected"
+    status_code = 502
+
+
 async def provider_catalog(
     base_url: str, api_key: str | None, *, hosted: bool, transport: Any = None
 ) -> list[dict[str, Any]]:
@@ -189,6 +203,9 @@ async def provider_catalog(
     async with client:
         try:
             async with client.stream("GET", models_url(base_url), headers=headers) as response:
+                if response.status_code in {401, 403}:
+                    # A distinct, fixed answer the form can act on; no provider detail.
+                    raise UpstreamCredentialRejectedError("The provider refused the API key")
                 if response.status_code != 200:
                     raise UpstreamError("Provider model catalog unavailable")
                 async for chunk in response.aiter_bytes():

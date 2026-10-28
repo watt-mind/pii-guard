@@ -387,6 +387,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `invalid_project_config` | A project, policy, endpoint or endpoint-key configuration is invalid. |
 | 422 | `upstream_destination_not_allowed` | Hosted endpoint destination does not satisfy the public HTTPS/port policy. |
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
+| 502 | `upstream_credential_rejected` | Listing a provider's models (`POST /v1/projects/{project_id}/endpoints/models`, a pass-through `/e/{endpoint_id}/v1/models`): the provider answered 401 or 403, so the API key is wrong or lacks access. The message is fixed; the provider's own status text and body are never passed on. |
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
@@ -1544,7 +1545,7 @@ single-owner routes keep their default namespace.
 | `GET /v1/projects/{project_id}/policies/versions/{version_id}` | — | Exact policy-version snapshot |
 | `GET /v1/projects/{project_id}/endpoints` | — | `{endpoints:[...]}`; credentials are never returned |
 | `POST /v1/projects/{project_id}/endpoints` | `{name,provider,policy_version_id,model?,base_url?,api_key?,enabled?}` | 201 endpoint metadata; maximum 128 per project. `model` is `null` for a pass-through endpoint |
-| `POST /v1/projects/{project_id}/endpoints/models` | `{provider,base_url?,api_key?,endpoint_id?}` | `{models:[id,...]}` for the endpoint form: the provider's `GET /models` asked with `api_key` (never stored) or, without it, `endpoint_id`'s stored key (same provider and base URL only, else 422); `sponsored` returns the hosted allow-list. No key is 422; a provider failure is a generic `502 upstream_unavailable` |
+| `POST /v1/projects/{project_id}/endpoints/models` | `{provider,base_url?,api_key?,endpoint_id?}` | `{models:[id,...]}` for the endpoint form: the provider's `GET /models` asked with `api_key` (never stored) or, without it, `endpoint_id`'s stored key (same provider and base URL only, else 422); `sponsored` returns the hosted allow-list. No key is 422; a provider 401/403 is `502 upstream_credential_rejected` ("check the API key"); any other provider failure is a generic `502 upstream_unavailable` |
 | `PUT /v1/projects/{project_id}/endpoints/{endpoint_id}` | Complete endpoint fields; `api_key` may be omitted to keep current credential | Updated metadata; explicit `policy_version_id` required. `enabled:false` atomically revokes active keys; re-enabling does not restore them |
 | `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}` | — | 204; permanently deletes endpoint and all its key records |
 | `GET /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | — | `{keys:[id,name,created_at,revoked_at]}`; no raw keys |

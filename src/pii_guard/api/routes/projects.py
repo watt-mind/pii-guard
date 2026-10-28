@@ -30,6 +30,7 @@ router.responses = error_responses(
     "invalid_project_config",
     "project_storage_unavailable",
     "upstream_destination_not_allowed",
+    "upstream_credential_rejected",
 )
 ResourceId = Annotated[
     str,

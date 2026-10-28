@@ -247,3 +247,26 @@ def test_form_catalog_failure_is_generic(gateway):
     result = _catalog(client, project, provider="openai", api_key="synthetic-typed-key")
     assert result.status_code == 502
     assert "synthetic-leak" not in result.text and "synthetic-typed-key" not in result.text
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        (401, "upstream_credential_rejected"),
+        (403, "upstream_credential_rejected"),
+        (404, "upstream_unavailable"),
+        (500, "upstream_unavailable"),
+    ],
+)
+def test_form_catalog_names_a_refused_key_without_provider_detail(gateway, status, code):
+    client, project, endpoint, _, catalog = gateway
+    catalog["status"] = status
+    result = _catalog(client, project, provider="openai", api_key="synthetic-typed-key")
+    assert result.status_code == 502
+    assert result.json()["error"]["code"] == code
+    assert "synthetic-leak" not in result.text and "synthetic-typed-key" not in result.text
+    resource, key = endpoint()
+    listing = client.get(
+        resource["base_path"] + "/models", headers={"Authorization": "Bearer " + key}
+    )
+    assert listing.status_code == 502 and listing.json()["error"]["code"] == code
