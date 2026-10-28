@@ -21,7 +21,8 @@ What is masked:
   ``reasoning`` summaries and reasoning text;
 - tool definitions: ``function`` tools (description and JSON-Schema text, as for chat),
   ``namespace`` tools (Muse Code groups its tools in one) and ``custom`` tools;
-- ``text.format`` (a JSON Schema for structured output), ``metadata`` values, and the
+- ``text.format`` (a JSON Schema for structured output), ``metadata`` and ``client_metadata``
+  (Codex) values, and the
   ``user``/``safety_identifier``/``prompt_cache_key`` strings.
 
 ``reasoning.encrypted_content`` is forwarded untouched: it is the provider's own encrypted
@@ -79,7 +80,11 @@ _TOP_CHECKED = frozenset(
 )
 #: Top-level free-text strings that identify the end user or a cache entry: masked.
 _TOP_USER_TEXT = ("user", "safety_identifier", "prompt_cache_key")
-_TOP_WALKED = frozenset({"input", "instructions", "metadata", "model", "text", "tools"})
+#: ``client_metadata``: Codex's per-turn ids (session, turn, installation), masked like
+#: ``metadata`` (LAB-1331).
+_TOP_WALKED = frozenset(
+    {"client_metadata", "input", "instructions", "metadata", "model", "text", "tools"}
+)
 #: Server-side state: refused with an explanation (see the module docstring).
 _TOP_STATE = ("previous_response_id", "conversation", "prompt")
 
@@ -156,11 +161,12 @@ def collect_response_texts(body: object) -> CollectedTexts:
             raise InvalidChatRequestError(f"{key} must be a string")
     _collect_tools(body, out)
     _collect_text_options(body, out)
-    metadata = body.get("metadata")
-    if metadata is not None:
-        if not isinstance(metadata, dict):
-            raise InvalidChatRequestError("metadata must be an object")
-        _collect_metadata(metadata, out)
+    for key in ("metadata", "client_metadata"):
+        metadata = body.get(key)
+        if metadata is not None:
+            if not isinstance(metadata, dict):
+                raise InvalidChatRequestError(f"{key} must be an object")
+            _collect_metadata(metadata, out)
     return out
 
 

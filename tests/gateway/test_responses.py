@@ -610,3 +610,19 @@ def test_through_the_bench_mock_upstream(stream: bool) -> None:
         call = called.json()["output"][0]
         assert call["name"] == "muse.write_file"
         assert "Jane Placeholder" in json.loads(call["arguments"])["text"]
+
+
+def test_codex_client_metadata_is_masked_like_metadata() -> None:
+    """Codex sends per-turn ids in ``client_metadata`` (LAB-1331): walked, not refused."""
+    from pii_guard.gateway.request import InvalidChatRequestError
+    from pii_guard.gateway.responses_request import collect_response_texts
+
+    body = {
+        "model": "m",
+        "input": "hi",
+        "client_metadata": {"session_id": "01a1", "x-codex-turn-metadata": '{"turn_id":"t1"}'},
+    }
+    slots = collect_response_texts(body).slots
+    assert {"01a1", '{"turn_id":"t1"}'} <= {s.text for s in slots}
+    with pytest.raises(InvalidChatRequestError, match="client_metadata must be an object"):
+        collect_response_texts({"model": "m", "input": "hi", "client_metadata": "x"})

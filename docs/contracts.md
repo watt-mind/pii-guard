@@ -894,7 +894,7 @@ with the treatments of the table above. Any other key, item type or part type is
 | body | `temperature`, `top_p`, `top_logprobs`, `max_output_tokens`, `max_tool_calls`, `parallel_tool_calls`, `store`, `stream`, `background` | pass |
 | body | `reasoning`, `include`, `tool_choice`, `truncation`, `service_tier`, `stream_options` | check |
 | body | `user`, `safety_identifier`, `prompt_cache_key` | mask |
-| body | `metadata` | keys check; values mask JSON |
+| body | `metadata`, `client_metadata` (Codex's per-turn ids) | keys check; values mask JSON |
 | body | `text` | `verbosity` check; `format` (`type`, `name`, `schema`, `description`, `strict`) as a definition |
 | body | `tools` | `function` and `custom` tools as definitions (as for chat); `namespace` tools: `name` check, `description` mask, `tools` (function/custom only) walked; hosted tools (`web_search`, `file_search`, `mcp`, ...) `400` |
 | body | `previous_response_id`, `conversation`, `prompt` | `400`: server-side state would hold another vault session's placeholders; send the whole `input` with `store: false` |
