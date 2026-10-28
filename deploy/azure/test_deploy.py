@@ -51,7 +51,7 @@ class TemplateContractTests(unittest.TestCase):
     def test_environment_names_and_tags(self) -> None:
         params = self.template["parameters"]
         self.assertEqual(params["environmentName"]["defaultValue"], "prod")
-        self.assertEqual(params["environmentName"]["allowedValues"], ["prod", "staging"])
+        self.assertEqual(params["environmentName"]["allowedValues"], ["prod", "dev"])
         self.assertEqual(params["projectPrefix"]["defaultValue"], "piiguard")
         tags = self.template["variables"]["tags"]
         self.assertEqual(tags["project"], "pii-guard")
@@ -80,6 +80,15 @@ class TemplateContractTests(unittest.TestCase):
             self.assertEqual(
                 probe["httpGet"]["httpHeaders"], [{"name": "Host", "value": "localhost"}]
             )
+
+    def test_dev_app_resource_is_disabled_pending_private_network(self) -> None:
+        guard = self.template["variables"]["appDeploymentEnabled"]
+        self.assertIn("environmentName", guard)
+        self.assertIn("'prod'", guard)
+        self.assertEqual(
+            self.resource("Microsoft.App/containerApps")["condition"],
+            "[variables('appDeploymentEnabled')]",
+        )
 
     def test_budget_and_secret_recovery_contract(self) -> None:
         budget = self.resource("Microsoft.Consumption/budgets")["properties"]
@@ -176,8 +185,19 @@ class DeploymentAdmissionTests(unittest.TestCase):
 
     def test_environment_mismatch_is_refused(self) -> None:
         self.assert_refused(
-            self.run_deploy("bootstrap", AZURE_ENVIRONMENT="staging"), "Refusing non-dedicated"
+            self.run_deploy("bootstrap", AZURE_ENVIRONMENT="dev"), "Refusing non-dedicated"
         )
+
+    def test_dev_cannot_create_public_foundation_or_app(self) -> None:
+        for mode in ("bootstrap", "stage", "enable"):
+            with self.subTest(mode=mode):
+                self.assert_refused(
+                    self.run_deploy(
+                        mode, AZURE_ENVIRONMENT="dev", AZURE_RESOURCE_GROUP="rg-pii-guard-dev"
+                    ),
+                    "tailnet-only private network",
+                )
+                self.assertNotIn("account show", self.calls)
 
     def test_wrong_subscription_is_refused(self) -> None:
         self.assert_refused(

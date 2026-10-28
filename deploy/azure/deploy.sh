@@ -12,9 +12,13 @@ AZURE_ENVIRONMENT=${AZURE_ENVIRONMENT:-prod}
 AZURE_PROJECT_PREFIX=${AZURE_PROJECT_PREFIX:-piiguard}
 AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP:-rg-pii-guard-${AZURE_ENVIRONMENT}}
 AZURE_LOCATION=${AZURE_LOCATION:-swedencentral}
-[[ "$AZURE_ENVIRONMENT" == prod || "$AZURE_ENVIRONMENT" == staging ]] || { echo 'Environment must be prod or staging' >&2; exit 2; }
+[[ "$AZURE_ENVIRONMENT" == prod || "$AZURE_ENVIRONMENT" == dev ]] || { echo 'Environment must be prod or dev' >&2; exit 2; }
 [[ "$AZURE_PROJECT_PREFIX" =~ ^[a-z][a-z0-9]{2,9}$ ]] || { echo 'Invalid project prefix' >&2; exit 2; }
 [[ "$AZURE_RESOURCE_GROUP" == "rg-pii-guard-${AZURE_ENVIRONMENT}" ]] || { echo 'Refusing non-dedicated resource group' >&2; exit 2; }
+if [[ "$AZURE_ENVIRONMENT" == dev ]]; then
+  echo 'Dev cloud operations require the reviewed tailnet-only private network; not implemented yet' >&2
+  exit 2
+fi
 name_prefix="${AZURE_PROJECT_PREFIX}-${AZURE_ENVIRONMENT}"
 app="${name_prefix}-app"
 budget_id="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Consumption/budgets/${name_prefix}-budget"

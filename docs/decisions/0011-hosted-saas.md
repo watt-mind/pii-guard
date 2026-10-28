@@ -74,6 +74,16 @@ privacy/acceptable-use review and provider-terms verification before editable te
 
 [Hosted operations and privacy](../hosted.md) defines the runnable steps and current limits.
 
+## Dev/prod follow-on
+
+`develop` is intended for tailnet-only dev and the actual production branch for prod, using the
+same image with isolated credentials/state/budgets. Dev cloud/app deployment is currently
+blocked pending a reviewed private VNet/Container Apps environment plus always-on tailnet
+proxy/router, DNS/TLS and OAuth callback. A sleeping app sidecar cannot wake itself. The
+finite sponsored default remains subject to provider permission and reconciled allocation
+policy; see the [dev/prod plan](../hosted.md#devprod-deployment-plan--private-dev-networking-pending).
+No branch deployment workflow or public dev app is enabled here.
+
 ## Consequences
 
 This provides a reviewable hosted path while preserving a small initial trust boundary.
