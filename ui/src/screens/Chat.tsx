@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { DEFAULT_CHAT_MODEL, SYSTEM_PROMPT, type ChatClient, type ChatMessage, type ChatMode } from "../api/chat";
+import { FALLBACK_CHAT_MODEL, SYSTEM_PROMPT, isChatModel, pickDefaultModel, type ChatClient, type ChatMessage, type ChatMode } from "../api/chat";
 import { MaskedText } from "../components/MaskedText";
 import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
@@ -10,6 +10,11 @@ import { metaFor } from "../lib/entities";
 import { SESSION_SOURCE_LABEL } from "../lib/traffic";
 import { alignLoose, alignRestored, tokenize, type RestoredSegment } from "../lib/placeholders";
 import { toRunError, type RunError } from "../lib/run";
+import { errorCopy, statusFromMessage } from "../lib/errorCopy";
+import { readPref, writePref } from "../lib/storage";
+
+/** Where the last model used in Chat is remembered (per viewer, best effort). */
+export const MODEL_PREF = "chat-model";
 
 export interface ChatDraft {
   text: string;
@@ -33,6 +38,13 @@ interface Turn {
   masked: number | null;
   ms: number | null;
   error: RunError | null;
+  finishReason: string | null;
+}
+
+/** The gateway's model list: loading, the ids it serves, or failed (then the fallback / a typed id is used). */
+interface ModelList {
+  status: "idle" | "loading" | "ok" | "failed";
+  ids: string[];
 }
 
 interface Props {
@@ -62,7 +74,13 @@ const MODES: { id: ChatMode; label: string; hint: string }[] = [
 export function Chat({ client, live, draft, ner = null, mockUpstream = false }: Props) {
   const [mode, setMode] = useState<ChatMode>("fast");
   const [language, setLanguage] = useState<"hu" | "en">(CHAT_SAMPLES[0]!.language);
-  const [model, setModel] = useState(DEFAULT_CHAT_MODEL);
+  const [model, setModel] = useState(FALLBACK_CHAT_MODEL);
+  /** The last `/v1/models` answer, and which client it came from (null ids: it failed). */
+  const [listed, setListed] = useState<{ client: ChatClient; ids: string[] | null } | null>(null);
+  const models: ModelList =
+    listed?.client === client
+      ? { status: listed.ids ? "ok" : "failed", ids: listed.ids ?? [] }
+      : { status: client.kind === "api" && client.listModels ? "loading" : "idle", ids: [] };
   const [text, setText] = useState(CHAT_SAMPLES[0]!.text);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -82,6 +100,31 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
   };
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Default to a model the upstream actually serves (LAB-1335): the last one used if it's
+  // still listed, else a preferred one, else the first chat-capable id.
+  useEffect(() => {
+    if (client.kind !== "api" || !client.listModels) return;
+    const controller = new AbortController();
+    client.listModels(controller.signal).then(
+      (ids) => {
+        setListed({ client, ids });
+        setModel(pickDefaultModel(ids, readPref(MODEL_PREF)));
+      },
+      () => {
+        if (controller.signal.aborted) return;
+        setListed({ client, ids: null });
+        setModel(readPref(MODEL_PREF) || FALLBACK_CHAT_MODEL);
+      },
+    );
+    return () => controller.abort();
+  }, [client]);
+
+  const chooseModel = (m: string) => {
+    setModel(m);
+    if (m.trim()) writePref(MODEL_PREF, m.trim());
+  };
+  const needsModel = client.kind === "api" && !mockUpstream && model.trim() === "";
 
 
   const reset = () => {
@@ -108,7 +151,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
     const message = (override?.text ?? text).trim();
     const lang = override?.language ?? language;
     const fresh = override !== undefined;
-    if (!message || (busy && !fresh)) return;
+    if (!message || (busy && !fresh) || needsModel) return;
     if (fresh) abortRef.current?.abort();
     const id = nextId.current++;
     const history: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
@@ -119,7 +162,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
     history.push({ role: "user", content: message });
     setTurns((ts) => [
       ...(fresh ? [] : ts.filter((t) => t.status !== "error")),
-      { id, user: message, mode, status: "masking", thinking: false, maskedUser: null, maskedSystem: null, answer: "", maskedAnswer: null, masked: null, ms: null, error: null },
+      { id, user: message, mode, status: "masking", thinking: false, maskedUser: null, maskedSystem: null, answer: "", maskedAnswer: null, masked: null, ms: null, error: null, finishReason: null },
     ]);
     setText("");
     // Keep the keyboard user in the composer; bring the new turn into view.
@@ -132,7 +175,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
     try {
       const result = await client.send({
         messages: history,
-        model,
+        model: model.trim(),
         mode,
         language: lang,
         sessionId: fresh ? (override.sessionId ?? null) : sessionId,
@@ -155,7 +198,9 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
         maskedUser: [...result.maskedMessages].reverse().find((m) => m.role === "user")?.content ?? null,
         masked: result.masked,
         ms: result.ms,
+        finishReason: result.finishReason ?? null,
       });
+      if (client.kind === "api" && model.trim()) writePref(MODEL_PREF, model.trim());
     } catch (err) {
       if (controller.signal.aborted) {
         setTurns((ts) => ts.filter((t) => t.id !== id));
@@ -226,7 +271,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
               if (!t) return "";
               if (t.status === "masking") return "Masking your message";
               if (t.status === "streaming") return t.maskedUser ? "Masked message sent; waiting for the answer" : "";
-              if (t.status === "error") return "Blocked. Nothing was sent to the model.";
+              if (t.status === "error" && t.error) return errorCopy(t.error.code, t.error.status ?? statusFromMessage(t.error.message)).title;
               return "Answer received and restored";
             })()}
           </p>
@@ -256,7 +301,9 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
             language={language}
             onLanguage={setLanguage}
             model={model}
-            onModel={setModel}
+            onModel={chooseModel}
+            models={models}
+            needsModel={needsModel}
             mock={client.kind === "mock"}
             sessionId={sessionId}
             onReset={turns.length ? reset : undefined}
@@ -289,6 +336,12 @@ function PlaceholderInfo({ placeholder }: { placeholder: string }) {
 function segmentsFor(masked: string | null, original: string): RestoredSegment[] {
   if (!masked) return [{ kind: "text", text: original }];
   return alignRestored(masked, original) ?? alignLoose(masked, original) ?? [{ kind: "text", text: original }];
+}
+
+/** The masked request left pii-guard and reached (or was sent to) the upstream. */
+function reachedUpstream(error: RunError): boolean {
+  const kind = errorCopy(error.code).kind;
+  return kind === "upstream" || kind === "stream";
 }
 
 function TurnView({
@@ -327,7 +380,11 @@ function TurnView({
       </Bubble>
       <Bubble side="model" label="What the model received">
         {turn.status === "error" && turn.maskedUser === null ? (
-          <p className="text-sm text-muted">Nothing was sent.</p>
+          <p className="text-sm text-muted">
+            {turn.error && reachedUpstream(turn.error)
+              ? "The masked request was sent; the upstream refused it before answering."
+              : "Nothing was sent."}
+          </p>
         ) : turn.maskedUser === null ? (
           <Pending
             label={simulated ? "Masking in your browser…" : turn.mode === "audit" ? "Detecting personal data (rules + NER + LLM detector)…" : "Detecting personal data (rules + NER)…"}
@@ -386,6 +443,13 @@ function TurnView({
                 />
               )}
             </div>
+            {turn.status === "done" && turn.answer.trim() === "" && (
+              <p role="note" data-testid="empty-answer-hint" className="mt-1 text-sm text-warn">
+                {turn.finishReason === "length"
+                  ? "The model used its whole token budget reasoning and returned no answer: raise max tokens, or pick a non-reasoning model."
+                  : "The model returned an empty answer."}
+              </p>
+            )}
             {turn.status === "done" && (
               <p className="mt-2 text-xs text-muted">
                 {restored} {restored === 1 ? "value" : "values"} restored{turn.ms !== null ? ` · ${turn.ms < 1000 ? `${Math.max(1, Math.round(turn.ms))} ms` : `${(turn.ms / 1000).toFixed(1)} s`}` : ""}.{" "}
@@ -454,6 +518,8 @@ interface ComposerProps {
   onLanguage: (l: "hu" | "en") => void;
   model: string;
   onModel: (m: string) => void;
+  models: ModelList;
+  needsModel: boolean;
   mock: boolean;
   sessionId: string | null;
   onReset?: () => void;
@@ -462,7 +528,9 @@ interface ComposerProps {
   handedOver: boolean;
 }
 
-function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, onLanguage, model, onModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
+function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, onLanguage, model, onModel, models, needsModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
+  const chatIds = models.ids.filter(isChatModel);
+  const options = model && !chatIds.includes(model) ? [model, ...chatIds] : chatIds;
   const modeHint = mock
     ? "The demo engine runs a small rule set in your browser in both modes; the AI detector and the real model need the live API."
     : MODES.find((m) => m.id === mode)!.hint;
@@ -529,6 +597,37 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
             <option value="en">English</option>
           </select>
         </label>
+        {!mock && !mockUpstream && (
+          <label className="flex min-w-0 items-center gap-2 text-sm text-muted">
+            Model
+            {models.status === "ok" && options.length > 0 ? (
+              <select
+                id="chat-model"
+                aria-label="Model"
+                value={model}
+                onChange={(e) => onModel(e.target.value)}
+                className="h-9 min-w-0 max-w-[16rem] rounded-lg border border-field bg-surface px-2 font-mono text-xs text-ink"
+              >
+                {options.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id="chat-model"
+                aria-label="Model"
+                value={model}
+                onChange={(e) => onModel(e.target.value)}
+                disabled={models.status === "loading"}
+                placeholder={models.status === "loading" ? "Loading models…" : "upstream model id"}
+                spellCheck={false}
+                className="h-9 w-56 min-w-0 rounded-lg border border-field bg-surface px-2 font-mono text-xs text-ink placeholder:text-faint"
+              />
+            )}
+          </label>
+        )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {onReset && (
             <Button variant="ghost" onClick={onReset} disabled={busy}>
@@ -540,12 +639,17 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
               Stop
             </Button>
           ) : (
-            <Button variant="primary" onClick={onSend} disabled={text.trim() === ""}>
+            <Button variant="primary" onClick={onSend} disabled={text.trim() === "" || needsModel} title={needsModel ? "Choose a model first" : undefined}>
               Send through pii-guard <span aria-hidden="true">→</span>
             </Button>
           )}
         </div>
       </div>
+      {!mock && !mockUpstream && models.status === "failed" && (
+        <p role="note" data-testid="models-failed" className="text-xs text-warn">
+          The gateway's model list (<code className="font-mono">GET /v1/models</code>) is not available. Type a model id the upstream serves.
+        </p>
+      )}
       <p className="text-xs text-muted">
         <span className="font-medium text-ink">{mock ? "Demo engine" : `${MODES.find((m) => m.id === mode)!.label} mode`}:</span> {modeHint}{" "}
         <kbd className="rounded border border-line px-1 font-mono text-2xs">⌘/Ctrl ↵</kbd> sends.
@@ -561,15 +665,8 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
               "Mock upstream (echo): the model name is ignored"
             ) : (
               <>
-                <label htmlFor="chat-model" className="sr-only">
-                  Upstream model
-                </label>
-                <input
-                  id="chat-model"
-                  value={model}
-                  onChange={(e) => onModel(e.target.value)}
-                  className="h-7 w-full max-w-sm rounded border border-field bg-surface-2 px-2 font-mono text-xs text-ink"
-                />
+                <span className="font-mono">{model || "none chosen"}</span>
+                {models.status === "ok" ? ` · ${models.ids.length} listed by GET /v1/models` : models.status === "failed" ? " · GET /v1/models failed" : ""}
               </>
             )}
           </dd>

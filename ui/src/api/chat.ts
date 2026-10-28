@@ -47,11 +47,15 @@ export interface ChatTurnResult {
   sessionSource?: string | null;
   mode: ChatMode;
   ms: number;
+  /** The upstream's `finish_reason` (`length`: the token budget ran out); null when not reported. */
+  finishReason?: string | null;
 }
 
 export interface ChatClient {
   readonly kind: "api" | "mock";
   send(req: ChatTurnRequest): Promise<ChatTurnResult>;
+  /** The model ids the gateway's upstream serves (`GET /v1/models`); absent for the demo engine. */
+  listModels?(signal?: AbortSignal): Promise<string[]>;
 }
 
 /** Tells the model how to treat placeholders, including Hungarian suffixes after them. */
@@ -60,7 +64,40 @@ export const SYSTEM_PROMPT =
   "Use them verbatim wherever you mean that value, and put any grammatical suffix right after the closing brackets " +
   "(for example [[PERSON_1a2b3c]]nak). Never ask what they stand for. Answer briefly, in plain text without Markdown.";
 
-export const DEFAULT_CHAT_MODEL = import.meta.env.VITE_PII_GUARD_CHAT_MODEL || "meta-models/muse-spark-open-1026";
+/**
+ * The model to ask for only when the gateway's `GET /v1/models` fails (LAB-1335). Without a
+ * build-time `VITE_PII_GUARD_CHAT_MODEL` it is empty: the upstream is unknown, so any
+ * provider's id would be a guess that 404s on the others. The screen then asks for an id.
+ */
+export const FALLBACK_CHAT_MODEL = import.meta.env.VITE_PII_GUARD_CHAT_MODEL ?? "";
+
+/** Preferred defaults, in order, when the upstream serves them (Meta's Model API). */
+export const PREFERRED_CHAT_MODELS = ["muse-spark-1.3", "muse-wonder-1.0"] as const;
+
+/**
+ * Room for reasoning models: muse-spark-1.3 and muse-wonder-1.0 spend their budget thinking
+ * first (about 1,300 tokens for a haiku), and a small cap leaves the answer empty.
+ */
+export const DEFAULT_MAX_TOKENS = 4096;
+
+/** Ids a chat completion can't use: transcription, image generation, segmentation (SAM), embeddings. */
+export function isChatModel(id: string): boolean {
+  const s = id.toLowerCase();
+  const base = s.slice(s.lastIndexOf("/") + 1);
+  return !(
+    /transcri|whisper|speech|tts|voice/.test(s) ||
+    /image|dall-?e|imagen|diffusion/.test(s) ||
+    /^sam[-_.\d]/.test(base) ||
+    /embed|rerank|moderation/.test(s)
+  );
+}
+
+/** The model the Playground starts with: the last one used if still served, then the preferred ones, then the first chat-capable id. */
+export function pickDefaultModel(ids: readonly string[], lastUsed: string | null): string {
+  if (lastUsed && ids.includes(lastUsed)) return lastUsed;
+  for (const p of PREFERRED_CHAT_MODELS) if (ids.includes(p)) return p;
+  return ids.find(isChatModel) ?? ids[0] ?? FALLBACK_CHAT_MODEL;
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
@@ -101,6 +138,24 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
 
   return {
     kind: "api",
+    async listModels(signal) {
+      let res: Response;
+      try {
+        res = await doFetch(`${baseUrl}/v1/models`, { headers: { Accept: "application/json" }, signal });
+      } catch (err) {
+        if (signal?.aborted) throw err;
+        throw new UnreachableError();
+      }
+      if (!res.ok) throw await errorFrom(res);
+      let payload: unknown;
+      try {
+        payload = await res.json();
+      } catch {
+        throw new UnreachableError("the model list is not JSON");
+      }
+      const data = isRecord(payload) && Array.isArray(payload.data) ? payload.data : [];
+      return [...new Set(data.flatMap((m) => (isRecord(m) && typeof m.id === "string" && m.id ? [m.id] : [])))];
+    },
     async send(req) {
       const started = performance.now();
       const headers: Record<string, string> = {
@@ -120,7 +175,7 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
             model: req.model,
             stream: true,
             reasoning_effort: "low",
-            max_tokens: 1200,
+            max_tokens: DEFAULT_MAX_TOKENS,
             messages: req.messages,
           }),
           signal: req.signal,
@@ -136,6 +191,7 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
       let maskedAnswer = "";
       let answer = "";
       let thinking = false;
+      let finishReason: string | null = null;
 
       const handle = (data: string) => {
         if (data.trim() === "[DONE]") return;
@@ -161,6 +217,7 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
           return;
         }
         const choice = Array.isArray(event.choices) ? event.choices[0] : undefined;
+        if (isRecord(choice) && typeof choice.finish_reason === "string") finishReason = choice.finish_reason;
         const delta = isRecord(choice) && isRecord(choice.delta) ? choice.delta : null;
         if (delta && !answer && typeof delta.reasoning_content === "string" && delta.reasoning_content && !thinking) {
           thinking = true;
@@ -207,6 +264,7 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
         masked: maskedHeader === null ? null : Number(maskedHeader),
         sessionSource: res.headers.get("x-pii-guard-session-source"),
         mode: req.mode,
+        finishReason,
         ms: Math.round(performance.now() - started),
       };
     },
