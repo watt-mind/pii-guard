@@ -328,10 +328,14 @@ traffic log is on:
 
 | Endpoint | What it returns |
 |---|---|
-| `GET /v1/traffic?limit=50&after=<seq>` | `{"level", "size", "events": [...]}`, oldest first |
+| `GET /v1/traffic?limit=50&after=<seq>` | `{"level", "size", "boot", "events": [...]}`, oldest first |
 | `GET /v1/traffic/stream?replay=10` | Server-sent events: one `traffic` event per call (`id:` = `seq`), a keep-alive comment every 15 s |
 
 Both answer `404 traffic_log_disabled` while the log is off.
+
+`seq` counts from 1 in each server process. `boot` is a random id (`b_` + 16 hex) chosen at
+startup: a poller that sees it change knows the server restarted and its `after` cursor is
+stale, and starts again from `after=0`. The Logs screen does this.
 
 ### Privacy model
 

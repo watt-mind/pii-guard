@@ -183,6 +183,21 @@ def test_ring_buffer_size_and_limit() -> None:
         assert [e["id"] for e in client.get("/v1/traffic?limit=1").json()["events"]] == ids[2:]
 
 
+def test_boot_id_is_stable_per_process_and_new_after_a_restart() -> None:
+    # LAB-1357: seq restarts at 1 with the process; the boot id lets a poller notice.
+    app = make(MockUpstream())
+    with TestClient(app) as client:
+        chat(client)
+        first = client.get("/v1/traffic").json()
+        assert first["boot"].startswith("b_") and len(first["boot"]) == 18
+        assert client.get("/v1/traffic?after=1").json()["boot"] == first["boot"]
+    with TestClient(make(MockUpstream())) as restarted:
+        chat(restarted)
+        second = restarted.get("/v1/traffic").json()
+        assert second["boot"] != first["boot"]
+        assert [e["seq"] for e in second["events"]] == [1]
+
+
 def test_full_is_refused_on_a_non_loopback_bind() -> None:
     with pytest.raises(TrafficLogConfigError):
         create_app(Settings(host="0.0.0.0"), ObservabilitySettings(traffic_log="full"))  # noqa: S104

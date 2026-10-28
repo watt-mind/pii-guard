@@ -742,6 +742,15 @@ without its path, query, user or password.
 Everything but `gateway.url`, `traffic_log` and `metrics` is fixed for the life of the app and
 computed on the first call; a settings change needs a restart.
 
+### `GET /v1/traffic`
+
+`{"level": "masked" | "full", "size": int, "boot": str, "events": [...]}`, events oldest first
+(`docs/operations.md`, "Traffic log", for an event's fields). `?limit=` keeps the newest N,
+`?after=<seq>` only events with a larger `seq`. `seq` restarts at 1 with the server process;
+`boot` (`b_` + 16 hex, random per process) changes with it, so a client holding an `after`
+cursor resets it to 0 when `boot` differs from the one it saw last. `GET /v1/traffic/stream`
+sends the same events as server-sent events (`id:` = `seq`).
+
 ### Vault inspector: `/v1/vault/sessions`
 
 For troubleshooting (LAB-1328): which vault sessions exist, where each came from and what it

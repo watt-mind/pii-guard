@@ -69,10 +69,17 @@ _TRAFFIC_ERRORS = error_responses("traffic_log_disabled", "invalid_request")
     responses={
         200: {
             "description": "`level` (`masked` or `full`), `size` (how many events the log "
-            "keeps) and `events`, oldest first. See docs/operations.md for an event's fields.",
+            "keeps), `boot` (a random id per server process: when it changes, `seq` restarted "
+            "at 1 and an `after` cursor from before is stale) and `events`, oldest first. See "
+            "docs/operations.md for an event's fields.",
             "content": {
                 "application/json": {
-                    "example": {"level": "masked", "size": 200, "events": []},
+                    "example": {
+                        "level": "masked",
+                        "size": 200,
+                        "boot": "b_3f9c2a7e5d1b8c04",
+                        "events": [],
+                    },
                 }
             },
         },
@@ -98,6 +105,7 @@ def recent_traffic(
     return {
         "level": traffic.level.value,
         "size": traffic.size,
+        "boot": traffic.boot,
         "events": events,
     }
 

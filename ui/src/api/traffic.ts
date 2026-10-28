@@ -8,6 +8,14 @@
 // `after=<last seq>` instead. Events are de-duplicated by request id, so a stream replay or a
 // reconnect never shows a call twice. Both routes answer 404 `traffic_log_disabled` while the
 // server runs with `PII_GUARD_TRAFFIC_LOG=off`.
+//
+// Robustness (LAB-1357):
+// - A restarted server numbers events from 1 again, so the old `after` cursor would hide every
+//   new event. A page's `boot` (one random id per server process) changing, or an unseen SSE
+//   event at or below the cursor, resets the cursor to 0.
+// - One `/v1/traffic` request at a time: the next poll is scheduled once the previous one
+//   settles, and each request is aborted after `timeoutMs`.
+// - The dedup set keeps the newest `dedupWindow` ids, not every id ever seen.
 
 import type { EntityType } from "./types";
 import { ApiError, UnreachableError } from "./http";
@@ -67,6 +75,8 @@ export interface TrafficEvent {
 export interface TrafficPage {
   level: TrafficLevel;
   size: number;
+  /** One random id per server process; a new one means the server restarted (its seq starts at 1). `null` from servers that predate it. */
+  boot: string | null;
   events: TrafficEvent[];
 }
 
@@ -138,6 +148,10 @@ export interface TrafficConnectOptions {
   /** `null` forces polling (tests, or a browser without EventSource). */
   EventSource?: EventSourceCtor | null;
   pollMs?: number;
+  /** Per-request timeout of `/v1/traffic` (backlog and polls). Default {@link TRAFFIC_TIMEOUT_MS}. */
+  timeoutMs?: number;
+  /** Event ids remembered for de-duplication, newest first. Default {@link DEDUP_WINDOW}. */
+  dedupWindow?: number;
   /** Events loaded before following the stream. */
   backlog?: number;
   onEvents: (events: TrafficEvent[]) => void;
@@ -150,6 +164,15 @@ export interface TrafficConnection {
 
 /** SSE errors in a row (without an open in between) before falling back to polling. */
 export const SSE_MAX_ERRORS = 3;
+
+/** Default per-request timeout of `/v1/traffic`. */
+export const TRAFFIC_TIMEOUT_MS = 10_000;
+
+/**
+ * Default dedup window: the Logs screen keeps `MAX_EVENTS` (500) events, and duplicates only
+ * come from the stream's `replay=50` and the 200-event backlog, so older ids can be forgotten.
+ */
+export const DEDUP_WINDOW = 500;
 
 export async function fetchTraffic(
   doFetch: typeof fetch,
@@ -177,6 +200,7 @@ export async function fetchTraffic(
     return {
       level: payload.level === "full" ? "full" : "masked",
       size: num(payload.size),
+      boot: typeof payload.boot === "string" ? payload.boot : null,
       events: payload.events.map(parseTrafficEvent).filter((e): e is TrafficEvent => e !== null),
     };
   }
@@ -194,21 +218,33 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
   const ES: EventSourceCtor | null =
     options.EventSource === undefined ? ((globalThis as { EventSource?: EventSourceCtor }).EventSource ?? null) : options.EventSource;
   const pollMs = options.pollMs ?? 2000;
+  const timeoutMs = options.timeoutMs ?? TRAFFIC_TIMEOUT_MS;
+  const dedupWindow = Math.max(1, options.dedupWindow ?? DEDUP_WINDOW);
+  const backlog = options.backlog ?? 200;
+  // Insertion-ordered: the first entry is the oldest id, evicted once the window is full.
   const seen = new Set<string>();
   let lastSeq = 0;
+  let boot: string | null = null;
   let closed = false;
+  let polling = false;
   let level: TrafficLevel = "masked";
   let size = 0;
   let es: InstanceType<EventSourceCtor> | null = null;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   const controller = new AbortController();
 
+  const remember = (id: string) => {
+    seen.add(id);
+    while (seen.size > dedupWindow) seen.delete(seen.values().next().value as string);
+  };
+
   const emit = (events: TrafficEvent[]) => {
     const fresh: TrafficEvent[] = [];
     for (const e of events) {
       if (seen.has(e.id)) continue;
-      seen.add(e.id);
-      lastSeq = Math.max(lastSeq, e.seq);
+      remember(e.id);
+      // A new call at or below the cursor: the server restarted and numbers from 1 again.
+      lastSeq = e.seq <= lastSeq ? e.seq : Math.max(lastSeq, e.seq);
       fresh.push(e);
     }
     if (fresh.length && !closed) options.onEvents(fresh);
@@ -225,28 +261,69 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
     return { state: "offline", message: err instanceof Error ? err.message : String(err) };
   };
 
+  /** One `/v1/traffic` request, aborted after `timeoutMs` or on `close()`, whatever the fetch does with the signal. */
+  const load = (query: { limit?: number; after?: number }): Promise<TrafficPage> => {
+    const request = new AbortController();
+    const abort = () => request.abort();
+    controller.signal.addEventListener("abort", abort);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stop = new Promise<never>((_, reject) => {
+      const onAbort = () =>
+        reject(controller.signal.aborted ? new DOMException("closed", "AbortError") : new UnreachableError(`pii-guard API did not answer within ${timeoutMs / 1000} s`));
+      request.signal.addEventListener("abort", onAbort);
+      timer = setTimeout(abort, timeoutMs);
+    });
+    return Promise.race([fetchTraffic(doFetch, baseUrl, query, request.signal), stop]).finally(() => {
+      clearTimeout(timer);
+      controller.signal.removeEventListener("abort", abort);
+    });
+  };
+
+  /**
+   * Take a page fetched with `after`. False when its boot id says the server restarted and the
+   * page was filtered by the old cursor: the cursor is reset and the caller fetches again.
+   */
+  const accept = (page: TrafficPage, after: number): boolean => {
+    level = page.level;
+    size = page.size;
+    const restarted = page.boot !== null && boot !== null && page.boot !== boot;
+    if (page.boot !== null) boot = page.boot;
+    if (restarted) lastSeq = 0;
+    if (restarted && after > 0) return false;
+    emit(page.events);
+    return true;
+  };
+
+  const schedulePoll = (delay: number) => {
+    if (!closed) pollTimer = setTimeout(poll, delay);
+  };
+
   const poll = () => {
+    pollTimer = null;
     if (closed) return;
-    fetchTraffic(doFetch, baseUrl, { after: lastSeq, limit: 200 }, controller.signal).then(
+    const after = lastSeq;
+    load({ after, limit: 200 }).then(
       (page) => {
-        level = page.level;
-        size = page.size;
-        emit(page.events);
+        if (closed) return;
+        if (!accept(page, after)) return schedulePoll(0); // restarted: fetch again from seq 0 right away
         status({ state: "live", via: "poll", level, size });
+        schedulePoll(pollMs);
       },
       (err: unknown) => {
-        if (!closed) status(failure(err));
+        if (closed) return;
+        status(failure(err));
+        schedulePoll(pollMs);
       },
     );
-    pollTimer = setTimeout(poll, pollMs);
   };
 
   const startPolling = () => {
-    if (closed || pollTimer !== null) return;
+    if (closed || polling) return;
+    polling = true;
     es?.close();
     es = null;
     status({ state: "live", via: "poll", level, size });
-    pollTimer = setTimeout(poll, pollMs);
+    schedulePoll(pollMs);
   };
 
   const follow = () => {
@@ -284,45 +361,27 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
     };
   };
 
-  fetchTraffic(doFetch, baseUrl, { limit: options.backlog ?? 200 }, controller.signal).then(
-    (page) => {
-      level = page.level;
-      size = page.size;
-      emit(page.events);
-      status({ state: "live", via: ES ? "sse" : "poll", level, size });
-      follow();
-    },
-    (err: unknown) => {
-      if (closed) return;
-      const s = failure(err);
-      status(s);
-      // Keep trying while the API is down; a disabled log needs a restart, so stop there.
-      if (s.state === "offline") startPollingQuiet();
-    },
-  );
-
-  // Retry the backlog until the API answers, then switch to following it.
-  function startPollingQuiet() {
+  // Load the backlog; retry it every 2 * pollMs while the API is down, then follow it.
+  const loadBacklog = () => {
+    pollTimer = null;
     if (closed) return;
-    pollTimer = setTimeout(() => {
-      pollTimer = null;
-      fetchTraffic(doFetch, baseUrl, { limit: options.backlog ?? 200 }, controller.signal).then(
-        (page) => {
-          level = page.level;
-          size = page.size;
-          emit(page.events);
-          status({ state: "live", via: ES ? "sse" : "poll", level, size });
-          follow();
-        },
-        (err: unknown) => {
-          if (closed) return;
-          const s = failure(err);
-          status(s);
-          if (s.state === "offline") startPollingQuiet();
-        },
-      );
-    }, pollMs * 2);
-  }
+    load({ limit: backlog }).then(
+      (page) => {
+        if (closed) return;
+        accept(page, 0);
+        status({ state: "live", via: ES ? "sse" : "poll", level, size });
+        follow();
+      },
+      (err: unknown) => {
+        if (closed) return;
+        const s = failure(err);
+        status(s);
+        // Keep trying while the API is down; a disabled log needs a restart, so stop there.
+        if (s.state === "offline") pollTimer = setTimeout(loadBacklog, pollMs * 2);
+      },
+    );
+  };
+  loadBacklog();
 
   return {
     close() {
