@@ -126,7 +126,12 @@ _PERSONAL_ID_CONTEXT = ("személyi azonosító", "személyi szám", "személyisz
 def _find_hu_personal_id(text: str) -> Iterator[_Hit]:
     for m in _PERSONAL_ID_RE.finditer(text):
         if is_valid_hu_personal_id(m.group(1) + m.group(3) + m.group(4)):
-            score = 0.99 if context_before(text, m.start(), _PERSONAL_ID_CONTEXT) else 0.85
+            if context_before(text, m.start(), _PERSONAL_ID_CONTEXT):
+                score = 0.99
+            elif reference_or_amount_before(text, m.start()):
+                continue  # "Order 75302022056", "ticket: 28309121692": a reference (LAB-1327)
+            else:
+                score = 0.85
             yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, score)
 
 
