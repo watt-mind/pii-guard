@@ -9,6 +9,7 @@ It writes:
 - ``<dest>/<code>/rules.py``: empty ``EVERYWHERE`` / ``RULES`` and a commented example rule;
 - ``<dest>/<code>/prompt.md``: generic LLM notes to replace with the language's own;
 - ``<dest>/<code>/cues.tsv``: cue words for context-cued numbers, commented examples only;
+- ``<dest>/<code>/brands.tsv``: the country's company and brand names, commented examples;
 - ``<fixtures>/<code>-smoke.jsonl.example``: one fictional document in the fixture format;
 - optionally ``<tests>/test_<code>_pack.py``: a test hook running the conformance suite (for
   a pack in its own distribution; inside this repository ``tests/languages`` already runs it
@@ -73,6 +74,7 @@ def pack() -> LanguagePack:
         # lexicons=LexiconSpec(...),  # name and place lists (see languages/hu/__init__.py)
         # captions=files(__name__).joinpath("captions.tsv"),  # ID card field captions
         # cues=files(__name__).joinpath("cues.tsv"),  # cue words before numbers (cues.tsv)
+        # brands=files(__name__).joinpath("brands.tsv"),  # brand names that are not persons
     )
 '''
 
@@ -137,6 +139,17 @@ _CUES = """# Cue words for context-cued numbers (pii_guard/languages/cues.py; do
 # order number\t-
 """
 
+_BRANDS = """# The country's well-known company and brand names (pii_guard/detect/ner_orgs.py;
+# docs/languages.md). One name per line, as it is written; case is ignored. An NER PERSON
+# span that is only one of these names (plus a suffix the inflection matcher allows) becomes
+# ORGANIZATION, which policy keeps. Global names (Meta, Google, OpenAI ...) are already in
+# pii_guard/languages/brands.tsv. Leave out names that are also given names or surnames.
+# Uncomment the pack's ``brands=`` line in __init__.py once there is a line here.
+# Examples (languages/de/brands.tsv is complete):
+# Deutsche Bahn
+# Lufthansa
+"""
+
 
 def _example_line(code: str) -> str:
     text = "Example: write to Sample Person at sample.person@example.com."
@@ -177,6 +190,7 @@ def new_pack(
         package / "rules.py": _RULES.format(code=code, name=name),
         package / "prompt.md": _PROMPT.format(name=name),
         package / "cues.tsv": _CUES,
+        package / "brands.tsv": _BRANDS,
     }
     if fixtures_dir is not None:
         files[Path(fixtures_dir) / f"{code}-smoke.jsonl.example"] = _example_line(code)

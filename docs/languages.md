@@ -30,6 +30,7 @@ guide, and every step below points at it.
 | Lexicons | `lexicons` (`LexiconSpec`) | `pii_guard.lang`, the corpus generator, rules | `LexiconUnavailable` |
 | Document field captions | `captions` (`captions.tsv`) | `visual/captions.py`: the value next to `Név` / `Date of birth` on an ID card is masked | captions in this language not recognised in images |
 | Cue words for numbers | `cues` (`cues.tsv`) | `RuleDetector` via `languages/cues.py`: a number right after `TAJ` or `passport` is masked even when its checksum fails | only the other packs' cues |
+| Brand names | `brands` (`brands.tsv`) | `NerDetector` via `detect/ner_orgs.py`: an NER `PERSON` span that is only a company or product name (`OTP Bank`, `Deutsche Bahn`) becomes `ORGANIZATION`, which policy keeps | the shared list (`languages/brands.tsv`) and the other packs' names |
 
 The NER and LLM passes are multilingual: a new language needs no model change, only prompt
 notes and a measurement.
@@ -201,6 +202,18 @@ or under it and masks that value ([visual/captions.py](../src/pii_guard/visual/c
 Write captions as printed, with accents; matching ignores case, accents and punctuation and
 tolerates small OCR errors. The conformance suite checks that the file parses (and
 `cues.tsv`, see [Rules](#3-rules)).
+
+`brands=files(__name__).joinpath("brands.tsv")`: the country's well-known company and brand
+names, one per line as written (`OTP Bank`, `Deutsche Bahn`). The NER model sometimes calls a
+bare brand a person (`Write a haiku about Meta` came out as `[[PERSON_x]]`, LAB-1336); a
+`PERSON` span that is exactly a listed name, plus a suffix your inflection matcher allows for
+an organisation (`Google-nek`, `Metáról`, `Metas`), becomes `ORGANIZATION`, which policy
+keeps. Global names (Meta, Llama, Google, OpenAI ...) are already in the shared
+`languages/brands.tsv`, and every pack's names count for every text. Leave out names that are
+also given names or surnames (Ford, Dell, Siemens, Otto): a missed brand is an over-mask, a
+missed person a leak. A name your pack's name lexicons list is never relabelled, and neither
+is one next to an honorific (`Ms. Apple`) or another part of a name (`Meta Kovács`). Add a
+few prompts with your brands to `eval/fixtures/negative/<code>-brand-names.jsonl`.
 
 ### 7. Check, measure, document
 

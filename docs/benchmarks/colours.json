@@ -62,6 +62,10 @@
       "color": "#D55E00",
       "shape": "circle"
     },
+    "rules+ner": {
+      "color": "#332288",
+      "shape": "circle"
+    },
     "rules+ner:eu-pii-anonimization-multilang": {
       "color": "#882255",
       "shape": "circle"

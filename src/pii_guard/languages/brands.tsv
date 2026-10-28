@@ -1,0 +1,94 @@
+# Well-known company, product and model names, for every language (detect/ner_orgs.py, LAB-1336).
+# One name per line, as it is written; matching ignores case. An NER PERSON span that is
+# exactly one of these (plus an inflection suffix) becomes ORGANIZATION, which policy keeps.
+# Leave out names that are also common given names or surnames (Ford, Dell, Tesla, Siemens,
+# Porsche, Disney, Claude, Alexa, Siri ...): a missed brand is an over-mask, a missed person a
+# leak. A name that a pack's name lexicon lists is never relabelled anyway.
+# Meta and its products
+Meta
+Meta AI
+Facebook
+Instagram
+WhatsApp
+Messenger
+Threads
+Oculus
+Llama
+Muse
+Muse Glimmer
+# Big tech and AI labs
+Google
+Alphabet
+DeepMind
+Gemini
+Gmail
+YouTube
+Android
+OpenAI
+ChatGPT
+Microsoft
+Azure
+Copilot
+LinkedIn
+GitHub
+Apple
+iPhone
+iPad
+Amazon
+AWS
+Anthropic
+Mistral
+Hugging Face
+DeepSeek
+Qwen
+Cohere
+Perplexity
+Nvidia
+Intel
+AMD
+IBM
+Oracle
+Samsung
+Huawei
+Xiaomi
+Sony
+Netflix
+Spotify
+Uber
+Airbnb
+SpaceX
+Twitter
+TikTok
+ByteDance
+Snapchat
+Reddit
+Discord
+Slack
+Zoom
+Telegram
+Alibaba
+Baidu
+Tencent
+Salesforce
+Nokia
+Ericsson
+Mastercard
+PayPal
+Stripe
+Shopify
+eBay
+Wikipedia
+Mozilla
+Firefox
+Linux
+Ubuntu
+PyTorch
+Kubernetes
+Docker
+Dropbox
+Adobe
+Figma
+Notion
+Atlassian
+Cloudflare
+Vodafone

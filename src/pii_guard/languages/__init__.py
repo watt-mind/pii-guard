@@ -166,6 +166,12 @@ class LanguagePack:
         ``cues``: a ``cues.tsv`` resource (``cue<TAB>ENTITY_TYPE``, ``-`` for a cue that names
         something else, such as an order number), so a number right after ``TAJ`` or
         ``passport`` is masked even when its checksum fails; ``None``: no cue words.
+
+    Brand names (``detect/ner_orgs.py``)
+        ``brands``: a ``brands.tsv`` resource (one company or product name per line), so an
+        NER ``PERSON`` span that is only such a name (``OTP Bank``, ``Deutsche Bahn``) becomes
+        ``ORGANIZATION``, which policy keeps; ``None``: only the shared list
+        (``languages/brands.tsv``) and the other packs' names.
     """
 
     code: str
@@ -182,6 +188,7 @@ class LanguagePack:
     lexicons: LexiconSpec | None = None
     captions: Traversable | None = None
     cues: Traversable | None = None
+    brands: Traversable | None = None
 
     def __repr__(self) -> str:
         return (
