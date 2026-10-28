@@ -12,6 +12,17 @@ carry a checksum these fail; the Slack sample has no numeric team id), so GitHub
 protection has nothing to block; gitleaks skips ``eval/fixtures/`` (``.gitleaks.toml``).
 Stripe and Google samples live in ``tests/detect/test_secrets.py`` only, assembled at runtime.
 
+Shapes added for LAB-1362 (bugs fixed in LAB-1349 and LAB-1350 that this suite could not see):
+whitespace padding inside quotes (the mask must cover the stripped value exactly, not the
+padding plus a truncated value), brackets inside a quoted password, two tokens that differ
+only in letter case (each needs its own placeholder to round-trip), and ``{...}`` template
+fields after a password key as a hard negative.
+
+Known miss, not in the JSONL: a *literal* quoted password that contains a ``{word}`` group
+(``password="Fake{0000}pw"``) is read as a format field and left unmasked, the same as
+``"{password}"``. The suite's leak limit is 0.0 (``eval/gates.json``), so the case is
+documented here and tracked as a follow-up rather than added as a failing document.
+
 Regenerate after editing (a test fails if the committed file is stale)::
 
     uv run python eval/fixtures/secrets/build_secrets.py
@@ -59,6 +70,9 @@ SHA256_B = "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
 SHA1 = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"
 SHA1_B = "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
 UUID = "123e4567-e89b-42d3-a456-426614174000"
+# Two GitHub-style tokens that differ only in letter case: distinct credentials (LAB-1350).
+GH_TOKEN_UPPER = fake("ghp_", 36, "FAKE0EXAMPLE0AbCd")
+GH_TOKEN_LOWER = "ghp_" + GH_TOKEN_UPPER[4:].swapcase()
 INTEGRITY = "sha512-" + fake("", 86, "FAKE0example0/+") + "=="
 
 
@@ -169,6 +183,46 @@ def documents() -> list[Document]:
             "sqlalchemy.exc.OperationalError: could not connect to "
             f"mysql://{s('jane.placeholder')}:{s('fake0pw0000')}@db.example.com:3306/shop\n"
             "postgres://app:${PGPASSWORD}@localhost/bakery worked before the upgrade.\n",
+        ),
+        (
+            "padded-quotes",
+            "code",
+            "# whitespace inside the quotes is not part of the credential\n"
+            f'password = " {s("Fake0pw0padded")}"\n'
+            f"DB_PASSWORD: '  {s('fake-pw-0000-pad')}  '\n"
+            f'token: "  {s("fake-token-0000-EXAMPLE")}  "\n'
+            f'"client_secret": "{s("fake-json-secret-pad-0000")}   "\n',
+        ),
+        (
+            "bracketed-password",
+            "code",
+            "conn = connect(\n"
+            '    host="db.example.com",\n'
+            '    user="bakery",\n'
+            f'    password="{s("Fake0[pw]0000")}",\n'
+            ")\n"
+            f"passwd = '{s('fake(0000)example')}'\n"
+            f'MYSQL_PWD="{s("[Fake]0pw0000")}"\n',
+        ),
+        (
+            "case-differing-tokens",
+            "chat",
+            "We rotated the CI token, the old and the new one look almost the same:\n"
+            f"old: {s(GH_TOKEN_UPPER)}\n"
+            f"new: {s(GH_TOKEN_LOWER)}\n"
+            f"API_TOKEN={s('fake-token-AbCdEf-0000')}\n"
+            f"BACKUP_API_TOKEN={s('fake-token-aBcDeF-0000')}\n",
+        ),
+        (
+            "neg-template-fields",
+            "code",
+            'DSN = "postgres://{user}:{password}@{host}/bakery"\n'
+            'password = "{password}"\n'
+            'password = f"{db_password}"\n'
+            "passwd = '%(passwd)s'\n"
+            "password = creds[0]\n"
+            "pwd = cfg[password]\n"
+            "pwd: /home/bakery/app\n",
         ),
         (
             "neg-uv-lock",
