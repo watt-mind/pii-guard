@@ -1,11 +1,15 @@
 /**
- * The benchmark index (`eval/results/index.json`, schema_version 1), bundled at build time.
+ * The benchmark index (`eval/results/index.json`, schema_version 1), shipped with the page.
  *
  * The Vite plugin in `vite.config.ts` builds it from the committed run records
- * (`pii-guard eval report --print-index`) as `virtual:pii-guard/benchmarks-index`, so the
- * Benchmarks tab works without the API (demo mode, static hosting). It is not committed
- * (LAB-1269). The JSON is loaded lazily, in its own chunk, the first time the tab opens.
+ * (`pii-guard eval report --print-index`), so the Benchmarks tab works without the API (demo
+ * mode, static hosting). It is not committed (LAB-1269). The index is about 7 MB, so it ships in
+ * parts (`benchmarksSplit.ts`, LAB-1454): hashed static JSON files the screen fetches when it
+ * needs them, the summary and run log first, then one fixture set's results at a time.
  */
+
+import manifestModule from "virtual:pii-guard/benchmarks-manifest";
+import { DETAIL_PART, joinIndex, RUNS_PART, setPart, SUMMARY_PART, type BenchmarkManifest } from "./benchmarksSplit";
 
 export interface TypeMetrics {
   gold: number;
@@ -147,10 +151,90 @@ export interface BenchmarkIndex {
 /** `"all"` pools every language; otherwise a language code. */
 export type LanguageFilter = "all" | string;
 
-export type BenchmarkLoader = () => Promise<BenchmarkIndex>;
+/** One fixture set's results: the part of the index the screen fetches when the set is picked. */
+export type SetResults = Pick<BenchmarkIndex, "snapshots" | "history">;
 
-export const loadBenchmarks: BenchmarkLoader = () =>
-  import("virtual:pii-guard/benchmarks-index").then((m) => m.default as BenchmarkIndex);
+/** The index in parts, fetched as the screen needs them. */
+export interface BenchmarkSource {
+  /** Everything but the per-set results: `snapshots` and `history` are empty. */
+  summary(): Promise<BenchmarkIndex>;
+  /** One fixture set's snapshots and history (empty lists for a set without results). */
+  set(fixtureSet: string): Promise<SetResults>;
+}
+
+/** A source, or a function that resolves the whole index at once (tests, embedders). */
+export type BenchmarkLoader = BenchmarkSource | (() => Promise<BenchmarkIndex>);
+
+const EMPTY_SET: SetResults = { snapshots: [], history: [] };
+
+function fetchJson(url: string): Promise<Record<string, unknown>> {
+  return fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+    return r.json() as Promise<Record<string, unknown>>;
+  });
+}
+
+/**
+ * The split index served next to the page. Each part is fetched once (a failed fetch is retried
+ * on the next call); the headline set's results are fetched with the summary, not after it.
+ */
+export function fetchedBenchmarks(
+  manifest: BenchmarkManifest = manifestModule as BenchmarkManifest,
+  get: (url: string) => Promise<Record<string, unknown>> = fetchJson,
+  base: string = import.meta.env.BASE_URL,
+): BenchmarkSource & { full(): Promise<BenchmarkIndex> } {
+  const cache = new Map<string, Promise<Record<string, unknown>>>();
+  const part = (name: string): Promise<Record<string, unknown>> => {
+    const file = manifest.parts[name];
+    if (!file) return Promise.reject(new Error(`benchmark index: no part ${name}`));
+    let p = cache.get(name);
+    if (!p) {
+      p = get(base + file);
+      p.catch(() => cache.delete(name));
+      cache.set(name, p);
+    }
+    return p;
+  };
+  const set = (fixtureSet: string): Promise<SetResults> =>
+    manifest.parts[setPart(fixtureSet)] ? (part(setPart(fixtureSet)) as Promise<unknown> as Promise<SetResults>) : Promise.resolve(EMPTY_SET);
+  return {
+    summary() {
+      if (manifest.headline_set) set(manifest.headline_set).catch(() => undefined); // in parallel
+      return Promise.all([part(SUMMARY_PART), part(RUNS_PART)]).then(
+        ([summary, runs]) => ({ ...summary, ...runs, ...EMPTY_SET }) as unknown as BenchmarkIndex,
+      );
+    },
+    set,
+    async full() {
+      const names = [SUMMARY_PART, RUNS_PART, DETAIL_PART, ...manifest.sets.map(setPart)];
+      const parts = await Promise.all(names.map(part));
+      return joinIndex(manifest, Object.fromEntries(names.map((n, i) => [n, parts[i]!]))) as unknown as BenchmarkIndex;
+    },
+  };
+}
+
+const served = fetchedBenchmarks();
+
+/** The index the screen reads by default: fetched in parts from next to the page. */
+export const benchmarkSource: BenchmarkSource = served;
+
+/** The whole index, every part fetched and put back together. */
+export const loadBenchmarks = (): Promise<BenchmarkIndex> => served.full();
+
+/** A loader as a source: a whole-index function is called once and filtered per set. */
+export function sourceOf(load: BenchmarkLoader): BenchmarkSource {
+  if (typeof load !== "function") return load;
+  let index: Promise<BenchmarkIndex> | undefined;
+  const all = () => (index ??= load());
+  return {
+    summary: all,
+    set: (fixtureSet) =>
+      all().then((i) => ({
+        snapshots: i.snapshots.filter((s) => s.fixture_set === fixtureSet),
+        history: i.history.filter((h) => h.fixture_set === fixtureSet),
+      })),
+  };
+}
 
 /** The metrics block a language filter selects, or null when that language wasn't run. */
 export function pick(block: { languages: Record<string, Metrics>; all: Metrics }, lang: LanguageFilter): Metrics | null {

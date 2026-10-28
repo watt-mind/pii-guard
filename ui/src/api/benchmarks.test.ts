@@ -9,7 +9,6 @@ import {
   formatMs,
   formatPct,
   languageName,
-  loadBenchmarks,
   originLabel,
   pick,
   snapshotsFor,
@@ -22,6 +21,8 @@ import {
 // machine, more under a parallel test run. That one-time build gets its own budget here instead
 // of eating the first test's 5 s default (LAB-1435); every test after it reads the cached module.
 const INDEX_BUILD_TIMEOUT_MS = 60_000;
+// The whole index as one module (tests only: the app fetches it in parts, benchmarksSplit.test.ts).
+const loadBenchmarks = async () => (await import("virtual:pii-guard/benchmarks-index")).default as BenchmarkIndex;
 beforeAll(async () => {
   await loadBenchmarks();
 }, INDEX_BUILD_TIMEOUT_MS);
