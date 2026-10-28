@@ -23,6 +23,7 @@ from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.identity import Principal
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits
 from pii_guard.hosted.runtime import HostedCapacityError
+from pii_guard.hosted.spend import DurableSpend
 
 ORIGIN = "https://guard.example"
 EMAIL = "synthetic.one@example.com"
@@ -121,6 +122,38 @@ def chat(
         json={"model": "muse-spark-1.3", "messages": [{"role": "user", "content": EMAIL}]},
         headers=headers,
     )
+
+
+def test_unavailable_durable_accounting_keeps_account_and_owned_byok_operational(
+    boundary: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, seen = boundary
+    service = client.app.state.hosted
+    service.spend = DurableSpend(None, None, daily_ceiling=10_000_000)
+
+    async def public_endpoint(url):
+        return url
+
+    service.connections._validator = public_endpoint
+    denied = chat(client, auth())
+    assert denied.status_code == 503
+    assert denied.json()["error"]["code"] == "sponsored_unavailable"
+    assert not seen
+    account = client.get("/v1/account", headers=auth())
+    assert account.status_code == 200
+    assert account.json()["limits"]["sponsored_enabled"] is False
+    connection = client.post(
+        "/v1/account/connections",
+        json={"provider": "openai", "api_key": "synthetic-owned-key"},
+        headers=auth(),
+    )
+    assert connection.status_code == 201, connection.text
+    byok = chat(client, auth(**{"x-pii-guard-connection": connection.json()["id"]}))
+    assert byok.status_code == 200, byok.text
+    assert len(seen) == 1
+    assert seen[0].headers["authorization"] == "Bearer synthetic-owned-key"
+    assert service.quotas._spent_allocation == 0
+    assert service._ingress == service.quotas._active == 0
 
 
 def test_real_demo_cookie_rotation_hits_network_burst_then_allows_sign_in(

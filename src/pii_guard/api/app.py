@@ -139,6 +139,7 @@ def create_app(
             while True:
                 await asyncio.sleep(30)
                 app.state.hosted.purge_expired()
+                await app.state.hosted.refresh_spend()
 
         cleaner = asyncio.create_task(cleanup_hosted()) if settings.hosted else None
         try:

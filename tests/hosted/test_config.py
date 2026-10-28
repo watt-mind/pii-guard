@@ -1,5 +1,8 @@
 """Hosted startup requires an explicit, fail-closed deployment boundary."""
 
+import asyncio
+import time
+
 import pytest
 
 from pii_guard.config import Settings
@@ -45,6 +48,22 @@ def test_incomplete_boundary_cannot_start(updates):
 
 def test_default_mode_remains_local():
     assert not Settings(_env_file=None).hosted
+
+
+def test_blob_mode_never_claims_a_marker_and_missing_store_keeps_app_available(tmp_path):
+    service = HostedService(
+        configured(
+            hosted_spend_store="azure_blob",
+            hosted_sponsored_microdollars=1_000_000,
+            hosted_sponsored_allocation_id="synthetic-approved",
+            hosted_allocation_directory=str(tmp_path),
+            hosted_allocation_expires_at=int(time.time()) + 3600,
+        )
+    )
+    assert not service.sponsored_enabled
+    assert not list(tmp_path.iterdir())
+    assert service.spend is not None
+    asyncio.run(service.close())
 
 
 def test_hosted_model_allowlist_environment(monkeypatch):
