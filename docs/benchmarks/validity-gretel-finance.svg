@@ -12,87 +12,117 @@
 <text x="551.1" y="159" font-size="21" fill="#1B1B1F">Invalid numbers</text>
 <rect x="745.61" y="140" width="22" height="22" fill="#332288"/>
 <text x="775.6" y="159" font-size="21" fill="#1B1B1F">Other values (names, addresses, e-mail)</text>
-<line x1="587" y1="210" x2="587" y2="730" stroke="#E3E3E8" stroke-width="2"/>
-<text x="587" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">0%</text>
-<line x1="805.3" y1="210" x2="805.3" y2="730" stroke="#E3E3E8" stroke-width="2"/>
-<text x="805.3" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">25%</text>
-<line x1="1023.5" y1="210" x2="1023.5" y2="730" stroke="#E3E3E8" stroke-width="2"/>
-<text x="1023.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">50%</text>
-<line x1="1241.8" y1="210" x2="1241.8" y2="730" stroke="#E3E3E8" stroke-width="2"/>
-<text x="1241.8" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">75%</text>
+<line x1="997.5" y1="210" x2="997.5" y2="730" stroke="#E3E3E8" stroke-width="2"/>
+<text x="997.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">0%</text>
+<line x1="1113.1" y1="210" x2="1113.1" y2="730" stroke="#E3E3E8" stroke-width="2"/>
+<text x="1113.1" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">25%</text>
+<line x1="1228.7" y1="210" x2="1228.7" y2="730" stroke="#E3E3E8" stroke-width="2"/>
+<text x="1228.7" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">50%</text>
+<line x1="1344.4" y1="210" x2="1344.4" y2="730" stroke="#E3E3E8" stroke-width="2"/>
+<text x="1344.4" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">75%</text>
 <line x1="1460" y1="210" x2="1460" y2="730" stroke="#E3E3E8" stroke-width="2"/>
 <text x="1460" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">100%</text>
-<circle cx="66" cy="247.1" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="255.1" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
-<rect x="587" y="218" width="704.7" height="11.6" fill="#4A4A52"/>
-<text x="1299.7" y="225.6" font-size="19" fill="#1B1B1F">80.7</text>
-<rect x="587" y="233.6" width="19.8" height="11.6" fill="#117733"/>
-<text x="614.8" y="241.1" font-size="19" fill="#1B1B1F">2.3</text>
-<rect x="587" y="249.1" width="329.1" height="11.6" fill="#CC6677"/>
-<text x="924.1" y="256.7" font-size="19" fill="#1B1B1F">37.7</text>
-<rect x="587" y="264.7" width="767.9" height="11.6" fill="#332288"/>
-<text x="1362.9" y="272.3" font-size="19" fill="#1B1B1F">88.0</text>
-<circle cx="66" cy="321.4" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="329.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base + hard negatives (LAB-1150)</text>
-<rect x="587" y="292.3" width="166.5" height="11.6" fill="#4A4A52"/>
-<text x="761.5" y="299.9" font-size="19" fill="#1B1B1F">19.1</text>
-<rect x="587" y="307.9" width="19.8" height="11.6" fill="#117733"/>
-<text x="614.8" y="315.4" font-size="19" fill="#1B1B1F">2.3</text>
-<rect x="587" y="323.4" width="43" height="11.6" fill="#CC6677"/>
-<text x="638" y="331" font-size="19" fill="#1B1B1F">4.9</text>
-<rect x="587" y="339" width="183.2" height="11.6" fill="#332288"/>
-<text x="778.2" y="346.6" font-size="19" fill="#1B1B1F">21.0</text>
-<circle cx="66" cy="395.7" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="403.7" font-size="21" fill="#1B1B1F" font-weight="600">audit (rules + NER v2 + LLM)</text>
-<rect x="587" y="366.6" width="232.8" height="11.6" fill="#4A4A52"/>
-<text x="827.8" y="374.1" font-size="19" fill="#1B1B1F">26.7</text>
-<rect x="587" y="382.1" width="2" height="11.6" fill="#117733"/>
-<text x="597" y="389.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="587" y="397.7" width="2" height="11.6" fill="#CC6677"/>
-<text x="597" y="405.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="587" y="413.3" width="255.5" height="11.6" fill="#332288"/>
-<text x="850.5" y="420.9" font-size="19" fill="#1B1B1F">29.3</text>
-<circle cx="66" cy="470" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="478" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 5 of 5 (LAB-1306)</text>
-<rect x="587" y="440.9" width="173.9" height="11.6" fill="#4A4A52"/>
-<text x="768.9" y="448.4" font-size="19" fill="#1B1B1F">19.9</text>
-<rect x="587" y="456.4" width="19.8" height="11.6" fill="#117733"/>
-<text x="614.8" y="464" font-size="19" fill="#1B1B1F">2.3</text>
-<rect x="587" y="472" width="71.6" height="11.6" fill="#CC6677"/>
-<text x="666.6" y="479.6" font-size="19" fill="#1B1B1F">8.2</text>
-<rect x="587" y="487.6" width="189.3" height="11.6" fill="#332288"/>
-<text x="784.4" y="495.1" font-size="19" fill="#1B1B1F">21.7</text>
-<rect x="58.4" y="536.6" width="15.3" height="15.3" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
-<text x="84" y="552.3" font-size="21" fill="#1B1B1F" font-weight="600">Presidio</text>
-<rect x="587" y="515.1" width="163.7" height="11.6" fill="#4A4A52"/>
-<text x="758.7" y="522.7" font-size="19" fill="#1B1B1F">18.8</text>
-<rect x="587" y="530.7" width="119.1" height="11.6" fill="#117733"/>
-<text x="714.1" y="538.3" font-size="19" fill="#1B1B1F">13.6</text>
-<rect x="587" y="546.3" width="229" height="11.6" fill="#CC6677"/>
-<text x="824" y="553.9" font-size="19" fill="#1B1B1F">26.2</text>
-<rect x="587" y="561.9" width="161.2" height="11.6" fill="#332288"/>
-<text x="756.3" y="569.4" font-size="19" fill="#1B1B1F">18.5</text>
-<polygon points="66,608.2 75.9,625.8 56.1,625.8" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
-<text x="84" y="626.6" font-size="21" fill="#1B1B1F" font-weight="600">LLM Guard</text>
-<rect x="587" y="589.4" width="517.9" height="11.6" fill="#4A4A52"/>
-<text x="1112.9" y="597" font-size="19" fill="#1B1B1F">59.3</text>
-<rect x="587" y="605" width="59.5" height="11.6" fill="#117733"/>
-<text x="654.6" y="612.6" font-size="19" fill="#1B1B1F">6.8</text>
-<rect x="587" y="620.6" width="357.7" height="11.6" fill="#CC6677"/>
-<text x="952.8" y="628.1" font-size="19" fill="#1B1B1F">41.0</text>
-<rect x="587" y="636.1" width="553.6" height="11.6" fill="#332288"/>
-<text x="1148.6" y="643.7" font-size="19" fill="#1B1B1F">63.4</text>
-<polygon points="66,681.6 77.2,692.9 66,704.1 54.8,692.9" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
-<text x="84" y="700.9" font-size="21" fill="#1B1B1F" font-weight="600">PrivAiTe</text>
-<rect x="587" y="663.7" width="241.4" height="11.6" fill="#4A4A52"/>
-<text x="836.4" y="671.3" font-size="19" fill="#1B1B1F">27.7</text>
-<rect x="587" y="679.3" width="59.5" height="11.6" fill="#117733"/>
-<text x="654.6" y="686.9" font-size="19" fill="#1B1B1F">6.8</text>
-<rect x="587" y="694.9" width="85.9" height="11.6" fill="#CC6677"/>
-<text x="680.9" y="702.4" font-size="19" fill="#1B1B1F">9.8</text>
-<rect x="587" y="710.4" width="262.2" height="11.6" fill="#332288"/>
-<text x="857.3" y="718" font-size="19" fill="#1B1B1F">30.0</text>
+<circle cx="66" cy="236" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="244" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
+<rect x="997.5" y="218" width="373.3" height="6" fill="#4A4A52"/>
+<text x="1378.8" y="220" font-size="19" fill="#1B1B1F">80.7</text>
+<rect x="997.5" y="228" width="10.5" height="6" fill="#117733"/>
+<text x="1016" y="230" font-size="19" fill="#1B1B1F">2.3</text>
+<rect x="997.5" y="238" width="174.4" height="6" fill="#CC6677"/>
+<text x="1179.9" y="240" font-size="19" fill="#1B1B1F">37.7</text>
+<rect x="997.5" y="248" width="406.8" height="6" fill="#332288"/>
+<text x="1412.3" y="250" font-size="19" fill="#1B1B1F">88.0</text>
+<circle cx="66" cy="288" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="296" font-size="21" fill="#1B1B1F" font-weight="600">tabularisai/eu-pii-safeguard alone (comparison, LAB-1386)</text>
+<rect x="997.5" y="270" width="162.2" height="6" fill="#4A4A52"/>
+<text x="1167.6" y="272" font-size="19" fill="#1B1B1F">35.1</text>
+<rect x="997.5" y="280" width="52.5" height="6" fill="#117733"/>
+<text x="1058" y="282" font-size="19" fill="#1B1B1F">11.4</text>
+<rect x="997.5" y="290" width="98.6" height="6" fill="#CC6677"/>
+<text x="1104.1" y="292" font-size="19" fill="#1B1B1F">21.3</text>
+<rect x="997.5" y="300" width="172.6" height="6" fill="#332288"/>
+<text x="1178.1" y="302" font-size="19" fill="#1B1B1F">37.3</text>
+<circle cx="66" cy="340" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="348" font-size="21" fill="#1B1B1F" font-weight="600">NER v2.0 alone (no rules)</text>
+<rect x="997.5" y="322" width="94.1" height="6" fill="#4A4A52"/>
+<text x="1099.6" y="324" font-size="19" fill="#1B1B1F">20.3</text>
+<rect x="997.5" y="332" width="21" height="6" fill="#117733"/>
+<text x="1026.5" y="334" font-size="19" fill="#1B1B1F">4.5</text>
+<rect x="997.5" y="342" width="30.3" height="6" fill="#CC6677"/>
+<text x="1035.8" y="344" font-size="19" fill="#1B1B1F">6.6</text>
+<rect x="997.5" y="352" width="102.5" height="6" fill="#332288"/>
+<text x="1108" y="354" font-size="19" fill="#1B1B1F">22.2</text>
+<circle cx="66" cy="392" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="400" font-size="21" fill="#1B1B1F" font-weight="600">rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386)</text>
+<rect x="997.5" y="374" width="137.7" height="6" fill="#4A4A52"/>
+<text x="1143.2" y="376" font-size="19" fill="#1B1B1F">29.8</text>
+<rect x="997.5" y="384" width="10.5" height="6" fill="#117733"/>
+<text x="1016" y="386" font-size="19" fill="#1B1B1F">2.3</text>
+<rect x="997.5" y="394" width="68.2" height="6" fill="#CC6677"/>
+<text x="1073.7" y="396" font-size="19" fill="#1B1B1F">14.8</text>
+<rect x="997.5" y="404" width="149.4" height="6" fill="#332288"/>
+<text x="1154.9" y="406" font-size="19" fill="#1B1B1F">32.3</text>
+<circle cx="66" cy="444" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="452" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base + hard negatives (LAB-1150)</text>
+<rect x="997.5" y="426" width="87.7" height="6" fill="#4A4A52"/>
+<text x="1093.2" y="428" font-size="19" fill="#1B1B1F">19.0</text>
+<rect x="997.5" y="436" width="10.5" height="6" fill="#117733"/>
+<text x="1016" y="438" font-size="19" fill="#1B1B1F">2.3</text>
+<rect x="997.5" y="446" width="22.8" height="6" fill="#CC6677"/>
+<text x="1028.3" y="448" font-size="19" fill="#1B1B1F">4.9</text>
+<rect x="997.5" y="456" width="96.5" height="6" fill="#332288"/>
+<text x="1102" y="458" font-size="19" fill="#1B1B1F">20.9</text>
+<circle cx="66" cy="496" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="504" font-size="21" fill="#1B1B1F" font-weight="600">audit (rules + NER v2 + LLM)</text>
+<rect x="997.5" y="478" width="123.3" height="6" fill="#4A4A52"/>
+<text x="1128.8" y="480" font-size="19" fill="#1B1B1F">26.7</text>
+<rect x="997.5" y="488" width="2" height="6" fill="#117733"/>
+<text x="1007.5" y="490" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="997.5" y="498" width="2" height="6" fill="#CC6677"/>
+<text x="1007.5" y="500" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="997.5" y="508" width="135.4" height="6" fill="#332288"/>
+<text x="1140.9" y="510" font-size="19" fill="#1B1B1F">29.3</text>
+<circle cx="66" cy="548" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="556" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 5 of 5 (LAB-1306)</text>
+<rect x="997.5" y="530" width="92.1" height="6" fill="#4A4A52"/>
+<text x="1097.6" y="532" font-size="19" fill="#1B1B1F">19.9</text>
+<rect x="997.5" y="540" width="10.5" height="6" fill="#117733"/>
+<text x="1016" y="542" font-size="19" fill="#1B1B1F">2.3</text>
+<rect x="997.5" y="550" width="37.9" height="6" fill="#CC6677"/>
+<text x="1043.4" y="552" font-size="19" fill="#1B1B1F">8.2</text>
+<rect x="997.5" y="560" width="100.3" height="6" fill="#332288"/>
+<text x="1105.8" y="562" font-size="19" fill="#1B1B1F">21.7</text>
+<rect x="58.4" y="592.4" width="15.3" height="15.3" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
+<text x="84" y="608" font-size="21" fill="#1B1B1F" font-weight="600">Presidio</text>
+<rect x="997.5" y="582" width="86.7" height="6" fill="#4A4A52"/>
+<text x="1092.2" y="584" font-size="19" fill="#1B1B1F">18.8</text>
+<rect x="997.5" y="592" width="63.1" height="6" fill="#117733"/>
+<text x="1068.6" y="594" font-size="19" fill="#1B1B1F">13.6</text>
+<rect x="997.5" y="602" width="121.3" height="6" fill="#CC6677"/>
+<text x="1126.8" y="604" font-size="19" fill="#1B1B1F">26.2</text>
+<rect x="997.5" y="612" width="85.4" height="6" fill="#332288"/>
+<text x="1090.9" y="614" font-size="19" fill="#1B1B1F">18.5</text>
+<polygon points="66,641.6 75.9,659.2 56.1,659.2" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
+<text x="84" y="660" font-size="21" fill="#1B1B1F" font-weight="600">LLM Guard</text>
+<rect x="997.5" y="634" width="274.4" height="6" fill="#4A4A52"/>
+<text x="1279.9" y="636" font-size="19" fill="#1B1B1F">59.3</text>
+<rect x="997.5" y="644" width="31.5" height="6" fill="#117733"/>
+<text x="1037" y="646" font-size="19" fill="#1B1B1F">6.8</text>
+<rect x="997.5" y="654" width="189.5" height="6" fill="#CC6677"/>
+<text x="1195" y="656" font-size="19" fill="#1B1B1F">41.0</text>
+<rect x="997.5" y="664" width="293.3" height="6" fill="#332288"/>
+<text x="1298.8" y="666" font-size="19" fill="#1B1B1F">63.4</text>
+<polygon points="66,692.8 77.2,704 66,715.2 54.8,704" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
+<text x="84" y="712" font-size="21" fill="#1B1B1F" font-weight="600">PrivAiTe</text>
+<rect x="997.5" y="686" width="127.9" height="6" fill="#4A4A52"/>
+<text x="1133.4" y="688" font-size="19" fill="#1B1B1F">27.7</text>
+<rect x="997.5" y="696" width="31.5" height="6" fill="#117733"/>
+<text x="1037" y="698" font-size="19" fill="#1B1B1F">6.8</text>
+<rect x="997.5" y="706" width="45.5" height="6" fill="#CC6677"/>
+<text x="1051" y="708" font-size="19" fill="#1B1B1F">9.8</text>
+<rect x="997.5" y="716" width="138.9" height="6" fill="#332288"/>
+<text x="1144.4" y="718" font-size="19" fill="#1B1B1F">30.0</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;gretel-finance&#x27; (mixed; de 200 docs + en 200 docs), de + en pooled (micro-averaged).</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">Valid = a validated rule of the type recognises the value (checksum, numbering plan, format). Invalid numbers stay in the headline.</text>
-<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-27 to 2026-10-28 · commits 18b15fa, 3b5c05b, 477196a · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-27 to 2026-10-28 · commits 18b15fa, 36a78e3, 477196a · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>

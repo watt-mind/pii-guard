@@ -1,0 +1,51 @@
+{
+  "device": "cpu",
+  "torch": "2.14.1",
+  "torch_threads": 8,
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "fixtures": [
+    "eval/fixtures/hu-synth-sample.jsonl",
+    "eval/fixtures/en-synth-sample.jsonl"
+  ],
+  "messages": 122,
+  "mean_chars": 382.5,
+  "load_average_end": [
+    28.17,
+    43.03,
+    37.28
+  ],
+  "note": "load_s: detector construction and warm-up forward, torch and transformers already imported; weights may be in the OS page cache",
+  "models": {
+    "pii-guard-ner-v2.0": {
+      "model": "hdkiller/pii-guard-ner-xlmr-base@95f612a9ad65cc5ade5b9248bd152020541e7097",
+      "licence": "Apache-2.0 (trained on Ai4Privacy OpenPII-1M, CC-BY-4.0: Ai4Privacy / Ai Suisse SA)",
+      "parameters": 277469205,
+      "weights_bytes": 1109900868,
+      "load_s": 7.29,
+      "p50_ms": 74.2,
+      "p95_ms": 146.5,
+      "mean_ms": 87.3
+    },
+    "eu-pii-safeguard": {
+      "model": "tabularisai/eu-pii-safeguard@c928cd51d4f28723289098a4ad59955413afcc05",
+      "licence": "conflicting: card metadata apache-2.0, LICENSE.md Tabularis AI Commercial License v1.0 (30-day evaluation, paid commercial use); evaluation only, pending owner decision",
+      "parameters": 558916682,
+      "weights_bytes": 2235715264,
+      "load_s": 2.85,
+      "p50_ms": 213.4,
+      "p95_ms": 466.9,
+      "mean_ms": 244.1
+    }
+  },
+  "load_fresh_process_s": {
+    "pii-guard-ner-v2.0": [
+      10.54,
+      11.19
+    ],
+    "eu-pii-safeguard": [
+      12.85,
+      13.43
+    ],
+    "note": "detector construction in a new process (torch and transformers imported first), two runs each, alternating, load average 30-40; see README"
+  }
+}
