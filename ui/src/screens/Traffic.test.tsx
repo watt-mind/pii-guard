@@ -286,6 +286,17 @@ describe("Live traffic", () => {
     expect(await screen.findByText(/Sent 8 fictional calls; 1 refused/)).toBeInTheDocument();
   });
 
+  it("doesn't offer demo traffic where the server has accounts (LAB-1435)", async () => {
+    const f = fakeConnect();
+    const sendDemo = vi.fn();
+    render(<Traffic connect={f.connect} pageHost="localhost" sendDemo={sendDemo} demoTraffic={false} />);
+    f.push([], { state: "live", via: "sse", level: "masked", size: 200 });
+    expect(await screen.findByText("Connect a client to one of your endpoints (Connect), or mask a text in the Playground.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send demo traffic" })).toBeNull();
+    expect(screen.queryByText(/make demo-traffic/)).toBeNull();
+    expect(sendDemo).not.toHaveBeenCalled();
+  });
+
   it("says which detectors ran, and that rules alone don't find names", async () => {
     const f = fakeConnect();
     render(<Traffic connect={f.connect} pageHost="localhost" />);

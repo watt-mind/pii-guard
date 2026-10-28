@@ -85,6 +85,7 @@ describe("console shell", () => {
     const nav = screen.getByRole("navigation", { name: "Console" });
     expect(within(nav).getAllByRole("link")).toHaveLength(8);
     for (const name of ["Overview", "Playground", "Logs", "Vault", "Projects", "Connect", "Policy", "Evaluation"]) expect(within(nav).getByRole("link", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: /^Playground/ })).toHaveTextContent("Try text, chat and images");
     expect(within(nav).getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
     expect(region("Overview")).toBeVisible();
   });

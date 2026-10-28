@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 import { SECTIONS, hashOf, type Route, type Section } from "../lib/routes";
-import { offersSection, type Capabilities } from "../lib/capabilities";
+import { offersSection, playgroundHint, type Capabilities } from "../lib/capabilities";
 import { useHostedSession } from "../hosted/session";
 
 interface Props {
@@ -117,7 +117,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                           <SectionIcon id={s.id} active={active} />
                           <span className="min-w-0">
                             <span className="block">{s.label}</span>
-                            <span className="block text-2xs text-faint lg:hidden">{s.id === "playground" && !caps.images ? "Try text and chat" : s.hint}</span>
+                            <span className="block text-2xs text-faint lg:hidden">{s.id === "playground" ? playgroundHint(caps) : s.hint}</span>
                           </span>
                         </a>
                       </li>

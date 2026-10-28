@@ -4,7 +4,7 @@ import { getSelectedEndpoint, getSelectedProject, setSelectedProject, useSelecte
 import { HostedApp } from "./hosted/HostedApp";
 import { AccountSummary, ProviderConnections } from "./hosted/AccountPanels";
 import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
-import { offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
+import { chatModesOf, offersDemoTraffic, offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
 import { endpointSnippets } from "./api/connect";
@@ -27,7 +27,7 @@ import { Benchmarks } from "./screens/Benchmarks";
 import { Connect } from "./screens/Connect";
 import { Images } from "./screens/Images";
 import { Overview } from "./screens/Overview";
-import { Policy } from "./screens/Policy";
+import { OwnerPolicy, Policy } from "./screens/Policy";
 import { RoundTrip } from "./screens/RoundTrip";
 import { Chat, type ChatDraft } from "./screens/Chat";
 import { Logs, type TrafficProps } from "./screens/Traffic";
@@ -264,8 +264,9 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 status={status}
                 forced={forceFixture}
                 sendDemo={traffic?.sendDemo}
+                demoTraffic={offersDemoTraffic(caps)}
                 serverSetup={server !== null || !caps.accounts}
-              account={caps.accounts ? <AccountSummary /> : undefined}
+                account={caps.accounts ? <AccountSummary /> : undefined}
                 onOpenCall={(id) => {
                   setLogFocus({ id, nonce: Date.now() });
                   openSection("logs");
@@ -342,7 +343,10 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               )}
             </div>
             <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" hidden={tab !== "chat"}>
-              <Chat client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={server?.upstream?.mock ?? false} />
+              <Chat
+                client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={server?.upstream?.mock ?? false}
+                modes={chatModesOf(server, caps)}
+              />
             </div>
             <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={tab !== "images"}>
               {caps.images && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}
@@ -355,6 +359,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 t={trafficHandle}
                 forceFixture={forceFixture}
                 sendDemo={traffic?.sendDemo}
+                demoTraffic={offersDemoTraffic(caps)}
                 pageHost={traffic?.pageHost}
                 mockUpstream={server?.upstream?.mock ?? false}
                 focus={logFocus}
@@ -390,7 +395,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
             {section === "projects" && <Workspace call={hosted?.call} hosted={caps.accounts} onProject={selectProject} projectId={getCurrentProject()} />}
           </section>
           <section id="section-policy" aria-label="Policy" hidden={section !== "policy"}>
-            <Policy status={status} />
+            {caps.server_policy ? <Policy status={status} /> : section === "policy" && <OwnerPolicy call={hosted?.call} projectId={getCurrentProject()} />}
           </section>
           <section id="section-evaluation" aria-label="Evaluation" hidden={section !== "evaluation"}>
             {evaluationOpened && <Benchmarks load={loadBenchmarks} />}

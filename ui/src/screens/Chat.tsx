@@ -56,7 +56,11 @@ interface Props {
   ner?: boolean | null;
   /** The server's upstream is the offline mock model, which echoes (LAB-1264). */
   mockUpstream?: boolean;
+  /** The detection modes the server offers (`/v1/status` `gateway.modes`); a hosted owner gets fast only. */
+  modes?: readonly ChatMode[];
 }
+
+const ALL_MODES: readonly ChatMode[] = ["fast", "audit"];
 
 const MODES: { id: ChatMode; label: string; hint: string }[] = [
   {
@@ -71,8 +75,10 @@ const MODES: { id: ChatMode; label: string; hint: string }[] = [
   },
 ];
 
-export function Chat({ client, live, draft, ner = null, mockUpstream = false }: Props) {
-  const [mode, setMode] = useState<ChatMode>("fast");
+export function Chat({ client, live, draft, ner = null, mockUpstream = false, modes = ALL_MODES }: Props) {
+  const [chosenMode, setMode] = useState<ChatMode>("fast");
+  // A mode the server stops offering (or never offered) is never sent.
+  const mode = modes.includes(chosenMode) ? chosenMode : (modes[0] ?? "fast");
   const [language, setLanguage] = useState<"hu" | "en">(CHAT_SAMPLES[0]!.language);
   const [model, setModel] = useState(FALLBACK_CHAT_MODEL);
   /** The last `/v1/models` answer, and which client it came from (null ids: it failed). */
@@ -297,6 +303,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
             onStop={stop}
             busy={busy}
             mode={mode}
+            modes={modes}
             onMode={setMode}
             language={language}
             onLanguage={setLanguage}
@@ -513,6 +520,7 @@ interface ComposerProps {
   onStop: () => void;
   busy: boolean;
   mode: ChatMode;
+  modes: readonly ChatMode[];
   onMode: (m: ChatMode) => void;
   language: "hu" | "en";
   onLanguage: (l: "hu" | "en") => void;
@@ -528,7 +536,7 @@ interface ComposerProps {
   handedOver: boolean;
 }
 
-function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, onLanguage, model, onModel, models, needsModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
+function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, language, onLanguage, model, onModel, models, needsModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
   const chatIds = models.ids.filter(isChatModel);
   const options = model && !chatIds.includes(model) ? [model, ...chatIds] : chatIds;
   const modeHint = mock
@@ -572,7 +580,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div role="radiogroup" aria-label="Detection mode" className="flex rounded-lg border border-line bg-surface-2 p-0.5 text-sm">
-          {MODES.map((m) => (
+          {MODES.filter((m) => modes.includes(m.id)).map((m) => (
             <button
               key={m.id}
               type="button"

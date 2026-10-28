@@ -21,6 +21,8 @@ export interface OverviewProps {
   /** Open one call on the Logs screen. */
   onOpenCall: (id: string) => void;
   sendDemo?: typeof sendDemoTraffic;
+  /** Offer "Send demo traffic" (`offersDemoTraffic`); off where the server has accounts. */
+  demoTraffic?: boolean;
   /** Show the server's upstream and detectors; off where the server can't report them yet. */
   serverSetup?: boolean;
   /** Shown under the introduction, such as a hosted owner's account. */
@@ -53,7 +55,7 @@ function summarize(events: readonly TrafficEvent[]) {
   };
 }
 
-export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTraffic, serverSetup = true, account }: OverviewProps) {
+export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTraffic, demoTraffic = true, serverSetup = true, account }: OverviewProps) {
   const s = useMemo(() => summarize(t.events), [t.events]);
   const now = useNow();
   const lastTime = t.events.length ? Date.parse(t.events[t.events.length - 1]!.time) : 0;
@@ -76,7 +78,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
       <ScopeNote t={t} forced={forced} since={s.since} />
 
       {empty && !recorded ? (
-        <EmptyOverview t={t} server={server} sendDemo={sendDemo} />
+        <EmptyOverview t={t} server={server} sendDemo={demoTraffic ? sendDemo : null} />
       ) : (
         <>
           <dl aria-label={recorded ? "Counters of the recorded demo traffic" : "Counters"} className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
@@ -179,7 +181,7 @@ function ScopeNote({ t, forced, since }: { t: TrafficHandle; forced: boolean; si
   return null;
 }
 
-function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: ServerStatus | null; sendDemo: typeof sendDemoTraffic }) {
+function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: ServerStatus | null; sendDemo: typeof sendDemoTraffic | null }) {
   const status = t.status;
   const gateway = server?.gateway.url ?? "/v1";
   const title =
@@ -207,7 +209,13 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
           )
         ) : (
           <>
-            The counters fill in as calls arrive. Point a client at the gateway ({code(gateway)}), or send a few fictional calls through it to see what happens to each one.
+            {sendDemo ? (
+              <>
+                The counters fill in as calls arrive. Point a client at the gateway ({code(gateway)}), or send a few fictional calls through it to see what happens to each one.
+              </>
+            ) : (
+              <>The counters fill in as calls arrive. Connect a client to one of your endpoints, or mask a text in the Playground to see what happens to it.</>
+            )}
           </>
         )}
       </p>
@@ -218,7 +226,7 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
         <a href="#playground/text" className="inline-flex h-9 items-center justify-center rounded-lg border border-line px-3.5 text-sm font-medium text-ink transition-colors hover:border-line-strong">
           Try it in the Playground
         </a>
-        {status.state === "live" && <DemoButton send={sendDemo} />}
+        {status.state === "live" && sendDemo && <DemoButton send={sendDemo} />}
         <Button variant="ghost" onClick={t.showFixture}>
           Watch a recorded demo
         </Button>
