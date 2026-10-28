@@ -22,6 +22,7 @@ from pii_guard.gateway.service import Gateway
 from pii_guard.hosted.runtime import HostedCapacityError, HostedVault, Runtime, SessionBudget
 from pii_guard.observability import Observability, ObservabilitySettings, TrafficLevel
 from pii_guard.policy import PolicySet
+from pii_guard.projects.blob import BlobProjectStore, configured_blob_store
 from pii_guard.projects.store import EndpointSnapshot, ProjectStore
 from pii_guard.types import Analyzer, DetectionError, PiiGuardError, Span
 from pii_guard.workers import BoundedWorkers
@@ -62,7 +63,7 @@ class PolicyAnalyzer:
 class ProjectService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self._store: ProjectStore | None = None
+        self._store: ProjectStore | BlobProjectStore | None = None
         self._lock = threading.RLock()
         self._runtimes: dict[str, Runtime] = {}
         self._session_budget = SessionBudget(settings.vault_max_sessions)
@@ -87,9 +88,13 @@ class ProjectService:
             return self.workers
 
     @property
-    def store(self) -> ProjectStore:
+    def store(self) -> ProjectStore | BlobProjectStore:
         with self._lock:
             if self._store is None:
+                if self.settings.hosted_project_store == "azure_blob":
+                    self._store = configured_blob_store(self.settings)
+                    self._key = self._store._key
+                    return self._store
                 path = Path(self.settings.project_state_path).expanduser()
                 key = self.settings.tenant_key_bytes()
                 if self.settings.hosted and (key is None or len(key) < 32):

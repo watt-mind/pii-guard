@@ -1410,7 +1410,10 @@ OpenAI, Fireworks and OpenRouter; custom connections require public HTTPS on por
 
 ### Projects, policies and endpoints
 
-The project store persists configuration in SQLite (see [projects.md](projects.md)). Hosted
+The project store persists configuration in local SQLite or hosted authenticated encrypted
+Azure Blob snapshots (see [projects.md](projects.md#hosted-encrypted-blob-snapshots)). Blob
+operations use fresh bounded in-memory SQLite state and conditional ETag commits; storage
+failures and conflicts return sanitized 503 without automatic replay or local fallback. Hosted
 management requires the authenticated Google owner. Self-hosted management uses the single
 `local-owner`, protected by the configured API token or trusted loopback access. The first
 listing/request for an owner atomically creates a default project with the deployment's default
