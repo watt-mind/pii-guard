@@ -156,10 +156,31 @@ def test_tax_id(detector: RuleDetector) -> None:
         make_tax_id() + "5",
         f"{make_tax_id()} Ft",  # an amount
         f"0.{make_tax_id()}",  # a decimal
+        f"1,{make_tax_id()[:3]}",  # a thousands group is not the start of a number
+        f"{make_tax_id()},50 Ft",  # a decimal comma
+        f"{make_tax_id()},5",
+        f"{make_tax_id()},123",  # thousands grouping ("8 461 269 322,123")
     ],
 )
 def test_tax_id_look_alikes(detector: RuleDetector, text: str) -> None:
     assert E.NATIONAL_ID_HU_TAX not in {s.entity_type for s in detector.detect(text)}
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        "Teszt Elek,06 20 751 6714,{},ORD-2024-398890,27358.76",  # after a phone field
+        "Teszt Elek,{},55098665582,41979.84",  # before another number field
+        "27358,{}",
+        "{},4567",
+    ],
+)
+def test_tax_id_in_a_csv_row_next_to_a_number(detector: RuleDetector, row: str) -> None:
+    """LAB-1367: a comma between two fields of digits is a field separator, not a decimal mark."""
+    tax = make_tax_id()
+    text = row.format(tax)
+    spans = [s for s in detector.detect(text) if s.entity_type is E.NATIONAL_ID_HU_TAX]
+    assert [(s.start, s.end) for s in spans] == [(text.index(tax), text.index(tax) + len(tax))]
 
 
 @settings(max_examples=50)

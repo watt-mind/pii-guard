@@ -46,7 +46,7 @@ The test split is never used for training or prompt tuning.
 | **Leak rate (end to end)** | Share of labelled values that appear, in any surface form, in the request the gateway sends upstream. This is the number that matters most. |
 | **Over-masking rate** | Share of masked spans (spans, not characters) that overlap no gold span: not personal data (hurts answer quality). Predictions on an *ignore region* are left out (below). |
 | **Re-identification accuracy** | Share of placeholders in responses restored to the correct, correctly inflected value |
-| **Placeholder consistency** | Share of gold entities (per document; the gold spans of one type that are surface forms of each other, `Minta Anna` / `Minta Annának`) whose occurrences are all fully masked by one and the same placeholder. Fully: every letter and digit of the gold span is inside the placeholder, except a case ending right after it (`[[PERSON_x]]nak`, `[[PERSON_x]]'s`) and words that identify no one by the partial-leak rule (`Ms`, `Frau`). An unmasked or partly masked occurrence (`Próba [[PERSON_x]]`, `[[ID_DOCUMENT_x]]010`) counts as inconsistent. Until LAB-1355 any overlap counted, so the consistency of earlier run records is an upper bound ([comparison](../eval/results/2026-10-28-consistency-metric/README.md)). Also reported over entities with 2+ occurrences (`multi_rate`). |
+| **Placeholder consistency** | Share of gold entities (per document; the gold spans of one type that are surface forms of each other, `Minta Anna` / `Minta Annának`) whose occurrences are all fully masked by one and the same placeholder. Fully: every letter and digit of the gold span is inside the placeholder, except a case ending right after it (`[[PERSON_x]]nak`, `[[PERSON_x]]'s`) and words that identify no one by the partial-leak rule (`Ms`, `Frau`). An unmasked or partly masked occurrence (`Próba [[PERSON_x]]`, `[[ID_DOCUMENT_x]]010`, digits joined to the placeholder by `.`, `-` or `/`: `[[ID_DOCUMENT_x]].91`) counts as inconsistent. Until LAB-1355 any overlap counted, so the consistency of earlier run records is an upper bound ([comparison](../eval/results/2026-10-28-consistency-metric/README.md)). Also reported over entities with 2+ occurrences (`multi_rate`). |
 | **Number validity** (public sets) | Recall and leak rate split by whether a structured identifier passes the language packs' validators, plus the leak of every other value; the headline is unchanged ([below](#number-validity)) |
 | **Visual recall** | Share of labelled image regions covered by a mask (IoU threshold) |
 | **Latency** | p50 / p95 per request, per pipeline stage |
@@ -102,6 +102,12 @@ a Hungarian IBAN also by the giro number inside it). A value is **leaked** if an
 survives. It is **partially leaked** if not, but an identifying token of it survives (for
 example the street of an address whose postcode alone was masked). Tokens that also occur
 outside the labelled spans, and generic words such as `utca` or month names, don't count.
+A value is also partially leaked when a placeholder covers an occurrence of it in part and
+leaves digits of it right at its edge: a digit run the edge cuts (`[[ID_DOCUMENT_x]]010`,
+`8[[NATIONAL_ID_HU_TAX_x]]`) or one joined to it by `.`, `-` or `/` (`[[ID_DOCUMENT_x]].91`).
+Those are too short to be a token, but they are part of the identifier. This uses the vault's
+replacements, so it is checked per occurrence; a system that doesn't report them (a comparison
+tool) gets the token rule only (LAB-1367).
 
 ## Reporting
 
