@@ -206,6 +206,26 @@ def test_connect_and_check_through_a_real_gateway(tmp_path: Path) -> None:
     assert statuses == [200]
 
 
+def test_check_with_gateway_flag_keeps_the_configured_session(tmp_path: Path) -> None:
+    """``pii-guard up`` prints ``connect pi --gateway URL --check`` (LAB-1469): the check must
+    go through the session in pi's baseUrl, not the gateway's default session."""
+    recorder = Recorder()
+    with serve(recorder.app) as upstream, serve(gateway_app(upstream + "/v1", [])) as gw:
+        run("pi", "--gateway", gw + "/v1", "--agent-dir", str(tmp_path))
+        configured = json.loads((tmp_path / "models.json").read_text())
+        base_url = configured["providers"]["pii-guard"]["baseUrl"]
+        code, out = run("pi", "--check", "--gateway", gw + "/v1", "--agent-dir", str(tmp_path))
+        assert code == 0, out
+        assert f"gateway      : {base_url}/chat/completions" in out
+        assert "session      : path " in out
+        # Another gateway URL is still taken as given.
+        code, out = run(
+            "pi", "--check", "--gateway", upstream + "/v1", "--agent-dir", str(tmp_path)
+        )
+    assert code == 1
+    assert "is this URL the pii-guard gateway" in out
+
+
 def test_check_fails_when_url_is_not_the_gateway(tmp_path: Path) -> None:
     recorder = Recorder()
     with serve(recorder.app) as upstream:

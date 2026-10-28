@@ -153,6 +153,27 @@ def _gateway(args: argparse.Namespace, existing: object) -> str:
     return session_url(gateway, existing if isinstance(existing, str) else None)
 
 
+def _check_url(args: argparse.Namespace, configured: object) -> object:
+    """The URL ``--check`` sends the canary to: the client's configured base URL.
+
+    ``--gateway`` without a session that names the same gateway as the config keeps the
+    config's session (LAB-1469): ``pii-guard up`` prints ``connect <client> --gateway URL
+    --check``, and that check went to the gateway's default session, not the path session
+    the client actually uses. A different gateway, or one with its own session, wins.
+    """
+    if not args.gateway:
+        return configured
+    gateway = str(args.gateway).rstrip("/")
+    if (
+        isinstance(configured, str)
+        and session_of(gateway) is None
+        and session_of(configured) is not None
+        and _without_session(configured) == gateway
+    ):
+        return configured.rstrip("/")
+    return gateway
+
+
 def _pi(args: argparse.Namespace, out: list[str]) -> int:
     path = pi.config_path(args.agent_dir)
     if args.check:
@@ -201,7 +222,7 @@ def _pi_check(path: os.PathLike[str], args: argparse.Namespace, out: list[str]) 
     entry = (existing.get("providers") or {}).get(pi.PROVIDER_ID)
     if not isinstance(entry, dict):
         raise ConnectError(f"{path} has no {pi.PROVIDER_ID!r} provider; run `pii-guard connect pi`")
-    base_url = args.gateway or entry.get("baseUrl")
+    base_url = _check_url(args, entry.get("baseUrl"))
     models = [m.get("id") for m in entry.get("models") or [] if isinstance(m, dict)]
     model = (args.model or [None])[0] or next((m for m in models if isinstance(m, str)), None)
     if not isinstance(base_url, str) or not model:
@@ -249,7 +270,7 @@ def _muse_check(
     path: os.PathLike[str], existing: dict[str, object], args: argparse.Namespace, out: list[str]
 ) -> int:
     transport = existing.get("endpoint_transport")
-    base_url = args.gateway or (transport.get("base_url") if isinstance(transport, dict) else None)
+    base_url = _check_url(args, transport.get("base_url") if isinstance(transport, dict) else None)
     if not isinstance(base_url, str) or not base_url:
         raise ConnectError(
             f"{path} has no endpoint_transport.base_url; run `pii-guard connect muse-code`"
