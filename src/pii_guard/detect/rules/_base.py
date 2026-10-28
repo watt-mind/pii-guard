@@ -30,7 +30,7 @@ Rule = Callable[[str], Iterator[_Hit]]
 # ``languages/cues.py``).
 #
 # A comma between digits is a thousands or decimal mark only when 1-3 digits follow it
-# ("1,234,567", "27358,76"). Otherwise it separates CSV fields ("…6714,8461269322,ORD-…": a phone
+# ("1,234,567", "27358,76"). Otherwise it separates CSV fields ("…6714,8461269321,ORD-…": a phone
 # field, then a tax number), and the number on either side is found as on its own (LAB-1367).
 NOT_IN_WORD_BEFORE = r"(?<![^\W\d])"
 NOT_IN_WORD_AFTER = r"(?![^\W\d])"

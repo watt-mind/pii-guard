@@ -142,8 +142,8 @@ def test_partial_ignores_tokens_found_outside_gold_spans() -> None:
 @pytest.mark.parametrize(
     ("value", "masked", "partial"),
     [
-        ("8461269322", "8461269", True),  # "[[X]]322": the edge cuts the digit run
-        ("8461269322", "461269322", True),  # "8[[X]]"
+        ("8461269321", "8461269", True),  # "[[X]]322": the edge cuts the digit run
+        ("8461269321", "461269321", True),  # "8[[X]]"
         ("812.754.113.91", "812.754.113", True),  # "[[X]].91": joined by a dot
         ("812.754.113.91", "812.754.113.91", False),  # whole value
         ("06 30 123 4567", "06 30 123", False),  # a space is not a joiner, "4567" is a token
