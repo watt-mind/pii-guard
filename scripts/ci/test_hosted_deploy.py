@@ -69,7 +69,10 @@ def config(target: str = "dev") -> dict:
         "AZURE_SUBSCRIPTION_ID": "33333333-3333-4333-8333-333333333333",
         "AZURE_RESOURCE_GROUP": "rg-pii-guard-" + target,
         "HOSTED_REGISTRY": "syntheticregistry.azurecr.io",
-        "HOSTED_PUBLIC_ORIGIN": "https://synthetic.example.com",
+        "HOSTED_PUBLIC_ORIGIN": "https://guard-dev.watt-mind.com"
+        if target == "dev"
+        else "https://synthetic.example.com",
+        **({"AZURE_DEV_NETWORK_APPROVED": "true"} if target == "dev" else {}),
         "HOSTED_RELEASE_EVIDENCE_JSON": '{"synthetic":true}',
         "META_KEY_SECRET_URI": "https://syntheticvault.vault.azure.net/secrets/meta/" + "a" * 32,
         "TENANT_KEY_SECRET_URI": "https://syntheticvault.vault.azure.net/secrets/tenant/"
@@ -220,6 +223,19 @@ class PrerequisiteTests(unittest.TestCase):
         with self.assertRaises(Refused):
             assert_config(config(), "staging")
 
+    def test_dev_requires_explicit_network_approval_and_exact_reviewed_origin(self) -> None:
+        for value in ("false", "", "TRUE", True):
+            with self.subTest(approval=value), self.assertRaises(Refused):
+                assert_config(config() | {"AZURE_DEV_NETWORK_APPROVED": value}, "dev")
+        for origin in (
+            "https://synthetic.example.com",
+            "http://guard-dev.watt-mind.com",
+            "https://guard-dev.watt-mind.com/",
+            "https://guard-dev.watt-mind.com.evil.example",
+        ):
+            with self.subTest(origin=origin), self.assertRaises(Refused):
+                assert_config(config() | {"HOSTED_PUBLIC_ORIGIN": origin}, "dev")
+
     def test_invalid_identity_registry_and_unversioned_secret_references_are_rejected(self) -> None:
         changes = (
             {"AZURE_CLIENT_ID": "not-a-uuid"},
@@ -367,6 +383,11 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 ),
                 True,
             )
+        else:
+            evidence |= dict.fromkeys(
+                ("private_dev_reviewed", "tailnet_acl", "proxy_tls", "proxy_headers"),
+                True,
+            )
         return evidence
 
     def validate(self, evidence: dict, target: str = "dev", sponsored: str = "0") -> dict:
@@ -398,6 +419,17 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 self.assertRaises(Refused),
             ):
                 release_evidence(IMAGE, "dev")
+
+    def test_every_dev_network_gate_must_be_explicitly_true(self) -> None:
+        evidence = self.evidence("dev")
+        for field in set(evidence) - {"image"}:
+            for value in (False, "true", 1, None):
+                with self.subTest(field=field, value=value), self.assertRaises(Refused):
+                    self.validate(evidence | {field: value}, "dev")
+            missing = evidence.copy()
+            del missing[field]
+            with self.subTest(missing=field), self.assertRaises(Refused):
+                self.validate(missing, "dev")
 
     def test_every_production_gate_must_be_explicitly_true(self) -> None:
         evidence = self.evidence("prod")
