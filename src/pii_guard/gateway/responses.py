@@ -93,7 +93,8 @@ class _Stats(RequestStats):
     def log(self, outcome: str) -> None:
         logger.info(
             "responses %s mode=%s stream=%s texts=%d cache_hits=%d cache_misses=%d seeded=%d "
-            "spans=%s masked=%s detect_ms=%.0f upstream=%s upstream_ms=%.0f unresolved=%d",
+            "spans=%s masked=%s detect_ms=%.0f upstream=%s upstream_ms=%.0f unresolved=%d "
+            "images=%d image_masked=%s image_ms=%.0f",
             outcome,
             self.mode.value,
             self.stream,
@@ -107,6 +108,9 @@ class _Stats(RequestStats):
             self.upstream_status if self.upstream_status is not None else "-",
             self.upstream_ms,
             self.unresolved,
+            self.images,
+            _counts(self.image_masked),
+            self.image_ms,
         )
 
 
@@ -215,10 +219,19 @@ class ResponsesGateway:
             len(s.text) > max_text_chars for s in collected.slots
         ):
             raise PayloadTooLargeError(f"a text is longer than {max_text_chars} characters")
+        if len(collected.images) > gw.config.max_images:
+            raise PayloadTooLargeError(
+                f"a request may carry at most {gw.config.max_images} inline images"
+            )
+        if any(len(img.data) > gw.config.max_image_bytes for img in collected.images):
+            raise PayloadTooLargeError(
+                f"an inline image is larger than {gw.config.max_image_bytes} bytes"
+            )
         detector = gw.detectors[mode]
         session, created = gw._session(headers, body, path_session, stats, trace)
         stats.stream = stream
         stats.texts = len(collected.slots)
+        stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
         try:
             with timer.span("detect"):
@@ -226,10 +239,20 @@ class ResponsesGateway:
                 spans = without_tool_names(
                     [slot.text for slot in collected.slots], spans, tool_names(body)
                 )
+            # Inline images go through the chat path (LAB-1285): mask the texts, then the
+            # images, then remask the texts with the values the images added (LAB-1278).
+            generation = session.generation
             before = _counts_of(session)
             with timer.span("mask"):
                 masked = gw._mask(collected.slots, spans, session, language)
-                gw._write(collected.slots, masked, session, language, False)
+            _count_masked(stats, before, session)
+            if collected.images:
+                with timer.span("image"):
+                    await gw._mask_images(collected.images, detector, language, stats, session)
+            before = _counts_of(session)
+            with timer.span("mask"):
+                remask = bool(collected.images)
+                gw._write(collected.slots, masked, session, language, remask, since=generation)
                 collected.finalize()
             _count_masked(stats, before, session)
         except BaseException:

@@ -13,6 +13,9 @@ What is masked:
 - ``instructions``; ``input`` as a string, or every ``input`` item:
   ``message`` (``system``/``developer``/``user``/``assistant``; string content or
   ``input_text``/``output_text``/``refusal`` parts, their ``annotations`` and ``logprobs``),
+  ``input_image`` parts with an inline base64 PNG/JPEG ``image_url`` (the visual pipeline, as
+  for chat: the masked PNG replaces it and, with placeholder labels, its transcript follows as
+  an ``input_text`` part; Muse Code ``--image`` sends these),
   ``function_call.arguments`` (JSON: every string, keys included, re-serialised),
   ``function_call_output.output``, ``custom_tool_call.input`` and its output, and
   ``reasoning`` summaries and reasoning text;
@@ -24,7 +27,7 @@ What is masked:
 ``reasoning.encrypted_content`` is forwarded untouched: it is the provider's own encrypted
 reasoning from an earlier turn, produced from masked input, and nothing here can read it.
 
-Rejected: images, files and audio parts (not masked on this route yet), hosted tools
+Rejected: remote and ``file_id`` images (never fetched), file and audio parts, hosted tools
 (``web_search``, ``file_search``, ``mcp``, ...: they act upstream on data the gateway never
 sees), ``item_reference`` items and the server-side state fields ``previous_response_id``,
 ``conversation`` and ``prompt`` (state kept by the upstream would hold placeholders of another
@@ -45,6 +48,7 @@ from pii_guard.gateway.request import (
     _check_text,
     _collect_arguments,
     _collect_function,
+    _collect_image,
     _collect_json,
     _collect_metadata,
     _field,
@@ -97,7 +101,8 @@ _PART_KEYS = {
     "output_text": frozenset({"type", "text", "annotations", "logprobs"}),
     "refusal": frozenset({"type", "refusal"}),
 }
-_MEDIA_PARTS = frozenset({"input_image", "input_file", "input_audio"})
+_MEDIA_PARTS = frozenset({"input_file", "input_audio"})
+_IMAGE_KEYS = frozenset({"type", "image_url", "detail", "file_id"})
 _REASONING_PARTS = {"summary": "summary_text", "content": "reasoning_text"}
 _TOOL_TYPES = frozenset({"function", "namespace", "custom"})
 _NAMESPACE_KEYS = frozenset({"type", "name", "description", "tools"})
@@ -217,19 +222,22 @@ def _collect_message(item: dict[str, Any], where: str, out: CollectedTexts) -> N
         out.slots.append(_text_slot(item, "content", "content"))
     elif isinstance(content, list):
         for i, part in enumerate(content):
-            _collect_part(part, f"{where}.content.{i}", out)
+            _collect_part(part, f"{where}.content.{i}", out, content)
     else:
         raise InvalidChatRequestError(f"{where}.content must be a string or an array")
 
 
-def _collect_part(part: object, where: str, out: CollectedTexts) -> None:
+def _collect_part(part: object, where: str, out: CollectedTexts, parts: list[Any]) -> None:
     if not isinstance(part, dict):
         raise InvalidChatRequestError(f"{where} must be an object")
     part_type = part.get("type")
+    if part_type == "input_image":
+        _collect_input_image(part, where, out, parts)
+        return
     if part_type in _MEDIA_PARTS:
         raise UnsupportedContentError(
-            f"{where}: {part_type} parts are not masked on /v1/responses yet; send text only "
-            "(inline images are masked on /v1/chat/completions)"
+            f"{where}: {part_type} parts are not masked on /v1/responses; send text, or images "
+            "inline as input_image data URLs"
         )
     allowed = _PART_KEYS.get(part_type) if isinstance(part_type, str) else None
     if allowed is None or not isinstance(part_type, str):
@@ -249,6 +257,24 @@ def _collect_part(part: object, where: str, out: CollectedTexts) -> None:
             _collect_json(part, name, out, name)
 
 
+def _collect_input_image(
+    part: dict[str, Any], where: str, out: CollectedTexts, parts: list[Any]
+) -> None:
+    """``{"type": "input_image", "image_url": "data:image/png;base64,...", "detail": ...}``:
+    masked by the chat image path (:func:`~pii_guard.gateway.request._collect_image`)."""
+    _reject_unknown(part, _IMAGE_KEYS, where, "input_image part")
+    if part.get("file_id") is not None:
+        raise UnsupportedContentError(
+            f"{where}: input_image file_id references are not fetched; send the image inline "
+            "as a base64 data URL (data:image/png;base64,...) so it can be masked"
+        )
+    if "detail" in part:
+        _check_json(part, "detail", f"{where}.detail", out)
+    if not isinstance(part.get("image_url"), str):
+        raise UnsupportedContentError(f"{where}: input_image parts need an inline data URL")
+    _collect_image(part, where, out, parts, text_type="input_text")
+
+
 def _collect_output(item: dict[str, Any], where: str, out: CollectedTexts) -> None:
     """A tool result: a string, or text parts (``input_text`` / ``output_text``)."""
     output = item.get("output")
@@ -256,7 +282,7 @@ def _collect_output(item: dict[str, Any], where: str, out: CollectedTexts) -> No
         out.slots.append(_text_slot(item, "output", "tool"))
     elif isinstance(output, list):
         for i, part in enumerate(output):
-            _collect_part(part, f"{where}.output.{i}", out)
+            _collect_part(part, f"{where}.output.{i}", out, output)
     else:
         raise InvalidChatRequestError(f"{where}.output must be a string or an array")
 

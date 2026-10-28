@@ -217,8 +217,11 @@ compared field by field (names and types, not values):
   at the same time then got 404, because the refused request dropped the session it had just
   created, and Muse stopped with "model does not exist". Fixed in the gateway (tool names, above).
 
-Muse can also attach images (`--image`). `/v1/responses` refuses image parts for now
-(LAB-1285).
+Muse can also attach images (`--image`): it sends each one as an `input_image` part with an
+inline `data:image/png;base64,` URL between `<image ...>` and `</image>` text parts. The gateway
+masks it as it masks chat images (faces, ID photos, signatures and OCR'd values covered; with
+`PII_GUARD_IMAGE_RENDER=labels` a masked transcript follows as an `input_text` part), so an
+image needs OCR: without Tesseract the request is refused with `503 ocr_unavailable` (LAB-1285).
 
 ## Sessions
 
