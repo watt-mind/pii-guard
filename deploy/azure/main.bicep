@@ -2,8 +2,10 @@ targetScope = 'resourceGroup'
 
 @description('Dedicated pii-guard hosted resources only. Never target an existing shared production group.')
 @minLength(3)
-@maxLength(15)
-param prefix string = 'piiguarddemo'
+@maxLength(10)
+param projectPrefix string = 'piiguard'
+@allowed(['prod', 'staging'])
+param environmentName string = 'prod'
 param location string = resourceGroup().location
 param deployApp bool = false
 @description('External ingress is opt-in and must be enabled only after release gates; staging uses internal ingress.')
@@ -13,8 +15,15 @@ param image string = ''
 @description('Canonical HTTPS origin, without trailing slash. Use the generated ACA host or a bound custom domain.')
 param publicOrigin string = 'https://guard.watt-mind.com'
 param googleClientId string = ''
-@description('Existing Azure Monitor action group resource IDs; no recipient addresses in source.')
-param alertActionGroupIds array = []
+@description('Existing Azure Monitor action groups reused by budget and app alerts; no recipient addresses in source.')
+@minLength(1)
+param alertActionGroupIds array
+@description('Monthly cost budget in subscription billing currency. Alerts are not a spending cap.')
+@minValue(1)
+param monthlyBudgetAmount int
+param budgetStartDate string = utcNow('yyyy-MM-01T00:00:00Z')
+@description('Optional current operator object ID; grants Secrets Officer at this vault only for secret migration.')
+param provisioningPrincipalObjectId string = ''
 @minValue(0)
 @maxValue(10000000)
 @description('Explicit one-time sponsored allocation, USD microdollars. Default zero. Maximum $10 per allocation.')
@@ -28,23 +37,24 @@ param tenantKeySecretUri string = ''
 param googleSecretUri string = ''
 
 var suffix = uniqueString(resourceGroup().id)
-var appName = '${prefix}-app'
-var tags = { project: 'pii-guard', purpose: 'hosted-demo', state: 'ephemeral-single-process' }
+var namePrefix = '${projectPrefix}-${environmentName}'
+var appName = '${namePrefix}-app'
+var tags = { project: 'pii-guard', environment: environmentName, state: 'ephemeral-single-process' }
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
-  name: '${replace(prefix, '-', '')}${suffix}'
+  name: '${replace(projectPrefix, '-', '')}${environmentName}${suffix}'
   location: location
   tags: tags
   sku: { name: 'Basic' }
   properties: { adminUserEnabled: false }
 }
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${prefix}-runtime'
+  name: '${namePrefix}-runtime'
   location: location
   tags: tags
 }
 resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: '${take(prefix, 10)}-${suffix}'
+  name: '${take(projectPrefix, 4)}-${environmentName}-${take(suffix, 11)}'
   location: location
   tags: tags
   properties: {
@@ -77,7 +87,7 @@ resource pull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
-  name: '${prefix}-env'
+  name: '${namePrefix}-env'
   location: location
   tags: tags
   properties: {
@@ -89,7 +99,7 @@ resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
 }
 // Durable only for atomic spend allocation claims; never store mappings, profiles or prompts.
 resource allocationStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: 'pgalloc${suffix}'
+  name: '${take(replace(projectPrefix, '-', ''), 4)}${environmentName}${suffix}'
   location: location
   tags: tags
   kind: 'StorageV2'
@@ -157,6 +167,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (deployApp) {
           { name: 'PII_GUARD_HOSTED_SINGLE_PROCESS', value: 'true' }
           { name: 'PII_GUARD_HOSTED_TRUST_EASY_AUTH', value: 'true' }
           { name: 'PII_GUARD_HOSTED_PUBLIC_ORIGIN', value: publicOrigin }
+          { name: 'PII_GUARD_ALLOWED_HOSTS', value: '${split(replace(publicOrigin, 'https://', ''), '/')[0]},${appName}.${environment.properties.defaultDomain}' }
           { name: 'PII_GUARD_HOSTED_MODELS', value: 'muse-spark-1.3' }
           // Marker-only volume forfeits an allocation after restart; an operator must reconcile.
           { name: 'PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS', value: string(sponsoredMicrodollars) }
@@ -170,13 +181,13 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (deployApp) {
           { name: 'PII_GUARD_METRICS', value: 'false' }
         ]
         probes: [
-          { type: 'Startup', httpGet: { path: '/healthz', port: 8787 }, periodSeconds: 10, failureThreshold: 60, timeoutSeconds: 5 }
-          { type: 'Readiness', httpGet: { path: '/readyz', port: 8787 }, periodSeconds: 10, failureThreshold: 3, timeoutSeconds: 5 }
-          { type: 'Liveness', httpGet: { path: '/healthz', port: 8787 }, periodSeconds: 30, failureThreshold: 3, timeoutSeconds: 5 }
+          { type: 'Startup', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 60, timeoutSeconds: 5 }
+          { type: 'Readiness', httpGet: { path: '/readyz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 3, timeoutSeconds: 5 }
+          { type: 'Liveness', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 30, failureThreshold: 3, timeoutSeconds: 5 }
         ]
       }]
       // Mandatory until LAB-1376. Revision changes still invalidate all in-memory state.
-      scale: { minReplicas: 1, maxReplicas: 1 }
+      scale: { minReplicas: 0, maxReplicas: 1 }
       volumes: [{ name: 'allocation-claims', storageType: 'AzureFile', storageName: allocationMount.name }]
     }
   }
@@ -214,13 +225,12 @@ output appFqdn string = deployApp ? app!.properties.configuration.ingress.fqdn :
 
 // Platform metrics contain counts/resource usage, never request bodies or credentials.
 var alerts = [
-  { name: 'replicas', metric: 'Replicas', aggregation: 'Average', operator: 'LessThan', threshold: 1 }
   { name: 'restarts', metric: 'RestartCount', aggregation: 'Maximum', operator: 'GreaterThan', threshold: 0 }
   { name: 'cpu', metric: 'UsageNanoCores', aggregation: 'Average', operator: 'GreaterThan', threshold: 1800000000 }
   { name: 'memory', metric: 'WorkingSetBytes', aggregation: 'Average', operator: 'GreaterThan', threshold: 3600000000 }
 ]
 resource metricAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for item in alerts: if (deployApp) {
-  name: '${prefix}-${item.name}'
+  name: '${namePrefix}-${item.name}'
   location: 'global'
   tags: tags
   properties: {
@@ -246,3 +256,32 @@ resource metricAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for item i
     actions: [for actionGroupId in alertActionGroupIds: { actionGroupId: actionGroupId }]
   }
 }]
+
+resource secretProvisioner 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(provisioningPrincipalObjectId)) {
+  name: guid(vault.id, provisioningPrincipalObjectId, 'secret-provisioner')
+  scope: vault
+  properties: {
+    principalId: provisioningPrincipalObjectId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
+  }
+}
+resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
+  name: '${namePrefix}-budget'
+  properties: {
+    amount: monthlyBudgetAmount
+    category: 'Cost'
+    timeGrain: 'Monthly'
+    timePeriod: { startDate: budgetStartDate }
+    notifications: {
+      Actual50: { enabled: true, operator: 'GreaterThanOrEqualTo', threshold: 50, thresholdType: 'Actual', contactEmails: [], contactGroups: alertActionGroupIds }
+      Actual80: { enabled: true, operator: 'GreaterThanOrEqualTo', threshold: 80, thresholdType: 'Actual', contactEmails: [], contactGroups: alertActionGroupIds }
+      Actual100: { enabled: true, operator: 'GreaterThanOrEqualTo', threshold: 100, thresholdType: 'Actual', contactEmails: [], contactGroups: alertActionGroupIds }
+    }
+  }
+}
+output registryName string = registry.name
+output vaultName string = vault.name
+output runtimeIdentityName string = identity.name
+output managedEnvironmentName string = environment.name
+output allocationStorageName string = allocationStorage.name
+output budgetName string = budget.name

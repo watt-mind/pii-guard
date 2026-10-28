@@ -35,7 +35,7 @@ still authorizes every protected API and scopes mappings to the authenticated ow
 platform's stripped and injected identity headers are trusted. No second exposed origin or
 container TCP ingress may bypass that boundary. Cookie writes require same-origin CSRF checks.
 
-The initial runtime has exactly **one replica and one worker**. Mappings, temporary provider
+The initial runtime has **zero to one replicas and one worker per replica**. Mappings, temporary provider
 profiles, API-key records and visitor/user counters are ephemeral. Their loss on restart is
 intentional and must be disclosed. It is not the durable/shared state architecture in LAB-1376.
 A small Azure Files share stores **allocation claim markers only**, preventing a restart from
@@ -47,13 +47,20 @@ costs. Azure infrastructure costs are separate and remain an operator responsibi
 
 No prompt, restored answer, identity claim or credential belongs in telemetry. Platform counts,
 readiness, replica/restart counts and CPU/memory usage are sufficient for the first deployment.
-Content-bearing traffic capture and public metrics are disabled. The project maintainer owns
+The global traffic log and public metrics are disabled. Each owner retains its last 50 masked
+traffic events in memory, readable only by that owner; owner purge or restart frees them. The project maintainer owns
 privacy/acceptable-use review and provider-terms verification before editable text is enabled.
 
 ## Rollout and evidence
 
 1. Land the ADR, hosted authorization, owner isolation, CSRF, quotas and endpoint policy.
-2. Build the hosted image and stage it with internal ingress. Configure Google OAuth callback
+   LAB-1372 must be Done before public enablement or any positive sponsored allocation.
+   Merge #159, then #156, then #157; rebase deployment after the backend lands.
+2. Use environment-derived production names (`rg-pii-guard-prod`, `piiguard-prod-*`) and
+   matching `project`/`environment` tags. Recreate the resource group and foundation in Sweden
+   Central with the owner-approved EUR 25/month notification budget and min replicas zero.
+   The budget is not a hard cap. Cold starts reload NER and forfeit prior claimed credit.
+   Build the hosted image and stage it with internal ingress. Configure Google OAuth callback
    for the eventual public HTTPS origin. Test model readiness and mount behavior.
 3. Review synthetic tests for isolation, forged identity headers, quota exhaustion/restart,
    SSRF/redirect refusal, streaming mask/restore and failures. Confirm public notices and the
@@ -70,6 +77,6 @@ privacy/acceptable-use review and provider-terms verification before editable te
 ## Consequences
 
 This provides a reviewable hosted path while preserving a small initial trust boundary.
-Deployment, restart and rollback can invalidate sessions and require a new reviewed sponsored
+Scale-to-zero, deployment, restart and rollback can invalidate sessions and require a new reviewed sponsored
 allocation. There is no claim of anonymity, perfect detection, guaranteed physical memory
 erasure or production SLA. Detection misses and contextual clues may still identify people.

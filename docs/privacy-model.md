@@ -70,7 +70,9 @@ A hosted **detector** endpoint would receive originals and needs separate explic
 terms review. Anonymous hosted traffic uses curated synthetic samples only; editable text and
 session-only BYOK require an authenticated owner. Hosted image/upload routes are disabled.
 
-The initial hosted runtime is one replica/worker with ephemeral owner state. Restart loses
+The initial hosted runtime scales from zero to one replicas with one worker and ephemeral
+owner state. Each owner also retains up to 50 masked traffic events in memory, released on
+owner purge or restart; masked payloads may contain detection misses or identifying context. Restart loses
 mappings, temporary profiles and API-key records. Logical deletion/expiry does not promise
 physical memory erasure; raw-value caches are a known limitation (LAB-1364). No content archive
 or mapping backup is provisioned. A durable marker-only share prevents reuse of sponsored
