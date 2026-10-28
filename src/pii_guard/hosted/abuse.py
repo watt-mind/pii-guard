@@ -27,6 +27,12 @@ MAX_HOPS = 32
 MAX_BUCKETS = 4096
 IDLE_SECONDS = 3600
 LIFETIME_SECONDS = 86400
+# (burst, refill per second) for each table.
+NETWORK_RATE = (30, 0.5)
+PRINCIPAL_RATE = (10, 0.5)
+# Signed-in console reads (GET/HEAD): one console load fans out to more than ten owner-scoped
+# reads (ADR 0013), so they draw on their own, larger bucket instead of the work bucket.
+PRINCIPAL_READ_RATE = (120, 10.0)
 
 
 class AbuseAdmissionError(PiiGuardError):
@@ -78,8 +84,9 @@ class AbuseAdmission:
 
     Network buckets have 30 burst tokens, refilling at 0.5/s, and 120 requests
     per fixed hour starting with their creation. Authenticated principals have
-    independent 10-token bursts at the same refill rate, without a network cap.
-    Both tables refuse new entries at capacity instead of forgetting allowances.
+    independent 10-token work bursts at the same refill rate, without a network
+    cap, plus a separate read bucket (120 burst, 10/s) for GET/HEAD requests.
+    Every table refuses new entries at capacity instead of forgetting allowances.
     """
 
     def __init__(
@@ -96,6 +103,7 @@ class AbuseAdmission:
         self._lock = threading.Lock()
         self._networks: dict[bytes, _Bucket] = {}
         self._principals: dict[bytes, _Bucket] = {}
+        self._reads: dict[bytes, _Bucket] = {}
         self._last_now = 0.0
 
     def _now(self) -> float:
@@ -149,6 +157,7 @@ class AbuseAdmission:
             now = self._now()
             self._purge(self._networks, now)
             self._purge(self._principals, now)
+            self._purge(self._reads, now)
 
     def admit(
         self,
@@ -157,20 +166,27 @@ class AbuseAdmission:
         principal_id: str,
         authenticated: bool,
         anonymous_sponsored: bool,
+        read: bool = False,
     ) -> None:
         """Charge before reading a body. Free account inspection bypasses this call.
 
         With source off, anonymous behavior is unchanged. Missing/invalid signals
         refuse anonymous sponsored work only; sign-in is always independent.
+        ``read`` marks a GET/HEAD request: an authenticated principal is charged to
+        its read bucket instead of its work bucket (a long-lived SSE stream costs
+        one read, at open). It does not change anonymous admission.
         """
         if authenticated:
             if not principal_id or len(principal_id) > 256:
                 raise AbuseUnavailableError
             digest = hmac.digest(self._key, b"principal\0" + principal_id.encode(), "sha256")
-            table, burst = self._principals, 10
+            if read:
+                table, (burst, rate) = self._reads, PRINCIPAL_READ_RATE
+            else:
+                table, (burst, rate) = self._principals, PRINCIPAL_RATE
         elif anonymous_sponsored and self.source != "off":
             digest = self._network_digest(headers)
-            table, burst = self._networks, 30
+            table, (burst, rate) = self._networks, NETWORK_RATE
         else:
             return
         with self._lock:
@@ -182,13 +198,13 @@ class AbuseAdmission:
                     raise AbuseAdmissionError(60)
                 bucket = _Bucket(now, now, float(burst), now)
                 table[digest] = bucket
-            bucket.tokens = min(float(burst), bucket.tokens + (now - bucket.touched) * 0.5)
+            bucket.tokens = min(float(burst), bucket.tokens + (now - bucket.touched) * rate)
             bucket.touched = now
             if now - bucket.hour_start >= 3600:
                 bucket.hour_start, bucket.requests = now, 0
             if not authenticated and bucket.requests >= 120:
                 raise AbuseAdmissionError(math.ceil(3600 - (now - bucket.hour_start)), sign_in=True)
             if bucket.tokens < 1:
-                raise AbuseAdmissionError(math.ceil((1 - bucket.tokens) / 0.5))
+                raise AbuseAdmissionError(math.ceil((1 - bucket.tokens) / rate))
             bucket.tokens -= 1
             bucket.requests += 1
