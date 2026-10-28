@@ -81,8 +81,9 @@ resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
   location: location
   tags: tags
   properties: {
-    // No console content is exported to Log Analytics by this template.
-    appLogsConfiguration: { destination: 'none' }
+    // CLI --logs-destination none maps to JSON null, not the literal string 'none'.
+    // Explicit null also clears a previously configured destination on updates.
+    appLogsConfiguration: { destination: null }
     workloadProfiles: [{ name: 'Consumption', workloadProfileType: 'Consumption' }]
   }
 }
