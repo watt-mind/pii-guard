@@ -27,6 +27,26 @@ from pii_guard.types import PiiGuardError
 BODY_READ_SECONDS = 10
 
 
+# Tool types a client executes itself; any other type (web search, file search, code
+# interpreter, MCP) runs and bills at the provider, outside the reserved token usage.
+_CLIENT_TOOL_TYPES = frozenset({"function", "custom"})
+
+
+def _provider_billed_tools(body: dict[str, Any]) -> bool:
+    """Whether a chat or Responses body asks the provider for separately billed tool work."""
+    if "web_search_options" in body:
+        return True
+    tools = body.get("tools")
+    if tools is None:
+        return False
+    if not isinstance(tools, list):
+        return True
+    return any(
+        not isinstance(tool, dict) or tool.get("type", "function") not in _CLIENT_TOOL_TYPES
+        for tool in tools
+    )
+
+
 class HostedRequestError(PiiGuardError):
     status_code = 403
     code = "hosted_request_denied"
@@ -301,12 +321,18 @@ class HostedMiddleware:
                     raise HostedRequestError("Invalid JSON request") from None
                 if not isinstance(body, dict) or headers.get("x-pii-guard-mode", "fast") != "fast":
                     raise HostedRequestError("Hosted requests require fast text mode")
-                if (
-                    not connection_id
-                    and (selected_endpoint is None or selected_endpoint.provider == "sponsored")
-                    and body.get("model") not in self.service.settings.hosted_models
-                ):
+                sponsored_route = not connection_id and (
+                    selected_endpoint is None or selected_endpoint.provider == "sponsored"
+                )
+                if sponsored_route and body.get("model") not in self.service.settings.hosted_models:
                     raise HostedRequestError("Model is not allowed for sponsored requests")
+                if sponsored_route and _provider_billed_tools(body):
+                    # Provider-side tools (Meta web search grounding: USD 2.50 per 1,000
+                    # queries, LAB-1372) are billed outside the token usage the reservation
+                    # bounds, so the sponsored route never asks for them.
+                    raise HostedRequestError(
+                        "Provider-side tools are not allowed for sponsored requests"
+                    )
                 if body.get("n", 1) != 1:
                     raise HostedRequestError("Hosted requests allow one completion")
                 maximum = self.service.settings.hosted_max_output_tokens
