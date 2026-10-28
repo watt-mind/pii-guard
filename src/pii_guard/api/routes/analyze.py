@@ -93,6 +93,7 @@ class AnalyzeResponse(BaseModel):
         "vault_not_configured",
         "detection_failed",
         "detection_unavailable",
+        "detector_loading",
     ),
 )
 def analyze(

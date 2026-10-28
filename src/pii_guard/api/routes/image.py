@@ -500,6 +500,7 @@ _OPENAPI_EXTRA: dict[str, Any] = {
         "masking_failed",
         "detection_failed",
         "detection_unavailable",
+        "detector_loading",
         "ocr_unavailable",
     ),
 )

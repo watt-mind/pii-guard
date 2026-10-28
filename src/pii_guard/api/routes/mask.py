@@ -110,6 +110,7 @@ class MaskResponse(BaseModel):
         "masking_failed",
         "detection_failed",
         "detection_unavailable",
+        "detector_loading",
     ),
 )
 def mask(

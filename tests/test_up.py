@@ -77,7 +77,7 @@ def test_ui_served_at_root_without_a_status_strip(ui_dir: Path) -> None:
     assert "detectors:" not in page.text
     assert page.headers["cache-control"] == "no-cache"
     assert client.get("/assets/app.js").text == "console.log('ui')"
-    assert client.get("/healthz").json() == {"status": "ok", "version": __version__}
+    assert client.get("/healthz").json() == {"status": "ok", "version": __version__, "ner": "off"}
 
 
 def test_ui_index_is_served_byte_for_byte(ui_dir: Path) -> None:

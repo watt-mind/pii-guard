@@ -213,6 +213,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_NER_MODEL` | `ner_model` | `str \| None` (hub id or directory) | unset (detector default; a set model makes a missing `ner` extra stop startup) |
 | `PII_GUARD_NER_REVISION` | `ner_revision` | `str \| None` | unset (pinned for the default model) |
 | `PII_GUARD_NER_DEVICE` | `ner_device` | `str \| None` (`auto\|cpu\|mps\|cuda`) | unset (`auto`) |
+| `PII_GUARD_NER_WARMUP_TIMEOUT` | `ner_warmup_timeout` | `float` (> 0, seconds): how long a detecting request waits for the background NER load | `120` |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
@@ -261,7 +262,20 @@ gateway settings into `Settings` is LAB-1095.
   `PolicySet` on `app.state.policies`. An unknown name in `PII_GUARD_DETECTORS`, or a
   configured but missing NER, raises `DetectionError` here, at startup. The analyzer (`app.state.analyzer`, default
   `pii_guard.api.deps.RegistryAnalyzer`) runs the detectors through `DetectionPipeline`.
-- `GET /healthz` → `200 {"status": "ok", "version": "<package version>"}`.
+- `GET /healthz` → `200 {"status": "ok", "version": "<package version>", "ner": "<state>"}`.
+  `ner` is `off` (no NER in the stack), `loading`, `ready` or `failed`. `status` stays `ok`
+  while it loads: it is a liveness check.
+- **NER warm-up (LAB-1274, LAB-1303).** With `PII_GUARD_NER_MODEL` set, the lifespan loads the
+  model before the app serves, and a model that can't load stops startup. Without it, when the
+  stack has `ner` (the resolved published model or the public fallback, `docs/models.md`), the
+  lifespan starts loading it, download included, in a background thread
+  (`pii_guard.detect.stack.NerWarmup`, `app.state.ner_warmup`): the server answers at once.
+  `POST` requests to the detecting routes (`/v1/analyze`, `/v1/mask`, `/v1/mask/image`,
+  `/v1/chat/completions`, `/v1/responses`, also under `/s/<session>/`) that arrive meanwhile
+  wait for it, without blocking the event loop, up to `PII_GUARD_NER_WARMUP_TIMEOUT` seconds.
+  Still loading then: `503 detector_loading` with `Retry-After`. The load failed:
+  `503 detection_unavailable` ("ner model unavailable: …", the exception type only) until
+  restart. Every other route answers while it loads.
 - **Routers.** Every module in `pii_guard/api/routes/` that defines a module-level
   `router: fastapi.APIRouter` is mounted by `pii_guard.api.routes.include_routers(app)`, in
   module-name order; modules starting with `_` are skipped. Routers declare full paths
@@ -344,6 +358,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
 | 503 | `detection_unavailable` | `DetectionUnavailableError` (a `DetectionError`): a configured detector can't run safely, so nothing ran and nothing was sent. Today: the LLM detector without `PII_GUARD_LLM_DETECTOR_API_KEY` (gateway audit mode, or `PII_GUARD_DETECTORS` with `llm` on `/v1/*`); the message is "audit mode needs PII_GUARD_LLM_DETECTOR_API_KEY …". Refused before any detection, image segmentation or request, so the text never leaves the machine. A keyless endpoint on loopback (`localhost`, `127.0.0.1`, `::1`) is allowed: the text stays on the machine. |
+| 503 | `detector_loading` | `DetectorLoadingError` (a `DetectionError`): the NER model is still loading in the background after `PII_GUARD_NER_WARMUP_TIMEOUT` (default 120 s, see "NER warm-up" above). Nothing ran and nothing was sent; the response has `Retry-After`. |
 | 503 | `ocr_unavailable` | `/v1/mask/image` (and gateway images): no OCR engine, so the text in the image can't be checked (`PII_GUARD_IMAGE_REQUIRE_OCR`, the default). |
 | 500 | `internal_error` | Anything unexpected. No exception text is returned. |
 
@@ -673,7 +688,7 @@ without its path, query, user or password.
     }
   },
   "rest": {"detectors": ["rules", "ner"]},
-  "ner": {"available": true, "model": null},
+  "ner": {"available": true, "model": null, "state": "ready", "error": null},
   "upstream": {"configured": true, "mock": false, "origin": "https://models.example.com:8443"},
   "images": {"segmenter": "hybrid", "sam": false, "ocr_required": true, "gaps": [],
              "available": true},
@@ -701,6 +716,8 @@ without its path, query, user or password.
 | `rest.detectors` | string[] | Detectors `/v1/analyze` and `/v1/mask` run (`PII_GUARD_DETECTORS`, or the fast default). |
 | `ner.available` | bool | `ner` is in the fast detectors. |
 | `ner.model` | string \| null | `PII_GUARD_NER_MODEL`, `null` when unset (the detector default). |
+| `ner.state` | string | Live: `off`, `loading` (detecting requests wait), `ready` or `failed` (as `/healthz`). |
+| `ner.error` | string \| null | Why the load failed (exception type only, no path or value); `null` otherwise. |
 | `upstream.configured` | bool | An upstream is set (or the mock one is used). |
 | `upstream.mock` | bool | The gateway answers from the built-in mock upstream. |
 | `upstream.origin` | string \| null | Origin only (`scheme://host[:port]`); `null` when unset, unparseable or mock. |

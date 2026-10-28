@@ -9,9 +9,10 @@ from contextlib import asynccontextmanager
 import anyio.to_thread
 from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from pii_guard import __version__
-from pii_guard.api.errors import error_responses, install_error_handlers
+from pii_guard.api.errors import error_response, error_responses, install_error_handlers
 from pii_guard.api.routes import include_routers
 from pii_guard.api.routes.vault import (
     InspectMode,
@@ -22,7 +23,7 @@ from pii_guard.api.routes.vault import (
 from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware, allowed_hosts
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect import stack
-from pii_guard.detect.stack import rest_detector_names
+from pii_guard.detect.stack import DetectorLoadingError, NerWarmup, rest_detector_names
 from pii_guard.gateway.sessions import SessionPathMiddleware
 from pii_guard.observability import (
     Observability,
@@ -34,10 +35,52 @@ from pii_guard.observability import (
 from pii_guard.observability.config import check_allowed_hosts
 from pii_guard.policy import PolicySet
 from pii_guard.registry import resolve_detector
+from pii_guard.types import PiiGuardError
 
 __all__ = ["create_app"]
 
 logger = logging.getLogger("pii_guard.api")
+
+#: The routes that run detectors (``POST``), so wait for a loading NER model (LAB-1303). Every
+#: other route answers at once while it loads. ``tests/api/test_ner_warmup.py`` checks that
+#: each ``POST`` route of the app is either here or in its non-detecting list.
+DETECTING_PATHS = frozenset(
+    {"/v1/analyze", "/v1/mask", "/v1/mask/image", "/v1/chat/completions", "/v1/responses"}
+)
+#: Seconds a refused client is told to wait before retrying ``503 detector_loading``.
+RETRY_AFTER_SECONDS = 5
+
+
+class NerWarmupMiddleware:
+    """Detecting requests wait (bounded, off the event loop) for the background NER load.
+
+    Inside the session-path rewrite, so ``/s/<session>/v1/...`` waits too, and inside the
+    Host, loopback and token checks, so a refused request never waits. Still loading after
+    ``PII_GUARD_NER_WARMUP_TIMEOUT``: ``503 detector_loading`` with ``Retry-After``; the load
+    failed: ``503 detection_unavailable``. Either way nothing ran and nothing was sent.
+    """
+
+    def __init__(self, app: ASGIApp, *, warmup: NerWarmup, timeout: float) -> None:
+        self.app = app
+        self.warmup = warmup
+        self.timeout = timeout
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            scope["type"] == "http"
+            and self.warmup.pending
+            and scope.get("method") == "POST"
+            and scope.get("path") in DETECTING_PATHS
+        ):
+            try:
+                await self.warmup.wait_async(self.timeout)
+            except PiiGuardError as exc:
+                response = error_response(exc.status_code, exc.code, exc.message)
+                if isinstance(exc, DetectorLoadingError):
+                    response.headers["Retry-After"] = str(RETRY_AFTER_SECONDS)
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 def create_app(
@@ -65,7 +108,11 @@ def create_app(
 
     With ``PII_GUARD_NER_MODEL`` set, the lifespan loads the NER model before the app serves
     (:func:`~pii_guard.detect.stack.warm_up`, LAB-1274), so concurrent first requests don't
-    race to load it; a model that can't be loaded stops startup. The gateway
+    race to load it; a model that can't be loaded stops startup. Without it, when the stack
+    has ``ner`` (the resolved published model or fallback), the lifespan starts loading it in
+    the background (:class:`~pii_guard.detect.stack.NerWarmup`, ``app.state.ner_warmup``,
+    LAB-1303): the server answers at once, ``/healthz`` and ``/v1/status`` say ``loading``,
+    and detecting requests wait for the model (:class:`NerWarmupMiddleware`). The gateway
     (``app.state.gateway``) keeps one upstream HTTP client; the lifespan closes it on shutdown
     (LAB-1176).
     """
@@ -74,7 +121,10 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if await anyio.to_thread.run_sync(stack.warm_up, settings):
+            warmup.mark_ready()
             logger.info("ner model warmed up before serving")
+        elif warmup.start():
+            logger.info("ner model loading in the background; detecting requests wait for it")
         yield
         close = getattr(getattr(app.state, "gateway", None), "aclose", None)
         if close is not None:
@@ -94,6 +144,8 @@ def create_app(
     app.state.settings = settings
     app.state.detector_names = list(detector_names)
     app.state.policies = PolicySet.from_settings(settings)
+    warmup = NerWarmup(settings)
+    app.state.ner_warmup = warmup
     obs_settings = observability or ObservabilitySettings()
     hosts = allowed_hosts(settings)
     check_bind(obs_settings.traffic_log, settings.host)
@@ -116,22 +168,29 @@ def create_app(
         summary="Liveness check",
         responses={
             200: {
-                "description": "The server is up.",
+                "description": "The server is up. ``ner``: ``off`` (no NER in the stack), "
+                "``loading`` (detecting requests wait for it), ``ready`` or ``failed`` "
+                "(detecting requests get 503 ``detection_unavailable``).",
                 "content": {
-                    "application/json": {"example": {"status": "ok", "version": __version__}}
+                    "application/json": {
+                        "example": {"status": "ok", "version": __version__, "ner": "ready"}
+                    }
                 },
             },
             **error_responses("traffic_log_not_local", common=False),
         },
     )
     def healthz() -> dict[str, str]:
-        """``{"status": "ok", "version": ...}`` while the server is up. Needs no token, and
-        touches no detector, vault or upstream."""
-        return {"status": "ok", "version": __version__}
+        """``{"status": "ok", "version": ..., "ner": ...}`` while the server is up, also while
+        the NER model loads (``ner``: ``loading``). Needs no token, and touches no detector,
+        vault or upstream."""
+        return {"status": "ok", "version": __version__, "ner": warmup.state}
 
     include_routers(app)
-    # Innermost: /s/<session>/v1/... reaches the /v1 routes with that vault session (LAB-1286);
-    # the Host, loopback and token checks see the URL as sent.
+    # Innermost: detecting requests wait for a loading NER model (LAB-1303), on the rewritten
+    # path. Then /s/<session>/v1/... reaches the /v1 routes with that vault session
+    # (LAB-1286); the Host, loopback and token checks see the URL as sent.
+    app.add_middleware(NerWarmupMiddleware, warmup=warmup, timeout=settings.ner_warmup_timeout)
     if inspect_mode is not InspectMode.OFF:  # where each gateway session came from
         app.add_middleware(SessionRecorderMiddleware, directory=app.state.vault_directory)
     app.add_middleware(SessionPathMiddleware)

@@ -461,8 +461,13 @@ def run_up(opts: UpOptions) -> int:
                 ner=ner_resolve.describe(choice),
             )
             if "ner" in status.detectors and not choice.ready:
-                # Loading the app fetches it (progress on stderr): say why startup waits.
-                print("pii-guard up: first run, fetching the NER model", file=sys.stderr)
+                # The app fetches it in the background once it serves (LAB-1303; progress on
+                # stderr): say why the first requests wait.
+                print(
+                    "pii-guard up: first run, the NER model downloads in the background; "
+                    "the first requests wait for it",
+                    file=sys.stderr,
+                )
             app = create_bundle_app(status, settings)
         except Exception as exc:  # configuration errors: say so, don't dump a traceback
             print(f"pii-guard up: {exc}", file=sys.stderr)

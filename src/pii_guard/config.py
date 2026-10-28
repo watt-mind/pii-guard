@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     ner_device: str | None = None
     ner_published_model: str = "hdkiller/pii-guard-ner-xlmr-base"
     ner_fallback: Literal["download", "cached", "off"] = "download"
+    # Without ner_model, the resolved model loads (and downloads) in the background at startup
+    # (LAB-1303); a detecting request that arrives meanwhile waits up to this many seconds,
+    # then gets 503 detector_loading.
+    ner_warmup_timeout: float = Field(default=120.0, gt=0)
 
     # Upstream LLM the gateway forwards masked requests to (OpenAI-compatible).
     upstream_base_url: str | None = None

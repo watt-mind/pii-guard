@@ -116,6 +116,11 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
         503,
         "A configured detector can't run safely (the LLM detector without a key).",
     ),
+    "detector_loading": (
+        503,
+        "The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after "
+        "`Retry-After` seconds.",
+    ),
     "ocr_unavailable": (
         503,
         "No OCR engine, so the text in an image can't be checked (`image_require_ocr`).",

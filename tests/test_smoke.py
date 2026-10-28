@@ -100,7 +100,7 @@ def test_python_dash_m() -> None:
 def test_healthz(client: TestClient) -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": __version__}
+    assert response.json() == {"status": "ok", "version": __version__, "ner": "off"}
 
 
 def test_unknown_route_uses_error_body(client: TestClient) -> None:
