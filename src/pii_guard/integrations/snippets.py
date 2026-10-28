@@ -62,9 +62,10 @@ TESTED = {
 TOKEN_ENV = "PII_GUARD_API_TOKEN"  # noqa: S105 - the variable's name, not a token
 MODEL_PLACEHOLDER = "<model-id>"
 #: The fictional request the cURL and Python blocks send (ADR 0005).
+#: No free-text name: on a rules-only server (no NER) a name would reach the model as written.
 SAMPLE_PROMPT = (
-    "Write a two-line note to Jane Placeholder (jane.placeholder@example.net, +44 20 7946 0958) "
-    "confirming her appointment."
+    "Write a two-line note to jane.placeholder@example.net (phone +44 20 7946 0958) "
+    "confirming the appointment."
 )
 
 _DOCS = "https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations/"

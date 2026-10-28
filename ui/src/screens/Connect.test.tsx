@@ -133,6 +133,11 @@ describe("Connect quickstart", () => {
     expect(await screen.findByText("✓ First request from Muse Code: 2 values masked, 0 of them reached the model.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open in Logs" }));
     expect(onOpenLog).toHaveBeenCalledWith(`req_${ref}`);
+    expect(screen.queryByRole("button", { name: "Open session in Vault" })).toBeNull();
+    const onOpenSession = vi.fn();
+    rerender(<Connect status={okStatus} traffic={live([event(ref)])} loadSnippets={load} onOpenLog={onOpenLog} onOpenSession={onOpenSession} />);
+    await user.click(screen.getByRole("button", { name: "Open session in Vault" }));
+    expect(onOpenSession).toHaveBeenCalledWith(ref);
   });
 
   it("says when the first request was stopped, and counts values kept by policy", async () => {

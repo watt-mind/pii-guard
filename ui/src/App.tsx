@@ -330,6 +330,10 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
                 setLogFocus({ id, nonce: Date.now() });
                 openSection("logs");
               }}
+              onOpenSession={(ref) => {
+                setVaultFocus({ ref, nonce: Date.now() });
+                openSection("vault");
+              }}
             />
           </section>
           <section id="section-policy" aria-label="Policy" hidden={section !== "policy"}>

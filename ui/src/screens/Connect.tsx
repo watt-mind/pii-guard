@@ -12,10 +12,12 @@ export interface ConnectProps {
   traffic?: QuickstartTraffic;
   /** Open one call on the Logs screen. */
   onOpenLog?: (id: string) => void;
+  /** Open the tool's vault session on the Vault screen (by its traffic-log ref). */
+  onOpenSession?: (ref: string) => void;
   loadSnippets?: SnippetsLoader;
 }
 
-export function Connect({ status, traffic, onOpenLog, loadSnippets }: ConnectProps) {
+export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets }: ConnectProps) {
   const server = status.state === "ok" ? status.status : null;
   const gateway = server?.gateway.url ?? DEFAULT_GATEWAY_URL;
 
@@ -29,7 +31,7 @@ export function Connect({ status, traffic, onOpenLog, loadSnippets }: ConnectPro
         </p>
       </div>
 
-      <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} load={loadSnippets} />
+      <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} />
 
       <GatewayLine status={status} server={server} gateway={gateway} />
     </div>

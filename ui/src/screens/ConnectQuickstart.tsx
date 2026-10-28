@@ -31,6 +31,8 @@ export interface ConnectQuickstartProps {
   ner?: boolean | null;
   /** Open one call on the Logs screen. */
   onOpenLog?: (id: string) => void;
+  /** Open the tool's vault session (Vault screen), by its traffic-log ref. */
+  onOpenSession?: (ref: string) => void;
   load?: SnippetsLoader;
 }
 
@@ -44,7 +46,7 @@ function sessionFor(tool: ToolId): string {
   return id;
 }
 
-export function ConnectQuickstart({ traffic, ner = null, onOpenLog, load = loadSnippets }: ConnectQuickstartProps) {
+export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSession, load = loadSnippets }: ConnectQuickstartProps) {
   const [tool, setToolState] = useState<ToolId>(() => {
     const saved = readPref("connect-tool");
     return isTool(saved) ? saved : "muse-code";
@@ -97,7 +99,7 @@ export function ConnectQuickstart({ traffic, ner = null, onOpenLog, load = loadS
           <>
             <StartStep snippets={snippets} />
             <PasteStep snippets={snippets} snippet={snippet} onModel={setModel} />
-            <FirstRequestStep snippets={snippets} label={label} tool={tool} traffic={traffic} ner={ner} onOpenLog={onOpenLog} />
+            <FirstRequestStep snippets={snippets} label={label} tool={tool} traffic={traffic} ner={ner} onOpenLog={onOpenLog} onOpenSession={onOpenSession} />
           </>
         ) : (
           <Unavailable missing tool={tool} />
@@ -255,6 +257,7 @@ function FirstRequestStep({
   traffic,
   ner,
   onOpenLog,
+  onOpenSession,
 }: {
   snippets: Snippets;
   label: string;
@@ -262,6 +265,7 @@ function FirstRequestStep({
   traffic?: QuickstartTraffic;
   ner: boolean | null;
   onOpenLog?: (id: string) => void;
+  onOpenSession?: (ref: string) => void;
 }) {
   const ask =
     tool === "curl" || tool === "python"
@@ -321,9 +325,10 @@ function FirstRequestStep({
         Every later call in this session shows up in Logs too.
       </p>
       {noNames}
-      {onOpenLog && (
-        <div>
-          <Button onClick={() => onOpenLog(event.id)}>Open in Logs</Button>
+      {(onOpenLog || onOpenSession) && (
+        <div className="flex flex-wrap gap-2">
+          {onOpenLog && <Button onClick={() => onOpenLog(event.id)}>Open in Logs</Button>}
+          {onOpenSession && event.session_ref && <Button onClick={() => onOpenSession(event.session_ref!)}>Open session in Vault</Button>}
         </div>
       )}
     </Step>
