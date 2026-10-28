@@ -1,0 +1,32 @@
+{
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "torch": "2.14.1",
+  "torch_threads": 8,
+  "messages": 122,
+  "mean_chars": 382.5,
+  "load_average_end": [
+    12.66,
+    17.71,
+    15.41
+  ],
+  "results": {
+    "v20": {
+      "p50_ms": 48.7,
+      "p95_ms": 68.2,
+      "mean_ms": 51.0,
+      "load_s": 7.6
+    },
+    "xlmr-v3": {
+      "p50_ms": 48.3,
+      "p95_ms": 66.5,
+      "mean_ms": 50.7,
+      "load_s": 2.0
+    },
+    "mmbert-v3": {
+      "p50_ms": 71.8,
+      "p95_ms": 105.7,
+      "mean_ms": 75.9,
+      "load_s": 2.0
+    }
+  }
+}

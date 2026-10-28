@@ -12,37 +12,57 @@
 <text x="551.1" y="159" font-size="21" fill="#1B1B1F">Invalid numbers</text>
 <rect x="745.61" y="140" width="22" height="22" fill="#332288"/>
 <text x="775.6" y="159" font-size="21" fill="#1B1B1F">Other values (names, addresses, e-mail)</text>
-<line x1="587" y1="210" x2="587" y2="730" stroke="#E3E3E8" stroke-width="2"/>
-<text x="587" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">0%</text>
-<line x1="805.3" y1="210" x2="805.3" y2="730" stroke="#E3E3E8" stroke-width="2"/>
-<text x="805.3" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">25%</text>
-<line x1="1023.5" y1="210" x2="1023.5" y2="730" stroke="#E3E3E8" stroke-width="2"/>
-<text x="1023.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">50%</text>
-<line x1="1241.8" y1="210" x2="1241.8" y2="730" stroke="#E3E3E8" stroke-width="2"/>
-<text x="1241.8" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">75%</text>
+<line x1="776.5" y1="210" x2="776.5" y2="730" stroke="#E3E3E8" stroke-width="2"/>
+<text x="776.5" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">0%</text>
+<line x1="947.3" y1="210" x2="947.3" y2="730" stroke="#E3E3E8" stroke-width="2"/>
+<text x="947.3" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">25%</text>
+<line x1="1118.2" y1="210" x2="1118.2" y2="730" stroke="#E3E3E8" stroke-width="2"/>
+<text x="1118.2" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">50%</text>
+<line x1="1289.1" y1="210" x2="1289.1" y2="730" stroke="#E3E3E8" stroke-width="2"/>
+<text x="1289.1" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">75%</text>
 <line x1="1460" y1="210" x2="1460" y2="730" stroke="#E3E3E8" stroke-width="2"/>
 <text x="1460" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">100%</text>
-<circle cx="66" cy="340" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="348" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
-<rect x="587" y="294" width="734.3" height="20" fill="#4A4A52"/>
-<text x="1329.4" y="310" font-size="19" fill="#1B1B1F">84.1</text>
-<rect x="587" y="318" width="2" height="20" fill="#117733"/>
-<text x="597" y="334" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="587" y="342" width="778.7" height="20" fill="#CC6677"/>
-<text x="1373.7" y="358" font-size="19" fill="#1B1B1F">89.2</text>
-<rect x="587" y="366" width="817" height="20" fill="#332288"/>
-<text x="1412" y="382" font-size="19" fill="#1B1B1F">93.6</text>
-<circle cx="66" cy="600" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="608" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base + hard negatives (LAB-1150)</text>
-<rect x="587" y="554" width="152.3" height="20" fill="#4A4A52"/>
-<text x="747.4" y="570" font-size="19" fill="#1B1B1F">17.4</text>
-<rect x="587" y="578" width="2" height="20" fill="#117733"/>
-<text x="597" y="594" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="587" y="602" width="431.9" height="20" fill="#CC6677"/>
-<text x="1027" y="618" font-size="19" fill="#1B1B1F">49.5</text>
-<rect x="587" y="626" width="3.8" height="20" fill="#332288"/>
-<text x="598.8" y="642" font-size="19" fill="#1B1B1F">0.4</text>
+<circle cx="66" cy="275" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="283" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
+<rect x="776.5" y="229" width="575" height="20" fill="#4A4A52"/>
+<text x="1359.5" y="245" font-size="19" fill="#1B1B1F">84.1</text>
+<rect x="776.5" y="253" width="2" height="20" fill="#117733"/>
+<text x="786.5" y="269" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="776.5" y="277" width="609.7" height="20" fill="#CC6677"/>
+<text x="1394.2" y="293" font-size="19" fill="#1B1B1F">89.2</text>
+<rect x="776.5" y="301" width="639.7" height="20" fill="#332288"/>
+<text x="1424.2" y="317" font-size="19" fill="#1B1B1F">93.6</text>
+<circle cx="66" cy="405" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="413" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)</text>
+<rect x="776.5" y="359" width="217.1" height="20" fill="#4A4A52"/>
+<text x="1001.5" y="375" font-size="19" fill="#1B1B1F">31.8</text>
+<rect x="776.5" y="383" width="2" height="20" fill="#117733"/>
+<text x="786.5" y="399" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="776.5" y="407" width="45.3" height="20" fill="#CC6677"/>
+<text x="829.7" y="423" font-size="19" fill="#1B1B1F">6.6</text>
+<rect x="776.5" y="431" width="354.9" height="20" fill="#332288"/>
+<text x="1139.4" y="447" font-size="19" fill="#1B1B1F">51.9</text>
+<circle cx="66" cy="535" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="543" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)</text>
+<rect x="776.5" y="489" width="59.7" height="20" fill="#4A4A52"/>
+<text x="844.1" y="505" font-size="19" fill="#1B1B1F">8.7</text>
+<rect x="776.5" y="513" width="2" height="20" fill="#117733"/>
+<text x="786.5" y="529" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="776.5" y="537" width="73.8" height="20" fill="#CC6677"/>
+<text x="858.3" y="553" font-size="19" fill="#1B1B1F">10.8</text>
+<rect x="776.5" y="561" width="59.9" height="20" fill="#332288"/>
+<text x="844.3" y="577" font-size="19" fill="#1B1B1F">8.8</text>
+<circle cx="66" cy="665" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="673" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base + hard negatives (LAB-1150)</text>
+<rect x="776.5" y="619" width="119.3" height="20" fill="#4A4A52"/>
+<text x="903.7" y="635" font-size="19" fill="#1B1B1F">17.4</text>
+<rect x="776.5" y="643" width="2" height="20" fill="#117733"/>
+<text x="786.5" y="659" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="776.5" y="667" width="338.2" height="20" fill="#CC6677"/>
+<text x="1122.7" y="683" font-size="19" fill="#1B1B1F">49.5</text>
+<rect x="776.5" y="691" width="2.9" height="20" fill="#332288"/>
+<text x="787.4" y="707" font-size="19" fill="#1B1B1F">0.4</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;pl-pii-bench&#x27; (hand-written; pl 346 docs), pl only.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">Valid = a validated rule of the type recognises the value (checksum, numbering plan, format). Invalid numbers stay in the headline.</text>
-<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-28 · commits 57ab2ed · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-28 · commits 57ab2ed, ac0603d, da9883e · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>
