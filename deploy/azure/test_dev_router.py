@@ -402,6 +402,7 @@ class LiveProxyTests(unittest.TestCase):
                 stderr=subprocess.DEVNULL,
             )
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
             context.load_cert_chain(str(cert), str(key))
             server = HTTPServer(("127.0.0.1", 0), Upstream)
             server.socket = context.wrap_socket(server.socket, server_side=True)
@@ -542,6 +543,7 @@ class LiveProxyTests(unittest.TestCase):
                 stderr=subprocess.DEVNULL,
             )
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
             context.load_cert_chain(str(cert), str(key))
             server = HTTPServer(("127.0.0.1", 0), Upstream)
             server.socket = context.wrap_socket(server.socket, server_side=True)
