@@ -7,6 +7,10 @@ import { ApiError, UnreachableError } from "../api/http";
 import { IMAGE_RECORDINGS } from "../api/imageMock";
 import { createMockClient } from "../api/mock";
 import type { ImageMaskResponse } from "../api/types";
+import type { RoutingClient } from "../api/engine";
+import type { Account } from "../hosted/api";
+import { HostedSessionContext, type HostedSession } from "../hosted/session";
+import { Images } from "./Images";
 
 const loadImage = vi.fn(async () => new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }));
 
@@ -196,5 +200,49 @@ describe("Images screen", () => {
     await waitFor(() => expect(within(panel).queryByTestId("masked-image")).toBeNull());
     expect(within(panel).getByText("Nothing has been sent yet")).toBeInTheDocument();
     expect(maskImage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Images screen, hosted", () => {
+  // Fictional owner; the server reports a 4 MiB decoded upload limit (ADR 0014).
+  const account: Account = {
+    mode: "hosted", authenticated: true, login_url: "/.auth/login/google", logout_url: "/.auth/logout", tier: "standard", providers: ["meta"],
+    limits: { images_per_day: 20, max_image_bytes: 4 * 1024 * 1024 }, usage: { requests_today: 0, resets_at: "2026-10-29T00:00:00Z" },
+    state: { persistence: "ephemeral", restart_loses_sessions: true }, connections: [],
+  };
+  const session: HostedSession = { account, error: "", refresh: async () => {}, call: vi.fn() as unknown as HostedSession["call"] };
+  const unused = () => Promise.reject(new Error("not used"));
+  const client = { analyze: unused, mask: unused, unmask: unused, maskImage: unused, createSession: unused, addKnownValues: unused } as unknown as RoutingClient;
+  const engineState = { preference: "api", status: { state: "online", version: "0.1.0" }, endpointsMissing: false } as const;
+
+  function renderHostedImages() {
+    return render(
+      <HostedSessionContext.Provider value={session}>
+        <Images client={client} engineState={engineState} loadImage={loadImage} />
+      </HostedSessionContext.Provider>,
+    );
+  }
+
+  it("says the image is processed in memory on the Azure server, not stored, and what stays visible", () => {
+    renderHostedImages();
+    const note = screen.getByRole("note", { name: /how hosted images are processed/i });
+    expect(note).toHaveTextContent(/processed in memory on our Azure server and is not stored/i);
+    expect(note).toHaveTextContent(/not sent to any other service/i);
+    expect(note).toHaveTextContent(/signatures and stamps are not detected here/i);
+    expect(screen.queryByText(/SAM 3\.1 segments signatures/i)).not.toBeInTheDocument();
+  });
+
+  it("refuses an upload over the hosted limit before sending it", async () => {
+    const user = userEvent.setup();
+    renderHostedImages();
+    const big = new File([new Uint8Array(4 * 1024 * 1024 + 1)], "big.png", { type: "image/png" });
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(input, big);
+    expect(await screen.findByText(/over 4 MB, the hosted service's limit/i)).toBeInTheDocument();
+  });
+
+  it("shows no hosted note in the local console", () => {
+    render(<Images client={client} engineState={engineState} loadImage={loadImage} />);
+    expect(screen.queryByRole("note", { name: /how hosted images are processed/i })).not.toBeInTheDocument();
   });
 });

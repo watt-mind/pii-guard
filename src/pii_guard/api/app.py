@@ -222,11 +222,20 @@ def create_app(
 
         app.state.hosted = HostedService(settings, projects=app.state.projects)
         app.include_router(hosted_router)
+        # Hosted images (ADR 0014): the route's own byte limit and the one-job image pool.
+        app.state.max_image_bytes = settings.hosted_max_image_bytes
+        app.state.image_workers = app.state.hosted.image_workers
 
         @app.get("/readyz", include_in_schema=False)
         def readyz() -> dict[str, str]:
             if warmup.state not in {"ready", "off"}:
                 raise DetectorLoadingError("Detectors are not ready")
+            if settings.hosted_images:
+                from pii_guard.hosted.images import require_image_pipeline
+
+                # Fail closed (ADR 0006): a replica that offers images must be able to OCR
+                # them and to find faces on the CPU, or it is not ready at all.
+                require_image_pipeline(app.state)
             return {"status": "ready"}
 
     # Innermost: detecting requests wait for a loading NER model (LAB-1303), on the rewritten

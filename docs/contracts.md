@@ -788,7 +788,7 @@ caller's own view (the server's settings locally, the owner's runtime when hoste
 |---|---|---|---|
 | `text` | `true` | `true` | Text masking (`/v1/analyze`, `/v1/mask`, `/v1/unmask`). |
 | `chat` | `true` | `true` | The gateway chat (`/v1/chat/completions`, `/v1/responses`). |
-| `images` | `true` | `false` | Image masking (`/v1/mask/image`); `images.available` says whether it can run. |
+| `images` | `true` | `PII_GUARD_HOSTED_IMAGES` and no masked visual type the on-device segmenter can't find | Image masking (`/v1/mask/image`); `images.available` says whether it can run locally. Hosted: signed-in owners, local processing only ([ADR 0014](decisions/0014-hosted-local-images.md)). |
 | `logs` | `traffic_log != "off"` | `true` | The traffic log (`/v1/traffic`). |
 | `vault` | `vault_inspect != "off"` | `true` | The vault inspector (`/v1/vault/sessions`). |
 | `server_policy` | `true` | `false` | The server-wide entity policy page (`policies`). Without it, Policy shows the owner's default project policy read-only (from the project API) and points to Projects. |
@@ -817,7 +817,7 @@ The response is an allow-list of the fields above: a field not listed here is no
   "default_language": "hu",
   "traffic_log": "masked",
   "vault_inspect": "masked",
-  "capabilities": {"text": true, "chat": true, "images": false, "logs": true, "vault": true,
+  "capabilities": {"text": true, "chat": true, "images": true, "logs": true, "vault": true,
                    "server_policy": false, "projects": true, "connect": true,
                    "evaluation": true, "accounts": true}
 }

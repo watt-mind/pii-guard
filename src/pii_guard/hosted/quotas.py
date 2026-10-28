@@ -105,6 +105,10 @@ class QuotaLimits:
     input_microdollars_per_token: int = 5
     output_microdollars_per_token: int = 30
     global_daily_microdollars: int = 10_000_000
+    # Images (LAB-1390): a separate daily count, never covered by the token allowance.
+    # Guests get none; there is no remote image cost, only replica CPU.
+    user_images: int = 20
+    global_images: int = 500
 
     def __post_init__(self) -> None:
         if any(
@@ -119,6 +123,7 @@ class _Usage:
     day: int
     requests: int = 0
     tokens: int = 0
+    images: int = 0
     active: int = 0
 
 
@@ -178,6 +183,7 @@ class QuotaLedger:
         self._active = 0
         self._day = self._read_day()
         self._requests = self._tokens = self._spent_today = self._spent_allocation = 0
+        self._images = 0
         if (
             type(sponsored_allocation_microdollars) is not int
             or sponsored_allocation_microdollars < 0
@@ -230,12 +236,12 @@ class QuotaLedger:
             raise QuotaUnavailableError
         if day > self._day:
             self._day = day
-            self._requests = self._tokens = self._spent_today = 0
+            self._requests = self._tokens = self._spent_today = self._images = 0
             # Never discard a live stream's permit. Idle previous-day identities can
             # be removed, but eviction within a day must not replenish quotas.
             self._users = {key: usage for key, usage in self._users.items() if usage.active}
             for usage in self._users.values():
-                usage.day, usage.requests, usage.tokens = day, 0, 0
+                usage.day, usage.requests, usage.tokens, usage.images = day, 0, 0, 0
         return day
 
     def _reset_at(self) -> str:
@@ -260,6 +266,7 @@ class QuotaLedger:
         input_tokens: int,
         output_tokens: int,
         sponsored: bool,
+        images: int = 0,
     ) -> Reservation:
         """Reserve once before detection/upstream work, or raise without mutating budgets.
 
@@ -268,10 +275,13 @@ class QuotaLedger:
         Each retry needs a new admission. Guarded detector work uses ``sponsored=False``
         but still consumes request/token/compute budgets. A downstream call in the same
         operation must be included here, not admitted after detector work has started.
+        ``images`` counts against the separate daily image allowance; guests have none.
         """
         if not principal or len(principal) > 256:
             raise QuotaUnavailableError
-        if any(type(n) is not int or n < 0 for n in (input_tokens, output_tokens)):
+        if any(type(n) is not int or n < 0 for n in (input_tokens, output_tokens, images)):
+            raise QuotaUnavailableError
+        if images and (not authenticated or sponsored):
             raise QuotaUnavailableError
         tokens = input_tokens + output_tokens
         limits = self.limits
@@ -302,6 +312,8 @@ class QuotaLedger:
                 or self._requests >= limits.global_requests
                 or self._tokens + tokens > limits.global_tokens
                 or self._active >= limits.global_concurrency
+                or (images and usage.images + images > limits.user_images)
+                or (images and self._images + images > limits.global_images)
                 or (sponsored and self._spent_today + spend > limits.global_daily_microdollars)
             ):
                 raise QuotaExceededError(resets_at=self._reset_at())
@@ -311,9 +323,11 @@ class QuotaLedger:
             self._users[principal] = usage
             usage.requests += 1
             usage.tokens += tokens
+            usage.images += images
             usage.active += 1
             self._requests += 1
             self._tokens += tokens
+            self._images += images
             self._active += 1
             if sponsored:
                 self._spent_today += spend
@@ -328,5 +342,6 @@ class QuotaLedger:
             return {
                 "requests_today": usage.requests if usage else 0,
                 "tokens_today": usage.tokens if usage else 0,
+                "images_today": usage.images if usage else 0,
                 "resets_at": self._reset_at(),
             }

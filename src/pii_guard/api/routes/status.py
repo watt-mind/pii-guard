@@ -139,16 +139,19 @@ def _static_status(request: Request) -> dict[str, Any]:
     }
 
 
-def capabilities(*, hosted: bool, traffic_log: str, vault_inspect: str) -> dict[str, bool]:
+def capabilities(
+    *, hosted: bool, traffic_log: str, vault_inspect: str, hosted_images: bool = False
+) -> dict[str, bool]:
     """Which console sections this server offers (ADR 0013): the UI's only source for them.
 
     ``traffic_log`` and ``vault_inspect`` are the caller's own view (the server's settings
     locally, the owner's runtime when hosted), so ``logs`` and ``vault`` are one expression in
-    both modes."""
+    both modes. Hosted images (ADR 0014) are the Images screen's ``/v1/mask/image`` for
+    signed-in owners, while the operator offers them (``PII_GUARD_HOSTED_IMAGES``)."""
     return {
         "text": True,
         "chat": True,
-        "images": not hosted,
+        "images": hosted_images if hosted else True,
         "logs": traffic_log != "off",
         "vault": vault_inspect != "off",
         "server_policy": not hosted,
@@ -184,6 +187,14 @@ def hosted_projection(status: dict[str, Any], public_origin: str) -> dict[str, A
     }
 
 
+def _hosted_images_servable(state: Any) -> bool:
+    """Hosted images run on the on-device segmenter only: offered only while the server's
+    visual policies ask for nothing it cannot find (a masked signature refuses every image)."""
+    from pii_guard.hosted.images import unservable_visual_types
+
+    return not unservable_visual_types(state.policies)
+
+
 def server_status(request: Request) -> dict[str, Any]:
     state = request.app.state
     cached = getattr(state, "status_static", None)
@@ -215,7 +226,12 @@ def server_status(request: Request) -> dict[str, Any]:
         "traffic_log": level,
         "vault_inspect": inspect,
         "metrics": getattr(obs, "metrics", None) is not None,
-        "capabilities": capabilities(hosted=hosted, traffic_log=level, vault_inspect=inspect),
+        "capabilities": capabilities(
+            hosted=hosted,
+            traffic_log=level,
+            vault_inspect=inspect,
+            hosted_images=bool(state.settings.hosted_images) and _hosted_images_servable(state),
+        ),
     }
     if hosted:
         return hosted_projection(status, state.hosted.origin)

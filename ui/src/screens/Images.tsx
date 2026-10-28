@@ -6,6 +6,7 @@ import type { ImageMaskRequest, ImageMaskResponse, ImageRegion } from "../api/ty
 import { Boundary } from "../components/Boundary";
 import { Pane } from "../components/Pane";
 import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
+import { useHostedSession } from "../hosted/session";
 import { DEFAULT_IMAGE_SAMPLE, IMAGE_SAMPLES, MAX_UPLOAD_BYTES, UPLOAD_TYPES, type ImageSample } from "../content/imageSamples";
 import { metaFor, modelLabel } from "../lib/entities";
 import {
@@ -68,7 +69,18 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }>
 
 const sampleSelection = (sample: ImageSample): Selection => ({ kind: "sample", key: `sample:${sample.id}`, sample });
 
+/** The hosted upload limit (ADR 0014) when `/v1/account` doesn't report one. */
+const HOSTED_MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+/** A hosted owner's decoded upload limit, from `/v1/account` `limits.max_image_bytes`. */
+function hostedUploadLimit(limits: Record<string, unknown> | undefined): number {
+  const reported = limits?.max_image_bytes;
+  return typeof reported === "number" && reported > 0 ? reported : HOSTED_MAX_UPLOAD_BYTES;
+}
+
 export function Images({ client, engineState, loadImage = fetchImage, replayRecorded, serverImages = null }: Props) {
+  const hosted = useHostedSession();
+  const maxUploadBytes = hosted ? hostedUploadLimit(hosted.account.limits) : MAX_UPLOAD_BYTES;
   const [selection, setSelection] = useState<Selection>(() => sampleSelection(DEFAULT_IMAGE_SAMPLE));
   const [result, setResult] = useState<ImageResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -110,8 +122,8 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
       setUploadError("Only PNG and JPEG images can be masked.");
       return;
     }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError(`That image is over ${MAX_UPLOAD_BYTES / 1024 / 1024} MB, the API's limit.`);
+    if (file.size > maxUploadBytes) {
+      setUploadError(`That image is over ${maxUploadBytes / 1024 / 1024} MB, the ${hosted ? "hosted service's" : "API's"} limit.`);
       return;
     }
     select({ kind: "upload", key: `upload:${++uploadSeq.current}`, name: file.name, blob: file, url: URL.createObjectURL(file) });
@@ -170,7 +182,9 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
       <div className="max-w-3xl">
         <h1 className="text-2xl font-medium text-balance text-ink">Faces, signatures and ID numbers, covered before the image leaves.</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          {serverImages && !demo
+          {hosted && !demo
+            ? "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
+            : serverImages && !demo
             ? serverImages.sam
               ? "SAM 3.1 segments signatures and stamps, an on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
               : "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image. Signatures and stamps need SAM 3.1 (META_API_KEY on the server)."
@@ -178,6 +192,14 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
           Every masked region is filled solid, and the image is rebuilt from pixels, so no metadata leaves either.
         </p>
       </div>
+
+      {hosted && (
+        <p role="note" aria-label="How hosted images are processed" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+          <strong className="font-medium">Your image is processed in memory on our Azure server and is not stored.</strong> Its text is read with Tesseract and faces are found on that
+          server's CPU; the image is not sent to any other service or model. Only the masked image and your session's placeholders are kept, in memory, until you delete the session or
+          the server restarts. Signatures and stamps are not detected here and stay visible: cover them before uploading, or self-host pii-guard with SAM 3.1.
+        </p>
+      )}
 
       {serverImages && !serverImages.available && !demo && (
         <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">

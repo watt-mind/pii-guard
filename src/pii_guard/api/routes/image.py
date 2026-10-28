@@ -269,8 +269,16 @@ class ImageOptions(BaseModel):
     expiry: ExpiryPolicy = "reduce"
 
 
+def _hosted(request: Request) -> bool:
+    return bool(getattr(request.app.state.settings, "hosted", False))
+
+
 def _sam_client(request: Request) -> Segmenter:
     state = request.app.state
+    if _hosted(request):
+        from pii_guard.hosted.images import local_segmenter
+
+        return local_segmenter(state)
     sam = getattr(state, "sam_client", None)
     if sam is None:
         with _lock:
@@ -284,6 +292,10 @@ def _sam_client(request: Request) -> Segmenter:
 
 def _ocr_engine(request: Request) -> OcrEngine | None:
     state = request.app.state
+    if _hosted(request):
+        from pii_guard.hosted.images import local_ocr
+
+        return local_ocr(state)
     if not hasattr(state, "ocr_engine"):
         state.ocr_engine = default_ocr_engine()
     ocr: OcrEngine | None = state.ocr_engine
@@ -309,8 +321,13 @@ def get_image_masker(request: Request) -> ImageMasker:
             model = getattr(inner, "model", None)
             if isinstance(model, str) and model:
                 models[getattr(inner, "name", type(inner).__name__)] = model
+    max_pixels = request.app.state.settings.image_max_pixels
+    if _hosted(request):
+        from pii_guard.hosted.images import hosted_image_limits
+
+        max_pixels, _ = hosted_image_limits(request.app.state.settings)
     return ImageMasker(
-        max_pixels=request.app.state.settings.image_max_pixels,
+        max_pixels=max_pixels,
         sam=_sam_client(request),
         policies=get_policies(request),
         ocr=ocr,
@@ -527,16 +544,34 @@ async def mask_image_endpoint(
     transcript and a document summary; ``opaque`` covers regions with solid boxes. Fail
     closed: any SAM, OCR or detector error is 503 ``detection_failed``, a ``block`` region
     422 ``blocked_entity``; the original image is never returned. See docs/contracts.md."""
+    settings = request.app.state.settings
+    timeout = settings.image_timeout
+    workers = image_workers_for(request.app.state, settings.image_concurrency)
+    if _hosted(request):
+        from pii_guard.hosted.images import (
+            hosted_image_limits,
+            hosted_image_policies,
+            require_image_capacity,
+            require_local_visual_policies,
+        )
+
+        # The project's text policies, the operator's visual ones (projects hold text only).
+        request.state.project_policies = hosted_image_policies(
+            get_policies(request), request.app.state.policies
+        )
+        # Before the image is decoded: a policy only SAM could serve, or a busy replica.
+        require_local_visual_policies(request.state.project_policies)
+        require_image_capacity(workers)
+        _, timeout = hosted_image_limits(settings)
     data, options = await _image_from_request(request)
     if not data:
         raise InvalidImageError("image is empty")
     if len(data) > max_image_bytes(request):
         raise PayloadTooLargeError(f"image is larger than {max_image_bytes(request)} bytes")
     masker = get_image_masker(request)
-    require_ocr(masker.ocr, required=request.app.state.settings.image_require_ocr)
+    require_ocr(masker.ocr, required=settings.image_require_ocr)
     lang = get_language(request, options.language or language)
     render, vault = _render_and_vault(request, options.render)
-    settings = request.app.state.settings
     # Unknown or expired id -> 404 not_found, before any detection; a session this request
     # created is dropped again on any error, so a refused image leaves nothing in the vault.
     with ephemeral_session(vault, options.session_id, request) as session:
@@ -545,8 +580,8 @@ async def mask_image_endpoint(
             masker,
             [data],
             lang,
-            workers=image_workers_for(request.app.state, settings.image_concurrency),
-            timeout=settings.image_timeout,
+            workers=workers,
+            timeout=timeout,
             render=render,
             session=session,
             expiry=options.expiry,
