@@ -36,6 +36,7 @@ import httpx
 from pydantic import SecretStr
 
 from pii_guard.config import Settings, get_settings
+from pii_guard.detection_profile import refuse_remote
 from pii_guard.types import DetectionError, EntityType
 from pii_guard.visual.image import encode_image, load_image
 from pii_guard.visual.regions import Box, Region, SamMask
@@ -187,6 +188,8 @@ class SamClient:
         settings: Settings | None = None,
     ) -> None:
         settings = settings or get_settings()
+        refuse_remote(settings, "SAM segmentation")
+        self._settings = settings
         self.url = _resolve_url(base_url or settings.sam_url or DEFAULT_BASE_URL)
         if api_key is None:
             env_key = os.environ.get(API_KEY_ENV_VAR)
@@ -270,6 +273,7 @@ class SamClient:
         )
 
     def _request(self, client: httpx.Client, prompt: str, data_url: str) -> str:
+        refuse_remote(self._settings, "SAM segmentation")
         payload = self.payload(prompt, data_url)
         last: str = "no attempt"
         for _attempt in range(self.max_retries + 1):

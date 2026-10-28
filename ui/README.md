@@ -171,3 +171,55 @@ curl -s --data-binary @ui/public/samples/id-card.png -H 'Content-Type: image/png
 
 Offsets from the API are code-point indices (Python `str`); the UI converts them to UTF-16
 before slicing, so emoji and other non-BMP characters don't shift highlights.
+
+## Public hosted shell
+
+The local console remains the default. Build the public landing and scoped playground with:
+
+```sh
+VITE_PII_GUARD_HOSTED=true pnpm build
+```
+
+This is a build-time choice, not a query parameter. Serve the output on the same origin as
+an API configured for hosted mode and Azure Google authentication (`/.auth/login/google`).
+The public shell calls `/v1/account`, `/v1/demo`, scoped account key/connection routes,
+and the existing models and streaming chat routes for authenticated custom text. It does
+not expose global traffic, vault, operator settings, or a browser mock engine.
+
+The initial walkthrough is an explicitly labelled, hand-written synthetic illustration.
+A live run sends a curated `hu-support` or `en-support` id; it never sends editable guest
+input and never replaces an API failure with a simulated success. Signed-in visitors can
+edit text and select a temporary provider connection. Provider and guard API keys are held
+only in component memory; they are never written to local/session storage. A created guard
+key is shown once, then only metadata remains in the UI.
+
+For local preview against a hosted API:
+
+```sh
+PII_GUARD_API_URL=http://127.0.0.1:8787 VITE_PII_GUARD_HOSTED=true pnpm dev --port 4185
+```
+
+The Vite development proxy covers API routes, not Azure's authentication endpoints. Google
+sign-in must be verified on the deployed same-origin Azure site. The live guest run and
+account controls require the companion hosted API; an unavailable API is shown visibly.
+Static illustrations are not benchmark evidence. Source benchmark runs and methodology
+are linked with their version/date context instead of copying an undated score.
+
+
+### Landing narrative and availability
+
+The landing compares two deployment modes. The open-source self-hosted full stack is
+available: the customer operates the guard, dashboard and vault, and chooses the upstream.
+Keeping every raw-data processing step local also requires local detectors and models;
+some detector modes call remote services. The hosted gateway is a preview, not a publicly
+live service. It receives raw prompts on the Azure-hosted guard, masks detected values and
+then forwards the request upstream. These descriptions do not imply enterprise readiness.
+
+The self-hosted stack supports text and image masking. Detected image text can share
+pseudonyms with text in the same session; masked image pixels are not reversibly restored.
+Remote detector services, including SAM segmentation, may receive original inputs. The
+hosted preview currently exposes text only.
+
+The copy describes privacy risk reduction and support for data minimisation, not automatic
+GDPR or EU AI Act compliance. It distinguishes fail-closed processing errors from missed
+detections, contextual identification and the limits of reversible pseudonymisation.

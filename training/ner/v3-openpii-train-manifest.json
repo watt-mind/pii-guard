@@ -1,0 +1,342 @@
+{
+  "dataset": "ai4privacy/pii-masking-openpii-1m",
+  "url": "https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m",
+  "revision": "ecfdc547f4a0955600cfe6ab98ba2a162207fcc0",
+  "file": "data/train.jsonl",
+  "file_sha256": "f167e4290bc8dc9d92866e1e7be57821e3847f0dc4b02140a9a5540fb9151743",
+  "license": "CC-BY-4.0",
+  "attribution": "Ai4Privacy / Ai Suisse SA",
+  "rows_committed": false,
+  "seed": 1393,
+  "requested": {
+    "train": {
+      "hu": 5000,
+      "en": 5000,
+      "de": 5000,
+      "pl": 2500,
+      "cs": 2500,
+      "sk": 2500,
+      "ro": 2500,
+      "hr": 2500,
+      "sl": 2500
+    },
+    "dev": {
+      "hu": 100,
+      "en": 100,
+      "de": 100,
+      "pl": 100,
+      "cs": 100,
+      "sk": 100,
+      "ro": 100,
+      "hr": 100,
+      "sl": 100
+    }
+  },
+  "sample_rule": "per language, usable rows ordered by sha256('<seed>:<uid>'): the first n_dev are dev, the next n_train are train",
+  "filters": {
+    "max_chars": 1500,
+    "hu_english_dates": "Hungarian rows with an English month name"
+  },
+  "loss_ignore": "every DATE span (birth dates are not marked in the dataset)",
+  "eval_holdout": {
+    "manifest": "eval/fixtures/public/ai4privacy-openpii-1m.json",
+    "rule": "no uid of the eval manifest and no text of the eval fixtures",
+    "disjoint": true
+  },
+  "languages": {
+    "hu": {
+      "rows_in_split": 36332,
+      "eval_overlap_skipped": 0,
+      "filtered": {
+        "hu_english_dates": 13732
+      },
+      "unconvertible": 0,
+      "train": {
+        "documents": 5000,
+        "gold_spans": {
+          "ADDRESS": 3043,
+          "BANK_ACCOUNT": 1260,
+          "EMAIL": 2317,
+          "ID_DOCUMENT": 2729,
+          "NATIONAL_ID_HU_TAJ": 973,
+          "NATIONAL_ID_HU_TAX": 1005,
+          "PERSON": 4085,
+          "PHONE": 1636
+        },
+        "loss_ignore_regions": 2756,
+        "uids_sha256": "f299c35a3c4074af005f3ce79591039b9c399dd50bfe6dd604e8332c221d8cce"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 76,
+          "BANK_ACCOUNT": 31,
+          "EMAIL": 44,
+          "ID_DOCUMENT": 63,
+          "NATIONAL_ID_HU_TAJ": 22,
+          "NATIONAL_ID_HU_TAX": 19,
+          "PERSON": 79,
+          "PHONE": 33
+        },
+        "loss_ignore_regions": 50,
+        "uids_sha256": "2e2b545f5dc9097560bfbe7d73e586c021703a76ae9ae70205088c37e3edbba3"
+      }
+    },
+    "en": {
+      "rows_in_split": 143515,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 5000,
+        "gold_spans": {
+          "ADDRESS": 3403,
+          "BANK_ACCOUNT": 1136,
+          "EMAIL": 2852,
+          "ID_DOCUMENT": 4766,
+          "PERSON": 5168,
+          "PHONE": 2111
+        },
+        "loss_ignore_regions": 4662,
+        "uids_sha256": "e06b6e02200971f046c970f0647b0e41d0b0a14de3f9c795b9c4371a9090f080"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 75,
+          "BANK_ACCOUNT": 19,
+          "EMAIL": 64,
+          "ID_DOCUMENT": 108,
+          "PERSON": 114,
+          "PHONE": 45
+        },
+        "loss_ignore_regions": 100,
+        "uids_sha256": "58366dd03b17140843bc15b242f0bd58371f797c64539cef91b0b57282c82792"
+      }
+    },
+    "de": {
+      "rows_in_split": 96179,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 5000,
+        "gold_spans": {
+          "ADDRESS": 2791,
+          "BANK_ACCOUNT": 1090,
+          "EMAIL": 2542,
+          "ID_DOCUMENT": 4293,
+          "PERSON": 4593,
+          "PHONE": 1868
+        },
+        "loss_ignore_regions": 4295,
+        "uids_sha256": "6cfadf9124838f30f2066cf1d27ea47e20310914ddb01999c09778d81257b54e"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 54,
+          "BANK_ACCOUNT": 18,
+          "EMAIL": 52,
+          "ID_DOCUMENT": 79,
+          "PERSON": 74,
+          "PHONE": 43
+        },
+        "loss_ignore_regions": 88,
+        "uids_sha256": "4241281715470bbef0db03221ea945b6809ef71ba12a6e9413bd7db87a6ca11a"
+      }
+    },
+    "pl": {
+      "rows_in_split": 37331,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 2500,
+        "gold_spans": {
+          "ADDRESS": 1574,
+          "BANK_ACCOUNT": 592,
+          "EMAIL": 1411,
+          "ID_DOCUMENT": 2339,
+          "PERSON": 2426,
+          "PHONE": 1100
+        },
+        "loss_ignore_regions": 2047,
+        "uids_sha256": "bae205c04bff1da2caa40aaa6667c33b0cf078c1ab755826f73e86de1d8d0eb6"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 57,
+          "BANK_ACCOUNT": 17,
+          "EMAIL": 63,
+          "ID_DOCUMENT": 86,
+          "PERSON": 101,
+          "PHONE": 54
+        },
+        "loss_ignore_regions": 85,
+        "uids_sha256": "12abad4d7d0b795f72ab867214c692b4304ebc22777703506623dfda60969648"
+      }
+    },
+    "cs": {
+      "rows_in_split": 37251,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 2500,
+        "gold_spans": {
+          "ADDRESS": 1727,
+          "BANK_ACCOUNT": 520,
+          "EMAIL": 1413,
+          "ID_DOCUMENT": 2381,
+          "PERSON": 2339,
+          "PHONE": 1045
+        },
+        "loss_ignore_regions": 2016,
+        "uids_sha256": "ba9ee346e1278528046f7ab03575e869824e013e7a59e131255ad0acef151098"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 48,
+          "BANK_ACCOUNT": 24,
+          "EMAIL": 49,
+          "ID_DOCUMENT": 90,
+          "PERSON": 72,
+          "PHONE": 36
+        },
+        "loss_ignore_regions": 72,
+        "uids_sha256": "9e300dc20d0581fb71cde0841e480c074cda87cc93a2ce8e8dc50bcf45393bb2"
+      }
+    },
+    "sk": {
+      "rows_in_split": 36736,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 2500,
+        "gold_spans": {
+          "ADDRESS": 1691,
+          "BANK_ACCOUNT": 558,
+          "EMAIL": 1408,
+          "ID_DOCUMENT": 2381,
+          "PERSON": 2344,
+          "PHONE": 1072
+        },
+        "loss_ignore_regions": 2086,
+        "uids_sha256": "83f53ac14da947031bef61f4999a50b42470d02e3f7fa29c7b88f7ec5ad4ddf6"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 69,
+          "BANK_ACCOUNT": 17,
+          "EMAIL": 56,
+          "ID_DOCUMENT": 75,
+          "PERSON": 97,
+          "PHONE": 42
+        },
+        "loss_ignore_regions": 81,
+        "uids_sha256": "1d1f3b7fb8629055491299aa93a78f87db6e25efbca631e7a5d7c2d267455905"
+      }
+    },
+    "ro": {
+      "rows_in_split": 36166,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 2500,
+        "gold_spans": {
+          "ADDRESS": 2142,
+          "BANK_ACCOUNT": 544,
+          "EMAIL": 1339,
+          "ID_DOCUMENT": 2206,
+          "PERSON": 2233,
+          "PHONE": 1040
+        },
+        "loss_ignore_regions": 2053,
+        "uids_sha256": "bee78774c298a69e72783fb0166a40a10f5e0e1746b95ee92eb61ca7e1d0e819"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 63,
+          "BANK_ACCOUNT": 19,
+          "EMAIL": 46,
+          "ID_DOCUMENT": 68,
+          "PERSON": 87,
+          "PHONE": 28
+        },
+        "loss_ignore_regions": 72,
+        "uids_sha256": "2779bc8e454ea8036450b850d3fc34564d1495b6c145bff015c2d414fc0cefbe"
+      }
+    },
+    "hr": {
+      "rows_in_split": 35842,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 2500,
+        "gold_spans": {
+          "ADDRESS": 1456,
+          "BANK_ACCOUNT": 525,
+          "EMAIL": 1407,
+          "ID_DOCUMENT": 2222,
+          "PERSON": 2412,
+          "PHONE": 1048
+        },
+        "loss_ignore_regions": 2081,
+        "uids_sha256": "eee6cce8eb0d9057d560a253a0360354bc581e36f523dd4358e13a8c29425af6"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 72,
+          "BANK_ACCOUNT": 28,
+          "EMAIL": 55,
+          "ID_DOCUMENT": 87,
+          "PERSON": 110,
+          "PHONE": 42
+        },
+        "loss_ignore_regions": 87,
+        "uids_sha256": "f8f7b60b1167ce77f0553ef53e757b2afc558d2f020ff4b61091935dbfa1fdc8"
+      }
+    },
+    "sl": {
+      "rows_in_split": 36048,
+      "eval_overlap_skipped": 0,
+      "filtered": {},
+      "unconvertible": 0,
+      "train": {
+        "documents": 2500,
+        "gold_spans": {
+          "ADDRESS": 1383,
+          "BANK_ACCOUNT": 524,
+          "EMAIL": 1474,
+          "ID_DOCUMENT": 2297,
+          "PERSON": 2446,
+          "PHONE": 1055
+        },
+        "loss_ignore_regions": 2074,
+        "uids_sha256": "82bd4c36adc5a0c7a1b838f7246d934b766475d92b448ef796bdd946abbb94b5"
+      },
+      "dev": {
+        "documents": 100,
+        "gold_spans": {
+          "ADDRESS": 56,
+          "BANK_ACCOUNT": 21,
+          "EMAIL": 58,
+          "ID_DOCUMENT": 96,
+          "PERSON": 92,
+          "PHONE": 43
+        },
+        "loss_ignore_regions": 73,
+        "uids_sha256": "c9226c883c20aa26ebe1cb2f9ad0cda7140b7397182335c0bd507a226f0fafdc"
+      }
+    }
+  }
+}

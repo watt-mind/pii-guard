@@ -207,6 +207,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_PORT` | `port` | `int` | `8787` |
 | `PII_GUARD_LOG_LEVEL` | `log_level` | `str` | `info` |
 | `PII_GUARD_DEFAULT_LANGUAGE` | `default_language` | `str` | `hu` |
+| `PII_GUARD_DETECTION_PROFILE` | `detection_profile` | `standard \| local-only` | `standard` |
 | `PII_GUARD_DETECTORS` | `detectors` | `tuple[str, ...] \| None` (comma-separated registry names) | unset (the gateway fast-mode stack: `rules`, plus `ner` when available) |
 | `PII_GUARD_POLICY_OVERRIDES` | `policy_overrides` | `dict[EntityType, Policy]` (`TYPE=mask\|keep\|block,...`) | none |
 | `PII_GUARD_GATEWAY_KEEP_TYPES` | `gateway_keep_types` | `frozenset[EntityType] \| None` (deprecated) | unset |
@@ -251,6 +252,30 @@ reasoning effort, max tokens and timeout as the constructor argument, then the s
 honour them too (Muse Spark Open on Baseten needs `REASONING_EFFORT=low`; contract-length
 documents need a larger `MAX_TOKENS` and `TIMEOUT`). Folding the text size limit and the
 gateway settings into `Settings` is LAB-1095.
+
+### Local-only detection profile
+
+`PII_GUARD_DETECTION_PROFILE=local-only` constrains components that receive original input.
+`standard` preserves the behavior above. Local-only permits built-in `rules` and in-process
+Transformers `ner` only; default rules + NER requires the `ner` extra and an explicit existing
+`PII_GUARD_NER_MODEL` directory. Loading uses `local_files_only=True`, with no implicit model
+fetch or downgrade. Explicit `PII_GUARD_DETECTORS=rules` deliberately selects reduced coverage
+for both REST and gateway fast mode in this profile. Hub model IDs, GLiNER, plugin detectors
+and LLM detection are refused. This includes loopback HTTP LLM detectors: the supported
+local-only text path is in-process.
+
+Gateway `audit` (including its `strict` alias) is refused before any processing or downstream
+request. Images require `PII_GUARD_SEGMENTER=local|off` and built-in Tesseract OCR; missing
+models/dependencies and unsupported visual `mask`/`block` policies still fail closed. Cached
+remote segmenters and custom OCR engines are refused. Unused endpoint settings and the default
+`hybrid` segmenter do not prevent text-only startup; selecting them for an image does refuse.
+Profile refusals use `503 detection_profile_denied`; existing component-specific missing-model
+and unsupported-capability errors remain valid.
+
+The downstream model configuration is independent: masked external inference is allowed.
+This is enforcement for the supported component configuration, not a network sandbox for
+arbitrary Python extensions. See [local-only setup](operations.md#local-only-detection) and
+[data-flow boundaries](privacy-model.md#local-only-detection-boundary).
 
 `settings.tenant_key_bytes() -> bytes | None` decodes the hex tenant key (raises
 `ValueError`, without echoing the key, if it isn't hex). A new key goes into `Settings`,
@@ -359,6 +384,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
+| 503 | `detection_profile_denied` | The selected or cached raw-processing component is not permitted by `PII_GUARD_DETECTION_PROFILE`; nothing is forwarded. |
 | 503 | `detection_unavailable` | `DetectionUnavailableError` (a `DetectionError`): a configured detector can't run safely, so nothing ran and nothing was sent. Today: the LLM detector without `PII_GUARD_LLM_DETECTOR_API_KEY` (gateway audit mode, or `PII_GUARD_DETECTORS` with `llm` on `/v1/*`); the message is "audit mode needs PII_GUARD_LLM_DETECTOR_API_KEY …". Refused before any detection, image segmentation or request, so the text never leaves the machine. A keyless endpoint on loopback (`localhost`, `127.0.0.1`, `::1`) is allowed: the text stays on the machine. |
 | 503 | `detector_loading` | `DetectorLoadingError` (a `DetectionError`): the NER model is still loading in the background after `PII_GUARD_NER_WARMUP_TIMEOUT` (default 120 s, see "NER warm-up" above). Nothing ran and nothing was sent; the response has `Retry-After`. |
 | 503 | `ocr_unavailable` | `/v1/mask/image` (and gateway images): no OCR engine, so the text in the image can't be checked (`PII_GUARD_IMAGE_REQUIRE_OCR`, the default). |

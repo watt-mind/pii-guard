@@ -634,7 +634,9 @@ def hu_inflection_documents() -> list[Document]:
 
     A final ``a``/``e`` lengthens (``Zsuzsanna`` -> ``Zsuzsannának``), a final digraph doubles
     (``Szabolcs`` -> ``Szabolccsal``), a single final consonant doubles into ``-val``
-    (``Elek`` -> ``Elekkel``). Measures that every form is masked by one placeholder
+    (``Elek`` -> ``Elekkel``). Since LAB-1342 also stacked suffixes: the family suffix ``-ék``,
+    the possessive ``-é`` and ``-éi``, with a case ending after them (``Ottóéknál``,
+    ``Hajnáéknak``, ``Hubáéit``). Measures that every form is masked by one placeholder
     (placeholder consistency) and that the suffix stays outside it.
     """
     docs = [
@@ -690,6 +692,41 @@ def hu_inflection_documents() -> list[Document]:
             f"{P('PRÓBA ZSUZSANNA')} (született {DOB('1988. 03. 14.')}) részére. Kérjük, "
             f"{P('Próba Zsuzsannával')} és {P('Minta Kendével')} is közölje a döntést.",
             {"kind": "form", "tags": ["inflected-stem", "upper-case"]},
+        ),
+        # Stacked suffixes (LAB-1342): the family suffix -ék, the possessive -é and the plural
+        # possessive -éi, each with or without a case ending after it. An unchanged stem keeps
+        # the chain outside the span; a lengthened stem is labelled as the whole word.
+        (
+            "hu-inflection-0009",
+            f"{P('Kerekes Ottó')} tegnap írt. Szombaton {P('Kerekes Ottó')}éknál vacsorázunk, "
+            f"a csomagot {P('Kerekes Ottó')}éknak visszük, és {P('Teszt Elek')}ékhez is "
+            f"beugrunk. {P('Teszt Elek')} címe: {A('1095 Budapest, Képzelt utca 12.')}",
+            {"kind": "chat", "tags": ["stacked-suffix", "family-suffix", "back-harmony"]},
+        ),
+        (
+            "hu-inflection-0010",
+            f"{P('Teszt Hajna')} jelezte, hogy költözik. {P('Teszt Hajnáéknál')} marad a kulcs, "
+            f"{P('Teszt Hajnáéktól')} kérjük vissza, és {P('Teszt Hajnáékat')} értesítjük. "
+            f"A kék autó {P('Teszt Hajnáé')}, rendszáma {PLATE('TSZ-417')}.",
+            {"kind": "note", "tags": ["stacked-suffix", "family-suffix", "vowel-lengthening"]},
+        ),
+        (
+            "hu-inflection-0011",
+            f"{P('Gyakorló Tihamér')} és {P('Próba Bence')} közös irodát bérel. "
+            f"{P('Gyakorló Tihamér')}éknek és {P('Próba Bencééknek')} is elküldtük a számlát. "
+            f"A szerződés {P('Gyakorló Tihamér')}éké, a bérleti díjat {P('Próba Bencéék')} "
+            f"fizetik. E-mail: {E('bence.proba@example.org')}",
+            {
+                "kind": "email",
+                "tags": ["stacked-suffix", "family-suffix", "front-harmony", "vowel-lengthening"],
+            },
+        ),
+        (
+            "hu-inflection-0012",
+            f"{P('Minta Huba')} levelet küldött. A régi iroda {P('Minta Hubáé')} volt, a miénk "
+            f"{P('Minta Hubáéval')} szemben van. {P('Minta Hubáéit')} holnap visszük el, "
+            f"{P('Minta Hubáéinak')} a raktárban a helye. Telefon: {PH('+36 20 555 0177')}.",
+            {"kind": "letter", "tags": ["stacked-suffix", "possessive", "vowel-lengthening"]},
         ),
     ]
     return [from_markup(doc_id, text, language="hu", meta=meta) for doc_id, text, meta in docs]

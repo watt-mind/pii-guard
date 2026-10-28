@@ -1,0 +1,62 @@
+# NER v3 (LAB-1393): the wider mix of training/ner/v3_data.py (manifest:
+# training/ner/v3-data-manifest.json), after the teacher audit (v3_teachers.py) and the
+# decontamination gate (decontam.py). Same data, same settings for both base models; only
+# the encoder differs (v3-mmbert-base.toml is the ablation). Fictional / synthetic data only (ADR 0005).
+#   modal run training/ner/modal_v3.py && <fetch, gate: see eval/results/2026-10-28-ner-v3>
+#   modal run training/distill/modal_train.py --config training/ner/v3-xlmr-base.toml --gpu A10G
+base_model = "FacebookAI/xlm-roberta-base"   # MIT licence
+base_revision = "e73636d4f797dec63c3081bb6ed5c7b0bb3f2089"
+train = [
+  "eval/generated/v3-final/openpii/hu-openpii-train.jsonl",
+  "eval/generated/v3-final/openpii/en-openpii-train.jsonl",
+  "eval/generated/v3-final/openpii/de-openpii-train.jsonl",
+  "eval/generated/v3-final/openpii/pl-openpii-train.jsonl",
+  "eval/generated/v3-final/openpii/cs-openpii-train.jsonl",
+  "eval/generated/v3-final/openpii/sk-openpii-train.jsonl",
+  "eval/generated/v3-final/openpii/ro-openpii-train.jsonl",
+  "eval/generated/v3-final/openpii/hr-openpii-train.jsonl",
+  "eval/generated/v3-final/openpii/sl-openpii-train.jsonl",
+  "eval/generated/v3-final/privy/en-privy-train.jsonl",
+  "eval/generated/v3-final/wismut/en-wismut-train.jsonl",
+  "eval/generated/v3-final/wismut/de-wismut-train.jsonl",
+  "eval/generated/v3-final/wismut/pl-wismut-train.jsonl",
+  "eval/generated/v3-final/wismut/cs-wismut-train.jsonl",
+  "eval/generated/v3-final/wismut/ro-wismut-train.jsonl",
+  "eval/generated/v3-final/nemotron/en-nemotron-train.jsonl",
+  "eval/generated/v3-final/gretel/en-gretel-train.jsonl",
+  "eval/generated/v3-final/agent-traffic/hu-agent-traffic-train.jsonl",
+  "eval/generated/v3-final/agent-traffic/en-agent-traffic-train.jsonl",
+  "eval/generated/v3-final/agent-traffic/de-agent-traffic-train.jsonl",
+  "eval/generated/v3-final/s11/hu-distill-train.jsonl",
+  "eval/generated/v3-final/s11/en-distill-train.jsonl",
+  "eval/generated/v3-final/negatives/hu-negatives-train.jsonl",
+  "eval/generated/v3-final/negatives/en-negatives-train.jsonl",
+  "eval/generated/v3-final/negatives/de-negatives-train.jsonl",
+]
+dev = [
+  "eval/generated/v3-final/openpii/hu-openpii-dev.jsonl",
+  "eval/generated/v3-final/openpii/en-openpii-dev.jsonl",
+  "eval/generated/v3-final/openpii/de-openpii-dev.jsonl",
+  "eval/generated/v3-final/openpii/pl-openpii-dev.jsonl",
+  "eval/generated/v3-final/openpii/cs-openpii-dev.jsonl",
+  "eval/generated/v3-final/openpii/sk-openpii-dev.jsonl",
+  "eval/generated/v3-final/openpii/ro-openpii-dev.jsonl",
+  "eval/generated/v3-final/openpii/hr-openpii-dev.jsonl",
+  "eval/generated/v3-final/openpii/sl-openpii-dev.jsonl",
+  "eval/generated/v3-final/s11/hu-distill-dev.jsonl",
+  "eval/generated/v3-final/s11/en-distill-dev.jsonl",
+]
+out = "models/ner/pii-guard-ner-xlmr-base-v3"
+teacher = "none"
+epochs = 3
+batch_size = 16
+lr = 5e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"
+other_types = "ignore"
+save_epochs = true

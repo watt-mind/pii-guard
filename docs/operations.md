@@ -98,6 +98,7 @@ separate durable allocation claim still prevents restart from replenishing spons
 spend. This is a secondary abuse signal, without an external CAPTCHA or bot-proof claim.
 
 - [Modes](#modes): `fast` (the default) and `audit`
+- [Local-only detection](#local-only-detection): enforced raw-processing boundary
 - [One command](#one-command-pii-guard-up): `uvx ... pii-guard up`, the release wheel, `make wheel`
 - [The demo stack](#the-demo-stack): `make demo`, `make demo-traffic`, `make smoke`, Docker
 - [Traffic log](#traffic-log): `GET /v1/traffic`, the live stream, the privacy model
@@ -133,6 +134,54 @@ carries `Deprecation: true` and a `Warning` header), `PII_GUARD_GATEWAY_MODE` (o
 warning), and the CLI's `--mode` / `--modes` / `--system` values and
 `pii-guard bench latency --strict-requests` (a stderr warning). Run records written before the
 rename keep their `-strict` IDs; the report shows them as audit.
+
+## Local-only detection
+
+Self-hosting controls who operates the guard; it does not by itself prevent remote detector
+calls. Set `PII_GUARD_DETECTION_PROFILE=local-only` to require the supported in-process text
+and local image components. This profile is a configuration of the existing product, not a
+separate service or a network sandbox for arbitrary Python extensions.
+
+Provision dependencies and a trusted Transformers token-classification checkpoint directory
+before serving requests. Model acquisition is an explicit setup operation and may use the
+network; it carries no request content. The profile does not automatically fetch missing
+weights or fall back to another detector during startup or inference.
+
+```bash
+uv sync --extra ner
+export PII_GUARD_DETECTION_PROFILE=local-only
+export PII_GUARD_NER_MODEL=/absolute/path/to/provisioned/checkpoint
+export PII_GUARD_NER_BACKEND=transformers
+export PII_GUARD_GATEWAY_MODE=fast
+export PII_GUARD_SEGMENTER=local
+uv run pii-guard up
+```
+
+Supply the usual tenant key and downstream settings as described below. The model directory
+must include the checkpoint, tokenizer and configuration files needed by Transformers;
+loading uses local files only. A hub model ID, missing directory, missing dependency or broken
+checkpoint fails closed. GLiNER and HTTP LLM detectors (even loopback) are outside the supported
+profile. `audit`/`strict` requests return `503 detection_profile_denied` before detection or
+forwarding. Unused remote URL defaults do not prevent a text-only setup.
+
+For a deliberately limited rules-only installation, set `PII_GUARD_DETECTORS=rules`. Under
+local-only this also sets the gateway fast detector stack; no NER dependency or model is
+loaded. Rules alone miss much free-form personal data. This is an explicit coverage choice,
+never an automatic fallback when NER is broken.
+
+Images require local Tesseract with the necessary language packs and `SEGMENTER=local` or
+`off`. Provision the pinned YuNet weights explicitly with
+`python -m pii_guard.visual.segment fetch` before using `local`; the local loader does not
+download missing weights. YuNet supports faces and estimated ID-photo regions, not signatures
+or stamps. The default `SIGNATURE=mask` therefore refuses local images. The guard does not
+silently change that policy to `keep`; any operator decision to keep an unsupported entity
+leaves it visible. `off` also refuses requested visual masks. See the
+[measured local segmentation limits](models.md#local-segmentation) before choosing image policies.
+
+`PII_GUARD_UPSTREAM_BASE_URL` and the downstream model stay independent. Local detection may
+send **masked** content to an external LLM; it is not fully local end-to-end inference. For the
+latter, operate the downstream model locally too. See the
+[privacy boundary](privacy-model.md#local-only-detection-boundary).
 
 ## One command: `pii-guard up`
 
@@ -213,7 +262,7 @@ make smoke-fast       # the same in fast mode with the NER (local)
 **First run of `make demo`.** It installs the `ner` extra (torch, transformers) and, unless
 `PII_GUARD_NER_MODEL` is set, downloads the NER model before the API starts, printing
 `ner: downloading … (Apache-2.0, about 1110 MB, first run only)`. The model is the published
-pii-guard checkpoint, `hdkiller/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
+pii-guard checkpoint, `watt-mind/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
 [models.md](models.md#which-ner-model-fast-mode-runs)), pinned to a hub revision and
 checked against its SHA-256, stored in `~/.cache/pii-guard/models/ner/`
 (`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK=cached`

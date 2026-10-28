@@ -18,7 +18,9 @@ Resolution order (LAB-1192, ``docs/models.md``), first match wins:
 Pinned models are fetched with ``huggingface_hub.snapshot_download`` at their revision, only the
 files the detector reads, into ``$PII_GUARD_MODELS_DIR/ner/<repo>-<revision>`` (default
 ``~/.cache/pii-guard/models``, the cache LAB-1249 uses for huSpaCy), and loaded from that
-directory, so a second run is offline. Nothing here goes through a ``uv`` source.
+directory, so a second run is offline. A checked directory named after the repo's previous hub
+id at the same revision (owner ``hdkiller``, before LAB-1402 moved it to ``watt-mind``) is
+reused. Nothing here goes through a ``uv`` source.
 
 ::
 
@@ -42,6 +44,7 @@ from pii_guard.types import DetectionError
 
 __all__ = [
     "FALLBACK_ENV_VAR",
+    "PREVIOUS_PUBLISHED_REPOS",
     "PUBLIC_FALLBACK",
     "PUBLISHED",
     "PUBLISHED_ENV_VAR",
@@ -83,17 +86,34 @@ class PinnedModel:
         "sentencepiece.bpe.model",
     )
 
+    #: Hub ids this repo was published under before (an HF transfer keeps the history, so
+    #: the revision is the same). A checked cache directory named after one of them is reused,
+    #: so an existing download keeps working offline and under ``cached`` (LAB-1402).
+    previous_repo_ids: tuple[str, ...] = ()
+
     @property
     def label(self) -> str:
         return f"{self.repo_id}@{self.revision[:12]}"
 
-    def local_dir(self, base: Path | None = None) -> Path:
-        name = f"{self.repo_id.replace('/', '--')}-{self.revision[:12]}"
+    def _dir_for(self, repo_id: str, base: Path | None) -> Path:
+        name = f"{repo_id.replace('/', '--')}-{self.revision[:12]}"
         return (base or models_dir()) / "ner" / name
+
+    def local_dir(self, base: Path | None = None) -> Path:
+        """The cache directory: ``<repo>-<revision>``, or a ready one under a previous id."""
+        primary = self._dir_for(self.repo_id, base)
+        if not self._ready_at(primary):
+            for old in self.previous_repo_ids:
+                legacy = self._dir_for(old, base)
+                if self._ready_at(legacy):
+                    return legacy
+        return primary
 
     def is_ready(self, base: Path | None = None) -> bool:
         """Downloaded and checked: the marker holds the weights' pinned SHA-256."""
-        root = self.local_dir(base)
+        return self._ready_at(self.local_dir(base))
+
+    def _ready_at(self, root: Path) -> bool:
         marker = root / _MARKER
         if not ((root / "config.json").is_file() and (root / "model.safetensors").is_file()):
             return False
@@ -127,8 +147,14 @@ PUBLIC_FALLBACK = PinnedModel(
     weights_sha256="03ec34b3cd297c25ab8c720352c125f571ebf844684d3fbb583927a73a7752fd",
 )
 
-#: Where the trained pii-guard NER is published (owner decision, LAB-1306).
-PUBLISHED_REPO = "hdkiller/pii-guard-ner-xlmr-base"
+#: Where the trained pii-guard NER is published (owner decision, LAB-1306; moved to the
+#: ``watt-mind`` organisation by LAB-1402).
+PUBLISHED_REPO = "watt-mind/pii-guard-ner-xlmr-base"
+#: Its ids before the transfer (owner ``hdkiller``, same repo name). The hub redirects them;
+#: here they name the same checkpoint, and their cache directories are reused.
+PREVIOUS_PUBLISHED_REPOS = tuple(
+    f"{owner}/{PUBLISHED_REPO.partition('/')[2]}" for owner in ("hdkiller",)
+)
 #: The published checkpoint. LAB-1306 sets ``revision``, ``weights_sha256``, ``licence`` and
 #: ``size_mb`` when it publishes; with an empty revision the step is skipped (nothing to pin).
 PUBLISHED = PinnedModel(
@@ -139,6 +165,7 @@ PUBLISHED = PinnedModel(
     licence="Apache-2.0 (trained on Ai4Privacy OpenPII-1M, CC-BY-4.0: Ai4Privacy / Ai Suisse SA)",
     size_mb=1110,
     weights_sha256="4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9",
+    previous_repo_ids=PREVIOUS_PUBLISHED_REPOS,
 )
 
 
@@ -178,6 +205,8 @@ def _env(env: Mapping[str, str] | None, name: str) -> str:
 def _published(value: str) -> PinnedModel | None:
     """The published checkpoint to try, or ``None`` while it has no pinned revision."""
     repo, _, revision = (value or PUBLISHED_REPO).partition("@")
+    if repo in PUBLISHED.previous_repo_ids:
+        repo = PUBLISHED.repo_id  # a setting that still names the old id (LAB-1402)
     if not revision and repo == PUBLISHED.repo_id:
         revision = PUBLISHED.revision
     if not revision:

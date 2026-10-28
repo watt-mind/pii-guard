@@ -48,7 +48,8 @@ docker network create "$NET" >/dev/null
 docker run -d --name "$NET-mock" --network "$NET" --network-alias mock --read-only \
   -p "127.0.0.1:${MOCK_PORT}:8790" \
   "$IMAGE" pii-guard bench mock-upstream --host 0.0.0.0 --port 8790 >/dev/null
-docker run -d --name "$NET-api" --network "$NET" --read-only \
+# Exercise the image's real OCR healthcheck promptly instead of its production 30 s cadence.
+docker run -d --name "$NET-api" --network "$NET" --read-only --health-interval=2s \
   -p "127.0.0.1:${API_PORT}:8787" \
   -e PII_GUARD_UPSTREAM_BASE_URL=http://mock:8790/v1 \
   -e PII_GUARD_UPSTREAM_API_KEY= \

@@ -1,0 +1,46 @@
+{
+  "device": "cpu",
+  "torch": "2.14.1",
+  "transformers": "5.21.0",
+  "torch_threads": 8,
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "fixtures": [
+    "eval/fixtures/hu-synth-sample.jsonl",
+    "eval/fixtures/en-synth-sample.jsonl"
+  ],
+  "messages": 122,
+  "mean_chars": 382.5,
+  "load_average_start": [
+    13.03,
+    22.14,
+    24.56
+  ],
+  "load_average_end": [
+    16.65,
+    22.04,
+    24.43
+  ],
+  "note": "load_s: detector construction and warm-up forward in one process, torch and transformers already imported; weights may be in the OS page cache",
+  "models": {
+    "pii-guard-ner-v2.0": {
+      "model": "hdkiller/pii-guard-ner-xlmr-base@95f612a9ad65cc5ade5b9248bd152020541e7097",
+      "licence": "Apache-2.0 (trained on Ai4Privacy OpenPII-1M, CC-BY-4.0: Ai4Privacy / Ai Suisse SA)",
+      "parameters": 277469205,
+      "weights_bytes": 1109900868,
+      "load_s": 5.93,
+      "p50_ms": 54.5,
+      "p95_ms": 82.3,
+      "mean_ms": 58.1
+    },
+    "bardsai-v3": {
+      "model": "bardsai/eu-pii-anonimization-multilang-v3@091984b5fbce4c161abc4776ed0f4e3206e1b374",
+      "licence": "apache-2.0 per card metadata; the repository has no LICENSE file at this revision",
+      "parameters": 307587915,
+      "weights_bytes": 1230365980,
+      "load_s": 2.54,
+      "p50_ms": 88.0,
+      "p95_ms": 144.3,
+      "mean_ms": 93.4
+    }
+  }
+}

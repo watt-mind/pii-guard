@@ -139,6 +139,15 @@ def default_detector_names(settings: Settings) -> tuple[str, ...]:
     (:func:`ner_choice`). Raises :class:`DetectionError` when ``PII_GUARD_NER_MODEL`` is set
     but the extra is missing.
     """
+    from pii_guard.detection_profile import is_local_only, require_detector
+
+    if is_local_only(settings):
+        names = settings.detectors or ("rules", "ner")
+        for name in names:
+            require_detector(settings, name)
+        if "ner" in names and not _ner_available():
+            raise DetectionError(NER_EXTRA_MISSING)
+        return tuple(names)
     if _ner_available():
         choice = ner_choice(settings)
         if choice.usable:
@@ -153,6 +162,10 @@ def default_detector_names(settings: Settings) -> tuple[str, ...]:
 
 def rest_detector_names(settings: Settings) -> tuple[str, ...]:
     """The REST API's detectors: an explicit ``PII_GUARD_DETECTORS`` wins over the default."""
+    from pii_guard.detection_profile import is_local_only
+
+    if is_local_only(settings):
+        return default_detector_names(settings)
     if settings.detectors:
         return tuple(settings.detectors)
     return default_detector_names(settings)
@@ -161,6 +174,13 @@ def rest_detector_names(settings: Settings) -> tuple[str, ...]:
 def build_detector(name: str, settings: Settings | None = None) -> Detector:
     """A registry detector by name, configured from ``settings`` where it takes any."""
     kwargs: dict[str, Any] = {}
+    if settings is not None:
+        from pii_guard.detection_profile import is_local_only, require_detector
+
+        require_detector(settings, name)
+        if name == "ner" and is_local_only(settings):
+            kwargs["local_files_only"] = True
+            kwargs["backend_kind"] = "transformers"
     if name == "llm":
         kwargs["settings"] = settings
     elif name == "ner" and settings is not None:
@@ -191,6 +211,10 @@ def warm_up(settings: Settings) -> bool:
     (:mod:`pii_guard.detect.ner`). A model that can't be loaded raises
     :class:`DetectionError` (fail closed: startup stops).
     """
+    from pii_guard.detection_profile import is_local_only
+
+    if is_local_only(settings) and "ner" not in default_detector_names(settings):
+        return False
     if not settings.ner_model or not _ner_available():
         return False
     _load_ner(settings)

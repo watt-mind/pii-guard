@@ -1,0 +1,51 @@
+{
+  "agent-traffic-dev": {
+    "values": 1555,
+    "leaked": 2,
+    "partial": 1,
+    "partial_token_rule_only": 1,
+    "entities": 1555,
+    "consistent": 1539,
+    "masked": 1686,
+    "over_masked": 31,
+    "precision_overlap": 0.9571511291256514,
+    "recall_overlap": 0.979253112033195,
+    "partial_covers": 1,
+    "partial_covers_by_source": {
+      "PERSON <- ner:PERSON": 1
+    }
+  },
+  "agent-traffic": {
+    "values": 5155,
+    "leaked": 12,
+    "partial": 1,
+    "partial_token_rule_only": 1,
+    "entities": 5155,
+    "consistent": 5104,
+    "masked": 5568,
+    "over_masked": 92,
+    "precision_overlap": 0.9542907180385289,
+    "recall_overlap": 0.9744048684446035,
+    "partial_covers": 1,
+    "partial_covers_by_source": {
+      "PERSON <- ner:PERSON": 1
+    }
+  },
+  "ai4privacy": {
+    "values": 2185,
+    "leaked": 8,
+    "partial": 2,
+    "partial_token_rule_only": 2,
+    "entities": 2185,
+    "consistent": 2170,
+    "masked": 2202,
+    "over_masked": 28,
+    "precision_overlap": 0.9800181653042689,
+    "recall_overlap": 0.9894736842105263,
+    "partial_covers": 2,
+    "partial_covers_by_source": {
+      "EMAIL <- rules:EMAIL": 1,
+      "ADDRESS <- ner:ADDRESS": 1
+    }
+  }
+}

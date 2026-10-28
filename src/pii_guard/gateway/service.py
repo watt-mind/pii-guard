@@ -371,6 +371,11 @@ class Gateway:
     def detectors(self) -> dict[Mode, ModeDetector]:
         if self._detectors is None:
             self._detectors = build_mode_detectors(self.settings, self.config)
+        from pii_guard.detection_profile import is_local_only, require_detector_instance
+
+        if is_local_only(self.settings):
+            for detector in self._detectors.values():
+                require_detector_instance(self.settings, detector.detector)
         return self._detectors
 
     def image_masker(self, detector: ModeDetector) -> ImageMasker:
@@ -379,6 +384,10 @@ class Gateway:
             self._sam = build_segmenter(self.settings)
         if self._ocr is _UNSET:
             self._ocr = default_ocr_engine()
+        from pii_guard.detection_profile import require_local_ocr, require_segmenter_instance
+
+        require_segmenter_instance(self.settings, self._sam)
+        require_local_ocr(self.settings, self._ocr)
         return ImageMasker(
             sam=self._sam,
             policies=detector.policies,
@@ -392,14 +401,17 @@ class Gateway:
 
     def _mode(self, headers: Mapping[str, str]) -> Mode:
         raw = headers.get(MODE_HEADER)
-        if raw is None or not raw.strip():
-            return self.config.mode
         try:
-            return parse_mode(raw)[0]
+            mode = self.config.mode if raw is None or not raw.strip() else parse_mode(raw)[0]
         except ValueError:
             raise InvalidChatRequestError(
                 f"{MODE_HEADER} must be one of: {', '.join(m.value for m in Mode)}"
             ) from None
+        if mode is not Mode.FAST:
+            from pii_guard.detection_profile import refuse_remote
+
+            refuse_remote(self.settings, "audit detection")
+        return mode
 
     @staticmethod
     def _mode_alias(headers: Mapping[str, str]) -> str | None:

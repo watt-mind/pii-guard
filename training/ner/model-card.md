@@ -1,146 +1,175 @@
-# pii-guard NER (`hdkiller/pii-guard-ner-xlmr-base`)
+# pii-guard NER: multilingual PII detection for AI agent traffic
 
-The token-classification encoder behind [pii-guard](https://github.com/watt-mind/pii-guard)'s
-**fast mode** (rules + one NER encoder, in process, no API call). Published release: **v2.0**,
-the LAB-1150 checkpoint `xlmr-base-v2-hn`, chosen over a v2.1 retrain in LAB-1306 (see
-[Selection](#selection-v2-vs-v21)).
+A token-classification model that finds personal data (names, addresses, birth dates, contact
+details, ID and account numbers) in Hungarian, English and German text. It is the detector
+behind the **fast mode** of [pii-guard](https://github.com/watt-mind/pii-guard), an open-source
+privacy firewall that masks personal data before a prompt reaches an LLM and restores it in the
+answer.
 
-## What it is
+It is small enough to run in-process on a CPU next to every LLM call (about 50 ms per message),
+so no text has to leave the machine to be checked.
 
-- Base: [`FacebookAI/xlm-roberta-base`](https://huggingface.co/FacebookAI/xlm-roberta-base)
-  (MIT), 278 M parameters, fine-tuned for 3 epochs (lr 5e-5, warmup 0.1, linear decay, bf16).
-- BIO labels named after pii-guard entity types (`training/ner/train.py`, `TYPES_V2`):
-  `PERSON`, `ORGANIZATION`, `ADDRESS`, `DATE_OF_BIRTH`, `EMAIL`, `PHONE`, `ID_DOCUMENT`,
-  `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT`.
-- `config.json` carries `pii_guard_aggregation = "token"` and `pii_guard_labels`, which the
-  `ner` detector reads. Weights are `model.safetensors` only.
-- **Languages:** Hungarian, English and German. Nothing else was trained or evaluated.
+| | |
+|---|---|
+| Base model | [`FacebookAI/xlm-roberta-base`](https://huggingface.co/FacebookAI/xlm-roberta-base) (278M parameters) |
+| Languages | Hungarian, English, German |
+| Release | `v2.0` |
+| Licence | Apache-2.0 (training data attribution below) |
 
-## Intended use
+## Labels
 
-The fast-mode detector in front of an LLM call, **alongside pii-guard's rules**. The NER
-proposes spans. The rules keep the final say on structured identifiers (checksums, formats,
-legal forms), and `ORGANIZATION` is a keep type by default. It is not a standalone
-anonymiser: on its own, without the rules, it is unmeasured.
+BIO tags over ten entity types:
+
+| Type | What it covers |
+|---|---|
+| `PERSON` | People's names, including inflected Hungarian forms |
+| `ORGANIZATION` | Company and institution names |
+| `ADDRESS` | Street addresses and places of residence |
+| `DATE_OF_BIRTH` | Birth dates |
+| `EMAIL` | E-mail addresses |
+| `PHONE` | Phone numbers |
+| `ID_DOCUMENT` | ID card, passport and driving-licence numbers |
+| `NATIONAL_ID_HU_TAX` | Hungarian tax ID (adóazonosító jel) |
+| `NATIONAL_ID_HU_TAJ` | Hungarian social security number (TAJ) |
+| `BANK_ACCOUNT` | Bank account numbers and IBANs |
+
+## Usage
+
+### With pii-guard (recommended)
+
+pii-guard downloads this model, verifies its checksum and runs it together with rule-based
+detectors. The rules have the final say on structured identifiers (checksums, formats).
+Detected values are replaced with reversible placeholders, and the originals are restored in
+the model's answer:
 
 ```bash
-# pii-guard downloads and SHA-256-checks it itself (docs/models.md, NER resolution order);
-# by hand:
-PII_GUARD_NER_MODEL=hdkiller/pii-guard-ner-xlmr-base PII_GUARD_NER_REVISION=v2.0 pii-guard up
+git clone https://github.com/watt-mind/pii-guard && cd pii-guard
+uv sync --extra ner
+uv run pii-guard up   # an OpenAI-compatible gateway with rules + this model
 ```
 
-## Training data
+### With transformers
 
-All training data is fictional or public synthetic text. None of it is real personal data.
+```python
+from transformers import pipeline
 
-| Part | Rows | Source | Licence |
-|---|---:|---|---|
-| Distillation corpus s11 (LAB-1128) | 4,223 train | pii-guard generator with a Muse Spark writer; Muse Glimmer teacher labels | generated |
-| Distillation corpus s13 (lexicon packs) | 2,364 train | written and labelled by Muse Glimmer 30B | generated; Glimmer weights Apache-2.0 |
-| Ai4Privacy OpenPII-1M **train split** | 5,000 per language (hu/en/de) | [`ai4privacy/pii-masking-openpii-1m`](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m), pinned revision and file SHA-256 | CC-BY-4.0, Ai4Privacy / Ai Suisse SA |
-| Hard negatives (`training/ner/negatives.py`) | 2,000 per language | seeded templates: order, invoice, tracking and case numbers, amounts; no spans | generated |
+ner = pipeline(
+    "token-classification",
+    model="watt-mind/pii-guard-ner-xlmr-base",
+    revision="v2.0",
+    aggregation_strategy="simple",
+)
+ner("Kovács Annának küldd el a számlát: anna.kovacs@example.com, +36 30 123 4567")
+```
 
-- **Disjointness.** None of the OpenPII rows is in pii-guard's ai4privacy evaluation sample
-  (validation split). `training/ner/openpii.py` checks every uid and every text, and a test
-  checks this too.
-- **Dates.** OpenPII doesn't say which dates are birth dates, so its date spans are left out
-  of the loss.
-- `training_meta.json` lists every training file by repository path and SHA-256 prefix, with
-  the settings and the per-epoch dev scores.
+Used this way you get raw spans. pii-guard adds word-boundary snapping, Hungarian suffix
+handling and the rule layer on top. The scores below are measured with those steps applied.
 
 ## Evaluation
 
-rules + this model, scored by `pii-guard eval` (overlap F1, leak = gold values not fully
-masked, over-masking = masked spans that aren't gold), in %. Run records and scorecards are in
-the repository under `eval/results/2026-10-27-ner-v21/`.
+Scored by `pii-guard eval`. A value **leaks** if any part of it reaches the LLM unmasked.
+**Over-masking** is the share of masked spans that weren't personal data. All numbers are %.
+The full run records are in the pii-guard repository under `eval/results/`.
 
-**In-distribution** (the model saw OpenPII train rows, so these are *not* a held-out check):
+| Set (documents) | Rules + this model: leak | Over-masking | This model, no rules: leak |
+|---|--:|--:|--:|
+| Hand-written smoke tests, hu/en/de (51) | 0.0 | 1.1 | 3.5 |
+| Agent traffic: tool calls, JSON, logs (990) | 0.2 | 1.7 | 0.3 |
+| Ai4Privacy OpenPII validation (600)\* | 0.4 | 1.3 | 0.4 |
+| NVIDIA Nemotron-PII test, en (300) | 0.7 | 1.4 | 1.1 |
+| CEE PII benchmark test, hu/en (451) | 0.4 | 26.4 | 1.6 |
+| Gretel finance test, en/de (400) | 19.0 | 22.5 | 20.3 |
+| MAPA EUR-Lex court documents (42)† | 8.5 | 55.6 | n/a |
 
-| Set | F1 | Leak | Over-masking |
-|---|---:|---:|---:|
-| ai4privacy hu / en / de (validation sample) | 99.3 / 97.7 / 98.3 | 0.5 / 0.2 / 0.3 | 0.9 / 1.1 / 2.3 |
+\* In distribution: the model was trained on rows from the same dataset's train split. A
+version trained without any of that data leaked 13.8 % here, which is the fairer figure for
+unseen text in that style.
+† Mixed EU languages, most of them outside the three this model was trained on.
 
-**Held out** (no rows of these sets were used for training or selection, except
-`agent-traffic-dev`, which picked v2 over v2.1):
+**Latency:** p50 74 ms and p95 147 ms per ~400-character message on an Apple M1 Max CPU under
+heavy load. The same machine measured 47 / 55 ms under lighter load.
 
-| Set | Leak | Over-masking |
-|---|---:|---:|
-| pii-guard smoke hu / en / de (hand-written) | 0.0 / 0.0 / 0.0 | 0.9 / 3.0 / 0.0 |
-| hu-company-names | 0.0 | 5.7 |
-| agent-traffic-dev (LAB-1226, hu+en+de, pooled; selection set) | 1.7 | 11.9 |
-| agent-traffic test (LAB-1226, pooled) | 2.6 | 14.0 |
-| cee-pii test (hu+en) | 0.4 | **39.4** |
-| nemotron-pii test (en) | 0.7 | 1.6 |
-| gretel-finance test (en+de) | **19.1** | 23.9 |
+### Compared with other open models
 
-The 0.4 % ai4privacy leak is in-distribution. In LAB-1150, an ablation trained without any
-Ai4Privacy rows leaked 12.5 % (large) and 13.8 % (base) on that set; that is the honest number
-for unseen text in that style.
+Measured the same way, with each model in place of this one inside pii-guard's fast mode:
 
-**Latency** (NER only, ~400-character messages, Apple M1 Max CPU under load 12): p50 47 ms,
-p95 55 ms. In LAB-1150: p95 85 ms on a 4-vCPU cloud container, 16 ms on a T4 GPU.
+| Leak % | This model | [bardsai/eu-pii-anonimization-multilang](https://huggingface.co/bardsai/eu-pii-anonimization-multilang) | [tabularisai/eu-pii-safeguard](https://huggingface.co/tabularisai/eu-pii-safeguard) | [urchade/gliner_multi-v2.1](https://huggingface.co/urchade/gliner_multi-v2.1) |
+|---|--:|--:|--:|--:|
+| Agent traffic (dev split) | **0.1** | n/a | 8.2 | n/a |
+| Smoke tests | **0.0** | n/a | 5.8 | n/a |
+| Ai4Privacy, pooled | **0.4** | 10.4 | 7.5 | 22.5 |
+
+"n/a" means that model wasn't run on that set. The bardsai and GLiNER figures come from an
+earlier pii-guard version.
 
 ## Limitations
 
-- **Over-masks reference numbers without a cue word** (LAB-1293). Tracking numbers,
-  timestamp-style references and order ids in tool output can come out as `BANK_ACCOUNT` or
-  `ID_DOCUMENT`: 39 % over-masking on cee-pii, 12–14 % on agent traffic.
-- **A street name on its own** can come out as `ADDRESS` (en-smoke "… Street"), because
-  OpenPII labels a lone street as an address.
-- **Family-firm suffixes:** "és Fia" in Hungarian company names can come out as `PERSON`.
-- **Leaks on finance text** (gretel-finance, 19 %), mostly identifiers in unfamiliar formats.
-- No username, IP address or URL types. Languages other than hu/en/de are unmeasured.
-- In pii-guard a load or inference error raises `DetectionError`, and the gateway blocks the
-  call (fail closed).
+- **Languages.** Only Hungarian, English and German were trained. Other languages work partly
+  through XLM-R's multilingual pretraining, but they leak more. On a Polish benchmark, 17.5 %
+  of values leak, almost all of them Polish national ID numbers.
+- **Reference numbers without context** (tracking numbers, order IDs in tool output) are
+  sometimes tagged as `BANK_ACCOUNT` or `ID_DOCUMENT`. That causes most of the over-masking on
+  the CEE benchmark. pii-guard's number post-processing removes most of these.
+- **Finance documents** with unusual identifier formats leak about 19 %.
+- **No types for usernames, IP addresses, URLs or secrets.** pii-guard handles these with rules.
+- **Not a standalone anonymiser.** It is designed to run with pii-guard's rules. On its own, it
+  reports spans with no checksum validation and no fail-closed behaviour.
 
-## Selection: v2 vs v2.1
+## Training
 
-LAB-1306 retrained the same recipe for 5 epochs, adding 1,500 hard negatives per language
-(`training/ner/negatives_v21.py`: reference numbers without a cue, lone streets, family firms as
-`ORGANIZATION`), and kept every epoch. The rule was: lowest leak on `agent-traffic-dev`, with
-smoke over-masking no worse than v2; on a tie, v2.
+- Fine-tuned for 3 epochs: learning rate 5e-5, 10 % warmup, linear decay, bf16.
+- All training text is synthetic or public. No real personal data was used.
 
-| Candidate | agent-traffic-dev leak / over-masking | smoke leak, max | smoke over-masking, max |
-|---|---:|---:|---:|
-| **v2 (published)** | **1.7** / 11.9 | **0.0** | 3.0 |
-| v2.1 epoch 1 | 2.5 / 16.6 | 0.9 | 5.9 |
-| v2.1 epoch 2 | 4.8 / 14.3 | 0.9 | 6.1 |
-| v2.1 epoch 3 | 3.1 / 12.1 | 1.9 | 0.0 |
-| v2.1 epoch 4 | 4.3 / 9.1 | 1.9 | 3.1 |
-| v2.1 epoch 5 | 2.4 / 11.2 | 0.9 | 3.0 |
+| Part | Rows | Source |
+|---|--:|---|
+| Synthetic agent-style documents, two corpora | 6,587 | Written and labelled by open-weight LLMs (Muse Spark as writer, Muse Glimmer 30B as labeller) from fictional people, companies and addresses |
+| Ai4Privacy OpenPII-1M, train split | 5,000 per language | [`ai4privacy/pii-masking-openpii-1m`](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m) |
+| Hard negatives | 2,000 per language | Generated order, invoice, tracking and case numbers with no personal data, to reduce over-masking |
 
-Every v2.1 epoch leaks more than v2 on unseen agent traffic, and leaks on smoke. The new
-negatives did fix what they targeted: "és Fia" as PERSON went from 4 spans to 0, the lone
-street went away, and cee-pii over-masking dropped from 39.4 to 29.0 % (epoch 5). But they
-also taught the model to drop real document ids and e-mails without a cue (uncued ID_DOCUMENT
-leaks on agent-traffic-dev went from 5 to 11). v2.1 is not published. The s13 corpus was
-regenerated for v2.1 (same seed and model, different LLM text), so the comparison also
-includes that difference.
+None of the Ai4Privacy rows used for training appear in the evaluation sample: every ID and
+every text was checked. A near-duplicate check (MinHash) of the training data against all of
+the evaluation sets found no overlap. It covered about 91 % of the training rows; one of the
+two synthetic corpora could not be rebuilt for the check.
+
+**Why v2.0 and not a newer retrain.** A v2.1 trained longer, with extra hard negatives, fixed
+some over-masking. But it leaked more real ID numbers and e-mail addresses on unseen agent
+traffic (2.4 % vs 1.7 % on the selection set), so v2.0 stays the release. The selection rule is
+always the lowest leak on held-out agent traffic, because a leak is worse than an extra mask.
+
+### Next candidate (v3, not published)
+
+LAB-1393 trained a v3 candidate on a wider mix:
+[eval/results/2026-10-28-ner-v3](https://github.com/watt-mind/pii-guard/tree/develop/eval/results/2026-10-28-ner-v3).
+It didn't pass the selection rule, so v2.0 above is still the release. If a later v3.x is
+published, its data and attribution are:
+
+| Part | Train rows | Source | Licence, attribution |
+|---|--:|---|---|
+| Ai4Privacy OpenPII-1M, train split | 30,000 (hu/en/de 5,000; pl/cs/sk/ro/hr/sl 2,500) | [`ai4privacy/pii-masking-openpii-1m`](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m) | CC-BY-4.0, "Ai4Privacy / Ai Suisse SA" |
+| Privy protocol traces | 12,000 | [`piimb/privy`](https://huggingface.co/datasets/piimb/privy) | MIT, Privy (Pixie) |
+| nym-pii multilingual | 13,000 (en/de/pl/cs/ro) | [`Wismut/nym-pii-multilingual-data`](https://huggingface.co/datasets/Wismut/nym-pii-multilingual-data) | MIT, byteowlz / Wismut |
+| Nemotron-PII, train split | 1,500 | [`nvidia/Nemotron-PII`](https://huggingface.co/datasets/nvidia/Nemotron-PII) | CC-BY-4.0, NVIDIA Corporation |
+| Gretel PII masking EN v1, train split | 2,500 | [`gretelai/gretel-pii-masking-en-v1`](https://huggingface.co/datasets/gretelai/gretel-pii-masking-en-v1) | Apache-2.0, Gretel.ai |
+| Synthetic agent traffic, s11 corpus, hard negatives | 12,023 | pii-guard generators | Apache-2.0 |
+
+Every source is pinned to a revision and file hash, and none is gated, CC-BY-SA or
+non-commercial. Labels with no pii-guard NER type are left out of the loss: secrets, URLs and
+IPs, which the rules handle, and the GDPR special categories. `Horizon-Labs/pii-redactor-base`
+(Apache-2.0) took unlabelled English and German PII out of the loss and added no labels. No
+training document is a near-copy of an evaluation text: 0 of 72,664 were dropped.
 
 ## Licence and attribution
 
-- **This model:** Apache-2.0, the licence of pii-guard.
-- XLM-RoBERTa base (Conneau et al. 2020): MIT.
-- Ai4Privacy OpenPII-1M: CC-BY-4.0. **Attribution: "Ai4Privacy / Ai Suisse SA"**, which any
-  redistribution of this model must carry.
-- Muse Glimmer 30B (corpus writer and teacher labels): Apache-2.0 open weights.
-- Hungarian name and place lexicons used to generate fictional text: KSH (CC-BY-4.0) and
-  OpenStreetMap street names (© OpenStreetMap contributors, ODbL 1.0, non-substantial extract).
+- **This model:** Apache-2.0.
+- **XLM-RoBERTa base:** MIT. Conneau et al., 2020, *Unsupervised Cross-lingual
+  Representation Learning at Scale*.
+- **Ai4Privacy OpenPII-1M:** CC-BY-4.0. **Attribution: "Ai4Privacy / Ai Suisse SA"**. Any
+  redistribution of this model must carry this attribution.
+- **Muse Glimmer 30B:** Apache-2.0 open weights. It wrote and labelled part of the synthetic
+  corpus.
+- **Hungarian name and place lists** used to generate fictional text:
+  - KSH (Hungarian Central Statistical Office), CC-BY-4.0.
+  - OpenStreetMap street names, © OpenStreetMap contributors, ODbL 1.0 (non-substantial
+    extract).
 
-The details are in `NOTICE`.
-
-## Reproduce
-
-```bash
-uv sync --extra ner
-uv run --no-sync python training/ner/openpii.py --source data/public/openpii-train/train.jsonl
-uv run --no-sync python training/ner/negatives.py --n 2000 --seed 1150
-modal run training/distill/modal_train.py --config training/ner/v2-base-hn.toml --gpu A10G
-PII_GUARD_NER_MODEL=models/ner/pii-guard-ner-xlmr-base-v2-hn uv run --no-sync \
-    python training/ner/eval_candidates.py --set v21 --candidate xlmr-base-v2-hn --detectors rules,ner
-```
-
-The OpenPII rows are the same rows (the manifest's uid hash matches). The rebuilt OpenPII and
-negative files don't match the SHA-256 prefixes in `training_meta.json`, because conversion code
-and templates changed after this checkpoint was trained. The LLM-written corpora (s11, s13)
-rebuild from their response cache; without it, the same plans give different text.
+The `NOTICE` file in this repository has the full attribution text.

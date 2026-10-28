@@ -124,6 +124,38 @@ Both run pytest in parallel (pytest-xdist, `-n auto`). Mark a test `slow` when i
 on its own and something else already covers the same ground on every pull request (the
 `eval-gate` job, for example); `make test-all` runs the slow ones locally.
 
+Superseded pull-request and `develop` push runs are cancelled so the latest commit gets
+feedback first. Nightly and manual runs use separate concurrency groups, so a stream of merges
+cannot cancel the scheduled full-suite check. Pushes to `main` and merge-queue runs retain
+their full checks without cancelling a running check.
+
+Report behavior tests use a small, fixed set of synthetic benchmark records; separate tests
+still validate the complete committed report and recompute every stored dataset summary.
+The summary checks are parametrized per file so parallel workers can share that work as the
+benchmark history grows.
+
+To measure coverage overhead on the same full suite without changing CI's coverage gates:
+
+```bash
+uv sync --locked
+uv run --no-sync python scripts/ci/benchmark_coverage.py --workers 2 --repeats 1
+```
+
+This compares branch coverage, `sys.monitoring` line coverage, and no coverage, each with the
+`ci-full` Hypothesis profile and the same worker count. It stops on a failing run, keeps the
+configured coverage floor for measured coverage runs, and writes logs, coverage JSON and
+`timings.json` to a fresh temporary directory printed at startup. Use `--repo PATH` for a
+separately synced baseline checkout, or `--modes branch` for a full verification run. Compare
+timings on an otherwise idle machine; worker contention and runner hardware affect them.
+Measurement modes do not change `make test` or `make test-all`.
+
+Only packaging jobs are path-filtered, using [`scripts/ci/changes.py`](scripts/ci/changes.py).
+The UI and wheel include benchmark records, dataset counts and colour configuration; Python
+source and package metadata changes select all three packaging jobs. Unknown paths also select
+all three. Removed and renamed inputs are checked, and an unreadable PR diff fails CI. Prose-only
+changes still run Python, report, security and PII checks. Smoke, evaluation and PII jobs install
+only runtime dependencies; the test and type-check jobs keep their development dependencies.
+
 | Job | What fails it | Locally |
 |---|---|---|
 | `lint` | ruff lint or format | `make lint` |
@@ -131,7 +163,7 @@ on its own and something else already covers the same ground on every pull reque
 | `test` | a failing test, or total coverage under the floor (see above) | `make test` or `make test-all` |
 | `smoke` | the demo stack leaking on the mock upstream (`make smoke`), or a stale benchmark report (an invalid run record or journey entry when `RENDER_DOCS_ON_MERGE` is on; [Generated files](#generated-files)) | `make smoke` |
 | `eval-gate` | leak or over-masking rising, or round trip falling, against the newest committed run record on the same fixtures, or past a limit in [`eval/gates.json`](eval/gates.json) | `make gate` |
-| `docker` | the image over its size budget (375 MB unpacked, `scripts/ci/docker_smoke.sh`), an unhealthy container, or a masked request that leaks to the mock upstream | `make docker-smoke` |
+| `docker` | the image over its size budget (`IMAGE_BUDGET_MB` in `scripts/ci/docker_smoke.sh`), an unhealthy container, or a masked request that leaks to the mock upstream | `make docker-smoke` |
 | `audit` | a known vulnerability in `uv.lock` (`uv audit`), or a GPL/AGPL runtime dependency | `make audit licences` |
 | `ui` | UI lint, typecheck, tests, build, `pnpm audit --prod` (high or critical), GPL/AGPL production dependency; runs when `ui/` changed | `cd ui && pnpm lint && pnpm typecheck && pnpm test --run` |
 | `workflows` | a [zizmor](https://docs.zizmor.sh/) finding in `.github/workflows/` (unpinned actions, injection, excessive permissions) | `uvx zizmor .github/workflows` |
