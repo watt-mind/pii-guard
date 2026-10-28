@@ -1,0 +1,23 @@
+# Polish company and brand names (detect/ner_orgs.py; the shared list is ../brands.tsv).
+# One name per line; matching ignores case. Leave out names that are also surnames or given
+# names (Żabka, Wedel, Kruk ...).
+PKO Bank Polski
+PKO BP
+Bank Pekao
+Pekao
+mBank
+Santander Bank Polska
+PZU
+Orlen
+PGNiG
+PKP
+PKP Intercity
+Poczta Polska
+InPost
+Allegro
+Biedronka
+Empik
+CD Projekt
+LOT
+Polsat
+TVN

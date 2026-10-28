@@ -1,6 +1,6 @@
 # Adding a language
 
-pii-guard ships Hungarian (`hu`), English (`en`) and German (`de`). Everything a language
+pii-guard ships Hungarian (`hu`), English (`en`), German (`de`) and Polish (`pl`). Everything a language
 contributes is one **language pack**: a Python package with one `LanguagePack` object
 ([ADR 0010](decisions/0010-language-pack-plugins.md)). The components (rule detector, vault,
 LLM detector, evaluation) ask the pack registry for the text's language and fall back to
@@ -12,7 +12,8 @@ masked value, and how the rules score on the pack's smoke set. It tells you what
 missing; it is also what "done" means (below).
 
 German is the worked example: `src/pii_guard/languages/de/` was written by following this
-guide, and every step below points at it.
+guide, and every step below points at it. The Polish pack (`src/pii_guard/languages/pl/`,
+LAB-1400) was built the same way, from the skeleton below.
 
 ## What a pack is made of
 
@@ -255,3 +256,18 @@ Every structured identifier is found (addresses, e-mails, phones, Steuer-IDs,
 Sozialversicherungsnummern, IBANs: 100 % overlap recall); the misses are the names, dates of
 birth and organisations that the rules don't cover by design. Adding the German pack left the
 `hu` and `en` scorecards unchanged.
+
+## Polish smoke results
+
+`uv run pii-guard eval --fixtures eval/fixtures/pl-smoke.jsonl` (rules detector, 11 documents
+with 47 labels, 2 of them hard negatives without any):
+
+| Detector | P overlap | R overlap | R exact | Leak | Round trip |
+|---|---:|---:|---:|---:|---:|
+| `rules` | 100.0 | 55.3 | 55.3 | 39.5 | 100.0 |
+
+Every structured identifier is found (PESEL, NIP, REGON, ID-card, passport and driving-licence
+numbers, IBANs, phones, addresses); the misses are names, dates of birth and organisations. In
+fast mode (rules + NER v2.0) the smoke set leaks 0.0 %, and pl-pii-bench (report-only) goes
+from 17.5 to 3.5 % ([results](../eval/results/2026-10-28-lab-1400-pl-pack/README.md)). Adding
+the Polish pack left the `hu`, `en` and `de` scorecards unchanged.
