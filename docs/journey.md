@@ -1383,24 +1383,39 @@ data, labelling it, judging), and ship a small, fast, self-hostable model distil
 
 ## Process numbers
 
-- **Time:** the 24 pull requests above merged between 2026-10-26 20:36 and 2026-10-27 08:01
-  UTC; [roadmap.md](roadmap.md) had planned this work over the first eight hackathon days.
-- **Tests:** 185 at the rules PR, 1,339 passing at the Baseten PR, CI on every pull request
-  *(ticket comments, LAB-1081 and LAB-1108)*.
+As of 2026-10-28, `develop` at `5581013`.
+
+- **Time:** 114 pull requests merged to `develop` between 2026-10-26 20:36 and 2026-10-28
+  07:17 UTC (`gh pr list --state merged`); [roadmap.md](roadmap.md) had planned this work over
+  the first eight hackathon days.
+- **Tests:** 3,393 collected by `pytest --collect-only` on a core install (the modules that
+  need the `ner` or `baselines` extras are skipped at collection, so the full count is
+  higher), CI on every pull request. For scale: 185 at the rules PR, 1,339 passing at the
+  Baseten PR *(ticket comments, LAB-1081 and LAB-1108)*.
+- **Evaluation runs:** 499 run records in [`eval/results/runs/`](../eval/results/runs/), all
+  listed in the [run log](benchmarks.md#run-log); `pii-guard eval report --check` fails CI when
+  [benchmarks.md](benchmarks.md) is out of date.
+- **Spend:** [the table above](#spend-so-far) itemises about $22 as of 2026-10-27. The NER
+  v2.1 retrain (LAB-1306, its entry is in [journey/](journey/)) added $2.92 of Modal free credits.
 
 ## What's next
 
-- **Charts and run history** (LAB-1129): every eval run recorded in one schema, with charts
-  for this page, the README and the demo UI.
-- **Add a language** (LAB-1130): language packs as one plugin unit with a conformance suite,
-  so a third language is a checklist.
-- **Prompt-injection red team** (LAB-1107): text that tries to talk the LLM detector out of
-  reporting values.
-- **Images:** a reader that copes with security-printed cards, since OCR misses 39 % of the
-  specimen values outright (milestone 22); MRZ zones and captioned values are masked since
-  milestones 18 and 22.
+- **Fewer false alarms in fast mode.** Reference and tracking numbers without a cue word are
+  read as IDs: 39.4 % over-masking on CEE-PII and 14.0 % on agent traffic
+  ([benchmarks.md](benchmarks.md#results-per-dataset)). The v2.1 retrain aimed at this
+  (LAB-1306) and cut CEE-PII over-masking to 29.0 %, but leaked more on unseen agent traffic,
+  so v2 stayed the published model. Tracked in LAB-1293 and LAB-1220 (triage).
+- **Finance text and unfamiliar text.** Fast mode leaks 19.1 % on Gretel finance, and the same
+  recipe trained without any Ai4Privacy rows leaks 13.8 % on that set (the 0.4 % is
+  in-distribution); see the [model card](../training/ner/model-card.md#evaluation).
+- **Images:** a reader that copes with security-printed cards, since OCR returns no word for 108 of
+  the 274 specimen text values (milestone 22). MRZ zones, captioned values, the comparison
+  with other image tools and placeholder-labelled images are shipped (milestones 18, 22, 26
+  and 27).
 - **English names** still missed on Muse-generated English (2.5–5.0 % leak across runs,
-  LAB-1138).
-- **Publish the distilled weights**, so fast mode works without training a model first.
-- **Confirm Baseten's data terms** (LAB-1139) before recommending the hosted endpoint for
-  real data.
+  LAB-1138, triage).
+- **Re-identification from residual context** (39.2 % re-identified with a five-name candidate list,
+  chance 20 %; LAB-1152, triage).
+- **Glimmer as a fine-tuned detector** (LAB-1109) is blocked.
+- **Confirm Baseten's data terms** (LAB-1139, triage) before recommending the hosted endpoint
+  for real data.
