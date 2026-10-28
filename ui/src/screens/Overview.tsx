@@ -75,7 +75,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
       <ScopeNote t={t} forced={forced} since={s.since} />
 
       {empty && !recorded ? (
-        <EmptyOverview t={t} server={server} sendDemo={demoTraffic ? sendDemo : null} />
+        <EmptyOverview t={t} server={server} sendDemo={demoTraffic ? sendDemo : null} setup={Boolean(account)} />
       ) : (
         <>
           <dl aria-label={recorded ? "Counters of the recorded demo traffic" : "Counters"} className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
@@ -178,7 +178,8 @@ function ScopeNote({ t, forced, since }: { t: TrafficHandle; forced: boolean; si
   return null;
 }
 
-function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: ServerStatus | null; sendDemo: typeof sendDemoTraffic | null }) {
+/** `setup`: a hosted owner's setup list (above) holds the next step, so this card adds no primary action. */
+function EmptyOverview({ t, server, sendDemo, setup = false }: { t: TrafficHandle; server: ServerStatus | null; sendDemo: typeof sendDemoTraffic | null; setup?: boolean }) {
   const status = t.status;
   const gateway = server?.gateway.url ?? "/v1";
   const title =
@@ -230,16 +231,20 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
         )}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <ButtonLink variant="primary" href="#connect">
-          Connect a client
-        </ButtonLink>
-        <ButtonLink href="#playground/text">Try it in the Playground</ButtonLink>
+        {!setup && (
+          <>
+            <ButtonLink variant="primary" href="#connect">
+              Connect a client
+            </ButtonLink>
+            <ButtonLink href="#playground/text">Try it in the Playground</ButtonLink>
+          </>
+        )}
         {status.state === "live" && sendDemo && <DemoButton send={sendDemo} />}
         <Button variant="ghost" onClick={t.showFixture}>
           Watch a recorded demo
         </Button>
       </div>
-      <p className="mt-3 text-xs text-faint">The recorded demo replays calls captured from the demo stack, in your browser, and is labelled as recorded wherever it shows.</p>
+      <p className="mt-3 text-xs text-faint">The recorded demo replays fictional calls in your browser, so you can see what the counters show. It is labelled as recorded wherever it shows.</p>
     </section>
   );
 }
@@ -373,7 +378,7 @@ function Detectors({ server, status }: { server: ServerStatus | null; status: Se
             value: (
               <>
                 <span className="font-medium capitalize">{server.gateway.default_mode}</span>
-                <span className="text-muted"> · a client can pick another mode per request (header {code("X-PII-Guard-Mode")})</span>
+                {audit && <span className="text-muted"> · a client can pick another mode per request (header {code("X-PII-Guard-Mode")})</span>}
               </>
             ),
           },

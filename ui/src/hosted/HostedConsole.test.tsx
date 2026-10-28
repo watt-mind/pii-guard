@@ -106,14 +106,16 @@ describe("hosted console for a signed-in owner", () => {
     expect(screen.queryByText("Reduce personal data")).not.toBeInTheDocument();
   });
 
-  it("shows the owner's usage and limits on the Overview, with shortcuts, and hides the server setup it can't read", async () => {
+  it("shows the owner's usage and limits on the Overview, with one setup list, and hides the server setup it can't read", async () => {
     renderHosted(requester());
     const summary = await screen.findByRole("region", { name: "Your account" });
     expect(within(summary).getByText("of 25", { exact: false })).toBeInTheDocument();
     expect(within(summary).getByText("standard tier", { exact: false })).toBeInTheDocument();
-    expect(within(summary).getByRole("link", { name: "Create a project" })).toHaveAttribute("href", "#projects");
-    expect(within(summary).getByRole("link", { name: "Add a provider connection" })).toHaveAttribute("href", "#connect");
-    expect(within(summary).getByRole("link", { name: "Try the playground" })).toHaveAttribute("href", "#playground/text");
+    // Ticks from the owner's data (a connection and calls today, no policy yet); one primary action: the next step (LAB-1448).
+    const setup = await within(summary).findByRole("region", { name: "Set up your gateway" });
+    expect(within(setup).getByText("2 of 5 done")).toBeInTheDocument();
+    expect(within(setup).getAllByRole("link")).toHaveLength(1);
+    expect(within(setup).getByRole("link", { name: /Create a policy/ })).toHaveAttribute("href", "#projects");
     expect(screen.queryByText("Upstream")).not.toBeInTheDocument();
   });
 

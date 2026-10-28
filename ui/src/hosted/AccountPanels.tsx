@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import { Announcer, Button, ButtonLink, ConfirmAction, Field, Input, KeyValues, Metric, Notice, Select } from "../components/ui";
+import { Announcer, Button, ConfirmAction, Field, Input, KeyValues, Metric, Notice, Select } from "../components/ui";
+import { SetupChecklist } from "./SetupChecklist";
 import { recovery, type Account, type Connection, type Requester } from "./api";
 import { getPlaygroundConnection, setPlaygroundConnection, time, useHostedSession, usePlaygroundConnection } from "./session";
 
@@ -76,6 +77,8 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
               if (created?.id) onConnect?.(created.id);
               const label = created?.origin ? connectionLabel({ provider, origin: created.origin }) : providerLabel(provider);
               setConnected(created?.id && onConnect ? `Connected ${label}. Playground chat now sends through it.` : `Connected ${label}.`);
+              // The submit button is disabled again (empty key): move focus to the list it changed.
+              setFocusList((n) => n + 1);
             });
           }}
         >
@@ -139,7 +142,7 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
 }
 
 /** The console's account block (Overview): tier, today's usage, the reset time and the limits. */
-export function AccountSummary() {
+export function AccountSummary({ active = true, calls = 0 }: { active?: boolean; calls?: number }) {
   const session = useHostedSession();
   if (!session) return null;
   const { account, error, refresh } = session;
@@ -161,11 +164,7 @@ export function AccountSummary() {
           {error}
         </Notice>
       )}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {[["#projects", "Create a project"], ["#connect", "Add a provider connection"], ["#playground/text", "Try the playground"]].map(([href, label]) => (
-          <ButtonLink key={href} href={href}>{label}</ButtonLink>
-        ))}
-      </div>
+      <SetupChecklist call={session.call} account={account} active={active} calls={calls} />
       <p className="mt-3 text-xs text-muted">Sessions and provider connections are temporary. A guard restart loses ephemeral state. Every section shows only your own projects, activity and sessions.</p>
     </section>
   );

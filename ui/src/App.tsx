@@ -289,7 +289,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 sendDemo={traffic?.sendDemo}
                 demoTraffic={offersDemoTraffic(caps)}
                 serverSetup={server !== null || !caps.accounts}
-                account={caps.accounts ? <AccountSummary /> : undefined}
+                account={caps.accounts ? <AccountSummary active={section === "overview"} calls={trafficHandle.source === "api" ? trafficHandle.events.length : 0} /> : undefined}
                 onOpenCall={(id) => {
                   setLogFocus({ id, nonce: Date.now() });
                   openSection("logs");
