@@ -20,7 +20,7 @@ README's "Why pii-guard" section, in [submission.md](submission.md) and in
 
 | # | Differentiator | Headline evidence | Status |
 |---|---|---|---|
-| 1 | [Reversible placeholders, consistent for a whole session](#1-reversible-placeholders-consistent-for-a-whole-session) | 100 % round trip on the hand-written set; placeholder consistency 98.3 % of entities, but only one entity there repeats (n = 1) | shipped |
+| 1 | [Reversible placeholders, consistent for a whole session](#1-reversible-placeholders-consistent-for-a-whole-session) | 100 % round trip on the hand-written set; placeholder consistency 96.5 % of entities, but only one entity there repeats (n = 1) | shipped |
 | 2 | [Grammar-aware: Hungarian inflection in and out](#2-grammar-aware-hungarian-inflection-in-and-out) | inflected-name leak 18/30 → 0/30 | shipped |
 | 3 | [Built on Meta's models end to end](#3-built-on-metas-models-end-to-end) | 6 Meta models, each with a job and a reason | shipped; Glimmer LoRA blocked |
 | 4 | [Two modes with published leak, latency and cost](#4-two-modes-with-published-leak-latency-and-cost) | fast (production default): 0.0 % leak on the hand-written set at 18 ms, $0, nothing leaves the machine; audit (optional): 0.6 % at 1.9 s, about $2–3 per 1k messages | shipped |
@@ -45,12 +45,12 @@ and the mapping never leaves pii-guard's vault.
 
 - **Evidence:** round trip 100 % (every document unmasks back to the original exactly) on the
   hand-written set, in fast mode ([benchmarks.md](benchmarks.md#smoke)). Placeholder
-  consistency is 170 of 173 entities (98.3 %) over the Hungarian, English and German smoke
-  documents in fast mode (run records
-  [hu](../eval/results/runs/2026-10-27-ner-v2-hu-smoke-xlmr-base-v2-hn.json),
-  [en](../eval/results/runs/2026-10-27-ner-v2-en-smoke-xlmr-base-v2-hn.json),
-  [de](../eval/results/runs/2026-10-27-ner-v2-de-smoke-xlmr-base-v2-hn.json)); the missing 3
-  are values not masked at all, which the metric counts as inconsistent. **n = 1:** only one
+  consistency is 167 of 173 entities (96.5 %) over the Hungarian, English and German smoke
+  documents in fast mode ([run record](../eval/results/runs/2026-10-28-lab-1355-smoke-fast.json)).
+  The missing 6 are 3 values not masked at all and 3 names whose given name alone was masked
+  (`Próba [[PERSON_x]]`). This page said 170 of 173 (98.3 %) until LAB-1355: the metric then
+  counted a partly masked occurrence as masked, which overstated it
+  ([comparison](../eval/results/2026-10-28-consistency-metric/README.md)). **n = 1:** only one
   entity in those documents is mentioned more than once, so these runs say little about
   repeated mentions. That claim rests on the Hungarian inflection fixtures (section 2:
   "same person, same placeholder" 18/18) and the vault tests
@@ -72,7 +72,13 @@ so every detector benefits.
   ([eval/fixtures/hu-inflection.jsonl](../eval/fixtures/hu-inflection.jsonl)), leaked values
   18/30 → **0/30** and "same person, same placeholder" 11/18 → **18/18**
   ([journey.md, milestone 10](journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333);
-  the scorecard is not committed). The behaviour is pinned by property tests
+  the scorecard is not committed, and it was scored with the overlap rule LAB-1355 replaced).
+  In fast mode today, with every mention fully covered: leak 1/30, consistency **13/18**, 5 of
+  the 10 people mentioned more than once
+  ([run record](../eval/results/runs/2026-10-28-lab-1355-inflection-fast.json)). Of the 5
+  misses, 3 are names whose surname the NER left unmasked in every form
+  (`Próba [[PERSON_x]]nak`), 1 is a name not masked at all, and 1 is an all-caps mention
+  (`PRÓBA [[PERSON_y]]`) that got a different placeholder from the inflected one. The behaviour is pinned by property tests
   ([tests/vault/test_vault_inflection_hu.py](../tests/vault/test_vault_inflection_hu.py)).
 - **Status:** shipped (LAB-1115). Old-orthography names with `th` and `cz` (`Kiss Tóthtal`,
   `Gipsz Kováczcal`) and long vowels the model writes on its own are masked and restored too (LAB-1131,
