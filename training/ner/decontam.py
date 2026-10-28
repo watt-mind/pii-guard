@@ -9,6 +9,9 @@ document with **every** evaluation text pii-guard reports on (LAB-1392):
   validation, Nemotron-PII test, Gretel finance test, CEE-PII-Bench, TAB, agent traffic,
   pl-pii-bench and MAPA EUR-Lex. Fetch-only sets (TAB, MAPA) are compared by text when their
   fixture files have been rebuilt locally, and by their manifest's document hashes always;
+- every ``dev`` set of the registry (``agent-traffic-dev``), under its own set name: NER
+  candidates are selected on it, so a training copy of a dev text would inflate the selection
+  (LAB-1409);
 - every fixture file under ``eval/fixtures/`` (the smoke sets, inflection, injection, brand
   names, uncued numbers, known values, secrets), which the rules are tuned against.
 
@@ -48,7 +51,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from pii_guard.eval.datasets import test_datasets
+from pii_guard.eval.datasets import REGISTRY, Dataset, test_datasets
 from pii_guard.eval.datasets._common import text_sha256
 from pii_guard.eval.fixtures import Document, FixtureError, load_fixtures
 
@@ -214,11 +217,16 @@ def _fixture_set_name(path: Path) -> str:
     return f"fixtures/{rest or stem}" if len(lang) == 2 else f"fixtures/{stem}"
 
 
+def _indexed_datasets() -> list[Dataset]:
+    """The registry sets the gate compares against: every ``test`` set, then every ``dev`` set."""
+    return [*test_datasets(), *(ds for ds in REGISTRY.values() if ds.split == "dev")]
+
+
 def eval_corpus(root: Path = Path(), *, threshold: float = THRESHOLD) -> EvalIndex:
     """Index every evaluation text reachable from ``root`` (the repository root)."""
     index = EvalIndex(threshold=threshold)
     seen: set[Path] = set()
-    for ds in test_datasets():
+    for ds in _indexed_datasets():
         manifest_path = root / ds.manifest_path
         if manifest_path.is_file():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

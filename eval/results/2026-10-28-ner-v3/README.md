@@ -125,8 +125,12 @@ language) plus the s11 dev files. XLM-R picked epoch 2 and mmBERT epoch 3.
 - **Decontamination.** [`decontam.json`](decontam.json) shows that the gate dropped
   **0 of 72,664** train and dev documents. It compared them with 3,416 evaluation documents
   (every test set and every `eval/fixtures` file). `train.py` ran the gate again on Modal and
-  also dropped 0. The gate does not index the agent-traffic **dev** split, so it was checked
-  by hand: no near-copies, highest J = 0.42.
+  also dropped 0. That gate did not index the agent-traffic **dev** split, so it was checked
+  by hand: no near-copies, highest J = 0.42. Since LAB-1409 the gate indexes it (300
+  documents, set `agent-traffic-dev`). Re-run on the 1,800 regenerated agent-traffic train
+  documents of this config (`decontam.py --config training/ner/v3-xlmr-base.toml
+  --allow-missing`; the downloaded sources were not on disk): 0 exact and 0 near copies of
+  agent-traffic-dev, highest exact J = 0.423.
 
 **Left out:**
 

@@ -30,7 +30,7 @@ them appears in:
 Hash equality only catches exact copies. The **decontamination gate**
 ([`training/ner/decontam.py`](../training/ner/decontam.py), LAB-1392) also catches near
 copies: it compares every training and dev document with every evaluation text (every `test`
-set here, by text where it is on disk and by manifest hash always, plus every fixture under
+set here and every `dev` set, which NER candidates are selected on, by text where it is on disk and by manifest hash always, plus every fixture under
 `eval/fixtures/`) and drops a document whose word-5-gram Jaccard similarity to one of them is
 0.8 or more. `training/ner/train.py` runs it by default; see
 [evaluation.md](evaluation.md#decontamination).
