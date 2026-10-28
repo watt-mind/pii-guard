@@ -3,7 +3,7 @@
 > **Draft for the owner to review before submitting.** Ready-to-paste text for the Meta
 > Global AI Developer Hackathon form. Every claim matches [why-pii-guard.md](why-pii-guard.md),
 > where each one links to its evidence; if a number changes there, change it here too. Status
-> as of 2026-10-27.
+> as of 2026-10-28; numbers from [benchmarks.md](benchmarks.md) on `develop`.
 
 ## Tagline (≤ 140 characters)
 
@@ -14,15 +14,15 @@ An open-source privacy firewall for AI agents: reversible, grammar-aware masking
 ## Description
 
 ```text
-pii-guard sits between an application and an LLM. It finds personal data in text and images, replaces each value with a reversible placeholder that stays the same for the whole conversation, sends only the masked request on, and puts the real values back into the answer, even while it streams. It is an OpenAI-compatible proxy, so adopting it is a change of API base URL. It is built for languages where existing tools break: in Hungarian a name changes with every grammatical case, so pii-guard keeps case endings outside the placeholder and re-inflects the name on the way back. On our hand-written test sets, rules alone let 52.6 % (Hungarian) and 46.7 % (English) of labelled values reach the model; the default fast mode (rules + an NER distilled from Meta's Muse Glimmer) runs on the machine at $0 and brings that to 0.6 % pooled over German, English and Hungarian, and the optional audit mode, a second opinion from Meta's open-weight Muse Spark Open for quality checks, reaches 0.9 % and 0.0 % at a median 1.2–1.8 s and about $2–2.50 per 1,000 messages. Every run is a committed record, with charts checked in CI, on fictional data only. Apache-2.0.
+pii-guard sits between an application and an LLM. It finds personal data in text and images, replaces each value with a reversible placeholder that stays the same for the whole conversation, sends only the masked request on, and puts the real values back into the answer, even while it streams. It is an OpenAI-compatible proxy, so adopting it is a change of API base URL. It is built for languages where existing tools break: in Hungarian a name changes with every grammatical case, so pii-guard keeps case endings outside the placeholder and re-inflects the name on the way back. On our hand-written test set (German, English and Hungarian, 51 documents), rules alone let 41.6 % of labelled values reach the model; the default fast mode (rules + our published NER, an XLM-RoBERTa fine-tuned on Meta's Muse Glimmer labels and public data) runs on the machine at $0 in about 18 ms per document and brings that to 0.0 %. On public test sets it never trained on it leaks 0.4–0.7 % (CEE-PII, Nemotron-PII) but 19.1 % on finance text. The optional audit mode adds a second opinion from Meta's open-weight Muse Spark Open for quality checks: 0.6 % at about 1.9 s per message. Every run is a committed record, with charts checked in CI, on fictional data only. Apache-2.0.
 ```
 
 ## How we used Meta models
 
 ```text
 One rule decides where each model runs: anything that sees real personal data is an open-weights model you can host yourself; hosted models only see fictional or masked data.
-- Muse Spark Open (open weights, on Baseten Model APIs or your own GPUs) is the LLM detector of audit mode, the optional second opinion for quality checks and the benchmark upper bound: 0.9 % Hungarian and 0.0 % English leak. Production traffic runs fast mode (rules + the distilled NER, local, about 36 ms, $0, nothing leaves the machine).
-- Muse Glimmer 30B (open weights, Apache-2.0) was the best zero-shot detector we measured (F1 99.3, 0.0 % leak) but takes 9.4 s per document, so we used it as the teacher: it labelled a 4,964-document fictional corpus, and we distilled it into XLM-RoBERTa, which runs in-process in tens of milliseconds for fast mode. A LoRA fine-tune of Glimmer is in progress.
+- Muse Spark Open (open weights, on Baseten Model APIs or your own GPUs) is the LLM detector of audit mode, the optional second opinion for quality checks and the benchmark upper bound: 0.9 % Hungarian and 0.0 % English leak. Production traffic runs fast mode (rules + the NER, local, about 18 ms per document, $0, nothing leaves the machine).
+- Muse Glimmer 30B (open weights, Apache-2.0) was the best zero-shot detector we measured (F1 99.3, 0.0 % leak) but takes 9.4 s per document, so we used it as the teacher: it labelled a 4,964-document fictional corpus, which, with public OpenPII rows and hard negatives, trained an XLM-RoBERTa base model. It is published as hdkiller/pii-guard-ner-xlmr-base v2.0 and runs in-process for fast mode. A LoRA fine-tune of Glimmer as a detector is blocked for now.
 - Muse Spark 1.3 wrote the synthetic Hungarian and English benchmark and the distillation corpus around fictional identities ($1.05 for 5,004 calls), and is the downstream model in the demo, which only ever sees placeholders.
 - Muse Spark Open and Muse Spark 1.3 are also the attackers in our red teams: prompt injection against the detector, and re-identification of masked documents.
 - Muse Image painted the portraits, signatures and stamps for 24 fictional specimen ID documents, so image tests need no real ID.
@@ -38,7 +38,8 @@ One rule decides where each model runs: anything that sees real personal data is
 - We publish exposure, not just detection: Meta's own model recovers 0.2 % of masked values from the masked text, and 39.2 % when handed five candidates (chance 20 %). We say "pseudonymisation, not anonymisation".
 - The gateway masks tool definitions, response schemas and metadata, refuses placeholders pasted back as input, and fails closed on every error.
 - Language packs with a conformance suite, so adding a language is a checklist (German was added this way).
-- Measured against Presidio, LLM Guard and PrivAiTe on the same fixtures: 1.0 % Hungarian leak against 19.6–49.5 %.
+- Measured against Presidio, LLM Guard and PrivAiTe with one scorer: on the hand-written set fast mode leaks 0.0 % against PrivAiTe 12.7 %, Presidio 24.3 % and LLM Guard 45.1 %; on public test sets 0.7 % vs 4.0 % (Nemotron-PII) and 0.4 % vs 4.4 % (CEE-PII, best other tool). It is behind or level where it is weak: finance text (19.1 % vs Presidio 18.8 %), agent traffic (2.6 % vs PrivAiTe 2.4 %), and Ai4Privacy-style text it has not seen (13.8 % for the same recipe trained without those rows, vs PrivAiTe 9.5 %).
+- Images: portraits, signatures and machine-readable zones on 65 official specimen IDs masked at 90.8 %, 83.8 % and 80.0 % (MRZ with the LLM detector), against 55–57 %, 46–49 % and at most 10 % for Eka PII Redaction; each masked region can carry the text session's placeholder, so a model told "which parties have an ID on file?" got 3 of 3 right with labelled images and 1 of 3 with black boxes.
 ```
 
 ## Challenges
@@ -54,10 +55,10 @@ One rule decides where each model runs: anything that sees real personal data is
 ## What's next
 
 ```text
-- A fresh, reproducible comparison against Presidio, LLM Guard and PrivAiTe with today's fast and audit modes, including the public ai4privacy OpenPII-1M benchmark (in progress).
-- Masking printed names and numbers on ID cards (in progress), then placeholder-labelled images that share the text session's placeholders, so an assistant can answer "which parties have an ID on file?" without seeing a value (planned). As far as we found in a survey on 2026-10-27, no open-source tool shares placeholders between images and the text session.
-- An image baseline against Presidio Image Redactor (planned).
-- A LoRA fine-tune of Muse Glimmer as a request-path detector (in progress), and publishing the distilled NER weights.
+- Fewer false alarms in fast mode: reference and tracking numbers without a cue word are read as IDs (39.4 % over-masking on CEE-PII, 14.0 % on agent traffic).
+- Better finance coverage (19.1 % leak on Gretel finance) and an NER that generalises to unseen Ai4Privacy-style text (13.8 % held out).
+- A reader for security-printed ID cards: OCR returns no word for 108 of 274 specimen text values.
+- Publishing the package to PyPI, so `uvx --from wattmind-pii-guard pii-guard up` is the one-command start.
 - Confirming the hosted endpoint's data-retention terms before recommending it for real data.
 ```
 
@@ -74,8 +75,8 @@ One rule decides where each model runs: anything that sees real personal data is
 
 ## Owner checklist before submitting
 
-- Re-read every number against [why-pii-guard.md](why-pii-guard.md); refresh the head-to-head
-  line once LAB-1148 merges.
+- Re-read every number against [benchmarks.md](benchmarks.md) and
+  [why-pii-guard.md](why-pii-guard.md) (why-pii-guard.md still carries some older figures).
 - Switch the links from `develop` to the submitted branch or tag if the form asks for a fixed
   version.
 - Add the demo video link.

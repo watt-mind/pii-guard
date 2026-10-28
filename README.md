@@ -18,9 +18,11 @@ agent can't do the job. pii-guard is a drop-in proxy in between: change one base
 name, address, ID and face is swapped for a reversible placeholder before the request leaves
 your network, then restored in the answer, even mid-stream and inside tool calls.
 
-**Try it offline** (no key, no model download; needs [uv](https://docs.astral.sh/uv/) and
+**Try it offline** (no key; needs [uv](https://docs.astral.sh/uv/) and
 [pnpm](https://pnpm.io/)): `git clone https://github.com/watt-mind/pii-guard.git && cd pii-guard && make demo`,
-then open http://localhost:5173. [More ways to run it](#try-it).
+then open http://localhost:5173. Once the package is on PyPI (it is not yet), one command
+will do it without a clone: `uvx --from wattmind-pii-guard pii-guard up`.
+[More ways to run it](#try-it).
 
 <p align="center">
   <img src="docs/assets/demo/demo.webp" alt="Demo of the console in the dark theme with fictional English data: the Overview counts real gateway calls, a support e-mail is masked in the Playground, the same session continues in Chat and comes back restored, Logs shows each call, and Connect gives the commands for a client" width="100%">
@@ -32,7 +34,7 @@ then open http://localhost:5173. [More ways to run it](#try-it).
 
 | Job | Meta model | Evidence |
 |---|---|---|
-| **Runs in production (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels: 36 ms p50 on an Apple-silicon GPU, 241 ms CPU-only | [latency](eval/results/ner/distilled/latency-large.json), [training](docs/models.md#distilled-from-muse-glimmer) |
+| **Runs in production (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa base** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels, Ai4Privacy OpenPII train rows and hard negatives; published as [`hdkiller/pii-guard-ner-xlmr-base`](https://huggingface.co/hdkiller/pii-guard-ner-xlmr-base) `v2.0`. 18 ms p50 per document on the hand-written set (Apple MPS), 47 ms NER-only on a loaded M1 CPU | [model card](training/ner/model-card.md), [latency](eval/results/2026-10-27-ner-v21/latency/xlmr-base-v2-hn.json), [training](docs/models.md#ner-v2-wider-labels-openpii-train-split-hard-negatives), [selection](eval/results/2026-10-27-ner-v21/README.md) |
 | **Teaches it, and audits:** labels 4,964 fictional documents for distillation; the optional audit mode and upper bound | **Muse Glimmer 30B** (open weights, Apache-2.0); **Muse Spark Open** (open weights) on Baseten partner inference | [Glimmer run](eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [audit runs](docs/benchmarks.md#smoke) |
 | **Sees images:** faces, ID photos and signatures, filled before the image leaves | **SAM 3.1** (Meta Model API) for signatures; faces and ID photos on-device (YuNet); OCR for printed text | [specimen results](eval/results/visual/specimens.md) |
 
@@ -46,33 +48,55 @@ yourself; hosted models only see fictional or already-masked text. All jobs, wit
 
 ## Results
 
-Pooled over German, English and Hungarian. Leak = labelled personal values still readable in
-what the model receives (lower is safer). Copied from the generated
-[docs/benchmarks.md](docs/benchmarks.md#results-by-fixture-set); every row there names its run
-records.
+Leak = labelled personal values still readable in what the model receives (lower is safer).
+Fast mode is the published NER `v2.0` (`NER v2 base + hard negatives` in the reports). Copied
+from the generated [docs/benchmarks.md](docs/benchmarks.md): the hand-written set from
+[results by fixture set](docs/benchmarks.md#smoke), the public and agent-traffic test splits
+(none of them trained on) from [results per dataset](docs/benchmarks.md#results-per-dataset),
+with 95 % intervals there.
 
-| System | Leak, hand-written (51 docs) | Precision | Leak, [ai4privacy](docs/benchmarks.md#ai4privacy) (600 docs) | Precision | Detect p50 (hand-written, shared CPU) | Per message |
-|---|---:|---:|---:|---:|---:|---|
-| **pii-guard fast** (rules + NER) | **0.6 %** | 98.5 % | 27.6 % | 92.8 % | 94 ms | on-device, $0 |
-| pii-guard audit (+ Muse Spark Open; opt-in second opinion) | 0.6 % | 97.0 % | **3.9 %** | 92.5 % | 1.9 s | one Baseten call |
-| PrivAiTe | 12.7 % | 51.2 % | 9.5 % | 64.8 % | 170 ms | on-device |
-| Presidio | 24.3 % | 62.5 % | 29.6 % | 38.6 % | 88 ms | on-device |
-| LLM Guard | 45.1 % | 61.5 % | 43.8 % | 79.3 % | 110 ms | on-device |
+| Leak | Hand-written (de+en+hu, 51 docs) | Agent traffic (990) | Nemotron-PII (300) | CEE-PII (451) | Gretel finance (400) | Ai4Privacy (600) |
+|---|---:|---:|---:|---:|---:|---:|
+| **pii-guard fast** (rules + NER, on-device, $0) | **0.0 %** | 2.6 % | **0.7 %** | **0.4 %** | 19.1 % | 0.4 % † |
+| PrivAiTe | 12.7 % | **2.4 %** | 4.0 % | 4.4 % | 27.6 % | 9.5 % |
+| Presidio | 24.3 % | 12.4 % | 12.8 % | 36.5 % | **18.8 %** | 29.6 % |
+| LLM Guard | 45.1 % | 20.2 % | 28.8 % | 75.8 % | 59.3 % | 43.8 % ‡ |
+| pii-guard rules only (no name detection) | 41.6 % | 45.3 % | 56.0 % | 40.9 % | 80.7 % | 63.1 % |
 
-On the hand-written set, fast mode leaks 20× less than the best other tool. On the public
-ai4privacy set, **PrivAiTe leaks less than fast mode** (9.5 % vs 27.6 %); only audit mode beats
-it there. Run records: fast [hand-written](eval/results/runs/2026-10-27-rules-resolve-after-smoke-fast.json) ·
-[ai4privacy](eval/results/runs/2026-10-27-rules-resolve-after-ai4privacy-fast.json); the others
-are listed per language in the [run log](docs/benchmarks.md#run-log). Small sets, and latency
-on a shared laptop CPU: compare loosely.
+† **In-distribution:** the NER was trained on other rows of the same dataset (the OpenPII
+train split; no evaluated row was trained on). The same recipe trained without those rows
+leaks **13.8 %** ([ablation](docs/benchmarks.md#ai4privacy)), so on unseen text in that style
+**PrivAiTe leaks less than fast mode** (9.5 %). ‡ LLM Guard's model was fine-tuned on
+Ai4Privacy data too ([configurations](eval/results/2026-10-27-comparison/README.md#systems)).
+
+- **Where fast mode is weak:** finance text (19.1 %, level with Presidio), and over-masking:
+  1.1 % on the hand-written set, but 14.0 % on agent traffic and 39.4 % on CEE-PII, where
+  reference numbers without a cue word come out as IDs
+  ([model card](training/ner/model-card.md#limitations)).
+- **Audit mode** (opt-in: rules + NER + Muse Spark Open, one hosted Baseten call per message,
+  fails closed when the call fails): 0.6 % on the hand-written set at 1.9 s p50. It is the
+  upper bound and the teacher, not the production path.
+- **Detection p50** on the hand-written set: fast 18 ms, Presidio 88 ms, LLM Guard 110 ms,
+  PrivAiTe 170 ms, averaged over runs on a loaded laptop: compare loosely.
+- **Caveats:** the sets are small (tens to hundreds of documents per language); headline sets
+  are hand-written or public because Muse-generated fixtures flatter Muse-based detection.
+  Run records: fast on the hand-written set
+  ([de](eval/results/runs/2026-10-27-ner-v21-de-smoke-xlmr-base-v2-hn.json) ·
+  [en](eval/results/runs/2026-10-27-ner-v21-en-smoke-xlmr-base-v2-hn.json) ·
+  [hu](eval/results/runs/2026-10-27-ner-v21-hu-smoke-xlmr-base-v2-hn.json)), per-dataset
+  counts in [eval/datasets/results/](eval/datasets/results/), everything else in the
+  [run log](docs/benchmarks.md#run-log).
 
 ## Built for agents: tool calls and streaming
 
 The gateway speaks the OpenAI chat API, so an agent framework only changes its base URL. It
 masks every message, **tool definitions, tool-call arguments and tool results**, restores
 placeholders in streamed answers chunk by chunk (also when one is split across chunks), keeps
-the same placeholder for the same person across a whole session, and fails closed on anything
-it can't mask ([field table](docs/contracts.md#gateway-request-fields-implemented)).
+the same placeholder for the same person across a whole session, masks inline images, and
+fails closed on anything it can't mask ([field table](docs/contracts.md#gateway-request-fields-implemented)).
+Clients that can't send a session header still get one sticky session: from the URL path
+that `pii-guard connect` writes, the `prompt_cache_key`, or one per client key
+([sessions](docs/architecture-gateway.md#sessions)).
 
 ```python
 from openai import OpenAI
@@ -89,7 +113,11 @@ stream = client.chat.completions.create(
 )  # the model sees [[PERSON_…]] and [[EMAIL_…]]; your code gets the real values back
 ```
 
-Sessions, headers, modes and settings: [docs/architecture-gateway.md](docs/architecture-gateway.md).
+It also serves the Responses API, so coding agents run behind it: with **Muse Code 1.4.14**
+on the Meta Model API, 0 of 16 fictional values reached the upstream and no request was
+refused ([LAB-1299](docs/journey/2026-10-27-lab-1299-muse-1-4-14.md),
+[guide](docs/integrations/muse-code.md)). Sessions, headers, modes and settings:
+[docs/architecture-gateway.md](docs/architecture-gateway.md).
 
 ## Why pii-guard
 
@@ -112,6 +140,10 @@ All 13 differentiators, with evidence and status: **[docs/why-pii-guard.md](docs
 
 ## What you can see in the demo
 
+The console has six sections: **Overview**, **Playground** (Text, Chat, Images), **Logs**,
+**Connect**, **Policy** and **Evaluation** ([ui/README.md](ui/README.md#screens)). These
+screenshots were taken in fast mode without the NER, so free-text names stay readable in them.
+
 | **Text:** every value found, and what the model saw | **Gateway:** a chat, masked out and restored back |
 |---|---|
 | [![Playground, Text tab: a fictional English support e-mail with each value the rules found highlighted, and the placeholders the model sees](docs/assets/demo/1-mask.webp)](docs/assets/demo/1-mask.webp) | [![Playground, Chat tab: the same e-mail sent through the gateway in the same session; a note says names are not detected without NER, and the model received placeholders](docs/assets/demo/2-chat.webp)](docs/assets/demo/2-chat.webp) |
@@ -125,19 +157,19 @@ At phone width: [Text](docs/assets/demo/5-mask-mobile.webp) ·
 
 ## Try it
 
-One command, no clone, Node or Docker: only [uv](https://docs.astral.sh/uv/). It starts the
+**Once the package is published** (there is no PyPI package or GitHub release yet), one
+command, with no clone, Node or Docker, only [uv](https://docs.astral.sh/uv/), starts the
 API, the OpenAI-compatible gateway and the web UI with the live dashboard on
 http://localhost:8787, with an offline mock upstream unless you pass `--upstream-url`:
 
 ```bash
-uvx --from https://github.com/watt-mind/pii-guard/releases/download/vX.Y.Z/wattmind_pii_guard-X.Y.Z-py3-none-any.whl pii-guard up
+uvx --from wattmind-pii-guard pii-guard up           # rules only
+uvx --from 'wattmind-pii-guard[ner]' pii-guard up    # fast mode with the NER (about 1.1 GB, downloaded once)
 ```
 
-Take the wheel URL from the [latest release](https://github.com/watt-mind/pii-guard/releases).
-Once it is on PyPI this becomes `uvx --from wattmind-pii-guard pii-guard up`. From source,
-`uvx --from git+https://github.com/watt-mind/pii-guard pii-guard up` runs the API and gateway
-without the UI. To put an agent behind it, run `pii-guard connect pi` with the same
-`uvx --from` prefix ([operations.md](docs/operations.md#one-command-pii-guard-up)).
+Today, from source, `uvx --from git+https://github.com/watt-mind/pii-guard pii-guard up` runs
+the API and gateway without the UI. To put an agent behind it, run `pii-guard connect pi`
+with the same `uvx --from` prefix ([operations.md](docs/operations.md#one-command-pii-guard-up)).
 
 From a checkout:
 
@@ -156,7 +188,8 @@ runs): pii-guard's own NER, [`hdkiller/pii-guard-ner-xlmr-base`](https://hugging
 Images screens alike. `make demo MODE=rules` is rules only: offline, no download, names need
 known values. Which model and why: [models.md](docs/models.md#which-ner-model-fast-mode-runs).
 A set `PII_GUARD_NER_MODEL` without the extra stops startup instead of quietly running rules
-only. Docker: `docker compose --profile demo up --build`. More:
+only. Docker: `docker compose --profile demo up --build` (the demo image is 1.9 GB on arm64
+with CPU-only torch; [operations.md](docs/operations.md#docker)). More:
 [docs/operations.md](docs/operations.md).
 
 ## How it works
