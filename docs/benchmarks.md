@@ -957,6 +957,12 @@ What the gateway adds to an LLM call, measured by `pii-guard bench latency` agai
 | fast: rules + ner | 1 | yes | 200 | 26 ms | 29 ms | 31 ms | 19 ms | 25 ms | 28 ms | 50 | `2026-10-27-gateway-latency-ner-fallback-fast` |
 | fast: rules + ner | 8 | no | 200 | 73 ms | 90 ms | 99 ms | 68 ms | — | — | 50 | `2026-10-27-gateway-latency-ner-fallback-fast` |
 | fast: rules + ner | 8 | yes | 200 | 79 ms | 112 ms | 146 ms | 72 ms | 77 ms | 111 ms | 50 | `2026-10-27-gateway-latency-ner-fallback-fast` |
+| fast: rules + ner | 1 | no | 200 | 21 ms | 27 ms | 44 ms | 20 ms | — | — | 50 | `2026-10-28-ner-concurrency-mps-fast` |
+| fast: rules + ner | 1 | yes | 200 | 22 ms | 39 ms | 65 ms | 21 ms | 22 ms | 37 ms | 50 | `2026-10-28-ner-concurrency-mps-fast` |
+| fast: rules + ner | 4 | no | 200 | 17 ms | 39 ms | 98 ms | 16 ms | — | — | 50 | `2026-10-28-ner-concurrency-mps-fast` |
+| fast: rules + ner | 4 | yes | 200 | 19 ms | 34 ms | 51 ms | 17 ms | 18 ms | 33 ms | 50 | `2026-10-28-ner-concurrency-mps-fast` |
+| fast: rules + ner | 8 | no | 200 | 36 ms | 56 ms | 91 ms | 36 ms | — | — | 50 | `2026-10-28-ner-concurrency-mps-fast` |
+| fast: rules + ner | 8 | yes | 200 | 45 ms | 71 ms | 149 ms | 44 ms | 45 ms | 70 ms | 50 | `2026-10-28-ner-concurrency-mps-fast` |
 
 ## Run log
 
@@ -964,6 +970,8 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-28 | `2026-10-28-ner-concurrency-mps-fast` | pii-guard gateway, fast mode (rules + ner hdkiller/pii-guard-ner-xlmr-base) | latency-corpus | de, en, hu | recorded | `6750a17` | Apple M1 Max, 10 CPUs, local loopback | — |
+| 2026-10-28 | `2026-10-28-ner-concurrency-cpu-fast` | pii-guard gateway, fast mode (rules + ner hdkiller/pii-guard-ner-xlmr-base) | latency-corpus | de, en, hu | recorded | `6750a17` | Apple M1 Max, 10 CPUs, local loopback | — |
 | 2026-10-28 | `2026-10-28-datasets-agent-traffic-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic | de, en, hu | recorded | `69bae45` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-datasets-agent-traffic-dev-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic-dev | de, en, hu | recorded | `69bae45` | — | — |
 | 2026-10-27 | `2026-10-27-ner-v21-de-gretel-finance-xlmr-base-v21-hn-e5` | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | gretel-finance | de | recorded | `477196a` (dirty) | arm64, 10 CPUs, macOS-26.5.2-arm64-arm-64bit; NER on PyTorch device auto; load average 8.9 at start (machine not idle) | — |

@@ -8,6 +8,8 @@ All text is fictional.
 from __future__ import annotations
 
 import os
+import threading
+import time
 
 import pytest
 
@@ -676,6 +678,154 @@ def test_predict_batch_softmax_runs_on_cpu(tiny_model_dir) -> None:
     backend.predict_batch(_batch_texts())
     assert len(forwards) > 1
     assert len(moved) == len(forwards)  # one device-to-CPU copy per micro-batch
+
+
+# -- concurrent callers share runs (LAB-1177) --
+
+
+def _gated(backend):
+    """Hold the first ``_predict_now`` run until ``release`` is set; record every run's texts."""
+    inner = backend._predict_now
+    started, release = threading.Event(), threading.Event()
+    runs: list[list[str]] = []
+    active: list[int] = []
+
+    def run(texts):
+        active.append(1)
+        try:
+            assert len(active) == 1, "two runs at once"
+            runs.append(list(texts))
+            if len(runs) == 1:
+                started.set()
+                assert release.wait(10)
+            return inner(texts)
+        finally:
+            active.pop()
+
+    backend._predict_now = run
+    return started, release, runs
+
+
+def _call_in_threads(backend, calls):
+    """Start one thread per call while the first run is held; results or exceptions, in order."""
+    out: list[object] = [None] * len(calls)
+
+    def work(i):
+        try:
+            out[i] = backend.predict_batch(calls[i])
+        except Exception as exc:
+            out[i] = exc
+
+    threads = [threading.Thread(target=work, args=(i,)) for i in range(len(calls))]
+    return threads, out
+
+
+def _wait_queued(backend, n):
+    deadline = time.monotonic() + 10
+    while len(backend._queue) < n:
+        assert time.monotonic() < deadline, "callers did not queue"
+        time.sleep(0.005)
+
+
+def test_concurrent_calls_share_one_run_and_get_their_own_results(tiny_model_dir) -> None:
+    path, vocab = tiny_model_dir
+    backend = ner.TransformersBackend(str(path), device="cpu", max_length=12, stride=2)
+    backend.model = _stub_forward(vocab)
+    texts = _batch_texts()
+    calls = [["Elek lakik"], texts[:3], texts[3:5], [texts[5]], texts[5:], ["a Minta Kft."]]
+    expected = [[backend.predict(t) for t in call] for call in calls]
+    started, release, runs = _gated(backend)
+    threads, out = _call_in_threads(backend, calls)
+    threads[0].start()
+    assert started.wait(10)  # the first caller runs at once, alone
+    for t in threads[1:]:
+        t.start()
+    _wait_queued(backend, len(calls) - 1)
+    release.set()
+    for t in threads:
+        t.join(10)
+    assert out == expected
+    # The five callers that queued behind the first run share the second run.
+    assert runs == [calls[0], [t for call in calls[1:] for t in call]]
+    assert not backend._running and not backend._queue
+    assert backend.predict_batch(calls[1]) == expected[1]  # idle again: runs at once, alone
+    assert runs[-1] == calls[1] and len(runs) == 3
+
+
+def test_combined_runs_respect_the_text_cap(tiny_model_dir) -> None:
+    path, vocab = tiny_model_dir
+    backend = ner.TransformersBackend(
+        str(path), device="cpu", max_length=12, stride=2, max_combined_texts=3
+    )
+    backend.model = _stub_forward(vocab)
+    calls = [
+        ["Teszt Elek"],
+        ["Elek"],
+        ["Minta Kft.", "Elek lakik"],
+        ["Teszt"],
+        ["a", "b", "c", "d"],
+    ]
+    expected = [[backend.predict(t) for t in call] for call in calls]
+    started, release, runs = _gated(backend)
+    threads, out = _call_in_threads(backend, calls)
+    threads[0].start()
+    assert started.wait(10)
+    for i, t in enumerate(threads[1:], start=1):
+        t.start()
+        _wait_queued(backend, i)  # queue in a known order
+    release.set()
+    for t in threads:
+        t.join(10)
+    assert out == expected
+    # Oldest first, up to 3 texts per run; a caller with more texts than the cap runs alone.
+    assert [len(r) for r in runs] == [1, 3, 1, 4]
+    with pytest.raises(ValueError, match="positive"):
+        ner.TransformersBackend(str(path), device="cpu", max_combined_texts=0)
+
+
+def test_a_failing_caller_does_not_fail_the_others(tiny_model_dir) -> None:
+    path, vocab = tiny_model_dir
+    backend = ner.TransformersBackend(str(path), device="cpu", max_length=12, stride=2)
+    forward = _stub_forward(vocab)
+    poison = vocab["Kft."]
+
+    def model(input_ids, **inputs):
+        if (input_ids == poison).any():
+            raise RuntimeError("fictional device error")
+        return forward(input_ids, **inputs)
+
+    backend.model = model
+    calls = [["Teszt Elek"], ["Elek lakik"], ["a Minta Kft. dolgozik"], ["Teszt Elek és Teszt"]]
+    expected = [[backend.predict(t) for t in call] for call in (calls[0], calls[1], calls[3])]
+    started, release, runs = _gated(backend)
+    threads, out = _call_in_threads(backend, calls)
+    threads[0].start()
+    assert started.wait(10)
+    for t in threads[1:]:
+        t.start()
+    _wait_queued(backend, 3)
+    release.set()
+    for t in threads:
+        t.join(10)
+    assert [out[0], out[1], out[3]] == expected
+    assert isinstance(out[2], RuntimeError)
+    # The combined run failed, then its three callers ran one at a time.
+    assert [len(r) for r in runs] == [1, 3, 1, 1, 1]
+    assert not backend._running and not backend._queue
+
+
+def test_an_interrupted_run_releases_every_waiting_caller(tiny_model_dir) -> None:
+    path, vocab = tiny_model_dir
+    backend = ner.TransformersBackend(str(path), device="cpu", max_length=12, stride=2)
+    backend.model = _stub_forward(vocab)
+
+    def interrupted(texts):
+        raise KeyboardInterrupt
+
+    backend._predict_now = interrupted
+    with pytest.raises(KeyboardInterrupt):
+        backend.predict_batch(["Teszt Elek", "Elek"])
+    assert not backend._running and not backend._queue
 
 
 # -- the shipped checkpoint, where one is available (PII_GUARD_NER_MODEL) --
