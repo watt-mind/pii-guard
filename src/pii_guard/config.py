@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
     # the gateway fast-mode stack, rules + ner when available (pii_guard.detect.stack).
     detectors: Annotated[tuple[str, ...] | None, NoDecode] = None
+    # A processing constraint, independent of the masked downstream LLM destination.
+    detection_profile: Literal["standard", "local-only"] = "standard"
     # "TYPE=mask|keep|block,..." on top of the defaults in docs/entities.md.
     policy_overrides: Annotated[dict[EntityType, Policy], NoDecode] = Field(default_factory=dict)
     # Deprecated (use policy_overrides): types to keep, the rest of the default keeps masked.

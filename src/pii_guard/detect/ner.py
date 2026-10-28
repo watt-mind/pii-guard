@@ -635,8 +635,14 @@ class NerDetector:
         published: str | None = None,
         fallback: str | None = None,
         number_checks: bool = True,
+        local_files_only: bool = False,
     ) -> None:
         self.number_checks = number_checks
+        from pii_guard.config import get_settings
+        from pii_guard.detection_profile import is_local_only
+
+        local_files_only = local_files_only or is_local_only(get_settings())
+        self.local_files_only = local_files_only
         kind = (backend_kind or os.environ.get(BACKEND_ENV_VAR) or "transformers").strip().lower()
         if kind not in BACKENDS:
             raise ValueError(f"ner backend must be one of {BACKENDS}")
@@ -667,6 +673,10 @@ class NerDetector:
             or os.environ.get(REVISION_ENV_VAR)
             or (default_revision if self.model == default_model else None)
         )
+        if local_files_only:
+            from pii_guard.detection_profile import require_local_model
+
+            require_local_model(model or env_model, self.backend_kind)
         self.device = device
         self.thresholds = _normalize_thresholds(thresholds)
         types = frozenset(EntityType(t) for t in (entity_types or NER_ENTITY_TYPES))
@@ -723,6 +733,7 @@ class NerDetector:
             self.max_length,
             self.stride,
             self.aggregation,
+            self.local_files_only,
         )
 
     def _build_backend(self) -> NerBackend:
@@ -762,6 +773,7 @@ class NerDetector:
                 max_length=self.max_length,
                 stride=self.stride,
                 aggregation=self.aggregation,
+                local_files_only=self.local_files_only,
             )
         logger.info("ner model loaded: %s", self.model)
         _shared_backends[key] = backend

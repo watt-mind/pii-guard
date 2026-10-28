@@ -101,6 +101,7 @@ class AnalyzeResponse(BaseModel):
         "invalid_request",
         "vault_not_configured",
         "detection_failed",
+        "detection_profile_denied",
         "detection_unavailable",
         "detector_loading",
     ),

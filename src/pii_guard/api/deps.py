@@ -121,6 +121,16 @@ def get_analyzer(request: Request) -> Analyzer:
                 )
                 state.analyzer = analyzer
                 logger.info("analyzer ready with detectors: %s", list(names))
+    from pii_guard.detection_profile import (
+        DetectionProfileError,
+        is_local_only,
+        require_detector_instance,
+    )
+
+    if is_local_only(state.settings):
+        if type(analyzer) is not RegistryAnalyzer:
+            raise DetectionProfileError("local-only requires the built-in registry analyzer")
+        require_detector_instance(state.settings, analyzer.pipeline)
     return analyzer
 
 
