@@ -215,9 +215,11 @@ starts the same stack in containers: `mock-upstream`, `demo-api` on
 `http://127.0.0.1:8788` (traffic log `masked`, `fast` mode with the NER) and `ui` on
 `http://localhost:5173`, next to the plain `api` service on 8787. The demo services use their
 own image, `pii-guard:demo`, built with the `ner` extra (`PII_GUARD_EXTRAS` build argument;
-the plain `pii-guard:dev` image stays without torch). It is large: 9.6 GB on arm64, because
-the locked torch wheel pulls the CUDA libraries even there (`pii-guard:dev` is 268 MB;
-LAB-1308). On the first start `demo-api` downloads the NER model into the `pii-guard-models` volume before the server listens (`docker compose
+the plain `pii-guard:dev` image stays without torch). On Linux, torch comes from the PyTorch
+CPU index (`[tool.uv.sources]` in `pyproject.toml`), so the image has no CUDA libraries
+(`nvidia-*`, `triton`): 1.9 GB on arm64 in `docker image ls` (424 MB content, a 1.2 GB
+virtualenv), down from 9.6 GB (3.42 GB content, a 5.6 GB virtualenv) with the PyPI wheel
+(LAB-1308). `pii-guard:dev` is 654 MB. macOS keeps the PyPI torch wheel, which has MPS. On the first start `demo-api` downloads the NER model into the `pii-guard-models` volume before the server listens (`docker compose
 logs -f demo-api` shows `ner: downloading …`); its healthcheck allows 15 minutes for that, and
 the UI waits until `demo-api` is healthy. Later starts reuse the volume (`docker compose down
 -v` drops it). Rules only, offline, no download:
