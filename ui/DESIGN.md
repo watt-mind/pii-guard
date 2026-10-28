@@ -25,7 +25,7 @@ proprietary fonts of the reference are used.
 | `--muted`, `--faint` | `#595959`, `#6b6762` | `#b3ada7`, `#948e88` | secondary text, hints and group labels |
 | `--line`, `--line-strong` | `#eeeeee`, `#e2ddd8` | `#2a2826`, `#3a3633` | hairlines on cards and dividers (decorative) |
 | `--field` | `#8f8780` | `#807973` | the outline of inputs, selects and text areas (3:1) |
-| `--primary` / `--on-primary` | `#280016` / white | `#f6dcec` / `#280016` | the primary action, selected segment |
+| `--primary` / `--on-primary` | `#280016` / white | `#f6dcec` / `#280016` | the primary action |
 | `--accent` family | `#a71e7e` | `#ec7fc4` | badges, the header hairline; never a state |
 | `--guard` | `#047a56` (dot `#05aa77`) | `#3fd6a0` | protected: the boundary, a live connection, values put back |
 
@@ -92,50 +92,114 @@ active nav item is marked by `aria-current`, its fill and a 500 weight, not by f
   apertures that stays clean at 14 px and light at 400/500), and it ships a mono with the same
   metrics, so values sit on the same rhythm as labels. Hanken Grotesk was the alternative; it
   is rounder and warmer, further from the reference, and has no matching mono.
-- Scale: `text-2xs` (11 px) · `text-xs` (12 px, subtitles) · `text-ui` (13 px) · `text-sm`
-  (14 px, body and controls) · `text-base` (16 px, header bar) · `text-lg` (18 px, card and
-  section titles) · `text-2xl` (24 px, the one page heading). No other sizes.
+- Scale (no other sizes, no arbitrary `text-[…]`):
+
+  | Role | Class | Size / line height / weight |
+  |---|---|---|
+  | Page title (`h1`, exactly one per screen, `PageHeader`) | `text-2xl font-medium` | 24 / 32 / 500 |
+  | Lead under the page title | `text-sm sm:text-base text-muted`, `max-w-3xl` | 14→16 / 20→24 / 400 |
+  | Card and pane title (`h2`, or `h3` inside a section) | `text-lg font-normal` | 18 / 28 / 400 |
+  | Metric value (`Metric`) | `text-lg font-medium tabular-nums` | 18 / 28 / 500 |
+  | Header bar | `text-base` | 16 / 24 / 400 |
+  | Body, controls, table cells, card subtitles | `text-sm` | 14 / 20 / 400 |
+  | Item title, step title, field label, emphasis | `text-sm font-medium` | 14 / 20 / 500 |
+  | Help text, hints, metric label | `text-xs text-muted` | 12 / 16 / 400 |
+  | Dense meta text and documents (`.doc`, text areas) | `text-ui` / `.doc` | 13 / 20 |
+  | Group label, badge, pane eyebrow | `text-2xs` (+ `uppercase tracking-[0.04em]` for sidebar groups only) | 11 / 16 / 500 |
+
+  Mono (`font-mono`) is for values, codes, IDs and documents, never for counts.
 - Weights stay light: 400 for body, card titles and buttons; 500 for page headings, labels and
-  the active nav item. Never 600 or bold. Headings are never italic. Line height 1.4.
+  the active nav item. Never 600 or bold (chart labels included). Headings are never italic.
+  Line height 1.4.
 - Labels are sentence case. The only uppercase is the sidebar group labels (Inspect, Set up,
   Measure: 11 px, 500, 0.04 em tracking, faint) and badges.
 
 ## Shape and depth
 
 - Radii: `rounded-sm` (4 px) for chips, highlights and nav items; `rounded-md` (6 px) for
-  badges and segment buttons; `rounded-lg` (10 px) for the primary button and inputs;
-  `rounded-control` (12 px) for secondary "quick action" buttons and the popover; `rounded-xl`
-  (20 px) for cards and panes. `rounded-full` only for dots and the boundary mark.
+  badges, code blocks and segments; `rounded-lg` (10 px) for every button, input, select,
+  notice and segmented track; `rounded-control` (12 px) for the popover only; `rounded-xl`
+  (20 px) for cards and panes. `rounded-full` only for dots, avatars and the boundary mark.
+- Spacing (Tailwind steps, 4 px base):
+
+  | Step | Use |
+  |---|---|
+  | 4 (`gap-1`, `mt-0.5`/`mt-1`) | label and value, title and subtitle |
+  | 8 (`gap-2`) | inline controls, chips, button rows |
+  | 12 (`py-3`) | pane and list-header vertical padding |
+  | 16 / 20 (`p-4 sm:p-5`) | **every** card and pane inset, its header included |
+  | 24 (`gap-6`, `space-y-6`) | between cards, grid columns and sections |
+  | 32 (`pt-8`) | header bar to the page title |
+
 - Depth comes from hairlines and the surface steps, never shadows. The only shadow is the
   floating popover.
 - No card inside a card: empty states and notes inside a panel are plain text.
 
 ## Components
 
-- **Primary button:** `bg-primary text-on-primary`, 10 px radius, 12 px side padding, 14 px
-  at 400, darker plum on hover.
-- **Secondary button:** white, 1 px `--line` border, 12 px radius, 16 px side padding; the
-  border and a warm fill deepen on hover.
-- **Cards and panes:** white, 1 px `--line`, 20 px radius, 16 to 20 px padding, title 18/400
-  and a 12 to 14 px muted subtitle.
-- **Sidebar:** 216 px (13.5 rem) from 1024 px, no fill, a 1 px line on its right. Items are
-  14 px with a 16 px icon, ink coloured; the active one has the `--surface-2` fill and a 4 px
-  radius. Groups (Inspect, Set up, Measure) keep the sections in their order; Overview stands
-  alone at the top. Hints under each label show only in the phone menu.
-- **Brand row:** one 36 px line in the nav items' gutter, so the mark sits over their icons: a
-  20 px shield glyph (no tile) and "pii-guard" in Geist 16/500. No tagline in the sidebar; it
-  lives on the Overview and in the page title.
+Every screen builds from these, in `src/components/ui.tsx` (class names for elements that are
+not a `<button>` in `src/components/controls.ts`). There are no element-selector stylesheets for
+controls; the hosted landing uses the same components. `className` on a component is for layout
+only (width, margin, flex): it never changes colour, height or radius, because classes are not
+merged.
+
+- **`Button`** `variant`: `primary` (plum fill, the one main action of a form or pane),
+  `secondary` (surface, `--line-strong` border deepening to `--field` on hover), `ghost` (text
+  only, low-weight actions inside a pane) and `danger` (red text and border: destructive actions
+  and their confirmation). `size`: `sm` 32 px, `md` 36 px; both become 44 px on a coarse pointer
+  (`pointer-coarse:`), so touch sizing follows the device, not hosted or local mode. Every
+  button has the 10 px radius and 14 px text at 400. `busy` keeps it focusable (`aria-disabled`,
+  clicks ignored), so keyboard focus is never dropped while work runs. `ButtonLink` is the same
+  look on an `<a>`, for navigation.
+- **`Field`** wraps one control with its label (14/500), an optional hint (12 px muted, linked by
+  `aria-describedby`, never inside the label), an error slot (12 px danger) and a required
+  marker. **`Input`**, **`Select`** and **`Textarea`** share the height (36 px, `sm` 32 px,
+  44 px on touch), the 10 px radius, the `--field` outline and the neutral focus ring; text areas
+  are 13 px mono on `--surface-2`.
+- **`Checkbox`**: a native 16 px checkbox with the primary as its accent and its label beside it.
+- **`SegmentedControl`**: native radios in a `radiogroup` (one tab stop, arrow keys). The track is
+  `--surface-2`; the selected segment is a raised `--surface` with a `--line-strong` ring and ink
+  text, never the primary fill, so it can't be mistaken for an action. Switching between panels
+  stays a tab list with the ink underline.
+- **`ConfirmAction`**: every destructive action (revoke a key, disconnect a provider, disable an
+  endpoint, drop a session) takes two steps. The trigger opens an inline box naming the object
+  and the consequence ("Revoke key 'ci'? Apps using it stop working."); the `danger` button takes
+  focus; Cancel and Escape return focus to the trigger. After the action the screen announces the
+  result and moves focus to the list it changed. Verbs: Revoke (keys), Disconnect (provider
+  connections), Disable (endpoints), Drop (vault sessions).
+- **`Notice`** `tone`: `info`, `warn`, `danger`, `success`; `live` makes it a status (polite) or
+  an alert. It replaces ad-hoc error paragraphs. Create, save and connect confirm with a live
+  `success` notice ("Endpoint 'Support bot' created."). `BlockedNotice` is the fail-closed variant
+  for gateway errors; the hosted console shows its code and mapped copy only, never server text.
+- **`SecretReveal`**: a copy-once secret. A warning box, announced, focus on Copy; "Copied" shows
+  on the button; dismissing an uncopied secret asks first.
+- **`Metric`**: a label (12 px muted) over a value (18/500 tabular): one look for every count,
+  latency and total.
+- **`PageHeader`**: the screen's one `h1`, the section name as the menu says it, and its lead
+  sentence. Playground's tabs and their views sit below it.
+- **`Card`**: white, 1 px `--line`, 20 px radius, `p-4 sm:p-5`, an 18/400 title and a 14 px muted
+  subtitle (`mt-0.5`). `Pane` uses the same insets and title; side-by-side cards share them so
+  their titles line up.
+- **`KeyValues`**: label/value rows with a fixed 8.5 rem label column (one column below 640 px),
+  so neighbouring cards line up.
+- **Sidebar:** 216 px (13.5 rem) from 1024 px, no fill, a 1 px line on its right. Items are 14 px
+  with a 16 px icon, ink coloured; the active one has the `--surface-2` fill and a 4 px radius.
+  Groups (Inspect, Set up, Measure) keep the sections in their order; Overview stands alone at
+  the top. Hints under each label show only in the phone menu.
+- **Brand row:** 48 px from 1024 px, the height of the page header bar, in the nav items'
+  gutter so the mark sits over their icons: a 24 px shield glyph (no tile) and "pii-guard" in
+  Geist 16/500. The product is always written "pii-guard": console, landing and copy.
 - **Sidebar footer:** the Engine select, then the connection as a quiet line beside the theme
-  toggle: a 6 px dot and the API version in muted 12 px, with "API connected · fast mode ·
+  control: a 6 px dot and the API version in muted 12 px, with "API connected · fast mode ·
   rules" in the tooltip (a click checks again). The label only appears when something differs:
   "Demo mode" in orange when the demo engine answers, in red when the API is down and nobody
   chose the demo engine. Only that case also turns the notice above the content red ("API not
   reachable.").
-- **Page header:** a 48 px bar with the section (and Playground tab) over the accent hairline,
-  from 1024 px. Below that width the menu's top bar names the section and the hairline sits
-  under it.
-- **Inputs:** 10 px radius, `--field` outline, white fill (text areas `--surface-2`).
-- **Segments and tabs:** the selected segment is `bg-primary`; tabs keep the ink underline.
+- **Page header bar:** 48 px with the section (and Playground tab) over the accent hairline, from
+  1024 px. Below that width the menu's top bar names the section and the hairline sits under it.
+- **Hosted landing:** the console's tokens (`.hosted` maps its variables onto `--ink`,
+  `--surface` and the rest), so it follows the light and dark theme; body 14 px, section titles
+  24/500 with no tracking, and the same `Button`, `ButtonLink`, `Field` and `Select`.
 
 ## Motion
 
