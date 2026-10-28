@@ -613,11 +613,11 @@ By language:
 
 ### `secrets`
 
-hand-written; documents: en 17.
+hand-written; documents: en 21.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 17 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 0.35 ms | 2026-10-27 | `72bcc27` |
+| **pii-guard rules** | 21 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 0.45 ms | 2026-10-28 | `cfb78ba` |
 
 
 By language:
@@ -1008,6 +1008,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-28 | `2026-10-28-secrets-fixtures` | pii-guard rules | secrets | en | recorded | `cfb78ba` | — | — |
 | 2026-10-28 | `2026-10-28-lab-1367-ai4privacy-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | de, en, hu | recorded | `4650dfe` | — | — |
 | 2026-10-28 | `2026-10-28-lab-1367-agent-traffic-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic | de, en, hu | recorded | `4650dfe` | — | — |
 | 2026-10-28 | `2026-10-28-lab-1367-agent-traffic-dev-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic-dev | de, en, hu | recorded | `4650dfe` | — | — |
