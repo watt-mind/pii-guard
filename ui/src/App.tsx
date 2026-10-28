@@ -141,9 +141,12 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
     };
   }, [navigate, hosted]);
 
+  // Rewrite the URL only once the server has said what it offers: until then a deep link to a
+  // section the defaults leave out (hosted #playground/images) must survive (LAB-1448).
+  const capsKnown = status.state !== "loading";
   useEffect(() => {
-    if (route !== requestedRoute) writeHash(route, "replace");
-  }, [route, requestedRoute]);
+    if (capsKnown && route !== requestedRoute) writeHash(route, "replace");
+  }, [capsKnown, route, requestedRoute]);
 
   // The traffic log feeds Overview, Logs and Connect; it connects when one first opens.
   const followsTraffic = route.section === "overview" || route.section === "logs" || route.section === "connect";
@@ -206,6 +209,23 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
     setSampleId(match?.id ?? null);
   };
 
+  // First paint waits (briefly) until the engine and the traffic log have settled, so the
+  // demo-mode notice and the recorded-traffic box don't push a painted page down (CLS, LAB-1448).
+  const [settleTimedOut, setSettleTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSettleTimedOut(true), SETTLE_CAP_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const settled =
+    settleTimedOut ||
+    (engine.state.status.state !== "checking" && (!trafficOpened || trafficHandle.status.state !== "connecting" || trafficHandle.source === "fixture"));
+
+  // Overview's usage counters come from /v1/account: read it again each time Overview opens.
+  const refreshAccount = hosted?.refresh;
+  useEffect(() => {
+    if (route.section === "overview") void refreshAccount?.();
+  }, [route.section, refreshAccount]);
+
   const chatClient = engine.engine === "api" ? apiChat : mockChat;
   // Nobody chose the demo engine and the API does not answer: the notice turns red.
   const apiDown = engine.engine === "mock" && engine.state.preference !== "mock" && engine.state.status.state === "offline";
@@ -227,7 +247,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
         caps={caps}
       />
 
-      <div className="min-w-0">
+      <div className={["min-w-0", settled ? "" : "invisible"].join(" ")} data-settled={settled || undefined}>
         <HeaderBar route={route} caps={caps} />
         {engine.engine === "mock" && (
           <div role="status" className={apiDown ? "border-b border-danger/30 bg-danger-soft" : "border-b border-warn/30 bg-warn-soft"}>
@@ -259,7 +279,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           </div>
         )}
 
-        <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
+        <main id="main" tabIndex={-1} className="mx-auto min-h-dvh max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
           <section id="section-overview" aria-label="Overview" hidden={section !== "overview"}>
             {trafficOpened && (
               <Overview
@@ -281,7 +301,11 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           <section id="section-playground" aria-label="Playground" hidden={section !== "playground"} className="space-y-6">
             <PageHeader
               title="Playground"
-              lead="pii-guard finds personal data before a request leaves your network, swaps it for reversible placeholders, and puts the real values back into the answer."
+              lead={
+                caps.accounts
+                  ? "pii-guard finds personal data in what you send, swaps it for reversible placeholders before the model sees it, and puts the real values back into the answer."
+                  : "pii-guard finds personal data before a request leaves your network, swaps it for reversible placeholders, and puts the real values back into the answer."
+              }
             />
             <PlaygroundTabs tab={tab} onTab={openTab} caps={caps} />
             <div id="panel-text" role="tabpanel" aria-labelledby="tab-text" hidden={tab !== "text"} className="space-y-6">
@@ -401,8 +425,17 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
         </main>
 
         <footer className="mx-auto max-w-[1280px] px-4 pb-10 text-xs text-faint sm:px-6">
-          All sample data is fictional. This page talks only to pii-guard, never to a model provider: image segmentation and the Chat model run behind the pii-guard server. The Chat
-          model is real only when the server has an upstream; the round trip and demo mode use a simulated answer.
+          {caps.accounts ? (
+            <>
+              All sample data is fictional. This page talks only to pii-guard, never to a model provider: pii-guard masks what you send and forwards it to the model your
+              endpoint or connection names. The round trip uses a simulated answer.
+            </>
+          ) : (
+            <>
+              All sample data is fictional. This page talks only to pii-guard, never to a model provider: image segmentation and the Chat model run behind the pii-guard server.
+              The Chat model is real only when the server has an upstream; the round trip and demo mode use a simulated answer.
+            </>
+          )}
         </footer>
       </div>
     </div>
@@ -452,6 +485,9 @@ function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
     </header>
   );
 }
+
+/** The longest the first paint waits for the engine and traffic log to settle. */
+const SETTLE_CAP_MS = 1200;
 
 /** Before Overview or Logs first opens, the traffic hook holds no connection. */
 const idleConnect = () => ({ close() {} });
