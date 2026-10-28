@@ -181,6 +181,7 @@ class HostedMiddleware:
                 "/v1/vault/sessions",
                 "/v1/account/api-keys",
                 "/v1/account/connections",
+                "/v1/account/first-run",
                 "/v1/status",
                 "/v1/connect/snippets",
             }
@@ -216,9 +217,13 @@ class HostedMiddleware:
                 raise HostedUnauthorizedError("Project management requires signed-in owner access")
             if console and principal.auth_method != "google":
                 raise HostedUnauthorizedError("The console requires signed-in owner access")
+            # First run (LAB-1455) provisions the owner's default endpoint and its first key:
+            # a signed-in owner's, like key management, and free like the account itself.
+            first_run = canonical == "/v1/account/first-run"
             credentials = canonical in {
                 "/v1/account/api-keys",
                 "/v1/account/connections",
+                "/v1/account/first-run",
             } or bool(re.fullmatch(r"/v1/account/(?:api-keys|connections)/[^/]+", canonical))
             if credentials and principal.auth_method != "google":
                 # A guard API key must never mint keys or connections that outlive it.
@@ -259,14 +264,14 @@ class HostedMiddleware:
                 needs_runtime = not (account or preflight or credentials)
                 # Reads (the console polls them) spend no daily request or token budget and
                 # hold no inference concurrency; the abuse read bucket bounds them instead.
-                work = not (account or preflight or read)
+                work = not (account or preflight or read or first_run)
             if not account:
                 self.service.abuse.admit(
                     headers,
                     principal_id=principal.id,
                     authenticated=principal.authenticated,
                     anonymous_sponsored=canonical == "/v1/demo" and scope.get("method") == "POST",
-                    read=read,
+                    read=read or first_run,
                 )
             # Only now, with identity, path, origin and abuse admission settled, does the
             # request take an ingress slot: from the guest or the signed-in pool, and within
