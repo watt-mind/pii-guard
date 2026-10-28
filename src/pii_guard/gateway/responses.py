@@ -8,7 +8,8 @@ cache and vault:
    nothing in it the gateway can't mask (:func:`~pii_guard.gateway.responses_request.
    collect_response_texts`)?
 2. detect every text, add the session's known values, drop detections that are exactly one of
-   the tool names the request declares (:func:`without_tool_names`), mask with one vault
+   the tool names the request declares (:func:`~pii_guard.gateway.tool_names.
+   without_tool_names`), mask with one vault
    session;
 3. forward the masked body to ``{upstream base}/responses``, natively (no translation to Chat
    Completions). An upstream without a Responses API (404/405 on that path) gets a clear 501
@@ -37,7 +38,6 @@ import httpx
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
-from pii_guard.detect.known import KNOWN_DETECTOR
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
 from pii_guard.gateway.responses_restore import (
@@ -59,59 +59,18 @@ from pii_guard.gateway.service import (
     _read_limited,
     _upstream_error,
 )
+from pii_guard.gateway.tool_names import tool_names, without_tool_names
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import RequestTimer
-from pii_guard.types import PayloadTooLargeError, PiiGuardError, Span
-from pii_guard.vault.placeholders import normalize_value
+from pii_guard.types import PayloadTooLargeError, PiiGuardError
 
 __all__ = [
     "ResponsesGateway",
     "ResponsesUnsupportedError",
     "responses_url",
-    "tool_names",
-    "without_tool_names",
 ]
 
 logger = logging.getLogger("pii_guard.gateway")
-
-
-def tool_names(body: Mapping[str, Any]) -> frozenset[str]:
-    """The names of the tools and tool namespaces the request declares (normalized)."""
-    names: set[str] = set()
-
-    def walk(tools: object) -> None:
-        for tool in tools if isinstance(tools, list) else []:
-            if isinstance(tool, dict):
-                if isinstance(tool.get("name"), str):
-                    names.add(normalize_value(tool["name"]))
-                walk(tool.get("tools"))
-
-    walk(body.get("tools"))
-    return frozenset(names)
-
-
-def without_tool_names(
-    texts: list[str], spans: list[list[Span]], names: frozenset[str]
-) -> list[list[Span]]:
-    """``spans`` without the detections whose whole value is one of the declared tool ``names``.
-
-    A client's tool vocabulary is not personal data, and it goes upstream as written anyway:
-    tool and namespace names are identifiers, sent unmasked or the request is refused. Masking
-    the same word elsewhere does harm only. Muse Code 1.4.14 says "Muse" alone in its reminder
-    prompts; the NER read it as a PERSON, and the vault then masked the ``muse`` namespace (an
-    identifier) as another occurrence of that value, so the request was refused (LAB-1299).
-    Values the operator pre-loaded (``known``) are kept.
-    """
-    if not names:
-        return spans
-    return [
-        [
-            s
-            for s in found
-            if s.detector == KNOWN_DETECTOR or normalize_value(text[s.start : s.end]) not in names
-        ]
-        for text, found in zip(texts, spans, strict=True)
-    ]
 
 
 class ResponsesUnsupportedError(PiiGuardError):

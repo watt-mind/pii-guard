@@ -27,8 +27,9 @@ from gateway_helpers import (
     make_app,
 )
 
-from pii_guard.gateway.responses import responses_url, tool_names, without_tool_names
+from pii_guard.gateway.responses import responses_url
 from pii_guard.gateway.responses_restore import ResponsesSseRestorer
+from pii_guard.gateway.tool_names import tool_names, without_tool_names
 from pii_guard.vault import PLACEHOLDER_RE
 
 BLOB = "gAAAAB-opaque-provider-blob-0000"
