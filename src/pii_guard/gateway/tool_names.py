@@ -2,20 +2,22 @@
 
 Shared by ``/v1/chat/completions`` (:class:`~pii_guard.gateway.service.Gateway`) and
 ``/v1/responses`` (:class:`~pii_guard.gateway.responses.ResponsesGateway`): after detection and
-before masking, both drop the detections whose whole value is a declared tool name.
+before masking, both drop the detections whose whole value is a declared tool name; when the
+masked texts are written back, an identifier whose only rewrites are declared tool names is
+written as the client sent it (:func:`identifier_keeps_tool_names`).
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from pii_guard.detect.known import KNOWN_DETECTOR
 from pii_guard.types import Span
-from pii_guard.vault.placeholders import normalize_value
+from pii_guard.vault.placeholders import PLACEHOLDER_RE, normalize_value
 
-__all__ = ["tool_names", "without_tool_names"]
+__all__ = ["identifier_keeps_tool_names", "tool_names", "without_tool_names"]
 
 #: What a tool or namespace name looks like (OpenAI: ``^[a-zA-Z0-9_-]{1,64}$``; namespaced
 #: calls add ``.``). A "name" with whitespace is not a real identifier and gets no exemption: a
@@ -76,3 +78,40 @@ def without_tool_names(
         ]
         for text, found in zip(texts, spans, strict=True)
     ]
+
+
+def identifier_keeps_tool_names(
+    text: str,
+    masked: str,
+    names: frozenset[str],
+    original: Callable[[str], str | None],
+) -> bool:
+    """Whether every placeholder in ``masked`` (an identifier ``text`` masked by the vault)
+    stands for one of the declared tool ``names``, so ``text`` can go upstream as written.
+
+    :func:`without_tool_names` drops the detections of a tool name, but the vault masks every
+    occurrence of every value its session holds: a value read from an image's text (then the
+    remask sweeps every text) or learned in an earlier turn that declared no tools still
+    rewrote the ``muse`` identifier, and the request was refused (LAB-1324). The tool names go
+    upstream as written in the tool definitions anyway, so keeping them in an identifier
+    reveals nothing more. A placeholder counts only when both the text it replaced and its
+    session value (``original``, ``None`` for a placeholder the session did not issue) are
+    declared names; anything else, a real name glued to a tool name included, fails closed.
+    The caller leaves the operator's pre-loaded ``known`` values out of ``names``.
+    """
+    if not names:
+        return False
+    literals = PLACEHOLDER_RE.split(masked)[:: PLACEHOLDER_RE.groups + 1]
+    placeholders = [m.group(0) for m in PLACEHOLDER_RE.finditer(masked)]
+    if not placeholders:
+        return masked == text
+    match = re.fullmatch("(.+?)".join(re.escape(part) for part in literals), text, re.DOTALL)
+    if match is None:
+        return False
+    for surface, placeholder in zip(match.groups(), placeholders, strict=True):
+        value = original(placeholder)
+        if value is None or normalize_value(value) not in names:
+            return False
+        if normalize_value(surface) not in names:
+            return False
+    return True
