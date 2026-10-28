@@ -312,16 +312,30 @@ def _is_reference_or_placeholder(value: str) -> bool:
     return bool(_REFERENCE_RE.search(value)) or len(set(value)) <= 1 or "..." in value
 
 
-def looks_like_secret_value(value: str, *, password_key: bool = False) -> bool:
+# A format or template field inside a string literal: ``"{password}"``, ``"%(pw)s"``.
+_FORMAT_FIELD_RE = re.compile(r"\{[\w.\[\]]*\}|%\(\w+\)[a-z]")
+
+
+def looks_like_secret_value(
+    value: str, *, password_key: bool = False, quoted: bool = False
+) -> bool:
     """True if ``value``, assigned to a secret-ish key, is a literal credential.
 
     Numbers count only for password keys (a numeric PIN); a token is never ``30``.
+    Brackets mark code (``get()``, ``env[...]``), except in a quoted literal assigned to a
+    password key: ``password="Synth9![x]pass"`` is a password with punctuation in it. A format
+    field (``"{pw}"``) is still a template there.
     """
     if len(value) < _MIN_LENGTH or value.casefold() in _TYPE_WORDS:
         return False
     if _is_reference_or_placeholder(value) or _entropy(value) < _MIN_ENTROPY:
         return False
-    if any(ch in value for ch in "()[]{}") or _ATTRIBUTE_PATH_RE.match(value):
+    if quoted and password_key:
+        if _FORMAT_FIELD_RE.search(value):
+            return False
+    elif any(ch in value for ch in "()[]{}"):
+        return False
+    if _ATTRIBUTE_PATH_RE.match(value):
         return False
     # A token or key always has letters; "3.1.1" or "4096" after "*_key" is a version or count.
     return password_key or any(ch.isalpha() for ch in value)
@@ -341,11 +355,12 @@ def _find_assignments(text: str) -> Iterator[_Hit]:
         words = [w.casefold() for w in _KEY_WORD_RE.findall(key)]
         last = words[-1]
         password_key = last.endswith(("password", "passwd", "pwd", "pass", "passphrase"))
-        if m.group("qvalue") is not None:
+        quoted = m.group("qvalue") is not None
+        if quoted:
             value, start = m.group("qvalue"), m.start("qvalue")
             value_end = m.end("qvalue")
             # Bearer inside a quoted header value: the token is the secret, not the scheme.
-            scheme = re.match(r"(?i)(?:bearer|basic|token)\s+", value)
+            scheme = re.match(r"(?i)\s*(?:bearer|basic|token)\s+", value)
             if scheme:
                 value, start = value[scheme.end() :], start + scheme.end()
         else:
@@ -366,8 +381,14 @@ def _find_assignments(text: str) -> Iterator[_Hit]:
                 continue  # ``api_key=api_key``, ``token=access_token``: a keyword argument.
             if value.casefold() in {"bearer", "basic", "token"}:
                 continue  # handled by the header rule
-        value = value.strip()
-        if not value or not looks_like_secret_value(value, password_key=password_key):
+        # Strip padding from both ends and move ``start`` past the leading part, so the span
+        # is exactly the value: ``" Synth9!pass"`` must not mask the space and leak the tail.
+        stripped = value.lstrip()
+        start += len(value) - len(stripped)
+        value = stripped.rstrip()
+        if not value or not looks_like_secret_value(
+            value, password_key=password_key, quoted=quoted
+        ):
             continue
         if value.casefold() == key.casefold():
             continue  # ``SECRET = "SECRET"``: an enum member

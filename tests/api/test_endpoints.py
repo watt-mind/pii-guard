@@ -32,6 +32,20 @@ def test_analyze_returns_sorted_public_spans(api: TestClient) -> None:
     assert FAKE_PHONE not in response.text
 
 
+def test_analyze_returns_the_subtype_when_set(api: TestClient) -> None:
+    """LAB-1349: the response model used to drop ``subtype`` that to_public_dict() sets."""
+    token = "ghp_" + ("Synth0Fake0" * 4)[:36]  # assembled at runtime, fails GitHub's checksum
+    text = f"token {token} and {FAKE_EMAIL}"
+    spans = api.post("/v1/analyze", json={"text": text, "language": "en"}).json()["spans"]
+    by_type = {s["entity_type"]: s for s in spans}
+    assert by_type["SECRET"]["subtype"] == "github_token"
+    assert text[by_type["SECRET"]["start"] : by_type["SECRET"]["end"]] == token
+    assert "subtype" not in by_type["EMAIL"]  # left out, not null
+    schema = api.get("/openapi.json").json()["components"]["schemas"]["PublicSpan"]
+    assert "subtype" in schema["properties"]
+    assert "subtype" not in schema.get("required", [])
+
+
 def test_analyze_without_tenant_key_works(client: TestClient) -> None:
     response = client.post("/v1/analyze", json={"text": SAMPLE_TEXT})
     assert response.status_code == 200
