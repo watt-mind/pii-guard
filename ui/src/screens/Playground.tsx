@@ -114,7 +114,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                 id="doc-language"
                 value={language}
                 onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
-                className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink"
                 title="Language of the document: decides which rules and inflections apply"
               >
                 <option value="hu">Hungarian</option>
@@ -173,7 +173,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                 }}
                 spellCheck={false}
                 rows={16}
-                className="doc block min-h-[22rem] w-full resize-y rounded-lg border border-line bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-line-strong"
+                className="doc block min-h-[22rem] w-full resize-y rounded-lg border border-field bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-ink"
                 placeholder="Paste a contract, an email, a referral… (fictional data only)"
               />
             </>
@@ -241,7 +241,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
         <section aria-labelledby="session-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-line pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
           <div className="space-y-4">
             <div>
-              <h2 id="session-title" className="text-base font-semibold tracking-tight text-ink">
+              <h2 id="session-title" className="text-lg font-normal text-ink">
                 Detected entities
               </h2>
               <p className="mt-1 text-sm text-muted">
@@ -264,7 +264,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
             </Button>
           </div>
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-ink">Placeholder map</h3>
+            <h3 className="mb-2 text-sm font-medium text-ink">Placeholder map</h3>
             <EntityTable entities={result.mask.entities} spans={result.spans} activeKey={activeKey} onActivate={activate} />
           </div>
         </section>
@@ -298,7 +298,7 @@ function ScopeNote({ summary, detectors, demo }: { summary: Summary; detectors: 
 function Intro() {
   return (
     <div className="max-w-3xl">
-      <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">
+      <h1 className="text-2xl font-medium text-balance text-ink">
         See what the model saw, and what you got back.
       </h1>
       <p className="mt-2 text-sm text-pretty text-muted sm:text-base">

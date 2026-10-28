@@ -48,7 +48,7 @@ export function Benchmarks({ load = loadBenchmarks }: { load?: BenchmarkLoader }
   return (
     <div className="space-y-6">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">How much gets through, measured on every run.</h1>
+        <h1 className="text-2xl font-medium text-balance text-ink">How much gets through, measured on every run.</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
           Each evaluation run of pii-guard, and of the open-source tools it is compared with, is recorded with its commit, models, fixtures and hardware. All test documents are fictional.
         </p>
@@ -60,7 +60,7 @@ export function Benchmarks({ load = loadBenchmarks }: { load?: BenchmarkLoader }
       )}
       {data.state === "error" && (
         <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft p-4 text-sm">
-          <p className="font-semibold text-danger">The benchmark results could not be loaded.</p>
+          <p className="font-medium text-danger">The benchmark results could not be loaded.</p>
           <p className="mt-1 text-muted">{data.message}</p>
         </div>
       )}
@@ -178,7 +178,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
       </p>
       {info?.origin === "generated" && (
         <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
-          <strong className="font-semibold text-warn">Generated set.</strong> These documents were written by a Muse model, the same family as pii-guard's LLM detector, which flatters
+          <strong className="font-medium text-warn">Generated set.</strong> These documents were written by a Muse model, the same family as pii-guard's LLM detector, which flatters
           Muse-based detection, and fine-tuned detectors may have been trained on similar generated text (see the run notes under the
           results). The hand-written set has neither bias.
         </p>
@@ -225,7 +225,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
       )}
 
       <details className="group rounded-xl border border-line bg-surface">
-        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-ink sm:px-5">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink sm:px-5">
           <span className="mr-1.5 inline-block transition-transform group-open:rotate-90" aria-hidden="true">
             ›
           </span>
@@ -251,7 +251,7 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
   const info = index.fixture_sets[set];
   const kind = info?.origin === "generated" ? "model-generated" : "hand-written";
   const scope = `${docs ?? "?"} ${kind} fictional ${lang === "all" ? "" : `${languageName(lang)} `}documents`;
-  const pct = (x: HeadlineSide) => <strong className="font-semibold tabular-nums text-ink">{formatPct(x.leak)}</strong>;
+  const pct = (x: HeadlineSide) => <strong className="font-medium tabular-nums text-ink">{formatPct(x.leak)}</strong>;
   const demo = index.snapshots.find((x) => x.fixture_set === set && x.system === FAST_MODE_SYSTEM);
   const demoLeak = demo ? pick(demo, lang)?.leak : null;
   const speed = (x: HeadlineSide) => (x.p50 === null ? "" : `${x.label}: ${formatMs(x.p50)} per document${x.hardware ? ` (${x.hardware})` : ""}`);
@@ -262,7 +262,7 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
         {demo && demoLeak !== null && demoLeak !== undefined && demo.system !== h.ours.system && (
           <>
             {" "}
-            Fast mode, the production path (rules + on-device NER): <strong className="font-semibold tabular-nums text-ink">{formatPct(demoLeak)}</strong>.
+            Fast mode, the production path (rules + on-device NER): <strong className="font-medium tabular-nums text-ink">{formatPct(demoLeak)}</strong>.
           </>
         )}
       </p>
@@ -278,7 +278,7 @@ function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col-reverse">
       <dt className="text-2xs text-muted">{label}</dt>
-      <dd className="font-semibold tabular-nums text-ink">{value}</dd>
+      <dd className="font-medium tabular-nums text-ink">{value}</dd>
     </div>
   );
 }
@@ -303,7 +303,7 @@ function Segmented<T extends string>({
             key={o.id}
             className={[
               "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
-              value === o.id ? "border-ink bg-ink text-canvas" : "border-line text-ink hover:border-line-strong",
+              value === o.id ? "border-primary bg-primary text-on-primary" : "border-line text-ink hover:border-line-strong",
             ].join(" ")}
           >
             <input type="radio" className="sr-only" name={label} checked={value === o.id} onChange={() => onChange(o.id)} />
@@ -319,7 +319,7 @@ function Segmented<T extends string>({
 function Section({ id, title, note, children }: { id: string; title: string; note: string; children: ReactNode }) {
   return (
     <section aria-labelledby={`${id}-title`} className="rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <h2 id={`${id}-title`} className="text-base font-semibold tracking-tight text-ink">
+      <h2 id={`${id}-title`} className="text-lg font-normal text-ink">
         {title}
       </h2>
       <p className="mt-0.5 mb-4 text-sm text-muted">{note}</p>
@@ -379,14 +379,14 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
         </caption>
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">
-            <th scope="col" className="sticky left-0 z-10 bg-surface py-2 pr-3 font-semibold">
+            <th scope="col" className="sticky left-0 z-10 bg-surface py-2 pr-3 font-medium">
               System
             </th>
             {COLUMNS.map((c) => (
               <th
                 key={c.key}
                 scope="col"
-                className="px-2 py-2 text-right font-semibold whitespace-nowrap"
+                className="px-2 py-2 text-right font-medium whitespace-nowrap"
                 aria-sort={c.key === sort.key ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}
               >
                 <button
@@ -401,7 +401,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                 </button>
               </th>
             ))}
-            <th scope="col" className="px-2 py-2 text-left font-semibold">
+            <th scope="col" className="px-2 py-2 text-left font-medium">
               Run
             </th>
           </tr>
@@ -434,7 +434,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                   const v = m?.[c.key] ?? null;
                   const top = v !== null && v === best(c.key, c.better) && rows.length > 1;
                   return (
-                    <td key={c.key} className={["px-2 py-2 text-right tabular-nums whitespace-nowrap", top ? "font-semibold text-ink underline decoration-line-strong decoration-2 underline-offset-4" : "text-muted"].join(" ")}>
+                    <td key={c.key} className={["px-2 py-2 text-right tabular-nums whitespace-nowrap", top ? "font-medium text-ink underline decoration-line-strong decoration-2 underline-offset-4" : "text-muted"].join(" ")}>
                       {m === null ? <span className="text-faint">not run</span> : c.key === "detect_p50_ms" ? formatMs(v) + (m.latency_pooled ? "*" : "") : formatPct(v)}
                     </td>
                   );
@@ -539,7 +539,7 @@ function VisualTable({ index }: { index: BenchmarkIndex }) {
                   {formatPct(r.by_region_type[t]?.recall_iou50, 0)}
                 </td>
               ))}
-              <td className="px-2 py-2 text-right font-semibold tabular-nums">{formatPct(r.overall.recall_iou50, 0)}</td>
+              <td className="px-2 py-2 text-right font-medium tabular-nums">{formatPct(r.overall.recall_iou50, 0)}</td>
             </tr>
           ))}
         </tbody>

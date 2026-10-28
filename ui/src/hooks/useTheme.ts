@@ -12,7 +12,8 @@ function systemDark(): boolean {
 export function useTheme(): [ThemePref, (t: ThemePref) => void] {
   const [pref, setPref] = useState<ThemePref>(() => {
     const stored = readPref("theme");
-    return stored === "light" || stored === "dark" ? stored : "system";
+    // Light is the console's first look; "system" is kept when someone picked it.
+    return stored === "light" || stored === "dark" || stored === "system" ? stored : "light";
   });
 
   useEffect(() => {

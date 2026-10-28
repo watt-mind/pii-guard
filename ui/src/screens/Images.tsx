@@ -168,7 +168,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
   return (
     <div className="space-y-6">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Faces, signatures and ID numbers, covered before the image leaves.</h1>
+        <h1 className="text-2xl font-medium text-balance text-ink">Faces, signatures and ID numbers, covered before the image leaves.</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
           {serverImages && !demo
             ? serverImages.sam
@@ -181,7 +181,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
 
       {serverImages && !serverImages.available && !demo && (
         <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
-          <strong className="font-semibold text-warn">This server refuses images right now (fail closed).</strong> {imageNeeds(serverImages.gaps)} The samples can still replay a
+          <strong className="font-medium text-warn">This server refuses images right now (fail closed).</strong> {imageNeeds(serverImages.gaps)} The samples can still replay a
           recorded run.
         </p>
       )}
@@ -269,7 +269,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
                 id="image-language"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as "hu" | "en")}
-                className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink"
                 title="Language of the text printed in the image: decides which rules run on its OCR text"
               >
                 <option value="hu">Hungarian</option>
@@ -378,7 +378,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
         <section aria-labelledby="regions-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 rounded-xl border border-line bg-surface p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
           <div className="space-y-4">
             <div>
-              <h2 id="regions-title" className="text-base font-semibold tracking-tight text-ink">
+              <h2 id="regions-title" className="text-lg font-normal text-ink">
                 Detected regions
               </h2>
               <p className="mt-1 text-sm text-muted">Blue regions were masked. Dashed grey regions were found but kept visible by policy (company stamps, by default). No region carries the text or pixels it covers.</p>
@@ -400,7 +400,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
             </dl>
           </div>
           <div className="min-w-0">
-            <h3 className="mb-2 text-sm font-semibold text-ink">Region list</h3>
+            <h3 className="mb-2 text-sm font-medium text-ink">Region list</h3>
             <RegionTable regions={data.regions} models={data.analysis.ocr.models} active={active} onActive={setActive} />
           </div>
         </section>
@@ -467,7 +467,7 @@ function RegionBox({
           "absolute px-1 font-mono",
           tag.startsWith("top") ? "-top-[1.15rem] rounded-t" : "-bottom-[1.15rem] rounded-b",
           tag.endsWith("left") ? "left-[-2px]" : "right-[-2px]",
-          " text-2xs leading-[1.1rem] font-semibold whitespace-nowrap text-white",
+          " text-2xs leading-[1.1rem] font-medium whitespace-nowrap text-white",
           // Text regions sit between lines of text: their tag would hide the line above.
           region.source === "ocr" && !active ? "hidden" : "",
         ].join(" ")}
@@ -584,17 +584,17 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
     <div className="space-y-2" data-testid="image-scope-note">
       <div className="text-sm text-ink">
         <p>
-          <span className="font-semibold">{segmenterLabel(data.analysis.sam.model)}</span> looked for {samTargets(data.analysis)}
+          <span className="font-medium">{segmenterLabel(data.analysis.sam.model)}</span> looked for {samTargets(data.analysis)}
           {ocr.ran ? (
             <>
-              ; <span className="font-semibold">OCR</span> ({ocr.engine}) read the text for the detectors
+              ; <span className="font-medium">OCR</span> ({ocr.engine}) read the text for the detectors
             </>
           ) : null}
           .
           {ocr.ran && ocr.models?.llm ? (
             <>
               {" "}
-              The OCR text also went to <span className="font-semibold">{modelLabel(ocr.models.llm)}</span>, an LLM detector that the pii-guard server calls.
+              The OCR text also went to <span className="font-medium">{modelLabel(ocr.models.llm)}</span>, an LLM detector that the pii-guard server calls.
             </>
           ) : null}
         </p>
@@ -606,7 +606,7 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
       </div>
       {gaps.map((g) => (
         <p key={g} role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-ink">
-          <span className="font-semibold text-warn">Not covered · </span>
+          <span className="font-medium text-warn">Not covered · </span>
           {g}
         </p>
       ))}
@@ -617,11 +617,11 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
 function DemoUploadNotice({ switchEngine }: { switchEngine: boolean }) {
   return (
     <div role="alert" className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
-      <p className="font-semibold text-warn">Uploads need the live API.</p>
+      <p className="font-medium text-warn">Uploads need the live API.</p>
       <p className="mt-1 text-ink">Image masking runs on the pii-guard server, not in your browser. Your image was not sent anywhere.</p>
       <p className="mt-2 text-muted">
         {switchEngine ? (
-          <>The API is up: switch <strong className="font-semibold text-ink">Engine</strong> in the header to <strong className="font-semibold text-ink">Live API</strong>, then mask the image again.</>
+          <>The API is up: switch <strong className="font-medium text-ink">Engine</strong> in the header to <strong className="font-medium text-ink">Live API</strong>, then mask the image again.</>
         ) : (
           <>
             Start it with <code className="rounded bg-surface px-1 font-mono text-xs">pii-guard up</code>, or try one of the samples, which replay a recorded run.
@@ -635,7 +635,7 @@ function DemoUploadNotice({ switchEngine }: { switchEngine: boolean }) {
 function UnreadableNotice({ code }: { code: string }) {
   return (
     <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft p-4 text-sm">
-      <p className="font-semibold text-danger">{code === "invalid_image" ? "This image couldn't be decoded." : "This file isn't a PNG or JPEG image."}</p>
+      <p className="font-medium text-danger">{code === "invalid_image" ? "This image couldn't be decoded." : "This file isn't a PNG or JPEG image."}</p>
       <p className="mt-1 text-ink">The guard rejected it before any detection ran, so nothing was sent to the model.</p>
       <p className="mt-2 text-muted">Try another PNG or JPEG file.</p>
     </div>

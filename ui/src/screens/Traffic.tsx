@@ -108,7 +108,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
   return (
     <div className="space-y-6">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Logs</h1>
+        <h1 className="text-2xl font-medium text-balance text-ink">Logs</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
           {t.source === "fixture" ? "Recorded calls, replayed in your browser." : "Every call through the gateway, live."} Pick one to see what your client sent, what the model received, and what your client got back with the values restored.
         </p>
@@ -151,7 +151,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <label className="flex items-center gap-2 text-muted">
             Mode
-            <select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })} className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink">
+            <select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })} className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink">
               <option value="all">All</option>
               {modes.map((m) => (
                 <option key={m} value={m}>
@@ -165,7 +165,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
             <select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters["type"] })}
-              className="h-9 max-w-[11rem] rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+              className="h-9 max-w-[11rem] rounded-lg border border-field bg-surface px-2 text-sm text-ink"
             >
               <option value="all">All types</option>
               {types.map((ty) => (
@@ -193,7 +193,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
       <div className="grid gap-6 lg:grid-cols-[minmax(19rem,25rem)_minmax(0,1fr)]">
         <section aria-labelledby="calls-title" className="flex min-w-0 flex-col rounded-xl border border-line bg-surface">
           <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-            <h2 id="calls-title" className="text-base font-semibold tracking-tight text-ink">
+            <h2 id="calls-title" className="text-lg font-normal text-ink">
               Calls <span className="font-normal text-muted">newest first</span>
             </h2>
             <span aria-live="polite" className="text-xs text-muted tabular-nums">
@@ -220,7 +220,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
             <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)} mockUpstream={mockUpstream} />
           ) : (
             <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-xl border border-line px-6 py-10 text-center">
-              <p className="text-sm font-semibold text-ink">No call selected</p>
+              <p className="text-sm font-medium text-ink">No call selected</p>
               <p className="mt-1 max-w-sm text-sm text-muted">Calls appear here as they go through the gateway. Pick one to see what the model received.</p>
             </div>
           )}
@@ -259,7 +259,7 @@ function SourceBanner({
     return (
       <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
         <p className="min-w-0 flex-1">
-          <strong className="font-semibold text-warn">Recorded demo traffic.</strong>{" "}
+          <strong className="font-medium text-warn">Recorded demo traffic.</strong>{" "}
           {forced
             ? "The engine is set to Demo engine, so these are calls recorded from the demo stack, replayed in your browser. Switch the engine to Auto or Live API to follow the gateway."
             : apiStatus.state === "disabled"
@@ -299,7 +299,7 @@ function SourceBanner({
     return (
       <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
         <p className="min-w-0 flex-1">
-          <strong className="font-semibold">The traffic log is off on this server.</strong>{" "}
+          <strong className="font-medium">The traffic log is off on this server.</strong>{" "}
           {status.reason === "off" ? (
             <>
               Restart the API with {code("PII_GUARD_TRAFFIC_LOG=masked")} ({code("make demo")} does this), or {code("full")} on localhost to also see the original values.
@@ -317,24 +317,24 @@ function SourceBanner({
   if (status.state === "offline") {
     return (
       <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-ink">
-        <strong className="font-semibold text-danger">Lost the connection to the API.</strong> Retrying every few seconds; the calls already shown stay. ({status.message})
+        <strong className="font-medium text-danger">Lost the connection to the API.</strong> Retrying every few seconds; the calls already shown stay. ({status.message})
       </div>
     );
   }
   return (
     <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-muted">
       {status.state === "connecting" ? (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-semibold">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium">
           <span aria-hidden="true" className="size-1.5 rounded-full bg-faint motion-safe:animate-pulse" /> Connecting…
         </span>
       ) : (
         <>
           {paused ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-warn/40 bg-warn-soft px-2.5 py-1 text-xs font-semibold text-warn">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-warn/40 bg-warn-soft px-2.5 py-1 text-xs font-medium text-warn">
               <PauseIcon /> Paused · new calls are held
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-guard/40 bg-guard-soft px-2.5 py-1 text-xs font-semibold text-guard-ink">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-guard/40 bg-guard-soft px-2.5 py-1 text-xs font-medium text-guard-ink">
               <span aria-hidden="true" className="size-1.5 rounded-full bg-guard motion-safe:animate-pulse" />
               Live · {status.via === "sse" ? "streaming" : "polling every 2 s"}
             </span>
@@ -362,7 +362,7 @@ function EmptyCalls({ hasAny, source, status, replayDone }: { hasAny: boolean; s
   if (status.state === "disabled") return <p className="py-6 text-center text-sm text-muted">Nothing to show while the traffic log is off.</p>;
   return (
     <div className="py-6 text-center text-sm text-muted">
-      <p className="font-semibold text-ink">{status.state === "connecting" ? "Connecting…" : "Waiting for the first call"}</p>
+      <p className="font-medium text-ink">{status.state === "connecting" ? "Connecting…" : "Waiting for the first call"}</p>
       {source === "api" && status.state === "live" && (
         <p className="mt-1">
           Press <strong className="text-ink">Send demo traffic</strong>, run <code className="font-mono text-xs">make demo-traffic</code>, or point an OpenAI client at{" "}
@@ -417,7 +417,7 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
   return (
     <span
       className={[
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold ring-1 ring-inset",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium ring-1 ring-inset",
         blocked ? "bg-warn-soft text-warn ring-warn/40" : "bg-danger-soft text-danger ring-danger/40",
       ].join(" ")}
     >
@@ -454,7 +454,7 @@ function LabelledNote({ match }: { match: LabelledMatch }) {
   const missed = match.missed.length > 0;
   return (
     <div role="note" className={["mt-3 rounded-lg border p-3 text-sm", missed ? "border-leak/40 bg-leak-soft" : "border-line bg-surface-2"].join(" ")}>
-      <p className={["font-semibold", missed ? "text-leak" : "text-ink"].join(" ")}>
+      <p className={["font-medium", missed ? "text-leak" : "text-ink"].join(" ")}>
         Demo scenario {match.scenario.name}: {match.scenario.label}.{" "}
         {missed ? "Expected miss in rules-only mode." : "The NER ran and masked the name."}
       </p>
@@ -521,7 +521,7 @@ function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: Traffi
         {hasImage && <Tag>image</Tag>}
         {labelled && <LabelTag match={labelled} />}
         <OutcomeBadge outcome={e.outcome} />
-        <span className="ml-auto font-semibold text-ink tabular-nums" title="pii-guard overhead">
+        <span className="ml-auto font-medium text-ink tabular-nums" title="pii-guard overhead">
           +{formatMsShort(e.timing.overhead_ms)}
         </span>
       </span>
@@ -565,7 +565,7 @@ function CallDetail({
       <section aria-labelledby="detail-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 id="detail-title" className="flex flex-wrap items-center gap-2 text-base font-semibold tracking-tight text-ink">
+            <h2 id="detail-title" className="flex flex-wrap items-center gap-2 text-lg font-normal text-ink">
               Call at {clock(e.time)} <OutcomeBadge outcome={e.outcome} />
             </h2>
             <p className="mt-0.5 font-mono text-xs break-all text-faint">{e.id}</p>
@@ -594,7 +594,7 @@ function CallDetail({
           <EntityChips counts={maskedCounts(e)} />
           {labelled && labelled.missed.length > 0 ? <span className="text-leak">· {labelled.missed.length} name reached the model (expected, needs NER)</span> : null}
           {e.upstream?.unresolved_placeholders ? (
-            <span className="rounded-sm bg-leak-soft px-2 py-0.5 font-semibold text-leak ring-1 ring-leak/40">
+            <span className="rounded-sm bg-leak-soft px-2 py-0.5 font-medium text-leak ring-1 ring-leak/40">
               {e.upstream.unresolved_placeholders} placeholder{e.upstream.unresolved_placeholders === 1 ? "" : "s"} the model invented (not restored)
             </span>
           ) : null}
@@ -604,7 +604,7 @@ function CallDetail({
 
       {!forwarded && e.outcome !== "ok" && (
         <div role="note" className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
-          <p className="font-semibold text-warn">{e.outcome === "blocked" ? "Blocked by policy." : "Refused."} Nothing was sent to the model.</p>
+          <p className="font-medium text-warn">{e.outcome === "blocked" ? "Blocked by policy." : "Refused."} Nothing was sent to the model.</p>
           <p className="mt-1 text-ink">
             <code className="font-mono text-xs">{e.error?.code ?? e.outcome}</code>
             {e.error?.status ? ` · HTTP ${e.error.status}` : ""}
@@ -617,7 +617,7 @@ function CallDetail({
       )}
 
       <section aria-labelledby="timing-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
-        <h2 id="timing-title" className="mb-3 text-base font-semibold tracking-tight text-ink">
+        <h2 id="timing-title" className="mb-3 text-lg font-normal text-ink">
           Timing
         </h2>
         <TimingWaterfall event={e} />
@@ -676,7 +676,7 @@ function DetailPane({ eyebrow, title, side, wide, children }: { eyebrow: string;
     >
       <header className={["border-b px-4 py-2.5", side === "model" ? "border-model/20 bg-model-soft/60" : "border-line bg-surface-2"].join(" ")}>
         <p className={["font-mono text-2xs", side === "model" ? "text-model" : "text-guard"].join(" ")}>{eyebrow}</p>
-        <h3 className="text-sm font-semibold tracking-tight text-ink">{title}</h3>
+        <h3 className="text-sm font-medium text-ink">{title}</h3>
       </header>
       <div className="max-h-[32rem] min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">{children}</div>
     </section>
@@ -694,14 +694,14 @@ function Role({ role }: { role: string }) {
 function ImagePart({ summary, event }: { summary: string; event?: TrafficEvent }) {
   const img = event?.entities?.images;
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-3 text-xs text-muted">
+    <div className="flex items-start gap-3 rounded-lg border border-field bg-surface-2 p-3 text-xs text-muted">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="size-8 shrink-0 text-faint" fill="none" stroke="currentColor" strokeWidth="1.5">
         <rect x="3" y="5" width="18" height="14" rx="2" />
         <rect x="6" y="8" width="5" height="5" fill="currentColor" />
         <path d="M13 9h5M13 12h5M6 16h12" />
       </svg>
       <p>
-        <span className="font-semibold text-ink">Image</span> <span className="font-mono">{summary}</span>
+        <span className="font-medium text-ink">Image</span> <span className="font-mono">{summary}</span>
         <br />
         {img
           ? `${Object.values(img.masked).reduce((a, b) => a + (b ?? 0), 0)} regions blacked out, ${Object.values(img.kept).reduce((a, b) => a + (b ?? 0), 0)} kept, OCR ${img.ocr ? "on" : "off"}. `
@@ -752,7 +752,7 @@ function MaskedRequestView({ body, event }: { body: unknown; event: TrafficEvent
       <MessageList messages={requestMessages(body)} event={event} />
       {tools.length > 0 && (
         <details className="rounded-lg border border-line p-2" open>
-          <summary className="cursor-pointer text-xs font-semibold text-ink">
+          <summary className="cursor-pointer text-xs font-medium text-ink">
             Tools ({tools.length}) <span className="font-normal text-muted">definitions are masked like messages</span>
           </summary>
           <div className="mt-2 space-y-2">
@@ -764,7 +764,7 @@ function MaskedRequestView({ body, event }: { body: unknown; event: TrafficEvent
       )}
       {extras && (
         <details className="rounded-lg border border-line p-2">
-          <summary className="cursor-pointer text-xs font-semibold text-ink">Other fields</summary>
+          <summary className="cursor-pointer text-xs font-medium text-ink">Other fields</summary>
           <div className="mt-2">
             <MaskedText text={extras} />
           </div>
@@ -815,7 +815,7 @@ function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
       ) : (
         <>
           This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (e-mail, phone, IBAN, IDs) but{" "}
-          <strong className="font-semibold text-ink">not names</strong>: names need <NerHint />.
+          <strong className="font-medium text-ink">not names</strong>: names need <NerHint />.
         </>
       )}
     </p>
@@ -834,7 +834,7 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
       <div data-testid="masked-response" className="min-w-0 space-y-2">
-        <p className="mb-1 text-xs font-semibold text-model">From the model{e.stream ? ` (streamed, ${e.response.chunks ?? "?"} chunks)` : ""}</p>
+        <p className="mb-1 text-xs font-medium text-model">From the model{e.stream ? ` (streamed, ${e.response.chunks ?? "?"} chunks)` : ""}</p>
         {nothing ? (
           <Notice>{e.stream ? "A streamed tool call: the log keeps streamed text, not tool-call arguments." : "Empty answer."}</Notice>
         ) : (
@@ -860,7 +860,7 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
         <span className="h-px flex-1 bg-guard/40 md:h-auto md:w-px" />
       </div>
       <div data-testid="unmasked-response" className="min-w-0 space-y-2">
-        <p className="mb-1 text-xs font-semibold text-guard">To your app</p>
+        <p className="mb-1 text-xs font-medium text-guard">To your app</p>
         {showOriginals && unmasked.length ? (
           unmasked.map((c) => {
             const m = masked.find((x) => x.index === c.index);
@@ -896,7 +896,7 @@ export function Fact({ label, value }: { label: string; value: number | string }
   return (
     <div className="flex flex-col-reverse">
       <dt className="text-xs text-muted">{label}</dt>
-      <dd className="text-lg font-semibold tabular-nums text-ink">{value}</dd>
+      <dd className="text-lg font-medium tabular-nums text-ink">{value}</dd>
     </div>
   );
 }
@@ -904,7 +904,7 @@ export function Fact({ label, value }: { label: string; value: number | string }
 export function ChartCard({ id, title, note, children }: { id: string; title: string; note: string; children: ReactNode }) {
   return (
     <section aria-labelledby={`${id}-title`} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <h3 id={`${id}-title`} className="text-base font-semibold tracking-tight text-ink">
+      <h3 id={`${id}-title`} className="text-lg font-normal text-ink">
         {title}
       </h3>
       <p className="mt-0.5 mb-4 text-sm text-muted">{note}</p>

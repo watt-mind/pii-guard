@@ -10,15 +10,15 @@ export function Button({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
   const styles: Record<Variant, string> = {
-    primary: "bg-ink text-canvas hover:bg-ink/85",
-    secondary: "border border-line bg-surface text-ink hover:border-line-strong",
-    ghost: "text-muted hover:bg-surface-2 hover:text-ink",
+    primary: "rounded-lg bg-primary px-3 font-normal text-on-primary hover:bg-primary-hover",
+    secondary: "rounded-control border border-line bg-surface px-4 font-normal text-ink hover:border-line-strong hover:bg-surface-2",
+    ghost: "rounded-lg px-3 font-normal text-muted hover:bg-surface-2 hover:text-ink",
   };
   return (
     <button
       type={type}
       className={[
-        "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap transition-colors active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45",
+        "inline-flex h-9 items-center justify-center gap-1.5 text-sm whitespace-nowrap transition-colors active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45",
         styles[variant],
         className,
       ].join(" ")}
@@ -31,7 +31,7 @@ export function Stat({ label, value }: { label: string; value: number | string }
   return (
     <div className="flex min-w-12 flex-col-reverse">
       <dt className="mt-1 text-2xs text-muted">{label}</dt>
-      <dd className="font-mono text-lg leading-none font-medium tabular-nums text-ink">{value}</dd>
+      <dd className="font-mono text-lg leading-none tabular-nums text-ink">{value}</dd>
     </div>
   );
 }
@@ -68,7 +68,7 @@ export function BlockedNotice({ error, phase = "outbound" }: { error: RunError; 
       : "pii-guard fails closed: if detection or masking fails, the request is stopped rather than forwarded unmasked.";
   return (
     <div role="alert" className="rounded-lg border border-blocked/40 bg-blocked-soft p-4 text-sm">
-      <p className="flex items-center gap-2 font-semibold text-blocked">
+      <p className="flex items-center gap-2 font-medium text-blocked">
         <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
           <circle cx="8" cy="8" r="6" />
           <path d="M3.8 12.2 12.2 3.8" />

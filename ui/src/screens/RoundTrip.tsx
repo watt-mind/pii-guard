@@ -143,7 +143,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden">
           <span>
             <span className="block font-mono text-2xs text-model">Sent to the model</span>
-            <span className="block text-sm font-semibold text-ink">
+            <span className="block text-sm font-medium text-ink">
               What the model saw{sample ? ` · ${sample.subtitle}` : ""}
             </span>
           </span>
@@ -155,7 +155,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
         <div className="space-y-3 border-t border-model/20 px-4 py-4 sm:px-5">
           {sample && (
             <p className="rounded-lg bg-model-soft px-3 py-2 text-sm text-ink">
-              <span className="font-semibold text-model">Instruction · </span>
+              <span className="font-medium text-model">Instruction · </span>
               {sample.task}
             </p>
           )}
@@ -223,7 +223,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
                 onChange={(e) => editAnswer(e.target.value)}
                 spellCheck={false}
                 rows={12}
-                className="doc block min-h-[18rem] w-full resize-y rounded-lg border border-line bg-surface-2 p-3 text-ink focus:border-model focus:outline-none"
+                className="doc block min-h-[18rem] w-full resize-y rounded-lg border border-field bg-surface-2 p-3 text-ink focus:border-model focus:outline-none"
               />
               {answerPlaceholders.length > 0 && (
                 <div>
@@ -266,7 +266,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
               value={speed}
               onChange={(e) => setSpeed(e.target.value as SpeedId)}
               disabled={streaming}
-              className="h-9 rounded-lg border border-line bg-surface px-2 text-xs text-ink lg:h-8 lg:w-full"
+              className="h-9 rounded-lg border border-field bg-surface px-2 text-xs text-ink lg:h-8 lg:w-full"
             >
               {SPEEDS.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -314,7 +314,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
               {streaming && <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 bg-ink motion-safe:animate-pulse" />}
               {unresolved.length > 0 && view.kind === "done" && (
                 <div role="note" className="rounded-xl border border-warn/40 bg-warn-soft p-3 text-sm text-ink">
-                  <p className="font-semibold text-warn">Unknown placeholder left as is</p>
+                  <p className="font-medium text-warn">Unknown placeholder left as is</p>
                   <p className="mt-1 text-muted">
                     The model produced {unresolved.map((u, i) => (
                       <span key={u}>
@@ -359,7 +359,7 @@ function PlaceholderDetails({ placeholder, restored }: { placeholder: string; re
 function RoundTripIntro({ live = false }: { live?: boolean }) {
   return (
     <div className="max-w-3xl">
-      <h2 className="text-xl font-semibold tracking-tight text-balance text-ink sm:text-2xl">
+      <h2 className="text-xl font-normal text-balance text-ink">
         {live ? "The answer comes back with the masked values restored." : "The answer comes back with the real names in it."}
       </h2>
       <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
@@ -385,7 +385,7 @@ function ChunkStream({ chunks, held }: { chunks: readonly string[]; held: string
         </span>
       ))}
       {held && (
-        <span className="ml-1 inline-flex translate-y-[-1px] items-center gap-1 rounded bg-warn-soft px-1.5 font-sans text-2xs font-semibold text-warn ring-1 ring-warn/40">
+        <span className="ml-1 inline-flex translate-y-[-1px] items-center gap-1 rounded bg-warn-soft px-1.5 font-sans text-2xs font-medium text-warn ring-1 ring-warn/40">
           held back
         </span>
       )}

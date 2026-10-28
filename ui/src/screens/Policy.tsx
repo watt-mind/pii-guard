@@ -29,7 +29,7 @@ export function Policy({ status }: PolicyProps) {
   return (
     <div className="space-y-6">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Policy</h1>
+        <h1 className="text-2xl font-medium text-balance text-ink">Policy</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
           What this server does with each kind of personal data, read from its configuration. Read-only: the settings live in the server's environment, so a change here could not
           survive a restart.
@@ -67,7 +67,7 @@ export function Policy({ status }: PolicyProps) {
             </Rows>
             {!server.ner.available && (
               <p role="note" className="mt-3 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-ink">
-                <span className="font-semibold text-warn">No NER: free-text names are not masked.</span> They need <NerHint />.
+                <span className="font-medium text-warn">No NER: free-text names are not masked.</span> They need <NerHint />.
               </p>
             )}
           </Card>
@@ -94,7 +94,7 @@ export function Policy({ status }: PolicyProps) {
       )}
 
       <section aria-labelledby="policies-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
-        <h2 id="policies-title" className="text-base font-semibold tracking-tight text-ink">
+        <h2 id="policies-title" className="text-lg font-normal text-ink">
           Entity policies
         </h2>
         <p className="mt-0.5 text-sm text-muted">
@@ -153,7 +153,7 @@ function PolicyTable({ title, types, server }: { title: string; types: readonly 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section aria-label={title} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <h2 className="mb-3 text-base font-semibold tracking-tight text-ink">{title}</h2>
+      <h2 className="mb-3 text-lg font-normal text-ink">{title}</h2>
       {children}
     </section>
   );

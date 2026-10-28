@@ -10,9 +10,9 @@
     <script>
       // Apply the theme before first paint so dark mode doesn't flash.
       (function () {
-        var pref = "system";
+        var pref = "light";
         try {
-          pref = localStorage.getItem("pii-guard:theme") || "system";
+          pref = localStorage.getItem("pii-guard:theme") || "light";
         } catch (e) {}
         var dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.classList.toggle("dark", dark);

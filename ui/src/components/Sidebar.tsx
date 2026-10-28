@@ -43,16 +43,16 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
     // The column carries the border, so it runs the full page height; the sticky panel inside
     // is only as tall as its content (at most the viewport), so nothing ends up below the fold
     // when something sits above the console, such as the strip pii-guard up injects.
-    <div className="relative z-30 border-b border-line bg-canvas lg:border-r lg:border-b-0">
+    <div className="relative z-30 border-line bg-canvas lg:border-r">
       <aside className="lg:sticky lg:top-0 lg:flex lg:max-h-dvh lg:flex-col">
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">
           Skip to content
         </a>
         <div className="flex items-center gap-2.5 px-4 py-3 lg:flex-wrap lg:px-5 lg:pt-4 lg:pb-3">
           <Logo />
-          <div className="min-w-0 leading-tight">
-            <p className="font-mono text-sm font-semibold tracking-tight text-ink">pii-guard</p>
-            <p className="truncate text-xs text-muted">
+          <div className="min-w-0 leading-tight lg:grow lg:basis-0">
+            <p className="font-mono text-sm font-medium text-ink">pii-guard</p>
+            <p className="truncate text-xs text-muted lg:whitespace-normal">
               <span className="lg:hidden">{current.label}</span>
               <span className="hidden lg:inline">privacy firewall for AI agents</span>
             </p>
@@ -75,38 +75,47 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
         </div>
 
         <div id={menuId} className={[open ? "block" : "hidden", "border-t border-line lg:flex lg:min-h-0 lg:flex-col lg:border-t-0"].join(" ")}>
-          <nav aria-label="Console" className="px-2 py-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-3">
-            <ul className="space-y-0.5">
-              {SECTIONS.map((s) => {
-                const active = s.id === route.section;
-                return (
-                  <li key={s.id}>
-                    <a
-                      href={hashOf({ section: s.id, tab: route.tab })}
-                      aria-current={active ? "page" : undefined}
-                      onClick={(e) => {
-                        // A plain click navigates here, without a history entry per section;
-                        // a modified click (new tab) is left to the browser.
-                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-                        e.preventDefault();
-                        setOpen(false);
-                        onSection(s.id);
-                      }}
-                      className={[
-                        "flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors lg:py-1.5",
-                        active ? "bg-surface font-medium text-ink ring-1 ring-line" : "text-muted hover:bg-surface-2 hover:text-ink",
-                      ].join(" ")}
-                    >
-                      <SectionIcon id={s.id} active={active} />
-                      <span className="min-w-0">
-                        <span className="block">{s.label}</span>
-                        <span className="block text-2xs text-faint lg:hidden xl:block">{s.hint}</span>
-                      </span>
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
+          <nav aria-label="Console" className="px-2 py-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-2">
+            {NAV_GROUPS.map((group, gi) => (
+              <div key={group.label ?? "top"} className={group.label ? "mt-4" : undefined}>
+                {group.label && (
+                  <p id={`${menuId}-group-${gi}`} className="px-3 pb-1.5 text-2xs font-medium tracking-[0.04em] text-faint uppercase">
+                    {group.label}
+                  </p>
+                )}
+                <ul className="space-y-0.5" aria-labelledby={group.label ? `${menuId}-group-${gi}` : undefined}>
+                  {SECTIONS.filter((s) => group.ids.includes(s.id)).map((s) => {
+                    const active = s.id === route.section;
+                    return (
+                      <li key={s.id}>
+                        <a
+                          href={hashOf({ section: s.id, tab: route.tab })}
+                          aria-current={active ? "page" : undefined}
+                          onClick={(e) => {
+                            // A plain click navigates here, without a history entry per section;
+                            // a modified click (new tab) is left to the browser.
+                            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                            e.preventDefault();
+                            setOpen(false);
+                            onSection(s.id);
+                          }}
+                          className={[
+                            "flex min-h-10 items-center gap-3 rounded-sm px-3 py-2 text-sm text-ink transition-colors lg:min-h-9 lg:py-1.5",
+                            active ? "bg-surface-2 font-medium" : "hover:bg-surface-2",
+                          ].join(" ")}
+                        >
+                          <SectionIcon id={s.id} active={active} />
+                          <span className="min-w-0">
+                            <span className="block">{s.label}</span>
+                            <span className="block text-2xs text-faint lg:hidden">{s.hint}</span>
+                          </span>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </nav>
 
           <div className="border-t border-line px-4 py-3 lg:px-5">
@@ -118,7 +127,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                 id="engine-mode"
                 value={engineState.preference}
                 onChange={(e) => onPreference(e.target.value as ModePreference)}
-                className="h-8 min-w-28 flex-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink"
+                className="h-8 min-w-28 flex-1 rounded-lg border border-field bg-surface px-2 text-xs font-medium text-ink"
               >
                 <option value="auto">Auto</option>
                 <option value="api">Live API</option>
@@ -132,6 +141,14 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
     </div>
   );
 }
+
+/** Sidebar groups, in the sections' own order: the console's map, not new destinations. */
+const NAV_GROUPS: readonly { label: string | null; ids: readonly Section[] }[] = [
+  { label: null, ids: ["overview"] },
+  { label: "Inspect", ids: ["playground", "logs"] },
+  { label: "Set up", ids: ["connect", "policy"] },
+  { label: "Measure", ids: ["evaluation"] },
+];
 
 const ICONS: Record<Section, string> = {
   overview: "M2.5 13.5h11M4.5 11V7.5M8 11V4M11.5 11V6",
@@ -147,7 +164,7 @@ function SectionIcon({ id, active }: { id: Section; active: boolean }) {
     <svg
       aria-hidden="true"
       viewBox="0 0 16 16"
-      className={["size-4 shrink-0", active ? "text-ink" : "text-faint"].join(" ")}
+      className={["size-4 shrink-0", active ? "text-ink" : "text-muted"].join(" ")}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -170,7 +187,7 @@ export function EngineBadge({ state, engine, onRecheck, className }: { state: En
       : engine === "mock"
         ? { label: "Demo mode", detail: status.state === "online" ? `API ${version} up, not in use` : "API offline", tone: "demo" as const }
         : { label: "API up", detail: version, tone: "live" as const };
-  const dot = tone === "live" ? "bg-guard" : tone === "demo" ? "bg-warn" : "bg-faint motion-safe:animate-pulse";
+  const dot = tone === "live" ? "bg-guard-dot" : tone === "demo" ? "bg-warn" : "bg-faint motion-safe:animate-pulse";
 
   return (
     <div role="status" aria-label={`${label}. ${reason}.`} className={className}>
@@ -207,7 +224,7 @@ function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemeP
           aria-label={o.label}
           title={o.label}
           onClick={() => onTheme(o.id)}
-          className={["grid size-7 place-items-center rounded-md transition-colors", theme === o.id ? "bg-ink text-canvas" : "text-muted hover:text-ink"].join(" ")}
+          className={["grid size-7 place-items-center rounded-md transition-colors", theme === o.id ? "bg-primary text-on-primary" : "text-muted hover:text-ink"].join(" ")}
         >
           <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d={o.icon} />
@@ -220,7 +237,7 @@ function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemeP
 
 function Logo() {
   return (
-    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink text-canvas dark:bg-guard-soft dark:text-guard dark:ring-1 dark:ring-guard/30">
+    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-on-primary">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
         <path d="M12 3 5 6v5.2c0 4.3 2.9 8 7 9.3 4.1-1.3 7-5 7-9.3V6l-7-3Z" />
         <path d="M8.6 12h6.8" strokeLinecap="round" />
