@@ -23,6 +23,8 @@ import { Policy } from "./screens/Policy";
 import { RoundTrip } from "./screens/RoundTrip";
 import { Chat, type ChatDraft } from "./screens/Chat";
 import { Logs, type TrafficProps } from "./screens/Traffic";
+import { Vault } from "./screens/Vault";
+import type { VaultClient } from "./api/vault";
 import type { KnownRow } from "./lib/knownRows";
 import { knownSignatureOf, type KnownSession } from "./lib/run";
 import { newKnownRow } from "./lib/knownRows";
@@ -41,6 +43,8 @@ export interface AppProps {
   traffic?: Omit<TrafficProps, "forceFixture">;
   /** Loads `/v1/status` (Overview, Connect, Policy); injectable for tests. */
   loadStatus?: StatusLoader;
+  /** The vault inspector's client (Vault screen); injectable for tests. */
+  vault?: VaultClient;
 }
 
 /** A user's navigation adds a history entry (Back returns); a redirect replaces the current one. */
@@ -54,7 +58,7 @@ function writeHash(route: Route, how: "push" | "replace") {
   }
 }
 
-export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks, chat, traffic, loadStatus }: AppProps) {
+export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks, chat, traffic, loadStatus, vault }: AppProps) {
   const apiClient = useMemo(() => api ?? createHttpClient(), [api]);
   const mockClient = useMemo(() => mock ?? createMockClient({ latencyMs: 220 }), [mock]);
   const engine = useEngine(apiClient, mockClient, envMode);
@@ -101,6 +105,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
   const forceFixture = engine.state.preference === "mock";
   const trafficHandle = useTraffic({ forceFixture, connect: trafficOpened ? traffic?.connect : idleConnect, fixtureIntervalMs: traffic?.fixtureIntervalMs });
   const [logFocus, setLogFocus] = useState<{ id: string; nonce: number } | null>(null);
+  const [vaultFocus, setVaultFocus] = useState<{ ref: string; nonce: number } | null>(null);
 
   const [sampleId, setSampleId] = useState<string | null>(DEFAULT_SAMPLE.id);
   const [text, setText] = useState(DEFAULT_SAMPLE.text);
@@ -184,7 +189,9 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
                 ? "Images replay regions recorded from a real SAM 3.1 run on the built-in samples; uploads need the API."
                 : section === "evaluation"
                   ? "Benchmarks are bundled with this page, so they are the same with or without the API."
-                  : section === "overview" || section === "logs"
+                  : section === "vault"
+                    ? "The vault lives in the pii-guard server; demo mode has none to inspect."
+                    : section === "overview" || section === "logs"
                     ? "Overview and Logs replay calls recorded from the demo stack (masked level, no original values)."
                     : section === "connect" || section === "policy"
                       ? "The server can't be asked for its configuration, so this shows the defaults."
@@ -296,7 +303,23 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
           </section>
 
           <section id="section-logs" aria-label="Logs" hidden={section !== "logs"}>
-            {trafficOpened && <Logs t={trafficHandle} forceFixture={forceFixture} sendDemo={traffic?.sendDemo} pageHost={traffic?.pageHost} mockUpstream={server?.upstream.mock ?? false} focus={logFocus} />}
+            {trafficOpened && (
+              <Logs
+                t={trafficHandle}
+                forceFixture={forceFixture}
+                sendDemo={traffic?.sendDemo}
+                pageHost={traffic?.pageHost}
+                mockUpstream={server?.upstream.mock ?? false}
+                focus={logFocus}
+                onOpenSession={(ref) => {
+                  setVaultFocus({ ref, nonce: Date.now() });
+                  openSection("vault");
+                }}
+              />
+            )}
+          </section>
+          <section id="section-vault" aria-label="Vault" hidden={section !== "vault"}>
+            <Vault status={status} live={engine.engine === "api"} active={section === "vault"} client={vault} focus={vaultFocus} />
           </section>
           <section id="section-connect" aria-label="Connect" hidden={section !== "connect"}>
             <Connect status={status} />

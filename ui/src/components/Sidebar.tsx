@@ -147,7 +147,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
 /** Sidebar groups, in the sections' own order: the console's map, not new destinations. */
 const NAV_GROUPS: readonly { label: string | null; ids: readonly Section[] }[] = [
   { label: null, ids: ["overview"] },
-  { label: "Inspect", ids: ["playground", "logs"] },
+  { label: "Inspect", ids: ["playground", "logs", "vault"] },
   { label: "Set up", ids: ["connect", "policy"] },
   { label: "Measure", ids: ["evaluation"] },
 ];
@@ -156,6 +156,7 @@ const ICONS: Record<Section, string> = {
   overview: "M2.5 13.5h11M4.5 11V7.5M8 11V4M11.5 11V6",
   playground: "M4 3.5 2 8l2 4.5M12 3.5 14 8l-2 4.5M9.5 3 6.5 13",
   logs: "M2.5 4h11M2.5 8h11M2.5 12h7",
+  vault: "M3 6.5h10v7H3zM5.5 6.5V5a2.5 2.5 0 0 1 5 0v1.5M8 9.5v1.5",
   connect: "M6.5 9.5 9.5 6.5M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1",
   policy: "M8 2.5 3.5 4.5v3.2c0 2.8 1.9 5 4.5 5.8 2.6-.8 4.5-3 4.5-5.8V4.5L8 2.5ZM6 8l1.5 1.5L10.5 6.5",
   evaluation: "M3 13V3M3 13h10.5M5.5 10l2.5-3 2 2 3-4",
