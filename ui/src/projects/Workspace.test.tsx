@@ -72,6 +72,28 @@ describe("project workspace", () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/endpoint-one/keys/key-one", undefined, "DELETE"));
   });
 
+  it("disables through PUT and explicitly re-enables the retained endpoint", async () => {
+    let current = endpoint;
+    const base = fixture();
+    const call = vi.fn(async (path: string, body?: unknown, method?: string) => {
+      if (path.endsWith("/endpoints") && !body) return { endpoints: [current] };
+      if (path.endsWith("/endpoints/endpoint-one") && method === "PUT") { current = { ...current, ...(body as Partial<Endpoint>) }; return current; }
+      return base(path, body, method as "GET" | "POST" | "PUT" | "DELETE" | undefined);
+    }) as unknown as Requester;
+    const user = userEvent.setup(); render(<Workspace call={call} />);
+    await user.click(await screen.findByRole("button", { name: "Edit endpoint" }));
+    await user.click(screen.getByRole("button", { name: "Disable endpoint…" }));
+    await user.click(screen.getByRole("button", { name: "Disable and revoke keys" }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/endpoint-one", { name: endpoint.name, provider: endpoint.provider, model: endpoint.model, policy_version_id: endpoint.policy_version_id, enabled: false }, "PUT"));
+    await screen.findByText(/· disabled/);
+    await user.click(screen.getByRole("button", { name: "Edit endpoint" }));
+    await user.click(screen.getByRole("checkbox", { name: "Re-enable this endpoint; issue a new integration key afterward" }));
+    await user.click(screen.getByRole("button", { name: "Save endpoint" }));
+    await waitFor(() => expect(call).toHaveBeenLastCalledWith("/v1/projects/project-one/endpoints"));
+    expect(current.enabled).toBe(true);
+    expect(vi.mocked(call).mock.calls.some(([, , method]) => method === "DELETE")).toBe(false);
+  });
+
   it("does not reset the inspection namespace when the selected project is already valid", async () => {
     const selected = vi.fn(); render(<Workspace call={fixture()} projectId="project-one" onProject={selected} />);
     await screen.findByText("Synthetic support");
