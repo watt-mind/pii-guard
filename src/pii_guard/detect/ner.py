@@ -52,6 +52,7 @@ from typing import Any, Protocol
 
 from pii_guard.detect import ner_resolve
 from pii_guard.detect.ner_numbers import check_numbers
+from pii_guard.detect.ner_words import snap_to_words
 from pii_guard.types import DetectionError, EntityType, Span
 
 __all__ = [
@@ -829,7 +830,8 @@ class NerDetector:
                 continue
             start, end = trimmed
             spans.add(Span(start, end, entity_type, text[start:end], score, self.name))
-        found = sorted(spans, key=lambda s: (s.start, s.end, s.entity_type.value))
+        # Names, organisations and addresses start and end on word boundaries (LAB-1338).
+        found = snap_to_words(text, list(spans), language)
         if self.number_checks:
             # Format, checksum and cue checks for the numbers the model proposes (LAB-1293).
             found = sorted(
