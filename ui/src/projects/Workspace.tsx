@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TEXT_ENTITY_TYPES, type TextEntityType } from "../api/types";
 import { ENTITY_META, type Policy } from "../lib/entities";
 import { request, recovery, type Requester } from "../hosted/api";
@@ -126,6 +126,12 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
 }
 
 function EndpointConnection({ endpoint, base, call }: { endpoint: Endpoint; base: string; call: Requester }) {
+  const panel = useRef<HTMLElement>(null);
+  // This component mounts only after an explicit Connect & keys expansion.
+  useEffect(() => {
+    panel.current?.focus({ preventScroll: true });
+    panel.current?.scrollIntoView({ block: "start", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, []);
   const [keys, setKeys] = useState<EndpointKey[]>([]);
   const [secret, setSecret] = useState<{ id: string; key: string } | null>(null);
   const [name, setName] = useState("");
@@ -138,7 +144,7 @@ function EndpointConnection({ endpoint, base, call }: { endpoint: Endpoint; base
   const url = `${globalThis.location.origin}${endpoint.base_path}`;
   const snippet = `from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url=${JSON.stringify(url)},\n    api_key=os.environ["PII_GUARD_ENDPOINT_KEY"],\n)\nresponse = client.chat.completions.create(\n    model=${JSON.stringify(endpoint.model)},\n    messages=[{"role": "user", "content": "Hello, Robin Example."}],\n)`;
   function copy(value: string, label: string) { void navigator.clipboard.writeText(value).then(() => setCopied(`${label} copied`)).catch(() => setCopied("Copy failed. Select the text and copy it manually.")); }
-  return <section className="pw-panel pw-stack" aria-label={`Connect ${endpoint.name}`}><h3>Connect {endpoint.name}</h3><p>Keys authorize only this endpoint. Provider credentials are managed by the guard.</p><label>OpenAI-compatible base URL<input readOnly value={url} /></label><div className="pw-actions"><button onClick={() => copy(url, "URL")}>Copy URL</button><button onClick={() => copy(snippet, "Snippet")}>Copy Python snippet</button></div><pre>{snippet}</pre><p role="status">{copied}</p>
+  return <section ref={panel} tabIndex={-1} className="pw-panel pw-stack" aria-label={`Connect ${endpoint.name}`}><h3>Connect {endpoint.name}</h3><p>Keys authorize only this endpoint. Provider credentials are managed by the guard.</p><label>OpenAI-compatible base URL<input readOnly value={url} /></label><div className="pw-actions"><button onClick={() => copy(url, "URL")}>Copy URL</button><button onClick={() => copy(snippet, "Snippet")}>Copy Python snippet</button></div><pre>{snippet}</pre><p role="status">{copied}</p>
     {error && <p role="alert" className="pw-error">{error}</p>}
     <form className="pw-inline" onSubmit={(e) => { e.preventDefault(); setSecret(null); void action(async () => { const created = await call<EndpointKey & { key: string }>(keyPath, { name }); setSecret({ id: created.id, key: created.key }); setKeys((prev) => [...prev, { id: created.id, name: created.name, created_at: created.created_at }]); setName(""); }); }}><label>Integration key name<input required maxLength={64} value={name} onChange={(e) => setName(e.target.value)} /></label><button type="submit" disabled={busy || !name.trim() || !endpoint.enabled}>{busy ? "Working…" : "Create endpoint key"}</button></form>
     {secret && <div className="pw-review pw-stack"><p>Copy this key now. It is shown only once.</p><code className="pw-secret">{secret.key}</code><div className="pw-actions"><button onClick={() => copy(secret.key, "Key")}>Copy key</button><button onClick={() => { setSecret(null); setCopied(""); }}>Dismiss key</button></div></div>}

@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TEXT_ENTITY_TYPES } from "../api/types";
 import type { Requester } from "../hosted/api";
 import { ENTITY_META } from "../lib/entities";
@@ -21,7 +21,20 @@ function fixture(custom?: (path: string, body: unknown, method: string | undefin
   }) as unknown as Requester;
 }
 
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
 describe("project workspace", () => {
+  it.each([false, true])("focuses and reveals connection details only after expansion (reduced motion: %s)", async (reduced) => {
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: reduced }));
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    const user = userEvent.setup(); render(<Workspace call={fixture()} />);
+    await screen.findByText("Synthetic support");
+    expect(scroll).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Connect & keys" }));
+    expect(screen.getByRole("region", { name: "Connect Synthetic support" })).toHaveFocus();
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: reduced ? "auto" : "smooth" });
+  });
+
   it("requires an explicit policy version and never preloads a provider secret", async () => {
     const call = fixture(); const user = userEvent.setup(); render(<Workspace call={call} />);
     await screen.findByText("Synthetic support");
