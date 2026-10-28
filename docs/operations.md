@@ -90,9 +90,14 @@ cookies do not reset a network allowance, and sign-in cannot replenish global sp
 429 responses include `Retry-After`; hourly anonymous exhaustion asks for Google sign-in
 or the free walkthrough. Missing/untrusted address signals return sanitized 503 errors.
 
-Each in-memory network/principal table is limited to 4096 keyed digests with bounded
-counters/timestamps, one-hour idle expiry and 24-hour absolute expiry. Full tables refuse
-new entries instead of evicting allowances. The HMAC key is random and process-only;
+Each anonymous network (IPv4 address, IPv6 /64) also charges its aggregate (IPv4 /24,
+IPv6 /48): 120-request burst refilling 60/minute, 480 per hour, at most 64 tracked
+networks. A single /48 therefore cannot fill the network table and lock out other clients.
+
+Each in-memory network/aggregate/principal table is limited to 4096 keyed digests with
+bounded counters/timestamps, one-hour idle expiry and 24-hour absolute expiry. A full table
+evicts its least recently used bucket once it has been idle for five minutes; otherwise it
+refuses new entries, and `Retry-After` reports when a slot can free. The HMAC key is random and process-only;
 application abuse buckets retain no raw address. State resets on restart, while the
 separate durable allocation claim still prevents restart from replenishing sponsored
 spend. This is a secondary abuse signal, without an external CAPTCHA or bot-proof claim.
