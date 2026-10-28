@@ -1,14 +1,16 @@
-# Judge walkthrough: useful answers without forwarding the original values
+# Judge walkthrough: protect text and images, preserve useful answers
 
 A repeatable three-minute walkthrough, with an optional two-minute technical extension.
 This is the live presentation runbook; [demo-script.md](demo-script.md) is the separate
 submission-video shot list. Use only fictional text and the bundled **MINTA / SPECIMEN**
 images. Never use a real identity document, even with the owner's permission.
 
-The story: an assistant needs to reply to a person and understand an attached document.
-Blanking everything destroys useful links; pii-guard replaces detected values with session
-placeholders, lets the downstream model work with those links, and restores text values in
-its answer. Show what crossed the downstream boundary before saying that it worked.
+Lead with the image: a fictional ID before and after masking makes the boundary visible.
+Then show why text placeholders matter: an assistant needs to reply to a person and understand
+their attached document. Blanking everything destroys useful links; pii-guard covers detected
+image regions and replaces detected text values with session placeholders, lets the downstream
+model work with those links, and restores text values in its answer. Show what crossed the
+downstream boundary before saying that it worked.
 
 ## Choose the route before presenting
 
@@ -103,13 +105,13 @@ readiness is implied by this document. Before the audience arrives:
 ## The three-minute story
 
 The default route below is the local mock baseline, which works without provider/model
-access. For a hosted presentation use the hosted text flow for beats 2–3, then explicitly
-switch to the self-hosted recording for beat 4.
+access. For a hosted presentation, identify the self-hosted image recording at the opening, switch
+visibly to hosted text for beats 2–3, then return to the recording for beat 4.
 
 | Time | Exact action and expected result | Say |
 |---|---|---|
-| 0:00–0:20 | Open Playground → Text. State that every value is fictional. | “An assistant needs enough detail to help someone. pii-guard keeps detected identity values behind a boundary while preserving links the assistant can use.” |
-| 0:20–0:55 | Replace the document with the Hungarian sentence below and choose Hungarian. Under **Known values**, add `Próba Zsuzsanna` as Person (`PERSON`). Click **Mask document**. Expect a PERSON placeholder for the name stem and an EMAIL placeholder; the Hungarian ending remains outside the person placeholder. Hover a placeholder to show the link. | “Here the application already knows its customer, so it preloads the name. This example uses rules and the vault, without an LLM detector. The same person gets a session placeholder, with the Hungarian ending kept outside it.” |
+| 0:00–0:20 | Start on Playground → Images with the bundled **ID card** before/after result prepared in preflight. Keep its live/recorded label visible. Point to the covered portrait, signature and printed values; state that the specimen is fictional. | “Personal data is also in pictures. Here is a fictional ID before and after masking. This is [a live run / a bundled recording]. pii-guard covers detected regions before the image goes to the downstream assistant; I’ll show what remains useful.” |
+| 0:20–0:55 | Switch to Playground → Text. Replace the document with the Hungarian sentence below and choose Hungarian. Under **Known values**, add `Próba Zsuzsanna` as Person (`PERSON`). Click **Mask document**. Expect a PERSON placeholder for the name stem and an EMAIL placeholder; the Hungarian ending remains outside the person placeholder. Hover a placeholder to show the link. | “Here the application already knows its customer, so it preloads the name. This example uses rules and the vault, without an LLM detector. The same person gets a session placeholder, with the Hungarian ending kept outside it.” |
 | 0:55–1:30 | Click **Send it to the model** to continue to Chat in that session. Send the same sentence. Inspect **What the model received**, then the answer. Expect placeholders upstream and the fictional name/e-mail restored in `Echo: …`; Chat streams the response. | “This is a real request through the gateway to an offline echo upstream. The upstream gets placeholders; the client gets restored text while the answer streams. With a prepared provider, the same boundary wraps generation.” |
 | 1:30–2:15 | Switch to Playground → Images. Click the bundled **ID card**. If the server refuses it, click **Replay the recorded run instead**. Keep the live/recorded label visible. Inspect the covered portrait/signature/text regions and displayed region provenance. | “The image path covers regions and can label them with session placeholders, plus a masked transcript and document summary. That lets an assistant connect an ID to a party without seeing the covered values. This is [a live run / the bundled recorded run]. SAM, when used, sees normalized unmasked pixels as a detector.” |
 | 2:15–2:40 | Open Evaluation and choose the relevant committed run/fixture set. Show the denominator and one weak dataset alongside the result. | “We measure leaks, over-masking and round trip on synthetic fixtures. A result belongs to its model and dataset; it does not prove that every new document is safe. The linked records make our limits inspectable.” |
