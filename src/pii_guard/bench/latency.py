@@ -25,6 +25,7 @@ import asyncio
 import hashlib
 import json
 import platform
+import re
 import secrets
 import socket
 import subprocess
@@ -357,6 +358,19 @@ def _cpu_brand() -> str | None:
     return None
 
 
+_DEVICE_RE = re.compile(r"\b(cpu|mps|cuda(?::\d+)?)\b", re.IGNORECASE)
+
+
+def detector_device(info: Mapping[str, Any]) -> str | None:
+    """The device a detector ran on: ``device`` in the info, else ``cpu``/``mps``/``cuda`` in
+    its ``serving`` text, else ``None`` (unknown; the record keeps its device-less key)."""
+    device = info.get("device") or (info.get("settings") or {}).get("device")
+    if not device:
+        match = _DEVICE_RE.search(str(info.get("serving") or ""))
+        device = match.group(1) if match else None
+    return str(device).strip().lower() if device else None
+
+
 def build_records(
     cells: Sequence[CellResult],
     *,
@@ -382,27 +396,40 @@ def build_records(
     for mode in dict.fromkeys(c.mode for c in cells):
         mode_cells = [c for c in cells if c.mode == mode]
         names = sorted({d for c in mode_cells for d in c.detectors}, key=_detector_order)
-        detectors = []
+        detectors: list[dict[str, Any]] = []
         for name in names:
             info = dict((detector_info or {}).get(name) or {})
+            settings = dict(info.get("settings") or {})
+            device = detector_device(info)
+            if device:
+                settings["device"] = device
             detectors.append(
                 {
                     "name": name,
                     "model": info.get("model"),
                     "model_ref": info.get("model_ref"),
                     "revision": None,
-                    "settings": dict(info.get("settings") or {}),
+                    "settings": settings,
                     "serving": info.get("serving"),
                 }
             )
+        # The device is part of the key: the same model on CPU and on MPS are different systems.
         system_detectors = "+".join(
-            d["name"] + (f":{d['model']}" if d["model"] else "") for d in detectors
+            d["name"]
+            + (f":{d['model']}" if d["model"] else "")
+            + (f"@{d['settings']['device']}" if d["settings"].get("device") else "")
+            for d in detectors
         )
         label = (
             "pii-guard gateway, "
             + mode
             + " mode ("
-            + " + ".join(d["name"] + (f" {d['model']}" if d["model"] else "") for d in detectors)
+            + " + ".join(
+                d["name"]
+                + (f" {d['model']}" if d["model"] else "")
+                + (f" on {d['settings']['device']}" if d["settings"].get("device") else "")
+                for d in detectors
+            )
             + ")"
         )
         records.append(
