@@ -23,8 +23,15 @@ Rule = Callable[[str], Iterator[_Hit]]
 # A number must not continue a longer digit run, directly or through a date/decimal separator
 # ("2026-10-26", "1.234.567"), or be followed by a currency (an amount, not an identifier),
 # also after the Hungarian ",-" of a round amount ("123 456 788,- Ft").
-NUM_START = r"(?<!\d)(?<!\d[-./,])"
-NUM_END = r"(?!\d)(?![-./,]\d)"
+#
+# Nor may it touch a letter or "_": digits glued to letters are part of a longer token, such as
+# a sha256 or git hash ("…885d392771036a9d…"), a base64 digest or a code name, and one digit
+# run in ten passes a mod-10 check by chance (LAB-1282). Cued numbers refuse the same ("Nr123",
+# ``languages/cues.py``).
+NOT_IN_WORD_BEFORE = r"(?<![^\W\d])"
+NOT_IN_WORD_AFTER = r"(?![^\W\d])"
+NUM_START = r"(?<!\d)(?<!\d[-./,])" + NOT_IN_WORD_BEFORE
+NUM_END = r"(?!\d)(?![-./,]\d)" + NOT_IN_WORD_AFTER
 NOT_AMOUNT = r"(?!\s?(?:,-\s?)?(?:Ft|HUF|forint|EUR|€)(?!\w))"
 # Space-grouped numbers must not be part of a longer space-grouped number ("1 234 567 890").
 NO_GROUP_BEFORE = r"(?<!\d )"

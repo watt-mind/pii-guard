@@ -1,0 +1,16 @@
+{
+  "detectors": "fast:rules",
+  "files": [
+    "uv.lock"
+  ],
+  "chars": 243195,
+  "masked": 14,
+  "by_kind": {
+    "value": 14
+  },
+  "by_kind_and_type": {
+    "value:ID_DOCUMENT": 1,
+    "value:NATIONAL_ID_HU_TAJ": 13
+  },
+  "code_spans": []
+}

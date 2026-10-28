@@ -32,6 +32,7 @@ import re
 from collections.abc import Iterator
 
 from pii_guard.detect.rules._base import (
+    NOT_IN_WORD_AFTER,
     NUM_END,
     NUM_START,
     Rule,
@@ -105,7 +106,7 @@ _PHONE_RE = re.compile(
     r"(?<![\w+])(?<!\d[-./])"
     r"(?:\(0[1-9]\d{1,4}\)|0[1-9]\d{1,4})"
     r"(?:[ /-]|\s?/\s?)?\d{3,8}(?:[ -]\d{1,5})?"
-    r"(?!\d)(?![-./]\d)(?!\s?(?:€|EUR|Euro)(?!\w))"
+    r"(?!\d)(?![-./]\d)(?!\s?(?:€|EUR|Euro)(?!\w))" + NOT_IN_WORD_AFTER
 )
 
 
