@@ -31,7 +31,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from pii_guard.api.routes._common import v1_router
 from pii_guard.gateway.service import UpstreamError, UpstreamNotConfiguredError
 
-__all__ = ["ModelsConfig", "models_url", "router"]
+__all__ = ["ModelsConfig", "endpoint_catalog", "models_url", "provider_catalog", "router"]
 
 router = v1_router()
 
@@ -97,6 +97,9 @@ def _listing(models: list[dict[str, Any]]) -> dict[str, Any]:
 async def list_models(request: Request) -> JSONResponse:
     endpoint = getattr(request.state, "project_endpoint", None)
     if endpoint is not None and getattr(request.state, "project_routed_endpoint", False):
+        if endpoint.model is None:
+            # Pass-through (LAB-1451): the provider's own list, with the endpoint's credential.
+            return JSONResponse(_listing(await endpoint_catalog(request, endpoint)))
         return JSONResponse(
             _listing(
                 [
@@ -161,9 +164,62 @@ async def list_models(request: Request) -> JSONResponse:
     return JSONResponse(_listing([m for m in found if m is not None]))
 
 
-async def _hosted_models(request: Request) -> JSONResponse:
-    from pii_guard.hosted.egress import secure_client
+async def provider_catalog(
+    base_url: str, api_key: str | None, *, hosted: bool, transport: Any = None
+) -> list[dict[str, Any]]:
+    """``GET {base_url}/models`` from a configured provider, bounded and sanitized.
 
+    Hosted, the request goes through the public-HTTPS egress client (checked on the socket);
+    locally through ``transport`` (``app.state.gateway_transport`` in tests). Any provider
+    failure is one generic ``UpstreamError``: its status and message are never passed on."""
+    import json
+
+    headers = {"Accept": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    if hosted:
+        from pii_guard.hosted.egress import secure_client
+
+        client = secure_client(timeout=_TIMEOUT)
+    else:
+        client = httpx.AsyncClient(
+            timeout=_TIMEOUT, transport=transport, trust_env=False, follow_redirects=False
+        )
+    content = bytearray()
+    async with client:
+        try:
+            async with client.stream("GET", models_url(base_url), headers=headers) as response:
+                if response.status_code != 200:
+                    raise UpstreamError("Provider model catalog unavailable")
+                async for chunk in response.aiter_bytes():
+                    content.extend(chunk)
+                    if len(content) > _MAX_BODY:
+                        raise UpstreamError("Provider model catalog is too large")
+        except httpx.HTTPError:
+            raise UpstreamError("Provider model catalog unavailable") from None
+    try:
+        data = json.loads(content).get("data")
+    except (ValueError, AttributeError, RecursionError):
+        raise UpstreamError("Provider model catalog is invalid") from None
+    if not isinstance(data, list):
+        raise UpstreamError("Provider model catalog is invalid")
+    entries = (_model(entry) for entry in data[:_MAX_MODELS])
+    return [entry for entry in entries if entry is not None]
+
+
+async def endpoint_catalog(request: Request, endpoint: Any) -> list[dict[str, Any]]:
+    """A pass-through endpoint's provider catalog, asked with the endpoint's own credential."""
+    hosted = bool(request.app.state.settings.hosted)
+    key = endpoint.api_key.get_secret_value() if endpoint.api_key is not None else None
+    return await provider_catalog(
+        endpoint.base_url,
+        key,
+        hosted=hosted,
+        transport=None if hosted else getattr(request.app.state, "gateway_transport", None),
+    )
+
+
+async def _hosted_models(request: Request) -> JSONResponse:
     service = request.app.state.hosted
     if getattr(request.state, "hosted_connection", None) is None:
         return JSONResponse(
@@ -175,28 +231,12 @@ async def _hosted_models(request: Request) -> JSONResponse:
             )
         )
     settings = service.provider_settings(request)
-    headers = {"Authorization": f"Bearer {settings.upstream_api_key.get_secret_value()}"}
-    async with secure_client(timeout=_TIMEOUT) as client:
-        try:
-            async with client.stream(
-                "GET", models_url(settings.upstream_base_url), headers=headers
-            ) as response:
-                if response.status_code != 200:
-                    raise UpstreamError("Provider model catalog unavailable")
-                content = bytearray()
-                async for chunk in response.aiter_bytes():
-                    content.extend(chunk)
-                    if len(content) > _MAX_BODY:
-                        raise UpstreamError("Provider model catalog is too large")
-        except httpx.HTTPError:
-            raise UpstreamError("Provider model catalog unavailable") from None
-    import json
-
-    try:
-        data = json.loads(content).get("data")
-    except (ValueError, AttributeError):
-        raise UpstreamError("Provider model catalog is invalid") from None
-    if not isinstance(data, list):
-        raise UpstreamError("Provider model catalog is invalid")
-    entries = [_model(entry) for entry in data[:_MAX_MODELS]]
-    return JSONResponse(_listing([entry for entry in entries if entry is not None]))
+    return JSONResponse(
+        _listing(
+            await provider_catalog(
+                settings.upstream_base_url,
+                settings.upstream_api_key.get_secret_value(),
+                hosted=True,
+            )
+        )
+    )
