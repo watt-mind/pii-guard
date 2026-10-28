@@ -363,5 +363,43 @@ class SpendLedgerFoundationTests(unittest.TestCase):
         self.assertEqual(set(self.template["outputs"]), {"accountUrl", "accountName", "container"})
 
 
+@unittest.skipUnless(shutil.which("az"), "Azure CLI is required to compile Bicep")
+class DevNetworkTemplateTests(unittest.TestCase):
+    def test_platform_defaults_need_no_allow_rules_and_egress_stays_restricted(self) -> None:
+        result = subprocess.run(  # noqa: S603 - local compiler, no cloud mutation
+            [
+                shutil.which("az") or "/unavailable-azure-cli",
+                "bicep",
+                "build",
+                "--file",
+                str(TEMPLATE.parent / "modules" / "dev-network.bicep"),
+                "--stdout",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        template = json.loads(result.stdout)
+        nsg = next(
+            resource
+            for resource in template["resources"]
+            if resource["type"] == "Microsoft.Network/networkSecurityGroups"
+            and "router-nsg" in resource["name"]
+        )
+        rules = {rule["name"]: rule["properties"] for rule in nsg["properties"]["securityRules"]}
+        for rule in rules.values():
+            self.assertNotIn(
+                rule["destinationAddressPrefix"], {"AzurePlatformDNS", "AzurePlatformIMDS"}
+            )
+        for name, direction in (
+            ("deny-other-outbound", "Outbound"),
+            ("deny-unsolicited-inbound", "Inbound"),
+        ):
+            self.assertEqual(rules[name]["direction"], direction)
+            self.assertEqual(rules[name]["access"], "Deny")
+            self.assertEqual(rules[name]["destinationAddressPrefix"], "*")
+        self.assertEqual(rules["private-aca-https"]["access"], "Allow")
+
+
 if __name__ == "__main__":
     unittest.main()
