@@ -12,6 +12,10 @@ from typing import Annotated, Literal
 from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from pii_guard.hosted.quotas import (
+    DEFAULT_INPUT_MICRODOLLARS_PER_TOKEN,
+    DEFAULT_OUTPUT_MICRODOLLARS_PER_TOKEN,
+)
 from pii_guard.policy import Policy, parse_overrides
 from pii_guard.types import EntityType
 
@@ -58,6 +62,8 @@ class Settings(BaseSettings):
     # Enable only after verifying direct ACA ingress and access-log privacy.
     hosted_client_ip_source: Literal["off", "aca_xff_rightmost"] = "off"
     hosted_max_principals: int = Field(default=256, ge=1, le=10000)
+    # Anonymous demo runtimes are a separate pool, so guests never take a signed-in slot.
+    hosted_max_guest_runtimes: int = Field(default=8, ge=1, le=1000)
     hosted_runtime_ttl: int = Field(default=3600, ge=300, le=86400)
     hosted_max_sessions: int = Field(default=20, ge=1, le=100)
     hosted_max_body_bytes: int = Field(default=32768, ge=1024, le=262144)
@@ -73,9 +79,16 @@ class Settings(BaseSettings):
     hosted_spend_container: str = "sponsored-allowance"
     hosted_spend_environment: Literal["dev", "prod"] = "dev"
     hosted_spend_managed_identity_client_id: str | None = None
+    # Operator kill switch: once a file exists at this absolute path, sponsored admission is
+    # disabled until restart (checked per sponsored request and every cleanup tick).
+    hosted_sponsored_kill_switch_path: str | None = None
     # Conservative ceilings, including reasoning tokens. Operator verifies against prices.
-    hosted_input_microdollars_per_token: int = Field(default=100, ge=1)
-    hosted_output_microdollars_per_token: int = Field(default=100, ge=1)
+    hosted_input_microdollars_per_token: int = Field(
+        default=DEFAULT_INPUT_MICRODOLLARS_PER_TOKEN, ge=1
+    )
+    hosted_output_microdollars_per_token: int = Field(
+        default=DEFAULT_OUTPUT_MICRODOLLARS_PER_TOKEN, ge=1
+    )
     # Hosted image masking (LAB-1390, ADR 0014): signed-in Google owners only, processed in
     # memory on the replica with Tesseract and the on-device segmenter; nothing remote. With it
     # on, readiness requires OCR and the local segmenter. Bounded separately from text: the

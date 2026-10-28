@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -31,6 +32,10 @@ from pii_guard.workers import BoundedWorkers
 
 if TYPE_CHECKING:
     from pii_guard.projects.runtime import ProjectService
+
+
+STREAMS_PER_OWNER = 2
+MAX_STREAMS = 16
 
 
 class HostedCapacityError(PiiGuardError):
@@ -95,6 +100,9 @@ class Runtime:
     active: int = 0
     session_holds: dict[str, Any] = field(default_factory=dict)
     holds_lock: Any = field(default_factory=threading.Lock)
+    #: The ``_runtimes`` key; a guest runtime is dropped as soon as it is idle.
+    identity: str = ""
+    guest: bool = False
 
 
 class BoundedAnalyzer:
@@ -134,6 +142,10 @@ class HostedService:
             or settings.api_token is not None
             or not settings.hosted_models
             or (settings.detectors and any(d not in {"rules", "ner"} for d in settings.detectors))
+            or (
+                settings.hosted_sponsored_kill_switch_path is not None
+                and not os.path.isabs(settings.hosted_sponsored_kill_switch_path)
+            )
         ):
             raise ValueError(
                 "Hosted mode requires trusted ingress, one process, HTTPS origin, "
@@ -182,6 +194,9 @@ class HostedService:
         self._lock = threading.Lock()
         self.rest_slots = threading.BoundedSemaphore(4)
         self._ingress = 0
+        # Live traffic streams leave the ingress bound for their own (LAB-1412): an open
+        # console must not occupy request capacity for its whole 180-second deadline.
+        self._streams: dict[str, int] = {}
         self._workers = {Mode.FAST: BoundedWorkers(4, "pii-guard-hosted-fast")}
         # One image job per replica (OCR is CPU- and memory-heavy); a busy slot is a 429,
         # never a queue. A timed-out job keeps the slot until its thread has finished.
@@ -194,13 +209,22 @@ class HostedService:
             identity = principal.id + (":" + namespace if namespace else "")
             runtime = self._runtimes.get(identity)
             if runtime is None:
+                guest = not principal.authenticated
                 owner_runtimes = sum(
                     runtime_id == principal.id or runtime_id.startswith(principal.id + ":")
                     for runtime_id in self._runtimes
                 )
                 if owner_runtimes >= min(32, self.settings.hosted_max_sessions):
                     raise HostedCapacityError("Account runtime capacity reached; try later")
-                if len(self._runtimes) >= self.settings.hosted_max_principals:
+                # Guests draw on their own small pool, so anonymous traffic can never take
+                # the runtimes reserved for signed-in owners (LAB-1412).
+                pooled = sum(item.guest == guest for item in self._runtimes.values())
+                maximum = (
+                    self.settings.hosted_max_guest_runtimes
+                    if guest
+                    else self.settings.hosted_max_principals
+                )
+                if pooled >= maximum:
                     raise HostedCapacityError("Hosted runtime capacity reached; try later")
                 key = hmac.digest(self.master_key, b"vault\0" + identity.encode(), "sha256")
                 budget = self._session_budgets.setdefault(
@@ -225,6 +249,8 @@ class HostedService:
                         )
                     ),
                     SessionDirectory(self.settings.hosted_max_sessions),
+                    identity=identity,
+                    guest=guest,
                 )
                 self._runtimes[identity] = runtime
             runtime.active += 1
@@ -235,6 +261,11 @@ class HostedService:
         with self._lock:
             runtime.active -= 1
             runtime.touched = time.monotonic()
+            # A guest's only work is one ephemeral demo: nothing outlives it.
+            if runtime.guest and not runtime.active:
+                runtime.vault.close()
+                if self._runtimes.get(runtime.identity) is runtime:
+                    del self._runtimes[runtime.identity]
 
     def purge_expired(self) -> None:
         with self._lock:
@@ -250,6 +281,7 @@ class HostedService:
         self.keys.purge_expired()
         self.connections.purge_expired()
         self.abuse.purge_expired()
+        self.check_kill_switch()
 
     def provider_settings(self, request: Request) -> Settings:
         connection = getattr(request.state, "hosted_connection", None)
@@ -356,8 +388,18 @@ class HostedService:
                 )
                 for mode, item in detectors.items()
             }
+        provider = self.provider_settings(request)
+        # The owner's traffic log, scrubbing the provider key this request may send (the
+        # sponsored key or the selected connection's), as the local and project gateways do.
+        credential = provider.upstream_api_key
+        observability = Observability(
+            runtime.observability.settings,
+            secrets=[credential.get_secret_value()] if credential is not None else [],
+        )
+        observability.traffic = runtime.observability.traffic
+        observability.metrics = runtime.observability.metrics
         gateway = Gateway(
-            settings=self.provider_settings(request),
+            settings=provider,
             vault=runtime.vault,
             config=GatewayConfig(
                 mode=Mode.FAST,
@@ -369,7 +411,7 @@ class HostedService:
             detectors=detectors,
             cache=runtime.cache,
             transport=SecureTransport(),
-            observability=runtime.observability,
+            observability=observability,
         )
         gateway._detect_workers = self._workers
         gateway._session_holds = runtime.session_holds
@@ -390,6 +432,40 @@ class HostedService:
         self._spend_workers.close()
         if self.spend is not None:
             self.spend.close()
+
+    def enter_stream(self, owner: str) -> None:
+        """Admit one live traffic stream: two per owner, sixteen in all."""
+        with self._lock:
+            if (
+                self._streams.get(owner, 0) >= STREAMS_PER_OWNER
+                or sum(self._streams.values()) >= MAX_STREAMS
+            ):
+                raise HostedCapacityError("Live traffic stream capacity reached; try later")
+            self._streams[owner] = self._streams.get(owner, 0) + 1
+
+    def leave_stream(self, owner: str) -> None:
+        with self._lock:
+            remaining = self._streams.get(owner, 0) - 1
+            if remaining > 0:
+                self._streams[owner] = remaining
+            else:
+                self._streams.pop(owner, None)
+
+    def check_kill_switch(self) -> bool:
+        """Disable sponsored admission for good once the operator's kill file exists.
+
+        Any error other than a missing file also disables it: the switch fails closed."""
+        path = self.settings.hosted_sponsored_kill_switch_path
+        if path is None or self.quotas.sponsored_killed:
+            return self.quotas.sponsored_killed
+        try:
+            os.stat(path)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            pass
+        self.quotas.disable_sponsored()
+        return True
 
     def enter_ingress(self) -> None:
         with self._lock:

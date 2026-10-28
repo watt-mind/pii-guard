@@ -27,6 +27,23 @@ from types import TracebackType
 from pii_guard.types import PiiGuardError
 
 DAY_SECONDS = 86_400
+# The one source of the sponsored token rates (integer microdollars per token): QuotaLimits
+# and the PII_GUARD_HOSTED_*_MICRODOLLARS_PER_TOKEN settings both default to these.
+DEFAULT_INPUT_MICRODOLLARS_PER_TOKEN = 5
+DEFAULT_OUTPUT_MICRODOLLARS_PER_TOKEN = 30
+# The curated demo asks for a short reply; its output reservation is this, not the hosted max.
+DEMO_MAX_OUTPUT_TOKENS = 512
+# Masking may lengthen a request (a placeholder can be longer than the value it replaces).
+# The upstream payload may be at most twice the admitted body plus a fixed allowance; the
+# gateway refuses a larger masked payload, so this bound is also the input token charge
+# (a byte-level tokenizer never emits more tokens than bytes).
+PAYLOAD_EXPANSION = 2
+PAYLOAD_ALLOWANCE_BYTES = 4096
+
+
+def upstream_payload_bound(body_bytes: int) -> int:
+    """The largest upstream payload, in bytes and so in input tokens, a body may become."""
+    return PAYLOAD_EXPANSION * max(0, body_bytes) + PAYLOAD_ALLOWANCE_BYTES
 
 
 def claim_allocation_file(directory: str | Path, allocation_id: str) -> bool:
@@ -102,8 +119,8 @@ class QuotaLimits:
     max_principals: int = 10_000
     # Integer microdollars per token, including reasoning/output. Operators must set
     # upper bounds covering every permitted model and provider billing component.
-    input_microdollars_per_token: int = 5
-    output_microdollars_per_token: int = 30
+    input_microdollars_per_token: int = DEFAULT_INPUT_MICRODOLLARS_PER_TOKEN
+    output_microdollars_per_token: int = DEFAULT_OUTPUT_MICRODOLLARS_PER_TOKEN
     global_daily_microdollars: int = 10_000_000
     # Images (LAB-1390): a separate daily count, never covered by the token allowance.
     # Guests get none; there is no remote image cost, only replica CPU.

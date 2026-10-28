@@ -468,14 +468,14 @@ def test_curated_demo_success_and_guest_identity_isolation(
     assert payload["entities"]
     assert first.headers["set-cookie"].startswith("__Host-pii-guard-guest=")
     service = client.app.state.hosted
-    guest_one = next(iter(service._runtimes))
+    # A guest runtime holds only the ephemeral demo, so it is gone once the demo is (LAB-1412).
+    assert service._runtimes == {}
     client.cookies.clear()
     second = client.post("/v1/demo", json={"sample_id": "en-support"}, headers={"origin": ORIGIN})
     assert second.status_code == 200, second.text
-    assert len(service._runtimes) == 2
+    assert service._runtimes == {}
     assert second.json()["session_id"] != payload["session_id"]
     assert second.json()["masked"] != payload["masked"]
-    assert guest_one in service._runtimes
 
 
 def test_connection_owner_selection_deletion_and_no_sponsored_fallback(
@@ -608,7 +608,7 @@ def test_sponsored_model_and_output_limits_admit_no_upstream_work(
     assert client.get("/v1/account", headers=auth()).json()["usage"]["requests_today"] == 0
 
 
-def test_cancelled_stream_releases_runtime_and_admission_but_keeps_charge() -> None:
+def test_cancelled_stream_releases_runtime_and_stream_slot_without_charge() -> None:
     app = create_app(settings(hosted_max_principals=1))
     app.router.routes[:] = [
         route for route in app.router.routes if getattr(route, "path", None) != "/v1/traffic/stream"
@@ -635,13 +635,17 @@ def test_cancelled_stream_releases_runtime_and_admission_but_keeps_charge() -> N
             await asyncio.wait_for(entered.wait(), 2)
             owner, runtime = next(iter(service._runtimes.items()))
             assert runtime.active == 1
-            assert service.quotas._active == 1
+            # A live stream is a read (LAB-1412): no inference slot, no ingress slot, no
+            # daily request; it holds one of its own bounded stream slots instead.
+            assert service.quotas._active == 0
+            assert service._ingress == 0
+            assert service._streams == {owner: 1}
             pending.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await pending
             assert runtime.active == 0
-            assert service.quotas._active == 0
-            assert service.quotas.usage(owner)["requests_today"] == 1
+            assert service._streams == {}
+            assert service.quotas.usage(owner)["requests_today"] == 0
         await service.close()
 
     asyncio.run(scenario())

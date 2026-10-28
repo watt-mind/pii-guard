@@ -58,6 +58,7 @@ from pii_guard.gateway.service import (
     _counts_of,
     _read_limited,
     _upstream_error,
+    check_upstream_payload,
 )
 from pii_guard.gateway.tool_names import tool_names, without_tool_names
 from pii_guard.gateway.trace import CallTrace
@@ -263,6 +264,11 @@ class ResponsesGateway:
 
         forwarding = time.perf_counter()
         payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        try:
+            check_upstream_payload(payload)
+        except PayloadTooLargeError:
+            stats.log("blocked")
+            raise
         if trace.payloads:
             trace.masked_request = payload
         masked_input = _masked_input(body) if echo else None
@@ -283,6 +289,10 @@ class ResponsesGateway:
             timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")
             raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
+        except UpstreamError:
+            timer.add("upstream", time.perf_counter() - started)
+            stats.log("upstream_unreachable")
+            raise
         timer.add("upstream_ttfb", time.perf_counter() - started)
         timer.add("upstream", time.perf_counter() - started)
 

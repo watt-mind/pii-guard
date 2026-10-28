@@ -26,6 +26,7 @@ from pii_guard.gateway.service import (
 )
 from pii_guard.hosted.connections import PROVIDERS
 from pii_guard.hosted.identity import IdentityError, Principal
+from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import PLACEHOLDER_RE, VaultSession
 
@@ -97,6 +98,14 @@ def _principal(request: Request, *, authenticated: bool = False) -> Principal:
     return principal
 
 
+def _signed_in(request: Request) -> Principal:
+    """Key and connection management: a signed-in Google session, never a guard API key."""
+    principal = _principal(request, authenticated=True)
+    if principal.auth_method != "google":
+        raise IdentityError()
+    return principal
+
+
 @router.get("/v1/account")
 def account(request: Request) -> dict[str, Any]:
     principal = _principal(request)
@@ -130,24 +139,24 @@ def account(request: Request) -> dict[str, Any]:
 
 @router.post("/v1/account/api-keys", status_code=201)
 def create_api_key(body: ApiKeyRequest, request: Request) -> dict[str, str]:
-    return request.app.state.hosted.keys.issue(_principal(request, authenticated=True), body.name)
+    return request.app.state.hosted.keys.issue(_signed_in(request), body.name)
 
 
 @router.get("/v1/account/api-keys")
 def list_api_keys(request: Request) -> list[dict[str, str]]:
-    return request.app.state.hosted.keys.list(_principal(request, authenticated=True))
+    return request.app.state.hosted.keys.list(_signed_in(request))
 
 
 @router.delete("/v1/account/api-keys/{key_id}", status_code=204)
 def delete_api_key(request: Request, key_id: str = Path(min_length=1, max_length=128)) -> Response:
-    if not request.app.state.hosted.keys.revoke(_principal(request, authenticated=True), key_id):
+    if not request.app.state.hosted.keys.revoke(_signed_in(request), key_id):
         raise _NotFoundError("API key is unknown or expired")
     return Response(status_code=204)
 
 
 @router.post("/v1/account/connections", status_code=201)
 async def create_connection(body: ConnectionRequest, request: Request) -> dict[str, str]:
-    principal = _principal(request, authenticated=True)
+    principal = _signed_in(request)
     connection = await request.app.state.hosted.connections.create(
         principal.id, body.provider, body.api_key, body.base_url
     )
@@ -158,7 +167,7 @@ async def create_connection(body: ConnectionRequest, request: Request) -> dict[s
 def delete_connection(
     request: Request, connection_id: str = Path(min_length=1, max_length=128)
 ) -> Response:
-    principal = _principal(request, authenticated=True)
+    principal = _signed_in(request)
     request.app.state.hosted.connections.delete(principal.id, connection_id)
     return Response(status_code=204)
 
@@ -200,7 +209,8 @@ async def demo(body: DemoRequest, request: Request) -> dict[str, Any]:
                 "model": model,
                 "messages": [{"role": "user", "content": original}],
                 "stream": False,
-                "max_completion_tokens": hosted.settings.hosted_max_output_tokens,
+                # Admission reserved exactly this many output tokens for the demo.
+                "max_completion_tokens": DEMO_MAX_OUTPUT_TOKENS,
             },
             {
                 ECHO_HEADER: "masked",
