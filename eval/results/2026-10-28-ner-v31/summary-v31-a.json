@@ -1,0 +1,62 @@
+{
+  "smoke": {
+    "documents": 51,
+    "leak": 0.057803,
+    "over_masking": 0.011834,
+    "f1": 0.933785
+  },
+  "inflection": {
+    "documents": 12,
+    "leak": 0.04,
+    "over_masking": 0.0,
+    "f1": 0.948276
+  },
+  "agent-traffic-dev": {
+    "documents": 300,
+    "leak": 0.001286,
+    "over_masking": 0.007203,
+    "f1": 0.969647
+  },
+  "agent-traffic": {
+    "documents": 990,
+    "leak": 0.002134,
+    "over_masking": 0.008696,
+    "f1": 0.967154
+  },
+  "ai4privacy": {
+    "documents": 600,
+    "leak": 0.010526,
+    "over_masking": 0.004142,
+    "f1": 0.984395
+  },
+  "nemotron-pii": {
+    "documents": 300,
+    "leak": 0.018651,
+    "over_masking": 0.009479,
+    "f1": 0.953212
+  },
+  "cee-pii": {
+    "documents": 451,
+    "leak": 0.021825,
+    "over_masking": 0.194805,
+    "f1": 0.856547
+  },
+  "gretel-finance": {
+    "documents": 400,
+    "leak": 0.216102,
+    "over_masking": 0.191248,
+    "f1": 0.739624
+  },
+  "pl-pii-bench": {
+    "documents": 346,
+    "leak": 0.052121,
+    "over_masking": 0.172603,
+    "f1": 0.872479
+  },
+  "mapa-eur-lex": {
+    "documents": 42,
+    "leak": 0.164865,
+    "over_masking": 0.498284,
+    "f1": 0.551141
+  }
+}

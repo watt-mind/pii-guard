@@ -1,0 +1,916 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-28-lab-1410-gretel-finance-v31-b",
+  "kind": "text",
+  "date": "2026-10-28",
+  "recorded_at": "2026-10-28T17:18:06+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard rules + ner (pii-guard-ner-xlmr-base-v31-b) on gretel-finance",
+  "notes": [
+    "LAB-1410: NER v3.1 candidates vs v2.0 (clean selection set: agent-traffic-dev), fast mode (rules + NER), CPU (PII_GUARD_NER_DEVICE=cpu), one commit.",
+    "Wall time 37.7 s, load average at end 26.6."
+  ],
+  "code": {
+    "commit": "72026a5948615fc0d68be9d844a8e805540b852f",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": "0.1.0",
+    "detectors": [
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "ner",
+        "model": "pii-guard-ner-xlmr-base-v31-b",
+        "model_ref": "pii-guard fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410); local checkpoint, not published",
+        "revision": "sha256:2fe04d351fb2cdefce0f6f767b5d65acd2f5ef7a6fd4625763452ecd9b1b1d45",
+        "settings": {},
+        "serving": "local PyTorch, CPU"
+      }
+    ],
+    "key": "rules+ner:pii-guard-ner-xlmr-base-v31-b",
+    "label": "pii-guard fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)"
+  },
+  "fixture_set": "gretel-finance",
+  "fixtures": [
+    {
+      "path": "eval/datasets/gretel-finance/de-gretel-finance.jsonl",
+      "sha256": "2401233fa20513d765a023706bf7e7a8f28b301b7901a948070121992b2953a5",
+      "set": "gretel-finance",
+      "language": "de",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 200
+    },
+    {
+      "path": "eval/datasets/gretel-finance/en-gretel-finance.jsonl",
+      "sha256": "12967fcd1a89b5704f25dfa628465c9fe566a71e962e703333c1056199db896c",
+      "set": "gretel-finance",
+      "language": "en",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 200
+    }
+  ],
+  "languages": [
+    "de",
+    "en"
+  ],
+  "hardware": {
+    "description": null,
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": null,
+  "metrics": {
+    "overall": {
+      "documents": 400,
+      "gold_spans": 1710,
+      "predicted_spans": 1633,
+      "unscored_predictions": 86,
+      "exact": {
+        "gold": 1710,
+        "pred": 1547,
+        "tp_pred": 1021,
+        "tp_gold": 1021,
+        "precision": 0.659987,
+        "recall": 0.597076,
+        "f1": 0.626957
+      },
+      "overlap": {
+        "gold": 1710,
+        "pred": 1547,
+        "tp_pred": 1218,
+        "tp_gold": 1179,
+        "precision": 0.78733,
+        "recall": 0.689474,
+        "f1": 0.73516
+      },
+      "macro_f1_overlap": 0.601253,
+      "leak": {
+        "values": 944,
+        "leaked": 206,
+        "partial": 28,
+        "rate": 0.21822,
+        "partial_rate": 0.029661
+      },
+      "over_masking": {
+        "masked": 1256,
+        "over_masked": 269,
+        "rate": 0.214172
+      },
+      "roundtrip": {
+        "documents": 400,
+        "exact": 400,
+        "rate": 1.0
+      },
+      "consistency": {
+        "entities": 944,
+        "consistent": 680,
+        "multi_occurrence": 172,
+        "multi_consistent": 133,
+        "rate": 0.720339,
+        "multi_rate": 0.773256
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 88.339,
+          "p95": 144.357
+        },
+        "mask": {
+          "p50": 0.685,
+          "p95": 1.45
+        }
+      },
+      "per_type": {
+        "PERSON": {
+          "gold": 694,
+          "pred": 497,
+          "exact_tp_gold": 415,
+          "exact_tp_pred": 415,
+          "overlap_tp_gold": 452,
+          "overlap_tp_pred": 454,
+          "leak": {
+            "values": 516,
+            "leaked": 182,
+            "partial": 13
+          },
+          "over_masking": {
+            "masked": 497,
+            "over_masked": 30
+          }
+        },
+        "ADDRESS": {
+          "gold": 296,
+          "pred": 437,
+          "exact_tp_gold": 204,
+          "exact_tp_pred": 204,
+          "overlap_tp_gold": 270,
+          "overlap_tp_pred": 302,
+          "leak": {
+            "values": 251,
+            "leaked": 20,
+            "partial": 11
+          },
+          "over_masking": {
+            "masked": 437,
+            "over_masked": 125
+          }
+        },
+        "EMAIL": {
+          "gold": 68,
+          "pred": 71,
+          "exact_tp_gold": 59,
+          "exact_tp_pred": 59,
+          "overlap_tp_gold": 65,
+          "overlap_tp_pred": 65,
+          "leak": {
+            "values": 50,
+            "leaked": 2,
+            "partial": 4
+          },
+          "over_masking": {
+            "masked": 71,
+            "over_masked": 5
+          }
+        },
+        "PHONE": {
+          "gold": 51,
+          "pred": 60,
+          "exact_tp_gold": 43,
+          "exact_tp_pred": 43,
+          "overlap_tp_gold": 49,
+          "overlap_tp_pred": 49,
+          "leak": {
+            "values": 48,
+            "leaked": 2,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 60,
+            "over_masked": 8
+          }
+        },
+        "DATE_OF_BIRTH": {
+          "gold": 23,
+          "pred": 33,
+          "exact_tp_gold": 23,
+          "exact_tp_pred": 23,
+          "overlap_tp_gold": 23,
+          "overlap_tp_pred": 23,
+          "leak": {
+            "values": 22,
+            "leaked": 0,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 33,
+            "over_masked": 10
+          }
+        },
+        "NATIONAL_ID_HU_TAJ": {
+          "gold": 0,
+          "pred": 6,
+          "exact_tp_gold": 0,
+          "exact_tp_pred": 0,
+          "overlap_tp_gold": 0,
+          "overlap_tp_pred": 0,
+          "leak": null,
+          "over_masking": {
+            "masked": 6,
+            "over_masked": 6
+          }
+        },
+        "ID_DOCUMENT": {
+          "gold": 33,
+          "pred": 67,
+          "exact_tp_gold": 30,
+          "exact_tp_pred": 30,
+          "overlap_tp_gold": 31,
+          "overlap_tp_pred": 31,
+          "leak": {
+            "values": 28,
+            "leaked": 0,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 67,
+            "over_masked": 34
+          }
+        },
+        "BANK_ACCOUNT": {
+          "gold": 33,
+          "pred": 84,
+          "exact_tp_gold": 31,
+          "exact_tp_pred": 31,
+          "overlap_tp_gold": 33,
+          "overlap_tp_pred": 33,
+          "leak": {
+            "values": 29,
+            "leaked": 0,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 84,
+            "over_masked": 50
+          }
+        },
+        "ORGANIZATION": {
+          "gold": 512,
+          "pred": 291,
+          "exact_tp_gold": 216,
+          "exact_tp_pred": 216,
+          "overlap_tp_gold": 256,
+          "overlap_tp_pred": 261,
+          "leak": null,
+          "over_masking": null
+        },
+        "SECRET": {
+          "gold": 0,
+          "pred": 1,
+          "exact_tp_gold": 0,
+          "exact_tp_pred": 0,
+          "overlap_tp_gold": 0,
+          "overlap_tp_pred": 0,
+          "leak": null,
+          "over_masking": {
+            "masked": 1,
+            "over_masked": 1
+          }
+        }
+      },
+      "validity": {
+        "valid": {
+          "gold": 51,
+          "found": 50,
+          "values": 44,
+          "leaked": 1
+        },
+        "invalid": {
+          "gold": 66,
+          "found": 63,
+          "values": 61,
+          "leaked": 1
+        },
+        "excluding_number_types": {
+          "gold": 1593,
+          "found": 1066,
+          "values": 839,
+          "leaked": 204
+        },
+        "per_type": {
+          "PHONE": {
+            "valid": {
+              "gold": 32,
+              "found": 31,
+              "values": 30,
+              "leaked": 1
+            },
+            "invalid": {
+              "gold": 19,
+              "found": 18,
+              "values": 18,
+              "leaked": 1
+            }
+          },
+          "ID_DOCUMENT": {
+            "valid": {
+              "gold": 8,
+              "found": 8,
+              "values": 5,
+              "leaked": 0
+            },
+            "invalid": {
+              "gold": 25,
+              "found": 23,
+              "values": 23,
+              "leaked": 0
+            }
+          },
+          "BANK_ACCOUNT": {
+            "valid": {
+              "gold": 11,
+              "found": 11,
+              "values": 9,
+              "leaked": 0
+            },
+            "invalid": {
+              "gold": 22,
+              "found": 22,
+              "values": 20,
+              "leaked": 0
+            }
+          }
+        },
+        "source": null
+      }
+    },
+    "languages": {
+      "de": {
+        "documents": 200,
+        "gold_spans": 912,
+        "predicted_spans": 859,
+        "unscored_predictions": 60,
+        "exact": {
+          "gold": 912,
+          "pred": 799,
+          "tp_pred": 483,
+          "tp_gold": 483,
+          "precision": 0.604506,
+          "recall": 0.529605,
+          "f1": 0.564582
+        },
+        "overlap": {
+          "gold": 912,
+          "pred": 799,
+          "tp_pred": 584,
+          "tp_gold": 567,
+          "precision": 0.730914,
+          "recall": 0.621711,
+          "f1": 0.671904
+        },
+        "macro_f1_overlap": 0.609213,
+        "leak": {
+          "values": 549,
+          "leaked": 166,
+          "partial": 14,
+          "rate": 0.302368,
+          "partial_rate": 0.025501
+        },
+        "over_masking": {
+          "masked": 705,
+          "over_masked": 182,
+          "rate": 0.258156
+        },
+        "roundtrip": {
+          "documents": 200,
+          "exact": 200,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 549,
+          "consistent": 351,
+          "multi_occurrence": 98,
+          "multi_consistent": 76,
+          "rate": 0.639344,
+          "multi_rate": 0.77551
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 81.367,
+            "p95": 117.725
+          },
+          "mask": {
+            "p50": 0.834,
+            "p95": 1.508
+          }
+        },
+        "per_type": {
+          "PERSON": {
+            "gold": 452,
+            "pred": 295,
+            "exact_tp_gold": 235,
+            "exact_tp_pred": 235,
+            "overlap_tp_gold": 265,
+            "overlap_tp_pred": 266,
+            "leak": {
+              "values": 345,
+              "leaked": 154,
+              "partial": 11
+            },
+            "over_masking": {
+              "masked": 295,
+              "over_masked": 20
+            }
+          },
+          "ADDRESS": {
+            "gold": 142,
+            "pred": 240,
+            "exact_tp_gold": 96,
+            "exact_tp_pred": 96,
+            "overlap_tp_gold": 128,
+            "overlap_tp_pred": 143,
+            "leak": {
+              "values": 118,
+              "leaked": 9,
+              "partial": 1
+            },
+            "over_masking": {
+              "masked": 240,
+              "over_masked": 89
+            }
+          },
+          "EMAIL": {
+            "gold": 28,
+            "pred": 31,
+            "exact_tp_gold": 21,
+            "exact_tp_pred": 21,
+            "overlap_tp_gold": 27,
+            "overlap_tp_pred": 27,
+            "leak": {
+              "values": 22,
+              "leaked": 1,
+              "partial": 2
+            },
+            "over_masking": {
+              "masked": 31,
+              "over_masked": 4
+            }
+          },
+          "PHONE": {
+            "gold": 20,
+            "pred": 27,
+            "exact_tp_gold": 16,
+            "exact_tp_pred": 16,
+            "overlap_tp_gold": 18,
+            "overlap_tp_pred": 18,
+            "leak": {
+              "values": 19,
+              "leaked": 2,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 27,
+              "over_masked": 6
+            }
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 12,
+            "pred": 20,
+            "exact_tp_gold": 12,
+            "exact_tp_pred": 12,
+            "overlap_tp_gold": 12,
+            "overlap_tp_pred": 12,
+            "leak": {
+              "values": 12,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 20,
+              "over_masked": 8
+            }
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 0,
+            "pred": 2,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": {
+              "masked": 2,
+              "over_masked": 2
+            }
+          },
+          "ID_DOCUMENT": {
+            "gold": 18,
+            "pred": 41,
+            "exact_tp_gold": 16,
+            "exact_tp_pred": 16,
+            "overlap_tp_gold": 16,
+            "overlap_tp_pred": 16,
+            "leak": {
+              "values": 15,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 41,
+              "over_masked": 24
+            }
+          },
+          "BANK_ACCOUNT": {
+            "gold": 19,
+            "pred": 49,
+            "exact_tp_gold": 17,
+            "exact_tp_pred": 17,
+            "overlap_tp_gold": 19,
+            "overlap_tp_pred": 19,
+            "leak": {
+              "values": 18,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 49,
+              "over_masked": 29
+            }
+          },
+          "ORGANIZATION": {
+            "gold": 221,
+            "pred": 94,
+            "exact_tp_gold": 70,
+            "exact_tp_pred": 70,
+            "overlap_tp_gold": 82,
+            "overlap_tp_pred": 83,
+            "leak": null,
+            "over_masking": null
+          }
+        },
+        "validity": {
+          "valid": {
+            "gold": 24,
+            "found": 23,
+            "values": 21,
+            "leaked": 1
+          },
+          "invalid": {
+            "gold": 33,
+            "found": 30,
+            "values": 31,
+            "leaked": 1
+          },
+          "excluding_number_types": {
+            "gold": 855,
+            "found": 514,
+            "values": 497,
+            "leaked": 164
+          },
+          "per_type": {
+            "PHONE": {
+              "valid": {
+                "gold": 19,
+                "found": 18,
+                "values": 18,
+                "leaked": 1
+              },
+              "invalid": {
+                "gold": 1,
+                "found": 0,
+                "values": 1,
+                "leaked": 1
+              }
+            },
+            "ID_DOCUMENT": {
+              "valid": {
+                "gold": 3,
+                "found": 3,
+                "values": 1,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 15,
+                "found": 13,
+                "values": 14,
+                "leaked": 0
+              }
+            },
+            "BANK_ACCOUNT": {
+              "valid": {
+                "gold": 2,
+                "found": 2,
+                "values": 2,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 17,
+                "found": 17,
+                "values": 16,
+                "leaked": 0
+              }
+            }
+          },
+          "source": null
+        }
+      },
+      "en": {
+        "documents": 200,
+        "gold_spans": 798,
+        "predicted_spans": 774,
+        "unscored_predictions": 26,
+        "exact": {
+          "gold": 798,
+          "pred": 748,
+          "tp_pred": 538,
+          "tp_gold": 538,
+          "precision": 0.719251,
+          "recall": 0.674185,
+          "f1": 0.69599
+        },
+        "overlap": {
+          "gold": 798,
+          "pred": 748,
+          "tp_pred": 634,
+          "tp_gold": 612,
+          "precision": 0.847594,
+          "recall": 0.766917,
+          "f1": 0.80524
+        },
+        "macro_f1_overlap": 0.656335,
+        "leak": {
+          "values": 395,
+          "leaked": 40,
+          "partial": 14,
+          "rate": 0.101266,
+          "partial_rate": 0.035443
+        },
+        "over_masking": {
+          "masked": 551,
+          "over_masked": 87,
+          "rate": 0.157895
+        },
+        "roundtrip": {
+          "documents": 200,
+          "exact": 200,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 395,
+          "consistent": 329,
+          "multi_occurrence": 74,
+          "multi_consistent": 57,
+          "rate": 0.832911,
+          "multi_rate": 0.77027
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 100.578,
+            "p95": 191.72
+          },
+          "mask": {
+            "p50": 0.518,
+            "p95": 1.324
+          }
+        },
+        "per_type": {
+          "PERSON": {
+            "gold": 242,
+            "pred": 202,
+            "exact_tp_gold": 180,
+            "exact_tp_pred": 180,
+            "overlap_tp_gold": 187,
+            "overlap_tp_pred": 188,
+            "leak": {
+              "values": 171,
+              "leaked": 28,
+              "partial": 2
+            },
+            "over_masking": {
+              "masked": 202,
+              "over_masked": 10
+            }
+          },
+          "ADDRESS": {
+            "gold": 154,
+            "pred": 197,
+            "exact_tp_gold": 108,
+            "exact_tp_pred": 108,
+            "overlap_tp_gold": 142,
+            "overlap_tp_pred": 159,
+            "leak": {
+              "values": 133,
+              "leaked": 11,
+              "partial": 10
+            },
+            "over_masking": {
+              "masked": 197,
+              "over_masked": 36
+            }
+          },
+          "EMAIL": {
+            "gold": 40,
+            "pred": 40,
+            "exact_tp_gold": 38,
+            "exact_tp_pred": 38,
+            "overlap_tp_gold": 38,
+            "overlap_tp_pred": 38,
+            "leak": {
+              "values": 28,
+              "leaked": 1,
+              "partial": 2
+            },
+            "over_masking": {
+              "masked": 40,
+              "over_masked": 1
+            }
+          },
+          "PHONE": {
+            "gold": 31,
+            "pred": 33,
+            "exact_tp_gold": 27,
+            "exact_tp_pred": 27,
+            "overlap_tp_gold": 31,
+            "overlap_tp_pred": 31,
+            "leak": {
+              "values": 29,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 33,
+              "over_masked": 2
+            }
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 11,
+            "pred": 13,
+            "exact_tp_gold": 11,
+            "exact_tp_pred": 11,
+            "overlap_tp_gold": 11,
+            "overlap_tp_pred": 11,
+            "leak": {
+              "values": 10,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 13,
+              "over_masked": 2
+            }
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 0,
+            "pred": 4,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": {
+              "masked": 4,
+              "over_masked": 4
+            }
+          },
+          "ID_DOCUMENT": {
+            "gold": 15,
+            "pred": 26,
+            "exact_tp_gold": 14,
+            "exact_tp_pred": 14,
+            "overlap_tp_gold": 15,
+            "overlap_tp_pred": 15,
+            "leak": {
+              "values": 13,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 26,
+              "over_masked": 10
+            }
+          },
+          "BANK_ACCOUNT": {
+            "gold": 14,
+            "pred": 35,
+            "exact_tp_gold": 14,
+            "exact_tp_pred": 14,
+            "overlap_tp_gold": 14,
+            "overlap_tp_pred": 14,
+            "leak": {
+              "values": 11,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 35,
+              "over_masked": 21
+            }
+          },
+          "ORGANIZATION": {
+            "gold": 291,
+            "pred": 197,
+            "exact_tp_gold": 146,
+            "exact_tp_pred": 146,
+            "overlap_tp_gold": 174,
+            "overlap_tp_pred": 178,
+            "leak": null,
+            "over_masking": null
+          },
+          "SECRET": {
+            "gold": 0,
+            "pred": 1,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": {
+              "masked": 1,
+              "over_masked": 1
+            }
+          }
+        },
+        "validity": {
+          "valid": {
+            "gold": 27,
+            "found": 27,
+            "values": 23,
+            "leaked": 0
+          },
+          "invalid": {
+            "gold": 33,
+            "found": 33,
+            "values": 30,
+            "leaked": 0
+          },
+          "excluding_number_types": {
+            "gold": 738,
+            "found": 552,
+            "values": 342,
+            "leaked": 40
+          },
+          "per_type": {
+            "PHONE": {
+              "valid": {
+                "gold": 13,
+                "found": 13,
+                "values": 12,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 18,
+                "found": 18,
+                "values": 17,
+                "leaked": 0
+              }
+            },
+            "ID_DOCUMENT": {
+              "valid": {
+                "gold": 5,
+                "found": 5,
+                "values": 4,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 10,
+                "found": 10,
+                "values": 9,
+                "leaked": 0
+              }
+            },
+            "BANK_ACCOUNT": {
+              "valid": {
+                "gold": 9,
+                "found": 9,
+                "values": 7,
+                "leaked": 0
+              },
+              "invalid": {
+                "gold": 5,
+                "found": 5,
+                "values": 4,
+                "leaked": 0
+              }
+            }
+          },
+          "source": null
+        }
+      }
+    }
+  }
+}

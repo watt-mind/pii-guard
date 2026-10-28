@@ -1,0 +1,282 @@
+{
+  "method": {
+    "shingles": "word 5-grams of NFKC case-folded text",
+    "minhash": "128 hashes, LSH 32 bands x 4 rows",
+    "threshold": "exact Jaccard >= 0.8",
+    "exact": "SHA-256 of the whitespace-folded text"
+  },
+  "documents": 71976,
+  "dropped": 0,
+  "dropped_exact": 0,
+  "dropped_near": 0,
+  "by_eval_set": {},
+  "files": {
+    "eval/generated/v31-final/openpii/hu-openpii-train-10k.jsonl": {
+      "documents": 10000,
+      "kept": 10000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/en-openpii-train.jsonl": {
+      "documents": 5000,
+      "kept": 5000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/de-openpii-train.jsonl": {
+      "documents": 5000,
+      "kept": 5000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/pl-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/cs-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/sk-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/ro-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/hr-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/sl-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/privy/en-privy-train-6k.jsonl": {
+      "documents": 6000,
+      "kept": 6000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/wismut/en-wismut-train.jsonl": {
+      "documents": 3000,
+      "kept": 3000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/wismut/de-wismut-train.jsonl": {
+      "documents": 3000,
+      "kept": 3000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/wismut/pl-wismut-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/wismut/cs-wismut-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/wismut/ro-wismut-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/nemotron/en-nemotron-train.jsonl": {
+      "documents": 1500,
+      "kept": 1500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/gretel/en-gretel-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/s11/hu-distill-train-x1.5.jsonl": {
+      "documents": 3156,
+      "kept": 3156,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/s11/en-distill-train-x1.5.jsonl": {
+      "documents": 3179,
+      "kept": 3179,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/negatives/hu-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/negatives/en-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/negatives/de-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/hu-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/en-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/de-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/pl-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/cs-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/sk-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/ro-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/hr-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/openpii/sl-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/s11/hu-distill-dev.jsonl": {
+      "documents": 368,
+      "kept": 368,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v31-final/s11/en-distill-dev.jsonl": {
+      "documents": 373,
+      "kept": 373,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    }
+  },
+  "examples": [],
+  "eval_index": {
+    "documents_by_set": {
+      "agent-traffic": 990,
+      "agent-traffic-dev": 300,
+      "ai4privacy": 600,
+      "cee-pii": 451,
+      "fixtures/brand-names": 24,
+      "fixtures/company-names": 44,
+      "fixtures/inflection": 12,
+      "fixtures/injection": 62,
+      "fixtures/known-values": 5,
+      "fixtures/secrets": 21,
+      "fixtures/smoke": 51,
+      "fixtures/synth-sample": 30,
+      "fixtures/uncued-numbers": 38,
+      "gretel-finance": 400,
+      "mapa-eur-lex": 42,
+      "nemotron-pii": 300,
+      "pl-pii-bench": 346
+    },
+    "hashes": 3653,
+    "missing": [
+      "data/datasets/fixtures/tab-echr/en-tab-echr.jsonl"
+    ]
+  },
+  "max_jaccard": {
+    "agent-traffic-dev": {
+      "jaccard": 0.0241,
+      "train_id": "en-distill-s11-01251",
+      "eval_id": "en-agent-traffic-dev-0020",
+      "train_documents": 71976,
+      "eval_documents": 300,
+      "method": "exact Jaccard of word 5-gram sets over every pair sharing a shingle"
+    }
+  }
+}

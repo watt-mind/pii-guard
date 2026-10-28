@@ -10,6 +10,8 @@ once per candidate, each in its own process (the NER backend is shared per proce
     PII_GUARD_NER_DEVICE=cpu uv run --no-sync python training/ner/eval_v3.py score \\
         --candidate xlmr-v3 --model models/ner/pii-guard-ner-xlmr-base-v3 --record
 
+``--ticket LAB-1410`` scores the v3.1 candidates (records ``<date>-lab-1410-<set>-<name>``).
+
 ``latency`` times every candidate on the same ~400-character messages (hu + en synth samples),
 alternating per message so changes in machine load hit all of them alike, NER only::
 
@@ -52,6 +54,14 @@ LABELS = {
     "v20": "pii-guard fast, NER v2.0 (published hdkiller/pii-guard-ner-xlmr-base, LAB-1306)",
     "xlmr-v3": "pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)",
     "mmbert-v3": "pii-guard fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)",
+    "v31-a": "pii-guard fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410)",
+    "v31-b": "pii-guard fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)",
+    "v31-c": "pii-guard fast, NER v3.1 candidate C: B without Wismut (LAB-1410)",
+}
+#: Per ticket: the record slug prefix and what the run notes say. ``--ticket`` picks one.
+TICKETS = {
+    "LAB-1393": "NER v3 candidates vs v2.0",
+    "LAB-1410": "NER v3.1 candidates vs v2.0 (clean selection set: agent-traffic-dev)",
 }
 
 
@@ -112,21 +122,26 @@ def _score(args: argparse.Namespace) -> int:
         wall = time.perf_counter() - started
         card = build_scorecard(results, detectors=analyzer.loaded, fixture_paths=paths)
         notes = [
-            "LAB-1393: NER v3 candidates vs v2.0, fast mode (rules + NER), CPU "
+            f"{args.ticket}: {TICKETS[args.ticket]}, fast mode (rules + NER), CPU "
             "(PII_GUARD_NER_DEVICE=cpu), one commit.",
             f"Wall time {wall:.1f} s, load average at end {os.getloadavg()[0]:.1f}.",
         ]
         if name == "ai4privacy":
             notes.append("Every candidate trained on OpenPII train rows: in distribution here.")
-        if name == "agent-traffic-dev":
+        if name == "agent-traffic-dev" and args.ticket == "LAB-1393":
             notes.append(
                 "The v3 mix holds train-only agent-traffic documents from the same generator "
                 "(seed 1393, near-copies removed by decontam.py): closer to distribution than "
                 "for v2.0."
             )
+        if name == "agent-traffic-dev" and args.ticket == "LAB-1410":
+            notes.append(
+                "Selection set. No v3.1 mix holds any agent-traffic generator document, so it "
+                "is unseen by every candidate, as it was for v2.0."
+            )
         records = build_records(
             card,
-            slug=f"lab-1393-{name}-{args.candidate}",
+            slug=f"{args.ticket.lower()}-{name}-{args.candidate}",
             detectors=detectors,
             hardware=host_info(),
             extra={"system": {"label": LABELS.get(args.candidate, args.candidate)}},
@@ -225,6 +240,7 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument("--candidate", required=True)
     score.add_argument("--model", help="checkpoint directory (default: the published v2.0)")
     score.add_argument("--sets", nargs="+", default=list(SETS), choices=list(SETS))
+    score.add_argument("--ticket", default="LAB-1393", choices=list(TICKETS))
     score.add_argument("--record", action="store_true")
     score.add_argument("--runs-dir", type=Path, default=Path("eval/results/runs"))
     score.add_argument("--scorecards", type=Path)
