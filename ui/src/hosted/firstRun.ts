@@ -169,7 +169,7 @@ export class TestRequestError extends Error {
 /** What to do after a failed test request, by status and error code only (never server text). */
 export function testRecovery(error: unknown): string {
   if (error instanceof TestRequestError) {
-    if (error.code === "sponsored_unavailable") return "Sponsored inference is unavailable right now. Add your own Meta API key to this endpoint, then try again.";
+    if (error.code === "sponsored_unavailable") return "Free runs are paused right now. Add your own Meta API key to this endpoint in Projects, then try again.";
     // The provider's own refusal keeps its status (a wrong key is the provider's 401).
     if (error.code.startsWith("upstream") || error.status === 502 || error.status === 504) return "The model provider refused or didn't answer. If you added your own key, check it is valid for the Meta Model API, then retry.";
     if (error.status === 401 || error.status === 403) return "Your session is no longer authorised. Sign in again, then retry.";

@@ -110,7 +110,7 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
         <h3 id={listTitle} tabIndex={-1} className="text-lg font-normal text-ink focus:outline-none">Your connections</h3>
         <Announcer message={announce} />
         {account.connections.length === 0 ? (
-          <p className="text-sm text-muted">No provider connections yet. Playground chat uses the sponsored model.</p>
+          <p className="text-sm text-muted">No provider connections yet. Playground chat uses Meta Muse Spark.</p>
         ) : (
           <ul className="divide-y divide-line" aria-labelledby={listTitle}>
             {account.connections.map((c) => (
@@ -190,7 +190,7 @@ export function ProviderConnections() {
       <div className="space-y-6 rounded-xl border border-line bg-surface p-4 sm:p-5">
         <Field label="Playground chat sends through" className="sm:max-w-md">
           <Select value={active} onChange={(e) => setPlaygroundConnection(e.target.value)}>
-            <option value="">Sponsored Meta (subject to allowance)</option>
+            <option value="">Meta Muse Spark (no key needed)</option>
             {account.connections.map((c) => <option key={c.id} value={c.id}>{connectionLabel(c)}</option>)}
           </Select>
         </Field>

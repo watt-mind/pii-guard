@@ -145,7 +145,7 @@ function ConnectEndpoint({
     wasNeedsKey.current = state === "needs_key";
   }, [state]);
   const upstream =
-    endpoint.provider === "sponsored" ? (state === "needs_key" ? "Meta API key needed" : "Sponsored Meta") : endpoint.provider === "meta" ? "Your Meta API key" : endpoint.provider;
+    endpoint.provider === "sponsored" ? (state === "needs_key" ? "Meta API key needed" : "Meta Muse Spark, no key needed") : endpoint.provider === "meta" ? "Your Meta API key" : endpoint.provider;
   return (
     <div className="space-y-5 rounded-xl border border-line bg-surface p-4 sm:p-5" data-testid="first-run">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
@@ -170,7 +170,7 @@ function ConnectEndpoint({
           <MetaKeyStep call={call} onAdded={onChanged} />
         ) : (
           <Notice tone="warn" title="This endpoint can't answer yet">
-            Sponsored inference is unavailable. Edit the endpoint in <a className="underline underline-offset-4" href="#projects">Projects</a> to use your own provider key.
+            Free runs are paused right now. Edit the endpoint in <a className="underline underline-offset-4" href="#projects">Projects</a> to use your own provider key.
           </Notice>
         )
       ) : state === "disabled" ? (
@@ -226,8 +226,8 @@ function MetaKeyStep({ call, onAdded }: { call: Requester; onAdded: () => void }
           Add your Meta API key
         </h3>
         <p className="mt-0.5 text-sm text-pretty text-muted">
-          Sponsored inference isn&apos;t available on this service yet, so your endpoint calls the Meta Model API with your own key. pii-guard sends it only to{" "}
-          {mono("api.meta.ai")}, with masked text, and never falls back to another model.
+          Free runs are paused right now, so your endpoint calls the Meta Model API with your own key. pii-guard sends it only to{" "}
+          {mono("api.meta.ai")}, with masked text, and never switches to another model or key.
         </p>
       </div>
       <Field

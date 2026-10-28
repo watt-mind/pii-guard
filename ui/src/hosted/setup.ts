@@ -23,7 +23,7 @@ interface Step {
 
 /** The order a first-time owner needs: each step needs the one before it (LAB-1448). */
 export const SETUP_STEPS: readonly Step[] = [
-  { id: "provider", title: "Choose a model", hint: "Connect your own provider key, or use Sponsored Meta within the daily allowance.", href: "#connect", cta: "Connect a provider" },
+  { id: "provider", title: "Choose a model", hint: "Connect your own provider key, or use Meta Muse Spark with no key within today's free runs.", href: "#connect", cta: "Connect a provider" },
   { id: "policy", title: "Create a policy", hint: "Decide what is masked, kept or blocked.", href: "#projects", cta: "Create a policy" },
   { id: "endpoint", title: "Create an endpoint", hint: "One upstream, model and policy version.", href: "#projects", cta: "Create an endpoint" },
   { id: "key", title: "Create an endpoint key", hint: "Your application authenticates with it. It is shown once.", href: "#connect", cta: "Create an endpoint key" },

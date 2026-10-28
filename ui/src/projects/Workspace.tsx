@@ -36,7 +36,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   fireworks: "Fireworks",
   openrouter: "OpenRouter",
   custom: "Custom HTTPS endpoint",
-  sponsored: "Sponsored Meta (subject to allowance)",
+  sponsored: "Meta Muse Spark (no key needed)",
 };
 const providerLabel = (provider: string) => PROVIDER_LABEL[provider] ?? provider;
 const LANGUAGE_LABEL: Record<string, string> = { hu: "Hungarian", en: "English", de: "German" };
