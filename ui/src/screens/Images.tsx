@@ -5,7 +5,7 @@ import type { ServerStatus } from "../api/status";
 import type { ImageMaskRequest, ImageMaskResponse, ImageRegion } from "../api/types";
 import { Boundary } from "../components/Boundary";
 import { Pane } from "../components/Pane";
-import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
+import { BlockedNotice, Button, Checkbox, EmptyState, KeyValues, Metric, Select } from "../components/ui";
 import { useHostedSession } from "../hosted/session";
 import { DEFAULT_IMAGE_SAMPLE, IMAGE_SAMPLES, MAX_UPLOAD_BYTES, UPLOAD_TYPES, type ImageSample } from "../content/imageSamples";
 import { metaFor, modelLabel } from "../lib/entities";
@@ -66,6 +66,13 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }>
   const value = await fn();
   return { value, ms: Math.round(performance.now() - started) };
 }
+
+/**
+ * Image colours, not theme colours: the server fills masked regions solid black, so the demo
+ * drawing does too, and region tags carry white text on the region hue. Overridable tokens.
+ */
+const IMAGE_FILL = "var(--image-mask-fill, #000)";
+const ON_REGION = "var(--on-region, #fff)";
 
 const sampleSelection = (sample: ImageSample): Selection => ({ kind: "sample", key: `sample:${sample.id}`, sample });
 
@@ -179,9 +186,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
 
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-medium text-balance text-ink">Faces, signatures and ID numbers, covered before the image leaves.</h1>
-        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
+      <p className="max-w-3xl text-sm text-pretty text-muted">
           {hosted && !demo
             ? "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
             : serverImages && !demo
@@ -190,11 +195,10 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
               : "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image. Signatures and stamps need SAM 3.1 (META_API_KEY on the server)."
             : "Faces, ID photos, signatures and stamps are segmented on the pii-guard server; OCR plus the text detectors find identifiers printed in the image."}{" "}
           Every masked region is filled solid, and the image is rebuilt from pixels, so no metadata leaves either.
-        </p>
-      </div>
+      </p>
 
       {hosted && (
-        <p role="note" aria-label="How hosted images are processed" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+        <p role="note" aria-label="How hosted images are processed" className="rounded-lg border border-line bg-surface px-4 py-3 text-sm text-ink">
           <strong className="font-medium">Your image is processed in memory on our Azure server and is not stored.</strong> Its text is read with Tesseract and faces are found on that
           server's CPU; the image is not sent to any other service or model. Only the masked image and your session's placeholders are kept, in memory, until you delete the session or
           the server restarts. Signatures and stamps are not detected here and stay visible: cover them before uploading, or self-host pii-guard with SAM 3.1.
@@ -202,7 +206,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
       )}
 
       {serverImages && !serverImages.available && !demo && (
-        <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+        <p role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
           <strong className="font-medium text-warn">This server refuses images right now (fail closed).</strong> {imageNeeds(serverImages.gaps)} The samples can still replay a
           recorded run.
         </p>
@@ -241,7 +245,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
               </button>
             );
           })}
-          <div className="flex w-[15rem] shrink-0 snap-start flex-col justify-center gap-1 sm:w-auto">
+          <div className="flex w-[15rem] shrink-0 snap-start flex-col sm:w-auto">
             <input
               ref={fileInput}
               id="image-upload"
@@ -255,17 +259,26 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
                 e.target.value = "";
               }}
             />
-            <Button
-              variant={selection.kind === "upload" ? "primary" : "secondary"}
-              className="h-auto min-h-16 w-full flex-col !items-start gap-0 rounded-lg border-dashed px-3.5 py-2 text-left"
+            <button
+              type="button"
               aria-describedby="upload-hint"
               onClick={() => fileInput.current?.click()}
+              className={[
+                "flex h-full min-h-16 w-full flex-col items-start justify-center gap-0.5 rounded-lg border border-dashed px-3.5 py-2 text-left text-ink transition-colors",
+                selection.kind === "upload"
+                  ? "border-line-strong bg-surface shadow-[0_0_0_1px_var(--line-strong)]"
+                  : "border-field hover:bg-surface-2",
+              ].join(" ")}
             >
               <span className="text-sm font-medium">{selection.kind === "upload" ? "Upload another image" : "Upload an image"}</span>
-              <span id="upload-hint" className="max-w-full truncate text-xs font-normal opacity-75">
-                {selection.kind === "upload" ? selection.name : demo ? "Needs the live API: masking runs on the server." : "PNG or JPEG, up to 10 MB. Fictional only."}
+              <span id="upload-hint" className="max-w-full text-xs break-words text-muted">
+                {selection.kind === "upload"
+                  ? selection.name
+                  : demo
+                    ? "Needs the live API: masking runs on the server."
+                    : `PNG or JPEG, up to ${Math.round(maxUploadBytes / 1024 / 1024)} MB. Fictional only.`}
               </span>
-            </Button>
+            </button>
           </div>
         </div>
         {uploadError && (
@@ -287,23 +300,19 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
               <label className="sr-only" htmlFor="image-language">
                 Language of the text in the image
               </label>
-              <select
-                id="image-language"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value as "hu" | "en")}
-                className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink"
-                title="Language of the text printed in the image: decides which rules run on its OCR text"
-              >
-                <option value="hu">Hungarian</option>
-                <option value="en">English</option>
-              </select>
-              {data && data.regions.length > 0 && (
-                <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm text-muted hover:text-ink">
-                  <input type="checkbox" checked={showRegions} onChange={(e) => setShowRegions(e.target.checked)} className="size-4 accent-[var(--guard)]" />
-                  Show regions
-                </label>
-              )}
-              <Button variant="primary" onClick={() => void run()} disabled={running}>
+              <div className="w-32">
+                <Select
+                  id="image-language"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as "hu" | "en")}
+                  title="Language of the text printed in the image: decides which rules run on its OCR text"
+                >
+                  <option value="hu">Hungarian</option>
+                  <option value="en">English</option>
+                </Select>
+              </div>
+              {data && data.regions.length > 0 && <Checkbox label="Show regions" checked={showRegions} onChange={(e) => setShowRegions(e.target.checked)} className="px-1" />}
+              <Button variant="primary" onClick={() => void run()} busy={running}>
                 {running ? "Masking…" : fresh ? "Run again" : "Mask image"}
                 <span aria-hidden="true">→</span>
               </Button>
@@ -331,9 +340,9 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
         <Boundary direction="outbound" label="pii-guard boundary: only the masked image crosses it">
           {summary && (
             <dl className="flex gap-3 text-center lg:flex-col lg:gap-2">
-              <Stat label="found" value={summary.found} />
-              <Stat label="masked" value={summary.masked} />
-              <Stat label="kept" value={summary.kept} />
+              <Metric label="found" value={summary.found} className="min-w-12" />
+              <Metric label="masked" value={summary.masked} className="min-w-12" />
+              <Metric label="kept" value={summary.kept} className="min-w-12" />
             </dl>
           )}
         </Boundary>
@@ -361,7 +370,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
               <UnreadableNotice code={error.code} />
             ) : (
               <div className="space-y-3">
-                <BlockedNotice error={error} />
+                <BlockedNotice error={error} onRetry={() => void run()} />
                 {serverImages && !serverImages.available && <p className="text-sm text-muted">{imageNeeds(serverImages.gaps)}</p>}
                 {replayRecorded && selection.kind === "sample" && !demo && (
                   <Button onClick={() => void replay()} title="Shows the regions recorded from a live run on this sample. The engine stays on the live API.">
@@ -382,7 +391,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
                 <Figure src={src} alt={`Masked image (drawn in the browser): ${summary?.masked ?? 0} regions covered.`} testId="demo-masked-image">
                   {data.regions.map((r, i) =>
                     r.policy === "mask" ? (
-                      <span key={i} aria-hidden="true" data-testid="demo-mask" className="absolute bg-black" style={percentBox(r.box, data.width, data.height, MASK_PADDING)} />
+                      <span key={i} aria-hidden="true" data-testid="demo-mask" className="absolute" style={{ ...percentBox(r.box, data.width, data.height, MASK_PADDING), backgroundColor: IMAGE_FILL }} />
                     ) : null,
                   )}
                   {active !== null && data.regions[active] && <Highlight region={data.regions[active]} width={data.width} height={data.height} />}
@@ -397,29 +406,23 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
       </div>
 
       {data && result && !error && (
-        <section aria-labelledby="regions-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 rounded-xl border border-line bg-surface p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+        <section aria-labelledby="regions-title" className="grid grid-cols-[minmax(0,1fr)] gap-6 rounded-xl border border-line bg-surface p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
           <div className="space-y-4">
             <div>
               <h2 id="regions-title" className="text-lg font-normal text-ink">
                 Detected regions
               </h2>
-              <p className="mt-1 text-sm text-muted">Blue regions were masked. Dashed grey regions were found but kept visible by policy (company stamps, by default). No region carries the text or pixels it covers.</p>
+              <p className="mt-0.5 text-sm text-muted">Blue regions were masked. Dashed grey regions were found but kept visible by policy (company stamps, by default). No region carries the text or pixels it covers.</p>
             </div>
             <ImageLegend regions={data.regions} activeType={active !== null ? (data.regions[active]?.entity_type ?? null) : null} />
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted">
-              <dt>Engine</dt>
-              <dd className="text-ink">{result.engine === "api" ? "pii-guard API" : "Demo engine (recorded regions)"}</dd>
-              <dt>Segmentation</dt>
-              <dd className="text-ink">
-                {data.analysis.sam.model} · {summary?.sam ?? 0} {summary?.sam === 1 ? "region" : "regions"}
-              </dd>
-              <dt>Text (OCR)</dt>
-              <dd className="text-ink">{data.analysis.ocr.ran ? `${data.analysis.ocr.engine} · ${summary?.ocr ?? 0} regions` : "off"}</dd>
-              <dt>Image</dt>
-              <dd className="tabular-nums text-ink">
-                {data.width} × {data.height} px
-              </dd>
-            </dl>
+            <KeyValues
+              items={[
+                { label: "Engine", value: result.engine === "api" ? "pii-guard API" : "Demo engine (recorded regions)" },
+                { label: "Segmentation", value: `${data.analysis.sam.model} · ${summary?.sam ?? 0} ${summary?.sam === 1 ? "region" : "regions"}` },
+                { label: "Text (OCR)", value: data.analysis.ocr.ran ? `${data.analysis.ocr.engine} · ${summary?.ocr ?? 0} regions` : "off" },
+                { label: "Image", value: <span className="tabular-nums">{data.width} × {data.height} px</span> },
+              ]}
+            />
           </div>
           <div className="min-w-0">
             <h3 className="mb-2 text-sm font-medium text-ink">Region list</h3>
@@ -487,13 +490,13 @@ function RegionBox({
         aria-hidden="true"
         className={[
           "absolute px-1 font-mono",
-          tag.startsWith("top") ? "-top-[1.15rem] rounded-t" : "-bottom-[1.15rem] rounded-b",
+          tag.startsWith("top") ? "-top-4 rounded-t" : "-bottom-4 rounded-b",
           tag.endsWith("left") ? "left-[-2px]" : "right-[-2px]",
-          " text-2xs leading-[1.1rem] font-medium whitespace-nowrap text-white",
+          "text-2xs font-medium whitespace-nowrap",
           // Text regions sit between lines of text: their tag would hide the line above.
           region.source === "ocr" && !active ? "hidden" : "",
         ].join(" ")}
-        style={{ backgroundColor: color }}
+        style={{ backgroundColor: color, color: ON_REGION }}
       >
         {meta.label}
         {kept ? " · kept" : ""}
@@ -638,7 +641,7 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
 
 function DemoUploadNotice({ switchEngine }: { switchEngine: boolean }) {
   return (
-    <div role="alert" className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
+    <div role="alert" className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4">
       <p className="font-medium text-warn">Uploads need the live API.</p>
       <p className="mt-1 text-ink">Image masking runs on the pii-guard server, not in your browser. Your image was not sent anywhere.</p>
       <p className="mt-2 text-muted">
@@ -656,7 +659,7 @@ function DemoUploadNotice({ switchEngine }: { switchEngine: boolean }) {
 
 function UnreadableNotice({ code }: { code: string }) {
   return (
-    <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft p-4 text-sm">
+    <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4">
       <p className="font-medium text-danger">{code === "invalid_image" ? "This image couldn't be decoded." : "This file isn't a PNG or JPEG image."}</p>
       <p className="mt-1 text-ink">The guard rejected it before any detection ran, so nothing was sent to the model.</p>
       <p className="mt-2 text-muted">Try another PNG or JPEG file.</p>
@@ -676,9 +679,9 @@ function Running() {
 /** What the server's image pipeline is missing, phrased for a checkout and for `uvx` alike. */
 function imageNeeds(gaps: readonly string[]): string {
   const parts: string[] = [];
-  if (gaps.includes("ocr")) parts.push("the ocr extra");
-  if (gaps.includes("tesseract")) parts.push("Tesseract (brew install tesseract, apt install tesseract-ocr)");
-  if (gaps.includes("segmenter")) parts.push("a face detector (the local-vision extra, or META_API_KEY for SAM 3.1)");
+  if (gaps.includes("ocr")) parts.push("pii-guard's OCR add-on (the ocr extra)");
+  if (gaps.includes("tesseract")) parts.push("the Tesseract OCR program (brew install tesseract, or apt install tesseract-ocr)");
+  if (gaps.includes("segmenter")) parts.push("a face detector (the local-vision extra, or a META_API_KEY for SAM 3.1)");
   if (!parts.length) return "";
-  return `It needs ${parts.join(", ")}. Restart with those extras; the pii-guard up banner prints the exact command.`;
+  return `To read images, the server needs ${parts.join(", ")}. Install what is missing and restart pii-guard: when it starts, pii-guard up prints the exact install command.`;
 }

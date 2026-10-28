@@ -6,8 +6,8 @@
 export function NerHint() {
   return (
     <>
-      the on-device NER: install the <code className="font-mono">ner</code> extra (<code className="font-mono">wattmind-pii-guard[ner]</code>) and restart; the{" "}
-      <code className="font-mono">pii-guard up</code> banner prints the exact command
+      the on-device NER: install the <code className="font-mono">ner</code> extra (<code className="font-mono">wattmind-pii-guard[ner]</code>) and restart;{" "}
+      <code className="font-mono">pii-guard up</code> prints the exact install command when it starts
     </>
   );
 }
