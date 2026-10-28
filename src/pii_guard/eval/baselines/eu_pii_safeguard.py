@@ -1,10 +1,17 @@
 """``tabularisai/eu-pii-safeguard`` as a comparison NER model (LAB-1386). Evaluation only.
 
-An open XLM-RoBERTa **large** token classifier (about 560M parameters, Apache-2.0) for 26 EU
+A public XLM-RoBERTa **large** token classifier (about 560M parameters) for 26 EU
 languages with 42 BIO entity labels: the closest open alternative to pii-guard's own NER
 (``hdkiller/pii-guard-ner-xlmr-base``, XLM-R base). It is never in the product's default path:
 nothing outside the evaluation imports this module, and the gateway's fast mode keeps resolving
 its NER model through :mod:`pii_guard.detect.ner_resolve`.
+
+**Licence: conflicting, pending the owner's decision.** The model card's metadata says
+``apache-2.0``, but the repository's ``LICENSE.md`` at the pinned revision is the "Tabularis AI
+Commercial License" v1.0 (30-day free evaluation, free for academic research, an annual paid
+licence for commercial use), and the card carries an "Accept License & Download" prompt (the
+hub does not enforce it: ``gated`` is false). It is used here for evaluation only, inside that
+evaluation window; the weights stay in the user's model cache and are never committed.
 
 :class:`EuPiiSafeguardDetector` is pii-guard's own :class:`~pii_guard.detect.ner.NerDetector`
 with the pinned checkpoint and a label adapter, so the model runs through exactly the same
@@ -66,7 +73,10 @@ DETECTOR_NAME = "eu-pii-safeguard"
 MODEL = ner_resolve.PinnedModel(
     repo_id="tabularisai/eu-pii-safeguard",
     revision="c928cd51d4f28723289098a4ad59955413afcc05",
-    licence="Apache-2.0",
+    licence=(
+        "conflicting: card metadata apache-2.0, LICENSE.md Tabularis AI Commercial License v1.0 "
+        "(30-day evaluation, paid commercial use); evaluation only, pending owner decision"
+    ),
     size_mb=2240,
     weights_sha256="206f8317e5df76b74d66853eea34ccae4313b06822f1c7135e390243b1770e33",
     files=(

@@ -106,4 +106,4 @@ def test_register_makes_the_name_resolvable() -> None:
 def test_the_model_is_pinned() -> None:
     assert len(eu.MODEL.revision) == 40
     assert len(eu.MODEL.weights_sha256) == 64
-    assert eu.MODEL.licence == "Apache-2.0"
+    assert "Commercial License" in eu.MODEL.licence  # the conflict is recorded, not hidden

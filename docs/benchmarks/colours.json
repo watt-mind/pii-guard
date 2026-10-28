@@ -38,6 +38,14 @@
       "color": "#E69F00",
       "shape": "circle"
     },
+    "ner:eu-pii-safeguard": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "ner:xlmr-base-v2-hn": {
+      "color": "#117733",
+      "shape": "circle"
+    },
     "presidio": {
       "color": "#595959",
       "shape": "square"
@@ -68,6 +76,10 @@
     },
     "rules+ner:eu-pii-anonimization-multilang": {
       "color": "#882255",
+      "shape": "circle"
+    },
+    "rules+ner:eu-pii-safeguard": {
+      "color": "#AA4499",
       "shape": "circle"
     },
     "rules+ner:xlm-roberta-base-ner-hrl": {

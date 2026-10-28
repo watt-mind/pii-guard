@@ -75,8 +75,8 @@ _THEIRS_DETECTOR = {
     "name": "ner",
     "model": "eu-pii-safeguard",
     "model_ref": (
-        f"{eu.MODEL.repo_id} revision {eu.MODEL.revision} ({eu.MODEL.licence}, XLM-R large, "
-        "42 labels, label adapter pii_guard.eval.baselines.eu_pii_safeguard; LAB-1386)"
+        f"{eu.MODEL.repo_id} revision {eu.MODEL.revision}, XLM-R large, 42 labels, label adapter "
+        f"pii_guard.eval.baselines.eu_pii_safeguard (LAB-1386); licence {eu.MODEL.licence}"
     ),
     "revision": f"sha256:{eu.MODEL.weights_sha256}",
     "settings": {},
@@ -208,8 +208,12 @@ def _pct(values: list[float], q: float) -> float:
 
 def _latency(args: argparse.Namespace) -> int:
     import torch
+    import transformers  # imported before timing, so neither load pays for it
 
     from pii_guard.detect.ner import NerDetector
+
+    transformers.AutoModelForTokenClassification  # noqa: B018 - resolve the lazy import
+    transformers.AutoTokenizer  # noqa: B018
 
     msgs = _messages(args.fixtures, args.chars, args.n)
     models: dict[str, Any] = {}
@@ -258,7 +262,10 @@ def _latency(args: argparse.Namespace) -> int:
         "messages": len(msgs),
         "mean_chars": round(statistics.mean(len(t) for _, t in msgs), 1),
         "load_average_end": [round(x, 2) for x in os.getloadavg()],
-        "note": "load_s: detector construction and warm-up forward, torch already imported",
+        "note": (
+            "load_s: detector construction and warm-up forward in one process, torch and "
+            "transformers already imported; weights may be in the OS page cache"
+        ),
         "models": info,
     }
     print(json.dumps(report, indent=2))

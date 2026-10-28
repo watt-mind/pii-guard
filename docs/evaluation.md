@@ -597,6 +597,73 @@ fast-mode NER adds nothing on numbers; fast mode's 27.6 % headline is mostly inv
 (63.4 % of them leak), while on names, addresses and e-mail it leaks 10.4 %. The comparison
 tools match a number's shape, so they don't care whether it validates.
 
+### NER comparison: tabularisai/eu-pii-safeguard (LAB-1386)
+
+[`tabularisai/eu-pii-safeguard`](https://huggingface.co/tabularisai/eu-pii-safeguard) is the
+closest public alternative to pii-guard's own NER: XLM-RoBERTa **large** (about 560M
+parameters) fine-tuned for PII in 26 EU languages with 42 BIO labels, self-reported F1 97.0 % on
+its own (undisclosed) data. It is scored as a **comparison model, never as a product default**:
+nothing outside `pii_guard.eval` imports it, and fast mode keeps resolving its model through
+`pii_guard.detect.ner_resolve`.
+
+**Its licence is conflicting, pending the owner's decision.** The card's metadata says
+`apache-2.0`, but the repository's `LICENSE.md` at the pinned revision is the "Tabularis AI
+Commercial License" v1.0 (30-day free evaluation, free academic research, an annual paid
+licence for commercial use), and the card shows an "Accept License & Download" prompt that the
+hub does not enforce. pii-guard uses it for this evaluation only; its weights are never
+committed or bundled.
+
+Unlike the tools above it is a bare NER model, so it is not wrapped as a `--baselines` tool
+with its own masking. `pii_guard.eval.baselines.eu_pii_safeguard.EuPiiSafeguardDetector` runs
+it through pii-guard's own `NerDetector` post-processing (thresholds 0.5, word and token snap,
+number checks, the resolver, the vault), which makes two configurations directly comparable
+with ours, placeholder consistency included: the model alone (in place of `ner`) and rules +
+the model (in place of fast mode's NER). Pinned to revision
+`c928cd51d4f28723289098a4ad59955413afcc05`, weights `sha256:206f8317…770e33` (2.24 GB),
+fetched once into `$PII_GUARD_MODELS_DIR/ner/` (outside the repository) and checked:
+
+```bash
+uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py score --record
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py latency
+```
+
+**Label mapping** (`LABEL_MAP` in that module; every one of the 42 labels has an entry):
+
+| Model labels | pii-guard type | Note |
+|---|---|---|
+| `FIRSTNAME`, `MIDDLENAME`, `LASTNAME` | `PERSON` | neighbouring parts merged into one span |
+| `PREFIX` | dropped | honorifics are outside `PERSON` in the gold |
+| `EMAIL`, `PHONE_NUMBER` | `EMAIL`, `PHONE` | |
+| `ADDRESS`, `STREET`, `BUILDING_NUMBER`, `POSTAL_CODE` | `ADDRESS` | neighbouring parts merged |
+| `CITY`, `STATE`, `COUNTRY` | `ADDRESS` inside an address | on their own dropped: a lone town is not an address under pii-guard's policy (the datasets mark it as an ignore region) |
+| `DOB` | `DATE_OF_BIRTH` | |
+| `IBAN`, `ACCOUNT_NUMBER`, `CREDIT_CARD_NUMBER` | `BANK_ACCOUNT` | cards are `BANK_ACCOUNT` in pii-guard's taxonomy |
+| `TAX_ID` | `NATIONAL_ID_HU_TAX` on `hu` text, else `ID_DOCUMENT` | the Ai4Privacy conversion's rule |
+| `HEALTH_INSURANCE_ID` | `NATIONAL_ID_HU_TAJ` on `hu` text, else `ID_DOCUMENT` | TAJ is the Hungarian health insurance number |
+| `NATIONAL_ID`, `PASSPORT_NUMBER`, `DRIVER_LICENSE` | `ID_DOCUMENT` | |
+| `COMPANY_NAME` | `ORGANIZATION` | `keep` policy, as for our NER |
+| `PASSWORD` | `SECRET` | |
+| `USERNAME`, `URL`, `IP_ADDRESS`, `MAC_ADDRESS`, `DEVICE_ID`, `LATITUDE`, `LONGITUDE` | dropped | no pii-guard type |
+| `AGE`, `GENDER`, `JOB_TITLE`, `AMOUNT`, `CURRENCY`, `SALARY` | dropped | no pii-guard type; policy-excluded in the public sets' gold |
+| `ETHNICITY`, `RELIGION`, `POLITICAL_OPINION`, `SEXUAL_ORIENTATION`, `HEALTH_CONDITION` | dropped | GDPR Art. 9 special categories: pii-guard has no type for them (a gap, not a scoring choice) |
+
+Parts are merged when only up to three spaces, tabs or commas separate them, the gap the gold
+conversions merge across, so one name is one placeholder and placeholder consistency is not
+penalised for the model's finer labels. **Dropped labels are removed before scoring** and
+counted per set (`eval/results/2026-10-28-eu-pii-safeguard/unmapped.json`, and in each run
+record's notes). The gold never contains them, so masking them could only count as
+over-masking, and dropping them can't count as a leak: neither direction is unfair. In a
+deployment that masks them, over-masking under pii-guard's policy would be higher than shown.
+The model labels words (`aggregation="first"`, its default): its spans can carry trailing
+punctuation (`john@example.com.`), which costs exact-match F1 but not overlap F1 or leak.
+
+**Result (2026-10-28):** pii-guard's NER v2.0 leaks less on every set, alone and with the
+rules: fast mode 0.0–0.7 % on smoke, agent-traffic, ai4privacy, nemotron-pii and cee-pii against
+2.8–8.8 % with this model in its place, at 2× the size and about 3× the CPU latency. It finds
+more organisations (a `keep` type), which doesn't change what leaks. Full table, latency and
+caveats: [eval/results/2026-10-28-eu-pii-safeguard](../eval/results/2026-10-28-eu-pii-safeguard/README.md).
+
 ## Prompt injection
 
 The LLM detector reads untrusted text, and a message can try to talk it out of reporting the
