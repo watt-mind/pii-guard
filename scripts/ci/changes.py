@@ -12,7 +12,7 @@ import subprocess
 import sys
 from collections.abc import Iterable
 
-JOBS = ("ui", "docker", "wheel")
+JOBS = ("ui", "docker", "wheel", "hosted")
 # Metadata used by Python installation, Docker COPY, or the wheel's UI build.
 SHARED_FILES = {
     "pyproject.toml",
@@ -43,8 +43,12 @@ def classify(paths: Iterable[str]) -> dict[str, bool]:
             # The report imports other package modules; UI validation must see source changes.
             selected.update(JOBS)
         elif path.startswith("ui/") or path.startswith(BENCHMARK_PREFIXES):
-            selected.update(("ui", "wheel"))
-        elif path in {"Dockerfile", ".dockerignore", "scripts/ci/docker_smoke.sh"}:
+            selected.update(("ui", "wheel", "hosted"))
+        elif path == ".dockerignore":
+            selected.update(("docker", "hosted"))
+        elif path == "Dockerfile.hosted" or path.startswith("deploy/azure/"):
+            selected.add("hosted")
+        elif path in {"Dockerfile", "scripts/ci/docker_smoke.sh"}:
             selected.add("docker")
         elif path in {"scripts/ci/wheel_smoke.sh", ".github/workflows/release.yml"}:
             selected.add("wheel")

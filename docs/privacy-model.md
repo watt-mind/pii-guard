@@ -1,6 +1,7 @@
 # Privacy model
 
-> Status: proposed. This is the threat model the design is built against.
+> Status: design guarantees; deployment-specific controls must be verified. The hosted launch
+> remains gated. See [hosted processing and retention](hosted.md).
 
 ## What we protect
 
@@ -18,12 +19,36 @@ See [entities.md](entities.md) for what counts as personal data.
 
 ## Trust boundary
 
-pii-guard itself, its mapping store and its detection models are **inside** the trust
+In a self-hosted deployment, pii-guard itself, its mapping store and its detection models are **inside** the trust
 boundary. They see raw data by necessity. That is why detection runs on open-weights models
 that can be hosted on infrastructure you control.
 
 If you point the LLM detector at a *hosted* model endpoint, that endpoint is inside your trust
 boundary too. Choose one with appropriate terms, or run it yourself.
+
+## Hosted service boundary
+
+A hosted guard receives originals in its Azure process. Its operators and infrastructure are
+inside the trust boundary; "data stays on your infrastructure" applies only to self-hosting.
+Local rules and NER process originals in the initial hosted image. The downstream provider
+receives masked text, which can still identify someone through missed values or context.
+A hosted **detector** endpoint would receive originals and needs separate explicit trust and
+terms review. Anonymous hosted traffic uses curated synthetic samples only; editable text and
+session-only BYOK require an authenticated owner. Hosted image/upload routes are disabled.
+
+The initial hosted runtime scales from zero to one replicas with one worker and ephemeral
+owner state. Each owner also retains up to 50 masked traffic events in memory, released on
+owner purge or restart; masked payloads may contain detection misses or identifying context. Restart loses
+mappings, temporary profiles and API-key records. Logical deletion/expiry does not promise
+physical memory erasure; raw-value caches are a known limitation (LAB-1364). No content archive
+or mapping backup is provisioned. A durable marker-only share prevents reuse of sponsored
+allocations after restart; this is not durable multi-tenant vault storage (LAB-1376). Key Vault
+secret recovery and Azure/provider retention are separate from input retention. See
+[hosted.md](hosted.md) for actual controls, lifecycle, deployment gates and policy review.
+
+Hosted downstream privacy claims must also match the provider contract: Meta Standard's
+no-training terms do not establish zero retention or EU-only processing. Sponsored proxy use
+remains gated on written provider authorization; see [hosted.md](hosted.md).
 
 ## Local-only detection boundary
 
