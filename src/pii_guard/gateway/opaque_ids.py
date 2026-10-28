@@ -1,22 +1,27 @@
-"""Ids the upstream issued, per vault session (LAB-1469).
+"""Opaque ids in identifier fields: forwarded as sent, not refused (LAB-1469).
 
-A coding agent sends the model's own ids back in the next request: Chat Completions
-``tool_calls[].id`` and ``tool_call_id``, Responses ``function_call`` ``call_id`` and item
-``id``. The gateway checks those fields like any identifier (personal data in one fails
-closed, because an id can't carry a placeholder). The upstream mints them as random tokens
-(``call_01a1849936ef77df938b17792f84e7f8``), and the NER encoder reads about one in eight of
-them as a ``PHONE``, so a long agent session was refused sooner or later.
+Coding agents send ids back in every request: Chat Completions ``tool_calls[].id`` and
+``tool_call_id``, Responses ``function_call`` ``call_id`` and item ``id``. The gateway checks
+those fields like any identifier (personal data in one fails closed, because an id can't carry
+a placeholder). Measured live (docs/integrations/harness-matrix-2026-10-28.md), the NER encoder
+reads random ids as a ``PHONE``: 37 of 300 upstream call ids (``call_<32 hex>``) and 59 of 200
+client message ids (Codex's ``msg_<uuid>``), so pi and Muse Code were refused after a few tool
+calls and Codex on its first request. Two rules, both narrow:
 
-An id the upstream issued can't tell the upstream anything it doesn't have: it wrote it, from
-masked text. So the gateway remembers the ids each upstream answer carried (raw, before
-restore) for that answer's vault session, and an identifier slot whose whole text is one of
-them is forwarded as sent, without detection. Any other identifier is still checked. The store
-is in memory and bounded: after a restart, or once evicted, an id is checked again (fail
-closed, never open).
+1. **Upstream-issued ids.** An id the upstream wrote can't tell it anything it doesn't have:
+   it minted it from masked text. The gateway remembers the ids each upstream answer carried
+   (raw, before restore) per vault session; an identifier slot whose whole text is one of them
+   gets no detection. The store is in memory and bounded: after a restart, or once evicted, the
+   id is checked again (fail closed).
+2. **Hex and UUID tokens.** An identifier that is exactly an optional short prefix plus a UUID
+   or a run of 16+ hex digits (``msg_01a184b6-8156-7cc2-b584-a0fb83dedf84``) has no room for a
+   name or an address. Hits from the model-based detectors (NER) are dropped there; the rules,
+   the LLM detector and known values still apply.
 """
 
 from __future__ import annotations
 
+import re
 import threading
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
@@ -26,12 +31,21 @@ if TYPE_CHECKING:
     from pii_guard.gateway.request import TextSlot
     from pii_guard.types import Span
 
-__all__ = ["ID_KEYS", "IssuedIds", "upstream_ids", "without_issued_ids"]
+__all__ = ["ID_KEYS", "IssuedIds", "is_hex_token", "upstream_ids", "without_opaque_ids"]
 
 #: The keys whose string values in an upstream answer are ids the client may send back.
 ID_KEYS = frozenset({"id", "call_id"})
 #: Longer strings aren't ids; ids with whitespace or a placeholder aren't opaque tokens.
 MAX_ID_CHARS = 256
+#: An optional short prefix, then a UUID or 16+ hex digits: room for no personal data.
+_HEX_TOKEN_RE = re.compile(
+    r"(?:[A-Za-z]{1,24}[_-])?"
+    r"(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    r"|[0-9a-fA-F]{16,128})"
+)
+#: Detectors whose hits in a hex token are dropped: learned models, which read digit runs as
+#: phone numbers. Rules (checksums, formats) and the LLM detector keep theirs.
+MODEL_DETECTORS = frozenset({"ner", "ner_gliner"})
 #: Sessions remembered, and ids per session (least recently used out first).
 MAX_SESSIONS = 4096
 MAX_IDS_PER_SESSION = 4096
@@ -105,13 +119,21 @@ class IssuedIds:
             self._sessions.pop(session_id, None)
 
 
-def without_issued_ids(
+def is_hex_token(text: str) -> bool:
+    """``text`` is a prefixed UUID or hex run (rule 2 above)."""
+    return _HEX_TOKEN_RE.fullmatch(text) is not None
+
+
+def without_opaque_ids(
     slots: Sequence[TextSlot], spans: list[list[Span]], issued: frozenset[str]
 ) -> list[list[Span]]:
-    """``spans`` with nothing found in an identifier slot that is an upstream-issued id."""
-    if not issued:
-        return spans
-    return [
-        [] if slot.kind == "identifier" and slot.text in issued else found
-        for slot, found in zip(slots, spans, strict=True)
-    ]
+    """``spans`` without the hits in identifier slots that are opaque ids (both rules)."""
+    out = []
+    for slot, found in zip(slots, spans, strict=True):
+        if slot.kind == "identifier" and found:
+            if slot.text in issued:
+                found = []
+            elif is_hex_token(slot.text):
+                found = [s for s in found if s.detector not in MODEL_DETECTORS]
+        out.append(found)
+    return out

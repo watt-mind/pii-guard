@@ -19,7 +19,7 @@ import json
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
-from pii_guard.gateway.issued_ids import upstream_ids
+from pii_guard.gateway.opaque_ids import upstream_ids
 from pii_guard.gateway.restore import MESSAGE_TEXT_FIELDS, JsonEscapingSession
 from pii_guard.vault import StreamUnmasker, VaultSession
 

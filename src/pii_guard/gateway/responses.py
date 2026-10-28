@@ -38,7 +38,7 @@ import httpx
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
-from pii_guard.gateway.issued_ids import upstream_ids, without_issued_ids
+from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
 from pii_guard.gateway.responses_restore import (
@@ -242,7 +242,7 @@ class ResponsesGateway:
                 names = tool_names(body)
                 spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
                 issued = gw.issued_ids.of(session.session_id)
-                spans = without_issued_ids(collected.slots, spans, issued)
+                spans = without_opaque_ids(collected.slots, spans, issued)
             # Inline images go through the chat path (LAB-1285): mask the texts, then the
             # images, then remask the texts with the values the images added (LAB-1278).
             generation = session.generation

@@ -1,4 +1,4 @@
-"""Upstream-issued ids are forwarded as sent when the client sends them back (LAB-1469).
+"""Opaque ids in identifier fields are forwarded as sent, not refused (LAB-1469).
 
 Live with pi 1.3.0 and Muse Code 1.4.14 against the Meta Model API: the upstream mints call ids
 such as ``call_01a1849936ef77df938b17792f84e7f8``, the NER encoder read that one as a PHONE
@@ -6,7 +6,8 @@ such as ``call_01a1849936ef77df938b17792f84e7f8``, the NER encoder read that one
 ``tool_calls[].id`` / ``tool_call_id`` (Chat Completions) or ``call_id`` (Responses), was
 refused as "personal data detected in an identifier". The fake detector here flags the id the
 way the NER did. An id the upstream did not issue in this session is still checked (fail
-closed). All values are fictional (ADR 0005).
+closed). Codex 0.163.0 mints its own message ids (``msg_<uuid>``), refused on the first request:
+those are hex tokens, where NER hits are dropped. All values are fictional (ADR 0005).
 """
 
 from __future__ import annotations
@@ -18,7 +19,10 @@ from fastapi.testclient import TestClient
 from gateway_helpers import NAMES, FakeLlm, MockUpstream, chunk, completion, make_app
 from test_responses import ResponsesUpstream, events_for, muse_body, sse
 
-from pii_guard.gateway.issued_ids import IssuedIds, upstream_ids
+from pii_guard.config import Settings
+from pii_guard.detect.stack import build_detectors
+from pii_guard.gateway import GatewayConfig, Mode, build_mode_detectors
+from pii_guard.gateway.opaque_ids import IssuedIds, is_hex_token, upstream_ids
 
 #: A real upstream call id the NER encoder read as a PHONE (an opaque token, not personal data).
 CALL_ID = "call_01a1849936ef77df938b17792f84e7f8"
@@ -172,3 +176,53 @@ def test_issued_ids_are_bounded_per_session_and_by_sessions() -> None:
     store.add("s3", ["y"])
     assert store.of("s1") == frozenset()  # least recently used session evicted
     assert store.of("s3") == {"y"}
+
+
+#: A Codex 0.163.0 client message id the NER encoder read as a PHONE.
+MESSAGE_ID = "msg_01a184b6-8156-7cc2-b584-a0fb83dedf84"
+
+
+class FakeNer(FakeLlm):
+    """Stands in for the NER encoder (``ner``): flags the person, the id and a word id."""
+
+    name = "ner"
+    model = "fake-ner"
+
+
+def fast_app(upstream: MockUpstream, flagged: tuple[str, ...]) -> Any:
+    app = make_app(upstream, config=GatewayConfig(mode=Mode.FAST))
+    settings: Settings = app.state.settings
+    base = [*build_detectors(["rules"], settings), FakeNer(flagged)]
+    app.state.gateway_detectors = build_mode_detectors(
+        settings, GatewayConfig(mode=Mode.FAST), base=base, llm_detector=FakeLlm()
+    )
+    return app
+
+
+def codex_body(message_id: str) -> dict[str, Any]:
+    body = muse_body(stream=True)
+    body["input"] = [
+        {"type": "message", "id": message_id, "role": "user", "content": f"Hi, I am {PERSON}."}
+    ]
+    return body
+
+
+def test_codex_message_id_is_not_read_as_a_phone() -> None:
+    upstream = ResponsesUpstream()
+    with TestClient(fast_app(upstream, (PERSON, MESSAGE_ID, "Elek-Teszt"))) as client:
+        ok = client.post("/v1/responses", json=codex_body(MESSAGE_ID))
+        # A word id is no hex token: the NER hit still refuses it (fail closed).
+        refused = client.post("/v1/responses", json=codex_body("Elek-Teszt"))
+    assert ok.status_code == 200, ok.text
+    sent = upstream.bodies[0]["input"][0]
+    assert sent["id"] == MESSAGE_ID
+    assert PERSON not in json.dumps(sent, ensure_ascii=False)
+    assert refused.status_code == 400
+    assert len(upstream.requests) == 1
+
+
+def test_hex_tokens() -> None:
+    for token in (MESSAGE_ID, CALL_ID, "fc_68a1b2c3d4e5f60718293a4b", "0123456789abcdef"):
+        assert is_hex_token(token), token
+    for text in ("call_1", "msg_Jane", "Teszt Elek", "+36 30 123 4567", "x_0123456789abcde"):
+        assert not is_hex_token(text), text

@@ -56,7 +56,7 @@ from pii_guard.detect.known import KNOWN_DETECTOR, WIDENED_TYPES, merge_known, w
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
-from pii_guard.gateway.issued_ids import IssuedIds, upstream_ids, without_issued_ids
+from pii_guard.gateway.opaque_ids import IssuedIds, upstream_ids, without_opaque_ids
 from pii_guard.gateway.request import (
     ImageSlot,
     InvalidChatRequestError,
@@ -840,7 +840,7 @@ class Gateway:
                 names = tool_names(body)
                 spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
                 issued = self.issued_ids.of(session.session_id)
-                spans = without_issued_ids(collected.slots, spans, issued)
+                spans = without_opaque_ids(collected.slots, spans, issued)
             # Every older entry has scanned every text by the end of _mask: an image's remask
             # needs only the entries this request added (LAB-1278).
             generation = session.generation
