@@ -45,21 +45,22 @@ Download (about 2.2 GB, once, into the pii-guard model cache, checked against th
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 from collections import Counter
 from collections.abc import Sequence
-from typing import Any
 
 from pii_guard.detect import ner_resolve
-from pii_guard.detect.ner import NER_ENTITY_TYPES, NerDetector, RawEntity
-from pii_guard.types import EntityType, Span
+from pii_guard.detect.ner import RawEntity
+from pii_guard.eval.baselines import encoders
+from pii_guard.eval.baselines.encoders import ComparisonDetector, EncoderSpec, LabelAdapter
+from pii_guard.types import EntityType
 
 __all__ = [
     "DETECTOR_NAME",
     "LABEL_MAP",
     "MODEL",
     "PART_ONLY",
+    "SPEC",
     "EuPiiSafeguardDetector",
     "adapt",
     "download",
@@ -153,15 +154,19 @@ LANGUAGE_LABEL_MAP: dict[str, dict[str, EntityType]] = {
 #: Labels that are an address only next to another address part.
 PART_ONLY: frozenset[str] = frozenset({"CITY", "STATE", "COUNTRY"})
 
-#: What may separate two parts of one name or address: the gold conversions' merge gap.
-_MERGE_GAP_RE = re.compile(r"[ \t,]{0,3}")
-#: Types whose parts are merged (identifiers and contact details are one token run anyway).
-_MERGED_TYPES = frozenset({_E.PERSON, _E.ADDRESS})
+#: The adapter (shared with the LAB-1391 encoders, :mod:`pii_guard.eval.baselines.encoders`).
+ADAPTER = LabelAdapter(
+    label_map=LABEL_MAP, language_label_map=LANGUAGE_LABEL_MAP, part_only=PART_ONLY
+)
 
-
-def _type_of(label: str, language: str) -> EntityType | None:
-    override = LANGUAGE_LABEL_MAP.get(language, {}).get(label)
-    return override if override is not None else LABEL_MAP.get(label)
+#: XLM-R checkpoint: pii-guard's own first-sub-token decoder.
+SPEC = EncoderSpec(
+    name=DETECTOR_NAME,
+    model=MODEL,
+    adapter=ADAPTER,
+    decoder="first",
+    summary="XLM-R large, 559M, 42 labels, 26 EU languages",
+)
 
 
 def adapt(
@@ -172,44 +177,10 @@ def adapt(
     Returns entities labelled with :class:`EntityType` values (``"PERSON"``), ready for
     :meth:`NerDetector.to_spans`. See the module docstring for the rules.
     """
-    dropped: Counter[str] = Counter()
-    typed: list[tuple[RawEntity, EntityType, bool]] = []  # (entity, type, part-only)
-    for e in sorted(raw, key=lambda e: (e.start, e.end)):
-        label = e.label.upper()
-        entity_type = _type_of(label, language)
-        if entity_type is None:
-            dropped[label] += 1
-            continue
-        typed.append((e, entity_type, label in PART_ONLY))
-    merged: list[tuple[int, int, EntityType, float, bool]] = []  # start, end, type, score, part
-    for e, entity_type, part_only in typed:
-        if merged:
-            start, end, last_type, score, last_part = merged[-1]
-            if (
-                last_type is entity_type
-                and entity_type in _MERGED_TYPES
-                and e.start >= end
-                and _MERGE_GAP_RE.fullmatch(text, end, e.start)
-            ):
-                merged[-1] = (
-                    start,
-                    e.end,
-                    entity_type,
-                    max(score, e.score),
-                    last_part and part_only,
-                )
-                continue
-        merged.append((e.start, e.end, entity_type, e.score, part_only))
-    out: list[RawEntity] = []
-    for start, end, entity_type, score, part_only in merged:
-        if part_only:  # a city, state or country on its own: not an address (policy)
-            dropped["ADDRESS_PART_ALONE"] += 1
-            continue
-        out.append(RawEntity(entity_type.value, start, end, score))
-    return out, dropped
+    return ADAPTER.adapt(text, raw, language)
 
 
-class EuPiiSafeguardDetector(NerDetector):
+class EuPiiSafeguardDetector(ComparisonDetector):
     """pii-guard's NER detector running ``tabularisai/eu-pii-safeguard`` through :func:`adapt`.
 
     ``name`` stays ``ner``: it takes the NER detector's place in the pipeline, and its spans
@@ -217,44 +188,12 @@ class EuPiiSafeguardDetector(NerDetector):
     first use (about 2.2 GB) and verified. ``unmapped`` counts the labels dropped so far.
     """
 
-    def __init__(
-        self,
-        *,
-        device: str | None = None,
-        preload: bool = True,
-        backend: Any = None,
-        **kwargs: Any,
-    ) -> None:
-        # Always the verified copy in the model cache, never a hub id (no unpinned load).
-        model = MODEL.repo_id if backend is not None else download()
-        super().__init__(model=model, device=device, backend=backend, preload=False, **kwargs)
-        self.revision = None  # a local directory, already at the pinned revision
-        self.entity_types = NER_ENTITY_TYPES | {_E.SECRET}
-        self.label_map = {t.value: t for t in EntityType}
-        self.unmapped: Counter[str] = Counter()
-        if preload:
-            self.load()
-
-    def __repr__(self) -> str:
-        return f"EuPiiSafeguardDetector(revision={MODEL.revision[:12]!r})"
-
-    def to_spans(self, text: str, raw: Sequence[RawEntity], language: str = "hu") -> list[Span]:
-        adapted, dropped = adapt(text, raw, language)
-        self.unmapped.update(dropped)
-        return super().to_spans(text, adapted, language)
+    spec = SPEC
 
 
 def download() -> str:
     """The verified local directory of :data:`MODEL`, fetched first if it isn't cached."""
-    choice = ner_resolve.NerChoice(
-        source="configured",
-        model=MODEL.repo_id,
-        revision=MODEL.revision,
-        pinned=MODEL,
-        ready=False,  # let ensure() check the cache marker (weights SHA-256) or download
-        may_download=True,
-    )
-    return ner_resolve.ensure(choice)
+    return encoders.download(SPEC)
 
 
 def register() -> None:

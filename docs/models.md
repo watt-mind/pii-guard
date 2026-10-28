@@ -129,7 +129,11 @@ extra, so `uvx`, `make demo` and the demo image need no second environment, unli
 
 - its v2 and v3 successors (Apache-2.0, mmBERT base, 1.2 GB) score higher on their own card,
   but need the card's word-level decoder; with pii-guard's first-sub-token decoder they cut
-  names into fragments (LAB-1192 sanity check), so they would need a decoder change first;
+  names into fragments (LAB-1192 sanity check). LAB-1391 benchmarked v3 with a word-level
+  decoder, next to `Horizon-Labs/pii-redactor-base` / `-small` and `Wismut/nym-pii-multilingual`:
+  none leaks less than v1 on the smoke, hu-inflection and cee-pii sets with the rules (v3:
+  9.8 / 34.0 / 14.5 % vs 1.2 / 0.0 / 3.6 %), so the fallback stays v1
+  ([eval/results/2026-10-28-new-encoders](../eval/results/2026-10-28-new-encoders/README.md));
 - `iiiorg/piiranha-v1-detect-personal-information`: CC BY-NC-ND 4.0, not open for this use.
 
 **Older models and licences.**

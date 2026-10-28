@@ -701,6 +701,83 @@ rules: fast mode 0.0–0.7 % on smoke, agent-traffic, ai4privacy, nemotron-pii a
 more organisations (a `keep` type), which doesn't change what leaks. Full table, latency and
 caveats: [eval/results/2026-10-28-eu-pii-safeguard](../eval/results/2026-10-28-eu-pii-safeguard/README.md).
 
+### NER comparison: public encoders (LAB-1391)
+
+Three newer public PII encoders, all mmBERT (ModernBERT) token classifiers, benchmarked the same
+way as `eu-pii-safeguard` above, against pii-guard's NER v2.0. They are **comparison models,
+never product defaults**: nothing outside `pii_guard.eval` imports them.
+
+| Registry name | Checkpoint (pinned revision) | Licence, as read from the files at that revision |
+|---|---|---|
+| `bardsai-v3` | [`bardsai/eu-pii-anonimization-multilang-v3`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang-v3) `091984b5fbce` | `apache-2.0` in the card metadata only: **no LICENSE file** in the repository |
+| `horizon-base` | [`Horizon-Labs/pii-redactor-base`](https://huggingface.co/Horizon-Labs/pii-redactor-base) `42dfb0dccb08` | Apache-2.0: card, `LICENSE` (Apache 2.0 text) and `NOTICE` (mmBERT, MIT) agree |
+| `horizon-small` | [`Horizon-Labs/pii-redactor-small`](https://huggingface.co/Horizon-Labs/pii-redactor-small) `3f6a99b99063` | as base |
+| `wismut-nym` | [`Wismut/nym-pii-multilingual`](https://huggingface.co/Wismut/nym-pii-multilingual) `0ed0242d67a3` | `mit` in the card metadata and text only: **no LICENSE file**; part of its training labels come from an LLM teacher on CC-BY-SA Wikipedia text |
+
+None is gated; nothing was accepted. The shared harness is
+`pii_guard.eval.baselines.encoders` (`EncoderSpec`, `LabelAdapter`, `ComparisonDetector`), which
+`eu_pii_safeguard` now uses too; the four specs are in `pii_guard.eval.baselines.new_encoders`.
+ModernBERT is supported by the `ner` extra's `transformers>=5.21`, so no pin changed.
+
+```bash
+uv run --extra ner python -m pii_guard.eval.baselines.new_encoders download
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score \
+  --configs fast-bardsai-v3 bardsai-v3 --record
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency \
+  --model bardsai-v3
+```
+
+**Word-level decoding.** Their tokenizer (Gemma-style) attaches the preceding space to a token
+and splits numbers into single digits, often with a bare `" "` token first, so pii-guard's
+first-sub-token decoder cuts names and numbers into fragments (the LAB-1192 sanity check).
+`WordLevelBackend` decodes words instead (`decode_words`): text in 512-token windows with
+128 overlap, each token's probabilities averaged over its windows, B- and I- pooled per type;
+each word (split on whitespace and `, ; | " < > ( ) [ ] { } * ^`, edge punctuation trimmed)
+takes the type with the highest mean probability over its sub-tokens, and neighbouring words
+of one type are merged unless the next word's first token is more likely a B- than not. This is
+a fresh implementation of the decoding the bardsai v3 card describes, without its format checks
+and e-mail regex (pii-guard's number checks and rules do that job). Horizon-Labs and Wismut
+recommend the `transformers` pipeline with `aggregation_strategy="simple"` plus a merge of close
+pieces, which this approximates; every mmBERT model is decoded alike. The rest of the
+post-processing is pii-guard's own (`NerDetector`: thresholds 0.5, snapping, number checks).
+
+**Label mapping** (each spec's `LabelAdapter`; every model label has an entry, checked by
+`tests/eval/test_new_encoders.py`). The rules are those of `eu-pii-safeguard`: name and address
+parts merged, a lone town or country dropped, tax and health-insurance numbers become the
+Hungarian types on `hu` text, and labels with no pii-guard type are dropped before scoring and
+counted (`eval/results/2026-10-28-new-encoders/unmapped-<model>.json`).
+
+| pii-guard type | bardsai v3 | Horizon (base, small) | Wismut nym |
+|---|---|---|---|
+| `PERSON` | `PERSON_NAME` | `PERSON` | `GIVEN_NAME`, `SURNAME` |
+| `ORGANIZATION` | `ORGANIZATION_NAME` | `ORGANIZATION` | `COMPANY_NAME` |
+| `EMAIL`, `PHONE` | `EMAIL_ADDRESS`, `PHONE_NUMBER` | `EMAIL`, `PHONE` | `EMAIL`, `PHONE`, `FAX_NUMBER` |
+| `ADDRESS` | `POSTAL_ADDRESS`; `LOCATION` only inside one | `STREET_ADDRESS`, `POSTCODE`; `LOCATION` only inside one | `STREET_ADDRESS`, `STREET_NAME`, `BUILDING_NUMBER`, `SECONDARY_ADDRESS`, `ZIP_CODE`; `CITY`, `STATE`, `COUNTRY` only inside one |
+| `DATE_OF_BIRTH` | `DATE_OF_BIRTH` | `DATE_OF_BIRTH` | `DATE_OF_BIRTH` |
+| `BANK_ACCOUNT` | `BANK_ACCOUNT_IDENTIFIER`, `PAYMENT_CARD` | `BANK_ACCOUNT`, `CREDIT_CARD` | `IBAN`, `ACCOUNT_NUMBER`, `CREDIT_DEBIT_CARD` |
+| `ID_DOCUMENT` | `PERSON_IDENTIFIER`, `DOCUMENT_IDENTIFIER` | `NATIONAL_ID`, `PASSPORT`, `DRIVER_LICENSE`, `TAX_ID`†, `MEDICAL_ID`‡ | `GOVERNMENT_ID`, `SSN`, `PASSPORT`, `DRIVERS_LICENSE`, `TAX_ID`† |
+| `SECRET` | `AUTH_SECRET` | `SECRET`, `PASSWORD` | `API_KEY`, `PASSWORD` |
+| dropped | dates and times, URLs, links, IP and device ids, handles, aliases, accounts, amounts, card CVVs, document references, vehicle and organisation ids, proper names, roles and attributes, the GDPR Art. 9 categories | `DATE`, `AGE`, `URL`, `USERNAME`, `ACCOUNT_ID`, `IP_ADDRESS`, `MAC_ADDRESS`, `DEVICE_ID`, `COORDINATE`, `CREDIT_CARD_CVV`, `LICENSE_NUMBER`, `VEHICLE_ID` | `DATE`, `TIME`, `AGE`, `GENDER`, `URL`, `USERNAME`, `CUSTOMER_ID`, `EMPLOYEE_ID`, `MEDICAL_RECORD_NUMBER`, `CVV`, `PIN`, `ROUTING_NUMBER`, `SWIFT_BIC`, `LICENSE_PLATE`, `MAC_ADDRESS` |
+
+† `NATIONAL_ID_HU_TAX` on `hu` text. ‡ `NATIONAL_ID_HU_TAJ` on `hu` text.
+
+**Contamination.** Our ai4privacy fixtures are OpenPII-1M validation rows and nemotron-pii is
+the Nemotron-PII test split. bardsai v3 trained on the OpenPII-1M and Nemotron-PII train splits
+(in distribution, like our v2.0 on ai4privacy). Horizon-Labs trained on a 256k sample of
+OpenPII-**1.5M** with no split stated, so its ai4privacy numbers **may be contaminated**: they
+are shown, marked, and left out of every ranking. Wismut reports ai4privacy as out of
+distribution and **does not cover Hungarian**, so its `hu` rows measure a language it wasn't
+trained for.
+
+**Result (2026-10-28):** none replaces NER v2.0 or the v1 fallback. In fast mode v2.0 leaks
+less on every uncontaminated set (smoke 0.0 % vs 4.0–9.8 %, cee-pii 0.4 % vs 5.6–16.3 %); bardsai
+v3 and Horizon lose Hungarian names and numbers (hu-inflection 16–34 %), and Wismut, the closest
+on agent traffic (0.3 % vs 0.1 %), over-masks 20.6 %. Base-size models cost about 1.6× v2.0's CPU
+latency; Horizon small matches it. bardsai v3 and Horizon base recall far more on nemotron-pii
+(96 % vs 88 %, in distribution for them), which makes them distillation-teacher candidates for
+English and German documents (LAB-1393). Full table, latency, contamination and
+recommendation: [eval/results/2026-10-28-new-encoders](../eval/results/2026-10-28-new-encoders/README.md).
+
 ## Prompt injection
 
 The LLM detector reads untrusted text, and a message can try to talk it out of reporting the
