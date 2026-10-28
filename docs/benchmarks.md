@@ -535,18 +535,20 @@ By language:
 
 ### `inflection`
 
-hand-written; documents: hu 8.
+hand-written; documents: hu 12.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 8 | 100.0% | 88.9% | 94.1% | 3.3% | 30.0% | 0.0% | 100.0% | 14 ms | 2026-10-28 | `51e9e02` |
+| **pii-guard rules** | 12 | 100.0% | 14.8% | 25.7% | 84.0% | 4.0% | 0.0% | 100.0% | 0.29 ms | 2026-10-28 | `cce2b66` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 30.0% | 0.0% | 100.0% | 14 ms | 2026-10-28 | `cce2b66` |
 
 
 By language:
 
 | System | hu F1 | hu leak |
 |---|---:|---:|
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 94.1% | 3.3% |
+| **pii-guard rules** | 25.7% | 84.0% |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 96.6% | 2.0% |
 
 
 ### `injection`
@@ -1008,6 +1010,8 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-28 | `2026-10-28-lab-1342-inflection-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | inflection | hu | recorded | `cce2b66` | — | — |
+| 2026-10-28 | `2026-10-28-lab-1342-inflection-rules` | pii-guard rules | inflection | hu | recorded | `cce2b66` | — | — |
 | 2026-10-28 | `2026-10-28-secrets-fixtures` | pii-guard rules | secrets | en | recorded | `cfb78ba` | — | — |
 | 2026-10-28 | `2026-10-28-lab-1367-ai4privacy-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | de, en, hu | recorded | `4650dfe` | — | — |
 | 2026-10-28 | `2026-10-28-lab-1367-agent-traffic-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | agent-traffic | de, en, hu | recorded | `4650dfe` | — | — |
