@@ -210,3 +210,40 @@ def test_connect_snippets_show_a_placeholder_for_pass_through(gateway):
     body = client.get("/v1/connect/snippets", params={"endpoint": pinned["id"]}).json()
     assert body["model"] == "synthetic-pinned"
     assert "synthetic-pinned" in next(t for t in body["tools"] if t["id"] == "curl")["code"]
+
+
+def _catalog(client: TestClient, project: dict[str, Any], **body: Any) -> httpx.Response:
+    return client.post(f"/v1/projects/{project['id']}/endpoints/models", json=body)
+
+
+def test_form_catalog_asks_the_provider_with_a_typed_key_it_never_stores(gateway):
+    client, project, _, sent, _ = gateway
+    result = _catalog(client, project, provider="openai", api_key="synthetic-typed-key")
+    assert result.status_code == 200, result.text
+    assert result.json() == {"models": ["synthetic-a", "synthetic-b"]}
+    assert str(sent[-1].url) == "https://api.openai.com/v1/models"
+    assert sent[-1].headers["authorization"] == "Bearer synthetic-typed-key"
+    assert "synthetic-typed-key" not in result.text
+    assert client.get(f"/v1/projects/{project['id']}/endpoints").json()["endpoints"] == []
+
+
+def test_form_catalog_reuses_an_endpoint_key_only_for_its_own_provider(gateway):
+    client, project, endpoint, sent, _ = gateway
+    resource, _ = endpoint(model="synthetic-pinned")
+    result = _catalog(client, project, provider="openai", endpoint_id=resource["id"])
+    assert result.status_code == 200, result.text
+    assert sent[-1].headers["authorization"] == "Bearer " + PROVIDER_KEY
+    count = len(sent)
+    other = _catalog(client, project, provider="openrouter", endpoint_id=resource["id"])
+    assert other.status_code == 422
+    assert _catalog(client, project, provider="openai").status_code == 422
+    assert _catalog(client, project, provider="sponsored").status_code == 422
+    assert len(sent) == count
+
+
+def test_form_catalog_failure_is_generic(gateway):
+    client, project, _, _, catalog = gateway
+    catalog["status"] = 403
+    result = _catalog(client, project, provider="openai", api_key="synthetic-typed-key")
+    assert result.status_code == 502
+    assert "synthetic-leak" not in result.text and "synthetic-typed-key" not in result.text

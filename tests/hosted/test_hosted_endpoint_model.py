@@ -186,3 +186,33 @@ def test_byok_pass_through_models_proxy_the_provider_catalog(hosted):
     assert seen[-1].url.path.endswith("/models")
     assert seen[-1].headers["authorization"] == "Bearer " + PROVIDER_KEY
     assert "dropped" not in listing.text and PROVIDER_KEY not in listing.text
+
+
+def test_form_catalog_lists_the_sponsored_allow_list_without_egress(hosted):
+    client, seen = hosted
+    project, _ = _project(client)
+    result = client.post(
+        f"/v1/projects/{project}/endpoints/models", json={"provider": "sponsored"}, headers=auth()
+    )
+    assert result.status_code == 200, result.text
+    assert result.json() == {"models": ["muse-spark-1.3"]}
+    assert not seen
+
+
+def test_form_catalog_asks_a_byok_provider_through_egress(hosted):
+    client, seen = hosted
+    project, _ = _project(client)
+    result = client.post(
+        f"/v1/projects/{project}/endpoints/models",
+        json={"provider": "fireworks", "api_key": PROVIDER_KEY},
+        headers=auth(),
+    )
+    assert result.status_code == 200, result.text
+    assert result.json() == {"models": ["synthetic-own-a"]}
+    assert seen[-1].headers["authorization"] == "Bearer " + PROVIDER_KEY
+    foreign = client.post(
+        f"/v1/projects/{project}/endpoints/models",
+        json={"provider": "fireworks", "api_key": PROVIDER_KEY},
+        headers=auth("synthetic-two"),
+    )
+    assert foreign.status_code == 404
