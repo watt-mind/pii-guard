@@ -5,6 +5,7 @@
 | [why-pii-guard.md](why-pii-guard.md) | What is different about pii-guard, each claim with its evidence and status |
 | [vision.md](vision.md) | The problem, who it is for, goals and non-goals |
 | [architecture.md](architecture.md) | Components, data flow, APIs, the gateway and streaming re-identification |
+| [hosted.md](hosted.md) | Hosted deployment, trust boundary, actual retention, release gates and rollback |
 | [privacy-model.md](privacy-model.md) | Threat model, what pii-guard guarantees and what it does not |
 | [entities.md](entities.md) | The entity taxonomy: what counts as personal data, per language |
 | [evaluation.md](evaluation.md) | Synthetic benchmark, metrics, baselines, how results are reported |
@@ -30,3 +31,4 @@
 | [0008](decisions/0008-language-packs.md) | Language packs: per-language rules, inflection, prompts and eval forms, with fallbacks |
 | [0009](decisions/0009-third-party-lexicons.md) | Third-party lexicons: committed only where terms allow, used by the generator and the address rule |
 | [0010](decisions/0010-language-pack-plugins.md) | Language packs as one plugin unit: one `LanguagePack`, entry-point discovery, a conformance suite |
+| [0011](decisions/0011-hosted-saas.md) | Opt-in hosted demo: Google-first identity, scoped ephemeral state and conservative sponsored allocations |
