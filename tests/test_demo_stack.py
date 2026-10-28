@@ -27,6 +27,8 @@ def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(demo_stack, "dotenv", lambda *_: {})
     monkeypatch.setattr(ner_resolve, "PUBLIC_FALLBACK", PIN)
     monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "download")
+    # The published step (pinned since LAB-1306) is skipped, so these tests see the fallback.
+    monkeypatch.setenv("PII_GUARD_NER_PUBLISHED_MODEL", "fictional/unpublished-ner")
 
 
 def test_fast_mode_is_the_default_and_names_the_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
