@@ -5,7 +5,7 @@ import { metaFor } from "../lib/entities";
 import { request, recovery, type Account, type DemoResult, type Requester } from "./api";
 import { Limits } from "./AccountPanels";
 import { OriginalText, PlaceholderText, RestoredAnswer } from "./Highlight";
-import { friendlyModel, placeholderCounts, usageLine } from "./landing";
+import { friendlyModel, placeholderCounts, providerLabel, usageLine } from "./landing";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 import "./hosted.css";
 
@@ -53,7 +53,6 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const [announce, setAnnounce] = useState("");
   const [text, setText] = useState(EXAMPLES[language].original);
   const [editable, setEditable] = useState(false);
-  const [connection, setConnection] = useState("");
   const controller = useRef<AbortController | null>(null);
 
   useEffect(() => () => controller.current?.abort(), []);
@@ -71,7 +70,11 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   // no live run, only the worked example and the way to sign in.
   const sponsoredOff = account?.limits.sponsored_enabled === false;
   const guestLive = Boolean(account) && !signedIn && !sponsoredOff;
-  const canRun = signedIn || guestLive;
+  // Signed in: sponsored Meta when it's on; otherwise the owner's first saved provider
+  // connection, silently; with neither there is no run, only the way to add a key.
+  const ownConnection = signedIn && sponsoredOff ? account?.connections[0] : undefined;
+  const needsKey = signedIn && sponsoredOff && !ownConnection;
+  const canRun = guestLive || (signedIn && !needsKey);
 
   function reset(nextLanguage = language) {
     setLanguage(nextLanguage); setText(EXAMPLES[nextLanguage].original); setResult(null); setFailed(false); setError(""); setAnnounce("");
@@ -80,13 +83,15 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     setRunning(true); setStep(0); setError(""); setFailed(false); setResult(null); setAnnounce("Running the live example…");
     try {
       let next: DemoResult;
-      if (editable && signedIn) {
+      // The curated sample goes through /v1/demo (sponsored only); your text, or any run through
+      // your own connection, goes through the gateway's chat endpoint.
+      if (signedIn && (editable || ownConnection)) {
         const abort = new AbortController(); controller.current = abort;
         const timeout = setTimeout(() => abort.abort(), 180_000);
         const doFetch: typeof fetch = (input, init) => {
           const headers = new Headers(init?.headers);
           headers.set("X-PII-Guard-Mode", "fast");
-          if (connection) headers.set("X-PII-Guard-Connection", connection);
+          if (ownConnection) headers.set("X-PII-Guard-Connection", ownConnection.id);
           return fetch(input, { ...init, credentials: "same-origin", headers });
         };
         try {
@@ -114,7 +119,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   }
 
   // A run in flight or a failed one keeps the worked example on screen: a live failure never blanks it.
-  const shown = result ?? (editable && signedIn ? null : EXAMPLES[language]);
+  const shown = result ?? (editable && signedIn && !needsKey ? null : EXAMPLES[language]);
   const counts = shown ? placeholderCounts(shown.masked) : [];
   const badge = running ? { tone: "", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: "Live run did not complete · showing the example" } : { tone: "", text: "Example · not a live run" };
 
@@ -150,14 +155,17 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           </div>
           <div className="controls">
             <div className="field-group"><span className="field-label" id="language-label">Sample language</span><SegmentedControl label="Sample language" options={LANGUAGES.map((l) => ({ ...l, disabled: running }))} value={language} onChange={(v) => reset(v as Language)} /></div>
-            {signedIn && <Field label="Input" className="min-w-36 max-w-56 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">Curated scenario</option><option value="custom">Your text</option></Select></Field>}
+            {signedIn && !needsKey && <Field label="Input" className="min-w-36 max-w-56 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">Curated scenario</option><option value="custom">Your text</option></Select></Field>}
             {canRun && <Button variant="primary" busy={running} disabled={!running && editable && !text.trim()} onClick={() => void run()}>{running ? "Running…" : editable ? "Run your text" : "Run live example"}</Button>}
             {!account && <Button variant="primary" disabled>{accountError ? "Run live example" : "Checking availability…"}</Button>}
             {(result || failed) && !running && <Button onClick={() => reset()}>Show the example</Button>}
           </div>
-          {account && !signedIn && sponsoredOff && <div className="notice paused"><p>Live guest runs are paused right now. The worked example below shows the same flow, step by step.</p><ButtonLink href={loginUrl}>Sign in with Google to run your own text</ButtonLink></div>}
+          {account && !signedIn && sponsoredOff && <div className="notice paused"><p>Live runs are paused right now. The worked example below shows the same flow, step by step.</p><ButtonLink href={loginUrl}>Sign in with Google to run your own text</ButtonLink></div>}
           {!account && accountError && <p className="notice">Live API unavailable. The worked example below still shows the flow. <a href="#account">Check the connection ↓</a></p>}
-          {editable && signedIn && <div className="stage editor"><Field label="Your text"><Textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field><Field label="Model connection" hint="The Azure-hosted guard receives this text. Use synthetic data while evaluating."><Select value={connection} disabled={running} onChange={(e) => setConnection(e.target.value)}><option value="">Sponsored Meta</option>{account!.connections.map((c) => <option key={c.id} value={c.id}>{c.provider} · {c.origin}</option>)}</Select></Field></div>}
+          {needsKey && <div className="notice paused"><p>Live runs are paused right now. Add your own provider key to run it, or follow the worked example below.</p><ButtonLink href={hasConsole ? "#connect" : "#account"}>Add a provider key</ButtonLink></div>}
+          {canRun && !ownConnection && !running && <p className="notice via">Runs on Meta Muse Spark · no key needed{account && <> · <span className="tabular-nums">{usageLine(account)}</span></>}</p>}
+          {ownConnection && <p className="notice via">Runs through your {providerLabel(ownConnection.provider)} connection. {hasConsole && <a href="#connect">Change it in Connect</a>}</p>}
+          {editable && signedIn && !needsKey && <div className="stage editor"><Field label="Your text" hint="The Azure-hosted guard receives this text. Use synthetic data while evaluating."><Textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field></div>}
           <p className="sr-only" role="status" aria-live="polite">{announce}</p>
           {running && <div className="notice progress"><ol aria-label="Live run progress">{STEPS.map((label, i) => <li key={label} data-state={i < step ? "done" : i === step ? "active" : "todo"}>{label}{i === step && <span className="sr-only"> (in progress)</span>}</li>)}</ol><p className="muted">Usually a few seconds. If the service has been idle, the first run can take a minute while it starts.</p></div>}
           {error && <Notice tone="danger" live className="m-4 sm:m-6">{error}</Notice>}
@@ -192,7 +200,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <p className="muted">How this hosted preview handles what you send. Self-hosting keeps all of it on your own infrastructure.</p>
           <dl className="data-list">
             <div><dt>Where it runs</dt><dd>On Microsoft Azure in Sweden Central (EU). Text and images are processed in the service’s memory; there is no content archive and no backup of the mappings. Azure operators can access process memory.</dd></div>
-            <div><dt>Guest demo</dt><dd>You can’t type anything. A fixed, fictional sample is masked here, and only the masked sample goes to Meta’s model, when the sponsored budget allows.</dd></div>
+            <div><dt>Guest demo</dt><dd>You can’t type anything. A fixed, fictional sample is masked here, and only the masked sample goes to Meta’s model.</dd></div>
             <div><dt>Signed in</dt><dd>Google receives your sign-in (name, e-mail and profile only). Your text reaches our Azure service in full; only the masked text goes to Meta’s model or to the provider you connect.</dd></div>
             <div><dt>Images</dt><dd>Signed-in users only. Read and masked inside the service with local OCR and an on-device face and ID-photo detector, never stored and never sent to a model. Signatures and stamps stay visible.</dd></div>
             <div><dt>How long</dt><dd>Placeholder mappings expire after 1 hour without use. Your last 50 masked requests are kept in memory for your activity log. A restart clears both. Expiry makes them unavailable, but doesn’t prove the memory is physically erased.</dd></div>
@@ -203,7 +211,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </section>
         <section className="account-panel stack" id="account" aria-labelledby="account-heading">
           <h2 id="account-heading">Try it now. Connect when you’re ready.</h2>
-          {!signedIn && <p className="measure">{sponsoredOff ? "Live guest runs are paused. Sign in with Google to run your own text with your own provider key, create projects and connect your application through a gateway endpoint." : "No login needed for the curated live example. Sign in with Google to run your own text, create projects and connect your application through a gateway endpoint."}</p>}
+          {!signedIn && <p className="measure">{sponsoredOff ? "Live runs are paused right now. Sign in with Google to run your own text with your own provider key, create projects and connect your application through a gateway endpoint." : "Runs on Meta Muse Spark, no key and no login needed for the curated live example. Sign in with Google to run your own text, create projects and connect your application through a gateway endpoint."}</p>}
           {accountError ? <Notice tone="danger" live action={<Button size="sm" onClick={() => void refresh()}>Reconnect to API</Button>}>{accountError}</Notice> : !account ? <p className="muted">Checking live availability…</p> : <>
             {(!sponsoredOff || signedIn) && <p className="muted tabular-nums">{usageLine(account)}</p>}
             <Limits account={account} hideZero />

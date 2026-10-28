@@ -50,7 +50,7 @@ export function recovery(error: unknown, context: "console" | "site" = "console"
   const fallback = site ? " The static example remains available." : "";
   if (error instanceof ApiError) {
     // The sponsored model budget is off (zero until the provider authorises it, docs/hosted.md).
-    if (error.code === "sponsored_unavailable") return site ? "Live guest runs are paused right now: the sponsored model isn’t available. The worked example is still shown below. Sign in with Google to run your own text." : "The sponsored model isn’t available right now. Connect your own provider key, or retry later.";
+    if (error.code === "sponsored_unavailable") return site ? "Live runs are paused right now. The worked example is still shown below. Sign in with Google to run your own text." : "Live runs on Meta’s model are paused right now. Connect your own provider key, or retry later.";
     if (error.status === 401 || error.status === 403) return "Your session is no longer authorized. Sign in again, then retry.";
     if (error.status === 429) return site ? "The live allowance is used up or requests are arriving too quickly. Check the reset time below and retry later; the static example remains available." : "The allowance is used up or requests are arriving too quickly. Check the reset time on Overview and retry later.";
     if (error.status === 410 || /expired|session|connection/.test(error.code)) return "This session or connection has expired. Reconnect your provider or start a fresh request.";

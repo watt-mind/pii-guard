@@ -2,10 +2,9 @@ import { useEffect, useId, useState } from "react";
 import { Announcer, Button, ConfirmAction, Field, Input, KeyValues, Metric, Notice, Select } from "../components/ui";
 import { SetupChecklist } from "./SetupChecklist";
 import { recovery, type Account, type Connection, type Requester } from "./api";
+import { providerLabel } from "./landing";
 import { getPlaygroundConnection, setPlaygroundConnection, time, useHostedSession, usePlaygroundConnection } from "./session";
 
-const PROVIDER_LABEL: Record<string, string> = { meta: "Meta", openai: "OpenAI", fireworks: "Fireworks", openrouter: "OpenRouter", custom: "Custom HTTPS endpoint" };
-const providerLabel = (provider: string) => PROVIDER_LABEL[provider] ?? provider;
 const connectionLabel = (c: Pick<Connection, "provider" | "origin">) => `${providerLabel(c.provider)} · ${c.origin}`;
 
 const LIMIT_LABEL: Record<string, string> = {

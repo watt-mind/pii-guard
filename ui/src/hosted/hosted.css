@@ -82,6 +82,7 @@ body:has(.hosted) {
   .hosted .entities .count { font-variant-numeric: tabular-nums; font-weight: 500; }
   .hosted .notice { padding: var(--hosted-space-md) var(--hosted-space-lg); background: var(--surface-2); }
   .hosted .notice.paused { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--hosted-space-md); border-bottom: 1px solid var(--line); }
+  .hosted .notice a { text-decoration: underline; }
   .hosted .progress { display: grid; gap: var(--hosted-space-sm); }
   .hosted .progress ol { display: flex; flex-wrap: wrap; gap: var(--hosted-space-sm) var(--hosted-space-lg); list-style: none; padding: 0; margin: 0; }
   .hosted .progress li { display: inline-flex; align-items: center; gap: var(--hosted-space-sm); color: var(--muted); }

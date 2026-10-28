@@ -3,6 +3,10 @@ import { modelLabel } from "../lib/entities";
 import { tokenize } from "../lib/placeholders";
 import type { Account } from "./api";
 
+const PROVIDER_LABEL: Record<string, string> = { meta: "Meta", openai: "OpenAI", fireworks: "Fireworks", openrouter: "OpenRouter", custom: "Custom HTTPS endpoint" };
+/** A provider id as a person reads it ("openai" -> "OpenAI"). */
+export const providerLabel = (provider: string) => PROVIDER_LABEL[provider] ?? provider;
+
 /** A model id as a person reads it: "muse-spark-1.3" -> "Muse Spark 1.3 (Meta API)", "Llama-4-Maverick-17B-…" -> "Llama 4 Maverick". */
 export function friendlyModel(model: string) {
   const llama = /^(?:.*\/)?Llama-(\d+(?:\.\d+)?)-([A-Za-z]+)/i.exec(model);

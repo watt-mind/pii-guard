@@ -17,7 +17,9 @@ describe("public hosted workflow", () => {
   it("sends sign-in back to the console instead of the provider's bare page", async () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);
-    await screen.findByText(/free runs today/);
+    await screen.findAllByText(/free runs today/);
+    expect(screen.getByText(/Runs on Meta Muse Spark · no key needed/)).toHaveTextContent("0 of 3 free runs today");
+    expect(document.body.textContent).not.toMatch(/sponsor/i);
     const links = screen.getAllByRole("link", { name: "Sign in with Google" });
     expect(links.length).toBeGreaterThanOrEqual(2);
     for (const link of links) expect(link).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23overview");
@@ -102,6 +104,8 @@ describe("sponsorship off (zero budget until the provider authorises it)", () =>
     expect(document.querySelector("#demo .flow .hl-placeholder")).toHaveTextContent("[[PERSON_3f9a1c]]");
     expect(screen.queryByText(/No login needed/)).not.toBeInTheDocument();
     expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
+    expect(screen.getByText("Live runs are paused right now. The worked example below shows the same flow, step by step.")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/sponsor/i);
   });
   it("hides limits that are off", async () => {
     const call = requester((path) => path === "/v1/account" ? off : result);
@@ -112,8 +116,46 @@ describe("sponsorship off (zero budget until the provider authorises it)", () =>
     expect(screen.queryByText("Largest image (bytes)")).not.toBeInTheDocument();
   });
   it("maps sponsored_unavailable to its own copy", () => {
-    expect(recovery(new ApiError(503, "sponsored_unavailable", "x"), "site")).toMatch(/Live guest runs are paused/);
-    expect(recovery(new ApiError(503, "sponsored_unavailable", "x"))).toMatch(/sponsored model isn’t available/);
+    expect(recovery(new ApiError(503, "sponsored_unavailable", "x"), "site")).toMatch(/^Live runs are paused right now/);
+    expect(recovery(new ApiError(503, "sponsored_unavailable", "x"))).toMatch(/Live runs on Meta’s model are paused/);
+  });
+});
+
+describe("signed-in example runs without a model picker", () => {
+  const signed: Account = { ...account, authenticated: true, tier: "standard" };
+  const conn = { id: "conn-one", provider: "meta", origin: "https://api.example.com", expires_at: "2026-10-28T20:00:00Z" };
+  it("uses sponsored Meta when it's on, with no connection dropdown", async () => {
+    const call = requester((path) => path === "/v1/account" ? { ...signed, limits: { requests_per_day: 5, sponsored_enabled: true }, connections: [conn] } : result);
+    const user = userEvent.setup(); render(<HostedApp call={call} />);
+    await user.click(await screen.findByRole("button", { name: "Run live example" }));
+    await screen.findByText("Live result · answered by test-model");
+    expect(call).toHaveBeenCalledWith("/v1/demo", { sample_id: "en-support", language: "en" });
+    expect(screen.queryByLabelText("Model connection")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Runs through your/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/sponsor/i);
+  });
+  it("silently uses the first saved connection when sponsorship is off", async () => {
+    const call = requester((path) => path === "/v1/account" ? { ...signed, limits: { requests_per_day: 5, sponsored_enabled: false }, connections: [conn, { ...conn, id: "conn-two", provider: "openai" }] } : result);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    try {
+      const user = userEvent.setup(); render(<HostedApp call={call} />);
+      expect(await screen.findByText(/Runs through your Meta connection/)).toBeInTheDocument();
+      expect(screen.queryByLabelText("Model connection")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Run live example" }));
+      await screen.findByRole("alert");
+      expect(new Headers(fetchSpy.mock.calls[0]![1]!.headers).get("X-PII-Guard-Connection")).toBe("conn-one");
+      expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
+      expect(document.querySelector("#demo .flow .hl-restored")).toHaveTextContent("Robin Example");
+    } finally { fetchSpy.mockRestore(); }
+  });
+  it("asks for a key instead of a failing run when there is neither", async () => {
+    const call = requester((path) => path === "/v1/account" ? { ...signed, limits: { requests_per_day: 5, sponsored_enabled: false }, connections: [] } : result);
+    render(<HostedApp call={call} />);
+    expect(await screen.findByRole("link", { name: "Add a provider key" })).toHaveAttribute("href", "#account");
+    expect(screen.queryByRole("button", { name: /^Run/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Input")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/sponsor/i);
+    expect(document.querySelector("#demo .flow .hl-placeholder")).toHaveTextContent("[[PERSON_3f9a1c]]");
   });
 });
 
