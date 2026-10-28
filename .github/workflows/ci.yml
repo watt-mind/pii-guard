@@ -31,6 +31,7 @@ jobs:
       ui: ${{ steps.filter.outputs.ui }}
       docker: ${{ steps.filter.outputs.docker }}
       wheel: ${{ steps.filter.outputs.wheel }}
+      hosted: ${{ steps.filter.outputs.hosted }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,17 +47,19 @@ jobs:
         run: |
           # Only pull requests are filtered; pushes, merge queue, nightly and manual runs check
           # everything.
-          ui=true docker=true wheel=true
+          ui=true docker=true wheel=true hosted=true
           if [ "$EVENT" = pull_request ]; then
             git diff --name-only "$BASE...HEAD" > changed.txt
             # The UI bundles the benchmark index, built from the run records (LAB-1269).
             grep -qE '^(ui/|eval/results/runs/|docs/benchmarks/config\.json$|src/pii_guard/eval/report|\.github/workflows/ci\.yml$|scripts/ci/licenses\.py$)' changed.txt || ui=false
             # What the image is built from (Dockerfile COPY lines) and how it is smoke-tested.
             grep -qE '^(src/|Dockerfile$|\.dockerignore$|pyproject\.toml$|uv\.lock$|README\.md$|LICENSE$|scripts/ci/docker_smoke\.sh$|\.github/workflows/ci\.yml$)' changed.txt || docker=false
+            # Hosted infra and production image inputs; no cloud credentials are required.
+            grep -qE '^(deploy/azure/|Dockerfile\.hosted$|src/|ui/|eval/results/|docs/benchmarks/config\.json$|\.dockerignore$|pyproject\.toml$|uv\.lock$|README\.md$|LICENSE$|NOTICE$|\.github/workflows/ci\.yml$)' changed.txt || hosted=false
             # What the release wheel is built from (`make wheel`: the package and the UI).
             grep -qE '^(src/|ui/|pyproject\.toml$|uv\.lock$|Makefile$|README\.md$|scripts/ci/wheel_smoke\.sh$|\.github/workflows/(ci|release)\.yml$)' changed.txt || wheel=false
           fi
-          { echo "ui=$ui"; echo "docker=$docker"; echo "wheel=$wheel"; } | tee -a "$GITHUB_OUTPUT"
+          { echo "ui=$ui"; echo "docker=$docker"; echo "wheel=$wheel"; echo "hosted=$hosted"; } | tee -a "$GITHUB_OUTPUT"
 
   lint:
     name: lint
@@ -185,6 +188,41 @@ jobs:
           cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
       - name: Size budget, healthcheck, one masked request on the mock upstream
         run: scripts/ci/docker_smoke.sh pii-guard:ci
+
+  # Secret-free validation of Azure source and the opt-in production image. The packaging
+  # smoke deliberately does not claim deployed auth, readiness or sponsored-provider access.
+  hosted-infra:
+    name: hosted-infra
+    needs: changes
+    if: needs.changes.outputs.hosted == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Bicep compiler (no Azure login)
+        run: az bicep install --version v0.48.1
+      - name: Compile Azure template and check deployment script
+        run: |
+          az bicep build --file deploy/azure/main.bicep --stdout > "$RUNNER_TEMP/hosted-arm.json"
+          bash -n deploy/azure/deploy.sh
+          shellcheck deploy/azure/deploy.sh
+      - name: Deployment admission and compiled-template regression tests (no cloud calls)
+        run: python3 deploy/azure/test_deploy.py
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build hosted UI and pinned CPU NER image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile.hosted
+          load: true
+          push: false
+          tags: pii-guard:hosted-ci
+          cache-from: type=gha,scope=hosted
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,scope=hosted,mode=max' || '' }}
+      - name: Bundled UI and offline CPU NER packaging smoke (no network)
+        run: docker run --rm --interactive --network none --entrypoint python pii-guard:hosted-ci - < deploy/azure/ci_hosted_smoke.py
 
   audit:
     name: audit
@@ -363,6 +401,7 @@ jobs:
         smoke,
         eval-gate,
         docker,
+        hosted-infra,
         audit,
         ui,
         wheel,
