@@ -6,7 +6,9 @@
 - :class:`JsonEscapingSession` restores into a JSON document (tool-call ``arguments``): each
   original value is JSON-string-escaped, so a value with a quote or backslash can't break the
   arguments. It is duck-type compatible with :class:`~pii_guard.vault.StreamUnmasker`.
-- :func:`restore_completion` rewrites a ``chat.completion`` body in place.
+- :func:`restore_completion` rewrites a ``chat.completion`` body in place: message texts,
+  tool-call ``function.arguments`` and the legacy ``function_call.arguments`` (JSON-escaped),
+  and custom tool ``custom.input`` (freeform text, restored as is; LAB-1354).
 
 Unknown placeholders are left as is and counted (``unresolved``). Every restored value is
 charged to one :class:`~pii_guard.vault.RestoreBudget` per response, so a response restores at
@@ -203,11 +205,19 @@ def restore_completion(session: VaultSession, body: dict[str, Any]) -> RestoreRe
                         part["text"] = restored
                         report.unresolved.update(dict.fromkeys(unresolved))
         for call in message.get("tool_calls") or []:
-            function = call.get("function") if isinstance(call, dict) else None
+            if not isinstance(call, dict):
+                continue
+            function = call.get("function")
             if isinstance(function, dict) and isinstance(function.get("arguments"), str):
                 function["arguments"] = restore_arguments(
                     session, function["arguments"], report, budget
                 )
+            custom = call.get("custom")
+            if isinstance(custom, dict) and isinstance(custom.get("input"), str):
+                # Custom tool input is freeform text, not JSON: restored without escaping.
+                restored, _, unresolved = restore_text(session, custom["input"], budget)
+                custom["input"] = restored
+                report.unresolved.update(dict.fromkeys(unresolved))
         function_call = message.get("function_call")
         if isinstance(function_call, dict) and isinstance(function_call.get("arguments"), str):
             function_call["arguments"] = restore_arguments(
