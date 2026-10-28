@@ -883,9 +883,10 @@ Treatments:
 - **mask**: free text. Detected values are replaced by placeholders and restored in the
   answer.
 - **mask JSON**: every string in the value, object keys included, is masked as its own text.
-  Every number with at least six digits is detected too (`{"tax_id": 8123456786}`; an
+  A JSON number with six or more decimal digits is detected too (`{"tax_id": <NUMBER>}` uses
+  schematic placeholder notation; an
   integral float in its integer form): a number with detected personal data is replaced by
-  the placeholder **string** (`"[[NATIONAL_ID_HU_TAX_ab12cd]]"`), because a JSON number can't
+  the placeholder **string** (`"[[NATIONAL_ID_HU_TAX]]"`), because a JSON number can't
   carry a placeholder; any other number is forwarded as the same number. A restored value
   comes back as a string: the answer's tool-call arguments hold the original digits as a JSON
   string, not a number (LAB-1348).
