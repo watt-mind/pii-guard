@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from pii_guard import __version__
-from pii_guard.api.errors import install_error_handlers
+from pii_guard.api.errors import error_responses, install_error_handlers
 from pii_guard.api.routes import include_routers
 from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware, allowed_hosts
 from pii_guard.config import Settings, get_settings
@@ -99,8 +99,23 @@ def create_app(
     )
     install_error_handlers(app)
 
-    @app.get("/healthz", tags=["health"])
+    @app.get(
+        "/healthz",
+        tags=["health"],
+        summary="Liveness check",
+        responses={
+            200: {
+                "description": "The server is up.",
+                "content": {
+                    "application/json": {"example": {"status": "ok", "version": __version__}}
+                },
+            },
+            **error_responses("traffic_log_not_local", common=False),
+        },
+    )
     def healthz() -> dict[str, str]:
+        """``{"status": "ok", "version": ...}`` while the server is up. Needs no token, and
+        touches no detector, vault or upstream."""
         return {"status": "ok", "version": __version__}
 
     include_routers(app)

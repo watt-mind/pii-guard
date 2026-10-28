@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 from fastapi import Request
 
 from pii_guard import __version__
+from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import v1_router
 from pii_guard.config import Settings
 from pii_guard.types import DetectionError
@@ -155,6 +156,16 @@ def server_status(request: Request) -> dict[str, Any]:
     }
 
 
-@router.get("/v1/status")
+@router.get(
+    "/v1/status",
+    summary="What this server runs: detectors, modes, policies, upstream, images",
+    responses=error_responses(),
+)
 def status(request: Request) -> dict[str, Any]:
+    """Read-only configuration for the web UI's Overview, Connect and Policy pages.
+
+    Detector names, whether NER and the audit mode can run, the entity policies, the
+    traffic-log level, the image pipeline's gaps and the upstream's origin (scheme, host,
+    port). Never a key, a token, a value or a session: secrets appear only as configured or
+    not. ``gateway.url`` is this request's own base URL plus ``/v1``."""
     return server_status(request)
