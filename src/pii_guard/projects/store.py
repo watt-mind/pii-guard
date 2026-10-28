@@ -501,6 +501,13 @@ class ProjectStore:
                     "model=?, credential=?, enabled=? WHERE id=? AND project_id=?",
                     (*values, endpoint, project),
                 )
+            if not enabled:
+                # Disable and revocation commit together. Re-enabling never restores an old key.
+                db.execute(
+                    "UPDATE endpoint_keys SET revoked_at = COALESCE(revoked_at, ?) "
+                    "WHERE endpoint_id = ? AND revoked_at IS NULL",
+                    (_now(), endpoint),
+                )
             return self._endpoint_metadata(self._endpoint(db, project, endpoint))
 
     def delete_endpoint(self, owner: str, project: str, endpoint: str) -> None:
