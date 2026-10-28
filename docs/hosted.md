@@ -28,6 +28,19 @@ to bypass them. The project maintainer must review the final public privacy and 
 notice before editable inputs are enabled. Put that notice beside the editable text/BYOK form,
 with an explicit acknowledgement before the first submission, not only on the landing page.
 
+## Sponsored provider launch gate
+
+Technical readiness does not authorize sponsored Meta access. The
+[Meta Model API terms](https://dev.meta.ai/legal/terms-of-service), section 10.1(i), require
+written Meta authorization for providing access through an API gateway, proxy or similar
+offering. Keep sponsorship at zero until the maintainer records the applicable written
+authorization. This also applies when testing a hosted proxy with synthetic inputs.
+
+Standard Services exclude training on submitted content (section 5.1), but allow need-based
+retention (section 4.4). No fixed deletion period or EU-only processing is established here.
+An Azure EU region does not establish downstream residency. Confirm actual Standard routing,
+applicable processing terms and public disclosure before activating paid calls.
+
 ## Retention, deletion and keys
 
 This initial deployment uses process memory for originals during processing, reversible
@@ -179,6 +192,115 @@ spoofed identity headers, cross-owner sessions/API keys and cross-origin cookie 
 that the platform discards caller-supplied `X-MS-CLIENT-PRINCIPAL` headers on **all** ingress
 hostnames, including anonymous requests. If this cannot be established, keep ingress internal.
 
+## Operator launch checklist
+
+Use the final combined backend/UI/deployment revision for launch. A green check on each
+separate PR, a locally built image or a successful foundation deployment is not evidence that
+an Azure app revision has been tested. Do not mark image-bound evidence true before its actual
+checks. The commands below inspect metadata only; do not add `--debug`, dump container env or
+retrieve secret values.
+
+```bash
+export AZURE_RESOURCE_GROUP=rg-pii-guard-hosted-demo
+export AZURE_LOCATION=swedencentral
+export AZURE_PREFIX=piiguarddemo
+export HOSTED_PUBLIC_ORIGIN=https://guard.watt-mind.com
+az deployment group show --resource-group "$AZURE_RESOURCE_GROUP" --name hosted-foundation \
+  --query 'properties.outputs.{registry:registryServer.value,vault:vaultUri.value,domain:environmentDomain.value}' --output json
+az acr repository show --name "$AZURE_REGISTRY_NAME" --image "pii-guard@$REVIEWED_DIGEST" \
+  --query '{digest:digest,lastUpdateTime:lastUpdateTime}' --output json
+az containerapp show --resource-group "$AZURE_RESOURCE_GROUP" --name "${AZURE_PREFIX}-app" \
+  --query '{image:properties.template.containers[0].image,latest:properties.latestRevisionName,ready:properties.latestReadyRevisionName,external:properties.configuration.ingress.external,fqdn:properties.configuration.ingress.fqdn}' --output json
+```
+
+Set `AZURE_REGISTRY_NAME` from the registry output (without `.azurecr.io`) and
+`REVIEWED_DIGEST=sha256:<reviewed digest>`. Require the deployed image digest to match the
+release evidence and `latest=ready`. No app/image yet means these checks are pending.
+
+- **Identity boundary:** inspect the auth configuration with the focused query below. Verify
+  Google enabled, HTTPS required and `AllowAnonymous` intentional. In a separately authorized,
+  restricted staging test, send a valid-shaped synthetic `X-MS-CLIENT-PRINCIPAL` with
+  `auth_typ=google` and a fictional `sub` to `/v1/account` without a Google cookie: it must stay
+  anonymous or be refused. Repeat on the default Azure hostname and custom hostname, and for
+  repeated security headers. A localhost test bypasses the platform and cannot establish this
+  boundary. Internal ingress alone may not exercise the external Easy Auth path. Before the
+  first external test, agree its network restriction and rollback with the release reviewer;
+  do not forge successful evidence to get past `enable`.
+- **Google audience:** confirm exact callback and actual requested scopes in the browser.
+  Google's [audience documentation](https://support.google.com/cloud/answer/15549945) exempts
+  sign-in limited to `openid`, profile and email from Testing's usual test-user/7-day limits.
+  Do not assume Testing either blocks or proves public access. Test the actual Google flow
+  with an authorized account outside the configured tester list; record requested scopes and
+  outcome without identity claims or tokens. Additional scopes change the audience requirements.
+  Publishing status or OAuth configuration changes require separate authorization.
+- **DNS/TLS:** before certificate binding, verify `dig +short CNAME guard.watt-mind.com` points
+  to the public app hostname and `dig +short TXT asuid.guard.watt-mind.com` matches the staged
+  app verification ID. A missing record leaves certificate issuance pending. After binding,
+  verify canonical HTTPS, certificate validity and Google callback; retain the Azure hostname
+  in the identity-boundary tests.
+- **Key references:** list secret *versions* using the command below; select enabled versioned
+  IDs from this vault. Require Google OAuth secret, Meta Standard credential and tenant key
+  references to resolve under the runtime managed identity. Existing enabled secret metadata
+  does not prove resolution or provider authorization. Never print their values.
+- **Allocation:** with sponsorship zero, run the filesystem probe below in the actual app
+  container as its runtime user. It must support exclusive create, no-follow and file/directory
+  fsync on `/app/allocation-ledger`. Then, only after provider authorization, use a tiny test
+  allocation to prove startup claim, duplicate-claim refusal, expiry, exhausted-budget refusal
+  and restart forfeiture. Filesystem support alone does not prove allocation accounting.
+- **Spend and rollback:** require written provider authorization, Standard routing, reviewed
+  pricing/reservations and a reconciled fresh ID/expiry before setting a positive allocation.
+  Keep it zero for a technical-only staging release. Save the previous immutable image and
+  secret-version references, exercise `disable`, and require fresh review before a rollback
+  image is publicly enabled. Preserve all real allocation markers; rollback never restores
+  spent credit. Record an owner for provider-spend reconciliation and Azure budget alerts.
+
+```bash
+az rest --method get --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.App/containerApps/${AZURE_PREFIX}-app/authConfigs/current?api-version=2025-01-01" \
+  --query 'properties.{enabled:platform.enabled,https:httpSettings.requireHttps,action:globalValidation.unauthenticatedClientAction,google:identityProviders.google.enabled,scopes:identityProviders.google.login.scopes}' --output json
+for secret_name in google-oauth-client-secret meta-api-key tenant-key; do
+  az keyvault secret list-versions --vault-name "$AZURE_VAULT_NAME" --name "$secret_name" \
+    --query '[].{id:id,enabled:attributes.enabled}' --output json
+done
+az containerapp show --resource-group "$AZURE_RESOURCE_GROUP" --name "${AZURE_PREFIX}-app" \
+  --query properties.customDomainVerificationId --output tsv
+```
+
+Set `AZURE_VAULT_NAME` from the foundation vault URI. For the allocation probe, open the app
+container using `az containerapp exec --resource-group "$AZURE_RESOURCE_GROUP" --name
+"${AZURE_PREFIX}-app" --command /bin/sh`, then run this synthetic filesystem check. It removes
+only its uniquely named probe file, never an allocation marker:
+
+```bash
+python - <<'PYTHON'
+import os, uuid
+root = os.open('/app/allocation-ledger', os.O_RDONLY | os.O_DIRECTORY)
+name = '.launch-probe-' + uuid.uuid4().hex
+flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+created = False
+try:
+    fd = os.open(name, flags, 0o600, dir_fd=root)
+    created = True
+    try:
+        os.write(fd, b'synthetic filesystem probe')
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    try:
+        duplicate = os.open(name, flags, 0o600, dir_fd=root)
+    except FileExistsError:
+        pass
+    else:
+        os.close(duplicate)
+        raise SystemExit('exclusive create failed')
+    os.fsync(root)
+    print('allocation filesystem primitives passed')
+finally:
+    if created:
+        os.unlink(name, dir_fd=root)
+    os.close(root)
+PYTHON
+```
+
 ## Release evidence and sponsored allocation
 
 The script does not generate successful evidence. The reviewer supplies an uncommitted JSON
@@ -204,7 +326,8 @@ The script checks pre-existing Easy Auth before opening external ingress and run
 landing/readiness/anonymous-API-refusal smoke. On failure it restores internal ingress. This
 smoke does not replace browser sign-in, provider streaming or privacy review.
 
-Sponsored budget remains zero unless the operator supplies `HOSTED_SPONSORED_MICRODOLLARS`,
+Sponsored budget remains zero until written provider authorization and the other launch gates
+are recorded, and the operator supplies `HOSTED_SPONSORED_MICRODOLLARS`,
 `HOSTED_ALLOCATION_ID` and `HOSTED_ALLOCATION_EXPIRES_AT`. A positive allocation creates a new
 revision/process; do not reuse an ID previously started. Verify atomic marker creation on the
 mounted share, including exclusive creation and file/directory fsync support, expiry, reservation bounds, exhausted-budget refusal and restart forfeiture
