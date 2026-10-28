@@ -65,26 +65,42 @@ def _client(ui: Path, status: Status | None = None, **settings: object) -> TestC
     return TestClient(app)
 
 
-def test_ui_served_at_root_with_status_strip(ui_dir: Path) -> None:
+def test_ui_served_at_root_without_a_status_strip(ui_dir: Path) -> None:
     client = _client(ui_dir)
     page = client.get("/")
     assert page.status_code == 200
     assert '<div id="root">' in page.text
-    assert "Demo mode: offline mock model" in page.text
-    assert "detectors: rules" in page.text
-    assert "images: on" in page.text
+    # The console reads /v1/status itself: a strip would repeat it (and "Demo mode" is the
+    # console's word for its in-browser engine).
+    assert "pii-guard-up-status" not in page.text
+    assert "Demo mode" not in page.text
+    assert "detectors:" not in page.text
     assert page.headers["cache-control"] == "no-cache"
     assert client.get("/assets/app.js").text == "console.log('ui')"
     assert client.get("/healthz").json() == {"status": "ok", "version": __version__}
 
 
-def test_configured_upstream_and_ocr_in_strip(ui_dir: Path) -> None:
+def test_ui_index_is_served_byte_for_byte(ui_dir: Path) -> None:
+    client = _client(ui_dir)
+    for path in ("/", "/index.html", "/traffic"):
+        assert client.get(path).text == INDEX
+
+
+def test_no_ui_page_says_mock_upstream_not_demo_mode(tmp_path: Path) -> None:
+    text = _client(tmp_path / "none").get("/").text
+    assert "Mock upstream: offline mock model" in text
+    assert "Demo mode" not in text
+    assert "detectors: rules" in text
+    assert "images: on" in text
+
+
+def test_no_ui_page_shows_configured_upstream_and_ocr_gaps(tmp_path: Path) -> None:
     status = Status(
         upstream="https://models.example.com",
         detectors=["rules", "ner"],
         image_gaps=["tesseract", "segmenter"],
     )
-    text = _client(ui_dir, status).get("/").text
+    text = _client(tmp_path / "none", status).get("/").text
     assert "Upstream: https://models.example.com" in text
     assert "detectors: rules, ner" in text
     assert "images: refused (no OCR, face detection)" in text

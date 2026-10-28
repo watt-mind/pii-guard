@@ -52,7 +52,7 @@ _STRIP_ID = "pii-guard-up-status"
 
 @dataclass
 class Status:
-    """What ``up`` runs, shown in the CLI banner and the strip above the UI."""
+    """What ``up`` runs, shown in the CLI banner and on the page without the UI."""
 
     upstream: str  # "mock" or the configured upstream's origin
     detectors: list[str] = field(default_factory=list)
@@ -78,14 +78,13 @@ def ui_available(ui_dir: Path = UI_DIR) -> bool:
     return (ui_dir / "index.html").is_file()
 
 
-def _strip(status: Status, *, system_theme: bool = False) -> str:
-    """A one-line status strip injected at the top of the UI (no UI rebuild needed).
+def _strip(status: Status) -> str:
+    """The status line of the page without the UI (the console shows the same from ``/v1/status``).
 
-    Light by default, dark under the UI's ``.dark`` class (``system_theme``: under a dark
-    system theme, for the page without the UI).
+    Light by default, dark under a dark system theme.
     """
     first = (
-        "Demo mode: offline mock model (echoes what it receives)"
+        "Mock upstream: offline mock model (echoes what it receives)"
         if status.mock
         else f"Upstream: {status.upstream}"
     )
@@ -98,24 +97,17 @@ def _strip(status: Status, *, system_theme: bool = False) -> str:
     style = (
         f"{sel}{{font:13px/1.4 system-ui,sans-serif;padding:6px 16px;text-align:center;"
         f"color:{light[0]};background:{light[1]}}}"
-        + (
-            f"@media (prefers-color-scheme:dark){{{sel}{{color:{dark[0]};background:{dark[1]}}}}}"
-            if system_theme
-            else f".dark {sel}{{color:{dark[0]};background:{dark[1]}}}"
-        )
+        f"@media (prefers-color-scheme:dark){{{sel}{{color:{dark[0]};background:{dark[1]}}}}}"
     )
     return f'<style>{style}</style><div id="{_STRIP_ID}" role="status">{html.escape(text)}</div>'
 
 
 class _SpaFiles(StaticFiles):
-    """Static files with ``index.html`` for client-side routes, and the status strip in it."""
+    """Static files with ``index.html`` for client-side routes."""
 
-    def __init__(self, *, directory: Path, status: Status) -> None:
+    def __init__(self, *, directory: Path) -> None:
         super().__init__(directory=directory, html=True)
-        index = (directory / "index.html").read_text(encoding="utf-8")
-        body = index.find("<body")
-        end = index.find(">", body) + 1 if body != -1 else 0
-        self._index = (index[:end] + _strip(status) + index[end:]).encode("utf-8")
+        self._index = (directory / "index.html").read_bytes()
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         if path in ("", ".", "index.html"):
@@ -139,7 +131,7 @@ def _no_ui_page(status: Status) -> str:
 <meta name="color-scheme" content="light dark">
 <style>body{{font:16px/1.5 system-ui,sans-serif;max-width:42rem;margin:3rem auto;
 padding:0 16px}}</style></head>
-<body>{_strip(status, system_theme=True)}
+<body>{_strip(status)}
 <h1>pii-guard is running</h1>
 <p>The API and the OpenAI-compatible gateway are up, but this install has no web UI bundled
 (it was built from source, not from a release wheel).</p>
@@ -159,7 +151,7 @@ def create_bundle_app(
     app = create_app(settings)
     app.state.up_status = status
     if ui_available(ui_dir):
-        app.mount("/", _SpaFiles(directory=ui_dir, status=status), name="ui")
+        app.mount("/", _SpaFiles(directory=ui_dir), name="ui")
     else:
         page = _no_ui_page(status)
 
