@@ -21,6 +21,10 @@ export interface OverviewProps {
   /** Open one call on the Logs screen. */
   onOpenCall: (id: string) => void;
   sendDemo?: typeof sendDemoTraffic;
+  /** Show the server's upstream and detectors; off where the server can't report them yet. */
+  serverSetup?: boolean;
+  /** Shown under the introduction, such as a hosted owner's account. */
+  account?: ReactNode;
 }
 
 const BLOCKED = new Set(["blocked", "refused"]);
@@ -49,7 +53,7 @@ function summarize(events: readonly TrafficEvent[]) {
   };
 }
 
-export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTraffic }: OverviewProps) {
+export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTraffic, serverSetup = true, account }: OverviewProps) {
   const s = useMemo(() => summarize(t.events), [t.events]);
   const now = useNow();
   const lastTime = t.events.length ? Date.parse(t.events[t.events.length - 1]!.time) : 0;
@@ -66,6 +70,8 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
           gateway, from its traffic log. Values never appear here, only their types and counts.
         </p>
       </div>
+
+      {account}
 
       <ScopeNote t={t} forced={forced} since={s.since} />
 
@@ -92,7 +98,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
       )}
 
       {/* Your server's setup, never mixed into the recorded demo's numbers. */}
-      {!recorded && (
+      {!recorded && serverSetup && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Panel title="Upstream" note="Where the gateway forwards masked requests.">
             <Upstream server={server} status={status} last={s.lastForwarded} errors={s.upstreamErrors} />

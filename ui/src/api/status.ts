@@ -26,6 +26,8 @@ export interface ServerStatus {
   upstream: { configured: boolean; mock: boolean; origin: string | null };
   images: { segmenter: string; sam: boolean; ocr_required: boolean; gaps: string[]; available: boolean };
   policies: Partial<Record<EntityType, Policy>>;
+  /** What this server offers the console (LAB-1431); older servers leave it out. */
+  capabilities?: Partial<Record<string, boolean>>;
   auth: { token_required: boolean };
   default_language: string;
   traffic_log: "off" | "masked" | "full" | string;

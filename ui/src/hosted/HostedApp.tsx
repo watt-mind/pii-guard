@@ -1,34 +1,31 @@
-import { Workspace } from "../projects/Workspace";
-import { setSelectedProject, useSelectedProject } from "../projects/selection";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createHttpChat, pickDefaultModel, SYSTEM_PROMPT } from "../api/chat";
 import { request, recovery, type Account, type DemoResult, type Requester } from "./api";
+import { Limits } from "./AccountPanels";
+import { SITE_HASHES, time, useAccount, useHash, type HostedSession } from "./session";
 import "./hosted.css";
 
 const SOURCE = "https://github.com/watt-mind/pii-guard";
-// Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425).
-const LOGIN = "/.auth/login/google?post_login_redirect_uri=%2F%23account";
+// Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
+// sign-in returns to the console (LAB-1430).
+const LOGIN = "/.auth/login/google?post_login_redirect_uri=%2F%23overview";
 const LOGOUT = "/.auth/logout?post_logout_redirect_uri=%2F";
 const EXAMPLES = {
   hu: { original: "Kérlek, írj rövid választ a visszatérítésről.\n\nNév: Minta Réka\nE-mail: reka.minta@example.com", masked: "Kérlek, írj rövid választ a visszatérítésről.\n\nNév: [[PERSON_example]]\nE-mail: [[EMAIL_example]]", answer: "Kedves [[PERSON_example]]! A visszatérítésről a [[EMAIL_example]] címre küldünk értesítést.", restored: "Kedves Minta Réka! A visszatérítésről a reka.minta@example.com címre küldünk értesítést." },
   en: { original: "Please draft a short refund reply.\n\nName: Robin Example\nEmail: robin.example@example.com", masked: "Please draft a short refund reply.\n\nName: [[PERSON_example]]\nEmail: [[EMAIL_example]]", answer: "Dear [[PERSON_example]], we will send your refund update to [[EMAIL_example]].", restored: "Dear Robin Example, we will send your refund update to robin.example@example.com." },
 };
 
-function time(value: string | undefined) {
-  if (!value) return "not available";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "not available" : date.toLocaleString();
+/** Anonymous visitors get the public page; a signed-in owner gets the console (`console`). */
+export function HostedApp({ call = request, console: renderConsole }: { call?: Requester; console?: (session: HostedSession) => ReactNode }) {
+  const { account, error, refresh } = useAccount(call);
+  const hash = useHash();
+  if (renderConsole && account?.authenticated && !SITE_HASHES.has(hash)) return renderConsole({ account, error, refresh, call });
+  // Back from sign-in: wait for the account rather than flash the public page.
+  if (renderConsole && !account && !error && hash !== "" && !SITE_HASHES.has(hash) && hash !== "#account") return <p role="status" className="p-6 text-sm text-muted">Opening your console…</p>;
+  return <HostedContent call={call} account={error ? null : account} accountError={error} refresh={refresh} console={Boolean(renderConsole)} />;
 }
 
-export function HostedApp({ call = request }: { call?: Requester }) {
-  const project = useSelectedProject();
-  return <HostedContent key={project ?? "default"} call={call} projectId={project ?? undefined} />;
-}
-const selectProject = (project: { id: string }) => setSelectedProject(project.id);
-
-function HostedContent({ call, projectId }: { call: Requester; projectId?: string }) {
-  const [account, setAccount] = useState<Account | null>(null);
-  const [accountError, setAccountError] = useState("");
+function HostedContent({ call, account, accountError, refresh, console: hasConsole }: { call: Requester; account: Account | null; accountError: string; refresh: () => Promise<void>; console: boolean }) {
   const [language, setLanguage] = useState<"hu" | "en">("hu");
   const [result, setResult] = useState<DemoResult | null>(null);
   const [kind, setKind] = useState<"static" | "live">("static");
@@ -39,15 +36,7 @@ function HostedContent({ call, projectId }: { call: Requester; projectId?: strin
   const [connection, setConnection] = useState("");
   const controller = useRef<AbortController | null>(null);
 
-  async function refresh() {
-    try { const next = await call<Account>("/v1/account"); if (next.mode !== "hosted") throw new Error(); setAccount(next); setAccountError(""); }
-    catch (e) { setAccount(null); setAccountError(recovery(e)); }
-  }
-  useEffect(() => {
-    let active = true;
-    call<Account>("/v1/account").then((next) => { if (next.mode !== "hosted") throw new Error(); if (active) setAccount(next); }).catch((e: unknown) => { if (active) setAccountError(recovery(e)); });
-    return () => { active = false; controller.current?.abort(); };
-  }, [call]);
+  useEffect(() => () => controller.current?.abort(), []);
 
   function reset(nextLanguage = language) {
     setLanguage(nextLanguage); setText(EXAMPLES[nextLanguage].original); setResult(null); setKind("static"); setError("");
@@ -96,7 +85,7 @@ function HostedContent({ call, projectId }: { call: Requester; projectId?: strin
         <a className="brand" href="#">pii-guard</a>
         <nav aria-label="Main navigation" className="nav-links">
           <a href="#demo">Try demo</a><a href="#privacy">Privacy</a><a href={`${SOURCE}#quick-start`}>Self-host</a>
-          <a className="button" href={account?.authenticated ? "#account" : account?.login_url ?? LOGIN}>{account?.authenticated ? "Your account" : "Sign in"}</a>
+          <a className="button" href={account?.authenticated ? (hasConsole ? "#overview" : "#account") : account?.login_url ?? LOGIN}>{account?.authenticated ? (hasConsole ? "Open console" : "Your account") : "Sign in"}</a>
         </nav>
       </header>
       <main id="main">
@@ -146,7 +135,7 @@ function HostedContent({ call, projectId }: { call: Requester; projectId?: strin
           {accountError ? <div className="stack"><p className="error" role="alert">{accountError}</p><div><button onClick={() => void refresh()}>Reconnect to API</button></div></div> : !account ? <p role="status">Checking live availability…</p> : <>
             <p className="muted">{account.usage.requests_today} requests used today. Allowance resets: {time(account.usage.resets_at)}.</p>
             <Limits account={account} />
-            {account.authenticated ? <><p>You’re signed in. Each project keeps its endpoints, policies and temporary sessions together.</p><Workspace call={call} hosted projectId={projectId} onProject={selectProject} /><Settings call={call} account={account} refresh={refresh} onDisconnect={(id) => { if (connection === id) setConnection(""); }} /><a href={account.logout_url || LOGOUT}>Sign out</a></> : <div className="stack"><div><a className="button primary" href={account.login_url || LOGIN}>Continue with Google</a></div></div>}
+            {account.authenticated ? <><p>You’re signed in. Your projects, endpoints, provider connections and activity are in the console.</p><div className="actions">{hasConsole && <a className="button primary" href="#overview">Open console</a>}<a href={account.logout_url || LOGOUT}>Sign out</a></div></> : <div className="stack"><div><a className="button primary" href={account.login_url || LOGIN}>Continue with Google</a></div></div>}
             <small>Sessions and provider connections are temporary. A guard restart loses ephemeral state; start a fresh request if restoration expires. Provider keys are kept by the guard for the connection lifetime, never saved in browser storage.</small>
           </>}
         </section>
@@ -162,31 +151,4 @@ function HostedContent({ call, projectId }: { call: Requester; projectId?: strin
 
 function Stage({ number, title, text, fallback, className = "", children }: { number: string; title: string; text?: string; fallback: string; className?: string; children?: React.ReactNode }) {
   return <article className={`stage ${className}`}><div className="stage-title"><span>{number}</span><h3>{title}</h3></div><p className="document">{text ?? fallback}</p>{children}</article>;
-}
-function Limits({ account }: { account: Account }) {
-  const entries = Object.entries(account.limits).filter(([, value]) => value !== null && typeof value !== "boolean");
-  return <details><summary>Current server limits</summary><ul className="list">{entries.map(([key, value]) => <li key={key}><span>{key.replaceAll("_", " ")}</span><span>{String(value)}</span></li>)}</ul></details>;
-}
-
-function Settings({ call, account, refresh, onDisconnect }: { call: Requester; account: Account; refresh: () => Promise<void>; onDisconnect: (id: string) => void }) {
-  const [provider, setProvider] = useState("openai");
-  const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function action(run: () => Promise<void>) { setBusy(true); setError(""); try { await run(); } catch (e) { setError(recovery(e)); } finally { setBusy(false); } }
-  return <div className="stack settings">
-    <div className="account-columns">
-      <div className="stack"><h3>Bring your own model key</h3><p className="muted">Connections are held in memory by the hosted guard. Disconnect to remove a key. Requests use your provider’s terms and billing.</p>
-        <form className="stack" onSubmit={(e) => { e.preventDefault(); void action(async () => { const secret = apiKey; setApiKey(""); await call("/v1/account/connections", { provider, api_key: secret, ...(provider === "custom" ? { base_url: baseUrl } : {}) }); await refresh(); }); }}>
-          <label>Provider<select disabled={busy} value={provider} onChange={(e) => setProvider(e.target.value)}>{["meta", "openai", "fireworks", "openrouter", "custom"].map((p) => <option key={p} value={p}>{p === "custom" ? "Custom public HTTPS endpoint" : p}</option>)}</select></label>
-          {provider === "custom" && <label>Base URL<input required type="url" placeholder="https://api.example.com/v1" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} pattern="https://.*" /><small>Public HTTPS only. Private and local network addresses are refused by the guard.</small></label>}
-          <label>Provider API key<input required type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} /></label><button disabled={busy || !apiKey} type="submit">{busy ? "Working…" : "Connect provider"}</button>
-        </form>
-        <ul className="list">{account.connections.map((c) => <li key={c.id}><div>{c.provider} · {c.origin}<br /><small>Expires {time(c.expires_at)}</small></div><button disabled={busy} onClick={() => void action(async () => { await call(`/v1/account/connections/${encodeURIComponent(c.id)}`, undefined, "DELETE"); onDisconnect(c.id); await refresh(); })}>Disconnect</button></li>)}</ul>
-      </div>
-
-    </div>
-    {error && <p className="error" role="alert">{error}</p>}
-  </div>;
 }

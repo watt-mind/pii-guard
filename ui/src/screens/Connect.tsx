@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { ServerStatus } from "../api/status";
 import type { SnippetsLoader } from "../api/connect";
 import type { ServerStatusState } from "../hooks/useServerStatus";
@@ -15,9 +16,13 @@ export interface ConnectProps {
   /** Open the tool's vault session on the Vault screen (by its traffic-log ref). */
   onOpenSession?: (ref: string) => void;
   loadSnippets?: SnippetsLoader;
+  /** Show the server's client snippets and gateway URL; off where the server can't report them yet. */
+  serverSnippets?: boolean;
+  /** Account settings shown first, such as a hosted owner's provider connections. */
+  accounts?: ReactNode;
 }
 
-export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets }: ConnectProps) {
+export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, accounts }: ConnectProps) {
   const server = status.state === "ok" ? status.status : null;
   const gateway = server?.gateway.url ?? DEFAULT_GATEWAY_URL;
 
@@ -31,9 +36,23 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
         </p>
       </div>
 
-      <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} />
+      {accounts}
 
-      <GatewayLine status={status} server={server} gateway={gateway} />
+      {serverSnippets ? (
+        <>
+          <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} />
+
+          <GatewayLine status={status} server={server} gateway={gateway} />
+        </>
+      ) : (
+        <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
+          Each endpoint has its own base URL, Python snippet and keys: open{" "}
+          <a className="text-ink underline underline-offset-4" href="#projects">
+            Projects
+          </a>{" "}
+          and choose Connect &amp; keys on an endpoint.
+        </p>
+      )}
     </div>
   );
 }

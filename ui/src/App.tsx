@@ -2,6 +2,9 @@ import { useOwnerRevision } from "./api/localOwner";
 import { Workspace } from "./projects/Workspace";
 import { getSelectedProject, setSelectedProject, useSelectedScope } from "./projects/selection";
 import { HostedApp } from "./hosted/HostedApp";
+import { AccountSummary, ProviderConnections } from "./hosted/AccountPanels";
+import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
+import { offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
 import { engineReason } from "./api/engine";
@@ -17,7 +20,7 @@ import { useServerStatus, type StatusLoader } from "./hooks/useServerStatus";
 import { useTheme } from "./hooks/useTheme";
 import { useTraffic } from "./hooks/useTraffic";
 import { initialAnswer, runGuard, toRunError, type RunError, type RunResult } from "./lib/run";
-import { PLAYGROUND_TABS, SECTIONS, hashOf, parseHash, routeFromLocation, sameRoute, type PlaygroundTab, type Route, type Section } from "./lib/routes";
+import { DEFAULT_ROUTE, PLAYGROUND_TABS, SECTIONS, hashOf, parseHash, routeFromLocation, sameRoute, type PlaygroundTab, type Route, type Section } from "./lib/routes";
 import { Playground } from "./screens/Playground";
 import { Benchmarks } from "./screens/Benchmarks";
 import { Connect } from "./screens/Connect";
@@ -53,7 +56,17 @@ export interface AppProps {
 
 /** Hosted deployment is an explicit build choice; the local console remains the default. */
 export function App(props: AppProps) {
-  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <HostedApp /> : <LocalConsole {...props} />;
+  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <HostedApp console={(session) => <SignedInConsole session={session} {...props} />} /> : <LocalConsole {...props} />;
+}
+
+/** A signed-in hosted owner gets the same console; the server's capabilities decide its sections. */
+export function SignedInConsole({ session, ...props }: AppProps & { session: HostedSession }) {
+  const hostedChat = useMemo(() => createHttpChat({ fetch: hostedChatFetch }), []);
+  return (
+    <HostedSessionContext.Provider value={session}>
+      <LocalConsole {...props} envMode={props.envMode ?? "api"} chat={{ ...props.chat, api: props.chat?.api ?? hostedChat }} />
+    </HostedSessionContext.Provider>
+  );
 }
 
 function LocalConsole(props: AppProps) {
@@ -83,8 +96,12 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   const [theme, setTheme] = useTheme();
   const { result: status } = useServerStatus(engine.engine === "mock" ? "offline" : engine.state.status.state, loadStatus);
   const server = status.state === "ok" ? status.status : null;
+  const hosted = useHostedSession();
+  const caps = useCapabilities(server);
 
-  const [route, setRouteState] = useState<Route>(routeFromLocation);
+  const [requestedRoute, setRouteState] = useState<Route>(routeFromLocation);
+  // A section or tab the server doesn't offer opens the Overview (or the first offered tab).
+  const route = allowedRoute(requestedRoute, caps);
   // Evaluation loads its data lazily on first open, then stays mounted (filters survive).
   const [evaluationOpened, setEvaluationOpened] = useState(() => route.section === "evaluation");
   const [textView, setTextView] = useState<"mask" | "roundtrip">("mask");
@@ -103,6 +120,8 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
     // Only route hashes switch sections (the skip link's #main must not). Back and forward
     // fire popstate, a typed or linked hash fires hashchange: both land here.
     const onHash = () => {
+      // The public page's anchors belong to the hosted page around the console.
+      if (hosted && SITE_HASHES.has(globalThis.location.hash)) return;
       const parsed = parseHash(globalThis.location.hash);
       if (parsed) navigate(parsed.route, parsed.redirect ? "replace" : "none");
     };
@@ -112,7 +131,11 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
       window.removeEventListener("hashchange", onHash);
       window.removeEventListener("popstate", onHash);
     };
-  }, [navigate]);
+  }, [navigate, hosted]);
+
+  useEffect(() => {
+    if (route !== requestedRoute) writeHash(route, "replace");
+  }, [route, requestedRoute]);
 
   // The traffic log feeds Overview, Logs and Connect; it connects when one first opens.
   const followsTraffic = route.section === "overview" || route.section === "logs" || route.section === "connect";
@@ -193,6 +216,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
         theme={theme}
         onTheme={setTheme}
         statusDetail={server ? statusDetailOf(server) : null}
+        caps={caps}
       />
 
       <div className="min-w-0">
@@ -235,6 +259,8 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 status={status}
                 forced={forceFixture}
                 sendDemo={traffic?.sendDemo}
+                serverSetup={server !== null || !caps.accounts}
+              account={caps.accounts ? <AccountSummary /> : undefined}
                 onOpenCall={(id) => {
                   setLogFocus({ id, nonce: Date.now() });
                   openSection("logs");
@@ -244,7 +270,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           </section>
 
           <section id="section-playground" aria-label="Playground" hidden={section !== "playground"} className="space-y-6">
-            <PlaygroundTabs tab={tab} onTab={openTab} />
+            <PlaygroundTabs tab={tab} onTab={openTab} caps={caps} />
             <div id="panel-text" role="tabpanel" aria-labelledby="tab-text" hidden={tab !== "text"} className="space-y-6">
               <div role="group" aria-label="Text view" className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-sm">
                 {(
@@ -314,7 +340,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               <Chat client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={server?.upstream.mock ?? false} />
             </div>
             <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={tab !== "images"}>
-              <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />
+              {caps.images && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}
             </div>
           </section>
 
@@ -340,6 +366,8 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           <section id="section-connect" aria-label="Connect" hidden={section !== "connect"}>
             <Connect
               status={status}
+              serverSnippets={server !== null || !caps.accounts}
+              accounts={caps.accounts ? <ProviderConnections /> : undefined}
               traffic={trafficOpened ? trafficHandle : undefined}
               onOpenLog={(id) => {
                 setLogFocus({ id, nonce: Date.now() });
@@ -352,7 +380,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
             />
           </section>
           <section id="section-projects" aria-label="Projects" hidden={section !== "projects"}>
-            {section === "projects" && <Workspace onProject={selectProject} projectId={getCurrentProject()} />}
+            {section === "projects" && <Workspace call={hosted?.call} hosted={caps.accounts} onProject={selectProject} projectId={getCurrentProject()} />}
           </section>
           <section id="section-policy" aria-label="Policy" hidden={section !== "policy"}>
             <Policy status={status} />
@@ -369,6 +397,12 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
       </div>
     </div>
   );
+}
+
+function allowedRoute(route: Route, caps: Capabilities): Route {
+  if (!offersSection(caps, route.section)) return DEFAULT_ROUTE;
+  if (route.section !== "playground" || offersTab(caps, route.tab)) return route;
+  return { section: "playground", tab: PLAYGROUND_TABS.find((t) => offersTab(caps, t.id))!.id };
 }
 
 /** The status tooltip's detail: "fast mode · rules+ner". */
@@ -403,18 +437,19 @@ function PageHeader({ route }: { route: Route }) {
 /** Before Overview or Logs first opens, the traffic hook holds no connection. */
 const idleConnect = () => ({ close() {} });
 
-function PlaygroundTabs({ tab, onTab }: { tab: PlaygroundTab; onTab: (t: PlaygroundTab) => void }) {
+function PlaygroundTabs({ tab, onTab, caps }: { tab: PlaygroundTab; onTab: (t: PlaygroundTab) => void; caps: Capabilities }) {
+  const tabs = PLAYGROUND_TABS.filter((t) => offersTab(caps, t.id));
   const onKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
     e.preventDefault();
-    const i = PLAYGROUND_TABS.findIndex((t) => t.id === tab);
-    const next = PLAYGROUND_TABS[(i + (e.key === "ArrowRight" ? 1 : PLAYGROUND_TABS.length - 1)) % PLAYGROUND_TABS.length]!;
+    const i = tabs.findIndex((t) => t.id === tab);
+    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]!;
     onTab(next.id);
     document.getElementById(`tab-${next.id}`)?.focus();
   };
   return (
     <div role="tablist" aria-label="Playground" className="flex gap-1 border-b border-line">
-      {PLAYGROUND_TABS.map((t) => {
+      {tabs.map((t) => {
         const selected = t.id === tab;
         return (
           <button
