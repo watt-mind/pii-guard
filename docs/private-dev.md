@@ -173,6 +173,49 @@ app sidecar cannot provide this wake path. Repeat streaming and synthetic error 
 that OAuth code/state, auth, cookie and body canaries appear in neither proxy output nor generated
 files. Local Linux Nginx tests exercise these properties but cannot prove the deployed Azure path.
 
+## Durable encrypted project configuration
+
+The operator foundation adds a separate private `project-configuration` container in the same
+identity-only Blob account as `sponsored-allowance`; it reuses dev's private endpoint and DNS.
+It grants the existing runtime identity read/write only in this container with an exact
+`dev.projects.v1.enc` ABAC path and listing denied. Prod uses its separate account, identity,
+container and `prod.projects.v1.enc` path. No delete, storage key, SAS or account-wide data
+permissions are added. Review inherited grants because they can bypass the scoped condition.
+
+The app-only release reads `projectAccountUrl` from the reviewed foundation and sets
+`PII_GUARD_HOSTED_PROJECT_STORE=azure_blob`, the fixed container/environment and the runtime
+identity's client ID. Preserve the separate environment's existing stable **32-byte tenant
+key**: it encrypts the snapshot and provider credentials. Rotating or losing it makes existing
+configuration unreadable. This storage persists project/policy/endpoint configuration and key
+revocations; mappings, sessions and traffic stay ephemeral. It does not fund sponsorship.
+
+After the combined application image includes the Blob project store, an authorized operator
+initializes the empty encrypted blob **once** under that environment's runtime identity and
+settings. The foundation creates only the private container. App startup, release and CI never
+initialize or migrate project data. Wake the private app from an authorized tailnet client and
+wait for `/readyz`, then run this explicit management command against the active app container:
+
+```bash
+az containerapp exec --name piiguard-dev-app --resource-group rg-pii-guard-dev \
+  --command '/app/.venv/bin/python -m pii_guard.projects.blob --initialize-empty'
+```
+
+This uses the existing runtime managed identity and Key Vault-backed tenant key inside the
+container; do not copy secrets, dump its environment or provide a token/key in command arguments.
+Use `piiguard-prod-app` and `rg-pii-guard-prod` only for the separately authorized prod bootstrap.
+The initializer performs create-if-absent and refuses an existing blob, including after an
+ambiguous write outcome. Never delete/reset it on retry or restore an older snapshot to roll
+back code: doing so can restore revoked endpoint keys. Missing/corrupt/wrong-key/unavailable
+storage fails project operations closed without creating local SQLite state. Legacy local
+SQLite migration needs a separate reviewed operator procedure.
+
+Verify from the authenticated private app that a synthetic project/policy/endpoint survives a
+revision replacement and that a key revoked from one revision stays refused by the next.
+Confirm unauthorized identities and alternate/list/delete paths are denied, and missing state
+returns sanitized `project_storage_unavailable`. See the combined source's
+[Blob project-store contract](projects.md#hosted-encrypted-blob-snapshots) for bounds, CAS,
+unknown-write handling and retained limitations. Deployment compilation is not live evidence.
+
 ## Finite authority, cost and rollback
 
 App releases configure LAB-1398's `azure_blob` store and reuse the exact operator-approved

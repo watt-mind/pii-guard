@@ -41,7 +41,10 @@ session-only BYOK require an authenticated owner. Hosted image/upload routes are
 The initial hosted runtime scales from zero to one replicas with one worker and ephemeral
 owner state. Each owner also retains up to 50 masked traffic events in memory, released on
 owner purge or restart; masked payloads may contain detection misses or identifying context. Restart loses
-mappings, temporary profiles and API-key records. Logical deletion/expiry does not promise
+mappings, temporary profiles and owner-session API-key records. Project configuration,
+encrypted endpoint credentials and endpoint-key verifier/revocation records use a separate
+authenticated encrypted Blob snapshot under a stable environment key and survive revision
+replacement; see [the Azure setup](private-dev.md#durable-encrypted-project-configuration). Logical deletion/expiry does not promise
 physical memory erasure; raw-value caches are a known limitation (LAB-1364). No content archive
 or mapping backup is provisioned. A durable marker-only share prevents reuse of sponsored
 allocations after restart; this is not durable multi-tenant vault storage (LAB-1376). Key Vault

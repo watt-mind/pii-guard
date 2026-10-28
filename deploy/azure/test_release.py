@@ -194,6 +194,30 @@ class ReleaseTemplateTests(unittest.TestCase):
         self.assertNotIn("PII_GUARD_HOSTED_ALLOCATION_DIRECTORY", env)
         self.assertNotIn("fund", " ".join(parameters).lower())
 
+    def test_projects_use_encrypted_blob_and_same_environment_runtime_identity(self) -> None:
+        parameter = self.template["parameters"]["projectAccountUrl"]
+        self.assertEqual(parameter["minLength"], 1)
+        self.assertNotIn("defaultValue", parameter)
+        env = self.env()
+        for key, value in {
+            "PII_GUARD_HOSTED_PROJECT_STORE": "azure_blob",
+            "PII_GUARD_HOSTED_PROJECT_ACCOUNT_URL": "[parameters('projectAccountUrl')]",
+            "PII_GUARD_HOSTED_PROJECT_CONTAINER": "project-configuration",
+            "PII_GUARD_HOSTED_PROJECT_ENVIRONMENT": "[parameters('environmentName')]",
+        }.items():
+            self.assertEqual(env[key]["value"], value)
+        self.assertEqual(
+            env["PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID"],
+            {
+                "name": "PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID",
+                "value": env["PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID"]["value"],
+            },
+        )
+        self.assertEqual(env["PII_GUARD_TENANT_KEY"]["secretRef"], "tenant-key")
+        self.assertNotIn("PII_GUARD_PROJECT_STATE_PATH", env)
+        for path in (TEMPLATE.parent / "deploy.sh", TEMPLATE.parent / "entrypoint.py"):
+            self.assertNotIn("--initialize-empty", path.read_text())
+
     def test_secret_references_and_preserved_alert_groups_are_required(self) -> None:
         params = self.template["parameters"]
         groups = params["alertActionGroupIds"]
@@ -399,6 +423,91 @@ class DevNetworkTemplateTests(unittest.TestCase):
             self.assertEqual(rules[name]["access"], "Deny")
             self.assertEqual(rules[name]["destinationAddressPrefix"], "*")
         self.assertEqual(rules["private-aca-https"]["access"], "Allow")
+
+
+@unittest.skipUnless(shutil.which("az"), "Azure CLI is required to compile Bicep")
+class ProjectConfigurationFoundationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        result = subprocess.run(  # noqa: S603 - local compiler, no cloud mutation
+            [
+                shutil.which("az") or "/unavailable-azure-cli",
+                "bicep",
+                "build",
+                "--file",
+                str(TEMPLATE.parent / "modules" / "project-configuration.bicep"),
+                "--stdout",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        cls.template = json.loads(result.stdout)
+
+    def resource(self, kind: str) -> dict:
+        resources = [r for r in self.template["resources"] if r["type"] == kind]
+        self.assertEqual(len(resources), 1)
+        return resources[0]
+
+    def test_only_private_container_and_bounded_role_are_written(self) -> None:
+        self.assertCountEqual(
+            [r["type"] for r in self.template["resources"]],
+            [
+                "Microsoft.Storage/storageAccounts/blobServices/containers",
+                "Microsoft.Authorization/roleDefinitions",
+                "Microsoft.Authorization/roleAssignments",
+            ],
+        )
+        container = self.resource("Microsoft.Storage/storageAccounts/blobServices/containers")
+        self.assertIn("'project-configuration'", container["name"])
+        self.assertEqual(container["properties"], {"publicAccess": "None"})
+        for forbidden in ("listkeys(", "listsecrets(", "accountkey", "sasurl"):
+            self.assertNotIn(forbidden, json.dumps(self.template).lower())
+        self.assertEqual(self.template["parameters"]["envName"]["allowedValues"], ["prod", "dev"])
+
+    def test_runtime_permission_is_container_scoped_read_write_only(self) -> None:
+        permissions = self.resource("Microsoft.Authorization/roleDefinitions")["properties"][
+            "permissions"
+        ]
+        self.assertEqual(
+            permissions,
+            [
+                {
+                    "actions": [],
+                    "notActions": [],
+                    "dataActions": [
+                        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+                        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+                    ],
+                    "notDataActions": [],
+                }
+            ],
+        )
+        assignment = self.resource("Microsoft.Authorization/roleAssignments")
+        self.assertIn("project-configuration", assignment["scope"])
+        self.assertEqual(
+            assignment["properties"]["principalId"], "[parameters('runtimeIdentityPrincipalId')]"
+        )
+        self.assertEqual(assignment["properties"]["principalType"], "ServicePrincipal")
+        self.assertEqual(assignment["properties"]["conditionVersion"], "2.0")
+        self.assertEqual(
+            assignment["properties"]["condition"], "[variables('projectPathCondition')]"
+        )
+        condition = self.template["variables"]["projectPathCondition"].replace("''", "'")
+        self.assertIn("AND SubOperationMatches{'Blob.List'}", condition)
+        self.assertIn("containers/blobs:path] StringEquals", condition)
+        self.assertIn("parameters('envName')", condition)
+        self.assertIn(".projects.v1.enc", condition)
+        self.assertNotIn("StringLike", condition)
+
+    def test_foundation_reuses_identity_only_private_account_and_environment_identity(self) -> None:
+        # Parent module dependencies reuse the spend account's private endpoint and DNS.
+        source = (TEMPLATE.parent / "main.bicep").read_text()
+        self.assertIn("storageAccountName: spendLedger.outputs.accountName", source)
+        self.assertIn("runtimeIdentityPrincipalId: identity.properties.principalId", source)
+        self.assertIn(
+            "output projectAccountUrl string = projectConfiguration.outputs.accountUrl", source
+        )
 
 
 if __name__ == "__main__":

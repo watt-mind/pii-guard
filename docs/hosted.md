@@ -50,28 +50,20 @@ request. Use implemented owner session/profile/key deletion and expiry controls 
 [contracts](contracts.md). Expiry/removal makes records unavailable to the application but does
 not prove physical memory erasure. Raw originals can remain in language runtime caches after
 logical vault deletion (LAB-1364); do not promise immediate secure erasure.
-
-Project configuration is stored separately in SQLite at
-`/var/lib/pii-guard/projects/state.sqlite3`, encrypted with a key derived from the stable tenant
-key. The hosted image creates this private writable directory, but the current deployment does
-not mount it as durable storage. Project names, policy versions, endpoint configuration and
-encrypted upstream credentials therefore survive an application process restart only while the
-same container filesystem remains, and are not guaranteed across container replacement or
-redeployment. A future durable mount requires a verified SQLite locking contract for that
-filesystem; do not place SQLite on generic SMB/Azure Files storage without confirming that
-contract. Endpoint key verifiers are configuration metadata; raw endpoint keys are shown only
-once. None of this makes request mappings or activity durable. See [projects](projects.md) for
-the exact persistence boundary. Azure platform and provider retention are separate; review the
-current terms for the actual account.
+No mapping backup or content archive is provisioned. Encrypted project configuration has a
+separate durable store described below and in [projects](projects.md). Azure platform and
+provider retention are separate; review the current terms for the actual account.
 
 The Key Vault holds versioned sponsored credentials, the runtime tenant key and Google OAuth
 client secret. The runtime identity has Secrets User access only within this dedicated vault.
 These durable credentials remain until an operator rotates/deletes them. Key Vault soft delete
 is seven days and purge protection is enabled; that is a secret-recovery policy, **not** prompt
-retention. Tenant-key rotation invalidates old pseudonyms; deploy with a new secret version and
-expect all ephemeral sessions to be lost. Delete temporary BYOK connections, project endpoints
-and their endpoint keys, and account API keys through the owner controls. Revoke the original
-provider credential at its provider if compromised.
+retention. Tenant-key rotation invalidates old pseudonyms and makes existing encrypted project
+configuration unreadable. It requires a separately reviewed project-key migration; changing the
+secret version alone is not a safe rotation procedure. Ephemeral sessions are also lost.
+Delete temporary BYOK connections, project endpoints and their endpoint keys, and account API
+keys through the owner controls. Revoke the original provider credential at its provider if
+compromised.
 Google's Easy Auth cookie is configured for one hour; it is not a mapping TTL. The auth token
 store is disabled. Application cookies/CSRF and profile expiry follow the backend contract.
 
@@ -83,7 +75,7 @@ The backend's current default application expiries are:
 | Guest owner cookie | Fixed one hour |
 | Vault session | Sliding one hour |
 | BYOK connection | Fixed one hour from creation; five per owner, 256 globally |
-| Project endpoint configuration and endpoint-key verifiers | Lifetime of the project SQLite file; raw endpoint keys are shown once and not stored |
+| Project endpoint configuration and endpoint-key verifiers | Durable encrypted configuration Blob until explicit owner deletion/revocation; raw endpoint keys are shown once and not stored |
 | Masked traffic log | Last 50 events per owner; freed on owner purge or process restart |
 | Spend ledger | Durable finite authority and total/daily counters in isolated Blob; no prompt/mapping/key content |
 | User API key | Fixed 24 hours; five per owner, 1,000 globally; process loss can revoke earlier |
@@ -112,6 +104,16 @@ control-plane activity still exist under Azure retention policies; they contain 
 and operation metadata, not application bodies by design. Never enable request-body tracing,
 identity-header dumps, `az --debug`, shell tracing or exception dumps to investigate real inputs.
 
+Project configuration has a separate durable boundary in the combined project-store release.
+The private `project-configuration/<environment>.projects.v1.enc` Blob snapshot stores project
+ownership, policy versions, endpoint settings, encrypted provider credentials and endpoint-key
+verifier/revocation records. It uses the environment's stable tenant key and runtime managed
+identity; it contains no request text, mappings, owner sessions or traffic archive. An operator
+must explicitly initialize it once; startup and app releases never create missing state.
+Project configuration and revocations survive replacement revisions; temporary connection
+profiles and owner-session API keys retain their existing ephemeral lifecycle. Never reset or
+roll back the snapshot to roll back app code. See [Azure setup and initialization](private-dev.md#durable-encrypted-project-configuration).
+
 ## Build and configuration
 
 The self-hosted `Dockerfile`, Compose stack and wheel packaging remain separate. The hosted
@@ -139,7 +141,7 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_SINGLE_PROCESS` | `true`; one worker per replica, zero to one replicas |
 | `PII_GUARD_HOSTED_PUBLIC_ORIGIN` | Canonical HTTPS origin, no trailing slash |
 | `PII_GUARD_HOSTED_TRUST_EASY_AUTH` | `true` only behind the platform's trusted ingress |
-| `PII_GUARD_PROJECT_STATE_PATH` | `/var/lib/pii-guard/projects/state.sqlite3`; current directory is private container storage, not a durable mount |
+| `PII_GUARD_PROJECT_STATE_PATH` | Image default `/var/lib/pii-guard/projects/state.sqlite3`; unused when the Azure templates select `azure_blob` |
 | `PII_GUARD_TENANT_KEY` | Versioned Key Vault reference; random 32-byte hex key |
 | `PII_GUARD_UPSTREAM_API_KEY` | Versioned Key Vault reference; sponsored Meta Standard key |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `https://api.meta.ai/v1`; server-owned sponsored route |
@@ -151,6 +153,11 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_SPEND_ACCOUNT_URL` | Environment-specific identity-only Blob account |
 | `PII_GUARD_HOSTED_SPEND_CONTAINER` | `sponsored-allowance`; fixed `<environment>.json` object |
 | `PII_GUARD_HOSTED_SPEND_ENVIRONMENT` | `dev` or `prod`, matching the authority object |
+| `PII_GUARD_HOSTED_PROJECT_STORE` | `azure_blob`; encrypted durable project configuration |
+| `PII_GUARD_HOSTED_PROJECT_ACCOUNT_URL` | Reviewed foundation's identity-only Blob account |
+| `PII_GUARD_HOSTED_PROJECT_CONTAINER` | `project-configuration`; fixed `<environment>.projects.v1.enc` snapshot |
+| `PII_GUARD_HOSTED_PROJECT_ENVIRONMENT` | `dev` or `prod`; separate account, identity and stable tenant key |
+| `PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID` | The environment runtime identity's client ID |
 | `PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` | Dedicated runtime UAMI client ID |
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
 | `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |

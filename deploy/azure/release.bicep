@@ -28,6 +28,9 @@ param alertActionGroupIds array
 @description('Existing dedicated HTTPS Blob account endpoint, with no query, SAS or account credentials. The operator precreates sponsored-allowance/<environment>.json and grants the app identity access.')
 @minLength(1)
 param ledgerAccountUrl string
+@description('Existing identity-only Blob account for encrypted project configuration. The operator creates project-configuration/<environment>.projects.v1.enc explicitly; app releases never initialize it.')
+@minLength(1)
+param projectAccountUrl string
 @description('Approved cumulative USD microdollar ceiling, reused with the same ID/expiry. Zero disables sponsorship. Releases never issue or replenish credit.')
 @minValue(0)
 @maxValue(10000000)
@@ -114,6 +117,12 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { name: 'PII_GUARD_HOSTED_SPEND_CONTAINER', value: 'sponsored-allowance' }
           { name: 'PII_GUARD_HOSTED_SPEND_ENVIRONMENT', value: environmentName }
           { name: 'PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID', value: identity.properties.clientId }
+          // Stable tenant-key encrypts both the project snapshot and its provider credentials.
+          { name: 'PII_GUARD_HOSTED_PROJECT_STORE', value: 'azure_blob' }
+          { name: 'PII_GUARD_HOSTED_PROJECT_ACCOUNT_URL', value: projectAccountUrl }
+          { name: 'PII_GUARD_HOSTED_PROJECT_CONTAINER', value: 'project-configuration' }
+          { name: 'PII_GUARD_HOSTED_PROJECT_ENVIRONMENT', value: environmentName }
+          { name: 'PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID', value: identity.properties.clientId }
           { name: 'PII_GUARD_UPSTREAM_BASE_URL', value: 'https://api.meta.ai/v1' }
           { name: 'PII_GUARD_UPSTREAM_API_KEY', secretRef: 'meta-key' }
           { name: 'PII_GUARD_TENANT_KEY', secretRef: 'tenant-key' }

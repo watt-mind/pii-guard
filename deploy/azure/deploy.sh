@@ -164,6 +164,8 @@ if [[ "$operator" != true ]]; then
   ledger=$(az deployment group show --resource-group "$AZURE_RESOURCE_GROUP" --name hosted-foundation --query properties.outputs.ledgerAccountUrl.value --output tsv)
   [[ "$HOSTED_IMAGE" == "$registry/"* ]] || { echo 'Image must come from this environment registry' >&2; exit 2; }
   [[ "$ledger" =~ ^https://[a-z0-9]+\.blob\.core\.windows\.net$ ]] || { echo 'Operator must provision durable identity-only ledger first' >&2; exit 2; }
+  projects=$(az deployment group show --resource-group "$AZURE_RESOURCE_GROUP" --name hosted-foundation --query properties.outputs.projectAccountUrl.value --output tsv)
+  [[ "$projects" == "$ledger" ]] || { echo 'Operator must provision project configuration in the reviewed durable account first' >&2; exit 2; }
   bindings_mode=$mode
   [[ "$technical_stage" != true ]] || bindings_mode=stage
   domains=$(python3 deploy/azure/app_bindings.py "$app" "$AZURE_RESOURCE_GROUP" "$bindings_mode")
@@ -207,7 +209,7 @@ PYEVIDENCE
     [[ $(az rest --method get --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.App/containerApps/$app/authConfigs/current?api-version=2025-01-01" --query properties.platform.enabled --output tsv) == true ]] || { echo 'Stage Easy Auth first' >&2; exit 2; }
     public=true
   fi
-  params+=(--parameters "privateDevReviewed=$private" "publicEnabled=$public" "image=$HOSTED_IMAGE" "publicOrigin=$HOSTED_PUBLIC_ORIGIN" "googleClientId=$GOOGLE_CLIENT_ID" "metaKeySecretUri=$META_KEY_SECRET_URI" "tenantKeySecretUri=$TENANT_KEY_SECRET_URI" "googleSecretUri=$GOOGLE_SECRET_URI" "ledgerAccountUrl=$ledger" "customDomains=$domains" "clientIpSource=${HOSTED_CLIENT_IP_SOURCE:-off}")
+  params+=(--parameters "privateDevReviewed=$private" "publicEnabled=$public" "image=$HOSTED_IMAGE" "publicOrigin=$HOSTED_PUBLIC_ORIGIN" "googleClientId=$GOOGLE_CLIENT_ID" "metaKeySecretUri=$META_KEY_SECRET_URI" "tenantKeySecretUri=$TENANT_KEY_SECRET_URI" "googleSecretUri=$GOOGLE_SECRET_URI" "ledgerAccountUrl=$ledger" "projectAccountUrl=$projects" "customDomains=$domains" "clientIpSource=${HOSTED_CLIENT_IP_SOURCE:-off}")
 fi
 name=hosted-release
 [[ "$operator" != true ]] || name=hosted-foundation

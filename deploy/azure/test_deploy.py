@@ -40,6 +40,7 @@ case "$*" in
   *properties.outputs.vaultUri.value*) echo __VAULT__;;
   *properties.outputs.registryServer.value*) echo piiguardexample.azurecr.io;;
   *properties.outputs.ledgerAccountUrl.value*) echo https://ledgerexample.blob.core.windows.net;;
+  *properties.outputs.projectAccountUrl.value*) echo "${TEST_PROJECT_ACCOUNT:-https://ledgerexample.blob.core.windows.net}";;
   "containerapp env show "*)
     printf '{"internal":%s,"public":"%s"}\n' \
       "${TEST_INTERNAL:-true}" "${TEST_PUBLIC_NETWORK:-Disabled}";;
@@ -380,6 +381,17 @@ class DeploymentAdmissionTests(unittest.TestCase):
         self.assertIn("environmentName=prod", self.calls)
         self.assertNotIn("deployApp=true", self.calls)
 
+    def test_release_requires_reviewed_project_configuration_account(self) -> None:
+        self.assert_refused(
+            self.run_deploy("stage", TEST_PROJECT_ACCOUNT="None"), "project configuration"
+        )
+        self.assert_refused(
+            self.run_deploy(
+                "stage", TEST_PROJECT_ACCOUNT="https://different.blob.core.windows.net"
+            ),
+            "project configuration",
+        )
+
     def test_stage_refuses_missing_budget(self) -> None:
         self.assert_refused(
             self.run_deploy("stage", TEST_BUDGET_EXISTS="false"), "budget must exist"
@@ -462,6 +474,7 @@ class DeploymentAdmissionTests(unittest.TestCase):
         self.assertNotIn("budgetStartDate=", self.calls)
         self.assertNotIn("monthlyBudgetAmount=", self.calls)
         self.assertIn("--template-file deploy/azure/release.bicep", self.calls)
+        self.assertIn("projectAccountUrl=https://ledgerexample.blob.core.windows.net", self.calls)
         self.assertIn("customDomains=", self.calls)
         self.assertIn("guard.example.com", self.calls)
         self.assertIn("monitor action-group show", self.calls)

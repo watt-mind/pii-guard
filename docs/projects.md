@@ -62,7 +62,7 @@ traffic, quota counters or sponsored spend records.
 
 ## Metadata storage and operations
 
-Project configuration is stored in a dedicated SQLite database. By default its path is
+The default `sqlite` backend stores project configuration in a dedicated SQLite database. Its path is
 `~/.local/share/pii-guard/projects/state.sqlite3`; override it with
 `PII_GUARD_PROJECT_STATE_PATH`. The directory and database are created with owner-only
 permissions (`0700` and `0600`). Hosted images set the path to
@@ -99,6 +99,9 @@ a new tenant key for each container. Its project configuration and credentials a
 and are expected to be lost when the demo container is replaced.
 
 ### Hosted encrypted Blob snapshots
+
+The Azure foundation/release templates select this backend. The hosted image's SQLite path
+is unused in that configuration. See [Azure initialization](private-dev.md#durable-encrypted-project-configuration).
 
 Set `PII_GUARD_HOSTED_PROJECT_STORE=azure_blob` and install the `hosted-azure` extra to
 persist hosted configuration without relying on a mounted filesystem's SQLite locks.

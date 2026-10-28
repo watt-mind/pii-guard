@@ -184,6 +184,15 @@ module spendLedger 'modules/spend-ledger.bicep' = {
     devPrivateEndpointSubnetId: environmentName == 'dev' ? devNetwork!.outputs.privateEndpointSubnetId : ''
   }
 }
+module projectConfiguration 'modules/project-configuration.bicep' = {
+  name: '${namePrefix}-project-configuration'
+  params: {
+    projectPrefix: projectPrefix
+    envName: environmentName
+    storageAccountName: spendLedger.outputs.accountName
+    runtimeIdentityPrincipalId: identity.properties.principalId
+  }
+}
 module devRouter 'modules/dev-router.bicep' = if (environmentName == 'dev' && deployDevRouter) {
   name: '${namePrefix}-router-bootstrap'
   params: {
@@ -217,3 +226,6 @@ output ledgerAccountUrl string = spendLedger.outputs.accountUrl
 output ledgerContainer string = spendLedger.outputs.container
 output devPrivateNetwork bool = environmentName == 'dev'
 output devRouterName string = environmentName == 'dev' && deployDevRouter ? devRouter!.outputs.vmName : ''
+output projectAccountUrl string = projectConfiguration.outputs.accountUrl
+output projectContainer string = projectConfiguration.outputs.container
+output projectBlobName string = projectConfiguration.outputs.blobName
