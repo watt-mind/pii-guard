@@ -291,6 +291,65 @@ def test_consistency_groups_surface_forms_and_needs_one_placeholder() -> None:
     assert "Anna" not in repr(report)
 
 
+def test_consistency_needs_each_occurrence_fully_covered() -> None:
+    """LAB-1355: one masked character is not a masked occurrence."""
+    doc = _doc(f"{label('PERSON', 'Teszt Elek')} írt, {label('PERSON', 'Teszt Elek')} válaszolt.")
+    a, b = sorted(doc.spans, key=lambda sp: sp.start)
+
+    def consistent(*reps: tuple[int, int, str]) -> bool:
+        (entity,) = consistency_report(doc, reps)
+        assert entity.occurrences == 2
+        return entity.consistent
+
+    p = "[[PERSON_aaaa]]"
+    assert consistent((a.start, a.end, p), (b.start, b.end, p))
+    assert not consistent((a.start, a.start + 1, p), (b.start, b.start + 1, p))  # first char
+    assert not consistent((a.start + 1, a.end, p), (b.start + 1, b.end, p))  # leading gap
+    assert not consistent((a.start, a.end - 1, p), (b.start, b.end - 1, p))  # not a suffix
+    assert not consistent((a.start, a.start + 5, p), (b.start, b.end, p))  # surname only
+    assert not consistent((a.start + 6, a.end, p), (b.start, b.end, p))  # given name only
+
+
+@pytest.mark.parametrize(
+    ("language", "value", "stem"),
+    [
+        ("hu", "Teszt Eleknek", "Teszt Elek"),
+        ("hu", "Próba Zsuzsannának", "Próba Zsuzsanná"),
+        ("en", "Smith's", "Smith"),
+    ],
+)
+def test_consistency_accepts_a_suffix_outside_the_placeholder(
+    language: str, value: str, stem: str
+) -> None:
+    doc = _doc(f"{label('PERSON', value)} és {label('PERSON', value)}.", language=language)
+    reps = [(s.start, s.start + len(stem), "[[PERSON_aaaa]]") for s in doc.spans]
+    assert [r.consistent for r in consistency_report(doc, reps)] == [True]
+    # One character short of the stem is not a suffix.
+    reps = [(s.start, s.start + len(stem) - 1, "[[PERSON_aaaa]]") for s in doc.spans]
+    assert [r.consistent for r in consistency_report(doc, reps)] == [False]
+
+
+@pytest.mark.parametrize(
+    ("language", "entity_type", "value", "masked", "consistent"),
+    [
+        ("en", "PERSON", "Ms Testwood", "Testwood", True),  # a title identifies no one
+        ("de", "PERSON", "Frau Beispiel", "Beispiel", True),
+        ("en", "PERSON", "Dr. Jane Testwood, MD", "Jane Testwood", True),
+        ("de", "PERSON", "Erika Beispiel", "Erika", False),  # the surname stays readable
+        ("hu", "PERSON", "Próba Piroska", "Piroska", False),
+        ("en", "ID_DOCUMENT", "AB1234010", "AB1234", False),  # digits left after it
+        ("hu", "ADDRESS", "1051 Budapest, Minta utca 12.", "1051", False),
+    ],
+)
+def test_consistency_words_left_outside_must_not_identify(
+    language: str, entity_type: str, value: str, masked: str, consistent: bool
+) -> None:
+    doc = _doc(f"{label(entity_type, value)} és {label(entity_type, value)}.", language=language)
+    offset = value.index(masked)
+    reps = [(s.start + offset, s.start + offset + len(masked), "[[X_aaaa]]") for s in doc.spans]
+    assert [r.consistent for r in consistency_report(doc, reps)] == [consistent]
+
+
 def test_run_documents_reports_consistency() -> None:
     docs = [
         _doc(
