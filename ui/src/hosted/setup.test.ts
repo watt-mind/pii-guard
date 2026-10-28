@@ -28,10 +28,16 @@ describe("first-run setup (LAB-1448)", () => {
   });
 
   it("ticks from the owner's own data: an endpoint counts as a chosen model; revoked keys don't count", async () => {
-    const endpoint = { id: "e1", enabled: true };
+    const endpoint = { id: "e1", enabled: true, provider: "openai", credential_configured: true };
     const call = requester({ policies: [{}], endpoints: [endpoint], keys: [{ id: "k1", revoked_at: "2026-10-28T10:00:00Z" }] });
     expect(await loadSetup(call, account())).toEqual({ provider: true, policy: true, endpoint: true, key: false, call: false });
     const withKey = requester({ policies: [{}], endpoints: [endpoint], keys: [{ id: "k2", revoked_at: null }] });
     expect(await loadSetup(withKey, account({ usage: { requests_today: 2, resets_at: "" } }))).toEqual({ provider: true, policy: true, endpoint: true, key: true, call: true });
+  });
+
+  it("a sponsored endpoint chooses a model only while sponsorship is on (LAB-1455)", async () => {
+    const call = requester({ policies: [{}], endpoints: [{ id: "e1", enabled: true, provider: "sponsored", credential_configured: false }] });
+    expect((await loadSetup(call, account({ limits: { sponsored_enabled: false } }))).provider).toBe(false);
+    expect((await loadSetup(call, account({ limits: { sponsored_enabled: true } }))).provider).toBe(true);
   });
 });

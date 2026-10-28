@@ -32,6 +32,33 @@ to bypass them. The project maintainer must review the final public privacy and 
 notice before editable inputs are enabled. Put that notice beside the editable text/BYOK form,
 with an explicit acknowledgement before the first submission, not only on the landing page.
 
+## First run for signed-in owners
+
+Straight after Google sign-in the console calls `POST /v1/account/first-run` (contract in
+[contracts](contracts.md)). The server provisions, once per owner, the default project (with its
+default policy), one **Default endpoint** and that endpoint's first key, and the console lands
+on Connect, "Connect your client": the guard key shown once, copy-paste blocks for Codex, pi,
+the OpenAI SDK, cURL and OpenCode with the key and endpoint URL filled in, and a **Send a test
+request** button that shows the masked round trip. Muse Code cannot use an endpoint URL yet, so
+its tab explains that instead of showing a block.
+
+- **Sponsorship available** (`limits.sponsored_enabled`): the endpoint uses the server-owned
+  sponsored Meta route with the first `PII_GUARD_HOSTED_MODELS` model and is ready immediately.
+- **Sponsorship unavailable** (the default until the launch gate below is met): the same
+  endpoint is marked **Needs a key** and refuses requests with `sponsored_unavailable` before
+  any upstream call. The first screen asks for one field, the owner's Meta API key; saving it
+  converts the endpoint in place to an own-key Meta endpoint whose credential is encrypted in
+  project configuration (ADR 0012). The browser never stores the key. An own-key endpoint never
+  falls back to sponsored inference, and the sponsored key is never sent to an owner endpoint.
+  If sponsorship is enabled later, endpoints still on the sponsored route become ready without
+  any action.
+
+The guard key exists only in that page's memory: after a reload the console offers one-click
+**Create a new guard key** rather than showing the old one. Policies and endpoints remain
+editable in Projects; nothing about first run is required for owners who configure their own.
+Provisioning adds rows only and needs no schema change, so existing encrypted snapshots load
+unchanged.
+
 ## Sponsored provider launch gate
 
 Technical readiness does not authorize sponsored Meta access. The
