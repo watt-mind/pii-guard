@@ -30,7 +30,7 @@ from pii_guard.detect.normalize import (
     normalize_for_detection,
 )
 
-__all__ = ["FoldedText", "fold_text", "fold_value", "fold_views"]
+__all__ = ["FoldedText", "fold_text", "fold_value", "fold_views", "spaced"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,16 +73,16 @@ def fold_views(text: str) -> tuple[FoldedText, ...]:
     primary = fold_text(text)
     if text.isascii() or not any(c in ZERO_WIDTH_SEPARATORS for c in text):
         return (primary,)
-    spaced = _spaced(text)
-    if spaced == text:
+    reading = spaced(text)
+    if reading == text:
         return (primary,)
-    alternative = _fold(text, spaced)
+    alternative = _fold(text, reading)
     if alternative.text == primary.text:
         return (primary,)
     return primary, alternative
 
 
-def _spaced(text: str) -> str:
+def spaced(text: str) -> str:
     """``text`` with each zero-width separator between two letters replaced by a space.
 
     One for one, so offsets into the result are offsets into ``text``.

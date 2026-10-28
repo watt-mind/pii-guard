@@ -80,6 +80,11 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
     ),
     "traffic_log_disabled": (404, "The traffic log is off (`PII_GUARD_TRAFFIC_LOG=off`)."),
     "payload_too_large": (413, "The body, text or image is larger than the configured limit."),
+    "unmask_output_too_large": (
+        413,
+        "Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of "
+        "original values (one `/v1/unmask` text, or one gateway response).",
+    ),
     "unsupported_media_type": (415, "The image is not a PNG or JPEG (sniffed from its bytes)."),
     "invalid_request": (
         422,

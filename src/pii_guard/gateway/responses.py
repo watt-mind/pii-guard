@@ -63,6 +63,7 @@ from pii_guard.gateway.tool_names import tool_names, without_tool_names
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import RequestTimer
 from pii_guard.types import PayloadTooLargeError, PiiGuardError
+from pii_guard.vault import UnmaskOutputTooLargeError
 
 __all__ = [
     "ResponsesGateway",
@@ -428,6 +429,8 @@ class ResponsesGateway:
                         "message": "the response stream failed",
                         "param": None,
                     }
+                    if isinstance(exc, UnmaskOutputTooLargeError):  # LAB-1350
+                        error.update(code=exc.code, message=exc.message)
                     yield sse_message(json.dumps(error), "error")
             except (GeneratorExit, asyncio.CancelledError):
                 if outcome == "ok":

@@ -8,7 +8,9 @@
   arguments. It is duck-type compatible with :class:`~pii_guard.vault.StreamUnmasker`.
 - :func:`restore_completion` rewrites a ``chat.completion`` body in place.
 
-Unknown placeholders are left as is and counted (``unresolved``).
+Unknown placeholders are left as is and counted (``unresolved``). Every restored value is
+charged to one :class:`~pii_guard.vault.RestoreBudget` per response, so a response restores at
+most ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of original values (LAB-1350).
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pii_guard.types import EntityType, Span
-from pii_guard.vault import PLACEHOLDER_RE, UnmaskResult, VaultSession
+from pii_guard.vault import PLACEHOLDER_RE, RestoreBudget, UnmaskResult, VaultSession
 from pii_guard.vault.inflection import following_suffix
 
 __all__ = [
@@ -51,7 +53,7 @@ class _Restored:
     suffix: str
 
 
-def _restorations(session: VaultSession, text: str) -> Iterator[_Restored]:
+def _restorations(session: VaultSession, text: str, budget: RestoreBudget) -> Iterator[_Restored]:
     """Each placeholder in ``text`` restored by the vault, together with its suffix.
 
     The suffix after a placeholder can change the restored stem (Hungarian
@@ -65,7 +67,7 @@ def _restorations(session: VaultSession, text: str) -> Iterator[_Restored]:
             continue
         placeholder = match.group(0)
         suffix = following_suffix(text, match.end())
-        result = session.unmask_with_report(placeholder + suffix)
+        result = session.unmask_with_report(placeholder + suffix, budget=budget)
         if result.unresolved:
             cursor = match.end()
             yield _Restored(match.start(), cursor, placeholder, match.group(1), None, "")
@@ -79,17 +81,22 @@ def _restorations(session: VaultSession, text: str) -> Iterator[_Restored]:
         yield _Restored(match.start(), cursor, placeholder, match.group(1), restored, kept)
 
 
-def restore_text(session: VaultSession, text: str) -> tuple[str, list[Span], tuple[str, ...]]:
+def restore_text(
+    session: VaultSession, text: str, budget: RestoreBudget | None = None
+) -> tuple[str, list[Span], tuple[str, ...]]:
     """``session.unmask(text)``, plus the spans of restored values and unresolved tokens.
 
     A span covers the restored value (the stem as inflected), not the suffix after it.
+    ``budget``: the response's (default: a fresh one for this text alone).
     """
+    if budget is None:
+        budget = session.restore_budget()
     parts: list[str] = []
     spans: list[Span] = []
     unresolved: dict[str, None] = {}
     cursor = 0
     length = 0
-    for item in _restorations(session, text):
+    for item in _restorations(session, text, budget):
         before = text[cursor : item.start]
         parts.append(before)
         length += len(before)
@@ -120,14 +127,19 @@ def restore_text(session: VaultSession, text: str) -> tuple[str, list[Span], tup
 class JsonEscapingSession:
     """Restores placeholders as JSON-string-escaped values (for tool-call ``arguments``)."""
 
-    def __init__(self, session: VaultSession) -> None:
+    def __init__(self, session: VaultSession, budget: RestoreBudget | None = None) -> None:
         self._session = session
+        self._budget = budget
 
-    def unmask_with_report(self, text: str) -> UnmaskResult:
+    def restore_budget(self) -> RestoreBudget:
+        return self._budget or self._session.restore_budget()
+
+    def unmask_with_report(self, text: str, *, budget: RestoreBudget | None = None) -> UnmaskResult:
+        budget = budget or self.restore_budget()
         unresolved: dict[str, None] = {}
         parts: list[str] = []
         cursor = 0
-        for item in _restorations(self._session, text):
+        for item in _restorations(self._session, text, budget):
             parts.append(text[cursor : item.start])
             cursor = item.end
             if item.value is None:
@@ -149,16 +161,25 @@ class RestoreReport:
         return f"RestoreReport(choices={choices}, unresolved={unresolved})"
 
 
-def restore_arguments(session: VaultSession, arguments: str, report: RestoreReport) -> str:
-    result = JsonEscapingSession(session).unmask_with_report(arguments)
+def restore_arguments(
+    session: VaultSession,
+    arguments: str,
+    report: RestoreReport,
+    budget: RestoreBudget | None = None,
+) -> str:
+    result = JsonEscapingSession(session, budget).unmask_with_report(arguments)
     report.unresolved.update(dict.fromkeys(result.unresolved))
     return result.text
 
 
 def restore_completion(session: VaultSession, body: dict[str, Any]) -> RestoreReport:
     """Restore every choice's message in place. ``restored_spans`` maps choice index to the
-    restored ``content`` string and its value spans (for the detection cache)."""
+    restored ``content`` string and its value spans (for the detection cache).
+
+    One :class:`~pii_guard.vault.RestoreBudget` covers the whole body: past it, raises
+    :class:`~pii_guard.vault.UnmaskOutputTooLargeError` (fail closed, LAB-1350)."""
     report = RestoreReport()
+    budget = session.restore_budget()
     choices = body.get("choices")
     if not isinstance(choices, list):
         return report
@@ -170,7 +191,7 @@ def restore_completion(session: VaultSession, body: dict[str, Any]) -> RestoreRe
         for name in MESSAGE_TEXT_FIELDS:
             value = message.get(name)
             if isinstance(value, str):
-                restored, spans, unresolved = restore_text(session, value)
+                restored, spans, unresolved = restore_text(session, value, budget)
                 message[name] = restored
                 report.unresolved.update(dict.fromkeys(unresolved))
                 if name == "content" and isinstance(index, int):
@@ -178,16 +199,18 @@ def restore_completion(session: VaultSession, body: dict[str, Any]) -> RestoreRe
             elif name == "content" and isinstance(value, list):
                 for part in value:
                     if isinstance(part, dict) and isinstance(part.get("text"), str):
-                        restored, _, unresolved = restore_text(session, part["text"])
+                        restored, _, unresolved = restore_text(session, part["text"], budget)
                         part["text"] = restored
                         report.unresolved.update(dict.fromkeys(unresolved))
         for call in message.get("tool_calls") or []:
             function = call.get("function") if isinstance(call, dict) else None
             if isinstance(function, dict) and isinstance(function.get("arguments"), str):
-                function["arguments"] = restore_arguments(session, function["arguments"], report)
+                function["arguments"] = restore_arguments(
+                    session, function["arguments"], report, budget
+                )
         function_call = message.get("function_call")
         if isinstance(function_call, dict) and isinstance(function_call.get("arguments"), str):
             function_call["arguments"] = restore_arguments(
-                session, function_call["arguments"], report
+                session, function_call["arguments"], report, budget
             )
     return report

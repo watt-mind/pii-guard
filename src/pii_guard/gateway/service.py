@@ -78,7 +78,7 @@ from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PayloadTooLargeError, PiiGuardError, Span
-from pii_guard.vault import Vault, VaultSession, normalize_value
+from pii_guard.vault import UnmaskOutputTooLargeError, Vault, VaultSession, normalize_value
 from pii_guard.vault.known import KnownValues
 from pii_guard.visual.masking import (
     ImageMasker,
@@ -950,7 +950,11 @@ class Gateway:
                     outcome = f"stream_error:{type(exc).__name__}"
                     sending = time.perf_counter()
                     try:
-                        yield sse_event(error_event("stream_failed", "the response stream failed"))
+                        if isinstance(exc, UnmaskOutputTooLargeError):  # LAB-1350
+                            failed = error_event(exc.code, exc.message)
+                        else:
+                            failed = error_event("stream_failed", "the response stream failed")
+                        yield sse_event(failed)
                     finally:
                         timer.add("client", time.perf_counter() - sending)
             except (GeneratorExit, asyncio.CancelledError):

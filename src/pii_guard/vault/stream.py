@@ -21,7 +21,7 @@ from pii_guard.vault.placeholders import (
     PLACEHOLDER_RE,
     is_placeholder_prefix,
 )
-from pii_guard.vault.vault import VaultSession
+from pii_guard.vault.vault import RestoreBudget, VaultSession
 
 __all__ = ["StreamUnmasker"]
 
@@ -31,10 +31,16 @@ class StreamUnmasker:
 
     Errors from the session (for example :class:`~pii_guard.vault.SessionNotFoundError`
     once it expires) propagate, so the caller can fail the response (ADR 0006).
+
+    Every chunk is charged to one :class:`~pii_guard.vault.RestoreBudget`: ``budget`` (share
+    one across the unmaskers of one response) or, by default, a fresh one of the session's,
+    so a stream restores at most ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of
+    original values and then raises :class:`~pii_guard.vault.UnmaskOutputTooLargeError`.
     """
 
-    def __init__(self, session: VaultSession) -> None:
+    def __init__(self, session: VaultSession, budget: RestoreBudget | None = None) -> None:
         self._session = session
+        self._budget = budget if budget is not None else session.restore_budget()
         self._buffer = ""
         self._unresolved: dict[str, None] = {}
         self._finished = False
@@ -66,7 +72,7 @@ class StreamUnmasker:
 
     def _unmask(self, text: str) -> str:
         # Called even with nothing ready, so an expired session fails the stream right away.
-        result = self._session.unmask_with_report(text)
+        result = self._session.unmask_with_report(text, budget=self._budget)
         self._unresolved.update(dict.fromkeys(result.unresolved))
         return result.text
 
