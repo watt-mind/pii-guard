@@ -43,6 +43,7 @@ import threading
 import time
 from collections import Counter
 from collections.abc import AsyncIterator, Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -117,6 +118,19 @@ _LANGUAGE_RE = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})?$")
 _SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _MAX_ERROR_BODY = 65_536
 _UNSET: Any = object()
+
+#: The largest masked upstream payload (bytes) the current request was admitted for. Hosted
+#: admission charges this bound in advance (hosted/quotas.py); None means no bound (local).
+UPSTREAM_PAYLOAD_LIMIT: ContextVar[int | None] = ContextVar(
+    "pii_guard_upstream_payload_limit", default=None
+)
+
+
+def check_upstream_payload(payload: bytes) -> None:
+    """Refuse a masked payload larger than the bound its admission was charged for."""
+    limit = UPSTREAM_PAYLOAD_LIMIT.get()
+    if limit is not None and len(payload) > limit:
+        raise PayloadTooLargeError("the masked request is larger than its admitted size bound")
 
 
 class UpstreamNotConfiguredError(PiiGuardError):
@@ -831,6 +845,11 @@ class Gateway:
 
         forwarding = time.perf_counter()
         payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        try:
+            check_upstream_payload(payload)
+        except PayloadTooLargeError:
+            stats.log("blocked")
+            raise
         if trace.payloads:
             trace.masked_request = payload
         masked_messages = _masked_messages(body) if echo else None
@@ -852,6 +871,11 @@ class Gateway:
             timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")
             raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
+        except UpstreamError:
+            # A refused (compressed or oversized) hosted response counts like no response.
+            timer.add("upstream", time.perf_counter() - started)
+            stats.log("upstream_unreachable")
+            raise
         timer.add("upstream_ttfb", time.perf_counter() - started)
         timer.add("upstream", time.perf_counter() - started)
 

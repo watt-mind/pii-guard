@@ -13,9 +13,11 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pii_guard.api.errors import error_response
+from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT
 from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
 from pii_guard.hosted.images import IMAGE_COMPUTE_TOKENS, IMAGE_PATH, image_body_limit
+from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, upstream_payload_bound
 from pii_guard.hosted.runtime import HostedService
 from pii_guard.projects.middleware import endpoint_body, endpoint_path, prepare_project
 from pii_guard.types import PiiGuardError
@@ -51,6 +53,8 @@ class HostedMiddleware:
         runtime = None
         reservation = None
         entered = False
+        streaming: str | None = None
+        payload_limit = None
         state: dict[str, Any] = dict(scope.get("state", {}))
 
         async def tracked_send(message: Message) -> None:
@@ -183,6 +187,15 @@ class HostedMiddleware:
                 raise HostedUnauthorizedError("Project management requires signed-in owner access")
             if console and principal.auth_method != "google":
                 raise HostedUnauthorizedError("The console requires signed-in owner access")
+            credentials = canonical in {
+                "/v1/account/api-keys",
+                "/v1/account/connections",
+            } or bool(re.fullmatch(r"/v1/account/(?:api-keys|connections)/[^/]+", canonical))
+            if credentials and principal.auth_method != "google":
+                # A guard API key must never mint keys or connections that outlive it.
+                raise HostedUnauthorizedError(
+                    "Key and connection management requires a signed-in session"
+                )
             if canonical not in allowed and parameterized is None and not project_management:
                 raise HostedRequestError("This endpoint is unavailable in hosted mode")
             if canonical not in {"/v1/account", "/v1/demo"} and not principal.authenticated:
@@ -203,14 +216,28 @@ class HostedMiddleware:
                     raise HostedRequestError("A same-origin request is required")
                 if headers.get("sec-fetch-site") == "cross-site":
                     raise HostedRequestError("A same-origin request is required")
-            account_inspection = canonical == "/v1/account" and scope.get("method") == "GET"
-            if not account_inspection:
+            method = scope.get("method")
+            read = method in {"GET", "HEAD"}
+            preflight = method == "OPTIONS"
+            # /v1/account is free under every method: it never admits, reserves budget or
+            # takes a runtime, so cookieless calls cannot exhaust capacity (LAB-1412).
+            account = canonical == "/v1/account"
+            if not principal.authenticated:
+                # A guest's only work is the curated demo itself.
+                needs_runtime = work = canonical == "/v1/demo" and method == "POST"
+            else:
+                # Key and connection management uses the account stores, never a runtime.
+                needs_runtime = not (account or preflight or credentials)
+                # Reads (the console polls them) spend no daily request or token budget and
+                # hold no inference concurrency; the abuse read bucket bounds them instead.
+                work = not (account or preflight or read)
+            if not account:
                 self.service.abuse.admit(
                     headers,
                     principal_id=principal.id,
                     authenticated=principal.authenticated,
                     anonymous_sponsored=canonical == "/v1/demo" and scope.get("method") == "POST",
-                    read=scope.get("method") in {"GET", "HEAD"},
+                    read=read,
                 )
             if principal.authenticated and canonical not in {"/v1/account", "/v1/demo"}:
                 state = await anyio.to_thread.run_sync(
@@ -252,7 +279,7 @@ class HostedMiddleware:
             if canonical in {"/v1/chat/completions", "/v1/responses"}:
                 try:
                     body = json.loads(raw)
-                except (ValueError, UnicodeDecodeError):
+                except (ValueError, UnicodeDecodeError, RecursionError):
                     raise HostedRequestError("Invalid JSON request") from None
                 if not isinstance(body, dict) or headers.get("x-pii-guard-mode", "fast") != "fast":
                     raise HostedRequestError("Hosted requests require fast text mode")
@@ -275,21 +302,31 @@ class HostedMiddleware:
                     maximum = min(maximum, value)
                 body[output_field] = maximum
                 raw = bytearray(json.dumps(body).encode())
+                output_limit = maximum
+            else:
+                output_limit = DEMO_MAX_OUTPUT_TOKENS
             state["hosted_principal"] = principal
-            # Account inspection remains available after exhaustion; all mutations and data
-            # routes consume compute quotas. The full conservative charge survives failure.
-            if not account_inspection:
-                input_tokens = (max(len(raw), 1024) * 32 + 4096) if paid else len(raw)
+            # The account remains available after exhaustion; mutations and data work consume
+            # compute quotas. The full conservative charge survives failure.
+            if work:
+                if paid:
+                    # Sized from this request: the gateway refuses a masked payload beyond
+                    # the bound, and output is the request's own (capped) token limit.
+                    payload_limit = upstream_payload_bound(len(raw))
+                    input_tokens, output_tokens = payload_limit, output_limit
+                else:
+                    input_tokens, output_tokens = len(raw), 0
                 if image:
                     # A fixed compute charge plus one from the separate daily image count:
                     # reserved here, before any decoding or OCR, and never refunded.
                     input_tokens = IMAGE_COMPUTE_TOKENS
-                output_tokens = self.service.settings.hosted_max_output_tokens if paid else 0
                 sponsored = (
                     paid
                     and not connection_id
                     and (selected_endpoint is None or selected_endpoint.provider == "sponsored")
                 )
+                if sponsored:
+                    self.service.check_kill_switch()
                 reservation = self.service.quotas.admit(
                     principal.id,
                     authenticated=principal.authenticated,
@@ -300,6 +337,13 @@ class HostedMiddleware:
                 )
                 if sponsored and self.service.spend is not None:
                     await self.service.charge_spend(input_tokens, output_tokens)
+            if needs_runtime and canonical == "/v1/traffic/stream":
+                # A live stream trades its ingress slot for a bounded stream slot.
+                self.service.enter_stream(principal.id)
+                streaming = principal.id
+                self.service.leave_ingress()
+                entered = False
+            if needs_runtime:
                 project_id = state.get("project_id")
                 default = (
                     (
@@ -340,10 +384,14 @@ class HostedMiddleware:
                     return {"type": "http.request", "body": bytes(raw), "more_body": False}
                 return await receive()
 
-            async with asyncio.timeout(self.service.settings.hosted_request_timeout):
-                await self.app(
-                    {**scope, "headers": filtered, "state": state}, body_receive, tracked_send
-                )
+            limit_token = UPSTREAM_PAYLOAD_LIMIT.set(payload_limit)
+            try:
+                async with asyncio.timeout(self.service.settings.hosted_request_timeout):
+                    await self.app(
+                        {**scope, "headers": filtered, "state": state}, body_receive, tracked_send
+                    )
+            finally:
+                UPSTREAM_PAYLOAD_LIMIT.reset(limit_token)
         except PiiGuardError as exc:
             if not started:
                 response = error_response(exc.status_code, exc.code, exc.message)
@@ -368,3 +416,5 @@ class HostedMiddleware:
                     reservation.release()
                 if entered:
                     self.service.leave_ingress()
+                if streaming is not None:
+                    self.service.leave_stream(streaming)

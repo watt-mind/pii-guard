@@ -21,7 +21,7 @@ from pii_guard.gateway.service import Gateway
 from pii_guard.hosted import routes
 from pii_guard.hosted.connections import ConnectionStore
 from pii_guard.hosted.identity import ApiKeyStore, Principal
-from pii_guard.hosted.quotas import QuotaLedger
+from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, QuotaLedger
 from pii_guard.policy import PolicySet
 from pii_guard.vault import Vault
 
@@ -209,7 +209,7 @@ def test_demo_real_masking_and_exact_roundtrip(
     assert result["masked"] == calls[0]["messages"][0]["content"]
     assert result["answer"] == result["masked"]
     assert result["restored"] == result["original"]
-    assert calls[0]["max_completion_tokens"] == 8192
+    assert calls[0]["max_completion_tokens"] == DEMO_MAX_OUTPUT_TOKENS
     assert calls[0]["stream"] is False
     assert result["entities"]
     for entity in result["entities"]:
