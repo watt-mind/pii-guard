@@ -1,15 +1,30 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { TEXT_ENTITY_TYPES, type TextEntityType } from "../api/types";
 import { ENTITY_META, type Policy } from "../lib/entities";
+import { ApiError } from "../api/http";
+import { localRequest } from "./request";
 import { request, recovery, type Requester } from "../hosted/api";
 import { projectPath, type Endpoint, type EndpointKey, type PolicyVersion, type Project, type ProjectList } from "./api";
 import "./workspace.css";
+
+const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
+
+const configurationRecovery = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? recovery : (error: unknown, hosted: boolean) => {
+  if (hosted) return recovery(error);
+  if (error instanceof ApiError) {
+    if (error.status === 401 || error.status === 403) return "The guard refused owner access. Open Local guard access and enter the owner API token configured on this server, then retry. Check that you are using the guard’s current address.";
+    if (error.status === 400 || error.status === 422) return "The guard refused these settings. Check the form and try again.";
+    if (error.status === 404) return "This project or endpoint is unavailable. Reload the project list and check that the guard supports project configuration.";
+  }
+  return "The guard could not complete this request. Check its connection and retry.";
+}
 
 interface Props { call?: Requester; hosted?: boolean; projectId?: string; onProject?: (project: Project) => void }
 const defaults = Object.fromEntries(TEXT_ENTITY_TYPES.map((type) => [type, ENTITY_META[type].policy])) as Record<TextEntityType, Policy>;
 
 /** Project configuration only. Secrets live in component memory, never browser storage. */
-export function Workspace({ call = request, hosted = false, projectId, onProject }: Props) {
+export function Workspace({ call: suppliedCall, hosted = false, projectId, onProject }: Props) {
+  const call = suppliedCall ?? (hosted ? request : localRequest);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selected, setSelected] = useState(projectId ?? "");
   const [name, setName] = useState("");
@@ -25,18 +40,19 @@ export function Workspace({ call = request, hosted = false, projectId, onProject
       const project = data.projects.find((p) => p.id === projectId) ?? data.projects.find((p) => p.id === data.default_project_id) ?? data.projects[0];
       if (project) { setSelected(project.id); if (project.id !== projectId) onProject?.(project); }
       setError("");
-    }).catch((e: unknown) => { if (active) setError(recovery(e)); });
+    }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); });
     return () => { active = false; };
-  }, [call, projectId, onProject, retry]);
+  }, [call, projectId, onProject, retry, hosted]);
   const project = projects.find((p) => p.id === selected);
   return <div className="project-workspace">
     <div className="pw-heading"><div><h2>Projects & endpoints</h2><p>Keep each application’s credentials, policy assignments and sessions together.</p></div></div>
+    {!hosted && OwnerAccess && <Suspense fallback={null}><OwnerAccess /></Suspense>}
     {error && <div className="pw-error" role="alert"><p>{error}</p><button onClick={() => setRetry((n) => n + 1)}>Retry projects</button></div>}
     {projects.length > 0 && <div className="pw-projects">
       <label>Current project<select value={selected} disabled={busy} onChange={(e) => { const next = projects.find((p) => p.id === e.target.value)!; setSelected(next.id); onProject?.(next); }}>
         {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select></label>
-      <form onSubmit={(e) => { e.preventDefault(); setBusy(true); setError(""); void call<Project>("/v1/projects", { name }).then((next) => { setProjects((prev) => [...prev, next]); setSelected(next.id); setName(""); onProject?.(next); }).catch((e: unknown) => setError(recovery(e))).finally(() => setBusy(false)); }}>
+      <form onSubmit={(e) => { e.preventDefault(); setBusy(true); setError(""); void call<Project>("/v1/projects", { name }).then((next) => { setProjects((prev) => [...prev, next]); setSelected(next.id); setName(""); onProject?.(next); }).catch((e: unknown) => setError(configurationRecovery(e, hosted))).finally(() => setBusy(false)); }}>
         <label>New project name<input required maxLength={64} value={name} onChange={(e) => setName(e.target.value)} /></label><button type="submit" disabled={busy || !name.trim()}>{busy ? "Creating…" : "Create project"}</button>
       </form>
     </div>}
@@ -61,8 +77,8 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
     setPolicies(policyData.policies); setEndpoints(endpointData.endpoints); setLoaded(true);
     window.dispatchEvent(new Event("pii-guard-project-configuration"));
   }
-  useEffect(() => { let active = true; void Promise.all([call<{ policies: PolicyVersion[] }>(`${base}/policies`), call<{ endpoints: Endpoint[] }>(`${base}/endpoints`)]).then(([p, e]) => { if (!Array.isArray(p.policies) || !Array.isArray(e.endpoints)) throw new Error("Invalid configuration"); if (active) { setPolicies(p.policies); setEndpoints(e.endpoints); setLoaded(true); } }).catch((e: unknown) => { if (active) setError(recovery(e)); }); return () => { active = false; }; }, [base, call]);
-  async function action(work: () => Promise<void>) { setBusy(true); setError(""); try { await work(); } catch (e) { setError(recovery(e)); } finally { setBusy(false); } }
+  useEffect(() => { let active = true; void Promise.all([call<{ policies: PolicyVersion[] }>(`${base}/policies`), call<{ endpoints: Endpoint[] }>(`${base}/endpoints`)]).then(([p, e]) => { if (!Array.isArray(p.policies) || !Array.isArray(e.endpoints)) throw new Error("Invalid configuration"); if (active) { setPolicies(p.policies); setEndpoints(e.endpoints); setLoaded(true); } }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); }); return () => { active = false; }; }, [base, call, hosted]);
+  async function action(work: () => Promise<void>) { setBusy(true); setError(""); try { await work(); } catch (e) { setError(configurationRecovery(e, hosted)); } finally { setBusy(false); } }
   return <div className="pw-stack">
     <p className="pw-note">Configuration is saved by the guard. Restoration mappings and activity remain temporary. {hosted && "This hosted preview supports text only."}</p>
     {error && <div role="alert" className="pw-error">{error}<button onClick={() => void action(reload)}>Reload configuration</button></div>}
@@ -72,7 +88,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
       <ul className="pw-list">{endpoints.map((endpoint) => <li key={endpoint.id}><div><h4>{endpoint.name} {!endpoint.enabled && <span>· disabled</span>}</h4><p>{endpoint.provider} · {endpoint.model}</p><p>{policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}</p></div><div className="pw-actions"><button onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>Connect & keys</button><button disabled={busy} onClick={() => { setEndpointEdit(endpoint); setPolicyEdit(null); }}>Edit endpoint</button></div></li>)}</ul>
     </section>
     {endpointEdit && <EndpointForm key={`endpoint-form-${typeof endpointEdit === "string" ? "new" : endpointEdit.id}`} endpoint={endpointEdit === "new" ? undefined : endpointEdit} policies={policies} busy={busy} hosted={hosted} onCancel={() => setEndpointEdit(null)} onSave={(body) => action(async () => { await call(endpointEdit === "new" ? `${base}/endpoints` : `${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, body, endpointEdit === "new" ? "POST" : "PUT"); await reload(); setEndpointEdit(null); })} onDisable={endpointEdit === "new" ? undefined : () => action(async () => { await call(`${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, { name: endpointEdit.name, provider: endpointEdit.provider, model: endpointEdit.model, policy_version_id: endpointEdit.policy_version_id, enabled: false, ...(endpointEdit.provider === "custom" ? { base_url: endpointEdit.base_url } : {}) }, "PUT"); await reload(); setEndpointEdit(null); setInspect(""); })} />}
-    {endpoints.find((e) => e.id === inspect) && <EndpointConnection key={`endpoint-connection-${inspect}`} endpoint={endpoints.find((e) => e.id === inspect)!} base={base} call={call} />}
+    {endpoints.find((e) => e.id === inspect) && <EndpointConnection key={`endpoint-connection-${inspect}`} endpoint={endpoints.find((e) => e.id === inspect)!} base={base} call={call} hosted={hosted} />}
     <section className="pw-panel" aria-labelledby="policy-heading"><div className="pw-heading"><div><h3 id="policy-heading">Reusable policies</h3><p>Each saved version is immutable. Endpoints keep their assigned version until you explicitly reassign them.</p></div><button disabled={!loaded || busy} onClick={() => { setPolicyEdit("new"); setEndpointEdit(null); }}>Create policy</button></div>
       <ul className="pw-list">{policies.map((policy) => <li key={policy.policy_version_id}><div><h4>{policy.name} · v{policy.version}</h4><p>{policy.language} · {policy.mode} · {endpoints.filter((e) => e.enabled && e.policy_version_id === policy.policy_version_id).length} endpoints</p></div><button aria-label={`New version of ${policy.name} v${policy.version}`} disabled={busy} onClick={() => { setPolicyEdit(policy); setEndpointEdit(null); }}>New version</button></li>)}</ul>
     </section>
@@ -125,7 +141,7 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
   </form>;
 }
 
-function EndpointConnection({ endpoint, base, call }: { endpoint: Endpoint; base: string; call: Requester }) {
+function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoint; base: string; call: Requester; hosted: boolean }) {
   const panel = useRef<HTMLElement>(null);
   // This component mounts only after an explicit Connect & keys expansion.
   useEffect(() => {
@@ -139,8 +155,8 @@ function EndpointConnection({ endpoint, base, call }: { endpoint: Endpoint; base
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState("");
   const keyPath = `${base}/endpoints/${encodeURIComponent(endpoint.id)}/keys`;
-  useEffect(() => { let active = true; call<{ keys: EndpointKey[] }>(keyPath).then((data) => { if (!Array.isArray(data.keys)) throw new Error("Invalid keys"); if (active) setKeys(data.keys); }).catch((e: unknown) => { if (active) setError(recovery(e)); }); return () => { active = false; }; }, [call, keyPath]);
-  async function action(work: () => Promise<void>) { setBusy(true); setError(""); try { await work(); } catch (e) { setError(recovery(e)); } finally { setBusy(false); } }
+  useEffect(() => { let active = true; call<{ keys: EndpointKey[] }>(keyPath).then((data) => { if (!Array.isArray(data.keys)) throw new Error("Invalid keys"); if (active) setKeys(data.keys); }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); }); return () => { active = false; }; }, [call, keyPath, hosted]);
+  async function action(work: () => Promise<void>) { setBusy(true); setError(""); try { await work(); } catch (e) { setError(configurationRecovery(e, hosted)); } finally { setBusy(false); } }
   const url = `${globalThis.location.origin}${endpoint.base_path}`;
   const snippet = `from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url=${JSON.stringify(url)},\n    api_key=os.environ["PII_GUARD_ENDPOINT_KEY"],\n)\nresponse = client.chat.completions.create(\n    model=${JSON.stringify(endpoint.model)},\n    messages=[{"role": "user", "content": "Hello, Robin Example."}],\n)`;
   function copy(value: string, label: string) { void navigator.clipboard.writeText(value).then(() => setCopied(`${label} copied`)).catch(() => setCopied("Copy failed. Select the text and copy it manually.")); }

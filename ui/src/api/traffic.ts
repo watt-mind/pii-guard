@@ -1,5 +1,5 @@
 import { getSelectedEndpoint, getSelectedProject } from "../projects/selection";
-import { inspectionHeaders } from "./project";
+import { createProjectFetch, inspectionHeaders } from "./project";
 // The gateway's traffic log (docs/operations.md, "Traffic log"): one event per LLM call.
 //
 // - `GET /v1/traffic?limit=&after=` returns the stored events, oldest first.
@@ -19,6 +19,7 @@ import { inspectionHeaders } from "./project";
 //   settles, and each request is aborted after `timeoutMs`.
 // - The dedup set keeps the newest `dedupWindow` ids, not every id ever seen.
 
+import { getOwnerToken } from "./localOwner";
 import type { EntityType } from "./types";
 import { ApiError, UnreachableError } from "./http";
 
@@ -189,7 +190,7 @@ export async function fetchTraffic(
   if (query.after !== undefined) params.set("after", String(query.after));
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl}/v1/traffic?${params}`, { headers: inspectionHeaders({ Accept: "application/json" }, projectId, endpointId), signal });
+    res = await createProjectFetch(doFetch, projectId, endpointId)(`${baseUrl}/v1/traffic?${params}`, { headers: inspectionHeaders({ Accept: "application/json" }, projectId, endpointId), signal });
   } catch (err) {
     if (signal?.aborted) throw err;
     throw new UnreachableError();
@@ -223,7 +224,7 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
   const endpointId = getSelectedEndpoint();
   // EventSource cannot send the project header. Polling retains the same authorization
   // boundary as REST, without adding another selector to URLs or browser history.
-  const ES: EventSourceCtor | null = projectId || endpointId ? null :
+  const ES: EventSourceCtor | null = projectId || endpointId || (import.meta.env.VITE_PII_GUARD_HOSTED !== "true" && getOwnerToken()) ? null :
     options.EventSource === undefined ? ((globalThis as { EventSource?: EventSourceCtor }).EventSource ?? null) : options.EventSource;
   const pollMs = options.pollMs ?? 2000;
   const timeoutMs = options.timeoutMs ?? TRAFFIC_TIMEOUT_MS;

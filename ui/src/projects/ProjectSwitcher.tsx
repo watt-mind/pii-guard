@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { request } from "../hosted/api";
+import { localRequest as request } from "./request";
 import type { Endpoint, ProjectList } from "./api";
 import { setSelectedEndpoint, setSelectedProject, useSelectedEndpoint, useSelectedProject } from "./selection";
 

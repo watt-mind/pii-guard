@@ -19,8 +19,8 @@ export interface DemoResult {
 export type Requester = <T>(path: string, body?: unknown, method?: "GET" | "POST" | "PUT" | "DELETE") => Promise<T>;
 
 /** Same-origin only. Never expose server messages which could echo sensitive input. */
-export const request: Requester = async <T>(path: string, body?: unknown, method?: "GET" | "POST" | "PUT" | "DELETE"): Promise<T> => {
-  const response = await fetch(path, {
+export const createRequester = (doFetch: typeof fetch): Requester => async <T>(path: string, body?: unknown, method?: "GET" | "POST" | "PUT" | "DELETE"): Promise<T> => {
+  const response = await doFetch(path, {
     method: method ?? (body === undefined ? "GET" : "POST"),
     credentials: "same-origin",
     headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
@@ -35,6 +35,8 @@ export const request: Requester = async <T>(path: string, body?: unknown, method
   if (response.status === 204) return undefined as T;
   try { return await response.json() as T; } catch { throw new Error("unavailable"); }
 };
+
+export const request = createRequester((...args) => fetch(...args));
 
 export function recovery(error: unknown): string {
   if (error instanceof ApiError) {
