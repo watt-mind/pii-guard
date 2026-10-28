@@ -92,7 +92,9 @@ sponsorship is 0 until the LAB-1398 allocation exists.
 
 ## 4. Private dev boundary (`proxy_headers`)
 
-[`dev-boundary.json`](dev-boundary.json). From a tailnet Mac with no sign-in, through
+[`dev-boundary.json`](dev-boundary.json); re-run per image with
+`uv run --no-sync python scripts/probe_dev_boundary.py https://guard-dev.watt-mind.com` (21
+requests, exits non-zero on any accepted forgery; it passed 21/21 at 22:10Z). From a tailnet Mac with no sign-in, through
 `guard-dev.watt-mind.com` (Tailscale, then router VM, then ACA, then Easy Auth), revision
 `piiguard-dev-app--0000005`. Each probe carried a valid-shaped forged Google
 `X-MS-CLIENT-PRINCIPAL`, `X-MS-CLIENT-PRINCIPAL-ID/-NAME/-IDP`, `X-MS-TOKEN-GOOGLE-*`, the
