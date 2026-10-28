@@ -74,6 +74,7 @@ The backend's current default application expiries are:
 | Vault session | Sliding one hour |
 | BYOK connection | Fixed one hour from creation; five per owner, 256 globally |
 | Masked traffic log | Last 50 events per owner; freed on owner purge or process restart |
+| Spend ledger | Durable finite authority and total/daily counters in isolated Blob; no prompt/mapping/key content |
 | User API key | Fixed 24 hours; five per owner, 1,000 globally; process loss can revoke earlier |
 
 API keys are stored as verifiers, not recoverable raw keys. Deleting a connection/session/key
@@ -82,7 +83,7 @@ closes the owner's vault and clears provider connections. These are application 
 not a guarantee that sensitive memory is physically erased on expiry. Review changes to these
 limits together with the backend contract and public notice.
 
-The Azure Files share contains only allocation claim markers (allocation identifiers, never
+The legacy Azure Files share contains only allocation claim markers (allocation identifiers, never
 prompts, mappings or keys). Retain markers while an allocation could be reused and preserve the
 share during deployment/rollback. No automatic marker deletion or backup policy is configured.
 Storage account keys used by the platform SMB mount stay in ARM's secret handling; they never
@@ -131,9 +132,13 @@ startup characteristics and is not subject to the self-hosted image's 375 MB OCR
 | `PII_GUARD_UPSTREAM_BASE_URL` | `https://api.meta.ai/v1`; server-owned sponsored route |
 | `PII_GUARD_HOSTED_MODELS` | `muse-spark-1.3` allowlist |
 | `PII_GUARD_NER_MODEL`, `PII_GUARD_DETECTORS` | `/app/models/ner`, `rules,ner`; cannot silently drop NER |
-| `PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS` | Default `0`; explicit one-time allocation, max USD 10 |
-| `PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID` | Fresh reviewed ID; reused ID forfeited on restart |
-| `PII_GUARD_HOSTED_ALLOCATION_DIRECTORY` | `/app/allocation-ledger`, durable marker-only share |
+| `PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS` | Default `0`; approved cumulative ceiling, max USD 10 |
+| `PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID` | Exact operator-approved ID; reused across Blob-backed restarts |
+| `PII_GUARD_HOSTED_SPEND_STORE` | `azure_blob`; requires LAB-1398 and the image SDK extra |
+| `PII_GUARD_HOSTED_SPEND_ACCOUNT_URL` | Environment-specific identity-only Blob account |
+| `PII_GUARD_HOSTED_SPEND_CONTAINER` | `sponsored-allowance`; fixed `<environment>.json` object |
+| `PII_GUARD_HOSTED_SPEND_ENVIRONMENT` | `dev` or `prod`, matching the authority object |
+| `PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` | Dedicated runtime UAMI client ID |
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
 | `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |
 
@@ -192,9 +197,10 @@ the selected subscription first if not already registered.
 Before `enable`, point the public `guard` CNAME at `<appName>.<environmentDomain>` with DNS-only
 resolution (no proxy during certificate validation), and create TXT `asuid.guard` from the app's
 `properties.customDomainVerificationId` after staging. These are public domain-verification
-records, not credentials. The enable script adds the hostname, requests/binds a platform-managed
-certificate using CNAME validation, and only then runs the canonical HTTPS smoke. Certificate
-issuance may take time; a failure attempts to restore internal ingress. Verify DNS propagation,
+records, not credentials. Run `deploy/azure/deploy.sh bind-domain` as the operator to add the hostname and request/bind
+a platform-managed certificate using CNAME validation. App release preserves that binding and
+runs the canonical HTTPS smoke during `enable`. Certificate issuance may take time; a failed
+enablement attempts to restore internal ingress. Verify DNS propagation,
 certificate subject/expiry and the HTTPS callback before retrying. Keep the canonical origin and
 Google callback aligned if the domain changes. The default Azure hostname also passes Easy Auth; never
 create a second public service that exposes the container directly. Do not enable raw TCP
@@ -207,41 +213,28 @@ spoofed identity headers, cross-owner sessions/API keys and cross-origin cookie 
 that the platform discards caller-supplied `X-MS-CLIENT-PRINCIPAL` headers on **all** ingress
 hostnames, including anonymous requests. If this cannot be established, keep ingress internal.
 
-## Dev/prod deployment plan — private dev networking pending
+## Dev/prod deployment
 
-The deployment environments are **dev** and **prod**. The intended branch mapping is
-`develop` → dev and the repository's actual production branch (`main`, or `master` where that
-is the actual branch) → prod. The branch deployment workflow is not implemented by this PR.
-Both environments should use the same reviewed application image/template with separate
-identities, vault credentials, OAuth client, owner state, allocation ledger and billing budget.
-Real input is allowed in the authorized running service; repository fixtures, screenshots,
-logs and committed evidence must still be synthetic.
+`develop` targets **dev** and `main` targets **prod**, with the same reviewed image and separate
+credentials, identities, state and budgets. The [private dev runbook](private-dev.md) specifies
+the dedicated internal ACA environment, always-on Tailscale HTTPS proxy, exact-host DNS,
+managed-identity credential bootstrap, OAuth/header boundary, cost and activation checks.
+This is source readiness, not a claim that a VM, private callback or dev app has been deployed.
+There is no public dev fallback. Real runtime inputs may be processed in the authorized service;
+repository fixtures and committed evidence remain synthetic.
 
-**Dev cloud operations are deliberately refused by the current script, and the Bicep app
-resource is disabled for dev until the private network design is implemented.** Recognizing
-the `dev` parameter does not mean a private dev service exists. Do not deploy an ad hoc public
-dev app or use Tailscale Funnel to bypass this gate.
+`main.bicep` is operator-only foundation; app `stage`/`enable` use `release.bicep`, which never
+writes RBAC, budgets, networks or storage and never calls account-key functions. The local
+`deploy.sh ci-preflight dev|prod` handshake is required before CI login. CI must not receive
+operator foundation/funding privileges. Existing domain bindings are preserved; a failed
+binding metadata read refuses release instead of silently clearing the certificate/hostname.
+Prod certificate binding is an explicit operator `bind-domain` step, not an app CI privilege.
 
-The proposed dev path is a dedicated VNet, an internal Container Apps environment with public
-network access disabled, private DNS for its ingress, and a dedicated always-on Tailscale
-subnet router/reverse proxy with narrow tailnet routes/ACLs. App HTTP ingress must be reachable
-from that proxy within the private environment. A request from the active proxy may trigger
-Container Apps HTTP scaling from zero; a Tailscale sidecar inside a sleeping app is not a
-wake path. Validate the full private request path and model cold start before promising it.
-Do not reuse unrelated existing tailnet nodes. The proxy's ongoing cost needs its own reviewed
-budget allowance; the prod EUR 25 budget does not authorize another environment's spend.
-
-Use an owned private HTTPS hostname and separately validated Google OAuth callback/client for
-dev. The user's browser must reach the private callback over the tailnet; no public application
-origin may bypass that path. DNS/TLS issuance, Google audience/redirect acceptance and tailnet
-route approval remain design/verification work. Production remains at the approved public
-origin, with all existing launch gates.
-
-The product intent is finite sponsored access by default once provider permission and
-LAB-1372 Done are established. This PR does not replenish allocations automatically: idle
-scale-to-zero/restart forfeits a previously claimed allocation. Before automatic dev releases,
-review a finite allocation issuance/reconciliation policy and any required durable spend state;
-never mint new credit on every restart or treat an alert budget as a hard spend ceiling.
+App releases require the operator-provisioned identity-only Blob ledger. They reuse approved
+finite cumulative allowance pins and never mint credit. On restart/scale-zero, LAB-1398 resumes
+total/daily accounting under CAS without restoring owner data. The old SMB marker-only store
+is legacy compatibility infrastructure; its restart-forfeiture behavior is not the new Blob
+store's behavior. Durable accounting does not implement LAB-1376 mapping/session persistence.
 
 ## Foundation migration and deletion
 
@@ -259,7 +252,7 @@ command is `az group delete --name rg-pii-guard-hosted-demo --yes`; do not run i
 conditions. Do not purge the old vault: its purge-protected soft deletion lasts seven days and
 reserves its old name. Report only new resource names in the PR discussion.
 
-Key Vault and allocation storage still use RBAC/credential-protected public network endpoints;
+Prod Key Vault and the legacy allocation share still use RBAC/credential-protected public network endpoints;
 this template does not establish private endpoints or an EU residency guarantee downstream.
 Limit operator permissions and keep that boundary visible in deployment review.
 
@@ -314,17 +307,18 @@ release evidence and `latest=ready`. No app/image yet means these checks are pen
   IDs from this vault. Require Google OAuth secret, Meta Standard credential and tenant key
   references to resolve under the runtime managed identity. Existing enabled secret metadata
   does not prove resolution or provider authorization. Never print their values.
-- **Allocation:** with sponsorship zero, run the filesystem probe below in the actual app
-  container as its runtime user. It must support exclusive create, no-follow and file/directory
-  fsync on `/app/allocation-ledger`. Then, only after provider authorization, use a tiny test
-  allocation to prove startup claim, duplicate-claim refusal, expiry, exhausted-budget refusal
-  and restart forfeiture. Filesystem support alone does not prove allocation accounting.
+- **Durable authority:** require LAB-1398 plus the `hosted-azure` SDK extra in both hosted image
+  dependency installations and an offline SDK import smoke. The first image without that
+  integration cannot be advertised as resumable sponsored service. With sponsorship zero,
+  verify private Blob DNS/MI access and missing-object refusal. After provider authorization,
+  use approved synthetic finite authority to prove exact-pin validation, concurrent CAS
+  charging, expiry, exhaustion and restart resumption without resetting total/daily charges.
 - **Spend and rollback:** require written provider authorization, Standard routing, reviewed
-  pricing/reservations and a reconciled fresh ID/expiry before setting a positive allocation.
-  Keep it zero for a technical-only staging release. Save the previous immutable image and
-  secret-version references, exercise `disable`, and require fresh review before a rollback
-  image is publicly enabled. Preserve all real allocation markers; rollback never restores
-  spent credit. Record an owner for provider-spend reconciliation and Azure budget alerts.
+  pricing/reservations and exact approved ID/ceiling/expiry pins before setting positive
+  sponsorship. Keep it zero for technical-only releases. Save the previous immutable image
+  and secret-version references, exercise `disable`, and require fresh review before public
+  rollback. Preserve the ledger; rollback never restores spent credit. Record an owner for
+  provider-spend reconciliation and Azure budget alerts.
 
 ```bash
 az rest --method get --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.App/containerApps/${AZURE_PROJECT_PREFIX}-${AZURE_ENVIRONMENT}-app/authConfigs/current?api-version=2025-01-01" \
@@ -337,41 +331,11 @@ az containerapp show --resource-group "$AZURE_RESOURCE_GROUP" --name "${AZURE_PR
   --query properties.customDomainVerificationId --output tsv
 ```
 
-Set `AZURE_VAULT_NAME` from the foundation vault URI. For the allocation probe, open the app
-container using `az containerapp exec --resource-group "$AZURE_RESOURCE_GROUP" --name
-"${AZURE_PROJECT_PREFIX}-${AZURE_ENVIRONMENT}-app" --command /bin/sh`, then run this synthetic filesystem check. It removes
-only its uniquely named probe file, never an allocation marker:
-
-```bash
-python - <<'PYTHON'
-import os, uuid
-root = os.open('/app/allocation-ledger', os.O_RDONLY | os.O_DIRECTORY)
-name = '.launch-probe-' + uuid.uuid4().hex
-flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
-created = False
-try:
-    fd = os.open(name, flags, 0o600, dir_fd=root)
-    created = True
-    try:
-        os.write(fd, b'synthetic filesystem probe')
-        os.fsync(fd)
-    finally:
-        os.close(fd)
-    try:
-        duplicate = os.open(name, flags, 0o600, dir_fd=root)
-    except FileExistsError:
-        pass
-    else:
-        os.close(duplicate)
-        raise SystemExit('exclusive create failed')
-    os.fsync(root)
-    print('allocation filesystem primitives passed')
-finally:
-    if created:
-        os.unlink(name, dir_fd=root)
-    os.close(root)
-PYTHON
-```
+Set `AZURE_VAULT_NAME` from the foundation vault URI. Ledger data must be provisioned only
+by the approved operator workflow, using managed identity and the reviewed LAB-1398 schema.
+Do not test authority by deleting a live object, rewriting old counters or creating a replacement
+allocation during app deployment. The [private dev runbook](private-dev.md#finite-authority-cost-and-rollback)
+describes the network and permission checks for dev.
 
 ## Release evidence and sponsored allocation
 
@@ -406,18 +370,18 @@ smoke does not replace browser sign-in, provider streaming or privacy review.
 Sponsored budget remains zero until written provider authorization and the other launch gates
 are recorded, and the operator supplies `HOSTED_SPONSORED_MICRODOLLARS`,
 `HOSTED_ALLOCATION_ID` and `HOSTED_ALLOCATION_EXPIRES_AT`. The `meta_proxy_authorized` key is required for positive allocations and may be set only
-after the maintainer records written Meta authorization. A positive allocation creates a new
-revision/process; do not reuse an ID previously started. Verify atomic marker creation on the
-mounted share, including exclusive creation and file/directory fsync support, expiry, reservation bounds, exhausted-budget refusal and restart forfeiture
-using synthetic traffic before funding public use. Never delete a claim marker to replenish
-credit. Reconcile actual upstream usage and all outstanding reservations before issuing fresh
-credit; assume the full old allocation spent if uncertain. Changing an allocation ID repeatedly
-is additional spending, not a monthly ceiling. The operator controls cumulative allocations.
+after the maintainer records written Meta authorization. Releases reuse the operator's exact
+existing authority pins. The operator precreates the private object; neither bootstrap nor
+app release funds it. Changing the ID or cumulative ceiling must preserve charged total and
+current-day charges. Reconcile actual upstream usage and outstanding reservations before
+approving additional authority; unknown commits are charged conservatively. Never delete or
+restore the object to replenish credit. Legacy marker-only deployments retain their original
+restart-forfeiture rules and are not the Blob-backed release path.
 
 The app scales to zero when idle and runs at most one 2-vCPU/4-GiB replica. Each cold start
 loads the local NER model before readiness and can delay the first request. Scale-to-zero
-discards owner state and forfeits an already claimed sponsored allocation; it cannot reopen
-credit automatically. A fresh reviewed allocation may be needed after the next start.
+discards owner state. The Blob store resumes the same finite total/daily authority; it never
+reopens credit automatically.
 ACR Basic, Key Vault, Azure Files, networking and alerting cost extra. The USD 10 limit is an
 application sponsored allocation ceiling, not an Azure hard cap or a verified price estimate.
 Bootstrap creates the owner-approved EUR 25/month resource-group budget with 50/80/100%
@@ -425,7 +389,7 @@ notifications routed to the existing selected action group. `stage` and `enable`
 without that budget and preserve its start date/recipients. Azure budgets alert; they do not
 stop billing. The EUR infrastructure budget is separate from USD sponsored allocations.
 Review daily and disable external ingress/stop the dedicated app when the demo ends. Preserve
-claim markers and follow Key Vault recovery obligations when cleaning up resources.
+the authority object and any legacy claim markers, and follow Key Vault recovery obligations when cleaning up resources.
 
 ## Observability, refusal and rollback
 
@@ -441,11 +405,12 @@ header logs. Alert delivery, 429 refusal thresholds, allocation exhaustion and p
 reconciliation require operational validation; this template does not invent a provider billing
 feed or an automatic infrastructure spending cutoff.
 
-A restart invalidates ephemeral state and forfeits a previously claimed sponsored allocation.
+A restart invalidates ephemeral owner state. The legacy marker store forfeits claimed credit;
+the reviewed Azure Blob store resumes the same durable finite authority without refilling it.
 Tell users to create fresh sessions/profiles/API keys; do not claim automatic recovery. Keep
 `minReplicas=0`, `maxReplicas=1` and the single-worker entrypoint until LAB-1376 is implemented.
-Container Apps revision transitions can briefly overlap workers; the allocation claim makes a
-new worker refuse reused credit, and no mutable owner state is shared. Prefer disabling public
+Container Apps revision transitions can briefly overlap workers; Blob conditional writes
+serialize spending across them, while no mutable owner state is shared. Prefer disabling public
 ingress during updates to avoid sessions straddling revisions.
 
 For an incident, run `deploy/azure/deploy.sh disable` first. This restores internal ingress.

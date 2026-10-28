@@ -28,7 +28,9 @@ boundary too. Choose one with appropriate terms, or run it yourself.
 
 ## Hosted service boundary
 
-A hosted guard receives originals in its Azure process. Its operators and infrastructure are
+A hosted guard receives originals in its Azure process. In private dev, the dedicated TLS
+proxy VM also handles originals in memory and is inside the trust boundary; its access/error
+content logs are disabled. See [private dev](private-dev.md). Its operators and infrastructure are
 inside the trust boundary; "data stays on your infrastructure" applies only to self-hosting.
 Local rules and NER process originals in the initial hosted image. The downstream provider
 receives masked text, which can still identify someone through missed values or context.
