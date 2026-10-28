@@ -90,8 +90,9 @@ export function HostedApp({ call = request }: { call?: Requester }) {
       </header>
       <main id="main">
         <section className="intro">
-          <h1>Useful answers.<br /><span>Less personal data exposed.</span></h1>
-          <p>A privacy firewall between your application and an AI model. Detect personal data, replace it with keyed placeholders, then restore the values in the answer. Built for Hungarian first.</p>
+          <h1>Reduce personal data<br /><span>exposure to AI.</span></h1>
+          <p>A privacy firewall between your application and an AI model. Replace detected personal data with keyed placeholders before forwarding the request, then restore the values in the answer. Built for Hungarian first. The self-hosted stack supports text and image masking; this hosted preview is text-only.</p>
+          <p className="compliance-note">Support data minimisation in your privacy and compliance work. PII Guard does not automatically make a deployment GDPR or EU AI Act compliant.</p>
           <div className="actions"><a className="button primary" href="#demo">Try the demo ↓</a><a href={SOURCE}>Explore on GitHub ↗</a></div>
         </section>
         <section className="demo" id="demo" aria-labelledby="demo-heading">
@@ -116,6 +117,18 @@ export function HostedApp({ call = request }: { call?: Requester }) {
           </div>
           <p className="notice"><small>{kind === "static" ? "This hand-written illustration explains the mechanism. No detection or model ran. Live requests use server-curated synthetic scenarios and may produce different results." : result ? "A real guard and model completed this request. Inspect the masked request: detection can miss values. This is pseudonymization, not anonymization." : "No static answer is substituted for a failed live request."}</small></p>
         </section>
+        <section className="deployment stack" aria-labelledby="deployment-heading">
+          <h2 id="deployment-heading">Text and images. Two ways to host.</h2>
+          <p className="muted">The self-hosted stack can link detected image text and text pseudonyms in a shared session. Image regions are masked; their original pixels are not reconstructed when an answer is restored. <a href={`${SOURCE}/blob/develop/docs/why-pii-guard.md#9-images-faces-signatures-machine-readable-zones`}>Explore image masking ↗</a></p>
+          <table className="mode-comparison">
+            <caption className="sr-only">Deployment modes, availability and trust boundaries</caption>
+            <thead><tr><th scope="col">Mode and availability</th><th scope="col">Where originals are processed</th><th scope="col">Who operates it</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Self-hosted<span className="mode-status">Available · open source</span></th><td data-label="Originals">The guard and vault run on your infrastructure. Keeping all raw processing local requires local detectors and models. Some detector services receive originals, including remote SAM image segmentation.</td><td data-label="Operations">You operate the full stack: guard, dashboard and vault. You choose the upstream model and its data-use terms.</td></tr>
+              <tr><th scope="row">Hosted gateway<span className="mode-status">Text-only preview · not publicly live</span></th><td data-label="Originals">Our Azure-hosted guard receives raw prompts and holds the restoration mappings. It masks detected values before forwarding to the upstream model.</td><td data-label="Operations">We operate the guard. You use the hosted interface and choose an available upstream or connect a provider key. Evaluate with synthetic data.</td></tr>
+            </tbody>
+          </table>
+        </section>
         <section className="account-panel stack" id="account" aria-labelledby="account-heading">
           <h2 id="account-heading">Try it now. Connect when you’re ready.</h2>
           {!account?.authenticated && <p>No login needed for curated live examples. Sign in with Google to edit text, bring your own provider key and manage guard API keys.</p>}
@@ -127,7 +140,7 @@ export function HostedApp({ call = request }: { call?: Requester }) {
           </>}
         </section>
         <section className="privacy" id="privacy" aria-label="Privacy and evidence">
-          <div className="stack"><h2>Know the trust boundary.</h2><p>The Azure-hosted guard receives originals and holds the mapping needed to restore them. The upstream model receives the masked request. If detection misses a value, that value can reach the model.</p><p>Self-host the guard to place that boundary on your own infrastructure. Any hosted detector you enable also becomes part of that boundary. Logs are designed to contain types and counts, not original values.</p><a href={`${SOURCE}/blob/develop/docs/privacy-model.md`}>Read the privacy model ↗</a></div>
+          <div className="stack"><h2>Know the trust boundary.</h2><p>A missed value can reach the model. Even with names removed, surrounding context can identify a person. Inspect the masked request and evaluate the detector for your workload.</p><p>Fail-closed handling blocks requests when processing fails; it does not eliminate leaks from missed detections. Reversible pseudonymisation reduces exposure, but it is not anonymity.</p><p>Any remote detector you enable also receives raw data and becomes part of your trust boundary. Choose its deployment and terms accordingly.</p><a href={`${SOURCE}/blob/develop/docs/privacy-model.md`}>Read the privacy model ↗</a></div>
           <div className="stack"><h2>Measured, not guaranteed.</h2><p>Hungarian names, identifiers and inflections need more than an English rule list. Evaluate recall and leak rate against the versioned synthetic benchmark before using real data.</p><p>Results depend on the detector, mode, corpus and model. The source reports include run dates and configuration; this page does not present an undated headline score.</p><div className="actions"><a href={`${SOURCE}/tree/develop/eval/results/runs`}>Benchmark runs ↗</a><a href={`${SOURCE}/blob/develop/docs/evaluation.md`}>Evaluation method ↗</a></div></div>
         </section>
       </main>

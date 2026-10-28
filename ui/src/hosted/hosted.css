@@ -64,3 +64,21 @@ html:has(.hosted), body:has(.hosted) { overflow-x: clip; }
 @media (min-width: 44rem) { .hosted .flow { grid-template-columns: repeat(2,minmax(0,1fr)); } .hosted .stage:nth-child(odd) { border-inline-end: 1px solid var(--color-line); } .hosted .privacy, .hosted .account-columns { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 32rem) { .hosted .nav-links { width: 100%; justify-content: space-between; gap: var(--space-sm); font-size: var(--text-small); } .hosted .wrap { padding-inline: var(--space-md); } .hosted .intro { padding-top: var(--space-2xl); } }
 @media (prefers-reduced-motion: reduce) { .hosted button, .hosted .button { transition: none; } .hosted button:active, .hosted .button:active { transform: none; } }
+
+/* Deployment comparison extends the locked workbench layout without changing the playground. */
+.hosted .intro .compliance-note { font-size: var(--text-body); max-width: 65ch; }
+.hosted .deployment { margin-block: var(--space-3xl); }
+.hosted .mode-comparison { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.hosted .mode-comparison th, .hosted .mode-comparison td { text-align: start; vertical-align: top; padding: var(--space-md); border-bottom: 1px solid var(--color-line); overflow-wrap: anywhere; }
+.hosted .mode-comparison th { font-weight: 500; }
+.hosted .mode-comparison thead { color: var(--color-muted); font-size: var(--text-small); }
+.hosted .mode-comparison th:first-child { width: 24%; }
+.hosted .mode-status { display: block; color: var(--color-muted); font-size: var(--text-small); font-weight: 400; margin-top: var(--space-sm); }
+@media (max-width: 43.99rem) {
+  .hosted .mode-comparison thead { display: none; }
+  .hosted .mode-comparison, .hosted .mode-comparison tbody, .hosted .mode-comparison tr { display: block; }
+  .hosted .mode-comparison tr { padding-block: var(--space-md); border-bottom: 1px solid var(--color-line); }
+  .hosted .mode-comparison th, .hosted .mode-comparison td { display: block; width: 100%; border: 0; padding: var(--space-sm) 0; }
+  .hosted .mode-comparison th:first-child { width: 100%; }
+  .hosted .mode-comparison td::before { content: attr(data-label); display: block; font-size: var(--text-small); font-weight: 500; color: var(--color-muted); margin-bottom: var(--space-xs); }
+}
