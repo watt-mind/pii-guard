@@ -96,6 +96,9 @@ def _listing(models: list[dict[str, Any]]) -> dict[str, Any]:
 @router.get("/v1/models", tags=["gateway"])
 async def list_models(request: Request) -> JSONResponse:
     state = request.app.state
+    hosted = getattr(state, "hosted", None)
+    if hosted is not None:
+        return await _hosted_models(request)
     config = getattr(state, "models_config", None) or ModelsConfig()
     if config.upstream_models:
         models = [_model({"id": m, "owned_by": "pii-guard"}) for m in config.upstream_models]
@@ -142,3 +145,44 @@ async def list_models(request: Request) -> JSONResponse:
         raise UpstreamError("upstream model list has no data array")
     found = (_model(entry) for entry in data[:_MAX_MODELS])
     return JSONResponse(_listing([m for m in found if m is not None]))
+
+
+async def _hosted_models(request: Request) -> JSONResponse:
+    from pii_guard.hosted.egress import secure_client
+
+    service = request.app.state.hosted
+    if getattr(request.state, "hosted_connection", None) is None:
+        return JSONResponse(
+            _listing(
+                [
+                    {"id": model, "object": "model", "created": 0, "owned_by": "meta"}
+                    for model in service.settings.hosted_models
+                ]
+            )
+        )
+    settings = service.provider_settings(request)
+    headers = {"Authorization": f"Bearer {settings.upstream_api_key.get_secret_value()}"}
+    async with secure_client(timeout=_TIMEOUT) as client:
+        try:
+            async with client.stream(
+                "GET", models_url(settings.upstream_base_url), headers=headers
+            ) as response:
+                if response.status_code != 200:
+                    raise UpstreamError("Provider model catalog unavailable")
+                content = bytearray()
+                async for chunk in response.aiter_bytes():
+                    content.extend(chunk)
+                    if len(content) > _MAX_BODY:
+                        raise UpstreamError("Provider model catalog is too large")
+        except httpx.HTTPError:
+            raise UpstreamError("Provider model catalog unavailable") from None
+    import json
+
+    try:
+        data = json.loads(content).get("data")
+    except (ValueError, AttributeError):
+        raise UpstreamError("Provider model catalog is invalid") from None
+    if not isinstance(data, list):
+        raise UpstreamError("Provider model catalog is invalid")
+    entries = [_model(entry) for entry in data[:_MAX_MODELS]]
+    return JSONResponse(_listing([entry for entry in entries if entry is not None]))

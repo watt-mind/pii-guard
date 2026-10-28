@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 import anyio.to_thread
 from fastapi import FastAPI
@@ -60,17 +61,25 @@ class NerWarmupMiddleware:
     failed: ``503 detection_unavailable``. Either way nothing ran and nothing was sent.
     """
 
-    def __init__(self, app: ASGIApp, *, warmup: NerWarmup, timeout: float) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        warmup: NerWarmup,
+        timeout: float,
+        detecting_paths: frozenset[str] = DETECTING_PATHS,
+    ) -> None:
         self.app = app
         self.warmup = warmup
         self.timeout = timeout
+        self.detecting_paths = detecting_paths
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if (
             scope["type"] == "http"
             and self.warmup.pending
             and scope.get("method") == "POST"
-            and scope.get("path") in DETECTING_PATHS
+            and scope.get("path") in self.detecting_paths
         ):
             try:
                 await self.warmup.wait_async(self.timeout)
@@ -125,10 +134,25 @@ def create_app(
             logger.info("ner model warmed up before serving")
         elif warmup.start():
             logger.info("ner model loading in the background; detecting requests wait for it")
-        yield
-        close = getattr(getattr(app.state, "gateway", None), "aclose", None)
-        if close is not None:
-            await close()
+
+        async def cleanup_hosted() -> None:
+            while True:
+                await asyncio.sleep(30)
+                app.state.hosted.purge_expired()
+
+        cleaner = asyncio.create_task(cleanup_hosted()) if settings.hosted else None
+        try:
+            yield
+        finally:
+            if cleaner is not None:
+                cleaner.cancel()
+                with suppress(asyncio.CancelledError):
+                    await cleaner
+            close = getattr(getattr(app.state, "gateway", None), "aclose", None)
+            if close is not None:
+                await close()
+            if settings.hosted:
+                await app.state.hosted.close()
 
     app = FastAPI(
         title="pii-guard",
@@ -187,19 +211,41 @@ def create_app(
         return {"status": "ok", "version": __version__, "ner": warmup.state}
 
     include_routers(app)
+    if settings.hosted:
+        from pii_guard.hosted.routes import router as hosted_router
+        from pii_guard.hosted.runtime import HostedService
+
+        app.state.hosted = HostedService(settings)
+        app.include_router(hosted_router)
+
+        @app.get("/readyz", include_in_schema=False)
+        def readyz() -> dict[str, str]:
+            if warmup.state not in {"ready", "off"}:
+                raise DetectorLoadingError("Detectors are not ready")
+            return {"status": "ready"}
+
     # Innermost: detecting requests wait for a loading NER model (LAB-1303), on the rewritten
     # path. Then /s/<session>/v1/... reaches the /v1 routes with that vault session
     # (LAB-1286); the Host, loopback and token checks see the URL as sent.
-    app.add_middleware(NerWarmupMiddleware, warmup=warmup, timeout=settings.ner_warmup_timeout)
-    if inspect_mode is not InspectMode.OFF:  # where each gateway session came from
+    app.add_middleware(
+        NerWarmupMiddleware,
+        warmup=warmup,
+        timeout=settings.ner_warmup_timeout,
+        detecting_paths=DETECTING_PATHS | {"/v1/demo"} if settings.hosted else DETECTING_PATHS,
+    )
+    if inspect_mode is not InspectMode.OFF and not settings.hosted:
         app.add_middleware(SessionRecorderMiddleware, directory=app.state.vault_directory)
     app.add_middleware(SessionPathMiddleware)
+    if settings.hosted:
+        from pii_guard.hosted.middleware import HostedMiddleware
+
+        app.add_middleware(HostedMiddleware, service=app.state.hosted)
 
     # Outermost last: Host check, then (full only) loopback sockets, then the token.
     token = settings.api_token
     if token is not None:
         app.add_middleware(BearerTokenMiddleware, token=token.get_secret_value())
-    elif not is_loopback(settings.host):
+    elif not settings.hosted and not is_loopback(settings.host):
         logger.warning(
             "pii-guard binds %s without authentication: anyone who can reach it can unmask, "
             "read the traffic log and use the gateway (and PII_GUARD_UPSTREAM_API_KEY). Set "

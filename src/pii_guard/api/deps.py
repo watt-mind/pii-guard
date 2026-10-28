@@ -121,6 +121,11 @@ def get_analyzer(request: Request) -> Analyzer:
                 )
                 state.analyzer = analyzer
                 logger.info("analyzer ready with detectors: %s", list(names))
+    hosted = getattr(state, "hosted", None)
+    if hosted is not None:
+        from pii_guard.hosted.runtime import BoundedAnalyzer
+
+        return BoundedAnalyzer(analyzer, hosted.rest_slots)
     return analyzer
 
 
@@ -136,6 +141,9 @@ def get_policies(request: Request) -> PolicySet:
 
 def get_vault(request: Request) -> Vault:
     """The app's vault, built on first use. Fails closed if the tenant key is unset."""
+    runtime = getattr(request.state, "hosted_runtime", None)
+    if runtime is not None:
+        return runtime.vault
     state = request.app.state
     vault = getattr(state, "vault", None)
     if vault is None:
