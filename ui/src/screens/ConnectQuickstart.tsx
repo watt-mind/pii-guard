@@ -3,6 +3,7 @@ import { TOOLS, firstRequest, loadSnippets, newSessionId, type Snippets, type Sn
 import type { TrafficEvent, TrafficStatus } from "../api/traffic";
 import { Button, SegmentedControl, Select } from "../components/ui";
 import { readPref, writePref } from "../lib/storage";
+import { exampleModel } from "../projects/api";
 import { totalMasked } from "../lib/traffic";
 
 /** The tabs, in order, while the server can't be asked (the server's list wins when it answers). */
@@ -218,7 +219,15 @@ function PasteStep({ snippets, snippet, onModel }: { snippets: Snippets; snippet
           </a>
         )}
       </div>
-      {!snippets.model && <p className="text-xs text-warn">The gateway lists no model yet: replace {mono("<model-id>")} with one your provider serves.</p>}
+      {!snippets.model &&
+        (snippets.endpoint ? (
+          <p className="text-xs text-muted">
+            This endpoint lets your client choose the model: replace {mono("<model-id>")} with the model your client uses
+            {exampleModel(snippets.upstream.preset) ? <>, for example {mono(exampleModel(snippets.upstream.preset)!)}</> : " (a model ID your endpoint serves)"}, or set it in the client’s own settings.
+          </p>
+        ) : (
+          <p className="text-xs text-warn">The gateway lists no model yet: replace {mono("<model-id>")} with one your provider serves.</p>
+        ))}
     </Step>
   );
 }

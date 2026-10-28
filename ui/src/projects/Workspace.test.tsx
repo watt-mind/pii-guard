@@ -182,7 +182,7 @@ describe("project workspace", () => {
     const form = screen.getByRole("form", { name: "Create endpoint" });
     expect(screen.getByRole("heading", { name: "Create endpoint" })).toHaveFocus();
     await user.type(within(form).getByRole("textbox", { name: "Endpoint name" }), "Support assistant");
-    await user.type(within(form).getByRole("textbox", { name: "Model ID" }), "synthetic-model");
+    await user.type(within(form).getByRole("textbox", { name: "Model (optional)" }), "synthetic-model");
     await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-fictional");
     await user.selectOptions(within(form).getByRole("combobox", { name: "Policy version" }), first.policy_version_id);
     await user.click(within(form).getByRole("button", { name: "Create endpoint" }));
@@ -241,5 +241,119 @@ describe("project workspace", () => {
     await user.selectOptions(screen.getByLabelText("Current project"), "project-two");
     expect(screen.queryByText("synthetic-once-only-key")).not.toBeInTheDocument();
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-two/endpoints"));
+  });
+
+  describe("endpoint model (LAB-1451)", () => {
+    const catalogFixture = (models: string[] | Error) => fixture((path, body) => {
+      if (path.endsWith("/endpoints/models")) { if (models instanceof Error) throw models; return { models }; }
+      return { ...endpoint, ...(body as object) };
+    });
+    async function openCreate(call: Requester, hosted = false) {
+      const user = userEvent.setup(); render(<Workspace call={call} hosted={hosted} />);
+      await user.click(await screen.findByRole("button", { name: "Create endpoint" }));
+      const form = screen.getByRole("form", { name: "Create endpoint" });
+      await user.type(within(form).getByRole("textbox", { name: "Endpoint name" }), "Agent endpoint");
+      await user.selectOptions(within(form).getByRole("combobox", { name: "Policy version" }), first.policy_version_id);
+      return { user, form };
+    }
+
+    it("makes the model optional for an own key: empty sends null (pass-through)", async () => {
+      const call = catalogFixture([]); const { user, form } = await openCreate(call);
+      const field = within(form).getByRole("textbox", { name: "Model (optional)" });
+      expect(field).not.toBeRequired();
+      expect(within(form).getByText("Leave empty to let your client choose, e.g. Codex or Muse Code.")).toBeInTheDocument();
+      expect(within(form).getByRole("button", { name: "Load models from OpenAI" })).toBeDisabled();
+      expect(within(form).getByText("Enter the provider API key to load models.")).toBeInTheDocument();
+      await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-fictional");
+      expect(within(form).getByRole("button", { name: "Load models from OpenAI" })).toBeEnabled();
+      expect(within(form).queryByText("Enter the provider API key to load models.")).not.toBeInTheDocument();
+      await user.click(within(form).getByRole("button", { name: "Create endpoint" }));
+      await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints", expect.objectContaining({ name: "Agent endpoint", model: null, api_key: "sk-test-fictional" }), "POST"));
+    });
+
+    it("loads the provider's models with the typed key into a dropdown with a free-text option", async () => {
+      const call = catalogFixture(["synthetic-a", "synthetic-b"]); const { user, form } = await openCreate(call);
+      await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-fictional");
+      await user.click(within(form).getByRole("button", { name: "Load models from OpenAI" }));
+      expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/models", { provider: "openai", api_key: "sk-test-fictional" }, "POST");
+      const select = await within(form).findByRole("combobox", { name: "Model (optional)" });
+      expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["Client chooses (no pinned model)", "synthetic-a", "synthetic-b", "Other model ID…"]);
+      expect(within(form).getByText("Pick ‘Client chooses’ to let Codex or Muse Code send their own model.")).toBeInTheDocument();
+      await user.selectOptions(select, "synthetic-b");
+      await user.click(within(form).getByRole("button", { name: "Create endpoint" }));
+      await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints", expect.objectContaining({ model: "synthetic-b" }), "POST"));
+    });
+
+    it("switches to typing another model ID, and back to the list", async () => {
+      const call = catalogFixture(["synthetic-a"]); const { user, form } = await openCreate(call);
+      await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-fictional");
+      await user.click(within(form).getByRole("button", { name: "Load models from OpenAI" }));
+      await user.selectOptions(await within(form).findByRole("combobox", { name: "Model (optional)" }), "Other model ID…");
+      await user.type(within(form).getByRole("textbox", { name: "Model (optional)" }), "synthetic-typed");
+      await user.click(within(form).getByRole("button", { name: "Choose from the list" }));
+      expect(within(form).getByRole("combobox", { name: "Model (optional)" })).toHaveValue("synthetic-typed");
+    });
+
+    it("says when the provider did not list its models and keeps free text", async () => {
+      const call = catalogFixture(new ApiError(502, "upstream_unavailable", "Provider model catalog unavailable")); const { user, form } = await openCreate(call);
+      await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-fictional");
+      await user.click(within(form).getByRole("button", { name: "Load models from OpenAI" }));
+      expect(await within(form).findByText("OpenAI did not list its models. Type a model ID, or leave it empty.")).toBeInTheDocument();
+      expect(within(form).getByRole("textbox", { name: "Model (optional)" })).toBeInTheDocument();
+    });
+
+    it("asks to check the API key when the provider refuses it", async () => {
+      const call = catalogFixture(new ApiError(502, "upstream_credential_rejected", "The provider refused the API key")); const { user, form } = await openCreate(call);
+      await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-wrong");
+      await user.click(within(form).getByRole("button", { name: "Load models from OpenAI" }));
+      expect(await within(form).findByText(/OpenAI refused the API key\. Check the API key/)).toBeInTheDocument();
+    });
+
+    it("names a custom provider's load button for its endpoint and waits for its base URL", async () => {
+      const call = catalogFixture(["synthetic-a"]); const { user, form } = await openCreate(call);
+      await user.selectOptions(within(form).getByRole("combobox", { name: "Provider" }), "custom");
+      await user.type(within(form).getByLabelText(/^Provider API key/), "sk-test-fictional");
+      expect(within(form).getByRole("button", { name: "Load models from this endpoint" })).toBeDisabled();
+      expect(within(form).getByText("Enter the base URL and provider API key to load models.")).toBeInTheDocument();
+      await user.type(within(form).getByLabelText(/^Upstream base URL/), "https://models.example.com/v1");
+      await user.click(within(form).getByRole("button", { name: "Load models from this endpoint" }));
+      expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/models", { provider: "custom", base_url: "https://models.example.com/v1", api_key: "sk-test-fictional" }, "POST");
+    });
+
+    it("edits with the stored key: asks by endpoint id and keeps the pinned model listed", async () => {
+      const call = catalogFixture(["synthetic-a"]); const user = userEvent.setup(); render(<Workspace call={call} />);
+      await user.click(await screen.findByRole("button", { name: "Edit Synthetic support" }));
+      await user.click(screen.getByRole("button", { name: "Load models from OpenAI" }));
+      expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/models", { provider: "openai", endpoint_id: "endpoint-one" }, "POST");
+      const select = await screen.findByRole("combobox", { name: "Model (optional)" });
+      expect(select).toHaveValue("synthetic-model");
+      await user.selectOptions(select, "");
+      await user.click(screen.getByRole("button", { name: "Save endpoint" }));
+      await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/endpoint-one", expect.objectContaining({ model: null }), "PUT"));
+    });
+
+    it("offers sponsored Meta only its allowed models, and requires one", async () => {
+      const call = catalogFixture(["muse-spark-1.3", "muse-spark-1.2"]); const { user, form } = await openCreate(call, true);
+      expect(within(form).getByRole("combobox", { name: "Provider" })).toHaveValue("sponsored");
+      const select = await within(form).findByRole("combobox", { name: "Model" });
+      expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/models", { provider: "sponsored" }, "POST");
+      expect(select).toBeRequired();
+      expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["muse-spark-1.3", "muse-spark-1.2"]);
+      expect(within(form).queryByText(/Leave empty/)).not.toBeInTheDocument();
+      await user.selectOptions(select, "muse-spark-1.2");
+      await user.click(within(form).getByRole("button", { name: "Create endpoint" }));
+      await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints", expect.objectContaining({ provider: "sponsored", model: "muse-spark-1.2" }), "POST"));
+    });
+
+    it("shows a pass-through endpoint as client-chosen with a placeholder in its snippet", async () => {
+      const passThrough = { ...endpoint, model: null };
+      const call = vi.fn(async (path: string) => (path.endsWith("/endpoints") ? { endpoints: [passThrough] } : (fixture() as unknown as (p: string) => Promise<unknown>)(path))) as unknown as Requester;
+      const user = userEvent.setup(); render(<Workspace call={call} />);
+      expect(await screen.findByText(/Client chooses the model/)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Connect & keys for Synthetic support" }));
+      const panel = screen.getByRole("region", { name: "Connect Synthetic support" });
+      expect(within(panel).getByText(/model="<model-id>"/)).toBeInTheDocument();
+      expect(within(panel).getByText(/has no pinned model/)).toHaveTextContent("for example gpt-4.1-mini");
+    });
   });
 });

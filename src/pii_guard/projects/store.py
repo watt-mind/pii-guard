@@ -93,7 +93,8 @@ class EndpointSnapshot:
     name: str
     provider: str
     base_url: str
-    model: str
+    # ``None`` is pass-through: the client's own ``model`` is forwarded unchanged.
+    model: str | None
     api_key: SecretStr | None = field(repr=False)
     enabled: bool
     policy_id: str
@@ -113,6 +114,20 @@ def _name(value: object, *, maximum: int = 64) -> str:
     if not value or len(value) > maximum or any(ord(c) < 32 or ord(c) == 127 for c in value):
         raise InvalidProjectConfigError()
     return value
+
+
+def _model(value: object, provider: str) -> str:
+    """The stored model: one pinned id, or ``''`` for pass-through (BYOK only).
+
+    Pass-through is stored as ``''`` in the existing ``model TEXT NOT NULL`` column, so the
+    schema (and every existing snapshot, which the loader checks against it) is unchanged.
+    Sponsored endpoints always pin a model; the allow-list is checked by the caller.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        if provider == "sponsored":
+            raise InvalidProjectConfigError()
+        return ""
+    return _name(value, maximum=256)
 
 
 class ProjectStore:
@@ -478,7 +493,7 @@ class ProjectStore:
             "policy_version": row["policy_version"],
             "provider": row["provider"],
             "base_url": row["base_url"],
-            "model": row["model"],
+            "model": row["model"] or None,
             "credential_configured": row["credential"] is not None,
             "enabled": bool(row["enabled"]),
             "base_path": f"/e/{row['id']}/v1",
@@ -521,7 +536,7 @@ class ProjectStore:
                 raise InvalidProjectConfigError()
             if not isinstance(base_url, str) or not 1 <= len(base_url) <= 2048:
                 raise InvalidProjectConfigError()
-            model = _name(data.get("model"), maximum=256)
+            model = _model(data.get("model"), provider)
             enabled = data.get("enabled", True)
             if type(enabled) is not bool:
                 raise InvalidProjectConfigError()
@@ -635,7 +650,7 @@ class ProjectStore:
             row["name"],
             row["provider"],
             row["base_url"],
-            row["model"],
+            row["model"] or None,
             key,
             bool(row["enabled"]),
             row["policy_id"],

@@ -64,6 +64,10 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
     "project_not_found": (404, "The project resource is unknown or belongs to another owner."),
     "invalid_project_config": (422, "A policy or endpoint configuration is invalid."),
     "project_storage_unavailable": (503, "The project configuration store is unavailable."),
+    "upstream_credential_rejected": (
+        502,
+        "The provider refused the API key while listing its models (HTTP 401/403).",
+    ),
     "upstream_destination_not_allowed": (
         422,
         "Hosted upstream destinations must use public HTTPS on port 443.",

@@ -403,18 +403,22 @@ def build(
 
 
 def build_endpoint(
-    *, gateway_url: str, endpoint: str, name: str, model: str, preset: Upstream | None
+    *, gateway_url: str, endpoint: str, name: str, model: str | None, preset: Upstream | None
 ) -> dict[str, Any]:
     """The quickstart for one owned endpoint (ADR 0013): every block at ``gateway_url``
     (``<origin>/e/<endpoint>/v1``) with the endpoint's model and its key as
     ``$PII_GUARD_ENDPOINT_KEY``. The same fields as :func:`build`; no session, no upstream
-    origin and no ``pii-guard up`` presets (the endpoint pins its own provider)."""
+    origin and no ``pii-guard up`` presets (the endpoint pins its own provider).
+
+    A pass-through endpoint (``model`` ``None``, LAB-1451) names no model: ``model`` is
+    ``null``, ``models`` is empty and the blocks carry :data:`MODEL_PLACEHOLDER` for the
+    client's own model."""
     return {
         "gateway_url": gateway_url,
         "session": None,
         "session_url": None,
         "endpoint": {"id": endpoint, "name": name, "model": safe_model(model)},
-        "models": chat_models([model]),
+        "models": chat_models([model]) if model else [],
         "model": safe_model(model),
         "auth": {"token_required": True, "token_env": ENDPOINT_KEY_ENV},
         "upstream": {
