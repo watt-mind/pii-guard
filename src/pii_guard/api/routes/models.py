@@ -98,7 +98,16 @@ async def list_models(request: Request) -> JSONResponse:
     endpoint = getattr(request.state, "project_endpoint", None)
     if endpoint is not None and getattr(request.state, "project_routed_endpoint", False):
         return JSONResponse(
-            _listing([_model({"id": endpoint.model, "owned_by": endpoint.provider})])
+            _listing(
+                [
+                    {
+                        "id": endpoint.model,
+                        "object": "model",
+                        "created": 0,
+                        "owned_by": endpoint.provider,
+                    }
+                ]
+            )
         )
     state = request.app.state
     hosted = getattr(state, "hosted", None)
