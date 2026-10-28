@@ -22,7 +22,7 @@ from test_responses import ResponsesUpstream, events_for, muse_body, sse
 from pii_guard.config import Settings
 from pii_guard.detect.stack import build_detectors
 from pii_guard.gateway import GatewayConfig, Mode, build_mode_detectors
-from pii_guard.gateway.opaque_ids import IssuedIds, is_hex_token, upstream_ids
+from pii_guard.gateway.opaque_ids import IssuedIds, is_opaque_token, upstream_ids
 
 #: A real upstream call id the NER encoder read as a PHONE (an opaque token, not personal data).
 CALL_ID = "call_01a1849936ef77df938b17792f84e7f8"
@@ -221,8 +221,44 @@ def test_codex_message_id_is_not_read_as_a_phone() -> None:
     assert len(upstream.requests) == 1
 
 
-def test_hex_tokens() -> None:
-    for token in (MESSAGE_ID, CALL_ID, "fc_68a1b2c3d4e5f60718293a4b", "0123456789abcdef"):
-        assert is_hex_token(token), token
+def test_opaque_tokens() -> None:
+    tokens = (MESSAGE_ID, CALL_ID, "fc_68a1b2c3d4e5f60718293a4b", "0123456789abcdef")
+    for token in (*tokens, "-9007199254740991", "1.5e10"):
+        assert is_opaque_token(token), token
     for text in ("call_1", "msg_Jane", "Teszt Elek", "+36 30 123 4567", "x_0123456789abcde"):
-        assert not is_hex_token(text), text
+        assert not is_opaque_token(text), text
+
+
+#: OpenCode 1.18.26's ``read`` tool: zod writes Number.MAX_SAFE_INTEGER as the bounds.
+OPENCODE_READ_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "read",
+        "description": "Read a file.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filePath": {"type": "string"},
+                "offset": {"type": "number", "minimum": 0, "maximum": 9007199254740991},
+                "limit": {"type": "number", "minimum": -9007199254740991, "exclusiveMinimum": 0},
+            },
+            "required": ["filePath"],
+        },
+    },
+}
+
+
+def test_schema_bounds_are_not_read_as_bank_accounts() -> None:
+    upstream = MockUpstream()
+    flagged = ("9007199254740991", "-9007199254740991", PERSON)
+    body = {
+        "model": "m",
+        "messages": [{"role": "user", "content": f"Read the letter from {PERSON}."}],
+        "tools": [OPENCODE_READ_TOOL],
+    }
+    with TestClient(fast_app(upstream, flagged)) as client:
+        response = client.post("/v1/chat/completions", json=body)
+    assert response.status_code == 200, response.text
+    sent = upstream.bodies[0]
+    assert sent["tools"] == [OPENCODE_READ_TOOL]
+    assert PERSON not in json.dumps(sent["messages"], ensure_ascii=False)

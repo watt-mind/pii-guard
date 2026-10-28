@@ -6,17 +6,20 @@ those fields like any identifier (personal data in one fails closed, because an 
 a placeholder). Measured live (docs/integrations/harness-matrix-2026-10-28.md), the NER encoder
 reads random ids as a ``PHONE``: 37 of 300 upstream call ids (``call_<32 hex>``) and 59 of 200
 client message ids (Codex's ``msg_<uuid>``), so pi and Muse Code were refused after a few tool
-calls and Codex on its first request. Two rules, both narrow:
+calls and Codex on its first request. It also reads JavaScript's ``Number.MAX_SAFE_INTEGER``
+(``9007199254740991``, the bound zod writes into OpenCode's tool schemas as ``maximum``) as a
+``BANK_ACCOUNT``, which refused every OpenCode request. Two rules, both narrow:
 
 1. **Upstream-issued ids.** An id the upstream wrote can't tell it anything it doesn't have:
    it minted it from masked text. The gateway remembers the ids each upstream answer carried
    (raw, before restore) per vault session; an identifier slot whose whole text is one of them
    gets no detection. The store is in memory and bounded: after a restart, or once evicted, the
    id is checked again (fail closed).
-2. **Hex and UUID tokens.** An identifier that is exactly an optional short prefix plus a UUID
-   or a run of 16+ hex digits (``msg_01a184b6-8156-7cc2-b584-a0fb83dedf84``) has no room for a
-   name or an address. Hits from the model-based detectors (NER) are dropped there; the rules,
-   the LLM detector and known values still apply.
+2. **Hex, UUID and number tokens.** An identifier that is exactly an optional short prefix plus
+   a UUID or a run of 16+ hex digits (``msg_01a184b6-8156-7cc2-b584-a0fb83dedf84``), or a JSON
+   number (a schema bound such as ``-9007199254740991``), has no room for a name or an address.
+   Hits from the model-based detectors (NER) are dropped there; the rules (phone formats,
+   checksummed ids), the LLM detector and known values still apply.
 """
 
 from __future__ import annotations
@@ -31,19 +34,20 @@ if TYPE_CHECKING:
     from pii_guard.gateway.request import TextSlot
     from pii_guard.types import Span
 
-__all__ = ["ID_KEYS", "IssuedIds", "is_hex_token", "upstream_ids", "without_opaque_ids"]
+__all__ = ["ID_KEYS", "IssuedIds", "is_opaque_token", "upstream_ids", "without_opaque_ids"]
 
 #: The keys whose string values in an upstream answer are ids the client may send back.
 ID_KEYS = frozenset({"id", "call_id"})
 #: Longer strings aren't ids; ids with whitespace or a placeholder aren't opaque tokens.
 MAX_ID_CHARS = 256
-#: An optional short prefix, then a UUID or 16+ hex digits: room for no personal data.
-_HEX_TOKEN_RE = re.compile(
+#: An optional short prefix, then a UUID or 16+ hex digits; or a JSON number.
+_OPAQUE_TOKEN_RE = re.compile(
     r"(?:[A-Za-z]{1,24}[_-])?"
     r"(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
     r"|[0-9a-fA-F]{16,128})"
+    r"|-?[0-9]{1,40}(?:\.[0-9]{1,40})?(?:[eE][+-]?[0-9]{1,4})?"
 )
-#: Detectors whose hits in a hex token are dropped: learned models, which read digit runs as
+#: Detectors whose hits in an opaque token are dropped: learned models, which read digit runs as
 #: phone numbers. Rules (checksums, formats) and the LLM detector keep theirs.
 MODEL_DETECTORS = frozenset({"ner", "ner_gliner"})
 #: Sessions remembered, and ids per session (least recently used out first).
@@ -119,9 +123,9 @@ class IssuedIds:
             self._sessions.pop(session_id, None)
 
 
-def is_hex_token(text: str) -> bool:
-    """``text`` is a prefixed UUID or hex run (rule 2 above)."""
-    return _HEX_TOKEN_RE.fullmatch(text) is not None
+def is_opaque_token(text: str) -> bool:
+    """``text`` is a prefixed UUID or hex run, or a JSON number (rule 2 above)."""
+    return _OPAQUE_TOKEN_RE.fullmatch(text) is not None
 
 
 def without_opaque_ids(
@@ -133,7 +137,7 @@ def without_opaque_ids(
         if slot.kind == "identifier" and found:
             if slot.text in issued:
                 found = []
-            elif is_hex_token(slot.text):
+            elif is_opaque_token(slot.text):
                 found = [s for s in found if s.detector not in MODEL_DETECTORS]
         out.append(found)
     return out
