@@ -28,7 +28,7 @@ metadata responses and never returned after creation. Editing an endpoint can pr
 credential or replace it. Sponsored Meta endpoints use the deployment's sponsored credential
 and do not store a per-endpoint provider secret. Endpoint gateway URLs use the form
 `/e/{endpoint_id}/v1`; supported OpenAI-compatible routes are chat completions, Responses and
-model catalogs. Endpoint selection is explicit. Invalid, disabled, expired or revoked endpoint
+model catalogs. Endpoint selection is explicit. Invalid, disabled or revoked endpoint
 credentials fail closed; they do not fall back to another endpoint or sponsored inference.
 
 An owner may issue endpoint-scoped guard keys. The raw value is shown once at creation; the
@@ -37,8 +37,9 @@ store retains only its SHA-256 verifier. At most 32 keys are active per endpoint
 revoked records may be pruned to stay within these limits. A key authorizes only that
 endpoint's gateway and model-catalog routes; it cannot access account, project, policy,
 endpoint-management, traffic or vault-inspection routes. Keys are individually revocable.
-Disabling an endpoint blocks all
-its keys from new admission; deleting an endpoint removes all its key records. Revocation
+Setting `enabled=false` on an endpoint revokes all currently active keys atomically while
+preserving the endpoint configuration. Re-enabling it does not reactivate those keys; issue
+new keys. Deleting an endpoint permanently removes its configuration and key records. Revocation
 applies to new admissions; a request that already captured its endpoint configuration may
 finish with that snapshot.
 

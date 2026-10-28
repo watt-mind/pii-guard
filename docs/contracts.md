@@ -1430,8 +1430,8 @@ single-owner routes keep their default namespace.
 | `GET /v1/projects/{project_id}/policies/versions/{version_id}` | — | Exact policy-version snapshot |
 | `GET /v1/projects/{project_id}/endpoints` | — | `{endpoints:[...]}`; credentials are never returned |
 | `POST /v1/projects/{project_id}/endpoints` | `{name,provider,model,policy_version_id,base_url?,api_key?,enabled?}` | 201 endpoint metadata; maximum 128 per project |
-| `PUT /v1/projects/{project_id}/endpoints/{endpoint_id}` | Complete endpoint fields; `api_key` may be omitted to keep current credential | Updated metadata; an explicit `policy_version_id` is required |
-| `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}` | — | 204; deletes endpoint and all its keys |
+| `PUT /v1/projects/{project_id}/endpoints/{endpoint_id}` | Complete endpoint fields; `api_key` may be omitted to keep current credential | Updated metadata; explicit `policy_version_id` required. `enabled:false` atomically revokes active keys; re-enabling does not restore them |
+| `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}` | — | 204; permanently deletes endpoint and all its key records |
 | `GET /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | — | `{keys:[id,name,created_at,revoked_at]}`; no raw keys |
 | `POST /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | `{name}` | 201 key metadata plus raw `key`, returned once; maximum 32 active and 128 retained records per endpoint |
 | `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}/keys/{key_id}` | — | 204; revokes future admissions |
@@ -1458,7 +1458,9 @@ Bearer credential. These routes accept only that endpoint's configured model, la
 upstream and policy version; caller overrides fail closed. Endpoint keys cannot call owner,
 account, management, traffic or vault routes. A revoked key or disabled endpoint rejects new
 admission; an already admitted call uses its captured endpoint/policy/credential snapshot and
-may finish. Deleting an endpoint deletes its key records. At most 32 keys remain active per
+may finish. Disabling an endpoint atomically revokes all active keys while preserving its
+configuration; re-enabling it leaves those keys revoked. Deleting an endpoint permanently
+removes its configuration and key records. At most 32 keys remain active per
 endpoint; the store can retain at most 128 records and prunes the oldest revoked records to
 enforce that bound. A global 65,536-record cap also applies. Hosted vault/session capacity is
 shared across all of an account's project and endpoint namespaces (20 sessions by default).
