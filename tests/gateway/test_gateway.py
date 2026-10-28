@@ -778,9 +778,11 @@ def _echo_all(body: dict) -> str:
     return "Rendben: " + ", ".join(tokens) + "."
 
 
-def _run_late_session(stream: bool) -> tuple[list[bytes], list[str], list[int], int]:
-    """The LATE_TURNS session; returns forwarded bodies, answers, entries scanned per request
-    and the number of entries at the end."""
+def _run_late_session(
+    stream: bool,
+) -> tuple[list[bytes], list[str], list[int], int, list[tuple[str, object, int]]]:
+    """The LATE_TURNS session; returns forwarded bodies, answers, entries scanned per request,
+    the number of entries at the end and the session's ``entities()`` (masked counts)."""
     upstream = MockUpstream(answer=_echo_all)
     app = make_app(upstream, llm=ScriptedNer(LATE_FOUND))
     history: list[dict] = [{"role": "system", "content": "Asszisztens vagy."}]
@@ -805,7 +807,8 @@ def _run_late_session(stream: bool) -> tuple[list[bytes], list[str], list[int], 
             answers.append(answer)
             history.append({"role": "assistant", "content": answer})
         entries = len(session._by_key)
-    return [r.content for r in upstream.requests], answers, scanned, entries
+        entities = session.entities()
+    return [r.content for r in upstream.requests], answers, scanned, entries, entities
 
 
 def _canonical(raw: bytes) -> str:
@@ -824,8 +827,8 @@ def test_remask_since_changes_no_masked_body(monkeypatch: pytest.MonkeyPatch, st
     fast = _run_late_session(stream)
     monkeypatch.setattr(vault_module, "_REMASK_SINCE", False)
     full = _run_late_session(stream)
-    fast_bodies, fast_answers, fast_scanned, entries = fast
-    full_bodies, full_answers, full_scanned, _ = full
+    fast_bodies, fast_answers, fast_scanned, entries, _ = fast
+    full_bodies, full_answers, full_scanned, _, _ = full
     assert [_canonical(b) for b in fast_bodies] == [_canonical(b) for b in full_bodies]
     assert fast_bodies == full_bodies  # same tenant key and session ids: same placeholders
     assert fast_answers == full_answers  # and the same restored answers
@@ -839,6 +842,21 @@ def test_remask_since_changes_no_masked_body(monkeypatch: pytest.MonkeyPatch, st
     assert entries > 5
 
 
+@pytest.mark.parametrize("stream", [False, True])
+def test_mask_memo_changes_no_masked_body(monkeypatch: pytest.MonkeyPatch, stream: bool) -> None:
+    from pii_guard.vault import vault as vault_module
+
+    memo = _run_late_session(stream)
+    monkeypatch.setattr(vault_module, "_MASK_MEMO", False)
+    scratch = _run_late_session(stream)
+    assert memo[0] == scratch[0]  # forwarded bodies, byte for byte
+    assert memo[1] == scratch[1]  # restored answers
+    assert memo[4] == scratch[4]  # entities() with their counts: the same masked counts
+    # Pass 1 re-scans only what changed since the previous request (LAB-1315).
+    assert all(a <= b for a, b in zip(memo[2], scratch[2], strict=True))
+    assert sum(memo[2]) * 2 < sum(scratch[2])
+
+
 def test_request_with_no_new_value_runs_no_remask_pass() -> None:
     upstream = MockUpstream()
     app = make_app(upstream)
@@ -850,10 +868,19 @@ def test_request_with_no_new_value_runs_no_remask_pass() -> None:
         entries, before = len(session._by_key), session.entries_scanned
         generation = session.generation
         # The same texts again: every value is known, nothing new is confirmed.
+        headers = {"X-PII-Guard-Session": session.session_id}
         client.chat.completions.with_raw_response.create(
-            model="m", messages=messages, extra_headers={"X-PII-Guard-Session": session.session_id}
+            model="m", messages=messages, extra_headers=headers
+        )
+        second = session.entries_scanned
+        client.chat.completions.with_raw_response.create(
+            model="m", messages=messages, extra_headers=headers
         )
     assert session.generation == generation
-    # Pass 1 only: texts x entries (it was 2 x texts x entries with the full second pass).
-    assert session.entries_scanned - before == len(messages) * entries
+    # Pass 1 only, and of it only the entries created after each text was first masked (it
+    # was texts x entries before LAB-1315, and 2 x texts x entries before LAB-1278).
+    assert 0 < second - before < len(messages) * entries
+    # Then every text was masked at the current generation: nothing is scanned at all.
+    assert session.entries_scanned == second
     assert upstream.bodies[0]["messages"] == upstream.bodies[1]["messages"]
+    assert upstream.bodies[1]["messages"] == upstream.bodies[2]["messages"]

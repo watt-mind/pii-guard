@@ -165,6 +165,7 @@ class _Entry:
         "language",
         "needles",
         "normalized",
+        "order",
         "original",
         "patterns",
         "placeholder",
@@ -191,6 +192,8 @@ class _Entry:
         # The session generation at which this entry was created or its patterns last
         # changed (a new surface or alias): see :attr:`VaultSession.generation`.
         self.changed = 0
+        # Position in the session's entries (insertion order), the tie-break of a scan.
+        self.order = 0
         self.patterns: dict[str, re.Pattern[str]] = {}
         # Per language, the literal prefilter of :meth:`pattern` (see :func:`_needles`).
         self.needles: dict[str, tuple[str, ...] | None] = {}
@@ -343,6 +346,28 @@ _REMASK_SINCE = True
 _FOLD_MEMO_ENTRIES = 1024
 _FOLD_MEMO_CHARS = 512_000
 
+#: Off only in tests and benchmarks, to check the pass-1 memo changes no output (LAB-1315).
+_MASK_MEMO = True
+
+#: Bounds of a session's mask memo (:class:`_Masked`): texts, and their characters in all.
+_MASK_MEMO_ENTRIES = 1024
+_MASK_MEMO_CHARS = 512_000
+
+
+@dataclass(frozen=True, slots=True)
+class _Masked:
+    """A text's last :meth:`VaultSession.mask` from spans, kept for the next request (LAB-1315).
+
+    ``replacements`` are ``(start, end, entry)`` sorted by ``start``, as of ``generation``:
+    every entry up to it scanned the text. ``depends`` are the lemma keys a weak split looked
+    up and the session did not have: once one exists, the plans may come out differently.
+    """
+
+    replacements: tuple[tuple[int, int, _Entry], ...]
+    generation: int
+    depends: frozenset[tuple[EntityType, str]]
+    spans: int
+
 
 def _compile(alternatives: list[str]) -> re.Pattern[str]:
     # The text is case-folded already; IGNORECASE covers a custom matcher's upper-case suffix.
@@ -441,6 +466,13 @@ class VaultSession:
         self._generation = 0
         # (generation, language) -> folded initial -> entries (see :meth:`_starting_with`).
         self._initials: tuple[int, str, dict[str, list[_Entry]]] | None = None
+        # The entry each generation was touched for: ``_touched[g:]`` changed after ``g``.
+        self._touched: list[_Entry] = []
+        # (text, spans, language) -> its last mask from spans: the next request re-sends the
+        # same history, so pass 1 scans only the entries changed since (LAB-1315). Bounded;
+        # forgotten with the session; ``None`` in a fork.
+        self._masked: OrderedDict[tuple[str, tuple[Span, ...], str], _Masked] | None = OrderedDict()
+        self._masked_chars = 0
         #: Entries scanned for occurrences, over every mask call (a cost counter for tests).
         self.entries_scanned = 0
 
@@ -468,6 +500,10 @@ class VaultSession:
             self._known.clear()
             self._folds.clear()
             self._folded_chars = 0
+            if self._masked is not None:
+                self._masked.clear()
+            self._masked_chars = 0
+            self._touched.clear()
 
     @property
     def known_values(self) -> KnownValues:
@@ -511,6 +547,7 @@ class VaultSession:
             fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
             fork._reserved = set(self._reserved)
             fork._generation = self._generation
+            fork._masked = None  # its journal is replayed in full anyway
             fork._known = self._known
             fork._journal = []
             fork._parent = self
@@ -576,6 +613,11 @@ class VaultSession:
         already scanned the text and its occurrences are placeholders now; with no such entry
         the text is returned as it is (LAB-1278).
 
+        A text masked again from the same spans (the history a request re-sends) is scanned
+        only with the entries created or changed since: the session keeps a bounded memo of
+        its last result. The output, ``entities()`` counts included, is the same as a mask
+        from scratch (LAB-1315).
+
         Raises :class:`MaskingError` for invalid, out-of-range or overlapping spans, and
         :class:`SessionNotFoundError` once the session has expired. Nothing is recorded when
         it raises.
@@ -606,11 +648,16 @@ class VaultSession:
                 # Nothing changed since the text was masked: no scan can find anything.
                 return MaskResult(text, (), self._generation)
             ordered = _validated(text, spans)
+            key = None
+            if _MASK_MEMO and self._masked is not None and not remask:
+                key = (text, tuple(spans), language)
             foreign = self._foreign_tokens(text, remask)
             added = foreign - self._reserved
             self._reserved |= added
             try:
-                result = self._mask_validated(text, ordered, language, since)
+                result = self._mask_again(text, key, language) if key is not None else None
+                if result is None:
+                    result = self._mask_validated(text, ordered, language, since, key)
             except BaseException:
                 self._reserved -= added
                 raise
@@ -696,12 +743,18 @@ class VaultSession:
         return index
 
     def _mask_validated(
-        self, text: str, ordered: Sequence[Span], language: str, since: int | None = None
+        self,
+        text: str,
+        ordered: Sequence[Span],
+        language: str,
+        since: int | None = None,
+        key: tuple[str, tuple[Span, ...], str] | None = None,
     ) -> MaskResult:
         matcher = inflection_for(language)
         taken = bytearray(len(text))
         replacements: list[tuple[int, int, _Entry]] = []
-        for plan in self._plans(text, ordered, matcher):
+        depends: set[tuple[EntityType, str]] | None = set() if key is not None else None
+        for plan in self._plans(text, ordered, matcher, depends):
             span, end = plan.span, plan.span.start + plan.stem_length
             entry = self._entry_for(span.entity_type, plan.lemma, language)
             if entry.add_surface(span.text):
@@ -721,23 +774,83 @@ class VaultSession:
             pool = [e for e in pool if e.changed > since]
         entries = sorted(pool, key=lambda e: len(e.normalized), reverse=True)
         self.entries_scanned += len(entries)
-        for entry in entries:
-            pattern = entry.pattern(language)
-            # Skipping a scan that can find nothing changes no output, only its cost: each
-            # request re-masks the whole history against every value of the session (LAB-1277).
-            if not _absent(entry.prefilter(language), folded):
-                for start, end in _occurrences(pattern, folded):
-                    if any(taken[start:end]):
-                        continue
-                    replacements.append((start, end, self._cased(entry, text[start:end])))
-                    taken[start:end] = b"\x01" * (end - start)
+        found = [self._found(entry, language, folded) for entry in entries]
+        self._take(text, found, language, replacements, taken)
+        if depends is not None and key is not None:
+            self._remember_masked(key, replacements, generation, depends, len(ordered))
+        return self._assemble(text, replacements, len(ordered), generation)
+
+    def _mask_again(
+        self, text: str, key: tuple[str, tuple[Span, ...], str], language: str
+    ) -> MaskResult | None:
+        """Pass 1 of a text masked from the same spans before, from :attr:`_masked`.
+
+        The same as :meth:`_mask_validated`, without planning it again or scanning it with
+        the entries that already did (LAB-1315). The plans are the same unless a lemma they
+        looked up exists now. Every older entry takes what it took then: an entry changed
+        since only adds occurrences that overlap none of those, else from scratch a longer
+        value could have won one (``Teszt Elek`` over ``Elek``), so ``None`` (mask from
+        scratch). The newer entries scan the input text, as they would from scratch.
+        """
+        memo = self._masked
+        masked = memo.get(key) if memo is not None else None
+        if masked is None or any(k in self._by_key for k in masked.depends):
+            return None
+        generation = self._generation
+        changed = dict.fromkeys(self._touched[masked.generation :])
+        entries = sorted(changed, key=lambda e: (-len(e.normalized), e.order))
+        self.entries_scanned += len(entries)
+        replacements = list(masked.replacements)
+        if entries:
+            taken = bytearray(len(text))
+            for start, end, _ in replacements:
+                taken[start:end] = b"\x01" * (end - start)
+            folded = self._fold_views(text)
+            found = [self._found(entry, language, folded) for entry in entries]
+            for _, occurrences, aliases in found:
+                spans = itertools.chain(occurrences, *(o for _, o in aliases))
+                if any(any(taken[start:end]) for start, end in spans):
+                    return None
+            self._take(text, found, language, replacements, taken)
+        self._remember_masked(key, replacements, generation, masked.depends, masked.spans)
+        return self._assemble(text, replacements, masked.spans, generation)
+
+    @staticmethod
+    def _found(
+        entry: _Entry, language: str, folded: tuple[FoldedText, ...]
+    ) -> tuple[_Entry, list[tuple[int, int]], list[tuple[str, list[tuple[int, int]]]]]:
+        """``entry``'s occurrences in ``folded``, and each alias's: ``(entry, own, aliases)``."""
+        pattern = entry.pattern(language)
+        # Skipping a scan that can find nothing changes no output, only its cost: each
+        # request re-masks the whole history against every value of the session (LAB-1277).
+        own = [] if _absent(entry.prefilter(language), folded) else _occurrences(pattern, folded)
+        aliases = [
+            (alias, _occurrences(alias_pattern, folded))
+            for alias, alias_pattern, needles in entry.alias_pattern_list(language)
+            if not _absent(needles, folded)
+        ]
+        return entry, own, aliases
+
+    def _take(
+        self,
+        text: str,
+        found: list[tuple[_Entry, list[tuple[int, int]], list[tuple[str, list[tuple[int, int]]]]]],
+        language: str,
+        replacements: list[tuple[int, int, _Entry]],
+        taken: bytearray,
+    ) -> None:
+        """Add each occurrence in ``found`` (in its order) that overlaps nothing taken yet."""
+        for entry, own, aliases in found:
+            for start, end in own:
+                if any(taken[start:end]):
+                    continue
+                replacements.append((start, end, self._cased(entry, text[start:end])))
+                taken[start:end] = b"\x01" * (end - start)
             # Forms of an alias share the entry's placeholder; with a suffix, unmask restores
             # them from ``seen``. A bare alias ("Minta Kende" after a "Minta Kendét" span) would
             # come back as the span's surface: it gets the alias's own entry instead.
-            for alias, alias_pattern, needles in entry.alias_pattern_list(language):
-                if _absent(needles, folded):
-                    continue
-                for start, end in _occurrences(alias_pattern, folded):
+            for alias, occurrences in aliases:
+                for start, end in occurrences:
                     if any(taken[start:end]):
                         continue
                     written = text[start:end]
@@ -748,6 +861,37 @@ class VaultSession:
                         owner = self._entry_for(entry.entity_type, written, language)
                     replacements.append((start, end, self._cased(owner, written)))
                     taken[start:end] = b"\x01" * (end - start)
+
+    def _remember_masked(
+        self,
+        key: tuple[str, tuple[Span, ...], str],
+        replacements: list[tuple[int, int, _Entry]],
+        generation: int,
+        depends: Iterable[tuple[EntityType, str]],
+        spans: int,
+    ) -> None:
+        memo = self._masked
+        text = key[0]
+        if memo is None or len(text) > _MASK_MEMO_CHARS:
+            return
+        replacements.sort(key=lambda r: r[0])
+        if key in memo:
+            memo.move_to_end(key)
+        else:
+            self._masked_chars += len(text)
+        memo[key] = _Masked(tuple(replacements), generation, frozenset(depends), spans)
+        while len(memo) > _MASK_MEMO_ENTRIES or self._masked_chars > _MASK_MEMO_CHARS:
+            evicted, _ = memo.popitem(last=False)
+            self._masked_chars -= len(evicted[0])
+
+    def _assemble(
+        self,
+        text: str,
+        replacements: list[tuple[int, int, _Entry]],
+        spans: int,
+        generation: int,
+    ) -> MaskResult:
+        """Write the placeholders into ``text``, counting and remembering each occurrence."""
         replacements.sort(key=lambda r: r[0])
         parts: list[str] = []
         cursor = 0
@@ -763,7 +907,7 @@ class VaultSession:
         logger.debug(
             "masked %d occurrences (%d from spans): %s",
             len(replacements),
-            len(ordered),
+            spans,
             dict(per_type),
         )
         return MaskResult(
@@ -787,7 +931,13 @@ class VaultSession:
                 self._folded_chars -= len(evicted)
         return views
 
-    def _plans(self, text: str, ordered: Sequence[Span], matcher: InflectionMatcher) -> list[_Plan]:
+    def _plans(
+        self,
+        text: str,
+        ordered: Sequence[Span],
+        matcher: InflectionMatcher,
+        depends: set[tuple[EntityType, str]] | None = None,
+    ) -> list[_Plan]:
         """The lemma and stem of every span (see :class:`~pii_guard.vault.inflection.Split`).
 
         - A span that ends inside a word (``Teszt Elek|nek``, ``Próba Zsuzsanná|nak``): the
@@ -798,6 +948,9 @@ class VaultSession:
           two spans agree on it, or this session already has it. Otherwise the span is its
           own value, as before, and the candidate lemmas become aliases of it (their forms
           get the same placeholder): recall never depends on a guess.
+
+        ``depends`` collects the weak-split lemmas this session did not have: the only session
+        state the plans read, so the same text and spans plan the same until one exists.
         """
         plans: list[_Plan | None] = []
         pending: dict[int, list[Split]] = {}
@@ -844,6 +997,8 @@ class VaultSession:
             for c in candidates:
                 key = (ordered[index].entity_type, normalize_value(c.lemma))
                 candidate_of.setdefault(key, set()).add(index)
+                if depends is not None and key not in confirmed:
+                    depends.add(key)
         for index, candidates in pending.items():
             span = ordered[index]
             own = (span.entity_type, normalize_value(span.text))
@@ -887,6 +1042,7 @@ class VaultSession:
             return entry
         placeholder = self._new_placeholder(entity_type, normalized)
         entry = _Entry(placeholder, entity_type, value, normalized, language)
+        entry.order = len(self._by_key)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
         self._touch(entry)
@@ -896,6 +1052,8 @@ class VaultSession:
         """A new entry, or new patterns of one: a newer generation (see :attr:`generation`)."""
         self._generation += 1
         entry.changed = self._generation
+        if self._masked is not None:
+            self._touched.append(entry)
 
     def _form(self, value: str) -> str:
         """The variant key of ``value``: its casing class (case-sensitive mode) and layout.
