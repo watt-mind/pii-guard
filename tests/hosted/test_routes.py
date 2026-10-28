@@ -105,6 +105,14 @@ def test_account_links_return_to_the_dashboard(route_app: tuple[FastAPI, list[An
     assert account["limits"]["sponsored_enabled"] is False
 
 
+def test_account_names_the_included_model(route_app: tuple[FastAPI, list[Any]]) -> None:
+    """The public page names the free runs' model from the API, never hard-coded (LAB-1466)."""
+    app, _ = route_app
+    with TestClient(app) as client:
+        account = client.get("/v1/account").json()
+    assert account["included_model"] == app.state.hosted.settings.hosted_models[0]
+
+
 def test_key_revealed_once_owner_scoped_and_revoked(route_app: tuple[FastAPI, list[Any]]) -> None:
     app, _ = route_app
     a, b = {"x-test-owner": "user-a"}, {"x-test-owner": "user-b"}
