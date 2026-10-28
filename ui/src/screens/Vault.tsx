@@ -117,7 +117,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
     if (detail.state !== "ok" || scrollRequest === scrolledFor.current) return;
     scrolledFor.current = scrollRequest;
     const heading = detailHeading.current;
-    heading?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    heading?.scrollIntoView?.({ block: "start", behavior: "smooth" });
     heading?.focus({ preventScroll: true });
   }, [detail, scrollRequest]);
 
@@ -244,7 +244,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search by session ref (s_…)"
-                  className="h-9 min-w-0 flex-1 rounded-lg border border-field bg-surface px-3 font-mono text-xs text-ink placeholder:font-sans placeholder:text-sm placeholder:text-faint"
+                  className="h-9 min-w-0 shrink-0 rounded-lg border border-field bg-surface px-3 font-mono text-base text-ink sm:flex-1 sm:text-xs lg:flex-none placeholder:font-sans placeholder:text-sm placeholder:text-faint"
                 />
               </div>
               <div className="mt-3">
@@ -443,7 +443,7 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, conf
                         {typeLabel(item.entity_type)} · {item.origin === "known" ? "known value" : "detected"} · masked {item.count}×
                       </span>
                     </td>
-                    <td className="px-2 py-2 font-mono text-xs break-all">
+                    <td className="px-2 py-2 font-mono text-xs [overflow-wrap:anywhere]">
                       {revealed && item.original != null ? (
                         <>
                           <span className="text-ink" data-original>
