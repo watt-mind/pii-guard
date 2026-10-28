@@ -170,9 +170,13 @@ def _ratio(num: int, den: int) -> float | None:
 
 
 def _f1(p: float | None, r: float | None) -> float | None:
-    if p is None or r is None:
+    """F1 as the scorer computes it (``eval/scorer.py``): 0 when either side is 0 or missing,
+    so a negative set with masked spans (no gold, precision 0) pools to its own F1."""
+    if p is None and r is None:
         return None
-    return 0.0 if p + r == 0 else 2 * p * r / (p + r)
+    if not p or not r:
+        return 0.0
+    return 2 * p * r / (p + r)
 
 
 def type_order(names: Iterable[str]) -> list[str]:

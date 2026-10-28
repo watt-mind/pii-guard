@@ -38,6 +38,12 @@ resolver lets a `PERSON` win over the overlapping kept `ORGANIZATION`, so only t
 masked (`[[PERSON_x]] és Társa Bt.`) and the rest of the company name stays. See "Person names
 in company names" below.
 
+The other way round, the NER model sometimes calls a bare company or product name a person
+(`Write a haiku about Meta`). An NER `PERSON` span that is exactly a listed brand name (the
+language packs' `brands.tsv`, [detect/ner_orgs.py](../src/pii_guard/detect/ner_orgs.py),
+LAB-1336) becomes `ORGANIZATION` and is kept, unless it is part of a longer name or follows an
+honorific (`Meta Kovács`, `Ms. Apple`). `PII_GUARD_NER_BRANDS=false` turns this off.
+
 ### NER label set
 
 The NER detector (`pii_guard.detect.ner`) reports a subset of the types above. A v1 checkpoint

@@ -155,6 +155,7 @@ def check_structure(pack: LanguagePack) -> list[Finding]:
     findings += _check_lexicons(pack)
     findings += _check_captions(pack)
     findings += _check_cues(pack)
+    findings += _check_brands(pack)
     if not pack.smoke_fixtures:
         findings.append(
             _error(
@@ -413,6 +414,26 @@ def _check_cues(pack: LanguagePack) -> list[Finding]:
                 "cues.tsv has no '-' cue (order or invoice numbers that end a cue's window)",
             )
         ]
+    return []
+
+
+def _check_brands(pack: LanguagePack) -> list[Finding]:
+    if pack.brands is None:
+        return [
+            _info(
+                "structure.brands",
+                "no brand names (only the shared list keeps the NER from calling a company "
+                "name a person)",
+            )
+        ]
+    if not isinstance(pack.brands, Traversable):
+        return [_error("structure.brands", "brands must be a resource (importlib.resources)")]
+    from pii_guard.detect.ner_orgs import load_brands
+
+    try:
+        load_brands(pack.brands)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        return [_error("structure.brands", f"brands.tsv is invalid: {exc}")]
     return []
 
 

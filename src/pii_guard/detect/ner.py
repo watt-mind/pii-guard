@@ -52,6 +52,7 @@ from typing import Any, Protocol
 
 from pii_guard.detect import ner_resolve
 from pii_guard.detect.ner_numbers import check_numbers
+from pii_guard.detect.ner_orgs import relabel_brands
 from pii_guard.detect.ner_words import snap_to_words
 from pii_guard.types import DetectionError, EntityType, Span
 
@@ -838,7 +839,7 @@ class NerDetector:
                 set(check_numbers(text, found)),
                 key=lambda s: (s.start, s.end, s.entity_type.value),
             )
-        return found
+        return relabel_brands(text, found, language)  # brand names as PERSON (LAB-1336)
 
 
 def _trim(text: str, start: int, end: int, entity_type: EntityType) -> tuple[int, int] | None:

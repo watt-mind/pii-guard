@@ -35,4 +35,5 @@ def pack() -> LanguagePack:
         ),
         captions=files(__name__).joinpath("captions.tsv"),
         cues=files(__name__).joinpath("cues.tsv"),
+        brands=files(__name__).joinpath("brands.tsv"),
     )

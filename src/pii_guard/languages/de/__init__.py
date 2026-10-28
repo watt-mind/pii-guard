@@ -36,4 +36,5 @@ def pack() -> LanguagePack:
         allow_suffix=True,  # "Annas": a name runs on into the genitive
         captions=files(__name__).joinpath("captions.tsv"),
         cues=files(__name__).joinpath("cues.tsv"),
+        brands=files(__name__).joinpath("brands.tsv"),
     )

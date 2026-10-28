@@ -307,6 +307,22 @@ These runs kept no per-document predictions, so each system was run again to cla
 
 § The re-run did not reproduce the headline counts exactly (an LLM detector doesn't answer the same way twice): the breakdown adds up to the re-run's own totals. audit (rules + NER + Muse Spark Open, Baseten) (re-run leak 3.8%, headline 3.9%).
 
+### `brand-names`
+
+hand-written; documents: de 6 + en 12 + hu 6.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| pii-guard rules + ner | 24 | 0.0% | — | 0.0% | — | — | 100.0% | 100.0% | 9.7 ms | 2026-10-28 | `9d800ba` |
+
+
+By language:
+
+| System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
+|---|---:|---:|---:|---:|---:|---:|
+| pii-guard rules + ner | 0.0% | 0.0% | 0.0% | — | — | — |
+
+
 ### `cee-pii`
 
 mixed; documents: en 200 + hu 251.
@@ -976,6 +992,8 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-28 | `2026-10-28-lab-1336-brands-after` | pii-guard rules + ner | brand-names | de, en, hu | recorded | `9d800ba` (dirty) | — | — |
+| 2026-10-28 | `2026-10-28-lab-1336-brands-before` | pii-guard rules + ner | brand-names | de, en, hu | recorded | `9d800ba` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-datasets-ai4privacy-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | de, en, hu | recorded | `3b5c05b` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-datasets-nemotron-pii-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | nemotron-pii | en | recorded | `3b5c05b` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-datasets-gretel-finance-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | gretel-finance | de, en | recorded | `3b5c05b` (dirty) | — | — |
