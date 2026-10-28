@@ -80,15 +80,16 @@ jobs:
       - name: mypy (no errors beyond scripts/ci/mypy-baseline.txt)
         run: uv run python scripts/ci/mypy_baseline.py
 
-  # Pull requests run the fast suite (`make test`: no tests marked slow, 25 Hypothesis examples,
-  # the fast coverage floor in the Makefile). Pushes, merge queue, nightly and manual runs run
+  # Pull requests, the merge queue and develop pushes run the fast suite (`make test`: no tests
+  # marked slow, 25 Hypothesis examples, the fast coverage floor in the Makefile), so a merge to
+  # develop is gated in about two minutes (LAB-1446). Pushes to main, nightly and manual runs run
   # every test (`make test-all`) with the coverage floor in pyproject.toml. Both use pytest-xdist.
   test:
     name: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      FULL: ${{ github.event_name != 'pull_request' }}
+      FULL: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
       PYTEST_ADDOPTS: --durations=15
       # Tests of the committed report follow the smoke job's choice (LAB-1269).
       RENDER_DOCS_ON_MERGE: ${{ vars.RENDER_DOCS_ON_MERGE }}

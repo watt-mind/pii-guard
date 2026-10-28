@@ -173,6 +173,33 @@ app sidecar cannot provide this wake path. Repeat streaming and synthetic error 
 that OAuth code/state, auth, cookie and body canaries appear in neither proxy output nor generated
 files. Local Linux Nginx tests exercise these properties but cannot prove the deployed Azure path.
 
+## Merge to dev: build in parallel, deploy after `ci-ok`
+
+The dev image is built by the operator in the dev registry, not by CI, so start it as soon as
+the pull request merges instead of waiting for develop CI (LAB-1446):
+
+```bash
+git fetch origin develop
+ACR_NAME=<dev registry> deploy/azure/acr_build.sh origin/develop   # in parallel with CI
+gh run watch "$(gh run list --branch develop --workflow ci --event push --limit 1 \
+  --json databaseId -q '.[0].databaseId')" --exit-status        # wait for ci-ok
+```
+
+`acr_build.sh` exports the commit with `git archive` (committed files only), runs
+`az acr run` with BuildKit, tags `pii-guard:develop-<sha>` and prints `TAG`, `DIGEST` and
+`IMAGE <registry>.azurecr.io/pii-guard@sha256:...` on stdout (build logs on stderr). It needs
+only the operator's existing `az login` and holds no secret. Each Dockerfile.hosted stage is also
+pushed as `pii-guard:buildcache-*`, an inline BuildKit layer cache the next build reads, so a
+change under `src/` reuses the dependency, NER model and apt layers. The cache tags are
+overwritten on every build; delete them to force a cold build.
+
+Develop pushes run the fast test suite (`make test`, the pull-request profile), so `ci-ok`
+lands about as fast as on the pull request; the full suite runs nightly, on `main` and on
+manual dispatch. Deploy only after `ci-ok` on that exact commit is green, and pass the printed
+`IMAGE` as `HOSTED_IMAGE` to `deploy/azure/deploy.sh technical-stage` (or `stage`) with the
+evidence described above, bound to that digest. If `ci-ok` is red, do not deploy that digest;
+fix forward and build the next commit.
+
 ## Durable encrypted project configuration
 
 The operator foundation adds a separate private `project-configuration` container in the same

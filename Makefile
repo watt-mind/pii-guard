@@ -26,7 +26,7 @@ test: ## fast suite as pull-request CI runs it: parallel, no slow tests, line co
 	COVERAGE_CORE=sysmon COVERAGE_BRANCH=false \
 		uv run pytest -n auto --dist worksteal -m "not slow" --cov-fail-under=$(FAST_COV_FLOOR)
 
-test-all: ## every test, as develop, main and nightly CI run it: parallel, full coverage floor
+test-all: ## every test, as main, nightly and manual CI run it: parallel, full coverage floor
 	uv run pytest -n auto --dist worksteal
 
 serve: ## run the API on http://127.0.0.1:8787
