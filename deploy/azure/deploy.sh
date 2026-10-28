@@ -89,7 +89,8 @@ except InvalidOperation:
 if not amount.is_finite() or amount < 1 or amount != amount.to_integral_value():
     raise SystemExit('Existing budget must have a positive whole amount')
 PYBUDGET
-    groups=$(az resource show --ids "$budget_id" --api-version 2023-11-01 --query properties.notifications.Actual50.contactGroups --output json)
+    notifications=$(az resource show --ids "$budget_id" --api-version 2023-11-01 --query properties.notifications --output json)
+    groups=$(python3 deploy/azure/budget_alerts.py <<< "$notifications")
   fi
 fi
 if [[ "$mode" != disable && "$mode" != bind-domain ]]; then
