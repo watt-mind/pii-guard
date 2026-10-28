@@ -1,11 +1,15 @@
 # syntax=docker/dockerfile:1
 # Hosted build: text plus local-only image masking (ADR 0014). Keep the self-hosted Dockerfile
 # independent. Images use Tesseract and the on-device YuNet segmenter only; never SAM.
-FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-trixie-slim@sha256:bf889bda77474aa50c351caf1538b855ef2b7a30add45f26ca50dcb6ade06402 AS python-build
+# python-deps ends with the dependency-only venv. The runtime copies it as its own layer, which
+# keeps its digest across src-only changes; only the small project layer changes (LAB-1449).
+FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-trixie-slim@sha256:bf889bda77474aa50c351caf1538b855ef2b7a30add45f26ca50dcb6ade06402 AS python-deps
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --no-install-project
+
+FROM python-deps AS python-build
 # The pinned NER checkpoint (about 1 GB) is fetched before `COPY src`, from only the modules that
 # hold its pin and SHA-256 verifier, so a change elsewhere in src/ reuses this layer from the
 # registry cache (deploy/azure/acr_build.sh, LAB-1446). Changing the pin re-fetches it.
@@ -16,7 +20,15 @@ RUN mkdir -p /app/models && PYTHONPATH=/app/pin .venv/bin/python -c "import shut
 COPY src ./src
 COPY eval/results ./eval/results
 COPY docs/benchmarks/config.json ./docs/benchmarks/config.json
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --no-editable \
+# Installs only the project (the dependencies are already synced) and byte-compiles only its own
+# package, so no dependency file is rewritten. venv_layer.py then copies what the install added
+# to the venv into /app/venv-project, and fails if the install removed anything.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=deploy/azure/venv_layer.py,target=/tmp/venv_layer.py \
+    --mount=type=bind,from=python-deps,source=/app/.venv,target=/tmp/venv-deps \
+    UV_COMPILE_BYTECODE=0 uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --no-editable \
+    && .venv/bin/python -m compileall -q -j 0 .venv/lib/python3.12/site-packages/pii_guard \
+    && .venv/bin/python /tmp/venv_layer.py /tmp/venv-deps /app/.venv /app/venv-project \
     && .venv/bin/python -m pii_guard.eval.report_cli --print-index > /app/benchmarks-index.json
 # Loads the fetched checkpoint with this commit's detector and warms a CPU forward pass.
 RUN .venv/bin/python -c "from pii_guard.detect.ner import NerDetector; NerDetector(model='/app/models/ner', device='cpu')"
@@ -48,7 +60,8 @@ RUN groupadd --system --gid 10001 piiguard \
     && useradd --system --uid 10001 --gid piiguard --no-create-home piiguard \
     && install -d -m 0700 -o piiguard -g piiguard /var/lib/pii-guard/projects
 WORKDIR /app
-COPY --from=python-build /app/.venv /app/.venv
+COPY --from=python-deps /app/.venv /app/.venv
+COPY --from=python-build /app/venv-project /app/.venv
 COPY --from=python-build /app/models /app/models
 COPY --from=ui-build /ui/dist /app/.venv/lib/python3.12/site-packages/pii_guard/_ui
 COPY deploy/azure/entrypoint.py /app/entrypoint.py
