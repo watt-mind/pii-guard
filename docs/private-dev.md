@@ -119,6 +119,38 @@ dev. Use the same immutable image digest and normal versioned app key references
 `lab_1372_done`, `private_dev_reviewed`, `tailnet_acl`, `proxy_tls`, `proxy_headers` for that image.
 Keep sponsorship zero until provider authorization and approved durable authority exist.
 
+### Operator technical stage before live acceptance
+
+The first private app is needed to collect end-to-end identity, OAuth and isolation evidence.
+An operator can use `deploy/azure/deploy.sh technical-stage` for that synthetic verification
+only. It requires `AZURE_TECHNICAL_STAGE_APPROVED=true`, an active Azure CLI account of type
+`user`, the exact dev group and origin, and no `CI` or `GITHUB_ACTIONS` environment. Set
+`HOSTED_SPONSORED_MICRODOLLARS=0` and leave both allocation ID/expiry variables unset.
+All existing budget/action-group, own-registry image digest, versioned dev-vault, internal
+PNA-disabled environment and dedicated-router checks still apply. The app stays reachable only
+through the private environment; the usual readiness and content-free smoke run after staging.
+
+Set `HOSTED_TECHNICAL_STAGE_EVIDENCE` to an uncommitted JSON file with exactly these fields:
+
+```json
+{
+  "image": "<reviewed immutable image digest>",
+  "purpose": "private-synthetic-verification",
+  "network_reviewed": true,
+  "tailnet_acl": true,
+  "proxy_tls": true,
+  "synthetic_only": true
+}
+```
+
+These attest the pre-app network controls already reviewed and tested: authorized and refused
+peer access and front TLS can be tested before the ACA app exists. They do not claim live
+header stripping, Google callback, cross-owner isolation or LAB-1372 acceptance. This path
+creates no funding or allowance object. Keep automatic releases disabled, collect the full live
+acceptance evidence on this private synthetic stage, and then use normal `stage`; technical
+evidence cannot satisfy normal release admission. Public `enable` and CI have no technical-stage
+exception.
+
 The proxy drops caller `X-MS-*`, `Forwarded`, `X-Forwarded-*`, `X-Real-IP`, Host and custom
 external-host/proto fields, then sets a fixed ACA Host and canonical HTTPS external host.
 Easy Auth explicitly consumes `X-Pii-Guard-External-Host` and `X-Pii-Guard-External-Proto` under
