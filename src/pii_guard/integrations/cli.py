@@ -6,7 +6,15 @@ pii-guard connect pi [--gateway URL] [--model ID ...] [--mode fast|audit] [--lan
                      [--dry-run | --check]
 pii-guard connect muse-code [--gateway URL] [--muse-dir DIR] [--model ID] [--no-session-path]
                             [--dry-run | --check]
+pii-guard connect <tool> --print [--gateway URL] [--model ID]
+                     # tool: muse-code, pi, codex, opencode, curl, python, claude-code
 ```
+
+- ``--print`` prints the tool's paste-and-run block, the same text the web UI's Connect page
+  shows: both read ``GET /v1/connect/snippets`` (:mod:`pii_guard.integrations.snippets`). For
+  ``codex``, ``opencode``, ``curl``, ``python`` and ``claude-code`` printing is all ``connect``
+  does (they need no config file), so ``--print`` is implied. When the gateway can't be asked,
+  the block is built locally (with ``--model``, or a ``<model-id>`` to fill in).
 
 - Both write a gateway base URL with a stable vault session in its path,
   ``http://127.0.0.1:8787/s/<session>/v1`` (LAB-1286): neither client can send
@@ -44,21 +52,26 @@ from collections.abc import Sequence
 import httpx
 
 from pii_guard.gateway.config import cli_mode
-from pii_guard.integrations import muse_code, pi
+from pii_guard.integrations import muse_code, pi, snippets
 from pii_guard.integrations.common import (
     DASHBOARD_URL,
     ConnectError,
+    _without_session,
     default_gateway_url,
     fetch_models,
     json_diff,
     run_check,
+    session_of,
     session_url,
     write_json,
 )
 
 __all__ = ["build_parser", "main"]
 
-CLIENTS = ("pi", "muse-code")
+#: Clients ``connect`` writes a config file for (and can ``--check``).
+CONFIGURED = ("pi", "muse-code")
+#: Every tool with a quickstart block (``--print``).
+CLIENTS = snippets.TOOL_IDS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -115,6 +128,12 @@ def build_parser() -> argparse.ArgumentParser:
     action.add_argument("--dry-run", action="store_true", help="print the diff, write nothing")
     action.add_argument(
         "--check", action="store_true", help="send one fictional canary through the client path"
+    )
+    action.add_argument(
+        "--print",
+        action="store_true",
+        dest="print_snippet",
+        help="print the paste-and-run block the web UI's Connect page shows; write nothing",
     )
     return parser
 
@@ -249,12 +268,64 @@ def _muse_check(
     return 0 if result.ok else 1
 
 
+def _snippets_from_gateway(root: str, session: str, model: str | None) -> list[object]:
+    """The ``tools`` of the gateway's ``GET /v1/connect/snippets``."""
+    params = {"session": session, **({"model": model} if model else {})}
+    token = _token()
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    response = httpx.get(
+        root + "/v1/connect/snippets",
+        params=params,
+        headers=headers,
+        timeout=httpx.Timeout(20.0, connect=3.0),
+    )
+    response.raise_for_status()
+    data = response.json()
+    tools = data.get("tools") if isinstance(data, dict) else None
+    if not isinstance(tools, list):
+        raise ValueError("not a snippets document")
+    return tools
+
+
+def _print(args: argparse.Namespace, out: list[str]) -> int:
+    """The tool's quickstart block: from the gateway when it answers, else built locally."""
+    gateway = (args.gateway or default_gateway_url()).rstrip("/")
+    session = session_of(gateway) or session_of(session_url(gateway))
+    root = _without_session(gateway)
+    root = root[: -len("/v1")] if root.endswith("/v1") else root
+    model = (args.model or [None])[0]
+    if model is not None and snippets.safe_model(model) is None:
+        raise ConnectError(f"--model {model!r} is not a model id")
+    tool: dict[str, object] | None = None
+    try:
+        tools = _snippets_from_gateway(root, str(session), model)
+        tool = next((t for t in tools if isinstance(t, dict) and t.get("id") == args.client), None)
+    except (httpx.HTTPError, ValueError) as exc:
+        print(
+            f"note: the gateway at {root} didn't answer ({type(exc).__name__}); "
+            "built locally" + ("" if model else ", fill in <model-id>"),
+            file=sys.stderr,
+        )
+    if tool is None:
+        url = f"{root}/s/{session}/v1"
+        tool = snippets.tool_snippet(args.client, url, model, token=_token() is not None)
+    if tool.get("code"):
+        out.append(snippets.printable(tool))
+    print(f"# {tool.get('note')}", file=sys.stderr)
+    return 0 if tool.get("supported") else 1
+
+
 def main(argv: Sequence[str] | None = None, *, stdout=None) -> int:  # type: ignore[no-untyped-def]
     stdout = stdout or sys.stdout
     args = build_parser().parse_args(list(argv) if argv is not None else None)
     out: list[str] = []
     try:
-        code = _muse(args, out) if args.client == "muse-code" else _pi(args, out)
+        if args.print_snippet or args.client not in CONFIGURED:
+            if args.dry_run or args.check:
+                raise ConnectError(f"--dry-run and --check are for {' and '.join(CONFIGURED)}")
+            code = _print(args, out)
+        else:
+            code = _muse(args, out) if args.client == "muse-code" else _pi(args, out)
     except ConnectError as exc:
         for line in out:
             print(line, file=stdout)

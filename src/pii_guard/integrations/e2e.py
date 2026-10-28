@@ -1,9 +1,12 @@
 """End-to-end run: a real coding agent (pinned) works on the fictional mini-repo through the
-gateway. Two clients: **pi** (Chat Completions) and **Muse Code** (Responses API).
+gateway. Four clients: **pi** and **OpenCode** (Chat Completions), **Muse Code** and **Codex**
+(Responses API).
 
 ```
 uv run python -m pii_guard.integrations.e2e                       # pi, scripted mock (CI)
 uv run python -m pii_guard.integrations.e2e --client muse-code    # Muse Code, scripted mock
+uv run python -m pii_guard.integrations.e2e --client codex        # Codex, scripted mock
+uv run python -m pii_guard.integrations.e2e --client opencode     # OpenCode, scripted mock
 uv run python -m pii_guard.integrations.e2e --client muse-code --session per-request  # before
 uv run python -m pii_guard.integrations.e2e --client muse-code --upstream https://api.meta.ai/v1 \\
     --model muse-spark-1.3 --key-env META_API_KEY --record examples/coding-agents/runs/<name>.json
@@ -24,7 +27,9 @@ What runs, all on loopback, in throwaway directories (``HOME`` and the client's 
    client (pi's ``models.json``; Muse's ``settings.json``, ``endpoint_transport``). Muse can't
    send ``X-PII-Guard-Mode``, so its gateway runs in fast mode (``PII_GUARD_GATEWAY_MODE``).
 4. The client runs headless (``pi --print``, ``muse exec``) on a copy of
-   ``examples/coding-agents/mini-repo``.
+   ``examples/coding-agents/mini-repo``. Codex and OpenCode need no config file: they run the
+   Connect page's paste-and-run block (:mod:`pii_guard.integrations.snippets`) with
+   ``exec`` / ``run`` appended, so the e2e covers the text users paste.
 
 The result (:class:`RunResult`) says whether any gold value (``examples/coding-agents/gold.json``)
 reached the upstream, whether the gateway refused a request, and what the agent wrote: the files
@@ -47,6 +52,7 @@ import json
 import os
 import re
 import secrets
+import shlex
 import shutil
 import socket
 import subprocess
@@ -66,30 +72,39 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from pii_guard.integrations import snippets
 from pii_guard.integrations.muse_code import MUSE_VERSION_CHECKED
+from pii_guard.integrations.snippets import CODEX_VERSION, OPENCODE_VERSION, PI_VERSION
 from pii_guard.vault import SessionNotFoundError
 from pii_guard.vault.placeholders import PLACEHOLDER_RE, normalize_value
 
 __all__ = [
+    "CODEX_VERSION",
     "EXAMPLE_DIR",
     "MUSE_INSTALLER",
     "MUSE_VERSION",
+    "OPENCODE_VERSION",
     "PI_PACKAGE",
     "PI_VERSION",
     "PROMPT",
     "MuseVersionError",
     "Recorder",
     "RunResult",
+    "install_codex",
     "install_muse",
+    "install_opencode",
     "install_pi",
     "load_gold",
     "main",
     "run",
+    "run_codex",
     "run_muse",
+    "run_opencode",
 ]
 
 PI_PACKAGE = "@earendil-works/pi-coding-agent"
-PI_VERSION = "1.4.0"
+CODEX_PACKAGE = "@openai/codex"
+OPENCODE_PACKAGE = "opencode-ai"
 MUSE_VERSION = MUSE_VERSION_CHECKED
 MUSE_INSTALLER = "https://dev.meta.ai/install.sh"
 EXAMPLE_DIR = Path(__file__).resolve().parents[3] / "examples" / "coding-agents"
@@ -142,6 +157,47 @@ def install_pi(prefix: Path, version: str = PI_VERSION) -> Path:
         timeout=600,
     )
     return binary
+
+
+def _install_npm(prefix: Path, package: str, version: str, command: str) -> Path:
+    """``command`` of ``package@version`` from npm into ``prefix`` (reused when it's there)."""
+    binary = prefix / "node_modules" / ".bin" / command
+    package_json = prefix / "node_modules" / Path(*package.split("/")) / "package.json"
+    installed = package_json.exists() and json.loads(package_json.read_text()).get("version")
+    if binary.exists() and installed == version:
+        return binary
+    npm = shutil.which("npm")
+    if npm is None:
+        raise RuntimeError("npm is not installed")
+    prefix.mkdir(parents=True, exist_ok=True)
+    subprocess.run(  # noqa: S603 - npm from PATH, a pinned package
+        [
+            npm,
+            "install",
+            "--prefix",
+            str(prefix),
+            f"{package}@{version}",
+            "--no-fund",
+            "--no-audit",
+            "--loglevel=error",
+        ],
+        check=True,
+        capture_output=True,
+        timeout=600,
+    )
+    if not binary.exists():
+        raise RuntimeError(f"npm installed no {command} binary for {package}@{version}")
+    return binary
+
+
+def install_codex(prefix: Path, version: str = CODEX_VERSION) -> Path:
+    """Codex (``@openai/codex``, with its platform binary) from npm into ``prefix``."""
+    return _install_npm(prefix, CODEX_PACKAGE, version, "codex")
+
+
+def install_opencode(prefix: Path, version: str = OPENCODE_VERSION) -> Path:
+    """OpenCode (``opencode-ai``, with its platform binary) from npm into ``prefix``."""
+    return _install_npm(prefix, OPENCODE_PACKAGE, version, "opencode")
 
 
 class MuseVersionError(RuntimeError):
@@ -295,6 +351,8 @@ def _scripted_turn(body: dict[str, Any]) -> tuple[str, Any]:
         arguments: dict[str, Any] = {key: None for key in required if isinstance(key, str)}
         arguments["decision"] = "none"
         return "call", (name, arguments)
+    if "exec_command" in names:  # Codex: one shell tool
+        return _codex_turn(names["exec_command"][0], _call_outputs(body))
     if "read_file" not in names or "write_file" not in names:
         return "text", "OK."
     outputs = _call_outputs(body)
@@ -306,6 +364,17 @@ def _scripted_turn(body: dict[str, Any]) -> tuple[str, Any]:
             names["write_file"][0],
             {"path": "reply.md", "content": _reply(_seen(outputs))},
         )
+    return "text", "Done: wrote reply.md."
+
+
+def _codex_turn(name: str, outputs: list[str]) -> tuple[str, Any]:
+    """Codex's turns: read the three files with one ``cat``, write ``reply.md`` with a quoted
+    heredoc (the placeholders it saw: the gateway restores them in the arguments), finish."""
+    if not outputs:
+        return "call", (name, {"cmd": "cat " + " ".join(_READS)})
+    if len(outputs) == 1:
+        reply = _reply(_seen(outputs))
+        return "call", (name, {"cmd": f"cat > reply.md <<'PII_GUARD_EOF'\n{reply}PII_GUARD_EOF"})
     return "text", "Done: wrote reply.md."
 
 
@@ -402,6 +471,8 @@ class Recorder:
     def __init__(self, upstream: str | None = None, key: str | None = None) -> None:
         self.upstream = upstream.rstrip("/") if upstream else None
         self.key = key
+        #: The client's workspace, for tools that want absolute paths (OpenCode).
+        self.workdir: Path | None = None
         self.bodies: list[str] = []
         self._lock = threading.Lock()
         self.app = FastAPI()
@@ -516,20 +587,37 @@ class Recorder:
 
         return StreamingResponse(relay(), media_type="text/event-stream")
 
+    def _path_arg(self, body: dict[str, Any], tool: str, name: str) -> dict[str, str]:
+        """``{"path": name}`` (pi) or ``{"filePath": <absolute>}`` (OpenCode's ``read`` and
+        ``write`` take an absolute ``filePath``), from the tool's own schema."""
+        for entry in body.get("tools") or []:
+            function = entry.get("function") if isinstance(entry, dict) else None
+            if not isinstance(function, dict) or function.get("name") != tool:
+                continue
+            properties = (function.get("parameters") or {}).get("properties") or {}
+            if "filePath" in properties:
+                base = self.workdir or Path.cwd()
+                return {"filePath": str(base / name)}
+        return {"path": name}
+
     def _scripted(self, body: dict[str, Any]) -> AsyncIterator[str]:
         tools = _tool_texts(body)
         step = len(tools)
+        has_tools = bool(body.get("tools"))
 
         async def events() -> AsyncIterator[str]:
             yield _chunk({"role": "assistant", "content": ""})
-            if step < len(_READS):
-                call = ("read", {"path": _READS[step]})
+            if not has_tools:  # a side call without tools (OpenCode's session title)
+                call = None
+            elif step < len(_READS):
+                call = ("read", self._path_arg(body, "read", _READS[step]))
             elif step == len(_READS):
-                call = ("write", {"path": "reply.md", "content": _reply(_seen(tools))})
+                content = {"content": _reply(_seen(tools))}
+                call = ("write", {**self._path_arg(body, "write", "reply.md"), **content})
             else:
                 call = None
             if call is None:
-                for piece in _pieces("Done: wrote reply.md."):
+                for piece in _pieces("Done: wrote reply.md." if has_tools else "Client reply"):
                     yield _chunk({"content": piece})
                 yield _chunk({}, finish="stop")
             else:
@@ -1009,6 +1097,154 @@ def run_muse(
     )
 
 
+def _snippet_command(tool: str, binary: Path, url: str, model: str, tail: str) -> list[str]:
+    """The Connect page's block for ``tool`` (what a user pastes), run with ``binary`` and
+    ``tail`` in place of the bare command at its end: the e2e covers the published text."""
+    code = str(snippets.tool_snippet(tool, url, model, token=False)["code"])
+    lines = code.split("\n")
+    if tool == "codex":
+        # The block is one command: `codex -m ... -c ...`; the run adds `exec ... "$PROMPT"`.
+        code = code.replace("codex ", f"{shlex.quote(str(binary))} ", 1) + " " + tail
+    else:
+        # The block's last line starts the tool: `opencode`.
+        code = "\n".join([*lines[:-1], f"{shlex.quote(str(binary))} {tail}"])
+    bash = shutil.which("bash") or "/bin/bash"
+    return [bash, "-c", code]
+
+
+def _run_snippet_client(
+    *,
+    client: str,
+    version: str,
+    binary: Path,
+    upstream: str | None,
+    key: str | None,
+    model: str | None,
+    example_dir: Path,
+    prompt: str,
+    timeout: float,
+    tail: str,
+    extra_env: dict[str, str],
+) -> RunResult:
+    """A client configured by its quickstart block alone (no config file), gateway in fast
+    mode, on the session URL the Connect page hands out."""
+    gold = load_gold(example_dir)
+    ner = _ner_available()
+    started = time.monotonic()
+    recorder = Recorder(upstream, key)
+    statuses: list[int] = []
+    calls: list[tuple[str, str]] = []
+    with _workspace(example_dir, f"pii-guard-{client}-e2e-") as (root, work, before):
+        recorder.workdir = work.resolve()
+        home = root / "home"
+        home.mkdir()
+        with (
+            serve(recorder.app) as recorder_url,
+            serve(
+                app := gateway_app(recorder_url + "/v1", statuses, mode="fast", calls=calls)
+            ) as gateway_url,
+        ):
+            url = f"{gateway_url}/s/e2e_{secrets.token_hex(8)}/v1"
+            cmd = _snippet_command(client, binary, url, model or SCRIPTED_MODEL, tail)
+            env = {
+                "PATH": os.environ.get("PATH", ""),
+                "HOME": str(home),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+                "XDG_DATA_HOME": str(home / ".local" / "share"),
+                "XDG_CACHE_HOME": str(home / ".cache"),
+                "XDG_STATE_HOME": str(home / ".local" / "state"),
+                "NO_COLOR": "1",
+                "PII_GUARD_E2E_PROMPT": prompt,
+                **extra_env,
+            }
+            proc = _client_run(cmd, work, env, timeout)
+        written, texts = _written(work, before)
+    return _result(
+        client=client,
+        version=version,
+        upstream=upstream,
+        model=model,
+        proc=proc,
+        output=_ANSI_RE.sub("", proc.stdout + proc.stderr),
+        recorder=recorder,
+        statuses=statuses,
+        written=written,
+        texts=texts,
+        gold=gold,
+        ner=ner,
+        started=started,
+        app=app,
+        calls=calls,
+        session="path",
+    )
+
+
+def run_codex(
+    *,
+    codex_bin: Path,
+    upstream: str | None = None,
+    key: str | None = None,
+    model: str | None = None,
+    example_dir: Path = EXAMPLE_DIR,
+    prompt: str = PROMPT,
+    timeout: float = 900,
+    version: str = CODEX_VERSION,
+) -> RunResult:
+    """Codex through the gateway (Responses API), started with the Connect page's block plus
+    ``exec``: headless, the workspace writable, nothing outside it."""
+    codex_home = Path(tempfile.mkdtemp(prefix="pii-guard-codex-home-"))
+    try:
+        tail = (
+            "exec --skip-git-repo-check --sandbox workspace-write --color never "
+            '"$PII_GUARD_E2E_PROMPT" </dev/null'
+        )
+        return _run_snippet_client(
+            client="codex",
+            version=version,
+            binary=codex_bin,
+            upstream=upstream,
+            key=key,
+            model=model,
+            example_dir=example_dir,
+            prompt=prompt,
+            timeout=timeout,
+            tail=tail,
+            extra_env={"CODEX_HOME": str(codex_home)},
+        )
+    finally:
+        shutil.rmtree(codex_home, ignore_errors=True)
+
+
+def run_opencode(
+    *,
+    opencode_bin: Path,
+    upstream: str | None = None,
+    key: str | None = None,
+    model: str | None = None,
+    example_dir: Path = EXAMPLE_DIR,
+    prompt: str = PROMPT,
+    timeout: float = 900,
+    version: str = OPENCODE_VERSION,
+) -> RunResult:
+    """OpenCode through the gateway (Chat Completions), configured by the Connect page's
+    ``OPENCODE_CONFIG_CONTENT`` alone, headless with ``opencode run``."""
+    return _run_snippet_client(
+        client="opencode",
+        version=version,
+        binary=opencode_bin,
+        upstream=upstream,
+        key=key,
+        model=model,
+        example_dir=example_dir,
+        prompt=prompt,
+        timeout=timeout,
+        # --auto: OpenCode asks before reading .env (and, headless, refuses); the task reads it
+        # on purpose, in a throwaway copy of the mini-repo.
+        tail='run --auto "$PII_GUARD_E2E_PROMPT" </dev/null',
+        extra_env={"OPENCODE_DISABLE_AUTOUPDATE": "1", "OPENCODE_DISABLE_LSP_DOWNLOAD": "1"},
+    )
+
+
 def record(result: RunResult, path: Path) -> None:
     """A run record for ``examples/coding-agents/runs/``: counts, never the values.
 
@@ -1037,11 +1273,13 @@ def record(result: RunResult, path: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m pii_guard.integrations.e2e")
-    parser.add_argument("--client", choices=("pi", "muse-code"), default="pi")
+    parser.add_argument("--client", choices=("pi", "muse-code", "codex", "opencode"), default="pi")
     parser.add_argument("--upstream", default=None, help="a real OpenAI-compatible base URL")
     parser.add_argument("--model", default=None, help="model id (required with --upstream)")
     parser.add_argument("--key-env", default=None, help="env var (or .env key) with its API key")
-    parser.add_argument("--pi-prefix", default=None, help="npm prefix for pi (default: temp)")
+    parser.add_argument(
+        "--pi-prefix", default=None, help="npm prefix for pi, Codex or OpenCode (default: temp)"
+    )
     parser.add_argument(
         "--muse-home", default=None, help="throwaway HOME for the Muse Code install (default: temp)"
     )
@@ -1068,7 +1306,29 @@ def main(argv: list[str] | None = None) -> int:
         key = os.environ.get(args.key_env) or _dotenv(args.key_env)
         if not key:
             parser.error(f"{args.key_env} is not set")
-    if args.client == "muse-code":
+    if args.client in ("codex", "opencode"):
+        prefix = (
+            Path(args.pi_prefix)
+            if args.pi_prefix
+            else Path(tempfile.gettempdir()) / f"pii-guard-{args.client}"
+        )
+        if args.client == "codex":
+            result = run_codex(
+                codex_bin=install_codex(prefix),
+                upstream=args.upstream,
+                key=key,
+                model=args.model,
+                timeout=args.timeout,
+            )
+        else:
+            result = run_opencode(
+                opencode_bin=install_opencode(prefix),
+                upstream=args.upstream,
+                key=key,
+                model=args.model,
+                timeout=args.timeout,
+            )
+    elif args.client == "muse-code":
         home = (
             Path(args.muse_home)
             if args.muse_home

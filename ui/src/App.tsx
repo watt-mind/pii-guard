@@ -99,9 +99,10 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
     };
   }, [navigate]);
 
-  // The traffic log feeds Overview and Logs; it connects when either first opens.
-  const [trafficOpened, setTrafficOpened] = useState(() => route.section === "overview" || route.section === "logs");
-  if (!trafficOpened && (route.section === "overview" || route.section === "logs")) setTrafficOpened(true);
+  // The traffic log feeds Overview, Logs and Connect; it connects when one first opens.
+  const followsTraffic = route.section === "overview" || route.section === "logs" || route.section === "connect";
+  const [trafficOpened, setTrafficOpened] = useState(() => followsTraffic);
+  if (!trafficOpened && followsTraffic) setTrafficOpened(true);
   const forceFixture = engine.state.preference === "mock";
   const trafficHandle = useTraffic({ forceFixture, connect: trafficOpened ? traffic?.connect : idleConnect, fixtureIntervalMs: traffic?.fixtureIntervalMs });
   const [logFocus, setLogFocus] = useState<{ id: string; nonce: number } | null>(null);
@@ -322,7 +323,14 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
             <Vault status={status} live={engine.engine === "api"} active={section === "vault"} client={vault} focus={vaultFocus} />
           </section>
           <section id="section-connect" aria-label="Connect" hidden={section !== "connect"}>
-            <Connect status={status} />
+            <Connect
+              status={status}
+              traffic={trafficOpened ? trafficHandle : undefined}
+              onOpenLog={(id) => {
+                setLogFocus({ id, nonce: Date.now() });
+                openSection("logs");
+              }}
+            />
           </section>
           <section id="section-policy" aria-label="Policy" hidden={section !== "policy"}>
             <Policy status={status} />
