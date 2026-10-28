@@ -38,6 +38,7 @@ def route_app(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, list[dict[str, 
         keys=ApiKeyStore(),
         connections=ConnectionStore(validator=validate),
         quotas=QuotaLedger(),
+        sponsored_enabled=False,
     )
     upstream_bodies: list[dict[str, Any]] = []
 

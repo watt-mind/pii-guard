@@ -102,7 +102,12 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
-      - run: uv sync
+      # Exercise the real Azure SDK conditional-write boundary, not only mocks/skips.
+      - run: uv sync --extra hosted-azure
+      - name: Hosted Azure SDK wire boundary (offline)
+        run: |
+          uv run --no-sync python -c "import azure.identity, azure.storage.blob"
+          uv run --no-sync pytest tests/hosted/test_spend_adapter.py -k real_sdk --no-cov -q
       - name: Test (parallel, coverage floor, derandomized Hypothesis)
         run: |
           if [ "$FULL" = true ]; then

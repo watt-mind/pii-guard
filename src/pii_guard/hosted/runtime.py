@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import threading
 import time
@@ -21,7 +22,8 @@ from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.connections import ConnectionStore
 from pii_guard.hosted.egress import SecureTransport
 from pii_guard.hosted.identity import ApiKeyStore, GuestIdentity, Principal
-from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits
+from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits, SponsoredUnavailableError
+from pii_guard.hosted.spend import azure_spend
 from pii_guard.observability import Observability, ObservabilitySettings, TrafficLevel
 from pii_guard.types import Analyzer, PiiGuardError, Span
 from pii_guard.vault import Vault
@@ -112,11 +114,20 @@ class HostedService:
                 input_microdollars_per_token=settings.hosted_input_microdollars_per_token,
                 output_microdollars_per_token=settings.hosted_output_microdollars_per_token,
             ),
-            sponsored_allocation_microdollars=settings.hosted_sponsored_microdollars,
+            sponsored_allocation_microdollars=settings.hosted_sponsored_microdollars
+            if settings.hosted_spend_store == "marker"
+            else 0,
             allocation_id=settings.hosted_sponsored_allocation_id,
             allocation_directory=settings.hosted_allocation_directory,
             allocation_expires_at=settings.hosted_allocation_expires_at,
         )
+        self.spend = (
+            azure_spend(settings, daily_ceiling=self.quotas.limits.global_daily_microdollars)
+            if settings.hosted_spend_store == "azure_blob"
+            else None
+        )
+        self._spend_workers = BoundedWorkers(2, "pii-guard-sponsored-spend")
+        self._spend_refresh_lock = threading.Lock()
         self._runtimes: dict[str, Runtime] = {}
         self._lock = threading.Lock()
         self.rest_slots = threading.BoundedSemaphore(4)
@@ -187,6 +198,53 @@ class HostedService:
             }
         )
 
+    @property
+    def sponsored_enabled(self) -> bool:
+        if self.quotas.sponsored_killed:
+            return False
+        return self.spend.available if self.spend is not None else self.quotas.sponsored_enabled
+
+    async def charge_spend(self, input_tokens: int, output_tokens: int) -> None:
+        if self.spend is None or self.quotas.sponsored_killed:
+            raise SponsoredUnavailableError
+        limits = self.quotas.limits
+        cost = (
+            input_tokens * limits.input_microdollars_per_token
+            + output_tokens * limits.output_microdollars_per_token
+        )
+        cancelled = threading.Event()
+        try:
+            async with asyncio.timeout(10):
+                await self._spend_workers.run(self.spend.charge, cost, cancelled)
+            if self.quotas.sponsored_killed:
+                raise SponsoredUnavailableError
+        except TimeoutError:
+            raise SponsoredUnavailableError from None
+        finally:
+            cancelled.set()
+
+    async def refresh_spend(self) -> None:
+        """Refresh the account hint with bounded, single-flight, read-only I/O."""
+        if self.spend is None or self.quotas.sponsored_killed:
+            return
+
+        def refresh() -> None:
+            # Acquire inside the worker: cancellation before submission cannot leak a
+            # lock, and a timed-out worker retains it until its actual read finishes.
+            if not self._spend_refresh_lock.acquire(blocking=False):
+                return
+            try:
+                if self.spend is not None:
+                    self.spend.refresh()
+            finally:
+                self._spend_refresh_lock.release()
+
+        try:
+            async with asyncio.timeout(10):
+                await self._spend_workers.run(refresh)
+        except TimeoutError:
+            return
+
     def gateway(self, request: Request) -> Gateway:
         existing = getattr(request.state, "hosted_gateway", None)
         if existing is not None:
@@ -236,6 +294,9 @@ class HostedService:
         self.connections.clear()
         for workers in self._workers.values():
             workers.close()
+        self._spend_workers.close()
+        if self.spend is not None:
+            self.spend.close()
 
     def enter_ingress(self) -> None:
         with self._lock:
