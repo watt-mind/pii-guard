@@ -1,6 +1,6 @@
 # Entity taxonomy
 
-> Status: proposed. Built-in languages: Hungarian (`hu`), English (`en`) and German (`de`). The entity types
+> Status: proposed. Built-in languages: Hungarian (`hu`), English (`en`), German (`de`) and Polish (`pl`). The entity types
 > below are shared by every language; the per-language tables say which identifiers each
 > language pack's rules find and which type they map to ([ADR 0008](decisions/0008-language-packs.md)).
 
@@ -201,6 +201,29 @@ German IBANs and `+49` phone numbers are found by the language-independent rules
 
 Vault inflection: the genitive kept outside the placeholder (`Annas` → `[[PERSON_7f3a]]s`,
 `Hans'`, colloquial `Anna's`).
+
+### Polish (`pl`)
+
+Polish IBANs and `+48` phone numbers are found by the language-independent rules. A REGON is a
+business number, but a sole trader's identifies a person, as a NIP does.
+
+| Identifier | Type | Validation | Scope |
+|---|---|---|---|
+| PESEL (`85031401234`) next to `PESEL` | `ID_DOCUMENT` | weights 1-3-7-9, a possible date of birth (month offset by century) + label | everywhere |
+| NIP (`123-456-32-18`, `123-45-63-218`, compact) next to `NIP` | `ID_DOCUMENT` | weights 6-5-7-2-3-4-5-6-7 mod 11 + label | everywhere |
+| EU VAT number `PL` + NIP (`PL1234563218`) | `ID_DOCUMENT` | NIP check digit | everywhere |
+| REGON, 9 or 14 digits, next to `REGON` | `ID_DOCUMENT` | mod 11 check digit(s) + label | everywhere |
+| ID card, dowód osobisty (`ABA 300000`) next to `dowód`, `seria i numer`, `nr dokumentu` | `ID_DOCUMENT` | 3 letters + 6 digits, weights 7-3-1-9-7-3-1-7-3 + label | everywhere |
+| Passport (`AA 0000000`) next to `paszport` / `passport` | `ID_DOCUMENT` | 2 letters + 7 digits, weights 7-3-9-1-7-3-1-7-3 + label | everywhere |
+| PESEL, NIP, ID card, passport without a label | `ID_DOCUMENT` | as above, not after an order, invoice or amount label (scores lower) | language |
+| National phone number (`555 123 456`, `(22) 555 12 34`) | `PHONE` | mobile 3-3-3 starting 4–8, landline 2-3-2-2, not an amount | language |
+| Street address (`ul. Kwiatowa 12/5[, 00-950 Warszawa]`, `al.`, `os.`, `pl.`) | `ADDRESS` | street-type word + name + house number | language |
+| Postcode and place (`31-008 Kraków`) | `ADDRESS` | `NN-NNN` + capitalised place | language |
+| Driving-licence number (`00123/16/1234`) after `prawo jazdy`; any number above with a bad check digit after its cue | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
+
+Vault inflection: case endings that leave the written name intact are kept outside the
+placeholder (`Nowaka` → `[[PERSON_7f3a]]a`, `Kowalskiego` → `[[PERSON_7f3a]]ego`); forms
+whose stem changes (`Annie`, `Kowalskiej`) are matched as written.
 
 ## Visual entities
 

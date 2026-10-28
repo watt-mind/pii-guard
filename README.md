@@ -133,6 +133,9 @@ refused ([LAB-1299](docs/journey/2026-10-27-lab-1299-muse-1-4-14.md),
   | You get back | Megírtam a levelet Próba Zsuzsannának. | I wrote *to Zsuzsanna Próba*. |
 
   Inflected-name leaks went [18/30 → 0/30](docs/journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333).
+- **Language packs.** Hungarian, English, German and Polish (`hu`, `en`, `de`, `pl`) each ship
+  validated identifier rules, cue words and case handling; a new language is one package
+  ([docs/languages.md](docs/languages.md)).
 - **Measured in the open.** Every number is a committed [run record](eval/results/runs/); the
   report is regenerated and checked in CI; all data is fictional.
 
