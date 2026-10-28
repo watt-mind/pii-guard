@@ -19,6 +19,7 @@ from pii_guard.config import Settings
 from pii_guard.detect.rules import RuleDetector
 from pii_guard.gateway.config import Mode
 from pii_guard.gateway.detection import ModeDetector
+from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.identity import easy_auth_principal
 from pii_guard.hosted.middleware import HostedMiddleware
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits
@@ -132,6 +133,142 @@ def status(messages):
     return next(
         message["status"] for message in messages if message["type"] == "http.response.start"
     )
+
+
+def test_secondary_denials_happen_before_body_runtime_and_paid_work():
+    async def exercise():
+        service = HostedService(settings(hosted_client_ip_source="aca_xff_rightmost"))
+        service.quotas = ledger()
+        request_scope = scope(path="/v1/demo")
+        request_scope["headers"] = [
+            (key, value)
+            for key, value in request_scope["headers"]
+            if key != b"x-ms-client-principal"
+        ]
+        received = downstream_calls = 0
+
+        async def receive():
+            nonlocal received
+            received += 1
+            raise AssertionError("Denied request body must not be read")
+
+        async def downstream(*args):
+            nonlocal downstream_calls
+            downstream_calls += 1
+
+        for signal in (
+            [],
+            [(b"x-forwarded-for", b"not-an-address")],
+            [(b"x-forwarded-for", b"192.0.2.1")] * 2,
+        ):
+            messages = []
+
+            async def send(message, messages=messages):
+                messages.append(message)
+
+            await HostedMiddleware(downstream, service)(
+                {**request_scope, "headers": request_scope["headers"] + signal}, receive, send
+            )
+            assert status(messages) == 503
+            body = next(m["body"] for m in messages if m["type"] == "http.response.body")
+            assert json.loads(body)["error"]["code"] == "abuse_signal_unavailable"
+        assert received == downstream_calls == 0
+        assert not service._runtimes
+        assert service._ingress == service.quotas._active == 0
+        assert service.quotas._spent_allocation == 0
+        await service.close()
+
+    asyncio.run(exercise())
+
+
+def test_secondary_hourly_sign_in_and_retry_after_precede_body_and_account_stays_readable():
+    async def exercise():
+        now = [100.0]
+        service = HostedService(settings(hosted_client_ip_source="aca_xff_rightmost"))
+        service.abuse = AbuseAdmission("aca_xff_rightmost", clock=lambda: now[0])
+        service.quotas = ledger()
+        from starlette.datastructures import Headers
+
+        for index in range(120):
+            service.abuse.admit(
+                Headers({"x-forwarded-for": "192.0.2.1"}),
+                principal_id=f"synthetic-rotating-guest-{index}",
+                authenticated=False,
+                anonymous_sponsored=True,
+            )
+            now[0] += 2
+        request_scope = scope(path="/v1/demo")
+        request_scope["headers"] = [
+            (key, value)
+            for key, value in request_scope["headers"]
+            if key != b"x-ms-client-principal"
+        ] + [(b"x-forwarded-for", b"198.51.100.1, 192.0.2.1")]
+        downstream_calls = 0
+
+        async def receive():
+            raise AssertionError("Denied request body must not be read")
+
+        async def downstream(request_scope, receive, send):
+            nonlocal downstream_calls
+            downstream_calls += 1
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"{}"})
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        middleware = HostedMiddleware(downstream, service)
+        await middleware(request_scope, receive, send)
+        assert status(messages) == 429
+        assert (b"retry-after", b"3360") in messages[0]["headers"]
+        assert json.loads(messages[1]["body"])["error"]["code"] == "sign_in_required"
+        assert downstream_calls == 0
+        assert not service._runtimes
+        assert service._ingress == service.quotas._active == 0
+        assert service.quotas._spent_allocation == 0
+        # The same exhausted network can still read account metadata and sign in.
+        messages.clear()
+        await middleware({**request_scope, "method": "GET", "path": "/v1/account"}, receive, send)
+        assert status(messages) == 200
+        assert downstream_calls == 1
+        assert service.quotas._spent_allocation == 0
+        await service.close()
+
+    asyncio.run(exercise())
+
+
+def test_authenticated_burst_is_independent_of_signal_and_releases_ingress_on_denial():
+    async def exercise():
+        service = HostedService(settings())
+        service.abuse = AbuseAdmission(clock=lambda: 100.0)
+        from starlette.datastructures import Headers
+
+        for _ in range(10):
+            service.abuse.admit(
+                Headers(), principal_id=owner().id, authenticated=True, anonymous_sponsored=False
+            )
+
+        async def downstream(*args):
+            raise AssertionError("Denied request must not reach detector/provider work")
+
+        async def receive():
+            raise AssertionError("Denied request body must not be read")
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        await HostedMiddleware(downstream, service)(scope(), receive, send)
+        assert status(messages) == 429
+        assert (b"retry-after", b"2") in messages[0]["headers"]
+        assert service._ingress == service.quotas._active == 0
+        assert not service._runtimes
+        await service.close()
+
+    asyncio.run(exercise())
 
 
 def test_concurrent_request_denied_before_upstream_and_owner_released(monkeypatch):
@@ -342,7 +479,12 @@ def test_incomplete_bodies_are_bounded_before_quota_admission():
             pass
 
         middleware = HostedMiddleware(downstream, service)
-        tasks = [asyncio.create_task(middleware(scope(), receive, send)) for _ in range(32)]
+        # Distinct principals exercise the global ingress cap independently of the
+        # authenticated per-principal burst allowance before body reads.
+        tasks = [
+            asyncio.create_task(middleware(scope(subject=f"synthetic-slow-{i}"), receive, send))
+            for i in range(32)
+        ]
         try:
             await asyncio.wait_for(full.wait(), 2)
             assert status(await invoke(middleware)) == 429

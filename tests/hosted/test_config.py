@@ -50,3 +50,12 @@ def test_default_mode_remains_local():
 def test_hosted_model_allowlist_environment(monkeypatch):
     monkeypatch.setenv("PII_GUARD_HOSTED_MODELS", "model-one, model-two")
     assert Settings(_env_file=None).hosted_models == ("model-one", "model-two")
+
+
+def test_hosted_client_ip_source_is_explicit_and_defaults_off(monkeypatch):
+    assert Settings(_env_file=None).hosted_client_ip_source == "off"
+    monkeypatch.setenv("PII_GUARD_HOSTED_CLIENT_IP_SOURCE", "aca_xff_rightmost")
+    assert Settings(_env_file=None).hosted_client_ip_source == "aca_xff_rightmost"
+    monkeypatch.setenv("PII_GUARD_HOSTED_CLIENT_IP_SOURCE", "x_real_ip")
+    with pytest.raises(ValueError):
+        Settings(_env_file=None)

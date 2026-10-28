@@ -1336,6 +1336,35 @@ image masking and audit detection. Cookie-authenticated mutations require `Origi
 The host-prefixed guest cookie is signed, Secure, HttpOnly, SameSite=Strict and lasts one hour.
 A new/expired cookie creates a different guest, with global quotas bounding cookie rotation.
 
+`PII_GUARD_HOSTED_CLIENT_IP_SOURCE=off` (default) leaves anonymous network admission
+disabled. The opt-in `aca_xff_rightmost` source is valid only behind verified direct Azure
+Container Apps ingress: it uses the ACA-appended rightmost `X-Forwarded-For` address.
+One header, at most 2048 ASCII bytes and 32 valid IP hops, is required for anonymous
+`POST /v1/demo`; duplicate, missing or malformed signals return 503
+`abuse_signal_unavailable` before the body is read. There is no first-hop, `Forwarded`,
+`X-Real-IP` or socket-peer fallback. Forwarding address headers are removed from the
+downstream application scope. This does not configure platform or server access logging.
+
+Secondary admission immediately HMACs each normalized IPv4 address or IPv6 /64 with a
+random process-only key; mapped IPv4 uses the same bucket as IPv4. Its bounded in-memory
+tables hold digests and counters/timestamps only. Each table holds at most 4096 entries,
+with one-hour idle and 24-hour absolute expiry; a full table refuses new entries without
+evicting live allowances. Anonymous sponsored demo requests share a 30-request network
+burst, refilling 30/minute, and 120 requests per fixed hour starting at bucket creation.
+Guest cookie rotation does not reset that network allowance. Authenticated principals
+have separate 10-request bursts refilling 30/minute, independent of network usage and
+without requiring an address signal. Account inspection and sign-in remain reachable.
+Secondary charges happen after identity/path/origin validation, before body reads, and
+survive downstream failure. Clock/accounting failure refuses admission.
+
+Burst or capacity exhaustion returns 429 `abuse_throttled` with `Retry-After` seconds.
+Anonymous hourly exhaustion returns 429 `sign_in_required`, `Retry-After` until the hour
+ends and a message directing Google sign-in or the free walkthrough. Sign-in never
+replenishes global requests, tokens, daily spend or the finite sponsored allocation.
+There is no external CAPTCHA or claim of bot-proof protection. Keep the address source
+off until deployed ingress spoof/header and logging checks pass (see
+[operations.md](operations.md#hosted-secondary-abuse-admission)).
+
 Each owner has a separately HMAC-derived vault key, bounded vault, detection cache, session
 coordination, masked traffic log and inspector directory. Identical caller-chosen session IDs
 never cross an owner boundary. Detectors are shared, with globally bounded compute workers
