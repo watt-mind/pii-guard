@@ -329,6 +329,30 @@ function SourceBanner({
       </div>
     );
   }
+  if (status.state === "limited") {
+    const wait = status.retryAfterMs ? ` in about ${Math.ceil(status.retryAfterMs / 1000)} s` : " shortly";
+    return (
+      <div role="status" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+        <strong className="font-medium text-warn">Too many requests just now.</strong> The API is up but asked this page to slow down; it retries{wait}. The calls already shown stay.
+      </div>
+    );
+  }
+  if (status.state === "denied") {
+    return (
+      <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-ink">
+        {status.reason === "signed_out" ? (
+          <>
+            <strong className="font-medium text-danger">You're signed out.</strong> The API is up but answered 401. Sign in again; this page reconnects by itself.
+          </>
+        ) : (
+          <>
+            <strong className="font-medium text-danger">This account can't read this traffic log.</strong> The API is up but answered 403. Check the selected project, or sign in with the account
+            that owns it.
+          </>
+        )}
+      </div>
+    );
+  }
   return (
     <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-muted">
       {status.state === "connecting" ? (

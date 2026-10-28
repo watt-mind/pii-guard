@@ -229,3 +229,76 @@ def test_concurrent_cookie_rotation_cannot_exceed_atomic_burst():
     with ThreadPoolExecutor(max_workers=32) as pool:
         assert sum(pool.map(attempt, range(128))) == 30
     assert next(iter(limiter._networks.values())).requests == 30
+
+
+def test_signed_in_reads_use_a_separate_generous_bucket():
+    clock = Clock()
+    limiter = AbuseAdmission(clock=clock)
+
+    def signed_in(*, read):
+        limiter.admit(
+            Headers(),
+            principal_id="synthetic-console-owner",
+            authenticated=True,
+            anonymous_sponsored=False,
+            read=read,
+        )
+
+    for _ in range(120):
+        signed_in(read=True)
+    with pytest.raises(AbuseAdmissionError) as error:
+        signed_in(read=True)
+    assert error.value.retry_after == 1
+    # Reads never drained the work bucket, and work never drains the read bucket.
+    for _ in range(10):
+        signed_in(read=False)
+    with pytest.raises(AbuseAdmissionError) as error:
+        signed_in(read=False)
+    assert error.value.retry_after == 2
+    clock.now += 1
+    for _ in range(10):
+        signed_in(read=True)
+    with pytest.raises(AbuseAdmissionError):
+        signed_in(read=True)
+    assert len(limiter._reads) == len(limiter._principals) == 1
+    assert all(len(key) == 32 for key in limiter._reads)
+    clock.now += IDLE_SECONDS
+    limiter.purge_expired()
+    assert not limiter._reads
+
+
+def test_read_flag_leaves_anonymous_network_admission_unchanged():
+    limiter = AbuseAdmission("aca_xff_rightmost", clock=Clock())
+    for _ in range(30):
+        limiter.admit(
+            headers(),
+            principal_id="guest",
+            authenticated=False,
+            anonymous_sponsored=True,
+            read=True,
+        )
+    with pytest.raises(AbuseAdmissionError):
+        admit(limiter)
+    assert not limiter._reads
+    assert not limiter._principals
+
+
+def test_read_bucket_table_is_bounded():
+    limiter = AbuseAdmission(clock=Clock())
+    for index in range(MAX_BUCKETS):
+        limiter.admit(
+            Headers(),
+            principal_id=f"synthetic-reader-{index}",
+            authenticated=True,
+            anonymous_sponsored=False,
+            read=True,
+        )
+    with pytest.raises(AbuseAdmissionError):
+        limiter.admit(
+            Headers(),
+            principal_id="synthetic-reader-new",
+            authenticated=True,
+            anonymous_sponsored=False,
+            read=True,
+        )
+    assert len(limiter._reads) == MAX_BUCKETS

@@ -169,6 +169,21 @@ describe("Overview", () => {
     expect(await within(overview).findByText("http://127.0.0.1:8899/v1")).toBeInTheDocument();
   });
 
+  it.each([
+    [{ state: "limited", message: "Request allowance reached", retryAfterMs: 4000 }, "Too many requests just now, so the traffic log is paused.", /retries by itself in about 4 s/],
+    [{ state: "denied", reason: "signed_out", message: "Sign in" }, "You're signed out, so the traffic log can't be read.", /answered 401\. Sign in again/],
+    [{ state: "denied", reason: "forbidden", message: "denied" }, "This account can't read this traffic log.", /answered 403/],
+  ] as [TrafficStatus, string, RegExp][])("says %o is not an unreachable API (LAB-1437)", async (status, title, body) => {
+    const f = fakeConnect();
+    render(<App api={liveApi()} mock={createMockClient()} traffic={{ connect: f.connect }} loadStatus={statusOf()} />);
+    await f.ready();
+    f.push([], status);
+    const overview = region("Overview");
+    expect(await within(overview).findByText(title)).toBeInTheDocument();
+    expect(within(overview).getByText(body)).toBeInTheDocument();
+    expect(within(overview).queryByText("The pii-guard API isn't reachable.")).toBeNull();
+  });
+
   it("counts real calls: requests, values masked, blocked, top types and stage latency", async () => {
     const f = fakeConnect();
     render(<App api={liveApi()} mock={createMockClient()} traffic={{ connect: f.connect }} loadStatus={statusOf()} />);

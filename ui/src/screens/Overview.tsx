@@ -191,7 +191,13 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
         ? "The traffic log is off on this server, so there is nothing to count."
         : status.state === "offline"
           ? "The pii-guard API isn't reachable."
-          : "Nothing has gone through the gateway yet.";
+          : status.state === "limited"
+            ? "Too many requests just now, so the traffic log is paused."
+            : status.state === "denied"
+              ? status.reason === "signed_out"
+                ? "You're signed out, so the traffic log can't be read."
+                : "This account can't read this traffic log."
+              : "Nothing has gone through the gateway yet.";
   return (
     <section aria-labelledby="empty-title" className="rounded-xl border border-line bg-surface px-5 py-8 sm:px-8">
       <h2 id="empty-title" className="text-lg font-normal text-ink">
@@ -207,6 +213,13 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
           ) : (
             <>{status.message}.</>
           )
+        ) : status.state === "limited" ? (
+          <>The API is up but asked this page to slow down. It retries by itself{status.retryAfterMs ? ` in about ${Math.ceil(status.retryAfterMs / 1000)} s` : ""}; nothing is lost.</>
+        ) : status.state === "denied" ? (
+          <>
+            The API is up but answered {status.reason === "signed_out" ? "401" : "403"}.{" "}
+            {status.reason === "signed_out" ? "Sign in again; this page reconnects by itself." : "Check the selected project, or sign in with the account that owns it."}
+          </>
         ) : (
           <>
             {sendDemo ? (

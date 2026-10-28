@@ -200,6 +200,7 @@ class HostedMiddleware:
                     principal_id=principal.id,
                     authenticated=principal.authenticated,
                     anonymous_sponsored=canonical == "/v1/demo" and scope.get("method") == "POST",
+                    read=scope.get("method") in {"GET", "HEAD"},
                 )
             if principal.authenticated and canonical not in {"/v1/account", "/v1/demo"}:
                 state = await anyio.to_thread.run_sync(

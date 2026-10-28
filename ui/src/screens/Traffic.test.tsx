@@ -200,6 +200,27 @@ describe("Live traffic", () => {
     expect(screen.queryByRole("button", { name: "Send demo traffic" })).toBeNull();
   });
 
+  it("says the API is rate limiting, not unreachable, and stays on the live log (LAB-1437)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" fixtureIntervalMs={60_000} />);
+    f.status({ state: "limited", message: "Request allowance reached; try again in 3 seconds", retryAfterMs: 3000 });
+    expect(await screen.findByText("Too many requests just now.")).toBeInTheDocument();
+    expect(screen.getByText(/retries in about 3 s/)).toBeInTheDocument();
+    expect(screen.queryByText("Recorded demo traffic.")).toBeNull();
+    expect(screen.queryByText(/isn't reachable|Lost the connection/)).toBeNull();
+  });
+
+  it("says the viewer is signed out or denied, not that the API is unreachable (LAB-1437)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" fixtureIntervalMs={60_000} />);
+    f.status({ state: "denied", reason: "signed_out", message: "Sign in with Google to use this endpoint" });
+    expect(await screen.findByText("You're signed out.")).toBeInTheDocument();
+    expect(screen.queryByText("Recorded demo traffic.")).toBeNull();
+    f.status({ state: "denied", reason: "forbidden", message: "denied" });
+    expect(await screen.findByText("This account can't read this traffic log.")).toBeInTheDocument();
+    expect(screen.queryByText(/isn't reachable|Lost the connection/)).toBeNull();
+  });
+
   it("plays the recorded traffic once, and Replay again never inflates the counters (LAB-1200)", async () => {
     const user = userEvent.setup();
     const total = (fixture.events as unknown[]).map(parseTrafficEvent).filter(Boolean).length;
