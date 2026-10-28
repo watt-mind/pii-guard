@@ -74,7 +74,7 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | pii-guard rules + NER (distilled base) † | 10 | 100.0% | 97.1% | 98.5% | 3.3% | 3.3% | 0.0% | 100.0% | 35 ms | 2026-10-27 | `c611f99` |
 | pii-guard rules + NER (fine-tuned) † | 10 | 80.0% | 94.1% | 86.5% | 3.3% | 6.7% | 16.2% | 100.0% | 14 ms | 2026-10-26 | `0ba3c1a` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 51 | 88.7% | 90.7% | 89.7% | 1.2% | 1.7% | 6.2% | 100.0% | 16 ms* | 2026-10-27 | `910a6a2` |
-| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 18 ms* | 2026-10-27 | `477196a` |
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 12 ms | 2026-10-28 | `51e9e02` |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 51 | 90.0% | 96.4% | 93.1% | 0.0% | 2.3% | 7.2% | 100.0% | 81 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 51 | 98.0% | 98.5% | 98.2% | 1.2% | 2.9% | 1.1% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 51 | 89.0% | 92.3% | 90.6% | 1.2% | 2.9% | 5.9% | 100.0% | 14 ms* | 2026-10-27 | `910a6a2` |
@@ -532,6 +532,22 @@ By language:
 | Presidio | 18.8% | 66.7% (34/51) | 13.6% (6/44) | 43.9% (29/66) | 26.2% (16/61) | 18.5% (155/839) |
 | LLM Guard | 59.3% | 90.2% (46/51) | 6.8% (3/44) | 34.8% (23/66) | 41.0% (25/61) | 63.4% (532/839) |
 | PrivAiTe | 27.7% | 82.4% (42/51) | 6.8% (3/44) | 54.5% (36/66) | 9.8% (6/61) | 30.0% (252/839) |
+
+### `inflection`
+
+hand-written; documents: hu 8.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 8 | 100.0% | 88.9% | 94.1% | 3.3% | 30.0% | 0.0% | 100.0% | 14 ms | 2026-10-28 | `51e9e02` |
+
+
+By language:
+
+| System | hu F1 | hu leak |
+|---|---:|---:|
+| pii-guard fast, NER v2 base + hard negatives (LAB-1150) | 94.1% | 3.3% |
+
 
 ### `injection`
 
@@ -992,6 +1008,8 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-28 | `2026-10-28-lab-1355-smoke-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | smoke | de, en, hu | recorded | `51e9e02` | — | — |
+| 2026-10-28 | `2026-10-28-lab-1355-inflection-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | inflection | hu | recorded | `51e9e02` | — | — |
 | 2026-10-28 | `2026-10-28-lab-1336-brands-after` | pii-guard rules + ner | brand-names | de, en, hu | recorded | `9d800ba` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-lab-1336-brands-before` | pii-guard rules + ner | brand-names | de, en, hu | recorded | `9d800ba` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-datasets-ai4privacy-fast` | pii-guard fast, NER v2 base + hard negatives (LAB-1150) | ai4privacy | de, en, hu | recorded | `3b5c05b` (dirty) | — | — |

@@ -31,8 +31,14 @@ Definitions (``docs/evaluation.md``):
 - **Placeholder consistency**: gold entities (per document, of a ``mask``-policy type) whose
   occurrences are all masked by one and the same placeholder. An entity groups the gold spans
   of one type that are surface forms of each other (``Minta Anna``, ``Minta Annának``,
-  ``TESZT ELEK``; :func:`pii_guard.eval.forms.surface_pattern`). An occurrence left unmasked
-  makes its entity inconsistent. ``multi_rate`` counts only entities with 2+ occurrences.
+  ``TESZT ELEK``; :func:`pii_guard.eval.forms.surface_pattern`). An occurrence counts only if
+  it is fully covered: every letter and digit of the gold span lies inside the placeholder,
+  except a trailing case ending or possessive the language's inflection matcher reads as a
+  suffix (the vault keeps it outside: ``[[PERSON_x]]nak``) and whole words that identify no
+  one by the partial-leak rule (``Ms``, ``Frau``, ``MD``). An occurrence left unmasked
+  or masked only in part (``[[PERSON_x]]inta Anna``, ``Próba [[PERSON_x]]``) makes its entity
+  inconsistent (LAB-1355).
+  ``multi_rate`` counts only entities with 2+ occurrences.
 - **Number validity** (public sets only): recall and leak split by whether a structured
   identifier passes the language packs' validators, plus the leak of every other value
   (:mod:`pii_guard.eval.validity`). The headline counts are not changed by it.
@@ -56,6 +62,7 @@ from pii_guard.policy import DEFAULT_POLICIES, PolicySet
 from pii_guard.registry import create_detector
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, Detector, EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, Vault, normalize_value
+from pii_guard.vault.inflection import inflection_for, splits
 
 __all__ = [
     "DEFAULT_POLICY",
@@ -325,13 +332,68 @@ def _gold_entities(doc: Document, policy: Mapping[EntityType, str]) -> list[list
     return [members for _, members in groups]
 
 
+def _fully_covered(span: GoldSpan, hits: Sequence[tuple[int, int, str]], language: str) -> bool:
+    """True if ``hits`` leave nothing identifying of ``span`` outside a placeholder.
+
+    Text of the span outside the placeholder is allowed only as
+
+    - whole words that identify no one, by the partial-leak rule (:func:`_identifying_tokens`):
+      a title or short particle (``Ms [[PERSON_x]]``, ``Frau [[PERSON_x]]``, ``, MD``);
+    - a case ending or possessive right after the placeholder at the end of the span, which
+      the language's inflection matcher reads as a suffix of it and the vault keeps outside
+      on purpose (``[[PERSON_x]]nak``, ``[[PERSON_x]]'s``).
+
+    ``[[PERSON_x]]inta Anna``, ``Minta [[PERSON_x]]`` and ``[[ID_x]]010`` are not covered.
+    """
+    if not hits:
+        return False
+    text = span.text
+    covered = [any(s <= i < e for s, e, _ in hits) for i in range(span.start, span.end)]
+    if not any(covered):
+        return False
+    stopwords = language_forms(language).stopwords
+    i = 0
+    while i < len(text):
+        if covered[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(text) and not covered[j]:
+            j += 1
+        gap = text[i:j]
+        cut_left = i > 0 and gap[0].isalnum() and text[i - 1].isalnum()
+        cut_right = j < len(text) and gap[-1].isalnum() and text[j].isalnum()
+        suffix = cut_left and j == len(text) and _is_suffix(span, i, language)
+        if not suffix and (
+            cut_left or cut_right or _identifying_tokens(gap, span.entity_type, stopwords)
+        ):
+            return False
+        i = j
+    return True
+
+
+def _is_suffix(span: GoldSpan, at: int, language: str) -> bool:
+    """True if ``span.text[at:]`` (bar trailing punctuation) is a suffix of ``span.text[:at]``."""
+    tail = _TRAILING_PUNCT_RE.sub("", span.text[at:])
+    if not tail or any(ch.isspace() for ch in tail):
+        return False
+    matcher = inflection_for(language)
+    if any(split.suffix == tail for split in splits(matcher, span.text, span.entity_type)):
+        return True
+    pattern = matcher.suffix_pattern(span.text[:at], span.entity_type)
+    return re.fullmatch(pattern, tail) is not None
+
+
+_TRAILING_PUNCT_RE = re.compile(r"[^\w'\u2019-]+$")
+
+
 def consistency_report(
     doc: Document,
     replacements: Sequence[tuple[int, int, str]],
     *,
     policy: Mapping[EntityType, str] = DEFAULT_POLICY,
 ) -> list[EntityConsistency]:
-    """Per gold entity: are all its occurrences masked by a single placeholder?
+    """Per gold entity: is every occurrence fully masked, all by a single placeholder?
 
     ``replacements`` are the vault's ``(start, end, placeholder)`` in input offsets
     (:meth:`pii_guard.vault.VaultSession.mask_with_report`).
@@ -341,9 +403,9 @@ def consistency_report(
         placeholders: set[str] = set()
         covered = True
         for span in members:
-            hits = {p for start, end, p in replacements if start < span.end and span.start < end}
-            covered &= bool(hits)
-            placeholders |= hits
+            hits = [(s, e, p) for s, e, p in replacements if s < span.end and span.start < e]
+            covered &= _fully_covered(span, hits, doc.language)
+            placeholders |= {p for _, _, p in hits}
         report.append(
             EntityConsistency(
                 members[0].entity_type, len(members), covered and len(placeholders) == 1
