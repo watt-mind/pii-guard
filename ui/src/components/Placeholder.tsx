@@ -44,7 +44,7 @@ export function Placeholder({ text, entityType, active, unresolved, onActivate, 
     >
       <span className="opacity-45">[[</span>
       <span>{type}</span>
-      <span className="opacity-60">_{id}</span>
+      <span>_{id}</span>
       <span className="opacity-45">]]</span>
       <span className="sr-only"> ({label})</span>
     </span>

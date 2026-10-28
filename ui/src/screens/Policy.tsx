@@ -21,7 +21,7 @@ const POLICY_TEXT: Record<EntityPolicy, string> = {
 
 const POLICY_CLASS: Record<EntityPolicy, string> = {
   mask: "bg-masked-soft text-masked ring-masked/35",
-  keep: "bg-surface-2 text-muted ring-kept/50",
+  keep: "bg-surface-2 text-kept-ink ring-kept/50",
   block: "bg-blocked-soft text-blocked ring-blocked/40",
 };
 

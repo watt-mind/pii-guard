@@ -10,8 +10,8 @@ screenshots, the default for a new visitor); dark is a full equal derived from t
 family, not an inversion. "System" stays available in the theme toggle.
 
 The look and feel follows the account console of a hosted inference provider
-(reference: https://app.fireworks.ai/account/home, measured 2026-10-28): white paper, warm
-neutrals, a plum-black primary, a magenta-plum accent family and a light neo-grotesk. Only
+(reference: https://app.fireworks.ai/account/home, measured 2026-10-28): a warm off-white canvas
+under white cards, warm neutrals, a plum primary, a magenta-plum accent family and a light neo-grotesk. Only
 the feel is shared. The name, logo, copy and fonts are pii-guard's own; no marks, logos or
 proprietary fonts of the reference are used.
 
@@ -19,18 +19,19 @@ proprietary fonts of the reference are used.
 
 | Token | Light | Dark | Used for |
 |---|---|---|---|
-| `--canvas`, `--surface` | `#ffffff` | `#121110`, `#191816` | page, cards, panes |
-| `--surface-2`, `--surface-3` | `#f9f7f5`, `#f4f0ec` | `#211f1d`, `#2a2725` | active nav item, pane headers, subtle fills, hover |
+| `--canvas`, `--surface` | `#faf9f7`, `#ffffff` | `#121110`, `#191816` | page; cards and panes (white on the warm canvas) |
+| `--surface-2`, `--surface-3` | `#f5f2ef`, `#eeeae5` | `#211f1d`, `#2a2725` | active nav item, pane headers, subtle fills, hover |
 | `--ink` | `#1e1d1b` | `#f3f0ec` | text, focus ring |
-| `--muted`, `--faint` | `#595959`, `#6b6762` | `#b3ada7`, `#948e88` | secondary text, hints and group labels |
-| `--line`, `--line-strong` | `#eeeeee`, `#e2ddd8` | `#2a2826`, `#3a3633` | hairlines on cards and dividers (decorative) |
+| `--muted`, `--faint` | `#57524d`, `#6b6762` | `#b3ada7`, `#948e88` | secondary text, hints and group labels |
+| `--line`, `--line-strong` | `#e6e1dc`, `#d6cfc8` | `#33302d`, `#45403c` | hairlines on cards and dividers (decorative, about 1.3:1); the stronger one for segment rings and secondary button borders |
 | `--field` | `#8f8780` | `#807973` | the outline of inputs, selects and text areas (3:1) |
-| `--primary` / `--on-primary` | `#280016` / white | `#f6dcec` / `#280016` | the primary action |
-| `--accent` family | `#a71e7e` | `#ec7fc4` | badges, the header hairline; never a state |
+| `--primary` / `--on-primary` | `#5c0a3f` / white | `#b8468f` / white | the primary action: a plum button with white text in both themes |
+| `--accent` family | `#a71e7e` | `#ec7fc4` | brand only: badges, the wordmark, the header hairline; never a state, never a placeholder |
 | `--guard` | `#047a56` (dot `#05aa77`) | `#3fd6a0` | protected: the boundary, a live connection, values put back |
 
-The header hairline is `--accent-gradient` (`#ff7c57` → `#a71e7e` → `#610a45`, 92°) at 35 %
-over a soft peach-pink wash, 4 px under the page header.
+Every neutral is warm (red above blue): no pure greys. The header hairline is `--accent-gradient` (`#ff7c57` → `#a71e7e` → `#610a45`, 92°) at 35 %
+over a soft peach-pink wash, 4 px under the page header. The gradient is for the hero and the
+wordmark only, never a button.
 
 What happened to a value keeps its own tokens, so components never name a hue:
 
@@ -38,20 +39,23 @@ What happened to a value keeps its own tokens, so components never name a hue:
 |---|---|---|
 | `--masked` | replaced by a placeholder | original values on your side, placeholders on the model's side |
 | `--restored` | real value put back | restored values in answers |
-| `--kept` | detected, left in place by policy | dashed outline, no fill |
+| `--kept`, `--kept-ink` | detected, left in place by policy | dashed outline in `--kept` (3:1, the same grey as `--field`), no fill; "kept" labels and chip text in `--kept-ink` (4.5:1) |
 | `--blocked` | fail closed: nothing was sent | blocked notices, refused calls |
 | `--leak` | a value reached the model unmasked | unresolved placeholders, leak figures |
 | `--model` | the model's side of the boundary | pane headers and labels |
 | `--focus` | keyboard focus | neutral ink, so it never reads as a state |
 
 Status hues follow the reference family, darkened where they carry text: green `#05aa77`
-(dots) / `#047a56` (text), red `#d2192d` (reference `#fd293e`), orange `#9a5300` (reference
+(dots) / `#047a56` (text), red `#c8331c` (an orange-red, so it never reads as the brand magenta), orange `#9a5300` (reference
 `#f98d00`), blue `#005fc7` (reference `#007aff`).
 
 Entity types are never told apart by hue: the type is always written (`[[EMAIL_…]]`, "Email").
-Charts use the categorical slots `--series-1…8` in fixed order (dataviz reference palette,
-unchanged by the restyle); the live-traffic stages take slots 1 to 7 and the upstream is a warm
-neutral. Seventeen entity types fold into five families for charts (`ENTITY_GROUPS` in
+Charts use the categorical slots `--series-1…8` in fixed order: blue, rose, violet, brown, teal,
+red, slate, green. Every slot is 3:1 or more on its surface in both themes, adjacent slots stay
+apart under deutan, protan and tritan simulation, and slots 1 to 5 avoid the status hues (no green,
+red or amber). The live-traffic stages take slots 1 to 5 in pipeline order, then unmask takes the
+green slot (values put back) and the response the slate one; the red slot is never a stage. The
+upstream is a warm neutral. Seventeen entity types fold into five families for charts (`ENTITY_GROUPS` in
 `src/lib/entities.ts`). Status colours are never chart series. The recall heatmap ramps from
 the surface to `--heat` (`#4a8ade` light, `#2c66bd` dark), tuned so its ink text keeps 4.5:1 on
 every step.
@@ -63,20 +67,33 @@ formula.
 
 | Pair | Light | Dark |
 |---|---|---|
-| ink on canvas | 16.8 | 16.6 |
-| ink on surface-2 | 15.8 | 14.5 |
-| muted on surface | 7.0 | 8.0 |
-| faint on surface-2 (worst case for hints) | 5.3 | 5.1 |
-| on-primary on primary (button text) | 19.1 | 14.9 |
+| ink on canvas | 16.0 | 16.6 |
+| ink on surface-2 | 15.1 | 14.5 |
+| muted on surface | 7.7 | 8.0 |
+| muted on canvas | 7.3 | 8.5 |
+| faint on surface-2 (worst case for hints) | 5.0 | 5.1 |
+| on-primary on primary (button text) | 13.4 | 4.9 |
+| on-primary on primary-hover | 10.7 | 5.8 |
 | white on accent (badge text) | 6.7 | n/a |
 | accent on surface (accent text) | 6.7 | 7.1 |
 | guard on surface (restored, protected text) | 5.4 | 9.6 |
 | model on model-soft (model pane labels) | 5.5 | 7.7 |
 | warn on warn-soft (blocked notices) | 5.3 | 8.8 |
-| danger on danger-soft (leak, errors) | 4.6 | 6.6 |
+| danger on surface | 5.3 | 7.4 |
+| danger on danger-soft (leak, errors) | 4.7 | 6.5 |
+| masked on masked-soft (placeholders) | 5.0 | 6.3 |
+| kept-ink on surface-2 ("kept" chips) | 4.9 | 6.1 |
+| kept on surface (dashed outline, 3:1) | 3.5 | 3.7 |
 | field on surface (control outline, 3:1) | 3.5 | 4.1 |
+| field on canvas | 3.4 | 4.4 |
+| chart series, worst slot on surface (3:1) | 3.9 | 3.6 |
+| line on surface (decorative, about 1.3) | 1.3 | 1.35 |
 | ink on the recall heatmap, worst step | 5.1 | 5.2 |
-| focus ring (ink) on canvas | 16.8 | 16.6 |
+| focus ring (ink) on canvas | 16.0 | 16.6 |
+
+`src/palette.test.ts` reads these tokens from `src/index.css` and asserts every ratio above (and
+the hue rules for the chart slots, danger and the primary), so a token change that breaks one
+fails CI.
 
 Hairlines (`--line`) are decorative: cards and dividers are identified by their content, not
 their border. The live dot (`--guard-dot`, 3.0:1) always sits next to its written label. The
@@ -145,7 +162,7 @@ controls; the hosted landing uses the same components. `className` on a componen
 only (width, margin, flex): it never changes colour, height or radius, because classes are not
 merged.
 
-- **`Button`** `variant`: `primary` (plum fill, the one main action of a form or pane),
+- **`Button`** `variant`: `primary` (plum fill and white text in both themes, never the gradient, the one main action of a form or pane),
   `secondary` (surface, `--line-strong` border deepening to `--field` on hover), `ghost` (text
   only, low-weight actions inside a pane) and `danger` (red text and border: destructive actions
   and their confirmation). `size`: `sm` 32 px, `md` 36 px; both become 44 px on a coarse pointer
@@ -196,7 +213,7 @@ merged.
   late cards never push a painted page down (CLS under 0.1 on every screen).
 - **Hosted setup list** (Overview): one ordered list (model → policy → endpoint → endpoint key →
   first call) ticked from the owner's own data, with one primary button: the next step.
-- **`Card`**: white, 1 px `--line`, 20 px radius, `p-4 sm:p-5`, an 18/400 title and a 14 px muted
+- **`Card`**: white (`--surface`) on the warm canvas, 1 px `--line`, 20 px radius, `p-4 sm:p-5`, an 18/400 title and a 14 px muted
   subtitle (`mt-0.5`). `Pane` uses the same insets and title; side-by-side cards share them so
   their titles line up.
 - **`KeyValues`**: label/value rows with a fixed 8.5 rem label column (one column below 640 px),

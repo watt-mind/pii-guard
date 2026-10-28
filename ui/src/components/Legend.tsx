@@ -36,7 +36,7 @@ export function Legend({ counts, kept: keptTypes, activeType = null, known = 0 }
             <span className="font-medium text-ink">{meta.label}</span>
             <span className="tabular-nums">{n}</span>
             {kept && (
-              <span className="font-mono text-2xs text-muted">kept</span>
+              <span className="font-mono text-2xs text-kept-ink">kept</span>
             )}
           </li>
         );
