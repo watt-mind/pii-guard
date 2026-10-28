@@ -150,9 +150,9 @@ make smoke          # rules only, offline (CI runs it)
 
 `make demo` runs **fast mode with the NER** from a clean checkout: it installs the `ner` extra
 and, without `PII_GUARD_NER_MODEL`, downloads a NER model once (about 1.1 GB, pinned
-revision, into `~/.cache/pii-guard/models`; the banner says which model runs). Until the
-trained pii-guard checkpoint is published, that is a public Apache-2.0 PII model: a stop-gap
-that over-masks (about 23 % on the English smoke set). Free-text names are then masked with no known values, in the gateway and on the Mask and
+revision, SHA-256 checked, into `~/.cache/pii-guard/models`; the banner says which model
+runs): pii-guard's own NER, [`hdkiller/pii-guard-ner-xlmr-base`](https://huggingface.co/hdkiller/pii-guard-ner-xlmr-base)
+`v2.0` (XLM-R base, Apache-2.0; [model card](training/ner/model-card.md)). Free-text names are then masked with no known values, in the gateway and on the Mask and
 Images screens alike. `make demo MODE=rules` is rules only: offline, no download, names need
 known values. Which model and why: [models.md](docs/models.md#which-ner-model-fast-mode-runs).
 A set `PII_GUARD_NER_MODEL` without the extra stops startup instead of quietly running rules

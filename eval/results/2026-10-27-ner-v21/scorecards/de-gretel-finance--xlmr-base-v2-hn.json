@@ -1,0 +1,976 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "commit": "477196a3427c8c02843f21f9f0c3094d6d509859",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "generated_at": "2026-10-27T22:01:48+00:00",
+    "detectors": [
+      "rules",
+      "ner"
+    ],
+    "skipped_detectors": [],
+    "languages": null,
+    "fixtures": [
+      {
+        "path": "eval/datasets/gretel-finance/de-gretel-finance.jsonl",
+        "sha256": "2401233fa20513d765a023706bf7e7a8f28b301b7901a948070121992b2953a5"
+      }
+    ]
+  },
+  "overall": {
+    "documents": 200,
+    "gold_spans": 912,
+    "predicted_spans": 913,
+    "unscored_predictions": 66,
+    "detection": {
+      "exact": {
+        "per_type": {
+          "PERSON": {
+            "gold": 452,
+            "pred": 355,
+            "tp_pred": 247,
+            "tp_gold": 247,
+            "precision": 0.6957746478873239,
+            "recall": 0.5464601769911505,
+            "f1": 0.6121437422552665
+          },
+          "ADDRESS": {
+            "gold": 142,
+            "pred": 239,
+            "tp_pred": 104,
+            "tp_gold": 104,
+            "precision": 0.4351464435146444,
+            "recall": 0.7323943661971831,
+            "f1": 0.5459317585301837
+          },
+          "EMAIL": {
+            "gold": 28,
+            "pred": 30,
+            "tp_pred": 21,
+            "tp_gold": 21,
+            "precision": 0.7,
+            "recall": 0.75,
+            "f1": 0.7241379310344827
+          },
+          "PHONE": {
+            "gold": 20,
+            "pred": 27,
+            "tp_pred": 16,
+            "tp_gold": 16,
+            "precision": 0.5925925925925926,
+            "recall": 0.8,
+            "f1": 0.6808510638297872
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 12,
+            "pred": 12,
+            "tp_pred": 11,
+            "tp_gold": 11,
+            "precision": 0.9166666666666666,
+            "recall": 0.9166666666666666,
+            "f1": 0.9166666666666666
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 0,
+            "pred": 4,
+            "tp_pred": 0,
+            "tp_gold": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          },
+          "ID_DOCUMENT": {
+            "gold": 18,
+            "pred": 74,
+            "tp_pred": 15,
+            "tp_gold": 15,
+            "precision": 0.20270270270270271,
+            "recall": 0.8333333333333334,
+            "f1": 0.32608695652173914
+          },
+          "BANK_ACCOUNT": {
+            "gold": 19,
+            "pred": 41,
+            "tp_pred": 15,
+            "tp_gold": 15,
+            "precision": 0.36585365853658536,
+            "recall": 0.7894736842105263,
+            "f1": 0.4999999999999999
+          },
+          "ORGANIZATION": {
+            "gold": 221,
+            "pred": 65,
+            "tp_pred": 37,
+            "tp_gold": 37,
+            "precision": 0.5692307692307692,
+            "recall": 0.167420814479638,
+            "f1": 0.25874125874125875
+          }
+        },
+        "micro": {
+          "gold": 912,
+          "pred": 847,
+          "tp_pred": 466,
+          "tp_gold": 466,
+          "precision": 0.5501770956316411,
+          "recall": 0.5109649122807017,
+          "f1": 0.5298465036952814
+        },
+        "macro": {
+          "precision": 0.4975519423479205,
+          "recall": 0.6150832268753886,
+          "f1": 0.5071732641754871
+        }
+      },
+      "overlap": {
+        "per_type": {
+          "PERSON": {
+            "gold": 452,
+            "pred": 355,
+            "tp_pred": 280,
+            "tp_gold": 279,
+            "precision": 0.7887323943661971,
+            "recall": 0.6172566371681416,
+            "f1": 0.6925378426896568
+          },
+          "ADDRESS": {
+            "gold": 142,
+            "pred": 239,
+            "tp_pred": 135,
+            "tp_gold": 130,
+            "precision": 0.5648535564853556,
+            "recall": 0.9154929577464789,
+            "f1": 0.6986464968152867
+          },
+          "EMAIL": {
+            "gold": 28,
+            "pred": 30,
+            "tp_pred": 28,
+            "tp_gold": 28,
+            "precision": 0.9333333333333333,
+            "recall": 1.0,
+            "f1": 0.9655172413793104
+          },
+          "PHONE": {
+            "gold": 20,
+            "pred": 27,
+            "tp_pred": 18,
+            "tp_gold": 18,
+            "precision": 0.6666666666666666,
+            "recall": 0.9,
+            "f1": 0.7659574468085106
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 12,
+            "pred": 12,
+            "tp_pred": 11,
+            "tp_gold": 11,
+            "precision": 0.9166666666666666,
+            "recall": 0.9166666666666666,
+            "f1": 0.9166666666666666
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 0,
+            "pred": 4,
+            "tp_pred": 0,
+            "tp_gold": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          },
+          "ID_DOCUMENT": {
+            "gold": 18,
+            "pred": 74,
+            "tp_pred": 15,
+            "tp_gold": 15,
+            "precision": 0.20270270270270271,
+            "recall": 0.8333333333333334,
+            "f1": 0.32608695652173914
+          },
+          "BANK_ACCOUNT": {
+            "gold": 19,
+            "pred": 41,
+            "tp_pred": 19,
+            "tp_gold": 19,
+            "precision": 0.4634146341463415,
+            "recall": 1.0,
+            "f1": 0.6333333333333334
+          },
+          "ORGANIZATION": {
+            "gold": 221,
+            "pred": 65,
+            "tp_pred": 58,
+            "tp_gold": 55,
+            "precision": 0.8923076923076924,
+            "recall": 0.248868778280543,
+            "f1": 0.38919050814371997
+          }
+        },
+        "micro": {
+          "gold": 912,
+          "pred": 847,
+          "tp_pred": 564,
+          "tp_gold": 555,
+          "precision": 0.6658795749704841,
+          "recall": 0.6085526315789473,
+          "f1": 0.6359267532325058
+        },
+        "macro": {
+          "precision": 0.6031864051861062,
+          "recall": 0.7146242636883515,
+          "f1": 0.5986596102620249
+        }
+      }
+    },
+    "leak": {
+      "values": 549,
+      "leaked": 160,
+      "partial": 17,
+      "rate": 0.29143897996357016,
+      "partial_rate": 0.030965391621129327,
+      "per_type": {
+        "PERSON": {
+          "values": 345,
+          "leaked": 151,
+          "partial": 11,
+          "rate": 0.43768115942028984,
+          "partial_rate": 0.03188405797101449
+        },
+        "ADDRESS": {
+          "values": 118,
+          "leaked": 6,
+          "partial": 5,
+          "rate": 0.05084745762711865,
+          "partial_rate": 0.0423728813559322
+        },
+        "EMAIL": {
+          "values": 22,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "PHONE": {
+          "values": 19,
+          "leaked": 2,
+          "partial": 0,
+          "rate": 0.10526315789473684,
+          "partial_rate": 0.0
+        },
+        "DATE_OF_BIRTH": {
+          "values": 12,
+          "leaked": 1,
+          "partial": 0,
+          "rate": 0.08333333333333333,
+          "partial_rate": 0.0
+        },
+        "ID_DOCUMENT": {
+          "values": 15,
+          "leaked": 0,
+          "partial": 1,
+          "rate": 0.0,
+          "partial_rate": 0.06666666666666667
+        },
+        "BANK_ACCOUNT": {
+          "values": 18,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        }
+      }
+    },
+    "over_masking": {
+      "masked": 782,
+      "over_masked": 218,
+      "rate": 0.27877237851662406,
+      "per_type": {
+        "PERSON": {
+          "masked": 355,
+          "over_masked": 33,
+          "rate": 0.09295774647887324
+        },
+        "ADDRESS": {
+          "masked": 239,
+          "over_masked": 93,
+          "rate": 0.3891213389121339
+        },
+        "EMAIL": {
+          "masked": 30,
+          "over_masked": 2,
+          "rate": 0.06666666666666667
+        },
+        "PHONE": {
+          "masked": 27,
+          "over_masked": 7,
+          "rate": 0.25925925925925924
+        },
+        "DATE_OF_BIRTH": {
+          "masked": 12,
+          "over_masked": 1,
+          "rate": 0.08333333333333333
+        },
+        "NATIONAL_ID_HU_TAJ": {
+          "masked": 4,
+          "over_masked": 4,
+          "rate": 1.0
+        },
+        "ID_DOCUMENT": {
+          "masked": 74,
+          "over_masked": 57,
+          "rate": 0.7702702702702703
+        },
+        "BANK_ACCOUNT": {
+          "masked": 41,
+          "over_masked": 21,
+          "rate": 0.5121951219512195
+        }
+      }
+    },
+    "consistency": {
+      "entities": 549,
+      "consistent": 372,
+      "rate": 0.6775956284153005,
+      "multi_occurrence": 98,
+      "multi_consistent": 82,
+      "multi_rate": 0.8367346938775511,
+      "per_type": {
+        "PERSON": {
+          "entities": 345,
+          "consistent": 187,
+          "rate": 0.5420289855072464,
+          "multi_occurrence": 70,
+          "multi_consistent": 57,
+          "multi_rate": 0.8142857142857143
+        },
+        "ADDRESS": {
+          "entities": 118,
+          "consistent": 105,
+          "rate": 0.8898305084745762,
+          "multi_occurrence": 18,
+          "multi_consistent": 16,
+          "multi_rate": 0.8888888888888888
+        },
+        "EMAIL": {
+          "entities": 22,
+          "consistent": 22,
+          "rate": 1.0,
+          "multi_occurrence": 6,
+          "multi_consistent": 6,
+          "multi_rate": 1.0
+        },
+        "PHONE": {
+          "entities": 19,
+          "consistent": 17,
+          "rate": 0.8947368421052632,
+          "multi_occurrence": 1,
+          "multi_consistent": 1,
+          "multi_rate": 1.0
+        },
+        "DATE_OF_BIRTH": {
+          "entities": 12,
+          "consistent": 11,
+          "rate": 0.9166666666666666,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "ID_DOCUMENT": {
+          "entities": 15,
+          "consistent": 14,
+          "rate": 0.9333333333333333,
+          "multi_occurrence": 2,
+          "multi_consistent": 1,
+          "multi_rate": 0.5
+        },
+        "BANK_ACCOUNT": {
+          "entities": 18,
+          "consistent": 16,
+          "rate": 0.8888888888888888,
+          "multi_occurrence": 1,
+          "multi_consistent": 1,
+          "multi_rate": 1.0
+        }
+      }
+    },
+    "roundtrip": {
+      "documents": 200,
+      "exact": 199,
+      "rate": 0.995
+    },
+    "latency_ms": {
+      "detect": {
+        "p50": 41.273541981354356,
+        "p95": 97.60874368948856
+      },
+      "mask": {
+        "p50": 0.8771454449743032,
+        "p95": 1.653759845066815
+      }
+    },
+    "validity": {
+      "valid": {
+        "gold": 24,
+        "found": 23,
+        "values": 21,
+        "leaked": 1
+      },
+      "invalid": {
+        "gold": 33,
+        "found": 29,
+        "values": 31,
+        "leaked": 1
+      },
+      "excluding_number_types": {
+        "gold": 855,
+        "found": 503,
+        "values": 497,
+        "leaked": 158
+      },
+      "per_type": {
+        "PHONE": {
+          "valid": {
+            "gold": 19,
+            "found": 18,
+            "values": 18,
+            "leaked": 1
+          },
+          "invalid": {
+            "gold": 1,
+            "found": 0,
+            "values": 1,
+            "leaked": 1
+          }
+        },
+        "ID_DOCUMENT": {
+          "valid": {
+            "gold": 3,
+            "found": 3,
+            "values": 1,
+            "leaked": 0
+          },
+          "invalid": {
+            "gold": 15,
+            "found": 12,
+            "values": 14,
+            "leaked": 0
+          }
+        },
+        "BANK_ACCOUNT": {
+          "valid": {
+            "gold": 2,
+            "found": 2,
+            "values": 2,
+            "leaked": 0
+          },
+          "invalid": {
+            "gold": 17,
+            "found": 17,
+            "values": 16,
+            "leaked": 0
+          }
+        }
+      },
+      "source": null
+    }
+  },
+  "languages": {
+    "de": {
+      "documents": 200,
+      "gold_spans": 912,
+      "predicted_spans": 913,
+      "unscored_predictions": 66,
+      "detection": {
+        "exact": {
+          "per_type": {
+            "PERSON": {
+              "gold": 452,
+              "pred": 355,
+              "tp_pred": 247,
+              "tp_gold": 247,
+              "precision": 0.6957746478873239,
+              "recall": 0.5464601769911505,
+              "f1": 0.6121437422552665
+            },
+            "ADDRESS": {
+              "gold": 142,
+              "pred": 239,
+              "tp_pred": 104,
+              "tp_gold": 104,
+              "precision": 0.4351464435146444,
+              "recall": 0.7323943661971831,
+              "f1": 0.5459317585301837
+            },
+            "EMAIL": {
+              "gold": 28,
+              "pred": 30,
+              "tp_pred": 21,
+              "tp_gold": 21,
+              "precision": 0.7,
+              "recall": 0.75,
+              "f1": 0.7241379310344827
+            },
+            "PHONE": {
+              "gold": 20,
+              "pred": 27,
+              "tp_pred": 16,
+              "tp_gold": 16,
+              "precision": 0.5925925925925926,
+              "recall": 0.8,
+              "f1": 0.6808510638297872
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 12,
+              "pred": 12,
+              "tp_pred": 11,
+              "tp_gold": 11,
+              "precision": 0.9166666666666666,
+              "recall": 0.9166666666666666,
+              "f1": 0.9166666666666666
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 0,
+              "pred": 4,
+              "tp_pred": 0,
+              "tp_gold": 0,
+              "precision": 0.0,
+              "recall": null,
+              "f1": 0.0
+            },
+            "ID_DOCUMENT": {
+              "gold": 18,
+              "pred": 74,
+              "tp_pred": 15,
+              "tp_gold": 15,
+              "precision": 0.20270270270270271,
+              "recall": 0.8333333333333334,
+              "f1": 0.32608695652173914
+            },
+            "BANK_ACCOUNT": {
+              "gold": 19,
+              "pred": 41,
+              "tp_pred": 15,
+              "tp_gold": 15,
+              "precision": 0.36585365853658536,
+              "recall": 0.7894736842105263,
+              "f1": 0.4999999999999999
+            },
+            "ORGANIZATION": {
+              "gold": 221,
+              "pred": 65,
+              "tp_pred": 37,
+              "tp_gold": 37,
+              "precision": 0.5692307692307692,
+              "recall": 0.167420814479638,
+              "f1": 0.25874125874125875
+            }
+          },
+          "micro": {
+            "gold": 912,
+            "pred": 847,
+            "tp_pred": 466,
+            "tp_gold": 466,
+            "precision": 0.5501770956316411,
+            "recall": 0.5109649122807017,
+            "f1": 0.5298465036952814
+          },
+          "macro": {
+            "precision": 0.4975519423479205,
+            "recall": 0.6150832268753886,
+            "f1": 0.5071732641754871
+          }
+        },
+        "overlap": {
+          "per_type": {
+            "PERSON": {
+              "gold": 452,
+              "pred": 355,
+              "tp_pred": 280,
+              "tp_gold": 279,
+              "precision": 0.7887323943661971,
+              "recall": 0.6172566371681416,
+              "f1": 0.6925378426896568
+            },
+            "ADDRESS": {
+              "gold": 142,
+              "pred": 239,
+              "tp_pred": 135,
+              "tp_gold": 130,
+              "precision": 0.5648535564853556,
+              "recall": 0.9154929577464789,
+              "f1": 0.6986464968152867
+            },
+            "EMAIL": {
+              "gold": 28,
+              "pred": 30,
+              "tp_pred": 28,
+              "tp_gold": 28,
+              "precision": 0.9333333333333333,
+              "recall": 1.0,
+              "f1": 0.9655172413793104
+            },
+            "PHONE": {
+              "gold": 20,
+              "pred": 27,
+              "tp_pred": 18,
+              "tp_gold": 18,
+              "precision": 0.6666666666666666,
+              "recall": 0.9,
+              "f1": 0.7659574468085106
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 12,
+              "pred": 12,
+              "tp_pred": 11,
+              "tp_gold": 11,
+              "precision": 0.9166666666666666,
+              "recall": 0.9166666666666666,
+              "f1": 0.9166666666666666
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 0,
+              "pred": 4,
+              "tp_pred": 0,
+              "tp_gold": 0,
+              "precision": 0.0,
+              "recall": null,
+              "f1": 0.0
+            },
+            "ID_DOCUMENT": {
+              "gold": 18,
+              "pred": 74,
+              "tp_pred": 15,
+              "tp_gold": 15,
+              "precision": 0.20270270270270271,
+              "recall": 0.8333333333333334,
+              "f1": 0.32608695652173914
+            },
+            "BANK_ACCOUNT": {
+              "gold": 19,
+              "pred": 41,
+              "tp_pred": 19,
+              "tp_gold": 19,
+              "precision": 0.4634146341463415,
+              "recall": 1.0,
+              "f1": 0.6333333333333334
+            },
+            "ORGANIZATION": {
+              "gold": 221,
+              "pred": 65,
+              "tp_pred": 58,
+              "tp_gold": 55,
+              "precision": 0.8923076923076924,
+              "recall": 0.248868778280543,
+              "f1": 0.38919050814371997
+            }
+          },
+          "micro": {
+            "gold": 912,
+            "pred": 847,
+            "tp_pred": 564,
+            "tp_gold": 555,
+            "precision": 0.6658795749704841,
+            "recall": 0.6085526315789473,
+            "f1": 0.6359267532325058
+          },
+          "macro": {
+            "precision": 0.6031864051861062,
+            "recall": 0.7146242636883515,
+            "f1": 0.5986596102620249
+          }
+        }
+      },
+      "leak": {
+        "values": 549,
+        "leaked": 160,
+        "partial": 17,
+        "rate": 0.29143897996357016,
+        "partial_rate": 0.030965391621129327,
+        "per_type": {
+          "PERSON": {
+            "values": 345,
+            "leaked": 151,
+            "partial": 11,
+            "rate": 0.43768115942028984,
+            "partial_rate": 0.03188405797101449
+          },
+          "ADDRESS": {
+            "values": 118,
+            "leaked": 6,
+            "partial": 5,
+            "rate": 0.05084745762711865,
+            "partial_rate": 0.0423728813559322
+          },
+          "EMAIL": {
+            "values": 22,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "PHONE": {
+            "values": 19,
+            "leaked": 2,
+            "partial": 0,
+            "rate": 0.10526315789473684,
+            "partial_rate": 0.0
+          },
+          "DATE_OF_BIRTH": {
+            "values": 12,
+            "leaked": 1,
+            "partial": 0,
+            "rate": 0.08333333333333333,
+            "partial_rate": 0.0
+          },
+          "ID_DOCUMENT": {
+            "values": 15,
+            "leaked": 0,
+            "partial": 1,
+            "rate": 0.0,
+            "partial_rate": 0.06666666666666667
+          },
+          "BANK_ACCOUNT": {
+            "values": 18,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          }
+        }
+      },
+      "over_masking": {
+        "masked": 782,
+        "over_masked": 218,
+        "rate": 0.27877237851662406,
+        "per_type": {
+          "PERSON": {
+            "masked": 355,
+            "over_masked": 33,
+            "rate": 0.09295774647887324
+          },
+          "ADDRESS": {
+            "masked": 239,
+            "over_masked": 93,
+            "rate": 0.3891213389121339
+          },
+          "EMAIL": {
+            "masked": 30,
+            "over_masked": 2,
+            "rate": 0.06666666666666667
+          },
+          "PHONE": {
+            "masked": 27,
+            "over_masked": 7,
+            "rate": 0.25925925925925924
+          },
+          "DATE_OF_BIRTH": {
+            "masked": 12,
+            "over_masked": 1,
+            "rate": 0.08333333333333333
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "masked": 4,
+            "over_masked": 4,
+            "rate": 1.0
+          },
+          "ID_DOCUMENT": {
+            "masked": 74,
+            "over_masked": 57,
+            "rate": 0.7702702702702703
+          },
+          "BANK_ACCOUNT": {
+            "masked": 41,
+            "over_masked": 21,
+            "rate": 0.5121951219512195
+          }
+        }
+      },
+      "consistency": {
+        "entities": 549,
+        "consistent": 372,
+        "rate": 0.6775956284153005,
+        "multi_occurrence": 98,
+        "multi_consistent": 82,
+        "multi_rate": 0.8367346938775511,
+        "per_type": {
+          "PERSON": {
+            "entities": 345,
+            "consistent": 187,
+            "rate": 0.5420289855072464,
+            "multi_occurrence": 70,
+            "multi_consistent": 57,
+            "multi_rate": 0.8142857142857143
+          },
+          "ADDRESS": {
+            "entities": 118,
+            "consistent": 105,
+            "rate": 0.8898305084745762,
+            "multi_occurrence": 18,
+            "multi_consistent": 16,
+            "multi_rate": 0.8888888888888888
+          },
+          "EMAIL": {
+            "entities": 22,
+            "consistent": 22,
+            "rate": 1.0,
+            "multi_occurrence": 6,
+            "multi_consistent": 6,
+            "multi_rate": 1.0
+          },
+          "PHONE": {
+            "entities": 19,
+            "consistent": 17,
+            "rate": 0.8947368421052632,
+            "multi_occurrence": 1,
+            "multi_consistent": 1,
+            "multi_rate": 1.0
+          },
+          "DATE_OF_BIRTH": {
+            "entities": 12,
+            "consistent": 11,
+            "rate": 0.9166666666666666,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "ID_DOCUMENT": {
+            "entities": 15,
+            "consistent": 14,
+            "rate": 0.9333333333333333,
+            "multi_occurrence": 2,
+            "multi_consistent": 1,
+            "multi_rate": 0.5
+          },
+          "BANK_ACCOUNT": {
+            "entities": 18,
+            "consistent": 16,
+            "rate": 0.8888888888888888,
+            "multi_occurrence": 1,
+            "multi_consistent": 1,
+            "multi_rate": 1.0
+          }
+        }
+      },
+      "roundtrip": {
+        "documents": 200,
+        "exact": 199,
+        "rate": 0.995
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 41.273541981354356,
+          "p95": 97.60874368948856
+        },
+        "mask": {
+          "p50": 0.8771454449743032,
+          "p95": 1.653759845066815
+        }
+      },
+      "validity": {
+        "valid": {
+          "gold": 24,
+          "found": 23,
+          "values": 21,
+          "leaked": 1
+        },
+        "invalid": {
+          "gold": 33,
+          "found": 29,
+          "values": 31,
+          "leaked": 1
+        },
+        "excluding_number_types": {
+          "gold": 855,
+          "found": 503,
+          "values": 497,
+          "leaked": 158
+        },
+        "per_type": {
+          "PHONE": {
+            "valid": {
+              "gold": 19,
+              "found": 18,
+              "values": 18,
+              "leaked": 1
+            },
+            "invalid": {
+              "gold": 1,
+              "found": 0,
+              "values": 1,
+              "leaked": 1
+            }
+          },
+          "ID_DOCUMENT": {
+            "valid": {
+              "gold": 3,
+              "found": 3,
+              "values": 1,
+              "leaked": 0
+            },
+            "invalid": {
+              "gold": 15,
+              "found": 12,
+              "values": 14,
+              "leaked": 0
+            }
+          },
+          "BANK_ACCOUNT": {
+            "valid": {
+              "gold": 2,
+              "found": 2,
+              "values": 2,
+              "leaked": 0
+            },
+            "invalid": {
+              "gold": 17,
+              "found": 17,
+              "values": 16,
+              "leaked": 0
+            }
+          }
+        },
+        "source": null
+      }
+    }
+  },
+  "run": {
+    "system": "pii-guard fast-xlmr-base-v2-hn",
+    "detectors": [
+      "rules",
+      "ner"
+    ],
+    "documents": 200,
+    "wall_s": 9.7,
+    "load_average_start": [
+      8.69,
+      14.88,
+      16.76
+    ],
+    "load_average_end": [
+      8.05,
+      14.54,
+      16.61
+    ],
+    "host": {
+      "description": null,
+      "platform": "macOS-26.5.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "cpu_count": 10,
+      "accelerator": null,
+      "python": "3.12.15"
+    },
+    "warmup_calls": 1,
+    "blocked": 0,
+    "blocked_documents": [],
+    "ner": {
+      "model": "pii-guard-ner-xlmr-base-v2-hn",
+      "safetensors_sha256": {
+        "model.safetensors": "4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9"
+      },
+      "training_meta_sha256": "ef3f09591c3c273a76c481170922ab875277cc7a3e6d0775d27d840a46866ac2",
+      "device": "auto"
+    },
+    "candidate": "xlmr-base-v2-hn"
+  }
+}

@@ -34,9 +34,14 @@ PIN = PinnedModel(
 
 @pytest.fixture
 def fallback(monkeypatch: pytest.MonkeyPatch) -> PinnedModel:
-    """The fictional pin as the public fallback, in the default ``download`` mode."""
+    """The fictional pin as the public fallback, in the default ``download`` mode.
+
+    The published step is pointed at an unpinned fictional repo, so it is skipped and these
+    tests see the fallback on its own (the real published pin is tested separately).
+    """
     monkeypatch.setattr(ner_resolve, "PUBLIC_FALLBACK", PIN)
     monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "download")
+    monkeypatch.setenv("PII_GUARD_NER_PUBLISHED_MODEL", "fictional/unpublished-ner")
     return PIN
 
 
@@ -63,9 +68,12 @@ def test_public_fallback_is_pinned_and_licence_checked() -> None:
     assert PUBLIC_FALLBACK.licence == "Apache-2.0"
     assert len(PUBLIC_FALLBACK.revision) == 40
     assert len(PUBLIC_FALLBACK.weights_sha256) == 64
-    # LAB-1306 publishes the trained checkpoint here; until it pins a revision, step 2 is skipped.
+    # LAB-1306 published the trained checkpoint (release v2.0), pinned with its weights' SHA-256.
     assert ner_resolve.PUBLISHED.repo_id == ner_resolve.PUBLISHED_REPO
-    assert ner_resolve.PUBLISHED.revision == ""
+    assert len(ner_resolve.PUBLISHED.revision) == 40
+    assert len(ner_resolve.PUBLISHED.weights_sha256) == 64
+    assert ner_resolve.PUBLISHED.licence.startswith("Apache-2.0")
+    assert "Ai4Privacy / Ai Suisse SA" in ner_resolve.PUBLISHED.licence
     assert Settings().ner_published_model == ner_resolve.PUBLISHED_REPO
 
 
@@ -98,9 +106,12 @@ def test_published_before_fallback(fallback: PinnedModel) -> None:
     assert "published pii-guard model" in describe(choice)
     # "cached" never downloads: an unready published model is skipped, so is the fallback.
     assert resolve(published="fictional/pii-guard-ner@abcdef1", fallback="cached").model is None
-    # No revision: not published yet, so never loaded unpinned; the fallback runs instead.
-    for unpinned in ("fictional/pii-guard-ner", "", ner_resolve.PUBLISHED_REPO):
-        assert resolve(published=unpinned).source == "fallback"
+    # Another repo without a revision is never loaded unpinned; the fallback runs instead.
+    assert resolve(published="fictional/pii-guard-ner").source == "fallback"
+    # The default repo, named or not, takes the pinned release.
+    assert resolve(published=ner_resolve.PUBLISHED_REPO).pinned == ner_resolve.PUBLISHED
+    choice = resolve(env={})
+    assert (choice.source, choice.pinned) == ("published", ner_resolve.PUBLISHED)
 
 
 def test_published_default_once_pinned(
@@ -113,6 +124,7 @@ def test_published_default_once_pinned(
         size_mb=1,
     )
     monkeypatch.setattr(ner_resolve, "PUBLISHED", pinned)
+    monkeypatch.delenv("PII_GUARD_NER_PUBLISHED_MODEL")
     choice = resolve()
     assert (choice.source, choice.pinned) == ("published", pinned)
     assert choice.model == str(pinned.local_dir())

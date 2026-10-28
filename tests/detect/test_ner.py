@@ -274,12 +274,18 @@ def test_model_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(ner.MODEL_ENV_VAR)
     monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "download")
     default = NerDetector(backend=FakeBackend())
-    # Unset: the public fallback, loaded from its pinned directory in the model cache.
-    fallback = ner_resolve.PUBLIC_FALLBACK
-    assert (default.model, default.revision) == (str(fallback.local_dir()), None)
-    assert fallback.repo_id == ner.DEFAULT_MODEL
-    assert default.choice is not None and default.choice.source == "fallback"
+    # Unset: the published checkpoint (LAB-1306), from its pinned directory in the model cache.
+    published = ner_resolve.PUBLISHED
+    assert (default.model, default.revision) == (str(published.local_dir()), None)
+    assert default.choice is not None and default.choice.source == "published"
     assert "custom" not in repr(default)
+    # Without the published step, the public fallback, likewise from its pinned directory.
+    monkeypatch.setenv("PII_GUARD_NER_PUBLISHED_MODEL", "fictional/unpublished-ner")
+    fallback = ner_resolve.PUBLIC_FALLBACK
+    without = NerDetector(backend=FakeBackend())
+    assert (without.model, without.revision) == (str(fallback.local_dir()), None)
+    assert fallback.repo_id == ner.DEFAULT_MODEL
+    assert without.choice is not None and without.choice.source == "fallback"
     # Pinned hub id given explicitly: the pinned revision applies.
     hub = NerDetector(model=ner.DEFAULT_MODEL, backend=FakeBackend())
     assert hub.revision == ner.DEFAULT_REVISION
@@ -295,6 +301,7 @@ def test_unresolved_model_refuses_to_load(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_missing_fallback_is_downloaded_on_first_load(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "download")
+    monkeypatch.setenv("PII_GUARD_NER_PUBLISHED_MODEL", "fictional/unpublished-ner")  # skip step 2
     monkeypatch.setattr(ner, "dependencies_available", lambda: True)
     fetched: list[str] = []
 

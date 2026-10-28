@@ -110,6 +110,9 @@ DEFAULTS: dict[str, Any] = {
     "other_types": "ignore",
     # Batches of similar length (less padding): sort within pools of this many batches.
     "length_pool": 50,
+    # v2.1 (LAB-1306): also save every epoch to <out>/epoch-<n>, for selection on held-out
+    # sets after training (the dev split picks the top-level checkpoint as before).
+    "save_epochs": False,
 }
 
 
@@ -424,13 +427,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         history.append(scores)
         print(json.dumps(scores), flush=True)
+        model.config.pii_guard_aggregation = "token"
+        model.config.pii_guard_labels = list(TYPES)
+        if cfg["save_epochs"]:
+            model.save_pretrained(out / f"epoch-{epoch}")
+            tokenizer.save_pretrained(out / f"epoch-{epoch}")
         if (
             best is None
             or scores["f1_overlap"] + scores["f1_exact"] > best["f1_overlap"] + best["f1_exact"]
         ):
             best = scores
-            model.config.pii_guard_aggregation = "token"
-            model.config.pii_guard_labels = list(TYPES)
             model.save_pretrained(out)
             tokenizer.save_pretrained(out)
 
@@ -454,6 +460,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "precision",
                 "other_types",
                 "length_pool",
+                "save_epochs",
             )
         },
         "types": list(TYPES),

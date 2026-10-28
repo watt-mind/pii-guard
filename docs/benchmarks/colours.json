@@ -99,6 +99,26 @@
       "color": "#882255",
       "shape": "circle"
     },
+    "rules+ner:xlmr-base-v21-hn-e1": {
+      "color": "#117733",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v21-hn-e2": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v21-hn-e3": {
+      "color": "#E69F00",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v21-hn-e4": {
+      "color": "#0072B2",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v21-hn-e5": {
+      "color": "#CC79A7",
+      "shape": "circle"
+    },
     "rules+ner:xlmr-large-distilled-glimmer": {
       "color": "#009E73",
       "shape": "circle"
