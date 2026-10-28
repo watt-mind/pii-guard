@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { ServerStatus } from "../api/status";
 import type { SnippetsLoader } from "../api/connect";
+import { Notice, PageHeader } from "../components/ui";
 import type { ServerStatusState } from "../hooks/useServerStatus";
 import { ConnectQuickstart, CopyButton, type QuickstartTraffic } from "./ConnectQuickstart";
 
@@ -30,13 +31,10 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
 
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-medium text-balance text-ink">Connect</h1>
-        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back
-          restored.
-        </p>
-      </div>
+      <PageHeader
+        title="Connect"
+        lead="Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back restored."
+      />
 
       {accounts}
 
@@ -47,14 +45,14 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
           {gatewayLine && <GatewayLine status={status} server={server} gateway={gateway} />}
         </>
       ) : (
-        <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
+        <Notice>
           Each endpoint has its own base URL, client snippets and keys. Pick one under <span className="text-ink">Inspect activity &amp; vault</span> in the project menu at the top for its
           snippets here, or open{" "}
           <a className="text-ink underline underline-offset-4" href="#projects">
             Projects
           </a>{" "}
           and choose Connect &amp; keys on an endpoint.
-        </p>
+        </Notice>
       )}
     </div>
   );
@@ -62,7 +60,7 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
 
 function GatewayLine({ status, server, gateway }: { status: ServerStatusState; server: ServerStatus | null; gateway: string }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface p-4 text-sm sm:p-5">
       <span className="text-muted">Any other client: gateway base URL</span>
       {status.state === "loading" ? (
         <span className="text-sm text-muted">…</span>

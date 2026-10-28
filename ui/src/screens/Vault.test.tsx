@@ -171,11 +171,23 @@ describe("Vault", () => {
     const user = userEvent.setup();
     render(<Vault status={statusOf("masked")} live active client={client} />);
     await user.click(await screen.findByRole("button", { name: /s_3333cccc4444dddd/ }));
-    await user.click(await screen.findByRole("button", { name: "Drop…" }));
+    const trigger = await screen.findByRole("button", { name: "Drop session s_3333cccc4444dddd" });
+    await user.click(trigger);
     expect(client.drop).not.toHaveBeenCalled();
+    // The confirmation names the session, and its danger button takes focus.
+    expect(screen.getByRole("group", { name: /Drop session s_3333cccc4444dddd\?/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Drop session" })).toHaveFocus();
+    // Cancel returns focus to the trigger.
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Drop session s_3333cccc4444dddd" })).toHaveFocus();
+    expect(client.drop).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Drop session s_3333cccc4444dddd" }));
     await user.click(screen.getByRole("button", { name: "Drop session" }));
     expect(client.drop).toHaveBeenCalledWith("s_3333cccc4444dddd");
-    expect(await screen.findByText(/Dropped session s_3333cccc4444dddd/)).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent(/Dropped session s_3333cccc4444dddd/);
+    // Focus moves to the list it changed, not to <body>.
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Sessions" })).toHaveFocus());
     await waitFor(() => expect(screen.queryByRole("button", { name: /s_3333cccc4444dddd/ })).toBeNull());
   });
 

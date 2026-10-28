@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { useWidth } from "../hooks/useWidth";
+import { ENTITY_META } from "../lib/entities";
 import {
   formatMs,
   formatPct,
@@ -17,6 +18,8 @@ import {
  * a viewBox. Every chart has a text alternative: the tables on the screen hold the same data. */
 
 const FONT = 12;
+/** Labels further than this from their marker get a leader line. */
+const LEADER_MIN = 22;
 
 
 // Palette colours too dark to tell apart on the dark canvas get a theme variable (index.css).
@@ -135,6 +138,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
     const text = `${p.info?.short_label ?? p.key}${p.note ? ` (${p.note})` : ""} ${formatPct(p.metrics.leak)}`;
     const x = sx(p.metrics.detect_p50_ms!);
     const y = sy(p.metrics.leak ?? 0);
+    // Nearest spots first; then the same spots nudged sideways, before moving further up.
     const tries: [number, number, "start" | "end"][] = [
       [x - 4, y - 12, "start"],
       [x - 4, y + 22, "start"],
@@ -142,6 +146,10 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
       [x + 4, y + 22, "end"],
       [x + 12, y + 4, "start"],
       [x - 12, y + 4, "end"],
+      [x + 16, y - 12, "start"],
+      [x - 16, y - 12, "end"],
+      [x + 16, y + 22, "start"],
+      [x - 16, y + 22, "end"],
       [x - 4, y - 30, "end"],
       [x + 4, y - 30, "start"],
       [x - 4, y - 46, "end"],
@@ -156,8 +164,11 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
       const left = anchor === "start" ? lx : lx - lw;
       const box = { x0: left - 2, y0: ly - FONT, x1: left + lw + 2, y1: ly + 3 };
       if (box.x0 < 2 || box.x1 > width - 2 || box.y0 < 0 || box.y1 > height - m.b) return false;
-      if (taken.some((t) => overlaps(t, box))) return false;
+      // A far label gets a leader line from its marker: keep later labels off that line too.
+      const leader = Math.hypot(lx - x, ly - y) > LEADER_MIN ? { x0: Math.min(x, lx) - 2, y0: Math.min(y - 8, ly + 3), x1: Math.max(x, lx) + 2, y1: Math.max(y - 8, ly + 3) } : null;
+      if (taken.some((t) => overlaps(t, box) || (leader !== null && overlaps(t, leader)))) return false;
       taken.push(box);
+      if (leader) taken.push(leader);
       return true;
     };
     for (const [lx, ly, anchor] of tries) {
@@ -229,8 +240,8 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
           (l, i) =>
             l && (
               <g key={byLeak[i]!.key}>
-                {Math.hypot(l.x - l.px, l.y - l.py) > 22 && <line x1={l.px} y1={l.py - 8} x2={l.x} y2={l.y + 3} stroke="var(--muted)" strokeWidth={1} />}
-                <text x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={600} fill="var(--ink)">
+                {Math.hypot(l.x - l.px, l.y - l.py) > LEADER_MIN && <line x1={l.px} y1={l.py - 8} x2={l.x} y2={l.y + 3} stroke="var(--muted)" strokeWidth={1} />}
+                <text x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={500} fill="var(--ink)">
                   {l.text}
                 </text>
               </g>
@@ -240,13 +251,15 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
       {dense && <p className="mt-2 text-xs text-muted">Many systems: only the featured ones are labelled in the chart. Hover a marker, or see the list below.</p>}
       <ul className="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
         {pts.map((p) => (
-          <li key={p.key} className="flex items-center gap-1.5">
-            <MarkerIcon info={p.info} />
-            <span className="min-w-0 flex-1 truncate text-ink">
-                {p.info?.short_label ?? p.key}
-                {p.note && <span className="ml-1 font-mono text-2xs text-warn">{p.note}</span>}
-              </span>
-            <span className="tabular-nums text-muted">
+          <li key={p.key} className="flex items-start gap-1.5">
+            <span className="mt-0.5">
+              <MarkerIcon info={p.info} />
+            </span>
+            <span className="min-w-0 flex-1 break-words text-ink">
+              {p.info?.short_label ?? p.key}
+              {p.note && <span className="ml-1 font-mono text-2xs text-warn">{p.note}</span>}
+            </span>
+            <span className="shrink-0 tabular-nums text-muted">
               {formatPct(p.metrics.leak)} · {formatMs(p.metrics.detect_p50_ms)}
             </span>
           </li>
@@ -459,8 +472,8 @@ export function TypeHeatmap({
             const gold = Math.max(...cols.map(({ m }) => m?.per_type[t]?.gold ?? 0));
             return (
               <tr key={t}>
-                <th scope="row" className="sticky left-0 z-10 bg-surface px-2 py-1 text-left font-mono font-normal whitespace-nowrap text-ink">
-                  {t} <span className="text-faint">n={gold}</span>
+                <th scope="row" title={t} className="sticky left-0 z-10 bg-surface px-2 py-1 text-left font-normal whitespace-nowrap text-ink">
+                  {typeLabel(t)} <span className="text-faint tabular-nums">n={gold}</span>
                 </th>
                 {cols.map(({ s, m }) => {
                   const v = m?.per_type[t]?.recall ?? null;
@@ -489,6 +502,11 @@ export function TypeHeatmap({
       </table>
     </div>
   );
+}
+
+/** An entity type as a reader names it ("Email"), with the code kept in the row's tooltip. */
+function typeLabel(type: string): string {
+  return (ENTITY_META as Record<string, { label: string } | undefined>)[type]?.label ?? type;
 }
 
 export function ChartEmpty({ children }: { children: ReactNode }) {
