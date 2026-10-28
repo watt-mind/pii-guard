@@ -1,0 +1,27 @@
+# Answer-only LoRA SFT of Muse Glimmer 30B for the llm detector (LAB-1109).
+# Data: training/llm/build_sft.py (manifest: training/llm/data-manifest.json).
+# Trainer: training/llm/fireworks_sft.py on Fireworks Serverless Training (free promotion for
+# Muse Glimmer LoRA SFT until 2026-11-30; no sampling in the session, sampling is billed).
+# The values below are what the committed adapter was trained with; they are the script's
+# defaults, so `fireworks_sft.py --file ... --run-id ... --out ...` reproduces the run.
+
+[model]
+base = "accounts/fireworks/models/muse-glimmer-30b"   # = meta-models/Muse-Glimmer-30B
+tokenizer = "meta-models/Muse-Glimmer-30B"
+renderer = "muse_glimmer"                             # fw-ai/cookbook training/renderer
+reasoning_strength = "low"                             # rendered into the system turn; serve with the same
+
+[lora]
+rank = 8          # Fireworks default
+alpha = 32        # Fireworks cookbook default for Glimmer
+train_attn = true
+train_mlp = true
+train_unembed = false   # keep lm_head frozen so vLLM can load the adapter
+
+[train]
+epochs = 1
+batch_size = 16         # sequences per optimiser step
+learning_rate = 1e-4    # constant, Adam(0.9, 0.999, eps 1e-8), no weight decay, grad clip 1.0
+max_seq_len = 4096      # longest example is 2,587 tokens
+loss = "cross_entropy on the assistant turn only"
+seed = 0

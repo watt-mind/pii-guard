@@ -1,0 +1,26 @@
+{
+  "summary": {
+    "documents": 300,
+    "workers": 1,
+    "p50_ms": 2282.3,
+    "p95_ms": 3923.8,
+    "completion_tokens_p50": null,
+    "completion_tokens_mean": 478.6,
+    "requests": 300,
+    "docs_with_reasoning": null,
+    "non_json_answers": 0,
+    "truncated": 0,
+    "usage": {
+      "requests": 301,
+      "prompt_tokens": 311178,
+      "cached_tokens": 237248,
+      "completion_tokens": 143567,
+      "reasoning_tokens": 108996,
+      "invalid_outputs": 0,
+      "refusals": 0,
+      "empty_challenged": 0
+    },
+    "note": "Run with the first driver version, which attributed requests to documents by full text and so missed the documents the pipeline splits (structured shapes). Per-document rows dropped; latency from the scorecard (correct), token means from the detector's usage counters over all 300 documents (+1 warm-up request), reasoning_tokens from usage (all requests reasoned)."
+  },
+  "documents": []
+}

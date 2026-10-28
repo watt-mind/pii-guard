@@ -45,3 +45,21 @@ def test_serve_passes_the_key_through_the_environment(glimmer, monkeypatch) -> N
     assert seen["env"]["VLLM_API_KEY"] == "secret-value"
     assert "GLIMMER_API_KEY" not in seen["env"]
     assert all("secret-value" not in part for part in seen["cmd"])
+
+
+def test_base_model_only_by_default(glimmer) -> None:
+    assert "--enable-lora" not in glimmer.vllm_command("")
+
+
+def test_lora_adapter_is_served_under_its_own_name(glimmer) -> None:
+    cmd = glimmer.vllm_command("pii-guard-glimmer-x")
+    assert "--enable-lora" in cmd
+    i = cmd.index("--lora-modules")
+    assert cmd[i + 1] == "pii-guard-glimmer-x=/adapters/pii-guard-glimmer-x"
+    assert int(cmd[cmd.index("--max-lora-rank") + 1]) >= 8
+
+
+@pytest.mark.parametrize("bad", ["../etc", "a/b", "/abs"])
+def test_lora_name_is_not_a_path(glimmer, bad) -> None:
+    with pytest.raises(ValueError):
+        glimmer.lora_args(bad)

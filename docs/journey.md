@@ -1369,6 +1369,36 @@ live runs were made just before it, with 13:
 <!-- journey:end -->
 
 Milestones merged since the last time this page was rendered are in [journey/](journey/), one file each, oldest first.
+### 46. Muse Glimmer fine-tuned to answer without reasoning (2026-10-27, trained; evaluated 2026-10-28)
+
+LAB-1109.
+
+Glimmer zero-shot had the best quality we measured but reasons for about 9 s per document. We
+fine-tuned it (LoRA r 8) on 3,883 fictional documents to emit the detector's JSON directly,
+with the detector's own prompts as input, on Fireworks' free Serverless Training.
+
+- **Training:** 243 steps, 30 minutes, 5.05 M training tokens, loss 0.18 to about 0.003;
+  Fireworks spend **$0.00** before and after every step (list price would have been about
+  $30). Source: [models.md](models.md#answer-only-muse-glimmer-lora-fine-tune-lab-1109),
+  *(ticket comments, LAB-1109)*.
+- **Template:** the training renderer and the model's own chat template agree byte for byte
+  (50/50 prompts); the trained answer is addressed straight to the user, with no reasoning
+  turn.
+- **Evaluated (2026-10-28)** on Fireworks, the LoRA and the base model each on one H200, owner
+  cap $25, **about $8 spent**, all deployments deleted the same hour. The LoRA really skips
+  the reasoning: 0 reasoning tokens on 682 documents, ~100 completion tokens per document
+  instead of ~475.
+- **Speed:** on agent traffic p50 1.03 s with n-gram speculation (1.88 s without) against
+  2.28 s for zero-shot, which Fireworks serves with speculative decoding. 2.2x, not the 10x
+  the token count promised.
+- **Leaks:** with the rules in front, the LoRA leaks 1.0-1.1 % of agent-traffic values and
+  2.9-4.4 % on smoke, zero-shot 0.4 % and 0.7 %: it misses names and ID numbers. Alone it
+  beats zero-shot on agent traffic (F1 96.9 vs 93.8), but the rules already cover what
+  zero-shot misses. *(eval/results/2026-10-28-glimmer-lora)*.
+- **Gotcha:** Fireworks ignores `chat_template_kwargs`; `reasoning_effort: low` is what reaches
+  Glimmer's template, and then the served prompt equals the training render byte for byte.
+- **Verdict:** fast but leaky. Fast mode (rules + NER: 96.1 F1, 0.13 % leak, 0.02 s) stays
+  the product; the fine-tune stays an experiment.
 
 ## How pii-guard uses Meta's models
 

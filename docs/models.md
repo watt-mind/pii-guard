@@ -446,6 +446,98 @@ modal app stop pii-guard-glimmer --yes   # always, when done
 - Keep the key somewhere local: a Modal secret can't be read back. If the key is lost,
   overwrite the secret and redeploy.
 
+### Answer-only Muse Glimmer (LoRA fine-tune, LAB-1109)
+
+Glimmer zero-shot is accurate but always reasons first (about 320 completion tokens per short
+document at `low`, 9.4 s p50). A LoRA fine-tune that answers with the span JSON directly keeps
+the open-weights model and removes the reasoning. Status: **trained and evaluated
+(2026-10-28): fast but leaky.** On the same Fireworks H200 it answers with ~5x fewer tokens and,
+with n-gram speculation, at half the latency of zero-shot Glimmer (agent traffic p50 1.03 s vs
+2.28 s), but with the rules in front it leaks 1.0-1.1 % of agent-traffic values against
+zero-shot's 0.4 % (mostly names and ID numbers). Not a production default. Results:
+[eval/results/2026-10-28-glimmer-lora](../eval/results/2026-10-28-glimmer-lora/README.md).
+
+**Data** (`training/llm/build_sft.py`, manifest `training/llm/data-manifest.json`). One chat
+example per LAB-1128 distillation document (train split, seed 11): system and user are exactly
+what the `llm` detector sends (`build_messages`, the language pack's prompt, normalisation,
+6,000/300 chunking, a fresh LAB-1107 delimiter boundary per example from a seeded generator);
+the assistant turn is only `{"entities": [{"type": ..., "text": ...}]}`. Targets are the labels
+the NER student learned from (planted gold plus the names Glimmer found); the 340 documents
+with a teacher disagreement are left out, because an LLM target can't mask part of the loss.
+3,883 examples (hu 1,789, en 2,094; 553 hard negatives with an empty list), 19.8 MB,
+5.06 M tokens. The distillation dev split (741 documents) is the held-out test set, and the
+build fails if any of its documents or any document under `eval/fixtures/**` is in the file
+(by hash of the normalised text). The JSONL is not committed: it is 19.8 MB, mostly the same
+3.4 KB system prompt repeated, and the script rebuilds it byte for byte (same sha256) from the
+corpus.
+
+**Training** (`training/llm/fireworks_sft.py`, `training/llm/glimmer-lora.toml`). Fireworks
+**Serverless Training** API, which is free for Muse Glimmer 30B LoRA SFT until 2026-11-30
+(docs.fireworks.ai/fine-tuning/models). Managed SFT would have been the simpler path, but the
+account cannot upload datasets yet (`dataset uploads are temporarily disabled`); Serverless
+Training takes rendered tokens directly. LoRA rank 8, alpha 32, attention + MLP (`q,k,v,o`,
+`gate,up,down`; the unembedding stays frozen so vLLM can load the adapter), 1 epoch, batch 16
+(243 steps), Adam at a constant 1e-4, loss on the answer only. 30 minutes of training on
+2026-10-27; loss 0.18 at step 1, 0.002-0.004 from step 25. The script never samples in the
+session, because sampling is billed separately. Fireworks Total Spend stayed **$0.00**
+(billing summary and `usageCosts:query`, checked before and after every action; 5.05 M
+`SERVERLESS_TRAINING_TOKENS` metered, rated $0). At the list price the same run would have cost
+about $30 ($5.86 per million training tokens). Output: `accounts/<account>/models/pii-guard-glimmer-lab1109-v1`
+(`HF_PEFT_ADDON`, r 8).
+
+**Template.** Fireworks renders Glimmer with the cookbook's port of the model's
+`chat_template.jinja` (`training/renderer/muse_glimmer.py` in fw-ai/cookbook). On 50 of 50
+examples it produced the same prompt, byte for byte, as Hugging Face
+`apply_chat_template(..., reasoning_strength="low")`, which is what vLLM builds when the
+detector sends `chat_template_kwargs: {"reasoning_strength": "low"}`. The system turn ends with
+`Reasoning strength: low.` and `# Valid recipients: "self", "user".`; the trained part is
+`<|start|>assistant to=user<|message|>{json}<|eot|>`. There is no `to=self` reasoning turn, so
+the model learns to address the user at once. Serve with the strength it was trained with:
+`PII_GUARD_LLM_DETECTOR_REASONING_STRENGTH=low`.
+
+**Serving options and cost** (prices from fireworks.ai/pricing and the Fireworks API,
+2026-10-27):
+
+| Option | Price | Status |
+|---|---|---|
+| a. Fireworks serverless LoRA inference | n/a | Not offered: the base model reports `supportsServerlessLora: false`, and the docs say trained LoRAs can't be served serverless |
+| b. Fireworks on-demand deployment (live merge) | $8.00 per GPU-hour on H100 or H200, $13.00 on B200, billed per GPU-second while a replica runs, start-up free | **Used for the 2026-10-28 eval** (owner-approved, $25 cap): 1x H200 BF16, shape `dkuwotf7`, three short deployments, about $8 in all |
+| c. vLLM on Modal with the adapter (`deploy/modal/glimmer.py`, `GLIMMER_LORA=...`) | Modal H100 $3.95 per hour, on the monthly free credit | Ready, but blocked: the account can't download models (`model downloading is restricted, please contact Fireworks AI`), even after `firectl signin` |
+
+**Pointing the detector at the Fireworks deployment** (option b). Fireworks ignores
+`chat_template_kwargs`, so `..._REASONING_STRENGTH` has no effect there; `reasoning_effort` is
+mapped onto Glimmer's template, and with `low` the served prompt equals the training render byte
+for byte (checked with `raw_output`):
+
+```
+PII_GUARD_LLM_DETECTOR_URL=https://api.fireworks.ai/inference/v1
+PII_GUARD_LLM_DETECTOR_MODEL='accounts/<account>/models/pii-guard-glimmer-lab1109-v1#accounts/<account>/deployments/<deployment>'
+PII_GUARD_LLM_DETECTOR_API_KEY=<FIREWORKS_API_KEY>
+PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low
+```
+
+A live-merged LoRA gets no speculative decoding by default (`draftTokenCount 0`; the base model
+gets 15) and decodes at about 45 tokens/s; create the deployment with
+`"ngramSpeculationLength": 3, "draftTokenCount": 8` for about 1.8x lower latency.
+
+Option (c), once the adapter is on the volume:
+
+```
+firectl signin                                         # interactive, browser
+firectl model download accounts/<account>/models/pii-guard-glimmer-lab1109-v1 models/llm/pii-guard-glimmer-lab1109-v1
+modal volume put pii-guard-lora-adapters models/llm/pii-guard-glimmer-lab1109-v1 /pii-guard-glimmer-lab1109-v1
+GLIMMER_LORA=pii-guard-glimmer-lab1109-v1 modal deploy deploy/modal/glimmer.py
+# PII_GUARD_LLM_DETECTOR_URL=https://<workspace>--pii-guard-glimmer-serve.<region>.modal.run/v1
+# PII_GUARD_LLM_DETECTOR_MODEL=pii-guard-glimmer-lab1109-v1
+# PII_GUARD_LLM_DETECTOR_REASONING_STRENGTH=low
+modal app stop pii-guard-glimmer --yes
+```
+
+The same deployment still serves the base model as `muse-glimmer`. vLLM in the
+`vllm/vllm-openai:muse-glimmer` image (0.26.1rc1) declares `SupportsLoRA` for
+`MuseGlimmerForCausalLM`. `training/llm/fetch_adapter.py` does the download and the volume
+upload in one step once downloads are allowed for the key.
+
 **Development: Meta Model API.** Verified on 2026-10-26:
 
 - Base URL `https://api.meta.ai/v1`, Bearer key from `META_API_KEY`, OpenAI-compatible
@@ -615,7 +707,7 @@ uv run python -m pii_guard.visual.segment_eval --candidate hybrid --set fictiona
 
 | Partner | What we use it for |
 |---|---|
-| **Fireworks** | Supervised fine-tuning of the detector model on the synthetic train split |
+| **Fireworks** | LoRA fine-tuning of Muse Glimmer 30B as an answer-only detector on the distillation train split (free Serverless Training, LAB-1109) |
 | **Modal** | GPU serving for SAM 3.1, and experiment runs |
 | **Baseten** | Serving Muse Spark Open (`meta-models/muse-spark-open-1026`) for the LLM detector |
 
