@@ -83,7 +83,7 @@ What it does:
   parts are refused (fail closed), the strip says `images: refused (no OCR, face detection)`,
   and the banner names the missing pieces with the commands to add them. Text works regardless.
 - **Traffic log** `masked` by default (the dashboard needs it); `--traffic-log full` only on a
-  loopback bind, as everywhere. A fresh tenant key per run unless `PII_GUARD_TENANT_KEY` is set.
+  loopback bind, as everywhere. A fresh tenant key per run unless `PII_GUARD_TENANT_KEY` is set (in the environment or `.env`).
 - It opens the browser (`--no-browser` to skip) and prints the gateway base URL and the
   `pii-guard connect pi` lines, written with the same `uvx --from` prefix when run through uvx.
   A port in use is refused up front (`--port`). Ctrl-C stops everything within about a second,
@@ -225,7 +225,11 @@ virtualenv), down from 9.6 GB (3.42 GB content, a 5.6 GB virtualenv) with the Py
 (LAB-1308). `pii-guard:dev` is 654 MB. macOS keeps the PyPI torch wheel, which has MPS. On the first start `demo-api` downloads the NER model into the `pii-guard-models` volume before the server listens (`docker compose
 logs -f demo-api` shows `ner: downloading …`); its healthcheck allows 15 minutes for that, and
 the UI waits until `demo-api` is healthy. Later starts reuse the volume (`docker compose down
--v` drops it). Rules only, offline, no download:
+-v` drops it). The UI's Benchmarks view reads an index built from the committed run records;
+the Node container has no Python and mounts only `ui/`, so a one-shot `benchmarks-index`
+service (the demo image, `eval/` and `docs/` mounted read-only) prints it into the
+`pii-guard-benchmarks` volume on every start, and `ui` waits for it and reads it through
+`PII_GUARD_BENCHMARKS_INDEX` (LAB-1356). Rules only, offline, no download:
 `PII_GUARD_DEMO_NER_FALLBACK=off docker compose --profile demo up --build`. A real upstream:
 `PII_GUARD_DEMO_UPSTREAM_URL` and `PII_GUARD_DEMO_UPSTREAM_API_KEY`. Inside a container the
 server binds `0.0.0.0`, so the traffic log can only be `masked` there (see below). Send the demo
@@ -237,7 +241,9 @@ inline images (a TAJ, a name) is read and masked. That adds about 115 MB (the ap
 image grew from about 269 MB to 429 MB in `docker image ls` on arm64). Without an OCR engine,
 image parts are refused with `503 ocr_unavailable` (fail closed, ADR 0006): set
 `PII_GUARD_IMAGE_REQUIRE_OCR=false` only if SAM-only masking is acceptable, which leaves text in
-images unchecked (`X-PII-Guard-Image-OCR: off`). The container healthcheck checks `/healthz`
+images unchecked (`X-PII-Guard-Image-OCR: off`). pytesseract hands Tesseract the image through
+a temp file, so the read-only `api` and `demo-api` containers mount a `tmpfs` on `/tmp`; a
+read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck checks `/healthz`
 and OCR availability, and prints `ocr on|off` (`docker inspect --format
 '{{json .State.Health}}' <container>`). For `make demo` outside Docker: `brew install
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then

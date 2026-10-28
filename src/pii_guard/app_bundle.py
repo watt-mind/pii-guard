@@ -382,6 +382,26 @@ class _QuietShutdown(logging.Filter):
         return not getattr(self.server, "should_exit", False)
 
 
+def _tenant_key_configured() -> bool:
+    """Whether the environment or ``.env`` sets a tenant key (LAB-1356).
+
+    Read through the settings, not ``os.environ`` alone: a key generated for this run goes
+    into the process environment, which beats ``.env``, so checking only the environment
+    replaced a configured key and changed every pseudonym on each start. Settings that do
+    not load are reported later, where ``up`` loads them for the server.
+    """
+    import os
+
+    from pii_guard.config import Settings
+
+    if os.environ.get("PII_GUARD_TENANT_KEY"):
+        return True
+    try:
+        return Settings().tenant_key is not None
+    except Exception:  # a broken .env is reported when the server settings load
+        return False
+
+
 def run_up(opts: UpOptions) -> int:
     """Run ``pii-guard up`` in the foreground until Ctrl-C (or SIGTERM)."""
     import os
@@ -405,7 +425,7 @@ def run_up(opts: UpOptions) -> int:
     if traffic_log == "off":
         traffic_log = "masked"  # the dashboard is the point of `up`
     env["PII_GUARD_TRAFFIC_LOG"] = traffic_log
-    if not os.environ.get("PII_GUARD_TENANT_KEY"):
+    if not _tenant_key_configured():
         env["PII_GUARD_TENANT_KEY"] = secrets.token_hex(32)  # this run only
     if opts.upstream_url:
         env["PII_GUARD_UPSTREAM_BASE_URL"] = opts.upstream_url

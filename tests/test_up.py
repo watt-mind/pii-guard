@@ -301,3 +301,69 @@ def test_banner_names_the_ner_model_or_why_there_is_none(
         UpOptions(port=18999), Status(upstream="mock", detectors=["rules"]), "masked", ui=True
     )
     assert "free-text names need NER" in text and "[ner]" in text
+
+
+_UP_ENV = (
+    "PII_GUARD_HOST",
+    "PII_GUARD_PORT",
+    "PII_GUARD_METRICS",
+    "PII_GUARD_SERVER_TIMING",
+    "PII_GUARD_GATEWAY_MODE",
+    "PII_GUARD_TRAFFIC_LOG",
+    "PII_GUARD_TENANT_KEY",
+    "PII_GUARD_UPSTREAM_BASE_URL",
+    "PII_GUARD_UPSTREAM_API_KEY",
+)
+
+
+def _settings_up_serves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dotenv: str | None
+) -> Settings:
+    """The settings `up` would serve with, from ``tmp_path`` with ``dotenv`` as its .env."""
+    import pii_guard.app_bundle as bundle
+    from pii_guard.config import get_settings
+
+    class Served(Exception):
+        pass
+
+    captured: list[Settings] = []
+
+    def capture(status: Status, settings: Settings) -> None:
+        captured.append(settings)
+        raise Served
+
+    for name in _UP_ENV:  # set first so teardown restores the absence, then clear
+        monkeypatch.setenv(name, "x")
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "off")
+    if dotenv is not None:
+        (tmp_path / ".env").write_text(dotenv, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(bundle, "create_bundle_app", capture)
+    try:
+        assert run_up(UpOptions(port=_free_port(), browser=False)) == 2
+    finally:
+        get_settings.cache_clear()
+    assert len(captured) == 1
+    return captured[0]
+
+
+def test_up_keeps_the_tenant_key_from_dotenv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # LAB-1356: `up` generated a key whenever the process env had none, and that env value
+    # beat the PII_GUARD_TENANT_KEY in .env (pseudonyms changed on every run).
+    settings = _settings_up_serves(tmp_path, monkeypatch, f"PII_GUARD_TENANT_KEY={TENANT_KEY}\n")
+    assert settings.tenant_key is not None
+    assert settings.tenant_key.get_secret_value() == TENANT_KEY
+    assert "PII_GUARD_TENANT_KEY" not in os.environ
+
+
+def test_up_generates_a_tenant_key_when_none_is_configured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = _settings_up_serves(tmp_path, monkeypatch, None)
+    assert settings.tenant_key is not None
+    key = settings.tenant_key.get_secret_value()
+    assert len(bytes.fromhex(key)) == 32
+    assert key != TENANT_KEY

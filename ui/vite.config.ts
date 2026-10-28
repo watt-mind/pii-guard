@@ -1,6 +1,6 @@
 /// <reference types="vitest/config" />
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
@@ -17,12 +17,15 @@ const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
  *
  * The index is built by `pii-guard eval report --print-index`, with the repository's
  * `.venv` when there is one (`uv sync`), otherwise through `uv run`. `PII_GUARD_PYTHON` picks
- * another interpreter that has pii-guard installed.
+ * another interpreter that has pii-guard installed. `PII_GUARD_BENCHMARKS_INDEX` names a
+ * prebuilt index file to read instead, with no Python at all: the demo stack's Node container
+ * mounts only `ui/` and gets the index from its `benchmarks-index` service (LAB-1356).
  */
 function benchmarksIndex(): Plugin {
   const id = "virtual:pii-guard/benchmarks-index";
   const resolved = "\0" + id;
   let cached: string | undefined;
+  const prebuilt = process.env.PII_GUARD_BENCHMARKS_INDEX || undefined;
   const python = (): [string, string[]] => {
     const args = ["-m", "pii_guard.eval.report_cli", "--print-index"];
     if (process.env.PII_GUARD_PYTHON) return [process.env.PII_GUARD_PYTHON, args];
@@ -47,6 +50,16 @@ function benchmarksIndex(): Plugin {
     resolveId: (source) => (source === id ? resolved : null),
     load(source) {
       if (source !== resolved) return null;
+      if (prebuilt) {
+        this.addWatchFile(prebuilt);
+        try {
+          return `export default ${readFileSync(prebuilt, "utf-8").trim()};`;
+        } catch (err) {
+          throw new Error(`benchmark index: cannot read PII_GUARD_BENCHMARKS_INDEX (${prebuilt}).`, {
+            cause: err,
+          });
+        }
+      }
       const runs = join(REPO_ROOT, "eval", "results", "runs");
       for (const name of readdirSync(runs)) if (name.endsWith(".json")) this.addWatchFile(join(runs, name));
       this.addWatchFile(join(REPO_ROOT, "docs", "benchmarks", "config.json"));
