@@ -164,7 +164,7 @@ _SPOOFED_PLACEHOLDER_RE = re.compile(r"(\[\[[A-Z][A-Z0-9_]*_)([^\[\]\n]{1,200}?)
 _HEX_ID_RE = re.compile(r"[0-9a-f]{4,}")
 # A line break directly between two digits: ``+36 30 123\n4567``, ``DE89\r\n3704 ...``.
 _WRAPPED_NUMBER_RE = re.compile(r"(?<=[0-9])(\r\n|[\n\r\x0b\x0c\x85\u2028\u2029])(?=[0-9])")
-_LINE_BREAK_RE = re.compile(f"[{_LINE_BREAKS}]")
+_LINE_BREAK_RE = re.compile(rf"\r\n|[{_LINE_BREAKS}]")
 
 # Obfuscated e-mail separators: ``[at]``, ``(dot)`` ... with the spaces around them (LAB-1297).
 _OPEN, _CLOSE = r"[\[({<]", r"[\])}>]"
@@ -424,19 +424,26 @@ def _join_wrapped_numbers(chars: list[str]) -> list[int]:
     a column of numbers, one per line, and chat lines starting with a time stay apart.
     """
     joined = "".join(chars)
-    if not any(b in joined for b in _LINE_BREAKS):
-        return []
+    breaks = iter(_LINE_BREAK_RE.finditer(joined))
+    current = next(breaks, None)
+    line_start = 0
     drop: list[int] = []
-    for match in _WRAPPED_NUMBER_RE.finditer(joined):
-        start, end = match.span()
-        line_start = max(joined.rfind(b, 0, start) for b in _LINE_BREAKS) + 1
-        following = _LINE_BREAK_RE.search(joined, end)
-        before = joined[line_start:start]
-        after = joined[end : following.start() if following else len(joined)]
-        if _is_number_line(before) or not _is_number_continuation(after):
-            continue
-        chars[end - 1] = " "
-        drop.extend(range(start, end - 1))
+    while current is not None:
+        following = next(breaks, None)
+        start, end = current.span()
+        if (
+            start > 0
+            and end < len(joined)
+            and ("0" <= joined[start - 1] <= "9" and "0" <= joined[end] <= "9")
+        ):
+            before = joined[line_start:start]
+            after = joined[end : following.start() if following else len(joined)]
+            if not _is_number_line(before) and _is_number_continuation(after):
+                chars[end - 1] = " "
+                drop.extend(range(start, end - 1))
+        # Every boundary advances once; each adjacent line is checked at most twice.
+        line_start = end
+        current = following
     return drop
 
 
