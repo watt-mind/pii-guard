@@ -1,0 +1,94 @@
+# Projects, policies and endpoints
+
+Hosted and self-hosted users can organize guard configuration into projects. A project owns
+reusable policy families and inference endpoints. A newly established owner receives one
+default project and a default policy; additional projects are isolated configuration spaces.
+Project selection never changes the hosted account-wide quota or sponsored allowance.
+
+## Policies
+
+A policy family contains a sequence of immutable versions. Each version records a complete
+text-entity action set (`mask`, `keep` or `block`), language, and detection mode. Creating a
+revision appends the next version to the family; it does not edit an existing version. An
+endpoint pins one exact version. New revisions do not move existing endpoints. To change an
+endpoint's behavior, explicitly edit that endpoint and select the intended version.
+
+Policy `keep` actions affect masking only after detection and resolution. They do not disable
+detection or suppress account/global quotas. `block` fails the request closed when an entity
+of that type is detected. Visual entity policies are not configurable here. Hosted endpoints
+run the hosted fast detector; self-hosted endpoints may use the supported detector modes for
+the configured deployment profile. Local-only detection continues to prohibit remote original-
+text detectors and refuses audit mode.
+
+## Endpoints and credentials
+
+An endpoint binds one provider, upstream base URL, model, credential and policy version. A
+provider credential is write-only: it is encrypted in the local metadata store, excluded from
+metadata responses and never returned after creation. Editing an endpoint can preserve its
+credential or replace it. Sponsored Meta endpoints use the deployment's sponsored credential
+and do not store a per-endpoint provider secret. Endpoint gateway URLs use the form
+`/e/{endpoint_id}/v1`; supported OpenAI-compatible routes are chat completions, Responses and
+model catalogs. Endpoint selection is explicit. Invalid, disabled, expired or revoked endpoint
+credentials fail closed; they do not fall back to another endpoint or sponsored inference.
+
+An owner may issue endpoint-scoped guard keys. The raw value is shown once at creation; the
+store retains only its SHA-256 verifier. At most 32 keys are active per endpoint, with up to
+128 total active and revoked records retained; a global limit of 65,536 records applies. The oldest
+revoked records may be pruned to stay within these limits. A key authorizes only that
+endpoint's gateway and model-catalog routes; it cannot access account, project, policy,
+endpoint-management, traffic or vault-inspection routes. Keys are individually revocable.
+Disabling an endpoint blocks all
+its keys from new admission; deleting an endpoint removes all its key records. Revocation
+applies to new admissions; a request that already captured its endpoint configuration may
+finish with that snapshot.
+
+## Isolation and lifetime
+
+The hosted owner remains the account identity. Hosted management operations require that
+identity; an endpoint key is not an owner credential. Project and endpoint IDs are always
+checked against the authenticated owner and selected project. Hosted account-wide request,
+token, concurrency and sponsorship accounting remains shared across projects. Creating another
+project or endpoint does not create another quota or sponsored budget.
+
+Vault mappings, known values, detection caches, session coordination, masked traffic events and
+vault inspector state are held in bounded process memory. Runtime namespaces include owner and
+project; endpoint-scoped gateway requests also include the endpoint. Hosted vault/session
+capacity is shared across that owner's project and endpoint namespaces. Identical session IDs
+in different namespaces cannot restore one another's mappings. These request and token mappings
+are ephemeral and disappear on runtime expiry or process loss. Project persistence must never be
+described as persistence of original text, restored output, vault mappings, session contents,
+traffic, quota counters or sponsored spend records.
+
+## Metadata storage and operations
+
+Project configuration is stored in a dedicated SQLite database. By default its path is
+`~/.local/share/pii-guard/projects/state.sqlite3`; override it with
+`PII_GUARD_PROJECT_STATE_PATH`. The directory and database are created with owner-only
+permissions (`0700` and `0600`). Hosted images set the path to
+`/var/lib/pii-guard/projects/state.sqlite3`; that directory is writable but ephemeral unless
+the operator mounts storage there. The hosted topology runs one replica/worker, but a durable
+mount still needs a verified local-filesystem SQLite locking contract. Do not assume generic
+SMB/Azure Files semantics are suitable for SQLite. Include the database in protected backups
+only if restoration is required. A backup contains configuration, not request mappings.
+Restrict backup access as carefully as the running store.
+
+Hosted deployments require the existing stable 32-byte `PII_GUARD_TENANT_KEY`. Credential
+encryption uses authenticated Fernet encryption with a domain-separated HMAC-SHA256 key derived
+from that tenant key. The database also contains an encrypted sentinel; a missing or changed key
+prevents the application from opening the project store. Back up the database and retain the
+matching tenant key through approved secret management. Rotating the tenant key without
+re-encrypting the database makes stored provider credentials unavailable. Do not log database
+rows, credential envelopes, key material or raw endpoint keys.
+
+For local self-hosting, when no tenant key is configured, pii-guard creates a random
+`project-storage.key` beside the database with owner-only permissions. Back up that key with
+the database; losing either or restoring them from different points makes stored credentials
+unavailable. Existing environment-based upstream configuration remains available for the local
+single-owner setup.
+
+Metadata that is durable includes project ownership and names, default-project selection,
+complete immutable policy versions, endpoint provider/URL/model/policy assignment/enabled
+state, encrypted provider credentials, and endpoint-key verifier/revocation metadata. The
+provider secret itself is encrypted; the one-time endpoint key is not recoverable from its
+verifier. SQLite durability is independent of the ephemeral runtime mappings and the separate
+hosted sponsored-spend store.

@@ -1,5 +1,10 @@
 # 0011. An opt-in hosted demo with explicit processing boundaries
 
+> Follow-up: [ADR 0012](0012-hosted-projects-and-endpoint-configuration.md) supersedes this
+> record's statements that all user configuration and API-key records are ephemeral. The
+> hosted project metadata database currently lives on ephemeral container storage; request
+> mappings, traffic and quota state remain in memory.
+
 - **Status:** accepted design; public launch remains gated
 - **Date:** 2026-10-28
 

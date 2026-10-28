@@ -2,8 +2,8 @@
 
 The hosted image and Azure templates are opt-in. Their presence does **not** mean a public
 service has passed review. Start with internal ingress and zero sponsored budget. Read
-[ADR 0011](decisions/0011-hosted-saas.md), [contracts](contracts.md) and the
-[privacy model](privacy-model.md) before enabling a deployment.
+[ADR 0011](decisions/0011-hosted-saas.md), [ADR 0012](decisions/0012-hosted-projects-and-endpoint-configuration.md),
+[contracts](contracts.md) and the [privacy model](privacy-model.md) before enabling a deployment.
 
 ## What each mode processes
 
@@ -11,7 +11,7 @@ service has passed review. Start with internal ingress and zero sponsored budget
 |---|---|---|---|
 | Anonymous walkthrough | Curated server-owned HU/EN synthetic sample; local rules and CPU NER | Masked sample to sponsored Meta, only when budget permits | Public; sample IDs only |
 | Signed-in editable text | Azure hosted service receives original text; local rules and CPU NER | Masked text to configured sponsored Meta or approved BYOK destination | Google identity or owner API key; owner-scoped vault |
-| BYOK | The service temporarily receives the provider key and configured endpoint | Masked input, key sent only to that approved public HTTPS destination | Signed-in owner; session-only profile |
+| BYOK | The service receives the provider key and configured endpoint | Masked input, key sent only to that approved public HTTPS destination | Signed-in owner; the endpoint credential is encrypted in project configuration (see [projects](projects.md)) |
 | Self-hosted | Original input stays in the operator's chosen guard/detector infrastructure | Masked input to the operator's provider | The operator controls access and retention |
 
 Hosted images/uploads and remote LLM detection are outside the initial scope. A remote detector
@@ -43,25 +43,35 @@ applicable processing terms and public disclosure before activating paid calls.
 
 ## Retention, deletion and keys
 
-This initial deployment uses process memory for originals during processing, reversible
-mappings, temporary provider credentials, API-key records, owner-scoped masked traffic events
-and visitor/user counters. It does
-not promise persistence across redeployments, worker failures or restarts. Do not describe
-"session-only" as meaning a browser reload erases server memory. Use the implemented owner
-session/profile/key deletion and expiry controls documented in [contracts](contracts.md);
-closing a tab alone is not a deletion request. Expiry/removal makes records unavailable to the
-application but does not prove physical memory erasure. Raw originals can remain in language
-runtime caches after logical vault deletion (LAB-1364); do not promise immediate secure erasure.
-No application database, mapping backup or content archive is provisioned here. Azure platform
-and provider retention are separate; their current terms must be reviewed for the actual account.
+This deployment keeps originals during processing, reversible mappings, request/session state,
+masked traffic events, counters and account-level temporary profiles in bounded process memory.
+Those values are lost on process/runtime loss; closing a browser tab alone is not a deletion
+request. Use implemented owner session/profile/key deletion and expiry controls documented in
+[contracts](contracts.md). Expiry/removal makes records unavailable to the application but does
+not prove physical memory erasure. Raw originals can remain in language runtime caches after
+logical vault deletion (LAB-1364); do not promise immediate secure erasure.
+
+Project configuration is stored separately in SQLite at
+`/var/lib/pii-guard/projects/state.sqlite3`, encrypted with a key derived from the stable tenant
+key. The hosted image creates this private writable directory, but the current deployment does
+not mount it as durable storage. Project names, policy versions, endpoint configuration and
+encrypted upstream credentials therefore survive an application process restart only while the
+same container filesystem remains, and are not guaranteed across container replacement or
+redeployment. A future durable mount requires a verified SQLite locking contract for that
+filesystem; do not place SQLite on generic SMB/Azure Files storage without confirming that
+contract. Endpoint key verifiers are configuration metadata; raw endpoint keys are shown only
+once. None of this makes request mappings or activity durable. See [projects](projects.md) for
+the exact persistence boundary. Azure platform and provider retention are separate; review the
+current terms for the actual account.
 
 The Key Vault holds versioned sponsored credentials, the runtime tenant key and Google OAuth
 client secret. The runtime identity has Secrets User access only within this dedicated vault.
 These durable credentials remain until an operator rotates/deletes them. Key Vault soft delete
 is seven days and purge protection is enabled; that is a secret-recovery policy, **not** prompt
 retention. Tenant-key rotation invalidates old pseudonyms; deploy with a new secret version and
-expect all ephemeral sessions to be lost. Delete/revoke BYOK profiles and user API keys through
-the owner controls, and revoke the original provider credential at its provider if compromised.
+expect all ephemeral sessions to be lost. Delete temporary BYOK connections, project endpoints
+and their endpoint keys, and account API keys through the owner controls. Revoke the original
+provider credential at its provider if compromised.
 Google's Easy Auth cookie is configured for one hour; it is not a mapping TTL. The auth token
 store is disabled. Application cookies/CSRF and profile expiry follow the backend contract.
 
@@ -73,11 +83,13 @@ The backend's current default application expiries are:
 | Guest owner cookie | Fixed one hour |
 | Vault session | Sliding one hour |
 | BYOK connection | Fixed one hour from creation; five per owner, 256 globally |
+| Project endpoint configuration and endpoint-key verifiers | Lifetime of the project SQLite file; raw endpoint keys are shown once and not stored |
 | Masked traffic log | Last 50 events per owner; freed on owner purge or process restart |
 | User API key | Fixed 24 hours; five per owner, 1,000 globally; process loss can revoke earlier |
 
-API keys are stored as verifiers, not recoverable raw keys. Deleting a connection/session/key
-prevents subsequent lookup; a request that already selected it may finish. Runtime cleanup
+Account and endpoint guard keys are stored as verifiers, not recoverable raw keys. Deleting a
+connection/session/key prevents subsequent lookup; disabling an endpoint blocks its keys from
+new admission. A request that already selected a connection or endpoint may finish. Runtime cleanup
 closes the owner's vault and clears provider connections. These are application defaults,
 not a guarantee that sensitive memory is physically erased on expiry. Review changes to these
 limits together with the backend contract and public notice.
@@ -126,6 +138,7 @@ startup characteristics and is not subject to the self-hosted image's 375 MB OCR
 | `PII_GUARD_HOSTED_SINGLE_PROCESS` | `true`; one worker per replica, zero to one replicas |
 | `PII_GUARD_HOSTED_PUBLIC_ORIGIN` | Canonical HTTPS origin, no trailing slash |
 | `PII_GUARD_HOSTED_TRUST_EASY_AUTH` | `true` only behind the platform's trusted ingress |
+| `PII_GUARD_PROJECT_STATE_PATH` | `/var/lib/pii-guard/projects/state.sqlite3`; current directory is private container storage, not a durable mount |
 | `PII_GUARD_TENANT_KEY` | Versioned Key Vault reference; random 32-byte hex key |
 | `PII_GUARD_UPSTREAM_API_KEY` | Versioned Key Vault reference; sponsored Meta Standard key |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `https://api.meta.ai/v1`; server-owned sponsored route |
