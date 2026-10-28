@@ -45,6 +45,15 @@ describe("public hosted workflow", () => {
     await user.click(await screen.findByRole("button", { name: "Run live example" }));
     await screen.findByRole("alert"); expect(screen.queryByText("Live result · test-model")).not.toBeInTheDocument();
   });
+  it.each([null, {}, { start: 0.5, end: 2, type: "PERSON" }, { start: 3, end: 2, type: "PERSON" }, { start: 0, end: 2, type: null }])("rejects malformed entity metadata without rendering a live success: %j", async (entity) => {
+    const call = requester((path) => path === "/v1/account" ? account : { ...result, entities: [entity] });
+    const user = userEvent.setup(); render(<HostedApp call={call} />);
+    await user.click(await screen.findByRole("button", { name: "Run live example" }));
+    await screen.findByRole("alert");
+    expect(screen.queryByText("Live result · test-model")).not.toBeInTheDocument();
+    expect(screen.queryByText(result.restored)).not.toBeInTheDocument();
+    expect(screen.getByText("Live request did not complete")).toBeInTheDocument();
+  });
   it("offers honest unavailable state with reconnect and keeps the static walkthrough", async () => {
     const call = requester(() => { throw new Error("offline"); });
     render(<HostedApp call={call} />);
@@ -61,7 +70,8 @@ describe("public hosted workflow", () => {
       return [];
     });
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await user.type(await screen.findByLabelText("Key name"), "Test integration");
+    expect(await screen.findByLabelText("Key name")).toHaveAttribute("maxlength", "64");
+    await user.type(screen.getByLabelText("Key name"), "Test integration");
     await user.click(screen.getByRole("button", { name: "Create guard key" }));
     await screen.findByText("synthetic-once-only-secret");
     expect(localStorage.length).toBe(0); expect(sessionStorage.length).toBe(0);

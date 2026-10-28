@@ -65,7 +65,10 @@ export function HostedApp({ call = request }: { call?: Requester }) {
         } finally { clearTimeout(timeout); controller.current = null; }
       } else {
         next = await call<DemoResult>("/v1/demo", { sample_id: `${language}-support`, language });
-        if (![next.original, next.masked, next.answer, next.restored, next.model].every((s) => typeof s === "string" && s.length > 0) || !Array.isArray(next.entities)) throw new Error("Incomplete demo");
+        if (![next.original, next.masked, next.answer, next.restored, next.model].every((s) => typeof s === "string" && s.length > 0) || !Array.isArray(next.entities) || !next.entities.every((entity) =>
+          entity !== null && typeof entity === "object" && Number.isInteger(entity.start) && Number.isInteger(entity.end) &&
+          entity.start >= 0 && entity.end > entity.start && typeof entity.type === "string" && entity.type.length > 0,
+        )) throw new Error("Incomplete demo");
       }
       setResult(next);
       void refresh();
@@ -164,7 +167,7 @@ function Settings({ call, account, refresh, onDisconnect }: { call: Requester; a
         <ul className="list">{account.connections.map((c) => <li key={c.id}><div>{c.provider} · {c.origin}<br /><small>Expires {time(c.expires_at)}</small></div><button disabled={busy} onClick={() => void action(async () => { await call(`/v1/account/connections/${encodeURIComponent(c.id)}`, undefined, "DELETE"); onDisconnect(c.id); await refresh(); })}>Disconnect</button></li>)}</ul>
       </div>
       <div className="stack"><h3>Your guard API keys</h3><p className="muted">Use a guard key to authenticate an integration. Copy a new key now; it is shown only once.</p>
-        <form className="stack" onSubmit={(e) => { e.preventDefault(); void action(async () => { setCreated(""); const key = await call<GuardKey & { key: string }>("/v1/account/api-keys", { name }); setCreated(key.key); setCopy("Copy key"); setKeys((prev) => [...prev, { id: key.id, name: key.name, prefix: key.prefix, created_at: key.created_at }]); setName(""); }); }}><label>Key name<input required value={name} onChange={(e) => setName(e.target.value)} maxLength={80} /></label><button disabled={busy || !name.trim()} type="submit">Create guard key</button></form>
+        <form className="stack" onSubmit={(e) => { e.preventDefault(); void action(async () => { setCreated(""); const key = await call<GuardKey & { key: string }>("/v1/account/api-keys", { name }); setCreated(key.key); setCopy("Copy key"); setKeys((prev) => [...prev, { id: key.id, name: key.name, prefix: key.prefix, created_at: key.created_at }]); setName(""); }); }}><label>Key name<input required value={name} onChange={(e) => setName(e.target.value)} maxLength={64} /></label><button disabled={busy || !name.trim()} type="submit">Create guard key</button></form>
         {created && <div className="stack"><p className="secret">{created}</p><div className="actions"><button onClick={() => { void navigator.clipboard.writeText(created).then(() => setCopy("Copied")).catch(() => setCopy("Select and copy key")); }}>{copy}</button><button onClick={() => setCreated("")}>Dismiss key</button></div></div>}
         <ul className="list">{keys.map((key) => <li key={key.id}><div>{key.name}<br /><small>{key.prefix}… · {time(key.created_at)}</small></div><button disabled={busy} onClick={() => void action(async () => { await call(`/v1/account/api-keys/${encodeURIComponent(key.id)}`, undefined, "DELETE"); setKeys((prev) => prev.filter((k) => k.id !== key.id)); setCreated(""); })}>Revoke</button></li>)}</ul>
       </div>
