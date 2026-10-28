@@ -1,6 +1,8 @@
 """Exercise fail-closed deployment admission without contacting Azure."""
 
+import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -9,6 +11,34 @@ from pathlib import Path
 SCRIPT = Path(__file__).with_name("deploy.sh").resolve()
 IMAGE = "piiguardexample.azurecr.io/pii-guard@sha256:" + "a" * 64
 VAULT = "https://piiguardexample.vault.azure.net/"
+
+
+class TemplateContractTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("az"), "Azure CLI is required to compile Bicep")
+    def test_disabled_log_export_serializes_as_null(self) -> None:
+        result = subprocess.run(  # noqa: S603 - fixed read-only compiler invocation
+            [
+                shutil.which("az") or "/unavailable-azure-cli",
+                "bicep",
+                "build",
+                "--file",
+                str(SCRIPT.with_name("main.bicep")),
+                "--stdout",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        template = json.loads(result.stdout)
+        environments = [
+            resource
+            for resource in template["resources"]
+            if resource["type"] == "Microsoft.App/managedEnvironments"
+        ]
+        self.assertEqual(len(environments), 1)
+        logs = environments[0]["properties"]["appLogsConfiguration"]
+        self.assertIn("destination", logs)
+        self.assertIsNone(logs["destination"])
 
 
 class DeploymentAdmissionTests(unittest.TestCase):
@@ -31,7 +61,7 @@ class DeploymentAdmissionTests(unittest.TestCase):
                 "PATH": directory + os.pathsep + os.defpath,
                 "AZURE_SUBSCRIPTION_ID": "test-subscription",
                 "AZURE_RESOURCE_GROUP": "rg-pii-guard-hosted-test",
-                "AZURE_LOCATION": "westeurope",
+                "AZURE_LOCATION": "swedencentral",
                 "HOSTED_IMAGE": IMAGE,
                 "HOSTED_PUBLIC_ORIGIN": "https://guard.example.com",
                 "GOOGLE_CLIENT_ID": "synthetic-client",

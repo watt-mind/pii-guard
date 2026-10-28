@@ -124,7 +124,7 @@ Use an explicit subscription and a **new dedicated** resource group beginning wi
 `rg-pii-guard-hosted-`. The deployment script refuses shared groups and requires the
 `project=pii-guard` ownership tag for updates. The selected public origin is **https://guard.watt-mind.com**, with Google callback
 `https://guard.watt-mind.com/.auth/login/google/callback`. The planned dedicated resource group
-is `rg-pii-guard-hosted-demo`, region `westeurope`, prefix `piiguarddemo`. These are intended
+is `rg-pii-guard-hosted-demo`, region `swedencentral`, prefix `piiguarddemo`. These are intended
 settings, not evidence that a live deployment exists. Choose an EU region after confirming Container
 Apps capacity and model memory needs. Infrastructure provisioning requires permission
 to create resources and RBAC assignments. Register Microsoft.App, Microsoft.ContainerRegistry,
