@@ -69,9 +69,13 @@ def test_print_refuses_check_and_dry_run_for_printed_tools(
 ) -> None:
     with pytest.raises(SystemExit):
         run("pi", "--print", "--check")
+    code, _ = run("curl", "--check", "--gateway", "http://127.0.0.1:9/v1")
+    assert code == 2
+    assert "--check for pi, muse-code, codex, opencode" in capsys.readouterr().err
+    # Codex and OpenCode have a --check (LAB-1469): an unreachable gateway is a problem to fix.
     code, _ = run("codex", "--check", "--gateway", "http://127.0.0.1:9/v1")
     assert code == 2
-    assert "--dry-run and --check are for" in capsys.readouterr().err
+    assert "could not reach the gateway" in capsys.readouterr().err
 
 
 def test_print_refuses_an_unsafe_model(capsys: pytest.CaptureFixture[str]) -> None:

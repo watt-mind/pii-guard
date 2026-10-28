@@ -26,9 +26,10 @@ Unknown placeholders are left as is and counted (``unresolved``).
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
+from pii_guard.gateway.opaque_ids import upstream_ids
 from pii_guard.gateway.restore import (
     JsonEscapingSession,
     RestoreReport,
@@ -158,8 +159,12 @@ class ResponsesSseRestorer:
     """Rewrites ``response.*`` events; feed them in order with :meth:`process`, then
     :meth:`finish`. Each returns ``(event name, data)`` pairs to emit."""
 
-    def __init__(self, session: VaultSession) -> None:
+    def __init__(
+        self, session: VaultSession, on_ids: Callable[[list[str]], None] | None = None
+    ) -> None:
+        """``on_ids`` receives the ids each event carries, raw (LAB-1469)."""
         self._session = session
+        self._on_ids = on_ids
         # One budget for every event of the stream (LAB-1350).
         self._budget = session.restore_budget()
         self._json_session = JsonEscapingSession(session, self._budget)
@@ -224,6 +229,8 @@ class ResponsesSseRestorer:
         event_type = parsed.get("type") if isinstance(parsed.get("type"), str) else event
         if event_type == "error" or (event_type is None and "error" in parsed):
             return [self._emit(_error("upstream_error", "upstream stream error"))]
+        if self._on_ids is not None:
+            self._on_ids(upstream_ids(parsed))
         if event_type in _DELTAS:
             return [self._emit(self._delta(event_type, parsed))]
         out: list[tuple[str | None, str]] = []

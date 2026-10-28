@@ -48,6 +48,12 @@ codex -m muse-spark-1.3 \
   `pii-guard serve`, set `PII_GUARD_GATEWAY_MODE=fast`.
 - Codex warns `Model metadata for <model> not found` for a model OpenAI doesn't list. The
   warning is harmless.
+- `pii-guard connect codex --check` sends one fictional canary the way Codex does (a
+  non-streamed `POST <base_url>/responses` through a path session) and prints what the model
+  saw and what came back.
+- Codex mints its own message ids (`msg_<uuid>`) and sends the model's call ids back; the
+  gateway forwards both as sent (LAB-1469: the NER used to read some of them as phone numbers
+  and refuse the request).
 
 ## What the gateway sees from Codex
 
