@@ -130,7 +130,7 @@ function useFieldProps(props: { id?: string; required?: boolean; "aria-described
 
 export function Input({ size = "md", className = "", ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & { size?: ControlSize; ref?: Ref<HTMLInputElement> }) {
   const field = useFieldProps(rest);
-  return <input {...rest} {...field} className={[CONTROL_BASE, CONTROL_SIZE[size], className].join(" ")} />;
+  return <input {...rest} {...field} className={[CONTROL_BASE, CONTROL_SIZE[size], "read-only:bg-surface-2", className].join(" ")} />;
 }
 
 export function Select({ size = "md", className = "", ...rest }: Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> & { size?: ControlSize; ref?: Ref<HTMLSelectElement> }) {
@@ -140,7 +140,7 @@ export function Select({ size = "md", className = "", ...rest }: Omit<SelectHTML
 
 export function Textarea({ className = "", ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) {
   const field = useFieldProps(rest);
-  return <textarea {...rest} {...field} className={[CONTROL_BASE, "min-h-36 resize-y bg-surface-2 px-3 py-2 font-mono text-ui read-only:bg-surface-2", className].join(" ")} />;
+  return <textarea {...rest} {...field} className={[CONTROL_BASE, "min-h-36 resize-y bg-surface-2 px-3 py-2 font-mono text-ui", className].join(" ")} />;
 }
 
 /** One checkbox style: 16 px, the primary as its accent, the label beside it. */
@@ -192,8 +192,11 @@ export function SegmentedControl<T extends string>({
   onChange,
   size = "md",
   name,
+  square = false,
   className = "",
 }: {
+  /** Icon-only segments: square, so a row of icons stays compact. */
+  square?: boolean;
   /** The group's accessible name ("Theme", "Chat mode"). */
   label: string;
   options: readonly Segment<T>[];
@@ -216,7 +219,13 @@ export function SegmentedControl<T extends string>({
             "hover:text-ink has-[:checked]:bg-surface has-[:checked]:text-ink has-[:checked]:shadow-[0_0_0_1px_var(--line-strong)]",
             "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus)]",
             "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-45",
-            size === "sm" ? "h-7 px-2.5 text-xs pointer-coarse:h-10" : "h-8 px-3 text-sm pointer-coarse:h-10",
+            square
+              ? size === "sm"
+                ? "size-7 pointer-coarse:size-10"
+                : "size-8 pointer-coarse:size-10"
+              : size === "sm"
+                ? "h-7 px-2.5 text-xs pointer-coarse:h-10"
+                : "h-8 px-3 text-sm pointer-coarse:h-10",
           ].join(" ")}
         >
           <input

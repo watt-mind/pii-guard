@@ -25,10 +25,10 @@ export function buttonClass(variant: ButtonVariant = "secondary", size: ControlS
 
 /** Inputs, selects and text areas: one height, radius, `--field` outline and neutral focus. */
 export const CONTROL_BASE =
-  "w-full min-w-0 rounded-lg border border-field bg-surface text-ink transition-colors placeholder:text-faint hover:border-ink/60 disabled:cursor-not-allowed disabled:opacity-55 aria-invalid:border-danger read-only:bg-surface-2";
+  "w-full min-w-0 rounded-lg border border-field text-ink transition-colors placeholder:text-faint hover:border-ink/60 disabled:cursor-not-allowed disabled:opacity-55 aria-invalid:border-danger";
 export const CONTROL_SIZE: Record<ControlSize, string> = {
-  sm: "h-8 px-2.5 text-xs pointer-coarse:h-11 pointer-coarse:text-sm",
-  md: "h-9 px-3 text-sm pointer-coarse:h-11",
+  sm: "h-8 bg-surface px-2.5 text-xs pointer-coarse:h-11 pointer-coarse:text-sm",
+  md: "h-9 bg-surface px-3 text-sm pointer-coarse:h-11",
 };
 
 
