@@ -179,13 +179,21 @@ class VaultMatcher:
         many words as it has: a lone surname in a footer is not the person). Accepted matches
         only, best first, never overlapping; an uncertain one is never a finding (guessing
         would cover the wrong person's placeholder). ``origin`` is ``"vault"``.
+
+        Only findings of a masked type cover words here: a known person a weaker detector
+        read as an ``ORGANIZATION`` (``keep``) is still found, so a known value wins over keep
+        and the pixels agree with the transcript sweep (LAB-1351).
         """
         candidates = [
             c for c in self._candidates if masked_types is None or c.entity_type in masked_types
         ]
         if not candidates:
             return []
-        covered = [f.region.box for f in ocr.findings]
+        covered = [
+            f.region.box
+            for f in ocr.findings
+            if masked_types is None or f.region.entity_type in masked_types
+        ]
         free = [
             w
             for w in ocr.words
