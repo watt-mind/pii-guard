@@ -13,6 +13,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import type { ThemePref } from "../hooks/useTheme";
 import { errorCopy, statusFromMessage } from "../lib/errorCopy";
 import type { RunError } from "../lib/run";
 import { CONTROL_BASE, CONTROL_SIZE, buttonClass, type ButtonVariant, type ControlSize } from "./controls";
@@ -246,6 +247,61 @@ export function SegmentedControl<T extends string>({
   );
 }
 
+/* ---------- Brand ---------- */
+
+/** The product mark: a 24 px shield glyph, no tile (ui/DESIGN.md, "Brand row"). Console and landing. */
+export function Logo() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6 shrink-0 text-ink" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+      <path d="M12 3 5 6v5.2c0 4.3 2.9 8 7 9.3 4.1-1.3 7-5 7-9.3V6l-7-3Z" />
+      <path d="M8.6 12h6.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Light, system or dark: three square icon segments. The sidebar footer and the landing footer. */
+export function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) => void }) {
+  const options: { id: ThemePref; label: string; icon: string }[] = [
+    { id: "light", label: "Light theme", icon: "M8 3.5V2m0 12v-1.5M3.5 8H2m12 0h-1.5M4.8 4.8 3.8 3.8m8.4 8.4-1-1m0-6.4 1-1M3.8 12.2l1-1M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z" },
+    { id: "system", label: "System theme", icon: "M2.5 3.5h11v7h-11zM6 13.5h4M8 10.5v3" },
+    { id: "dark", label: "Dark theme", icon: "M13 9.6A5.5 5.5 0 0 1 6.4 3a5.5 5.5 0 1 0 6.6 6.6Z" },
+  ];
+  return (
+    <SegmentedControl
+      label="Theme"
+      size="sm"
+      square
+      className="shrink-0"
+      value={theme}
+      onChange={onTheme}
+      options={options.map((o) => ({
+        value: o.id,
+        ariaLabel: o.label,
+        title: o.label,
+        label: (
+          <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d={o.icon} />
+          </svg>
+        ),
+      }))}
+    />
+  );
+}
+
+/* ---------- Badge ---------- */
+
+export type BadgeTone = "neutral" | "live" | "failed";
+const BADGE_TONE: Record<BadgeTone, string> = {
+  neutral: "bg-surface-2 text-muted ring-line-strong",
+  live: "bg-guard-soft text-guard ring-guard/30",
+  failed: "bg-danger-soft text-danger ring-danger/35",
+};
+
+/** A short status label: 6 px radius, 11/500 (ui/DESIGN.md, "Type"). `live` and `failed` are states; neutral is not. */
+export function Badge({ tone = "neutral", children, className = "" }: { tone?: BadgeTone; children: ReactNode; className?: string }) {
+  return <span className={["inline-flex w-fit items-center rounded-md px-2 py-0.5 text-2xs font-medium ring-1 ring-inset", BADGE_TONE[tone], className].join(" ")}>{children}</span>;
+}
+
 /* ---------- Confirmation ---------- */
 
 /**
@@ -378,7 +434,8 @@ export function Notice({
   return (
     <div ref={ref} role={role} className={["rounded-lg border p-3 text-sm sm:p-4", t.box, className].join(" ")} {...rest}>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
+        {/* The message keeps at least 16 rem: on a phone the action wraps below it rather than squeezing it. */}
+        <div className="min-w-0 flex-[1_1_16rem]">
           {title && <p className={["font-medium", t.title].join(" ")}>{title}</p>}
           {children && <div className={[title ? "mt-1" : "", "text-ink [&_p+p]:mt-1"].join(" ")}>{children}</div>}
         </div>

@@ -106,7 +106,7 @@ describe("hosted console for a signed-in owner", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Visit site" })).toHaveAttribute("href", "#site");
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toHaveAttribute("href", account.logout_url);
-    expect(screen.queryByText("Reduce personal data")).not.toBeInTheDocument();
+    expect(screen.queryByText("Send the work to the model.")).not.toBeInTheDocument();
   });
 
   it("shows the owner's usage and limits on the Overview, with one setup list, and hides the server setup it can't read", async () => {
@@ -277,7 +277,7 @@ describe("hosted console for a signed-in owner", () => {
     await screen.findByRole("navigation", { name: "Console" });
     history.pushState(null, "", "#site");
     act(() => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
-    expect(await screen.findByText("Reduce personal data", { exact: false })).toBeInTheDocument();
+    expect(await screen.findByText("Send the work to the model.", { exact: false })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Open console" })[0]).toHaveAttribute("href", "#overview");
     expect(screen.queryByRole("navigation", { name: "Console" })).not.toBeInTheDocument();
   });
