@@ -100,9 +100,12 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
       {/* Your server's setup, never mixed into the recorded demo's numbers. */}
       {!recorded && serverSetup && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Upstream" note="Where the gateway forwards masked requests.">
-            <Upstream server={server} status={status} last={s.lastForwarded} errors={s.upstreamErrors} />
-          </Panel>
+          {/* A hosted owner's status has no upstream: the owner's endpoints pick their own. */}
+          {(!server || server.upstream) && (
+            <Panel title="Upstream" note="Where the gateway forwards masked requests.">
+              <Upstream server={server} status={status} last={s.lastForwarded} errors={s.upstreamErrors} />
+            </Panel>
+          )}
           <Panel title="Mode and detectors" note="What runs on each gateway call.">
             <Detectors server={server} status={status} />
           </Panel>
@@ -321,8 +324,8 @@ function Unknown({ status }: { status: ServerStatusState }) {
 }
 
 function Upstream({ server, status, last, errors }: { server: ServerStatus | null; status: ServerStatusState; last: TrafficEvent | null; errors: number }) {
-  if (!server) return <Unknown status={status} />;
-  const up = server.upstream;
+  const up = server?.upstream;
+  if (!up) return <Unknown status={status} />;
   return (
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
       <dt className="text-muted">Model</dt>
@@ -365,14 +368,14 @@ function Detectors({ server, status }: { server: ServerStatus | null; status: Se
         </dd>
         <dt className="text-muted">Fast</dt>
         <dd className="text-ink">{fast.detectors.map(detectorName).join(" + ") || "none"}</dd>
-        <dt className="text-muted">Audit</dt>
-        <dd className="text-ink">
+        {audit && <dt className="text-muted">Audit</dt>}
+        {audit && <dd className="text-ink">
           {audit.available ? (
             <>Fast + the LLM detector{audit.model ? ` (${audit.model.split("/").pop()})` : ""}: sends the text to that endpoint, for spot checks.</>
           ) : (
             <span className="text-muted [overflow-wrap:anywhere]">Unavailable: requests get 503 {code("detection_unavailable")}. {audit.reason}</span>
           )}
-        </dd>
+        </dd>}
       </dl>
       {!server.ner.available && (
         <p role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-ink">

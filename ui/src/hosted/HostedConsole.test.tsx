@@ -6,7 +6,10 @@ import { createMockChat } from "../api/chat";
 import type { HttpGuardClient } from "../api/http";
 import { createMockClient } from "../api/mock";
 import type { ServerStatus, StatusResult } from "../api/status";
-import { capabilitiesOf, HOSTED_CAPABILITIES, LOCAL_CAPABILITIES } from "../lib/capabilities";
+import { capabilitiesOf, HOSTED_CAPABILITIES, LOCAL_CAPABILITIES, offersSection } from "../lib/capabilities";
+import { fetchSnippets, parseSnippets } from "../api/connect";
+import { parseStatus } from "../api/status";
+import { setSelectedEndpoint, setSelectedProject } from "../projects/selection";
 import type { BenchmarkIndex } from "../api/benchmarks";
 import bundled from "virtual:pii-guard/benchmarks-index";
 import { HostedApp } from "./HostedApp";
@@ -38,6 +41,10 @@ function liveApi(): HttpGuardClient {
   return { health: () => Promise.resolve({ status: "ok", version: "0.1.0" }), analyze: backend.analyze, mask: backend.mask, unmask: backend.unmask };
 }
 
+// A hosted owner's /v1/status (LAB-1431): no upstream, images, auth, rest or metrics; fast mode only.
+const hostedStatus = { version: "0.1.0", gateway: { default_mode: "fast", url: "https://guard.example.com/v1", modes: { fast: { detectors: ["rules", "ner"], available: true, reason: null } } }, ner: { available: true, state: "ready", error: null }, policies: { PERSON: "mask" }, default_language: "hu", traffic_log: "masked", vault_inspect: "masked", capabilities: { text: true, chat: true, images: false, logs: true, vault: true, server_policy: false, projects: true, connect: true, evaluation: true, accounts: true } };
+const withStatus = () => Promise.resolve<StatusResult>({ state: "ok", status: parseStatus(hostedStatus)! });
+
 // Today's hosted image refuses /v1/status, so the console runs on the mode's defaults.
 const noStatus = () => Promise.resolve<StatusResult>({ state: "offline" });
 
@@ -67,7 +74,7 @@ beforeEach(() => {
   localStorage.clear();
   window.matchMedia ??= vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} });
 });
-afterEach(() => setPlaygroundConnection(""));
+afterEach(() => { setPlaygroundConnection(""); setSelectedEndpoint(null); setSelectedProject(null); vi.restoreAllMocks(); });
 
 describe("hosted console for a signed-in owner", () => {
   it("opens the console's menu, without the sections the hosted server doesn't offer", async () => {
@@ -184,11 +191,42 @@ describe("hosted console for a signed-in owner", () => {
     expect(screen.queryByRole("navigation", { name: "Console" })).not.toBeInTheDocument();
   });
 
+  it("reads the hosted status projection: detectors shown, no upstream panel", async () => {
+    renderHosted(requester(), withStatus);
+    expect(await screen.findByText("Mode and detectors")).toBeInTheDocument();
+    expect(screen.queryByText("Upstream")).not.toBeInTheDocument();
+    expect(within(menu()).queryByRole("link", { name: /^Policy/ })).not.toBeInTheDocument();
+  });
+
+  it("asks for one endpoint's snippets on Connect when an endpoint is picked", async () => {
+    setSelectedProject("project-one");
+    setSelectedEndpoint("ep-one");
+    history.replaceState(null, "", "#connect");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { code: "unavailable" } }), { status: 503 }));
+    renderHosted(requester(), withStatus);
+    await waitFor(() => expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/v1/connect/snippets?endpoint=ep-one"))).toBe(true));
+    expect(fetchSpy.mock.calls.some(([url]) => /snippets\?.*session=/.test(String(url)))).toBe(false);
+    expect(screen.queryByTestId("gateway-url")).not.toBeInTheDocument();
+  });
+
   it("follows the server's reported capabilities when it has them", async () => {
     const status = { capabilities: { images: true, server_policy: false } } as unknown as ServerStatus;
     expect(capabilitiesOf(status, true)).toEqual({ ...HOSTED_CAPABILITIES, images: true });
     expect(capabilitiesOf(null, true)).toEqual(HOSTED_CAPABILITIES);
     expect(capabilitiesOf(null, false)).toEqual(LOCAL_CAPABILITIES);
     expect(capabilitiesOf({ capabilities: { images: "yes" } } as unknown as ServerStatus, true).images).toBe(false);
+    // A local server with its traffic log off keeps Logs and Vault in the menu, as before.
+    expect(offersSection(LOCAL_CAPABILITIES, "logs")).toBe(true);
+    expect(offersSection({ ...LOCAL_CAPABILITIES, vault: false }, "vault")).toBe(true);
+    expect(offersSection(HOSTED_CAPABILITIES, "policy")).toBe(false);
+  });
+
+  it("parses endpoint snippets, which pin their URL and carry no session", async () => {
+    const body = { gateway_url: "https://guard.example.com/e/ep-one/v1", session: null, session_url: null, endpoint: { id: "ep-one", name: "Support assistant", model: "gpt-example" }, models: ["gpt-example"], model: "gpt-example", auth: { token_required: true, token_env: "PII_GUARD_ENDPOINT_KEY" }, upstream: { connected: true, mock: false, origin: null, preset: null, label: null }, presets: [], tools: [{ id: "python", label: "Python", api: "chat", kind: "request", supported: true, code: "client = OpenAI()", note: "", tested_version: null, docs: null }], traffic_log: "masked", session_ref: null };
+    expect(parseSnippets(body)?.endpoint?.id).toBe("ep-one");
+    expect(parseSnippets({ ...body, endpoint: undefined })).toBeNull();
+    const doFetch = vi.fn(async () => new Response(JSON.stringify(body)));
+    expect((await fetchSnippets({ endpoint: "ep-one" }, doFetch as unknown as typeof fetch)).state).toBe("ok");
+    expect(String((doFetch.mock.calls[0] as unknown[])[0])).toMatch(/\/v1\/connect\/snippets\?endpoint=ep-one$/);
   });
 });

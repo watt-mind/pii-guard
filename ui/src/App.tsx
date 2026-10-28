@@ -1,12 +1,13 @@
 import { useOwnerRevision } from "./api/localOwner";
 import { Workspace } from "./projects/Workspace";
-import { getSelectedProject, setSelectedProject, useSelectedScope } from "./projects/selection";
+import { getSelectedEndpoint, getSelectedProject, setSelectedProject, useSelectedScope } from "./projects/selection";
 import { HostedApp } from "./hosted/HostedApp";
 import { AccountSummary, ProviderConnections } from "./hosted/AccountPanels";
 import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
 import { offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
+import { endpointSnippets } from "./api/connect";
 import { engineReason } from "./api/engine";
 import { createHttpClient, type HttpGuardClient } from "./api/http";
 import { MOCK_SESSION_PREFIX, createMockClient } from "./api/mock";
@@ -98,6 +99,10 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   const server = status.state === "ok" ? status.status : null;
   const hosted = useHostedSession();
   const caps = useCapabilities(server);
+  // A hosted owner's snippets are one endpoint's (the menu's "Inspect activity & vault"); the
+  // console remounts when it changes.
+  const [snippetsEndpoint] = useState(getSelectedEndpoint);
+  const hostedSnippets = useMemo(() => (caps.accounts && snippetsEndpoint ? endpointSnippets(snippetsEndpoint) : undefined), [caps.accounts, snippetsEndpoint]);
 
   const [requestedRoute, setRouteState] = useState<Route>(routeFromLocation);
   // A section or tab the server doesn't offer opens the Overview (or the first offered tab).
@@ -337,7 +342,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               )}
             </div>
             <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" hidden={tab !== "chat"}>
-              <Chat client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={server?.upstream.mock ?? false} />
+              <Chat client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={server?.upstream?.mock ?? false} />
             </div>
             <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={tab !== "images"}>
               {caps.images && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}
@@ -351,7 +356,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 forceFixture={forceFixture}
                 sendDemo={traffic?.sendDemo}
                 pageHost={traffic?.pageHost}
-                mockUpstream={server?.upstream.mock ?? false}
+                mockUpstream={server?.upstream?.mock ?? false}
                 focus={logFocus}
                 onOpenSession={(ref) => {
                   setVaultFocus({ ref, nonce: Date.now() });
@@ -366,7 +371,9 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           <section id="section-connect" aria-label="Connect" hidden={section !== "connect"}>
             <Connect
               status={status}
-              serverSnippets={server !== null || !caps.accounts}
+              serverSnippets={!caps.accounts || (server !== null && hostedSnippets !== undefined)}
+              loadSnippets={hostedSnippets}
+              gatewayLine={!caps.accounts}
               accounts={caps.accounts ? <ProviderConnections /> : undefined}
               traffic={trafficOpened ? trafficHandle : undefined}
               onOpenLog={(id) => {

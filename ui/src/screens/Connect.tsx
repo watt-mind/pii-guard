@@ -18,11 +18,13 @@ export interface ConnectProps {
   loadSnippets?: SnippetsLoader;
   /** Show the server's client snippets and gateway URL; off where the server can't report them yet. */
   serverSnippets?: boolean;
+  /** The server's gateway URL line; off where each endpoint has its own URL (hosted). */
+  gatewayLine?: boolean;
   /** Account settings shown first, such as a hosted owner's provider connections. */
   accounts?: ReactNode;
 }
 
-export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, accounts }: ConnectProps) {
+export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts }: ConnectProps) {
   const server = status.state === "ok" ? status.status : null;
   const gateway = server?.gateway.url ?? DEFAULT_GATEWAY_URL;
 
@@ -42,11 +44,12 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
         <>
           <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} />
 
-          <GatewayLine status={status} server={server} gateway={gateway} />
+          {gatewayLine && <GatewayLine status={status} server={server} gateway={gateway} />}
         </>
       ) : (
         <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
-          Each endpoint has its own base URL, Python snippet and keys: open{" "}
+          Each endpoint has its own base URL, client snippets and keys. Pick one under <span className="text-ink">Inspect activity &amp; vault</span> in the menu for its
+          snippets here, or open{" "}
           <a className="text-ink underline underline-offset-4" href="#projects">
             Projects
           </a>{" "}

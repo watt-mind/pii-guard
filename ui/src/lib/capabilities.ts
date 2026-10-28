@@ -9,9 +9,10 @@ export const CAPABILITY_KEYS = ["text", "chat", "images", "logs", "vault", "serv
 export type Capability = (typeof CAPABILITY_KEYS)[number];
 export type Capabilities = Readonly<Record<Capability, boolean>>;
 
-export const LOCAL_CAPABILITIES: Capabilities = { text: true, chat: true, images: true, logs: true, vault: true, server_policy: true, projects: true, connect: true, evaluation: true, accounts: false };
-/** Text only, owner-scoped: the hosted middleware serves no image masking and no server policy. */
-export const HOSTED_CAPABILITIES: Capabilities = { ...LOCAL_CAPABILITIES, images: false, server_policy: false, accounts: true };
+/** The server's own defaults (status.py `capabilities`): the traffic log is off unless configured. */
+export const LOCAL_CAPABILITIES: Capabilities = { text: true, chat: true, images: true, logs: false, vault: true, server_policy: true, projects: true, connect: true, evaluation: true, accounts: false };
+/** Text only, owner-scoped: no image masking and no server policy; each owner has a log and a vault. */
+export const HOSTED_CAPABILITIES: Capabilities = { ...LOCAL_CAPABILITIES, images: false, logs: true, server_policy: false, accounts: true };
 
 /**
  * `/v1/status` `capabilities` when the server reports them (LAB-1431); until then, the
@@ -24,7 +25,9 @@ export function capabilitiesOf(status: ServerStatus | null, hosted: boolean): Ca
   return Object.fromEntries(CAPABILITY_KEYS.map((key) => [key, typeof reported[key] === "boolean" ? reported[key] : defaults[key]])) as Capabilities;
 }
 
-const SECTION_CAPABILITY: Record<Section, Capability | null> = { overview: null, playground: null, logs: "logs", vault: "vault", projects: "projects", connect: "connect", policy: "server_policy", evaluation: "evaluation" };
+// Logs and Vault stay in the menu when the server's log or inspector is off: the screens say so
+// and how to turn it on (Logs also replays recorded traffic), as the local console always has.
+const SECTION_CAPABILITY: Record<Section, Capability | null> = { overview: null, playground: null, logs: null, vault: null, projects: "projects", connect: "connect", policy: "server_policy", evaluation: "evaluation" };
 const TAB_CAPABILITY: Record<PlaygroundTab, Capability> = { text: "text", chat: "chat", images: "images" };
 
 export const offersTab = (caps: Capabilities, tab: PlaygroundTab) => caps[TAB_CAPABILITY[tab]];
