@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     allowed_hosts: Annotated[tuple[str, ...], NoDecode] = ()
     # Bearer token required on every route but /healthz; unset: no authentication.
     api_token: SecretStr | None = None
+    # Durable project metadata and encrypted upstream credentials (raw mappings remain ephemeral).
+    project_state_path: str = "~/.local/share/pii-guard/projects/state.sqlite3"
 
     # Hosted mode requires the Azure Easy Auth sidecar to own the only ingress path.
     # Defaults deliberately retain the local/self-hosted behavior.
