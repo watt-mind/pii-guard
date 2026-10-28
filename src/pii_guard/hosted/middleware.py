@@ -22,6 +22,10 @@ from pii_guard.hosted.runtime import HostedService
 from pii_guard.projects.middleware import endpoint_body, endpoint_path, prepare_project
 from pii_guard.types import PiiGuardError
 
+# The whole body (endpoint and hosted reads together) must arrive within this many seconds
+# of taking an ingress slot, however it is trickled.
+BODY_READ_SECONDS = 10
+
 
 class HostedRequestError(PiiGuardError):
     status_code = 403
@@ -52,7 +56,8 @@ class HostedMiddleware:
         started = False
         runtime = None
         reservation = None
-        entered = False
+        # The principal holding an ingress slot; set only once identity and admission pass.
+        ingress: Principal | None = None
         streaming: str | None = None
         payload_limit = None
         state: dict[str, Any] = dict(scope.get("state", {}))
@@ -79,8 +84,6 @@ class HostedMiddleware:
 
         cookie_header = None
         try:
-            self.service.enter_ingress()
-            entered = True
             headers = Headers(scope=scope)
             protected_headers = {
                 "authorization",
@@ -108,9 +111,15 @@ class HostedMiddleware:
                 if auth.startswith("pg_ep_"):
                     if routed is None or headers.get("x-pii-guard-token"):
                         raise HostedUnauthorizedError("Endpoint key requires its endpoint path")
-                    endpoint_snapshot = await anyio.to_thread.run_sync(
-                        self.service.projects.store.resolve_key, auth, routed[0]
-                    )
+                    # The only pre-authentication await: bounded by its own small pool,
+                    # and no body is read while it is held.
+                    self.service.enter_preauth()
+                    try:
+                        endpoint_snapshot = await anyio.to_thread.run_sync(
+                            self.service.projects.store.resolve_key, auth, routed[0]
+                        )
+                    finally:
+                        self.service.leave_preauth()
                     principal = (
                         Principal(endpoint_snapshot.owner_id, True, "api_key")
                         if endpoint_snapshot
@@ -239,6 +248,14 @@ class HostedMiddleware:
                     anonymous_sponsored=canonical == "/v1/demo" and scope.get("method") == "POST",
                     read=read,
                 )
+            # Only now, with identity, path, origin and abuse admission settled, does the
+            # request take an ingress slot: from the guest or the signed-in pool, and within
+            # its principal's share (LAB-1442). One deadline then bounds every body read.
+            self.service.enter_ingress(principal)
+            ingress = principal
+            deadline = asyncio.get_running_loop().time() + min(
+                BODY_READ_SECONDS, self.service.settings.hosted_request_timeout
+            )
             if principal.authenticated and canonical not in {"/v1/account", "/v1/demo"}:
                 state = await anyio.to_thread.run_sync(
                     prepare_project,
@@ -247,9 +264,10 @@ class HostedMiddleware:
                     principal.id,
                     endpoint_snapshot,
                 )
-                scope, receive = await endpoint_body(
-                    scope, receive, state, self.service.settings.hosted_max_body_bytes
-                )
+                async with asyncio.timeout_at(deadline):
+                    scope, receive = await endpoint_body(
+                        scope, receive, state, self.service.settings.hosted_max_body_bytes
+                    )
                 headers = Headers(scope=scope)
             # Text routes stay text-sized; the image route gets its own bounded limit.
             body_limit = (
@@ -259,7 +277,7 @@ class HostedMiddleware:
             )
             raw = bytearray()
             if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}:
-                async with asyncio.timeout(min(10, self.service.settings.hosted_request_timeout)):
+                async with asyncio.timeout_at(deadline):
                     while True:
                         message = await receive()
                         if message["type"] == "http.disconnect":
@@ -341,8 +359,8 @@ class HostedMiddleware:
                 # A live stream trades its ingress slot for a bounded stream slot.
                 self.service.enter_stream(principal.id)
                 streaming = principal.id
-                self.service.leave_ingress()
-                entered = False
+                self.service.leave_ingress(principal)
+                ingress = None
             if needs_runtime:
                 project_id = state.get("project_id")
                 default = (
@@ -414,7 +432,7 @@ class HostedMiddleware:
                     self.service.release(runtime)
                 if reservation is not None:
                     reservation.release()
-                if entered:
-                    self.service.leave_ingress()
+                if ingress is not None:
+                    self.service.leave_ingress(ingress)
                 if streaming is not None:
                     self.service.leave_stream(streaming)

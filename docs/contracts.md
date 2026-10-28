@@ -1598,9 +1598,16 @@ guest's `POST /v1/demo` require atomic admission before detector/provider work. 
 request or token budget and hold no inference concurrency; the per-owner read bucket above
 bounds them. `/v1/account` is never admitted. Defaults are five guest or 100 standard
 requests per UTC day, 100,000 guest or 1,000,000 standard reserved tokens, two active requests
-per owner, eight globally, 10,000 requests and 10,000,000 tokens globally per day. A separate
-32-slot ingress bound and ten-second body-read deadline cover slow clients before parsed
-admission. `GET /v1/traffic/stream` gives its ingress slot back once admitted and holds a
+per owner, eight globally, 10,000 requests and 10,000,000 tokens globally per day. Ingress
+slots cover slow clients before parsed admission. A request takes one only after identity,
+path, origin and abuse checks have passed, so a request refused by any of them never holds
+one: 32 slots for signed-in principals (at most eight per principal, a guard key counting
+as its owner) and a separate eight for guests (at most two per guest), `429 hosted_capacity`
+beyond, never a queue. The slot is held from the body read to the end of the response. One
+ten-second deadline from taking the slot bounds the whole body read, however it is
+trickled (`504 hosted_timeout`, no quota charged). Endpoint-key lookup, the only wait
+before identity is known, has its own pool of eight and reads no body. `GET
+/v1/traffic/stream` gives its ingress slot back once admitted and holds a
 stream slot instead: two per owner, sixteen in all (`429 hosted_capacity` beyond). Bodies are capped at 32 KiB; hosted
 requests have a 180-second deadline, fast text detection, one completion and at most 8192
 output/reasoning tokens. Sponsored models are an explicit server allowlist, initially
