@@ -95,6 +95,14 @@ and Google client secret values remain in that environment's Key Vault.
 | `dev`, `prod` | Their own Azure IDs, `AZURE_RESOURCE_GROUP` (`rg-pii-guard-dev` or `rg-pii-guard-prod`), `HOSTED_REGISTRY`, `HOSTED_PUBLIC_ORIGIN`, `GOOGLE_CLIENT_ID`, versioned `META_KEY_SECRET_URI`, `TENANT_KEY_SECRET_URI`, `GOOGLE_SECRET_URI`, and exact `HOSTED_RELEASE_EVIDENCE_JSON` |
 | `dev`, `prod` | `HOSTED_ENVIRONMENT_READY=true`, `HOSTED_NETWORK_READY=true`, `HOSTED_BUDGET_READY=true` only after operator review of the corresponding prerequisites |
 
+Dev additionally requires `AZURE_DEV_NETWORK_APPROVED=true` and the exact split-DNS origin
+`https://guard-dev.watt-mind.com`. Its image-bound release evidence must explicitly approve
+`private_dev_reviewed`, `tailnet_acl`, `proxy_tls` and `proxy_headers` as well as
+`lab_1372_done`. These are manual approvals, not CI-generated values. The dedicated CI
+runner identity/tag needs an explicit narrow tailnet grant for dev HTTPS (TCP 443) and the
+approved split-DNS resolver (DNS 53); an operator's admin-user grant does not authorize the
+runner implicitly. No router enrollment credential is passed through CI.
+
 `AZURE_PROJECT_PREFIX` optionally selects the existing deployment's prefix. Dev and prod
 must have distinct runtime identities, Key Vaults, provider credentials, tenant keys,
 OAuth clients/callbacks, allocation stores and registry/resource names. Reusing the same
@@ -122,7 +130,10 @@ the missing contract.
 CI must use the app-only release template provided by the Azure lane. Reapplying a
 foundation template that lists storage account keys or writes role assignments is not
 allowed with the deployment identity. This split is a prerequisite, not a request to grant
-broader CI permissions. Runtime preflight must verify the actual private environment,
+broader CI permissions. The release identity needs only selected resource metadata reads
+and app/auth/alert writes, including `Microsoft.Insights/actionGroups/read` at each selected
+existing action group (which can live outside the project resource group). It needs no
+action-group writes or receiver details. Runtime preflight must verify the actual private environment,
 proxy/ACL/TLS readiness and durable ledger binding before staging dev.
 
 ## Verification and recovery
@@ -130,7 +141,11 @@ proxy/ACL/TLS readiness and durable ledger binding before staging dev.
 The offline policy suite tests exact branch/event admission, missing prerequisites,
 provenance/schema validation, source/template mismatches, expiry and digest equality.
 Workflow validation uses actionlint and zizmor. Hosted image/template tests remain in the
-existing CI job. Automated runtime smoke uses synthetic fixtures only; real user inputs
+existing CI job. That Linux job discovers `deploy/azure/test_*.py`, compiles the app-only
+release template when present and lints the router shell installer. It installs nginx and
+OpenSSL so the companion router's actual loopback TLS/header tests execute after those
+source files are integrated. This does not claim those new cases ran on the older
+foundation-only stack. Automated runtime smoke uses synthetic fixtures only; real user inputs
 must never enter test fixtures or CI logs.
 
 The pipeline calls `stage` for dev and `enable` for prod. It never invokes `bootstrap`.

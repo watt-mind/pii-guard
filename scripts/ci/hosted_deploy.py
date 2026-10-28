@@ -117,6 +117,11 @@ def assert_config(config: dict, target: str) -> None:
         raise Refused("Configure the dedicated ACR hostname")
     if not re.fullmatch(r"https://[a-z0-9.-]+", config.get("HOSTED_PUBLIC_ORIGIN", "")):
         raise Refused("Configure an exact canonical HTTPS origin")
+    if target == "dev" and (
+        config.get("AZURE_DEV_NETWORK_APPROVED") != "true"
+        or config.get("HOSTED_PUBLIC_ORIGIN") != "https://guard-dev.watt-mind.com"
+    ):
+        raise Refused("Dev requires the approved private network and exact split-DNS origin")
     for field in ("META_KEY_SECRET_URI", "TENANT_KEY_SECRET_URI", "GOOGLE_SECRET_URI"):
         if not re.fullmatch(
             r"https://[a-z0-9-]+\.vault\.azure\.net/secrets/[a-zA-Z0-9-]+/[a-f0-9]{32}",
@@ -314,6 +319,8 @@ def release_evidence(image: str, target: str) -> dict:
             "Supply reviewed image-bound release evidence; CI cannot fabricate approval"
         ) from None
     required = ["lab_1372_done"]
+    if target == "dev":
+        required += ["private_dev_reviewed", "tailnet_acl", "proxy_tls", "proxy_headers"]
     if target == "prod":
         required += [
             "isolation",
