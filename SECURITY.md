@@ -25,8 +25,19 @@ configured `PII_GUARD_UPSTREAM_API_KEY`: that key is shared by every caller. Run
 `PII_GUARD_ALLOWED_HOSTS` as `Host` (a DNS-rebinding guard), and the `full` traffic log only
 serves loopback connections. Details: [docs/operations.md](docs/operations.md#exposure-and-authentication).
 
+The **vault inspector** (`/v1/vault/sessions*`, the console's Vault screen) is on by default
+in `masked` mode: anyone who can reach the API sees which sessions exist, where they came from,
+their placeholders, entity types, counts and a redacted hint of each value (a word's first
+letter and length, a number's last two digits), never an original or a session id. With
+`PII_GUARD_VAULT_INSPECT=full` it can also return **every original value the vault holds**,
+their inflected forms and the session id (a bearer handle for `/v1/unmask`): as sensitive as
+the `full` traffic log, and guarded the same way (loopback bind and loopback connections only,
+the token when set, the host check), with every reveal logged. Set it to `off` where nobody
+needs it.
+
 Reports about an open deployment that ignored this are not vulnerabilities; a way around the
-token, the host check or the loopback-only `full` log is.
+token, the host check, the loopback-only `full` log or vault inspector, or a value in a
+`masked` inspector response is.
 
 ## How to report
 
