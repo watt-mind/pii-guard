@@ -1,0 +1,444 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-28-lab-1470-uncued-numbers-before",
+  "kind": "text",
+  "date": "2026-10-28",
+  "recorded_at": "2026-10-28T23:21:03+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard fast, NER v2.0 (published hdkiller/pii-guard-ner-xlmr-base, LAB-1306) on uncued-numbers",
+  "notes": [
+    "LAB-1470 before: fast mode (rules + NER), CPU (PII_GUARD_NER_DEVICE=cpu). Base: develop f93a2e1, before the agent-text guards."
+  ],
+  "code": {
+    "commit": "f93a2e18ff0bf0323c647f780e2dd2cbc6b969c8",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": "0.1.0",
+    "detectors": [
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "ner",
+        "model": "xlmr-base-v2-hn",
+        "model_ref": "watt-mind/pii-guard-ner-xlmr-base v2.0, revision 95f612a9ad65",
+        "revision": "sha256:4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9",
+        "settings": {},
+        "serving": "local PyTorch, CPU"
+      }
+    ],
+    "key": "rules+ner:xlmr-base-v2-hn",
+    "label": "pii-guard fast, NER v2.0 (published hdkiller/pii-guard-ner-xlmr-base, LAB-1306)"
+  },
+  "fixture_set": "uncued-numbers",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/negative/hu-uncued-numbers.jsonl",
+      "sha256": "6df1406b02901dfb0358c4eae8cea6ddc2fe4e5fe5bb4223ca249bf94d0962d5",
+      "set": "uncued-numbers",
+      "language": "hu",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 14
+    },
+    {
+      "path": "eval/fixtures/negative/en-uncued-numbers.jsonl",
+      "sha256": "ac6f234c161b621840f7392de6f617d2b1106eeae03bd85cc6c5f8c2cc43b845",
+      "set": "uncued-numbers",
+      "language": "en",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 13
+    },
+    {
+      "path": "eval/fixtures/negative/de-uncued-numbers.jsonl",
+      "sha256": "4016966c2075c0be9f72f4fba380007957b6e345f6baf14300d2e197e7dfd3a5",
+      "set": "uncued-numbers",
+      "language": "de",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 11
+    }
+  ],
+  "languages": [
+    "de",
+    "en",
+    "hu"
+  ],
+  "hardware": {
+    "description": null,
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": null,
+  "metrics": {
+    "overall": {
+      "documents": 38,
+      "gold_spans": 0,
+      "predicted_spans": 13,
+      "unscored_predictions": 0,
+      "exact": {
+        "gold": 0,
+        "pred": 13,
+        "tp_pred": 0,
+        "tp_gold": 0,
+        "precision": 0.0,
+        "recall": null,
+        "f1": 0.0
+      },
+      "overlap": {
+        "gold": 0,
+        "pred": 13,
+        "tp_pred": 0,
+        "tp_gold": 0,
+        "precision": 0.0,
+        "recall": null,
+        "f1": 0.0
+      },
+      "macro_f1_overlap": 0.0,
+      "leak": {
+        "values": 0,
+        "leaked": 0,
+        "partial": 0,
+        "rate": null,
+        "partial_rate": null
+      },
+      "over_masking": {
+        "masked": 13,
+        "over_masked": 13,
+        "rate": 1.0
+      },
+      "roundtrip": {
+        "documents": 38,
+        "exact": 38,
+        "rate": 1.0
+      },
+      "consistency": {
+        "entities": 0,
+        "consistent": 0,
+        "multi_occurrence": 0,
+        "multi_consistent": 0,
+        "rate": null,
+        "multi_rate": null
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 32.056,
+          "p95": 37.33
+        },
+        "mask": {
+          "p50": 0.107,
+          "p95": 0.548
+        }
+      },
+      "per_type": {
+        "ADDRESS": {
+          "gold": 0,
+          "pred": 10,
+          "exact_tp_gold": 0,
+          "exact_tp_pred": 0,
+          "overlap_tp_gold": 0,
+          "overlap_tp_pred": 0,
+          "leak": null,
+          "over_masking": {
+            "masked": 10,
+            "over_masked": 10
+          }
+        },
+        "NATIONAL_ID_HU_TAX": {
+          "gold": 0,
+          "pred": 1,
+          "exact_tp_gold": 0,
+          "exact_tp_pred": 0,
+          "overlap_tp_gold": 0,
+          "overlap_tp_pred": 0,
+          "leak": null,
+          "over_masking": {
+            "masked": 1,
+            "over_masked": 1
+          }
+        },
+        "ID_DOCUMENT": {
+          "gold": 0,
+          "pred": 2,
+          "exact_tp_gold": 0,
+          "exact_tp_pred": 0,
+          "overlap_tp_gold": 0,
+          "overlap_tp_pred": 0,
+          "leak": null,
+          "over_masking": {
+            "masked": 2,
+            "over_masked": 2
+          }
+        }
+      }
+    },
+    "languages": {
+      "de": {
+        "documents": 11,
+        "gold_spans": 0,
+        "predicted_spans": 3,
+        "unscored_predictions": 0,
+        "exact": {
+          "gold": 0,
+          "pred": 3,
+          "tp_pred": 0,
+          "tp_gold": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0
+        },
+        "overlap": {
+          "gold": 0,
+          "pred": 3,
+          "tp_pred": 0,
+          "tp_gold": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0
+        },
+        "macro_f1_overlap": 0.0,
+        "leak": {
+          "values": 0,
+          "leaked": 0,
+          "partial": 0,
+          "rate": null,
+          "partial_rate": null
+        },
+        "over_masking": {
+          "masked": 3,
+          "over_masked": 3,
+          "rate": 1.0
+        },
+        "roundtrip": {
+          "documents": 11,
+          "exact": 11,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 0,
+          "consistent": 0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "rate": null,
+          "multi_rate": null
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 34.417,
+            "p95": 45.418
+          },
+          "mask": {
+            "p50": 0.119,
+            "p95": 0.226
+          }
+        },
+        "per_type": {
+          "ADDRESS": {
+            "gold": 0,
+            "pred": 3,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": {
+              "masked": 3,
+              "over_masked": 3
+            }
+          }
+        }
+      },
+      "en": {
+        "documents": 13,
+        "gold_spans": 0,
+        "predicted_spans": 6,
+        "unscored_predictions": 0,
+        "exact": {
+          "gold": 0,
+          "pred": 6,
+          "tp_pred": 0,
+          "tp_gold": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0
+        },
+        "overlap": {
+          "gold": 0,
+          "pred": 6,
+          "tp_pred": 0,
+          "tp_gold": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0
+        },
+        "macro_f1_overlap": 0.0,
+        "leak": {
+          "values": 0,
+          "leaked": 0,
+          "partial": 0,
+          "rate": null,
+          "partial_rate": null
+        },
+        "over_masking": {
+          "masked": 6,
+          "over_masked": 6,
+          "rate": 1.0
+        },
+        "roundtrip": {
+          "documents": 13,
+          "exact": 13,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 0,
+          "consistent": 0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "rate": null,
+          "multi_rate": null
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 31.661,
+            "p95": 33.629
+          },
+          "mask": {
+            "p50": 0.063,
+            "p95": 0.381
+          }
+        },
+        "per_type": {
+          "ADDRESS": {
+            "gold": 0,
+            "pred": 4,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": {
+              "masked": 4,
+              "over_masked": 4
+            }
+          },
+          "ID_DOCUMENT": {
+            "gold": 0,
+            "pred": 2,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": {
+              "masked": 2,
+              "over_masked": 2
+            }
+          }
+        }
+      },
+      "hu": {
+        "documents": 14,
+        "gold_spans": 0,
+        "predicted_spans": 4,
+        "unscored_predictions": 0,
+        "exact": {
+          "gold": 0,
+          "pred": 4,
+          "tp_pred": 0,
+          "tp_gold": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0
+        },
+        "overlap": {
+          "gold": 0,
+          "pred": 4,
+          "tp_pred": 0,
+          "tp_gold": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0
+        },
+        "macro_f1_overlap": 0.0,
+        "leak": {
+          "values": 0,
+          "leaked": 0,
+          "partial": 0,
+          "rate": null,
+          "partial_rate": null
+        },
+        "over_masking": {
+          "masked": 4,
+          "over_masked": 4,
+          "rate": 1.0
+        },
+        "roundtrip": {
+          "documents": 14,
+          "exact": 14,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 0,
+          "consistent": 0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "rate": null,
+          "multi_rate": null
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 31.283,
+            "p95": 36.002
+          },
+          "mask": {
+            "p50": 0.117,
+            "p95": 1.309
+          }
+        },
+        "per_type": {
+          "ADDRESS": {
+            "gold": 0,
+            "pred": 3,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": {
+              "masked": 3,
+              "over_masked": 3
+            }
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 0,
+            "pred": 1,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": {
+              "masked": 1,
+              "over_masked": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

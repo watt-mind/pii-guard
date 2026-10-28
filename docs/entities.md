@@ -44,6 +44,15 @@ language packs' `brands.tsv`, [detect/ner_orgs.py](../src/pii_guard/detect/ner_o
 LAB-1336) becomes `ORGANIZATION` and is kept, unless it is part of a longer name or follows an
 honorific (`Meta Kovács`, `Ms. Apple`). `PII_GUARD_NER_BRANDS=false` turns this off.
 
+In agent text, the NER's hits also pass structural guards
+([detect/ner_context.py](../src/pii_guard/detect/ner_context.py), LAB-1470). An `EMAIL` needs
+an `@`. A hit on a file extension, a code-fence language tag or part of a code identifier is
+dropped. An unvalidated number in a path or a file name is dropped too, and so is a name in a
+path segment that also holds a digit. A `PERSON` that is a listed software name
+(`languages/software.tsv`: `JSON`, `Codex`, `Muse Spark`, `Claude Code`) is dropped. The rules
+are not affected, so a valid IBAN in a path is still masked. The session sweep doesn't spread
+an NER-only value into those positions either. `PII_GUARD_NER_AGENT_TEXT=false` turns this off.
+
 ### NER label set
 
 The NER detector (`pii_guard.detect.ner`) reports a subset of the types above. A v1 checkpoint
