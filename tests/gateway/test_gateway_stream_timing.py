@@ -15,9 +15,12 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
+import pytest
 from fastapi import FastAPI
 from gateway_helpers import TEST_TENANT_KEY, UPSTREAM_KEY, UPSTREAM_URL, FakeLlm
 from starlette.requests import ClientDisconnect
+from timing_helpers import VirtualClock
+from timing_helpers import install as install_clock
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
@@ -103,8 +106,10 @@ def _event(app: FastAPI) -> dict[str, Any]:
     return events[-1]
 
 
-def _stream_once(app: FastAPI, delay: float) -> None:
-    """One streamed call whose client takes ``delay`` seconds to read each body message."""
+def _stream_once(app: FastAPI, delay: float, clock: VirtualClock | None = None) -> None:
+    """One streamed call whose client takes ``delay`` seconds to read each body message.
+
+    With a ``clock`` the read is a jump of virtual time (LAB-1275), not a sleep."""
     body = _body()
     sent = {"request": False}
 
@@ -117,17 +122,26 @@ def _stream_once(app: FastAPI, delay: float) -> None:
 
     async def send(message: dict[str, Any]) -> None:
         if message["type"] == "http.response.body" and message.get("body"):
-            await asyncio.sleep(delay)  # the client's read speed / network backpressure
+            # the client's read speed / network backpressure
+            if clock is not None:
+                clock.skip(delay)
+                await asyncio.sleep(0)
+            else:
+                await asyncio.sleep(delay)
 
     asyncio.run(app(_scope(body, "2.4"), receive, send))
 
 
-def test_slow_client_reads_are_not_overhead() -> None:
-    """20 events, each taking the client 20 ms to read: that is ``client`` time, not overhead."""
-    delay = 0.02
+def test_slow_client_reads_are_not_overhead(monkeypatch: pytest.MonkeyPatch) -> None:
+    """20 events, each taking the client 1 s to read: that is ``client`` time, not overhead.
+
+    The client's reads are jumps of a virtual clock (LAB-1275), so the 20 s are exact and the
+    bounds below cannot be broken by scheduler latency on a loaded machine."""
+    clock = install_clock(monkeypatch)
+    delay = 1.0
     app = _app(_Transport(_Stream(20)))
     _stream_once(app, 0.0)  # warm-up: first-call costs (imports, compiled rules) are not the point
-    _stream_once(app, delay)
+    _stream_once(app, delay, clock)
     events = app.state.observability.traffic.recent()
     assert len(events) == 2
     event = events[-1]
@@ -137,11 +151,10 @@ def test_slow_client_reads_are_not_overhead() -> None:
     assert stages["client"] >= 20 * delay * 1000 * 0.9
     expected = timing["total_ms"] - timing["upstream_ms"] - stages["client"]
     assert abs(timing["overhead_ms"] - expected) < 0.01
-    # What is left is pii-guard's own stages plus scheduling slack, nowhere near the ~400 ms the
+    # What is left is pii-guard's own stages plus scheduling slack, nowhere near the ~20 s the
     # client spent reading (before LAB-1212 it was all counted as overhead).
     own = sum(stages[name] for name in OWN_STAGES)
     assert own * 0.9 <= timing["overhead_ms"] < stages["client"] / 4
-    assert timing["overhead_ms"] - own < 50
 
 
 def _run_disconnect(stream: _Stream, *, spec_version: str, after: int) -> FastAPI:

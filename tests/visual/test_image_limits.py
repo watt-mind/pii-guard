@@ -52,15 +52,19 @@ class NoSam:
 class SlowOcr(FakeOcr):
     """The perfect fake OCR, but each image takes ``delay`` seconds (records start/end)."""
 
-    def __init__(self, delay: float) -> None:
+    def __init__(self, delay: float, *, gate: threading.Event | None = None) -> None:
         super().__init__(card_words())
         self.delay = delay
+        self.gate = gate  # when set, OCR blocks on it instead of sleeping (the test releases it)
         self.events: list[str] = []
         self.done = threading.Event()
 
     def words(self, image: Image.Image) -> list[OcrWord]:
         self.events.append("start")
-        time.sleep(self.delay)
+        if self.gate is not None:
+            self.gate.wait(30)
+        else:
+            time.sleep(self.delay)
         self.events.append("end")
         self.done.set()
         return super().words(image)
@@ -149,17 +153,28 @@ def _post_image(http: TestClient, data: bytes, **fields: object) -> httpx.Respon
 
 
 def test_mask_image_endpoint_has_a_timeout_and_leaves_the_session_alone() -> None:
-    ocr = SlowOcr(delay=0.8)
+    """The endpoint answers at its timeout while OCR is still running (LAB-1322).
+
+    OCR is held on a gate the test controls, so "answered at the timeout, not when OCR finished"
+    is checked structurally -- the 503 arrives while OCR has not finished -- not by a wall-clock
+    bound that scheduler latency on a loaded machine can break. If the endpoint waited for OCR,
+    it would block until the gate's 30 s cap, and OCR would be done by the time it answered."""
+    gate = threading.Event()
+    ocr = SlowOcr(delay=0, gate=gate)
     app = _image_app(ocr, image_timeout=0.3)
     app.state.vault = Vault.from_settings(app.state.settings)
     session = app.state.vault.session()  # an existing conversation
     with TestClient(app) as http:
-        started = time.perf_counter()
-        response = _post_image(http, id_card_png(), render="labels", session_id=session.session_id)
-        elapsed = time.perf_counter() - started
+        try:
+            response = _post_image(
+                http, id_card_png(), render="labels", session_id=session.session_id
+            )
+            ocr_finished_before_answer = ocr.done.is_set()
+        finally:
+            gate.set()
         assert response.status_code == 503, response.text
         assert response.json()["error"]["code"] == "detection_failed"
-        assert elapsed < 0.75  # answered at the timeout, not when OCR finished
+        assert not ocr_finished_before_answer  # answered at the timeout, not when OCR finished
         assert ocr.done.wait(5)
     assert session.entities() == []
 

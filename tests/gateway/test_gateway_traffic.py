@@ -27,6 +27,8 @@ from gateway_helpers import (
     completion,
     conversation_turn_one,
 )
+from timing_helpers import VirtualClock
+from timing_helpers import install as install_clock
 
 from pii_guard.api.app import create_app
 from pii_guard.api.routes.traffic import traffic_stream
@@ -205,21 +207,31 @@ def test_serve_refuses_full_on_a_public_host(
 
 # --- AC4: timing with a fake upstream delay ------------------------------------------------
 
-DELAY = 0.08
+# The upstream's delays are jumps of a virtual clock (LAB-1275), not sleeps: wall-clock bounds on
+# a few dozen ms flaked at 162-249 ms on loaded runners. DELAY is "seconds" of virtual time, far
+# above scheduling noise, so overhead < DELAY / 2 still fails by seconds if the gateway counts
+# the upstream's time as its own (or a real regression adds that much to its own work).
+DELAY = 2.0
+OVERHEAD_BOUND_MS = DELAY * 1000 / 2
 
 
-def slow_upstream(*, stream: bool) -> httpx.MockTransport:
+async def _wait(clock: VirtualClock, seconds: float) -> None:
+    clock.skip(seconds)
+    await asyncio.sleep(0)
+
+
+def slow_upstream(clock: VirtualClock, *, stream: bool) -> httpx.MockTransport:
     async def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         if not stream:
-            await asyncio.sleep(DELAY)
+            await _wait(clock, DELAY)
             return httpx.Response(200, json=completion("Rendben.", model=body["model"]))
 
         async def chunks() -> AsyncIterator[bytes]:
-            await asyncio.sleep(DELAY)  # the model "thinks" before its first token
+            await _wait(clock, DELAY)  # the model "thinks" before its first token
             for event in (chunk({"role": "assistant", "content": "Ren"}), chunk({"content": "d"})):
                 yield f"data: {json.dumps(event)}\n\n".encode()
-            await asyncio.sleep(DELAY / 2)
+            await _wait(clock, DELAY / 2)
             yield b"data: [DONE]\n\n"
 
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=chunks())
@@ -227,8 +239,11 @@ def slow_upstream(*, stream: bool) -> httpx.MockTransport:
     return httpx.MockTransport(handler)
 
 
-def test_overhead_excludes_the_upstream_delay_non_streaming() -> None:
-    app = make(slow_upstream(stream=False), server_timing=True, metrics=True)
+def test_overhead_excludes_the_upstream_delay_non_streaming(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = install_clock(monkeypatch)
+    app = make(slow_upstream(clock, stream=False), server_timing=True, metrics=True)
     with TestClient(app) as client:
         started = time.perf_counter()
         r = chat(client)
@@ -240,7 +255,7 @@ def test_overhead_excludes_the_upstream_delay_non_streaming() -> None:
     assert t["upstream_ms"] >= DELAY * 1000
     assert t["stages_ms"]["upstream_ttfb"] >= DELAY * 1000
     assert t["overhead_ms"] == pytest.approx(t["total_ms"] - t["upstream_ms"], abs=0.01)
-    assert t["overhead_ms"] < DELAY * 1000  # the delay is not counted as pii-guard's time
+    assert t["overhead_ms"] < OVERHEAD_BOUND_MS  # the delay is not counted as pii-guard's time
     assert t["total_ms"] <= client_ms
     assert t["stages_ms"]["detect"] > 0 and t["stages_ms"]["response"] > 0
     assert t["detectors_ms"]["rules"] > 0 and "llm" in t["detectors_ms"]
@@ -250,8 +265,9 @@ def test_overhead_excludes_the_upstream_delay_non_streaming() -> None:
     assert 'pii_guard_gateway_requests_total{mode="audit",outcome="ok"} 1' in metrics
 
 
-def test_overhead_and_added_ttft_streaming() -> None:
-    with TestClient(make(slow_upstream(stream=True))) as client:
+def test_overhead_and_added_ttft_streaming(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = install_clock(monkeypatch)
+    with TestClient(make(slow_upstream(clock, stream=True))) as client:
         r = chat(client, stream=True)
         assert r.status_code == 200 and "Ren" in r.text and "[DONE]" in r.text
         (event,) = events(client)
@@ -259,11 +275,11 @@ def test_overhead_and_added_ttft_streaming() -> None:
     assert t["upstream_ms"] >= DELAY * 1.5 * 1000  # first-token wait + the pause before [DONE]
     assert t["upstream_ttft_ms"] >= DELAY * 1000
     assert t["added_ttft_ms"] == pytest.approx(t["ttft_ms"] - t["upstream_ttft_ms"], abs=0.01)
-    assert t["added_ttft_ms"] < DELAY * 1000
+    assert t["added_ttft_ms"] < OVERHEAD_BOUND_MS
     # Streams also take out the time spent handing events to the client (LAB-1212).
     client_ms = t["stages_ms"]["client"]
     assert t["overhead_ms"] == pytest.approx(t["total_ms"] - t["upstream_ms"] - client_ms, abs=0.01)
-    assert t["overhead_ms"] < DELAY * 1000
+    assert t["overhead_ms"] < OVERHEAD_BOUND_MS
     assert t["stages_ms"]["unmask"] > 0
 
 
