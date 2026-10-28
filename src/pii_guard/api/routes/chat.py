@@ -65,7 +65,7 @@ def get_gateway(request: Request) -> Gateway:
                     observability=getattr(state, "observability", None),
                     image_workers=image_workers_for(state, state.settings.image_concurrency),
                 )
-                gateway._detect_workers = state.projects.workers
+                gateway._detect_workers = state.projects.worker_pools(gateway.config.concurrency)
                 state.gateway = gateway
     from pii_guard.detection_profile import DetectionProfileError, is_local_only
 

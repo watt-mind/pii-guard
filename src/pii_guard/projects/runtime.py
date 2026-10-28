@@ -67,7 +67,24 @@ class ProjectService:
         self._runtimes: dict[str, Runtime] = {}
         self._session_budget = SessionBudget(settings.vault_max_sessions)
         self._detectors: dict[Mode, ModeDetector] | None = None
-        self.workers = {mode: BoundedWorkers(4, "pii-guard-project-" + mode.value) for mode in Mode}
+        self.workers: dict[Mode, BoundedWorkers] = {}
+        self._worker_concurrency: int | None = None
+
+    def worker_pools(self, concurrency: int) -> dict[Mode, BoundedWorkers]:
+        """Share one configured pool per mode, including work held after caller timeouts."""
+        with self._lock:
+            if self._worker_concurrency is None:
+                self.workers.update(
+                    {
+                        mode: BoundedWorkers(concurrency, "pii-guard-project-" + mode.value)
+                        for mode in Mode
+                    }
+                )
+                self._worker_concurrency = concurrency
+            elif concurrency != self._worker_concurrency:
+                # Never swap pools while a timed-out detection may still hold its slot.
+                raise PiiGuardError("Gateway concurrency cannot change while the app is running")
+            return self.workers
 
     @property
     def store(self) -> ProjectStore:
@@ -211,8 +228,13 @@ class ProjectService:
             }
         )
         hosted = getattr(request.app.state, "hosted", None)
-        config = GatewayConfig(
-            mode=Mode(policy["mode"]), max_images=0, concurrency=4, cache_size=256
+        base_config = getattr(request.app.state, "gateway_config", None) or GatewayConfig()
+        config = base_config.model_copy(
+            update={
+                "mode": Mode(policy["mode"]),
+                "max_images": 0,
+                "cache_size": 256,
+            }
         )
         with self._lock:
             bases = getattr(request.app.state, "gateway_detectors", None)
@@ -265,7 +287,9 @@ class ProjectService:
             transport=transport,
             observability=observability,
         )
-        gateway._detect_workers = hosted._workers if hosted is not None else self.workers
+        gateway._detect_workers = (
+            hosted._workers if hosted is not None else self.worker_pools(config.concurrency)
+        )
         gateway._session_holds, gateway._holds_lock = runtime.session_holds, runtime.holds_lock
         request.state.project_gateway = gateway
         return gateway
