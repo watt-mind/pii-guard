@@ -40,7 +40,7 @@ from pii_guard.visual import labels as labels_module
 from pii_guard.visual.image import load_image
 from pii_guard.visual.labels import VaultMatcher
 from pii_guard.visual.masking import ImageMasker
-from pii_guard.visual.ocr import OcrWord
+from pii_guard.visual.ocr import OcrText, OcrWord, TextFinding
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.render import LABEL_FILL, LabelBox, render_labels
 
@@ -246,6 +246,78 @@ def test_find_never_covers_an_uncertain_match() -> None:
         id_card_png(), render="labels", matcher=VaultMatcher(session)
     )
     assert not [r for r in outcome.regions if r.region.source == "vault"]
+
+
+class OrganizationDetector:
+    """A weaker text detector that reads the badge's person name as an organization."""
+
+    name = "weak-ner"
+
+    def detect(self, text: str, language: str = "hu") -> list[Span]:
+        start = text.find("TESZT ELEK")
+        if start < 0:
+            return []
+        end = start + len("TESZT ELEK")
+        return [Span(start, end, EntityType.ORGANIZATION, text[start:end], 0.6, self.name)]
+
+
+def test_a_known_person_read_as_a_kept_organization_is_still_masked_in_pixels() -> None:
+    # LAB-1351: an ORGANIZATION/keep finding over a session-known name used to suppress the
+    # vault backstop; the transcript sweep masked the name, the pixels kept it readable.
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    person = seeded(session, "Teszt Elek")
+    words = badge_words()
+    image = id_card_png()
+    outcome = ImageMasker(
+        sam=FakeSam(),  # type: ignore[arg-type]
+        policies=PolicySet(),
+        ocr=FakeOcr(words),
+        text_detector=OrganizationDetector(),
+    ).mask(image, render="labels", matcher=VaultMatcher(session))
+    masked = [r for r in outcome.regions if r.policy is Policy.MASK]
+    found = [r for r in masked if r.region.source == "vault"]
+    assert len(found) == 1
+    assert found[0].entity_type is EntityType.PERSON
+    assert found[0].label is not None and found[0].label.placeholder == person
+    # The kept organization finding is still reported, unmasked.
+    assert any(
+        r.entity_type is EntityType.ORGANIZATION and r.policy is Policy.KEEP
+        for r in outcome.regions
+    )
+    # The name's pixels changed.
+    name_box = found[0].region.box
+    before = load_image(image).crop((name_box.x1, name_box.y1, name_box.x2 + 1, name_box.y2 + 1))
+    after = load_image(outcome.image).crop(
+        (name_box.x1, name_box.y1, name_box.x2 + 1, name_box.y2 + 1)
+    )
+    assert before.tobytes() != after.tobytes()
+    # Transcript and pixels agree: every word the transcript masked is under a mask region.
+    assert outcome.transcript is not None and person in outcome.transcript
+    kept = set(outcome.transcript.split())
+    for word in words:
+        if word.text in kept:
+            continue
+        area = word.box.width * word.box.height
+        assert any(
+            labels_module._overlap(word.box, r.region.box) >= labels_module.WORD_COVER * area
+            for r in masked
+        ), word.text
+
+
+def test_a_masked_finding_still_suppresses_a_duplicate_vault_find() -> None:
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    seeded(session, "Teszt Elek")
+    matcher = VaultMatcher(session)
+    words = badge_words()
+    box = words[1].box.union(words[2].box)
+    finding = TextFinding(Region(EntityType.PERSON, box, 0.9, "ner"), "TESZT ELEK", "detector")
+    ocr = OcrText(words, [finding], [], [])
+    assert matcher.find(ocr, frozenset({EntityType.PERSON})) == []
+    kept = TextFinding(Region(EntityType.ORGANIZATION, box, 0.9, "ner"), "TESZT ELEK", "detector")
+    ocr = OcrText(words, [kept], [], [])
+    assert [f.region.entity_type for f in matcher.find(ocr, frozenset({EntityType.PERSON}))] == [
+        EntityType.PERSON
+    ]
 
 
 def test_leak_check_scope() -> None:
