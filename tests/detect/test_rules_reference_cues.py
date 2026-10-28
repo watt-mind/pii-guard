@@ -217,3 +217,45 @@ def test_german_postcode_line_in_a_company_name_is_not_masked() -> None:
 )
 def test_legal_form_after(text: str, expected: bool) -> None:
     assert legal_form_after(text, 0) is expected
+
+
+# --- Hungarian personal identification number (LAB-1327) -----------------------
+
+PERSONAL_ID = "17103041237"  # sex/century 1, born 1971-03-04, serial 1237 (checksum-valid)
+PERSONAL_ID_2 = "75302022056"  # the agent-traffic-dev docstring order number
+
+
+@pytest.mark.parametrize(
+    ("language", "text"),
+    [
+        ("hu", f'    """Order {PERSONAL_ID_2}'),
+        ("en", f"Order {PERSONAL_ID}"),
+        ("de", f"ticket: {PERSONAL_ID_2}"),
+        ("hu", f"Rendelésszám: {PERSONAL_ID}"),
+        ("hu", f"Számla: SZ-{PERSONAL_ID}"),
+        ("de", f"Bestellnummer {PERSONAL_ID_2}"),
+        ("en", f"Total: ${PERSONAL_ID}"),
+    ],
+)
+def test_personal_id_after_a_reference_is_not_masked(language: str, text: str) -> None:
+    assert E.ID_DOCUMENT not in _types(text, language, cued=False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        f"Személyi azonosító: {PERSONAL_ID}",
+        f"Rendelés 2026-0042, személyi szám: {PERSONAL_ID}",  # its cue wins over the order label
+        f"Order for personal ID {PERSONAL_ID}",
+        f"Teszt Elek, {PERSONAL_ID}, Szeged",  # no cue at all: still masked
+        f"A rendelést Teszt Elek adta le, {PERSONAL_ID}",  # the label must end right before it
+    ],
+)
+def test_personal_id_with_a_cue_or_without_a_reference_is_masked(text: str) -> None:
+    assert E.ID_DOCUMENT in _types(text, "hu")
+
+
+def test_personal_id_scores_are_unchanged() -> None:
+    [cued] = RuleDetector().detect(f"Személyi azonosító: {PERSONAL_ID}", "hu")
+    [bare] = RuleDetector().detect(f"Teszt Elek, {PERSONAL_ID}", "hu")
+    assert (cued.score, bare.score) == (0.99, 0.85)

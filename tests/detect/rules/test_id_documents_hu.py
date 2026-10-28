@@ -57,7 +57,7 @@ def test_personal_id_in_context(detector: RuleDetector, written: str) -> None:
 def test_personal_id_without_context_scores_lower_and_runs_everywhere(
     detector: RuleDetector,
 ) -> None:
-    assert ids(detector, f"Reference {PID} attached.", language="en") == [(PID, 0.85)]
+    assert ids(detector, f"Applicant {PID} attached.", language="en") == [(PID, 0.85)]
 
 
 @pytest.mark.parametrize(
