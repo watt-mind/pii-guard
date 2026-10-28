@@ -79,6 +79,11 @@ class _NotFoundError(PiiGuardError):
     status_code = 404
 
 
+# Easy Auth shows its own bare "signed in" page without a return address (LAB-1425).
+LOGIN_URL = "/.auth/login/google?post_login_redirect_uri=%2F%23account"
+LOGOUT_URL = "/.auth/logout?post_logout_redirect_uri=%2F"
+
+
 class _InvalidDemoError(PiiGuardError):
     code = "invalid_request"
     status_code = 422
@@ -101,8 +106,8 @@ def account(request: Request) -> dict[str, Any]:
         "mode": "hosted",
         "authenticated": authenticated,
         "principal": {"id": principal.id, "provider": "google"} if authenticated else None,
-        "login_url": "/.auth/login/google",
-        "logout_url": "/.auth/logout",
+        "login_url": LOGIN_URL,
+        "logout_url": LOGOUT_URL,
         "tier": "standard" if authenticated else "anonymous",
         "providers": list(PROVIDERS),
         "limits": {

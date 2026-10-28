@@ -6,6 +6,9 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import "./hosted.css";
 
 const SOURCE = "https://github.com/watt-mind/pii-guard";
+// Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425).
+const LOGIN = "/.auth/login/google?post_login_redirect_uri=%2F%23account";
+const LOGOUT = "/.auth/logout?post_logout_redirect_uri=%2F";
 const EXAMPLES = {
   hu: { original: "Kérlek, írj rövid választ a visszatérítésről.\n\nNév: Minta Réka\nE-mail: reka.minta@example.com", masked: "Kérlek, írj rövid választ a visszatérítésről.\n\nNév: [[PERSON_example]]\nE-mail: [[EMAIL_example]]", answer: "Kedves [[PERSON_example]]! A visszatérítésről a [[EMAIL_example]] címre küldünk értesítést.", restored: "Kedves Minta Réka! A visszatérítésről a reka.minta@example.com címre küldünk értesítést." },
   en: { original: "Please draft a short refund reply.\n\nName: Robin Example\nEmail: robin.example@example.com", masked: "Please draft a short refund reply.\n\nName: [[PERSON_example]]\nEmail: [[EMAIL_example]]", answer: "Dear [[PERSON_example]], we will send your refund update to [[EMAIL_example]].", restored: "Dear Robin Example, we will send your refund update to robin.example@example.com." },
@@ -93,7 +96,7 @@ function HostedContent({ call, projectId }: { call: Requester; projectId?: strin
         <a className="brand" href="#">pii-guard</a>
         <nav aria-label="Main navigation" className="nav-links">
           <a href="#demo">Try demo</a><a href="#privacy">Privacy</a><a href={`${SOURCE}#quick-start`}>Self-host</a>
-          <a className="button" href={account?.authenticated ? "#account" : "/.auth/login/google"}>{account?.authenticated ? "Your account" : "Sign in"}</a>
+          <a className="button" href={account?.authenticated ? "#account" : account?.login_url ?? LOGIN}>{account?.authenticated ? "Your account" : "Sign in"}</a>
         </nav>
       </header>
       <main id="main">
@@ -143,7 +146,7 @@ function HostedContent({ call, projectId }: { call: Requester; projectId?: strin
           {accountError ? <div className="stack"><p className="error" role="alert">{accountError}</p><div><button onClick={() => void refresh()}>Reconnect to API</button></div></div> : !account ? <p role="status">Checking live availability…</p> : <>
             <p className="muted">{account.usage.requests_today} requests used today. Allowance resets: {time(account.usage.resets_at)}.</p>
             <Limits account={account} />
-            {account.authenticated ? <><p>You’re signed in. Each project keeps its endpoints, policies and temporary sessions together.</p><Workspace call={call} hosted projectId={projectId} onProject={selectProject} /><Settings call={call} account={account} refresh={refresh} onDisconnect={(id) => { if (connection === id) setConnection(""); }} /><a href="/.auth/logout">Sign out</a></> : <div className="stack"><div><a className="button primary" href="/.auth/login/google">Continue with Google</a></div></div>}
+            {account.authenticated ? <><p>You’re signed in. Each project keeps its endpoints, policies and temporary sessions together.</p><Workspace call={call} hosted projectId={projectId} onProject={selectProject} /><Settings call={call} account={account} refresh={refresh} onDisconnect={(id) => { if (connection === id) setConnection(""); }} /><a href={account.logout_url || LOGOUT}>Sign out</a></> : <div className="stack"><div><a className="button primary" href={account.login_url || LOGIN}>Continue with Google</a></div></div>}
             <small>Sessions and provider connections are temporary. A guard restart loses ephemeral state; start a fresh request if restoration expires. Provider keys are kept by the guard for the connection lifetime, never saved in browser storage.</small>
           </>}
         </section>
