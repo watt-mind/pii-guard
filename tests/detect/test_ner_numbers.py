@@ -53,6 +53,9 @@ CARD = "5117 3778 4464 2943"  # made up, Luhn fails
         ('"""Order 623728311818 escalation; owner: x."""', "623728311818"),
         ("Tracking number 9400111899223344556677 ships today", "9400111899223344556677"),
         ("payment approved order=586666414270 amount=1", "586666414270"),
+        ("Ihre Bestellnummer bleibt SO9353081.", "SO9353081"),  # one word between
+        ("  sku: AD-61026", "61026"),  # the value's own prefix is no word between
+        ("see ORD-2024-398890 today", "398890"),  # an order prefix on the value
     ],
 )
 def test_a_negative_label_drops_the_number(text: str, value: str) -> None:
@@ -65,6 +68,10 @@ def test_a_negative_label_drops_the_number(text: str, value: str) -> None:
     [
         "For my order last week the clerk took number 858761608507 down",  # too far back
         "order SO1, then 858761608507 arrived",  # another number between
+        "Your order was sent; card 858761608507",  # a positive cue is nearer
+        "Payment reference: 858761608507",  # reference and amount words are no negative cue
+        "Betrag 858761608507",
+        "Ihre Bestellung wurde heute 858761608507",  # two words between
     ],
 )
 def test_a_reference_word_earlier_in_the_sentence_is_no_label(text: str) -> None:

@@ -19,10 +19,11 @@ detector. Every other type passes untouched. For each span:
    of a CSV row, or anywhere in the line before the value (a JSON or YAML key, a label), keeps
    the field whatever its shape. The typed cues of every language pack (``cues.tsv``) count,
    plus the field names in :data:`_POSITIVE`.
-4. **Negative cue: drop.** The column header, or the label right before the value (at most
-   three words before it, no other number between), names something that is not personal
-   data: an order, ticket, SKU, invoice, reference, tracking or request number, an amount
-   (:data:`_NEGATIVE`). A reference word earlier in a sentence does not count.
+4. **Negative cue: drop.** The column header, or a label right before the value (at most one
+   word between, no other number), names something that is not personal data: an order,
+   ticket, SKU, invoice, tracking or request number (:data:`_NEGATIVE`). A reference word
+   earlier in a sentence does not count. An ID prefix of the value itself does
+   (``ORD-2024-…``, ``SKU-…``).
 5. **No cue: the shape decides.** Dropped only when the shape rules personal data out:
 
    - a UPS (``1Z`` + 16) or UPU S10 (``LX123456785GB``) tracking number;
@@ -71,20 +72,18 @@ _POSITIVE = (
     "identifikation*", "personal*", "pesel", "cnp", "oib", "emso", "jmbg", "egn", "rodne*",
     "dni", "nie", "nif", "bsn", "pin", "vat", "ust*", "kontonummer*", "giro*",
 )  # fmt: skip
-# Negative: the value is a business or machine reference, or an amount.
+# Negative: the value is a business or machine reference. Amount words ("amount", "Betrag")
+# and generic reference words ("reference", "case", "product", "serial") are left out on
+# purpose: amounts are told by their shape, and in real text an account or ID number often
+# follows those words ("payment reference: <IBAN>").
 _NEGATIVE = (
-    "order*", "ord", "invoice*", "inv", "receipt*", "reference*", "ref", "booking*",
-    "tracking*", "shipment*", "shipping*", "parcel*", "package", "consignment*",
-    "awb", "ticket*", "sku*", "item", "items", "article*", "product", "products", "case",
-    "cases", "req", "request*",
-    "trace", "span", "txn", "transaction*", "session*", "uuid", "guid", "hash*", "sha",
-    "digest*", "commit*", "build", "version", "serial*", "model", "amount*", "total*",
-    "price*", "balance*", "qty", "quantity*",
-    "rendeles*", "megrendeles*", "hivatkozas*", "sorszam*", "cikkszam*", "csomag*",
-    "kuldemeny*", "jegy", "jegyszam*", "ugyszam*", "iktatoszam*", "osszeg*", "vegosszeg*",
-    "ar", "nyugta*",
-    "bestell*", "auftrag*", "referenz*", "artikel*", "vorgang*", "sendung*", "rechnung*",
-    "paket*", "betrag*", "summe*", "preis*", "ticketnummer*",
+    "order*", "ord", "invoice*", "inv", "receipt*", "booking*", "tracking*", "shipment*",
+    "shipping*", "parcel*", "consignment*", "awb", "ticket*", "sku*", "item", "items",
+    "article*", "req", "request*", "trace", "span", "txn", "transaction*", "session*", "uuid",
+    "guid", "hash*", "sha", "digest*", "commit*",
+    "rendeles*", "megrendeles*", "sorszam*", "cikkszam*", "csomag*", "kuldemeny*", "jegy",
+    "jegyszam*", "ugyszam*", "iktatoszam*", "nyugta*",
+    "bestell*", "auftrag*", "artikel*", "sendung*", "rechnung*", "ticketnummer*",
 )  # fmt: skip
 
 #: Words of a pack cue too generic to count on their own ("account number", "TAJ szám").
@@ -96,8 +95,10 @@ _WINDOW = 60
 _FIELD_SEPARATORS = ",;|=\"'\t"
 _WORD_RE = re.compile(r"[^\W\d_]+")
 _WORD_OR_NUMBER_RE = re.compile(r"[^\W\d_]+|\d+")
+#: Words of a label that don't count as words between it and its value ("order number").
+_FILLER = frozenset({"number", "no", "nr", "num", "nummer", "szam", "szama", "id"})
 #: A negative word counts as a value's label only this close (in words) before it.
-_LABEL_WORDS = 3
+_LABEL_WORDS = 2
 _HEX_RE = re.compile(r"(?:[a-z]+_)?(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{8,}")
 _UPS_RE = re.compile(r"1Z[0-9A-Z]{16}")
 _S10_RE = re.compile(r"[A-Z]{2}\d{9}[A-Z]{2}")
@@ -161,12 +162,12 @@ def _classify_label(label: str) -> bool | None:
     return verdict
 
 
-def cue_before(text: str, start: int) -> bool | None:
+def cue_before(text: str, start: int, *, label_words: int = _LABEL_WORDS) -> bool | None:
     """The cue for a value at ``start``: True positive, False negative, None none.
 
     A CSV row's column header decides first. Then the words before the value on its line,
     nearest first, within :data:`_WINDOW` characters: a positive word anywhere keeps the value;
-    a negative word drops it only as its label, at most :data:`_LABEL_WORDS` words before it
+    a negative word drops it only as its label, fewer than :data:`_LABEL_WORDS` words before it
     with no other number between (``"order": "…"``, ``Rendelés módosítása …``), so a reference
     word earlier in a sentence ("for my order, my number is …") does not drop it.
     """
@@ -186,9 +187,10 @@ def cue_before(text: str, start: int) -> bool | None:
         verdict = _classify_word(m.group())
         if verdict is True:
             return True
-        if verdict is False and label and words < _LABEL_WORDS:
+        if verdict is False and label and words < label_words:
             return False
-        words += 1
+        if m.group() not in _FILLER:
+            words += 1
     return None
 
 
@@ -238,6 +240,18 @@ def _token(text: str, start: int, end: int) -> tuple[int, int]:
     return start, end
 
 
+_JOINED_RE = re.compile(r"[0-9A-Za-z]+[-/]$")
+
+
+def _run_start(text: str, start: int) -> int:
+    """Start of the hyphen- or slash-joined run ending in the token at ``start`` (``AD-12345``)."""
+    while True:
+        m = _JOINED_RE.search(text, max(0, start - 16), start)
+        if m is None or (m.start() > 0 and _TOKEN_CHAR.match(text[m.start() - 1])):
+            return start
+        start = m.start()
+
+
 def _amount(text: str, start: int, end: int) -> bool:
     """True if ``text[start:end]`` is an amount or part of one (``48170.94``, ``…70.94``)."""
     if _DECIMAL_RE.fullmatch(text[start:end]):
@@ -256,7 +270,16 @@ def number_verdict(text: str, start: int, end: int) -> bool:
     token = text[tok_start:tok_end]
     if _HEX_RE.fullmatch(token):
         return False  # a machine id, whatever its key says ("tool_calls" … "call_9f…")
-    cue = cue_before(text, tok_start)
+    run_start = _run_start(text, tok_start)
+    if run_start < tok_start:  # "ORD-2024-…", "SKU-…": the prefix names the value
+        prefix = _WORD_RE.match(_fold(text[run_start:tok_start]))
+        if prefix is not None and _classify_word(prefix.group()) is False:
+            return False
+    # A word between the label and the value ("Bestellnummer bleibt SO…") only for a value with
+    # letters in it; a bare number needs its label right before it.
+    tail = text[run_start:end]
+    letters = any(ch.isascii() and ch.isalpha() for ch in tail)
+    cue = cue_before(text, run_start, label_words=_LABEL_WORDS if letters else 1)
     if cue is not None:
         return cue
     if _UPS_RE.fullmatch(token) or _S10_RE.fullmatch(token):
