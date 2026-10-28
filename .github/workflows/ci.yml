@@ -336,6 +336,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Hosted deployment policy tests (offline; no cloud credentials)
+        run: python3 -m unittest discover -s scripts/ci -p 'test_hosted_deploy.py'
       - name: zizmor (workflow security lint)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -423,3 +425,19 @@ jobs:
             echo "::error title=ci-ok::failed or cancelled: $bad"
             exit 1
           fi
+
+  # Disabled until reviewed identity, network, durable budget and release gates are configured.
+  # No PR/merge-group/nightly/manual test run can enter this credential-bearing flow.
+  hosted-deployment:
+    needs: ci-ok
+    if: >-
+      needs.ci-ok.result == 'success' && github.repository == 'watt-mind/pii-guard' &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
+      vars.HOSTED_DEPLOYMENTS_ENABLED == 'true'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    # Local relative calls resolve to this commit; retain actionlint-compatible syntax.
+    uses: ./.github/workflows/hosted-deploy.yml # zizmor: ignore[self-repository]
