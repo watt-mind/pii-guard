@@ -51,6 +51,7 @@ from copy import copy
 from dataclasses import dataclass
 
 from pii_guard.detect.normalize import NormalizedText, normalize_for_detection
+from pii_guard.detect.suffix_trim import trim_name_suffixes
 from pii_guard.registry import create_detector
 from pii_guard.types import DetectionError, Detector, EntityType, Span
 from pii_guard.vault.inflection import following_suffix
@@ -542,6 +543,8 @@ class DetectionPipeline:
                 keep_types=self.keep_types,
                 overriding=self.overriding,
             )
+            # A name found whole with its case ending ends at its stem (LAB-1174).
+            resolved = trim_name_suffixes(text, resolved, language)
             logger.debug(
                 "pipeline resolved %d candidate spans into %d", len(candidates), len(resolved)
             )
