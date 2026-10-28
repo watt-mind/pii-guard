@@ -226,6 +226,33 @@ def test_check_with_gateway_flag_keeps_the_configured_session(tmp_path: Path) ->
     assert "is this URL the pii-guard gateway" in out
 
 
+@pytest.mark.parametrize(
+    ("client", "route"), [("codex", "/responses"), ("opencode", "/chat/completions")]
+)
+def test_check_for_tools_without_a_config_file(client: str, route: str) -> None:
+    """``connect codex|opencode --check`` (LAB-1469): the canary the way the block sends it,
+    through a path session, masked upstream and restored for the user."""
+    recorder = Recorder()
+    statuses: list[int] = []
+    with serve(recorder.app) as upstream, serve(gateway_app(upstream + "/v1", statuses)) as gw:
+        code, out = run(client, "--check", "--gateway", gw + "/v1")
+    assert code == 0, out
+    assert re.search(rf"gateway      : {re.escape(gw)}/s/c_[0-9a-f]{{32}}/v1{route}\n", out)
+    assert f"model        : {SCRIPTED_MODEL}" in out
+    assert "session      : path " in out
+    assert "ok           : 3 value(s) masked" in out
+    received = out.split("you got back : ")[1].splitlines()[0]
+    for value in CANARY_VALUES:
+        assert value in received
+    assert all(value not in "".join(recorder.bodies) for value in CANARY_VALUES)
+    assert statuses == [200]
+
+
+def test_dry_run_is_still_refused_for_tools_without_a_config_file(unreachable: str) -> None:
+    code, _ = run("codex", "--dry-run", "--gateway", unreachable)
+    assert code == 2
+
+
 def test_check_fails_when_url_is_not_the_gateway(tmp_path: Path) -> None:
     recorder = Recorder()
     with serve(recorder.app) as upstream:

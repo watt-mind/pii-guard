@@ -8,6 +8,7 @@ pii-guard connect muse-code [--gateway URL] [--muse-dir DIR] [--model ID] [--no-
                             [--dry-run | --check]
 pii-guard connect <tool> --print [--gateway URL] [--model ID]
                      # tool: muse-code, pi, codex, opencode, curl, python, claude-code
+pii-guard connect codex|opencode --check [--gateway URL] [--model ID]
 ```
 
 - ``--print`` prints the tool's paste-and-run block, the same text the web UI's Connect page
@@ -38,6 +39,13 @@ pii-guard connect <tool> --print [--gateway URL] [--model ID]
   ``--dry-run``). Muse then reads ``/muse-code/models`` and sends ``/v1/responses`` through
   pii-guard. ``--check`` sends the canary the way Muse does (``POST <base_url>/responses``, with
   ``$META_API_KEY`` as Muse sends it) and prints what the model saw and what came back.
+
+- ``connect codex --check`` and ``connect opencode --check`` write nothing (those tools take
+  the block's flags or variable, no config file): they send the canary the way the block's
+  client does, to a fresh path session on ``--gateway``. Codex: a non-streamed
+  ``POST <base_url>/responses``; OpenCode: ``POST <base_url>/chat/completions`` without
+  ``X-PII-Guard-*`` headers (so the gateway's default mode and language). The model is
+  ``--model`` or the one the Connect page suggests.
 
 Exit codes: 0 done, 1 the check failed, 2 bad arguments or a problem to fix.
 """
@@ -70,6 +78,10 @@ __all__ = ["build_parser", "main"]
 
 #: Clients ``connect`` writes a config file for (and can ``--check``).
 CONFIGURED = ("pi", "muse-code")
+#: Tools without a config file that ``--check`` still covers: the canary goes the way their
+#: block sends requests (LAB-1469). Codex: ``POST /responses``; OpenCode: ``/chat/completions``
+#: without pii-guard headers.
+BLOCK_CHECKED = ("codex", "opencode")
 #: Every tool with a quickstart block (``--print``).
 CLIENTS = snippets.TOOL_IDS
 
@@ -289,8 +301,8 @@ def _muse_check(
     return 0 if result.ok else 1
 
 
-def _snippets_from_gateway(root: str, session: str, model: str | None) -> list[object]:
-    """The ``tools`` of the gateway's ``GET /v1/connect/snippets``."""
+def _snippets_document(root: str, session: str, model: str | None) -> dict[str, object]:
+    """The gateway's ``GET /v1/connect/snippets``."""
     params = {"session": session, **({"model": model} if model else {})}
     token = _token()
     headers = {"Authorization": f"Bearer {token}"} if token else {}
@@ -302,7 +314,14 @@ def _snippets_from_gateway(root: str, session: str, model: str | None) -> list[o
     )
     response.raise_for_status()
     data = response.json()
-    tools = data.get("tools") if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        raise ValueError("not a snippets document")
+    return data
+
+
+def _snippets_from_gateway(root: str, session: str, model: str | None) -> list[object]:
+    """The ``tools`` of the gateway's ``GET /v1/connect/snippets``."""
+    tools = _snippets_document(root, session, model).get("tools")
     if not isinstance(tools, list):
         raise ValueError("not a snippets document")
     return tools
@@ -336,14 +355,48 @@ def _print(args: argparse.Namespace, out: list[str]) -> int:
     return 0 if tool.get("supported") else 1
 
 
+def _block_check(args: argparse.Namespace, out: list[str]) -> int:
+    """``connect codex|opencode --check``: the canary the way the tool's block sends it."""
+    gateway = (args.gateway or default_gateway_url()).rstrip("/")
+    base_url = gateway
+    if args.session_path and session_of(gateway) is None:
+        base_url = session_url(gateway)
+    token = _token()
+    model = (args.model or [None])[0]
+    if model is None:
+        root = _without_session(gateway)
+        root = root[: -len("/v1")] if root.endswith("/v1") else root
+        try:  # the model the Connect page puts in the block
+            suggested = _snippets_document(root, str(session_of(base_url)), None).get("model")
+            model = suggested if isinstance(suggested, str) else None
+        except (httpx.HTTPError, ValueError):
+            model = None
+        model = model or fetch_models(gateway, token=token)[0]
+    if args.client == "codex":
+        result, mode = muse_code.run_check(base_url, model, token=token)
+    else:
+        result, mode = run_check(base_url, model, token=token), ""
+    out.append(f"client       : {args.client} (no config file: the Connect block's base URL)")
+    out.extend(result.lines())
+    if mode:
+        out.append(f"gateway mode : {mode}")
+    out.append(f"dashboard    : {DASHBOARD_URL} (with PII_GUARD_TRAFFIC_LOG=masked or full)")
+    return 0 if result.ok else 1
+
+
 def main(argv: Sequence[str] | None = None, *, stdout=None) -> int:  # type: ignore[no-untyped-def]
     stdout = stdout or sys.stdout
     args = build_parser().parse_args(list(argv) if argv is not None else None)
     out: list[str] = []
     try:
-        if args.print_snippet or args.client not in CONFIGURED:
+        if args.check and not args.print_snippet and args.client in BLOCK_CHECKED:
+            code = _block_check(args, out)
+        elif args.print_snippet or args.client not in CONFIGURED:
             if args.dry_run or args.check:
-                raise ConnectError(f"--dry-run and --check are for {' and '.join(CONFIGURED)}")
+                checked = ", ".join((*CONFIGURED, *BLOCK_CHECKED))
+                raise ConnectError(
+                    f"--dry-run is for {' and '.join(CONFIGURED)}; --check for {checked}"
+                )
             code = _print(args, out)
         else:
             code = _muse(args, out) if args.client == "muse-code" else _pi(args, out)
