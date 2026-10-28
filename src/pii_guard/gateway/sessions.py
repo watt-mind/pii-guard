@@ -9,8 +9,13 @@ match wins:
 2. ``path``: the URL ``/s/<session>/v1/...`` (or ``/s/<session>/muse-code/...``), rewritten by
    :class:`SessionPathMiddleware`. Same grammar as the header; created on first use (the
    client chose the id). ``pii-guard connect`` writes such a base URL.
-3. ``prompt_cache_key``: the body's ``prompt_cache_key`` (Muse sends one per conversation):
-   the id is ``HMAC(tenant key, "pck:" + client identity + ":" + key)``. Created on first use.
+3. ``prompt_cache_key``: the body's ``prompt_cache_key``: the id is
+   ``HMAC(tenant key, "pck:" + client identity + ":" + key)``. Created on first use. Muse Code
+   sends ``tbh:main:<conversation uuid>`` for its main agent and
+   ``tbh:<kind>-reminder:<uuid[:8]>:...`` for each reminder observer; an observer key uses the
+   session of the newest main key of the same client identity with that 8-hex prefix
+   (LAB-1300), so one task stays in one session. An observer whose main key this process hasn't
+   seen keeps a session of its own.
 4. ``default``: one session per client identity, ``HMAC(tenant key, "default:" + identity)``.
    Created on first use.
 
@@ -28,6 +33,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
+import weakref
+from collections import OrderedDict
 from collections.abc import Mapping
 from enum import StrEnum
 
@@ -54,6 +62,14 @@ PATH_SESSION_KEY = "pii_guard.path_session"
 
 SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _PATH_RE = re.compile(r"^/s/([^/]*)(/(?:v1|muse-code)(?:/.*)?)$")
+# Muse Code's prompt_cache_key grammar (1.4.13, 1.4.14): the main agent's key carries the
+# conversation's UUID, each reminder observer's key the UUID's first 8 hex digits.
+_MUSE_MAIN_RE = re.compile(
+    r"^tbh:main:([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
+_MUSE_OBSERVER_RE = re.compile(r"^tbh:[a-z]+-reminder:([0-9a-f]{8}):")
+#: Main conversations remembered per vault for their observers (oldest forgotten first).
+MAX_CONVERSATIONS = 4096
 
 
 class SessionSource(StrEnum):
@@ -69,6 +85,51 @@ def client_identity(headers: Mapping[str, str]) -> str:
     if raw is None or not raw.strip():
         return "anonymous"
     return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()
+
+
+class _Conversations:
+    """``(client identity, 8-hex prefix) -> derived session id`` of the newest Muse main key,
+    bounded by :data:`MAX_CONVERSATIONS`. Lives as long as its vault (sessions are in memory)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._by_prefix: OrderedDict[tuple[str, str], str] = OrderedDict()
+
+    def remember(self, identity: str, prefix: str, derived: str) -> None:
+        with self._lock:
+            self._by_prefix[identity, prefix] = derived
+            self._by_prefix.move_to_end((identity, prefix))
+            while len(self._by_prefix) > MAX_CONVERSATIONS:
+                self._by_prefix.popitem(last=False)
+
+    def lookup(self, identity: str, prefix: str) -> str | None:
+        with self._lock:
+            return self._by_prefix.get((identity, prefix))
+
+
+_CONVERSATIONS: weakref.WeakKeyDictionary[Vault, _Conversations] = weakref.WeakKeyDictionary()
+_CONVERSATIONS_LOCK = threading.Lock()
+
+
+def _conversations(vault: Vault) -> _Conversations:
+    with _CONVERSATIONS_LOCK:
+        found = _CONVERSATIONS.get(vault)
+        if found is None:
+            found = _CONVERSATIONS[vault] = _Conversations()
+        return found
+
+
+def _cache_key_session_id(vault: Vault, identity: str, key: str) -> str:
+    """The derived id for ``key`` (step 3), a Muse observer's mapped to its main key's."""
+    if (main := _MUSE_MAIN_RE.match(key)) is not None:
+        derived = vault.derive_session_id(f"pck:{identity}:{key}")
+        _conversations(vault).remember(identity, main.group(1), derived)
+        return derived
+    if (observer := _MUSE_OBSERVER_RE.match(key)) is not None:
+        found = _conversations(vault).lookup(identity, observer.group(1))
+        if found is not None:
+            return found
+    return vault.derive_session_id(f"pck:{identity}:{key}")
 
 
 def resolve_session(
@@ -96,8 +157,7 @@ def resolve_session(
     identity = client_identity(headers)
     key = body.get("prompt_cache_key")
     if isinstance(key, str) and key:
-        derived = vault.derive_session_id(f"pck:{identity}:{key}")
-        session, created = vault.session_or_create(derived)
+        session, created = vault.session_or_create(_cache_key_session_id(vault, identity, key))
         return session, created, SessionSource.PROMPT_CACHE_KEY
     session, created = vault.session_or_create(vault.derive_session_id(f"default:{identity}"))
     return session, created, SessionSource.DEFAULT

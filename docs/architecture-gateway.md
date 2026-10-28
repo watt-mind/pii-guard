@@ -108,9 +108,9 @@ client that can't send headers (LAB-1286). The first match wins:
    `/s/<session>/muse-code/...`) reaches the same routes with that session. Same id grammar as
    the header (1-128 of `A-Z a-z 0-9 _ -`, else 400); created on first use, never 404.
    `pii-guard connect` writes such a URL with a random id.
-3. **`prompt_cache_key`**: the body's `prompt_cache_key` (Muse Code sends one per call stream)
-   selects the session `HMAC(tenant key, "pck:" + client identity + ":" + key)`. Created on first
-   use.
+3. **`prompt_cache_key`**: the body's `prompt_cache_key` selects the session
+   `HMAC(tenant key, "pck:" + client identity + ":" + key)`. Created on first use. Muse Code's
+   reminder observers are grouped with their main conversation (below).
 4. **`default`**: one session per client, `HMAC(tenant key, "default:" + client identity)`.
 
 The client identity is the SHA-256 of the request's `Authorization` value (`anonymous`
@@ -128,9 +128,17 @@ the full one is left to expire. The client re-sends its history, which is masked
 new generation; only a placeholder the model kept from before the rotation, for a value no
 longer in the request, stays unrestored (`X-PII-Guard-Unresolved`).
 
-Muse Code's `prompt_cache_key` differs between its main conversation and each reminder
-observer, so on the plain URL one task spans a few sessions and a value gets one placeholder in
-each (still restored). The path URL that `connect` writes keeps them all in one.
+Muse Code's `prompt_cache_key` differs between its main conversation
+(`tbh:main:<conversation uuid>`) and each reminder observer
+(`tbh:<kind>-reminder:<first 8 hex of the uuid>:...`). Per key, one task would span four
+sessions and a value would get a placeholder in each (LAB-1300). So the gateway remembers each
+main key's session under its 8-hex prefix and client identity (in memory, the newest 4 096
+conversations), and an observer key with that prefix and identity uses that session. The
+prefix is a UUIDv7 timestamp (about 65 s), so when one client starts two Muse conversations in
+the same window, their observers follow the newer one; the main conversations keep their own
+sessions, and nothing is ever shared across client identities. An observer seen before its
+main key (e.g. right after a restart) keeps a session of its own. The path URL that `connect`
+writes needs none of this.
 
 ## Failing closed
 

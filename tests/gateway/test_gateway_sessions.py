@@ -24,7 +24,7 @@ from gateway_helpers import (
 )
 
 from pii_guard.config import Settings
-from pii_guard.gateway import InvalidChatRequestError
+from pii_guard.gateway import InvalidChatRequestError, sessions
 from pii_guard.gateway.sessions import (
     SESSION_RE,
     SessionSource,
@@ -83,6 +83,67 @@ def test_prompt_cache_key_session_per_client_and_key() -> None:
     assert resolve(BEARER_1, "conv-2")[0] is not a  # another conversation
     assert resolve(BEARER_2, "conv-1")[0] is not a  # another client, same key
     assert "conv-1" not in a.session_id
+
+
+MUSE_MAIN = "tbh:main:01a17f61-2bc6-7b91-b9e6-8198ed7af1bf"
+MUSE_OBSERVERS = (
+    "tbh:skill-reminder:01a17f61:f350a679:a8f4452d",
+    "tbh:goal-reminder:01a17f61:cb6542df:ed07a9ef",
+    "tbh:verify-reminder:01a17f61:ab8c6967:3508f1e3",
+)
+
+
+def test_muse_observer_keys_share_the_main_conversations_session() -> None:
+    """LAB-1300: Muse's reminder observers send their own prompt_cache_key; they land in the
+    session of the main key whose UUID starts with their 8-hex prefix."""
+    vault = Vault(KEY_A)
+
+    def resolve(headers: dict[str, str], key: str) -> Any:
+        return resolve_session(vault, headers, {"prompt_cache_key": key}, None)
+
+    main, created, source = resolve(BEARER_1, MUSE_MAIN)
+    assert created and source is SessionSource.PROMPT_CACHE_KEY
+    for key in MUSE_OBSERVERS:
+        assert resolve(BEARER_1, key) == (main, False, SessionSource.PROMPT_CACHE_KEY)
+    # Never across clients: another bearer's observer with the same prefix gets its own.
+    other = resolve(BEARER_2, MUSE_OBSERVERS[0])[0]
+    assert other is not main
+    # A second conversation with the same prefix (UUIDv7: same ~65 s) keeps its own session;
+    # observers follow the newest one.
+    second = resolve(BEARER_1, "tbh:main:01a17f61-77b0-7d82-b7ef-857659db09bc")[0]
+    assert second is not main
+    assert resolve(BEARER_1, MUSE_OBSERVERS[0])[0] is second
+    assert resolve(BEARER_1, MUSE_MAIN)[0] is main
+
+
+def test_muse_observer_without_a_known_main_key_keeps_its_own_session() -> None:
+    vault = Vault(KEY_A)
+
+    def resolve(key: str) -> Any:
+        return resolve_session(vault, BEARER_1, {"prompt_cache_key": key}, None)[0]
+
+    alone = resolve(MUSE_OBSERVERS[0])
+    assert alone is not resolve(MUSE_OBSERVERS[1])
+    main = resolve(MUSE_MAIN)
+    assert main is not alone  # main keys never follow an observer
+    assert resolve(MUSE_OBSERVERS[0]) is main  # from now on the observer follows the main key
+    # Look-alikes outside the grammar are ordinary keys.
+    for key in ("tbh:main:01a17f61", "tbh:skill-reminder:01A17F61:x", "x:skill-reminder:01a17f61:"):
+        assert resolve(key) is not main
+
+
+def test_muse_conversation_index_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sessions, "MAX_CONVERSATIONS", 2)
+    vault = Vault(KEY_A)
+
+    def resolve(key: str) -> Any:
+        return resolve_session(vault, BEARER_1, {"prompt_cache_key": key}, None)[0]
+
+    mains = [resolve(f"tbh:main:0000000{i}-2bc6-7b91-b9e6-8198ed7af1bf") for i in range(3)]
+    observer = "tbh:skill-reminder:0000000{}:f350a679:a8f4452d"
+    assert resolve(observer.format(0)) not in mains  # the oldest was forgotten
+    assert resolve(observer.format(1)) is mains[1]
+    assert resolve(observer.format(2)) is mains[2]
 
 
 def test_default_session_per_client_identity() -> None:
