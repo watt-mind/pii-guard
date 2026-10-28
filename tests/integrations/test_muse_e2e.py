@@ -76,14 +76,16 @@ def test_muse_code_through_gateway_masks_upstream_and_restores_files(muse_bin: P
 
 @needs_bash
 def test_muse_code_without_the_session_path_uses_prompt_cache_key(muse_bin: Path) -> None:
-    """The plain base URL: one session per prompt_cache_key. Muse sends one key for the main
-    conversation and one per reminder observer, so a task spans a few sessions (a value can
-    get one placeholder in each); the files are still restored."""
+    """The plain base URL: the session comes from prompt_cache_key. Muse sends one key for the
+    main conversation and one per reminder observer; the observers' keys follow the main
+    conversation's session (LAB-1300), so the task stays in one session, as with the path."""
     result = run_muse(muse_bin=muse_bin, timeout=300, session="auto", version=VERSION)
     assert result.client_exit == 0, result.client_output
     assert result.gold_upstream == []
-    assert set(result.session_sources) == {"prompt_cache_key"}
-    assert 1 <= result.sessions < result.requests
+    assert result.session_sources == {"prompt_cache_key": result.requests}
+    assert result.sessions == 1
+    assert result.gold_unstable == 0
+    assert result.gold_max_placeholders == 1
     assert result.placeholders_in_files == 0
     assert result.ok
 

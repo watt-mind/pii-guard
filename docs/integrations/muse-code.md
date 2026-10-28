@@ -229,15 +229,17 @@ Muse can't send `X-PII-Guard-Session`, so `pii-guard connect muse-code` writes a
 vault session in its path, `http://127.0.0.1:8787/s/<session>/v1` (LAB-1286): every call, the
 main agent's and its reminder observers', lands in that session, and the same value has the
 same placeholder in every turn and every task. `--check` prints `session      : path`. With
-`--no-session-path` (the plain URL) the gateway uses one session per `prompt_cache_key`;
-Muse sends one key for the main conversation and one per observer, so a task spans about four
-sessions and a value gets a placeholder in each (all of them restored). Details:
-[architecture-gateway.md](../architecture-gateway.md#sessions).
+`--no-session-path` (the plain URL) the gateway picks the session by `prompt_cache_key`.
+Muse sends one key for the main conversation and one per observer; the gateway groups the
+observers' keys with the main conversation's (LAB-1300), so a task again stays in one session.
+Before that, a task spanned four sessions and a value got a placeholder in each (all of them
+restored). Details: [architecture-gateway.md](../architecture-gateway.md#sessions).
 
 | Muse 1.4.14, e2e harness | requests | sessions | distinct placeholders upstream | gold values under >1 placeholder (most for one) | gold upstream |
 |---|---|---|---|---|---|
 | scripted, `--session per-request` (before) | 10 | 10 | 150 | 16 of 16 (8) | 0 of 16 |
-| scripted, `--session auto` (`prompt_cache_key`) | 10 | 4 | 85 | 16 of 16 (4) | 0 of 16 |
+| scripted, `--session auto` (`prompt_cache_key`, before LAB-1300) | 10 | 4 | 85 | 16 of 16 (4) | 0 of 16 |
+| scripted, `--session auto` (`prompt_cache_key`, observers grouped, LAB-1300) | 12 | 1 | 15 | 0 of 14 (1) | 0 of 14 |
 | scripted, `--session path` (`connect` default) | 11 | 1 | 25 | 0 of 16 (1) | 0 of 16 |
 | Meta Model API `muse-spark-1.3`, per-request (before; 13 gold, before `SECRET`) | 10 | 10 | 155 | 13 of 13 (8) | 0 of 13 |
 | Meta Model API `muse-spark-1.3`, path (13 gold, before `SECRET`) | 8 | 1 | 21 | 0 of 13 (1) | 0 of 13 |
