@@ -37,7 +37,7 @@ What happened to a value keeps its own tokens, so components never name a hue:
 
 | Token | Means | Used for |
 |---|---|---|
-| `--masked` | replaced by a placeholder | original values on your side, placeholders on the model's side, the landing demo's highlights |
+| `--masked` | replaced by a placeholder | original values on your side, placeholders on the model's side |
 | `--restored` | real value put back | restored values in answers |
 | `--kept`, `--kept-ink` | detected, left in place by policy | dashed outline in `--kept` (3:1, the same grey as `--field`), no fill; "kept" labels and chip text in `--kept-ink` (4.5:1) |
 | `--blocked` | fail closed: nothing was sent | blocked notices, refused calls |
