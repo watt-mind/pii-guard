@@ -20,3 +20,8 @@ eval/runs
 real
 private
 ui/node_modules
+# Hosted build must not copy local artifacts or deployment evidence into an image.
+ui/dist
+src/pii_guard/_ui
+deploy/azure/*.local.*
+deploy/azure/release-evidence*
