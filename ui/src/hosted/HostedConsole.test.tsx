@@ -99,8 +99,10 @@ describe("hosted console for a signed-in owner", () => {
     expect(within(menu()).getByRole("link", { name: /^Playground/ })).not.toHaveTextContent(/images/i);
     expect(within(menu()).getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByLabelText("Engine")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View site" })).toHaveAttribute("href", "#site");
-    expect(screen.getByRole("link", { name: "Sign out" })).toHaveAttribute("href", account.logout_url);
+    // View site and Sign out live in the header's profile menu (LAB-1436).
+    await userEvent.setup().click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Visit site" })).toHaveAttribute("href", "#site");
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toHaveAttribute("href", account.logout_url);
     expect(screen.queryByText("Reduce personal data")).not.toBeInTheDocument();
   });
 

@@ -1,10 +1,8 @@
-import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { useEffect, useId, useRef, useState } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 import { SECTIONS, hashOf, type Route, type Section } from "../lib/routes";
 import { offersSection, playgroundHint, type Capabilities } from "../lib/capabilities";
-import { useHostedSession } from "../hosted/session";
 
 interface Props {
   route: Route;
@@ -45,7 +43,6 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
   }, [open]);
 
   const current = SECTIONS.find((s) => s.id === route.section)!;
-  const session = useHostedSession();
   // 44 px targets at phone width for the hosted console, whose visitors are often on a phone.
   const touch = caps.accounts;
 
@@ -83,7 +80,6 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
         </div>
 
         <div id={menuId} className={[open ? "block" : "hidden", "border-t border-line lg:flex lg:min-h-0 lg:flex-col lg:border-t-0"].join(" ")}>
-          <ProjectSwitcher />
           <nav aria-label="Console" className="px-2 py-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-2">
             {NAV_GROUPS.map((group, gi) => (
               <div key={group.label ?? "top"} className={group.label ? "mt-4" : undefined}>
@@ -129,16 +125,6 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
           </nav>
 
           <div className="space-y-2.5 border-t border-line px-5 py-3">
-            {session && (
-              <div className="flex flex-wrap items-center gap-x-4 text-sm">
-                <a href="#site" className="inline-flex min-h-11 items-center text-muted hover:text-ink lg:min-h-8">
-                  View site
-                </a>
-                <a href={session.account.logout_url || "/.auth/logout?post_logout_redirect_uri=%2F"} className="inline-flex min-h-11 items-center text-muted hover:text-ink lg:min-h-8">
-                  Sign out
-                </a>
-              </div>
-            )}
             {!caps.accounts && (
               <div className="flex items-center gap-2">
                 <label className="text-xs text-muted" htmlFor="engine-mode">

@@ -14,6 +14,8 @@ import { MOCK_SESSION_PREFIX, createMockClient } from "./api/mock";
 import type { GuardClient } from "./api/types";
 import type { ServerStatus } from "./api/status";
 import { Sidebar } from "./components/Sidebar";
+import { ProfileMenu } from "./components/ProfileMenu";
+import { ProjectSwitcher } from "./projects/ProjectSwitcher";
 import { DEFAULT_SAMPLE, SAMPLES, sampleBehind, type Sample } from "./content/samples";
 import type { BenchmarkLoader } from "./api/benchmarks";
 import { useEngine } from "./hooks/useEngine";
@@ -99,7 +101,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   const server = status.state === "ok" ? status.status : null;
   const hosted = useHostedSession();
   const caps = useCapabilities(server);
-  // A hosted owner's snippets are one endpoint's (the menu's "Inspect activity & vault"); the
+  // A hosted owner's snippets are one endpoint's (the project menu's "Inspect activity & vault"); the
   // console remounts when it changes.
   const [snippetsEndpoint] = useState(getSelectedEndpoint);
   const hostedSnippets = useMemo(() => (caps.accounts && snippetsEndpoint ? endpointSnippets(snippetsEndpoint) : undefined), [caps.accounts, snippetsEndpoint]);
@@ -225,7 +227,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
       />
 
       <div className="min-w-0">
-        <PageHeader route={route} />
+        <PageHeader route={route} caps={caps} />
         {engine.engine === "mock" && (
           <div role="status" className={apiDown ? "border-b border-danger/30 bg-danger-soft" : "border-b border-warn/30 bg-warn-soft"}>
             <p className="mx-auto max-w-[1280px] px-4 py-2 text-xs text-ink sm:px-6 sm:text-sm">
@@ -423,24 +425,33 @@ function statusDetailOf(s: ServerStatus): string {
   return [`${s.gateway.default_mode} mode`, mode?.detectors.join("+")].filter(Boolean).join(" · ");
 }
 
-/** The bar above every section: where you are, over the accent hairline. Below 1024 px the
- *  menu's top bar names the section, so only the hairline shows. */
-function PageHeader({ route }: { route: Route }) {
+/** The bar above every section, over the accent hairline: where you are on the left (from
+ *  1024 px; below it the menu's top bar names the section) and, on the right, the project
+ *  switcher and, for a signed-in hosted owner, the profile menu. */
+function PageHeader({ route, caps }: { route: Route; caps: Capabilities }) {
   const section = SECTIONS.find((s) => s.id === route.section)!;
   const tab = route.section === "playground" ? PLAYGROUND_TABS.find((t) => t.id === route.tab) : undefined;
+  const session = useHostedSession();
   return (
     <header>
-      <p className="hidden h-12 items-center gap-2 px-6 text-base text-ink lg:flex">
-        <span>{section.label}</span>
-        {tab && (
-          <>
-            <span aria-hidden="true" className="text-faint">
-              /
-            </span>
-            <span className="text-muted">{tab.label}</span>
-          </>
-        )}
-      </p>
+      {/* Below 1024 px the row shows only when it holds a switcher or an avatar. */}
+      <div className="hidden h-12 items-center gap-3 px-4 has-[[data-header-item]]:flex sm:px-6 lg:flex">
+        <p className="hidden min-w-0 items-center gap-2 text-base text-ink lg:flex">
+          <span>{section.label}</span>
+          {tab && (
+            <>
+              <span aria-hidden="true" className="text-faint">
+                /
+              </span>
+              <span className="text-muted">{tab.label}</span>
+            </>
+          )}
+        </p>
+        <div className="ml-auto flex min-w-0 items-center gap-2.5">
+          <ProjectSwitcher manage={caps.projects} />
+          {caps.accounts && session && <ProfileMenu session={session} />}
+        </div>
+      </div>
       <div aria-hidden="true" className="header-hairline" />
     </header>
   );

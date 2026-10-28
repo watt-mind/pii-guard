@@ -4,6 +4,8 @@ export interface Connection { id: string; provider: string; origin: string; expi
 export interface GuardKey { id: string; name: string; prefix: string; created_at: string }
 export interface Account {
   mode: "hosted"; authenticated: boolean;
+  /** The signed-in owner: an opaque id today; a display name or email only if the server adds one. */
+  principal?: { id: string; provider: string; name?: string; email?: string } | null;
   login_url: string; logout_url: string; tier: "anonymous" | "standard";
   providers: unknown[];
   limits: Record<string, number | string | boolean | null>;

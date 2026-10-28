@@ -2,10 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createHttpChat, pickDefaultModel, SYSTEM_PROMPT } from "../api/chat";
 import { request, recovery, type Account, type DemoResult, type Requester } from "./api";
 import { Limits } from "./AccountPanels";
-import { SITE_HASHES, time, useAccount, useHash, type HostedSession } from "./session";
+import { SITE_HASHES, SOURCE, time, useAccount, useHash, type HostedSession } from "./session";
 import "./hosted.css";
 
-const SOURCE = "https://github.com/watt-mind/pii-guard";
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
 // sign-in returns to the console (LAB-1430).
 const LOGIN = "/.auth/login/google?post_login_redirect_uri=%2F%23overview";
