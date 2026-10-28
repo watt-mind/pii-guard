@@ -10,6 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from pii_guard.detect.pipeline import DetectionPipeline, resolve_spans
 from pii_guard.detect.rules import RuleDetector
@@ -452,6 +454,86 @@ def test_secret_fixtures_are_found_exactly(detector: RuleDetector) -> None:
         gold = {(s.start, s.end, s.entity_type) for s in doc.spans}
         got = {(s.start, s.end, s.entity_type) for s in detector.detect(doc.text, doc.language)}
         assert got == gold, doc.id
+
+
+# --- Exact offsets and quoted literals (LAB-1349) ----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ('password=" Synth9!pass"', "Synth9!pass"),  # leading space: the tail leaked
+        ('password="Synth9!pass "', "Synth9!pass"),
+        ("password='\tSynth9!pass\t'", "Synth9!pass"),
+        ('token: "  fake-token-0000-1111  "', "fake-token-0000-1111"),
+        ('"client_secret": " fake-json-secret-0000"', "fake-json-secret-0000"),
+        ('Authorization = " Bearer fake0bearer0token0000"', "fake0bearer0token0000"),
+    ],
+)
+def test_padded_quoted_value_is_masked_exactly(
+    detector: RuleDetector, text: str, value: str
+) -> None:
+    spans = [s for s in detector.detect(text, "en") if s.entity_type is E.SECRET]
+    assert [s.text for s in spans] == [value]
+    assert all(text[s.start : s.end] == s.text for s in spans)
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ('password="Synth9![x]pass"', "Synth9![x]pass"),
+        ("db_password = 'Synth(9)pass!'", "Synth(9)pass!"),
+        ('"passphrase": "Synth9!(x)-pass"', "Synth9!(x)-pass"),
+        ("MYSQL_PWD=`Synth[9]pw`", "Synth[9]pw"),
+    ],
+)
+def test_bracketed_quoted_password_is_masked(detector: RuleDetector, text: str, value: str) -> None:
+    assert values(detector, text) == [value]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "password=Synth9![x]pass",  # unquoted: may be code (an index expression)
+        'token="fake[0]token0000"',  # not a password key: brackets still mean code
+        'password = "{password}"',  # a format field, not a value
+        'password = "Synth{0}pass"',  # a positional field too
+        'password = "%(password)s"',
+        "password = os.environ['DB_PASSWORD']",
+        'password = "${DB_PASSWORD}"',
+        'password: "{{ secrets.DB_PASSWORD }}"',
+        'password = "[[SECRET_ab12cd]]"',
+    ],
+)
+def test_bracket_negatives_stay_unmasked(detector: RuleDetector, text: str) -> None:
+    assert secrets_in(detector, text) == []
+
+
+_PAD = st.text(alphabet=" \t", max_size=3)
+_BODY = st.text(alphabet="abcXYZ0189!#*+-_[]()~^", min_size=4, max_size=24)
+
+
+@given(
+    key=st.sampled_from(["password", "DB_PASSWORD", "client_secret", "API_TOKEN", "admin_pwd"]),
+    sep=st.sampled_from(["=", ": ", " = ", ":="]),
+    quote=st.sampled_from(['"', "'", "`"]),
+    lead=_PAD,
+    trail=_PAD,
+    body=_BODY,
+)
+def test_secret_offsets_are_exact_after_strip(
+    key: str, sep: str, quote: str, lead: str, trail: str, body: str
+) -> None:
+    """Every emitted SECRET span is the exact value: no padding inside, no tail outside."""
+    value = "Synth9" + body
+    text = f"{key}{sep}{quote}{lead}{value}{trail}{quote}\n"
+    spans = [s for s in RuleDetector().detect(text, "en") if s.entity_type is E.SECRET]
+    for span in spans:
+        assert text[span.start : span.end] == span.text
+        assert span.text and span.text == span.text.strip()
+    password_key = key.casefold().startswith(("password", "db_password", "admin_pwd"))
+    if password_key or not any(ch in value for ch in "()[]"):
+        assert [s.text for s in spans] == [value]
 
 
 # --- Through the pipeline ---------------------------------------------------------------------

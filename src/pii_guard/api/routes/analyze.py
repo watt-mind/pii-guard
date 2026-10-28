@@ -67,6 +67,13 @@ class PublicSpan(BaseModel):
         description="Registry name of the detector that found it (`rules`, `ner`, `llm`, `known`).",
         examples=["ner"],
     )
+    subtype: str | None = Field(
+        default=None,
+        description="Which shape of the type the rule matched, e.g. `github_token`, "
+        "`url_password` or `assignment` for `SECRET` (docs/contracts.md). Left out when the "
+        "detector sets none. Names a rule, never a value.",
+        examples=["github_token"],
+    )
     policy: Policy = Field(
         description="The type's effective policy. Known values report `mask` even for a "
         "`keep` type, because `/v1/mask` masks them."
@@ -85,6 +92,8 @@ class AnalyzeResponse(BaseModel):
 @router.post(
     "/v1/analyze",
     response_model=AnalyzeResponse,
+    # Optional span fields (``subtype``) are left out, not sent as null: Span.to_public_dict().
+    response_model_exclude_none=True,
     summary="Detect personal data without masking it",
     responses=error_responses(
         "not_found",

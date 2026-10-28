@@ -384,7 +384,9 @@ Detect without masking.
 Spans are sorted by `start`, after the resolver (`DetectionPipeline`) has merged overlaps. The
 raw `text` of a span is **not** returned (the caller already has it; it can slice). This is
 `Span.to_public_dict()` plus `policy`, the type's effective policy. Every span is returned,
-including `keep` and `block` ones: analyze never refuses on policy.
+including `keep` and `block` ones: analyze never refuses on policy. A span whose rule sets a
+`subtype` carries it (`{"entity_type": "SECRET", "subtype": "github_token", ...}`); spans
+without one leave the key out rather than sending `null` (LAB-1349).
 
 Optional `session_id` (1-128 characters, as on `/v1/mask`) previews the session's pre-loaded
 known values: the spans the `known` detector adds are merged in exactly as `/v1/mask` does and
