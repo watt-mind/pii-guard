@@ -22,6 +22,13 @@ ENDPOINT_PATH = re.compile(
 )
 
 
+class EndpointModelRequiredError(PiiGuardError):
+    """A pass-through endpoint (no pinned model) got a request that names no model."""
+
+    code = "invalid_request"
+    status_code = 400
+
+
 def endpoint_path(path: str) -> tuple[str, str] | None:
     match = ENDPOINT_PATH.fullmatch(path)
     return (match[1], match[2]) if match else None
@@ -100,9 +107,23 @@ async def endpoint_body(
             raise ProjectAccessError("Invalid endpoint JSON request") from None
         if not isinstance(body, dict):
             raise ProjectAccessError("Endpoint request must be an object")
-        if "model" in body and body["model"] != endpoint.model:
-            raise ProjectAccessError("Endpoint allows only its configured model")
-        body["model"] = endpoint.model
+        if endpoint.model is not None:
+            # Pinned: the configured model, whatever the client sends.
+            if "model" in body and body["model"] != endpoint.model:
+                raise ProjectAccessError("Endpoint allows only its configured model")
+            body["model"] = endpoint.model
+        else:
+            # Pass-through (BYOK only; sponsored always pins): the client's model, unchanged.
+            model = body.get("model")
+            if (
+                not isinstance(model, str)
+                or not model.strip()
+                or len(model) > 256
+                or any(ord(c) < 32 or ord(c) == 127 for c in model)
+            ):
+                raise EndpointModelRequiredError(
+                    "This endpoint has no pinned model: the request must name one in 'model'"
+                )
         raw = bytearray(json.dumps(body).encode())
     filtered = [
         (k, v)

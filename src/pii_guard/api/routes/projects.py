@@ -96,7 +96,7 @@ class PolicyRequest(NameRequest):
 
 
 class EndpointRequest(NameRequest):
-    """One provider, model, credential and explicitly pinned policy version."""
+    """One provider, optional pinned model, credential and explicitly pinned policy version."""
 
     policy_version_id: str = Field(
         min_length=1, max_length=128, description="Immutable policy version in this project."
@@ -111,11 +111,13 @@ class EndpointRequest(NameRequest):
         repr=False,
         description="Upstream API base URL; required for custom providers.",
     )
-    model: str = Field(
-        min_length=1,
+    model: str | None = Field(
+        default=None,
         max_length=256,
         repr=False,
-        description="The single upstream model served by this endpoint.",
+        description="The upstream model this endpoint pins. Omit it, or send null or an empty "
+        "string, for pass-through: the client's own `model` is forwarded unchanged. Optional "
+        "for own-key providers; sponsored endpoints require an allow-listed model.",
     )
     api_key: SecretStr | None = Field(
         default=None,
