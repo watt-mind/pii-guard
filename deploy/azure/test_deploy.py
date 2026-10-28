@@ -121,7 +121,8 @@ class DeploymentAdmissionTests(unittest.TestCase):
                 '  "group show "*"location"*) echo swedencentral;;\n'
                 '  "monitor action-group show "*) echo true;;\n'
                 '  "resource show "*"properties.amount"*) '
-                '[ "${TEST_BUDGET_EXISTS:-true}" = true ] || exit 1; echo 25;;\n'
+                '[ "${TEST_BUDGET_EXISTS:-true}" = true ] || exit 1; '
+                'echo "${TEST_BUDGET_AMOUNT:-25.0}";;\n'
                 f'  "resource show "*"Actual50.contactGroups"*) echo \'["{GROUP}"]\';;\n'
                 '  "resource show "*"startDate"*) echo 2026-10-01T00:00:00Z;;\n'
                 f"  *properties.outputs.vaultUri.value*) echo {VAULT};;\n"
@@ -280,13 +281,22 @@ class DeploymentAdmissionTests(unittest.TestCase):
             self.assertIn("containerapp ingress update --name piiguard-prod-app", self.calls)
             self.assertIn("--type internal --output none", self.calls)
 
+    def test_invalid_budget_amounts_are_refused_without_rounding(self) -> None:
+        for amount in ("NaN", "inf", "-25.0", "25.5"):
+            with self.subTest(amount=amount):
+                self.assert_refused(
+                    self.run_deploy("stage", TEST_BUDGET_AMOUNT=amount), "positive whole amount"
+                )
+
     def test_stage_preserves_existing_action_groups(self) -> None:
-        result = self.run_deploy("stage")
+        result = self.run_deploy("stage", TEST_BUDGET_AMOUNT="25.0")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(GROUP, self.calls)
         self.assertIn("alertActionGroupIds=", self.calls)
         self.assertNotIn("alertActionGroupIds=[]", self.calls)
         self.assertIn("budgetStartDate=2026-10-01T00:00:00Z", self.calls)
+        self.assertIn("monthlyBudgetAmount=25", self.calls)
+        self.assertNotIn("monthlyBudgetAmount=25.0", self.calls)
 
 
 if __name__ == "__main__":

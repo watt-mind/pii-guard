@@ -50,7 +50,19 @@ else
     AZURE_MONTHLY_BUDGET_AMOUNT=$(az resource show --ids "$budget_id" --api-version 2023-11-01 --query properties.amount --output tsv 2>/dev/null) || { echo 'A resource-group budget must exist before stage or enable' >&2; exit 2; }
     groups=$(az resource show --ids "$budget_id" --api-version 2023-11-01 --query properties.notifications.Actual50.contactGroups --output json)
     budget_start=$(az resource show --ids "$budget_id" --api-version 2023-11-01 --query properties.timePeriod.startDate --output tsv)
-    [[ "$AZURE_MONTHLY_BUDGET_AMOUNT" =~ ^[1-9][0-9]*$ ]] || { echo 'Existing budget amount is invalid' >&2; exit 2; }
+    # ARM returns numeric budget amounts as decimals (for example 25.0), while Bicep takes int.
+    AZURE_MONTHLY_BUDGET_AMOUNT=$(python3 - "$AZURE_MONTHLY_BUDGET_AMOUNT" <<'PYBUDGET'
+from decimal import Decimal, InvalidOperation
+import sys
+try:
+    amount = Decimal(sys.argv[1])
+except InvalidOperation:
+    raise SystemExit('Existing budget must have a positive whole amount') from None
+if not amount.is_finite() or amount < 1 or amount != amount.to_integral_value():
+    raise SystemExit('Existing budget must have a positive whole amount')
+print(int(amount))
+PYBUDGET
+    )
     params+=(--parameters "budgetStartDate=$budget_start")
     # Preserve budget/metric notification recipients when stage has no override.
     if [[ -n "${AZURE_ALERT_ACTION_GROUP_ID:-}" ]]; then
