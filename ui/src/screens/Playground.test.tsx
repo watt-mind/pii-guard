@@ -58,13 +58,16 @@ describe("Playground Text (LAB-1441)", () => {
     expect(onRun).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the language select and Mask document in the pane header, Clear in its footer", () => {
+  it("keeps the language select and Mask document above the panes, Clear in the pane's footer (LAB-1448)", () => {
     renderPlayground();
     const pane = screen.getByRole("region", { name: "Your document" });
     const header = pane.querySelector("header")!;
     const footer = pane.querySelector("footer")!;
-    expect(within(header).getByRole("combobox", { name: "Document language" })).toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: /mask document/i })).toBeInTheDocument();
+    // The pane headers hold only their titles, so the two stay the same height.
+    expect(within(header).queryByRole("combobox")).toBeNull();
+    expect(within(header).queryByRole("button")).toBeNull();
+    expect(screen.getByRole("combobox", { name: "Document language" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mask document/i })).toBeInTheDocument();
     expect(within(footer).getByRole("button", { name: "Clear" })).toBeInTheDocument();
   });
 
