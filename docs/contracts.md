@@ -1080,7 +1080,14 @@ Messages and `repr()`s carry types, counts and placeholder ids, never an origina
   span that includes a suffix is narrowed to the stem; an ambiguous split (`Zoltán` could be
   `Zolta` + `n`) is applied only when the lemma is confirmed (it occurs on its own, another span
   or an earlier request has it, or two different forms agree). Otherwise the whole word is masked
-  and the candidate lemmas' forms get the same placeholder (recall first).
+  and the candidate lemmas' forms get the same placeholder (recall first). Before the vault sees
+  them, the detection pipeline ends a whole-word PERSON span at its stem when the language pack
+  reads it confidently (`pii_guard.detect.suffix_trim`, LAB-1174; Hungarian:
+  `HungarianSuffixMatcher.confident_split`), for every detector: `Kerekes Ottótól` →
+  `[[PERSON_x]]tól`. Confident means the lemma's last word is a lexicon name and the surface's
+  is not (`Ottó` + `tól`, `Béla` + `t`), or the ending can't end a name (`Tihamérnak`,
+  `Szabolccsal`); `Márton`, `Kornél` and `Simon` stay whole. `/v1/analyze` returns the trimmed
+  span.
 - `unmask` re-inflects: a known placeholder followed by a suffix restores the stem as written in
   the input for that suffix, or, for a suffix the model added itself, the language's inflected
   stem (`[[PERSON_x]]nak` → `Próba Zsuzsannának`, `[[PERSON_y]]val` → `Kováccsal`).

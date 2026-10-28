@@ -339,7 +339,8 @@ def test_pipeline_rules_stay_authoritative() -> None:
     pipeline = DetectionPipeline(["rules", NerDetector(backend=FakeBackend(raw))])
     spans = pipeline.detect(text, "hu")
     by_type = {s.entity_type: s for s in spans}
-    assert by_type[EntityType.PERSON].text == "Teszt Eleknek"
+    # The case ending stays outside the name (LAB-1174).
+    assert by_type[EntityType.PERSON].text == "Teszt Elek"
     assert by_type[EntityType.EMAIL].text == "teszt.elek@example.com"
     assert by_type[EntityType.EMAIL].detector == "rules"
     assert EntityType.ORGANIZATION not in by_type

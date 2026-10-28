@@ -8,7 +8,7 @@ optional methods live in :mod:`pii_guard.languages.inflection` and
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from pii_guard.languages.inflection import Split
 from pii_guard.types import EntityType
@@ -60,6 +60,14 @@ _HU_LENGTHENING_RE = re.compile(
     "|".join(re.escape(s) for s in sorted(_HU_LENGTHENING, key=len, reverse=True))
 )
 _MIN_LEMMA_LETTERS = 2
+# Case endings after an unchanged stem that no Hungarian name ends in, so a detector span
+# ending in one is trimmed without a confirmed lemma (LAB-1174). Not ``-nél`` (Kornél),
+# ``-ért`` (Gellért), ``-ra``/``-re`` (Klára, Imre), ``-on``/``-en`` (Márton, Kelemen),
+# ``-t`` (Bálint), ``-val``/``-vel`` (Percival): those need a lexicon name or a confirmed lemma.
+_HU_UNAMBIGUOUS_ENDINGS = frozenset({
+    "nak", "nek", "ban", "ben", "ból", "ből", "hoz", "hez", "höz",
+    "nál", "tól", "től", "ról", "ről", "ként",
+})  # fmt: skip
 
 
 def _alternation(suffixes: Iterable[str]) -> str:
@@ -244,6 +252,51 @@ class HungarianSuffixMatcher:
         # Strong readings first; otherwise keep the order above (most specific first).
         unique = list(dict.fromkeys(found))
         return sorted(unique, key=lambda split: not split.strong)
+
+    def confident_split(
+        self, surface: str, entity_type: EntityType, is_name: Callable[[str], bool]
+    ) -> Split | None:
+        """The reading of a name a detector found whole (``Kerekes Ottótól``) safe to apply now.
+
+        Used before the vault sees the span (:mod:`pii_guard.detect.suffix_trim`), when no
+        lemma is confirmed yet. ``is_name(word)`` says whether ``word`` is a known given name
+        or surname (the pack's lexicons). Only PERSON values; ``None`` unless one of:
+
+        - the last word is not a name itself (``Márton``, ``Kornél``, ``Simon`` stay whole)
+          and exactly one reading's lemma ends in a name (``Ottó`` + ``tól``, ``Béla`` + ``t``,
+          ``Zoltán`` + ``t``, ``Jakab`` + ``bal``);
+        - a strong reading (``Hajnának``), a doubled digraph (``Szabolccsal``,
+          ``Gergellyel``), or a long case ending after an unchanged stem that no Hungarian
+          name ends in (``Tihamérnak``, ``Ödönhöz``; not ``-nél``/``-ért``: ``Kornél``,
+          ``Gellért``).
+        """
+        if entity_type is not EntityType.PERSON:
+            return None
+        words = surface.split()
+        if not words or is_name(words[-1]):
+            return None
+        candidates = [c for c in self.splits(surface, entity_type) if c.stem and c.suffix]
+        if not candidates:
+            return None
+        named = {c.lemma: c for c in candidates if c.lemma.split() and is_name(c.lemma.split()[-1])}
+        if len(named) == 1:
+            return next(iter(named.values()))
+        if len(named) > 1:
+            return None  # Kissel: Kis or Kiss, both surnames
+        for c in candidates:
+            if c.strong:
+                return c
+            folded = c.suffix.casefold()
+            if c.stem == c.lemma and folded in _HU_UNAMBIGUOUS_ENDINGS:
+                return c
+            digraph = _hu_digraph(c.lemma)
+            if (
+                digraph is not None
+                and c.stem.casefold().endswith(digraph[0] + digraph)
+                and folded in _HU_DOUBLED_ENDINGS
+            ):
+                return c
+        return None
 
     def restore(self, lemma: str, suffix: str, entity_type: EntityType) -> str:
         """``lemma`` inflected for ``suffix`` as it follows a placeholder: ``stem + suffix``.

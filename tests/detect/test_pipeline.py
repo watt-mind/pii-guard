@@ -83,9 +83,11 @@ def test_rules_and_llm_on_recorded_contract() -> None:
     assert by_text[("+36 30 123 4567", E.PHONE)] == "rules"
     # The rules' bare postcode is absorbed into the LLM's full address.
     assert by_text[("6720 Szeged, Kárász utca 7. szám", E.ADDRESS)] == "llm"
-    # Base form and inflected form of the same name merge into one span per occurrence.
-    assert ("Teszt Eleknek", E.PERSON) in by_text
-    assert ("Példa Ágnesnek", E.PERSON) in by_text
+    # Base form and inflected form of the same name merge into one span per occurrence; an
+    # inflected one ends at its stem, so the case ending stays outside the placeholder (LAB-1174).
+    assert ("Teszt Eleknek", E.PERSON) not in by_text
+    assert ("Teszt Elek", E.PERSON) in by_text
+    assert ("Példa Ágnes", E.PERSON) in by_text
     assert sum(s.entity_type is E.PERSON for s in spans) == 6
     assert ("1985. április 12.", E.DATE_OF_BIRTH) in by_text
 
