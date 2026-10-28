@@ -5,7 +5,7 @@ import { ApiError } from "../api/http";
 import { HostedApp } from "./HostedApp";
 import type { Account, DemoResult, Requester } from "./api";
 
-const account: Account = { mode: "hosted", authenticated: false, login_url: "/.auth/login/google", logout_url: "/.auth/logout", tier: "anonymous", providers: ["meta"], limits: { requests_per_day: 3 }, usage: { requests_today: 0, resets_at: "2026-10-29T00:00:00Z" }, state: { persistence: "ephemeral", restart_loses_sessions: true }, connections: [] };
+const account: Account = { mode: "hosted", authenticated: false, login_url: "/.auth/login/google?post_login_redirect_uri=%2F%23account", logout_url: "/.auth/logout?post_logout_redirect_uri=%2F", tier: "anonymous", providers: ["meta"], limits: { requests_per_day: 3 }, usage: { requests_today: 0, resets_at: "2026-10-29T00:00:00Z" }, state: { persistence: "ephemeral", restart_loses_sessions: true }, connections: [] };
 const result: DemoResult = { sample_id: "hu-support", language: "hu", original: "Synthetic original", masked: "[[PERSON_live]]", answer: "Hello [[PERSON_live]]", restored: "Hello Synthetic Person", model: "test-model", session_id: "test-session", request_id: "test-request", entities: [{ start: 0, end: 9, type: "PERSON" }] };
 
 function requester(handler: (path: string, body?: unknown, method?: string) => unknown) {
@@ -13,6 +13,13 @@ function requester(handler: (path: string, body?: unknown, method?: string) => u
 }
 
 describe("public hosted workflow", () => {
+  it("sends sign-in back to the workspace instead of the provider's bare page", async () => {
+    const call = requester((path) => path === "/v1/account" ? account : result);
+    render(<HostedApp call={call} />);
+    await screen.findByRole("link", { name: "Continue with Google" });
+    expect(screen.getByRole("link", { name: "Continue with Google" })).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23account");
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23account");
+  });
   it("labels the static mechanism, requests only a server sample, and shows all live stages", async () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     const user = userEvent.setup();
