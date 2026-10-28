@@ -1,0 +1,46 @@
+{
+  "device": "cpu",
+  "torch": "2.14.1",
+  "transformers": "5.21.0",
+  "torch_threads": 8,
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "fixtures": [
+    "eval/fixtures/hu-synth-sample.jsonl",
+    "eval/fixtures/en-synth-sample.jsonl"
+  ],
+  "messages": 122,
+  "mean_chars": 382.5,
+  "load_average_start": [
+    16.57,
+    21.14,
+    23.94
+  ],
+  "load_average_end": [
+    13.96,
+    20.17,
+    23.51
+  ],
+  "note": "load_s: detector construction and warm-up forward in one process, torch and transformers already imported; weights may be in the OS page cache",
+  "models": {
+    "pii-guard-ner-v2.0": {
+      "model": "hdkiller/pii-guard-ner-xlmr-base@95f612a9ad65cc5ade5b9248bd152020541e7097",
+      "licence": "Apache-2.0 (trained on Ai4Privacy OpenPII-1M, CC-BY-4.0: Ai4Privacy / Ai Suisse SA)",
+      "parameters": 277469205,
+      "weights_bytes": 1109900868,
+      "load_s": 4.36,
+      "p50_ms": 50.7,
+      "p95_ms": 67.0,
+      "mean_ms": 52.0
+    },
+    "wismut-nym": {
+      "model": "Wismut/nym-pii-multilingual@0ed0242d67a30ca6a83e5f118506ff1e1daf83ca",
+      "licence": "MIT per card metadata and card text; the repository has no LICENSE file at this revision; part of its training labels come from an LLM teacher on CC-BY-SA text",
+      "parameters": 307592529,
+      "weights_bytes": 1230384436,
+      "load_s": 1.7,
+      "p50_ms": 83.1,
+      "p95_ms": 113.1,
+      "mean_ms": 85.7
+    }
+  }
+}

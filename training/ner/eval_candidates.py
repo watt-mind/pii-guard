@@ -18,7 +18,8 @@ every fixture in :data:`FIXTURES`, with the detector list of the candidate:
 names, the ai4privacy sample (in-distribution for every OpenPII-trained candidate) and the
 LAB-1226 ``agent-traffic-dev`` split, which is what v2 vs v2.1 is selected on. ``--set
 heldout`` is :data:`FIXTURES_HELDOUT`, the LAB-1226 **test** sets, scored once for the chosen
-candidates after selection and never used to pick one. The LAB-1226 files are read from
+candidates after selection and never used to pick one; it includes pl-pii-bench and MAPA
+EUR-Lex (LAB-1392). The LAB-1226 files are read from
 ``eval/synthetic`` / ``eval/datasets`` when present, else from ``eval/generated/lab1226/``.
 """
 
@@ -32,6 +33,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from pii_guard.eval.baselines import suite
+from pii_guard.eval.datasets.mapa import LANGUAGES as MAPA_LANGUAGES
 from pii_guard.registry import register_detector
 
 OUT = Path("eval/results/2026-10-27-ner-v2/scorecards")
@@ -80,6 +82,10 @@ FIXTURES_HELDOUT = (
     _lab1226("eval/datasets/nemotron-pii/en-nemotron-pii.jsonl"),
     _lab1226("eval/datasets/gretel-finance/en-gretel-finance.jsonl"),
     _lab1226("eval/datasets/gretel-finance/de-gretel-finance.jsonl"),
+    # LAB-1392: Polish (committed) and MAPA EUR-Lex in 21 languages (rebuilt by fetch into
+    # data/, skipped when absent: real documents, never committed).
+    "eval/datasets/pl-pii-bench/pl-pl-pii-bench.jsonl",
+    *(f"data/datasets/fixtures/mapa-eur-lex/{lang}-mapa-eur-lex.jsonl" for lang in MAPA_LANGUAGES),
 )
 
 

@@ -117,6 +117,10 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
     "masking_failed": (500, "Masking or re-identification could not complete."),
     "internal_error": (500, "Anything unexpected. No exception text is returned."),
     "detection_failed": (503, "A detector (or SAM, or OCR) failed or timed out."),
+    "detection_profile_denied": (
+        503,
+        "The selected or cached processing component is not permitted by the detection profile.",
+    ),
     "detection_unavailable": (
         503,
         "A configured detector can't run safely (the LLM detector without a key).",

@@ -610,3 +610,23 @@ def test_separate_request_gateways_share_session_holds(monkeypatch, refuse_secon
             await service.close()
 
     asyncio.run(exercise())
+
+
+def test_hosted_local_profile_validates_analyzer_before_bounded_wrapper():
+    from pii_guard.api.deps import get_analyzer
+    from pii_guard.detection_profile import DetectionProfileError
+
+    app = create_app(settings(detection_profile="local-only"))
+    request = Request({**scope(path="/v1/analyze"), "app": app})
+    bounded = get_analyzer(request)
+    assert isinstance(bounded, BoundedAnalyzer)
+    assert type(bounded.inner) is RegistryAnalyzer
+    assert bounded.analyze("synthetic@example.com", "en")
+
+    class UntrustedAnalyzer:
+        def analyze(self, text, language):
+            pytest.fail("Unsupported analyzer received original text")
+
+    app.state.analyzer = UntrustedAnalyzer()
+    with pytest.raises(DetectionProfileError):
+        get_analyzer(request)

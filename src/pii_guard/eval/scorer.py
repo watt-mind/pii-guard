@@ -18,7 +18,11 @@ Definitions (``docs/evaluation.md``):
   (:func:`pii_guard.eval.forms.find_surface_forms`) survives in the masked text.
   **Partial leak**: not fully leaked, but an identifying token of the value survives (a
   token of 3+ letters or 4+ digits that is not a language stopword and doesn't also occur in
-  the original text outside the gold spans).
+  the original text outside the gold spans), or, when the vault's replacements are known,
+  digits of an occurrence are left right next to its placeholder: a digit run the placeholder
+  edge cuts (``[[ID_DOCUMENT_x]]010``, ``8[[NATIONAL_ID_HU_TAX_x]]``) or one joined to it by
+  ``.``, ``-`` or ``/`` (``[[ID_DOCUMENT_x]].91``). These are a few digits of an identifier,
+  too short to count as a token on their own (LAB-1367).
 - **Over-masking rate**: masked predicted spans that overlap no gold span of any type (a share
   of spans, not of characters).
 - **Unscored predictions**: a prediction that overlaps one of the document's *ignore regions*
@@ -36,8 +40,9 @@ Definitions (``docs/evaluation.md``):
   except a trailing case ending or possessive the language's inflection matcher reads as a
   suffix (the vault keeps it outside: ``[[PERSON_x]]nak``) and whole words that identify no
   one by the partial-leak rule (``Ms``, ``Frau``, ``MD``). An occurrence left unmasked
-  or masked only in part (``[[PERSON_x]]inta Anna``, ``Próba [[PERSON_x]]``) makes its entity
-  inconsistent (LAB-1355).
+  or masked only in part (``[[PERSON_x]]inta Anna``, ``Próba [[PERSON_x]]``, digits left next
+  to the placeholder as in the partial-leak rule: ``[[ID_x]].91``) makes its entity
+  inconsistent (LAB-1355, LAB-1367).
   ``multi_rate`` counts only entities with 2+ occurrences.
 - **Number validity** (public sets only): recall and leak split by whether a structured
   identifier passes the language packs' validators, plus the leak of every other value
@@ -50,7 +55,7 @@ import re
 import statistics
 import time
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
@@ -256,16 +261,73 @@ def _identifying_tokens(value: str, entity_type: EntityType, stopwords: frozense
     return tokens
 
 
+#: Characters that join digit groups inside one identifier (``812.754.113.91``, ``06-20``).
+_DIGIT_JOINERS = ".-/"
+
+
+def _digits_at_edge(text: str, covered: Sequence[bool], i: int, j: int) -> bool:
+    """True if the uncovered ``text[i:j]`` leaves digits right next to a covered neighbour.
+
+    ``covered[k]`` says whether ``text[k]`` lies inside a placeholder. Digits count when the
+    edge cuts their run (``[[ID_x]]010``: a covered alphanumeric next to a digit) or when one
+    joiner (:data:`_DIGIT_JOINERS`) stands between a covered digit and them (``[[ID_x]].91``).
+    """
+    gap = text[i:j]
+    if i > 0 and covered[i - 1]:
+        before = text[i - 1]
+        if gap[0].isdigit() and before.isalnum():
+            return True
+        if len(gap) > 1 and gap[0] in _DIGIT_JOINERS and gap[1].isdigit() and before.isdigit():
+            return True
+    if j < len(text) and covered[j]:
+        after = text[j]
+        if gap[-1].isdigit() and after.isalnum():
+            return True
+        if len(gap) > 1 and gap[-1] in _DIGIT_JOINERS and gap[-2].isdigit() and after.isdigit():
+            return True
+    return False
+
+
+def _gaps(text: str, covered: Sequence[bool]) -> Iterator[tuple[int, int]]:
+    """The maximal uncovered runs ``[i, j)`` of ``text``."""
+    i = 0
+    while i < len(text):
+        if covered[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(text) and not covered[j]:
+            j += 1
+        yield i, j
+        i = j
+
+
+def _coverage(span: GoldSpan, replacements: Sequence[tuple[int, int, str]]) -> list[bool]:
+    hits = [(s, e) for s, e, _ in replacements if s < span.end and span.start < e]
+    return [any(s <= i < e for s, e in hits) for i in range(span.start, span.end)]
+
+
+def _digits_left(span: GoldSpan, replacements: Sequence[tuple[int, int, str]]) -> bool:
+    """True if a placeholder covers part of ``span`` and leaves digits of it at its edge."""
+    covered = _coverage(span, replacements)
+    if not any(covered):
+        return False
+    return any(_digits_at_edge(span.text, covered, i, j) for i, j in _gaps(span.text, covered))
+
+
 def leak_report(
     doc: Document,
     masked_text: str,
     *,
     policy: Mapping[EntityType, str] = DEFAULT_POLICY,
+    replacements: Sequence[tuple[int, int, str]] | None = None,
 ) -> list[ValueLeak]:
     """Which labelled values of ``doc`` survive in ``masked_text`` (the text sent upstream).
 
     Only ``mask``-policy types are checked. Placeholders are removed before searching, so a
-    hex placeholder id never counts as a surviving value.
+    hex placeholder id never counts as a surviving value. With ``replacements`` (the vault's
+    ``(start, end, placeholder)``), digits of an occurrence left at its placeholder's edge
+    also make the value partially leaked (see the module docstring).
     """
     clean = _strip_placeholders(masked_text)
     forms = language_forms(doc.language)
@@ -292,6 +354,8 @@ def leak_report(
                 if find_surface_forms(clean, token, EntityType.PERSON, doc.language):
                     partial = True
                     break
+            if not partial and replacements:
+                partial = any(_digits_left(span, replacements) for span in spans)
         report.append(ValueLeak(entity_type, len(spans), leaked, partial, value))
     return report
 
@@ -343,7 +407,8 @@ def _fully_covered(span: GoldSpan, hits: Sequence[tuple[int, int, str]], languag
       the language's inflection matcher reads as a suffix of it and the vault keeps outside
       on purpose (``[[PERSON_x]]nak``, ``[[PERSON_x]]'s``).
 
-    ``[[PERSON_x]]inta Anna``, ``Minta [[PERSON_x]]`` and ``[[ID_x]]010`` are not covered.
+    ``[[PERSON_x]]inta Anna``, ``Minta [[PERSON_x]]``, ``[[ID_x]]010`` and ``[[ID_x]].91``
+    are not covered.
     """
     if not hits:
         return False
@@ -352,23 +417,18 @@ def _fully_covered(span: GoldSpan, hits: Sequence[tuple[int, int, str]], languag
     if not any(covered):
         return False
     stopwords = language_forms(language).stopwords
-    i = 0
-    while i < len(text):
-        if covered[i]:
-            i += 1
-            continue
-        j = i
-        while j < len(text) and not covered[j]:
-            j += 1
+    for i, j in _gaps(text, covered):
         gap = text[i:j]
         cut_left = i > 0 and gap[0].isalnum() and text[i - 1].isalnum()
         cut_right = j < len(text) and gap[-1].isalnum() and text[j].isalnum()
         suffix = cut_left and j == len(text) and _is_suffix(span, i, language)
         if not suffix and (
-            cut_left or cut_right or _identifying_tokens(gap, span.entity_type, stopwords)
+            cut_left
+            or cut_right
+            or _digits_at_edge(text, covered, i, j)
+            or _identifying_tokens(gap, span.entity_type, stopwords)
         ):
             return False
-        i = j
     return True
 
 
@@ -590,7 +650,7 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
                 if entity.occurrences > 1:
                     bucket["multi_occurrence"] += 1
                     bucket["multi_consistent"] += entity.consistent
-        for leak in leak_report(r.document, r.masked_text):
+        for leak in leak_report(r.document, r.masked_text, replacements=r.replacements):
             for bucket in (leak_total, leak_by_type[leak.entity_type.value]):
                 bucket["values"] += 1
                 bucket["leaked"] += leak.leaked

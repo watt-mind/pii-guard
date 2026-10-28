@@ -1,0 +1,198 @@
+{
+  "teachers": [
+    {
+      "repo": "Horizon-Labs/pii-redactor-base",
+      "revision": "42dfb0dccb0864c889c99300265567ace9fa6e6d",
+      "license": "Apache-2.0",
+      "languages": [
+        "de",
+        "en"
+      ]
+    }
+  ],
+  "files": {
+    "eval/generated/v3/privy/en-privy-train.jsonl": {
+      "documents": 12000,
+      "documents_with_flags": 6841,
+      "regions_added": 19629,
+      "by_teacher_type": {
+        "Horizon-Labs/pii-redactor-base": {
+          "PASSWORD": 4760,
+          "SECRET": 3937,
+          "ACCOUNT_ID": 3441,
+          "BANK_ACCOUNT": 2473,
+          "STREET_ADDRESS": 1779,
+          "NATIONAL_ID": 1664,
+          "COORDINATE": 941,
+          "POSTCODE": 902,
+          "IP_ADDRESS": 788,
+          "DRIVER_LICENSE": 614,
+          "DEVICE_ID": 534,
+          "PERSON": 472,
+          "PHONE": 459,
+          "VEHICLE_ID": 416,
+          "EMAIL": 403,
+          "DATE_OF_BIRTH": 390,
+          "URL": 366,
+          "USERNAME": 358,
+          "MAC_ADDRESS": 306,
+          "TAX_ID": 295,
+          "CREDIT_CARD": 166,
+          "CREDIT_CARD_CVV": 88,
+          "PASSPORT": 60,
+          "MEDICAL_ID": 50,
+          "ORGANIZATION": 12,
+          "LICENSE_NUMBER": 1
+        }
+      }
+    },
+    "eval/generated/v3/wismut/cs-wismut-train.jsonl": {
+      "documents": 2500,
+      "documents_with_flags": 0,
+      "regions_added": 0,
+      "by_teacher_type": {
+        "Horizon-Labs/pii-redactor-base": {}
+      }
+    },
+    "eval/generated/v3/wismut/de-wismut-train.jsonl": {
+      "documents": 3000,
+      "documents_with_flags": 1509,
+      "regions_added": 4029,
+      "by_teacher_type": {
+        "Horizon-Labs/pii-redactor-base": {
+          "DRIVER_LICENSE": 1555,
+          "NATIONAL_ID": 881,
+          "STREET_ADDRESS": 598,
+          "POSTCODE": 524,
+          "ACCOUNT_ID": 346,
+          "USERNAME": 309,
+          "PERSON": 215,
+          "URL": 203,
+          "SECRET": 152,
+          "PASSWORD": 145,
+          "TAX_ID": 130,
+          "MEDICAL_ID": 126,
+          "MAC_ADDRESS": 116,
+          "BANK_ACCOUNT": 94,
+          "CREDIT_CARD_CVV": 85,
+          "PASSPORT": 73,
+          "IP_ADDRESS": 39,
+          "EMAIL": 16,
+          "PHONE": 7,
+          "VEHICLE_ID": 5,
+          "CREDIT_CARD": 3
+        }
+      }
+    },
+    "eval/generated/v3/wismut/en-wismut-train.jsonl": {
+      "documents": 3000,
+      "documents_with_flags": 678,
+      "regions_added": 1117,
+      "by_teacher_type": {
+        "Horizon-Labs/pii-redactor-base": {
+          "ACCOUNT_ID": 436,
+          "PASSWORD": 336,
+          "STREET_ADDRESS": 282,
+          "POSTCODE": 140,
+          "USERNAME": 127,
+          "DRIVER_LICENSE": 117,
+          "PERSON": 106,
+          "MEDICAL_ID": 88,
+          "BANK_ACCOUNT": 61,
+          "NATIONAL_ID": 55,
+          "SECRET": 45,
+          "MAC_ADDRESS": 43,
+          "URL": 32,
+          "CREDIT_CARD_CVV": 28,
+          "PASSPORT": 21,
+          "TAX_ID": 17,
+          "ORGANIZATION": 16,
+          "IP_ADDRESS": 16,
+          "PHONE": 3,
+          "LICENSE_NUMBER": 3,
+          "EMAIL": 2
+        }
+      }
+    },
+    "eval/generated/v3/wismut/pl-wismut-train.jsonl": {
+      "documents": 2500,
+      "documents_with_flags": 0,
+      "regions_added": 0,
+      "by_teacher_type": {
+        "Horizon-Labs/pii-redactor-base": {}
+      }
+    },
+    "eval/generated/v3/wismut/ro-wismut-train.jsonl": {
+      "documents": 2000,
+      "documents_with_flags": 0,
+      "regions_added": 0,
+      "by_teacher_type": {
+        "Horizon-Labs/pii-redactor-base": {}
+      }
+    },
+    "eval/generated/v3/nemotron/en-nemotron-train.jsonl": {
+      "documents": 1500,
+      "documents_with_flags": 139,
+      "regions_added": 241,
+      "by_teacher_type": {
+        "Horizon-Labs/pii-redactor-base": {
+          "URL": 657,
+          "ACCOUNT_ID": 523,
+          "MEDICAL_ID": 257,
+          "PASSWORD": 232,
+          "BANK_ACCOUNT": 214,
+          "USERNAME": 181,
+          "IP_ADDRESS": 132,
+          "SECRET": 132,
+          "COORDINATE": 120,
+          "VEHICLE_ID": 119,
+          "LICENSE_NUMBER": 110,
+          "POSTCODE": 83,
+          "MAC_ADDRESS": 82,
+          "DEVICE_ID": 58,
+          "CREDIT_CARD_CVV": 56,
+          "ORGANIZATION": 28,
+          "PERSON": 19,
+          "NATIONAL_ID": 15,
+          "DATE_OF_BIRTH": 6,
+          "PHONE": 3,
+          "STREET_ADDRESS": 3,
+          "EMAIL": 1
+        }
+      }
+    },
+    "eval/generated/v3/gretel/en-gretel-train.jsonl": {
+      "documents": 2500,
+      "documents_with_flags": 284,
+      "regions_added": 483,
+      "by_teacher_type": {
+        "Horizon-Labs/pii-redactor-base": {
+          "MEDICAL_ID": 1338,
+          "ACCOUNT_ID": 1159,
+          "IP_ADDRESS": 446,
+          "USERNAME": 130,
+          "DEVICE_ID": 125,
+          "BANK_ACCOUNT": 119,
+          "LICENSE_NUMBER": 54,
+          "VEHICLE_ID": 49,
+          "DATE_OF_BIRTH": 48,
+          "COORDINATE": 43,
+          "PERSON": 40,
+          "POSTCODE": 39,
+          "PASSWORD": 30,
+          "SECRET": 16,
+          "URL": 12,
+          "STREET_ADDRESS": 10,
+          "CREDIT_CARD": 8,
+          "EMAIL": 8,
+          "NATIONAL_ID": 7,
+          "CREDIT_CARD_CVV": 6,
+          "ORGANIZATION": 6,
+          "DRIVER_LICENSE": 5,
+          "MAC_ADDRESS": 2,
+          "PASSPORT": 2
+        }
+      }
+    }
+  }
+}

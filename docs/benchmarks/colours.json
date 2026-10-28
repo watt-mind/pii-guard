@@ -7,6 +7,9 @@
     "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base@cpu": "#999933",
     "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base@mps": "#0072B2",
     "gateway-latency:fast:rules+ner:pii-guard-ner-xlmr-large-distilled": "#009E73",
+    "gateway-latency:fast:rules+ner:watt-mind/pii-guard-ner-xlmr-base": "#332288",
+    "gateway-latency:fast:rules+ner:watt-mind/pii-guard-ner-xlmr-base@cpu": "#999933",
+    "gateway-latency:fast:rules+ner:watt-mind/pii-guard-ner-xlmr-base@mps": "#0072B2",
     "gateway-latency:strict:rules+llm:muse-spark-open": "#D55E00"
   },
   "systems": {
@@ -38,6 +41,30 @@
       "color": "#E69F00",
       "shape": "circle"
     },
+    "ner:bardsai-v3@decoder=word": {
+      "color": "#E69F00",
+      "shape": "circle"
+    },
+    "ner:eu-pii-safeguard": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "ner:horizon-base@decoder=word": {
+      "color": "#0072B2",
+      "shape": "circle"
+    },
+    "ner:horizon-small@decoder=word": {
+      "color": "#009E73",
+      "shape": "circle"
+    },
+    "ner:wismut-nym@decoder=word": {
+      "color": "#D55E00",
+      "shape": "circle"
+    },
+    "ner:xlmr-base-v2-hn": {
+      "color": "#117733",
+      "shape": "circle"
+    },
     "presidio": {
       "color": "#595959",
       "shape": "square"
@@ -66,8 +93,40 @@
       "color": "#332288",
       "shape": "circle"
     },
+    "rules+ner:bardsai-v1-fallback": {
+      "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "rules+ner:bardsai-v3@decoder=word": {
+      "color": "#332288",
+      "shape": "circle"
+    },
     "rules+ner:eu-pii-anonimization-multilang": {
       "color": "#882255",
+      "shape": "circle"
+    },
+    "rules+ner:eu-pii-safeguard": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
+    "rules+ner:horizon-base@decoder=word": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "rules+ner:horizon-small@decoder=word": {
+      "color": "#882255",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-mmbert-base-v3": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v3": {
+      "color": "#E69F00",
+      "shape": "circle"
+    },
+    "rules+ner:wismut-nym@decoder=word": {
+      "color": "#117733",
       "shape": "circle"
     },
     "rules+ner:xlm-roberta-base-ner-hrl": {

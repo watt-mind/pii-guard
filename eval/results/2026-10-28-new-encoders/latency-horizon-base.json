@@ -1,0 +1,46 @@
+{
+  "device": "cpu",
+  "torch": "2.14.1",
+  "transformers": "5.21.0",
+  "torch_threads": 8,
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "fixtures": [
+    "eval/fixtures/hu-synth-sample.jsonl",
+    "eval/fixtures/en-synth-sample.jsonl"
+  ],
+  "messages": 122,
+  "mean_chars": 382.5,
+  "load_average_start": [
+    16.65,
+    22.04,
+    24.43
+  ],
+  "load_average_end": [
+    18.92,
+    21.94,
+    24.3
+  ],
+  "note": "load_s: detector construction and warm-up forward in one process, torch and transformers already imported; weights may be in the OS page cache",
+  "models": {
+    "pii-guard-ner-v2.0": {
+      "model": "hdkiller/pii-guard-ner-xlmr-base@95f612a9ad65cc5ade5b9248bd152020541e7097",
+      "licence": "Apache-2.0 (trained on Ai4Privacy OpenPII-1M, CC-BY-4.0: Ai4Privacy / Ai Suisse SA)",
+      "parameters": 277469205,
+      "weights_bytes": 1109900868,
+      "load_s": 5.2,
+      "p50_ms": 52.9,
+      "p95_ms": 69.5,
+      "mean_ms": 54.4
+    },
+    "horizon-base": {
+      "model": "Horizon-Labs/pii-redactor-base@42dfb0dccb0864c889c99300265567ace9fa6e6d",
+      "licence": "Apache-2.0: card metadata, LICENSE (Apache 2.0 text) and NOTICE (mmBERT, MIT) agree",
+      "parameters": 307575611,
+      "weights_bytes": 1230316764,
+      "load_s": 1.66,
+      "p50_ms": 87.6,
+      "p95_ms": 119.0,
+      "mean_ms": 90.4
+    }
+  }
+}

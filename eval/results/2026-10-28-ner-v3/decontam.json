@@ -1,0 +1,292 @@
+{
+  "method": {
+    "shingles": "word 5-grams of NFKC case-folded text",
+    "minhash": "128 hashes, LSH 32 bands x 4 rows",
+    "threshold": "exact Jaccard >= 0.8",
+    "exact": "SHA-256 of the whitespace-folded text"
+  },
+  "documents": 72664,
+  "dropped": 0,
+  "dropped_exact": 0,
+  "dropped_near": 0,
+  "by_eval_set": {},
+  "files": {
+    "agent-traffic/de-agent-traffic-train.jsonl": {
+      "documents": 600,
+      "kept": 600,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "agent-traffic/en-agent-traffic-train.jsonl": {
+      "documents": 600,
+      "kept": 600,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "agent-traffic/hu-agent-traffic-train.jsonl": {
+      "documents": 600,
+      "kept": 600,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "gretel/en-gretel-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "negatives/de-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "negatives/en-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "negatives/hu-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "nemotron/en-nemotron-train.jsonl": {
+      "documents": 1500,
+      "kept": 1500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/cs-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/cs-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/de-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/de-openpii-train.jsonl": {
+      "documents": 5000,
+      "kept": 5000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/en-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/en-openpii-train.jsonl": {
+      "documents": 5000,
+      "kept": 5000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/hr-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/hr-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/hu-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/hu-openpii-train.jsonl": {
+      "documents": 5000,
+      "kept": 5000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/pl-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/pl-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/ro-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/ro-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/sk-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/sk-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/sl-openpii-dev.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "openpii/sl-openpii-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "privy/en-privy-train.jsonl": {
+      "documents": 12000,
+      "kept": 12000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "s11/en-distill-dev.jsonl": {
+      "documents": 373,
+      "kept": 373,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "s11/en-distill-train.jsonl": {
+      "documents": 2119,
+      "kept": 2119,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "s11/hu-distill-dev.jsonl": {
+      "documents": 368,
+      "kept": 368,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "s11/hu-distill-train.jsonl": {
+      "documents": 2104,
+      "kept": 2104,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "wismut/cs-wismut-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "wismut/de-wismut-train.jsonl": {
+      "documents": 3000,
+      "kept": 3000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "wismut/en-wismut-train.jsonl": {
+      "documents": 3000,
+      "kept": 3000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "wismut/pl-wismut-train.jsonl": {
+      "documents": 2500,
+      "kept": 2500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "wismut/ro-wismut-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    }
+  },
+  "examples": [],
+  "eval_index": {
+    "documents_by_set": {
+      "agent-traffic": 990,
+      "ai4privacy": 600,
+      "cee-pii": 451,
+      "fixtures/brand-names": 24,
+      "fixtures/company-names": 44,
+      "fixtures/inflection": 12,
+      "fixtures/injection": 62,
+      "fixtures/known-values": 5,
+      "fixtures/secrets": 21,
+      "fixtures/smoke": 51,
+      "fixtures/synth-sample": 30,
+      "fixtures/uncued-numbers": 38,
+      "gretel-finance": 400,
+      "mapa-eur-lex": 42,
+      "nemotron-pii": 300,
+      "pl-pii-bench": 346
+    },
+    "hashes": 3353,
+    "missing": [
+      "data/datasets/fixtures/tab-echr/en-tab-echr.jsonl"
+    ]
+  }
+}

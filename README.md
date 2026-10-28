@@ -34,7 +34,7 @@ will do it without a clone: `uvx --from wattmind-pii-guard pii-guard up`.
 
 | Job | Meta model | Evidence |
 |---|---|---|
-| **Runs in production (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa base** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels, Ai4Privacy OpenPII train rows and hard negatives; published as [`hdkiller/pii-guard-ner-xlmr-base`](https://huggingface.co/hdkiller/pii-guard-ner-xlmr-base) `v2.0`. 18 ms p50 per document on the hand-written set (Apple MPS), 47 ms NER-only on a loaded M1 CPU | [model card](training/ner/model-card.md), [latency](eval/results/2026-10-27-ner-v21/latency/xlmr-base-v2-hn.json), [training](docs/models.md#ner-v2-wider-labels-openpii-train-split-hard-negatives), [selection](eval/results/2026-10-27-ner-v21/README.md) |
+| **Runs in production (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa base** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels, Ai4Privacy OpenPII train rows and hard negatives; published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v2.0`. 18 ms p50 per document on the hand-written set (Apple MPS), 47 ms NER-only on a loaded M1 CPU | [model card](training/ner/model-card.md), [latency](eval/results/2026-10-27-ner-v21/latency/xlmr-base-v2-hn.json), [training](docs/models.md#ner-v2-wider-labels-openpii-train-split-hard-negatives), [selection](eval/results/2026-10-27-ner-v21/README.md) |
 | **Teaches it, and audits:** labels 4,964 fictional documents for distillation; the optional audit mode and upper bound | **Muse Glimmer 30B** (open weights, Apache-2.0); **Muse Spark Open** (open weights) on Baseten partner inference | [Glimmer run](eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [audit runs](docs/benchmarks.md#smoke) |
 | **Sees images:** faces, ID photos and signatures, filled before the image leaves | **SAM 3.1** (Meta Model API) for signatures; faces and ID photos on-device (YuNet); OCR for printed text | [specimen results](eval/results/visual/specimens.md) |
 
@@ -183,7 +183,7 @@ make smoke          # rules only, offline (CI runs it)
 `make demo` runs **fast mode with the NER** from a clean checkout: it installs the `ner` extra
 and, without `PII_GUARD_NER_MODEL`, downloads a NER model once (about 1.1 GB, pinned
 revision, SHA-256 checked, into `~/.cache/pii-guard/models`; the banner says which model
-runs): pii-guard's own NER, [`hdkiller/pii-guard-ner-xlmr-base`](https://huggingface.co/hdkiller/pii-guard-ner-xlmr-base)
+runs): pii-guard's own NER, [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
 `v2.0` (XLM-R base, Apache-2.0; [model card](training/ner/model-card.md)). Free-text names are then masked with no known values, in the gateway and on the Mask and
 Images screens alike. `make demo MODE=rules` is rules only: offline, no download, names need
 known values. Which model and why: [models.md](docs/models.md#which-ner-model-fast-mode-runs).

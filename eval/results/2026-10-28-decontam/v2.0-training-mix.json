@@ -1,0 +1,123 @@
+{
+  "method": {
+    "shingles": "word 5-grams of NFKC case-folded text",
+    "minhash": "128 hashes, LSH 32 bands x 4 rows",
+    "threshold": "exact Jaccard >= 0.8",
+    "exact": "SHA-256 of the whitespace-folded text"
+  },
+  "documents": 25673,
+  "dropped": 0,
+  "dropped_exact": 0,
+  "dropped_near": 0,
+  "by_eval_set": {},
+  "files": {
+    "eval/generated/distill-s11/labelled/hu-distill-train.jsonl": {
+      "documents": 2104,
+      "kept": 2104,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/distill-s11/labelled/en-distill-train.jsonl": {
+      "documents": 2119,
+      "kept": 2119,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/openpii-train/hu-openpii-train.jsonl": {
+      "documents": 5000,
+      "kept": 5000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/openpii-train/en-openpii-train.jsonl": {
+      "documents": 5000,
+      "kept": 5000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/openpii-train/de-openpii-train.jsonl": {
+      "documents": 5000,
+      "kept": 5000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/negatives/hu-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/negatives/en-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/negatives/de-negatives-train.jsonl": {
+      "documents": 2000,
+      "kept": 2000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/openpii-train/hu-openpii-dev.jsonl": {
+      "documents": 150,
+      "kept": 150,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/openpii-train/en-openpii-dev.jsonl": {
+      "documents": 150,
+      "kept": 150,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/openpii-train/de-openpii-dev.jsonl": {
+      "documents": 150,
+      "kept": 150,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    }
+  },
+  "examples": [],
+  "eval_index": {
+    "documents_by_set": {
+      "agent-traffic": 990,
+      "ai4privacy": 600,
+      "cee-pii": 451,
+      "fixtures/brand-names": 24,
+      "fixtures/company-names": 44,
+      "fixtures/inflection": 12,
+      "fixtures/injection": 62,
+      "fixtures/known-values": 5,
+      "fixtures/secrets": 21,
+      "fixtures/smoke": 51,
+      "fixtures/synth-sample": 30,
+      "fixtures/uncued-numbers": 38,
+      "gretel-finance": 400,
+      "mapa-eur-lex": 42,
+      "nemotron-pii": 300,
+      "pl-pii-bench": 346
+    },
+    "hashes": 3353,
+    "missing": [
+      "data/datasets/fixtures/tab-echr/en-tab-echr.jsonl"
+    ]
+  },
+  "absent_inputs": [
+    "eval/generated/distill-s13/labelled/hu-distill-train.jsonl",
+    "eval/generated/distill-s13/labelled/en-distill-train.jsonl",
+    "eval/generated/distill-s13/labelled/hu-distill-dev.jsonl",
+    "eval/generated/distill-s13/labelled/en-distill-dev.jsonl"
+  ]
+}

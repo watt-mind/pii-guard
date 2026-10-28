@@ -16,7 +16,16 @@ one, the licence table and the split policy are in ``docs/datasets.md``.
 
 from __future__ import annotations
 
-from pii_guard.eval.datasets import cee, gretel, nemotron, openpii, synthetic, tab
+from pii_guard.eval.datasets import (
+    cee,
+    gretel,
+    mapa,
+    nemotron,
+    openpii,
+    pl_pii_bench,
+    synthetic,
+    tab,
+)
 from pii_guard.eval.datasets.spec import Dataset
 
 __all__ = ["REGISTRY", "Dataset", "get", "test_datasets"]
@@ -30,6 +39,8 @@ REGISTRY: dict[str, Dataset] = {
         nemotron.DATASET,
         cee.DATASET,
         tab.DATASET,
+        pl_pii_bench.DATASET,
+        mapa.DATASET,
         synthetic.DATASET,
         synthetic.DEV_DATASET,
     )

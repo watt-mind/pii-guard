@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from pii_guard.detect.ner import NerDetector, RawEntity
-from pii_guard.detect.ner_words import snap_to_words
+from pii_guard.detect.ner_words import snap_to_tokens, snap_to_words
 from pii_guard.detect.pipeline import DetectionPipeline
 from pii_guard.detect.rules import RuleDetector
 from pii_guard.types import EntityType, Span
@@ -113,3 +113,76 @@ def test_word_end_extension_then_trimmed_by_suffix_trim(text: str, value: str, s
     pipeline = DetectionPipeline([RuleDetector(), NerDetector(backend=FakeBackend(raw))])
     spans = [s for s in pipeline.detect(text, "hu") if s.entity_type is E.PERSON]
     assert [s.text for s in spans] == [stem]
+
+
+# --- Structured types cover whole tokens (LAB-1367) --------------------------------------
+
+_ROW = (
+    "nev,email,telefon,adoazonosito\n"
+    "Kozák Gabriella,g.kozak@example.org,06-20-751-6714,8461269321,ORD-1\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "value", "label", "expected"),
+    [
+        (_ROW, "8461269", "NATIONAL_ID_HU_TAX", "8461269321"),  # end inside the run
+        (_ROW, "1269321", "NATIONAL_ID_HU_TAX", "8461269321"),  # start inside the run
+        (_ROW, "6-20-751", "PHONE", "06-20-751-6714"),  # across "-" between digits
+        ("Ausweis 812.754.113.91, danke", "812.754.11", "ID_DOCUMENT", "812.754.113.91"),
+        ("Azonosító: AB123456CD, köszönöm.", "123456", "ID_DOCUMENT", "AB123456CD"),
+        ("Tel.: +36 30 123 4567.", "30 12", "PHONE", "30 123"),  # a space doesn't join
+    ],
+)
+def test_number_fragments_snap_to_tokens(text: str, value: str, label: str, expected: str) -> None:
+    raw = fragment(text, value, label)
+    spans = snap_to_tokens(text, [Span(raw.start, raw.end, E(label), value, 0.9, "ner")])
+    assert [s.text for s in spans] == [expected]
+
+
+def test_number_snap_keeps_whole_tokens_and_text_types() -> None:
+    text = "Adószám: 8461269321, Kozák Gabriella."
+    whole = fragment(text, "8461269321", "NATIONAL_ID_HU_TAX")
+    name = fragment(text, "Gabriella")
+    spans = [
+        Span(whole.start, whole.end, E.NATIONAL_ID_HU_TAX, "8461269321", 0.9, "ner"),
+        Span(name.start, name.end, E.PERSON, "Gabriella", 0.9, "ner"),
+    ]
+    assert snap_to_tokens(text, spans) == spans
+    # A date or amount next to the number is not joined through the space or the comma.
+    assert [
+        s.text
+        for s in snap_to_tokens(
+            "x 2024-05 8461269321,50",
+            [Span(10, 20, E.NATIONAL_ID_HU_TAX, "8461269321", 0.9, "ner")],
+        )
+    ] == ["8461269321"]
+
+
+def test_ner_pieces_of_one_number_cover_it_and_mask_it_whole() -> None:
+    """Two pieces of a tax number, one labelled PHONE: no digit is left next to the mask."""
+    text = "Kozák Gabriella,g.kozak@example.org,+36 1 389 4443,8461269321,ORD-1"
+    start = text.index("8461269321")
+    raw = [
+        RawEntity("PHONE", start, start + 3, 0.9),
+        RawEntity("NATIONAL_ID_HU_TAX", start + 3, start + 6, 0.6),
+    ]
+    ner = NerDetector(backend=FakeBackend(raw), number_checks=False)
+    assert {s.text for s in ner.detect(text, "hu")} == {"8461269321"}
+    pipeline = DetectionPipeline([NerDetector(backend=FakeBackend(raw))])
+    session = Vault(KEY).session()
+    out = session.mask(text, pipeline.detect(text, "hu"), language="hu")
+    cell = out.split(",")[3]
+    assert PLACEHOLDER_RE.fullmatch(cell), "the whole cell is one placeholder"
+    assert session.unmask(out) == text
+
+
+def test_pieces_of_different_types_on_one_token_keep_the_majority_type() -> None:
+    text = "Adatok: 8461269321, köszönöm."
+    start = text.index("8461269321")
+    spans = [
+        Span(start, start + 3, E.PHONE, "846", 0.98, "ner"),
+        Span(start + 3, start + 9, E.NATIONAL_ID_HU_TAX, "126932", 0.6, "ner"),
+    ]
+    (span,) = snap_to_tokens(text, spans)
+    assert (span.text, span.entity_type) == ("8461269321", E.NATIONAL_ID_HU_TAX)

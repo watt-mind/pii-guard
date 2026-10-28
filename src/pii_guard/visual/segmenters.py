@@ -33,6 +33,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal, get_args
 
 from pii_guard.config import Settings, get_settings
+from pii_guard.detection_profile import require_segmenter_mode
 from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, EntityType
 from pii_guard.visual.regions import Region
@@ -173,6 +174,7 @@ def build_segmenter(
     mode = mode or settings.segmenter
     if mode not in SEGMENTER_MODES:
         raise ValueError(f"segmenter must be one of: {', '.join(SEGMENTER_MODES)}")
+    require_segmenter_mode(settings, mode)
     if mode == "off":
         logger.warning("image segmentation is off (PII_GUARD_SEGMENTER=off): images are refused")
         return OffSegmenter()

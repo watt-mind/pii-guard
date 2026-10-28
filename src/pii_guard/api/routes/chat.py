@@ -18,6 +18,7 @@ from fastapi import Request
 from starlette.responses import Response
 
 from pii_guard.api.deps import get_max_text_chars, get_vault
+from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
 from pii_guard.gateway import Gateway, InvalidChatRequestError
 from pii_guard.gateway.sessions import path_session
@@ -61,10 +62,20 @@ def get_gateway(request: Request) -> Gateway:
                     image_workers=image_workers_for(state, state.settings.image_concurrency),
                 )
                 state.gateway = gateway
+    from pii_guard.detection_profile import DetectionProfileError, is_local_only
+
+    if is_local_only(state.settings) and (
+        type(gateway) is not Gateway or not is_local_only(gateway.settings)
+    ):
+        raise DetectionProfileError("local-only cannot reuse a gateway from another profile")
     return gateway
 
 
-@router.post("/v1/chat/completions", tags=["gateway"])
+@router.post(
+    "/v1/chat/completions",
+    tags=["gateway"],
+    responses=error_responses("detection_profile_denied"),
+)
 async def chat_completions(request: Request) -> Response:
     gateway = get_gateway(request)
     raw = await request.body()

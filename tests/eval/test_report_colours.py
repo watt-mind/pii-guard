@@ -117,9 +117,9 @@ def test_regenerating_without_changes_is_byte_identical(
 
 @pytest.mark.slow
 def test_a_new_text_system_leaves_other_colours_and_unrelated_files_unchanged(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    report_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.chdir(_copy_repo(tmp_path))
+    monkeypatch.chdir(report_repo)
     before = build_outputs()
     old = json.loads(before[INDEX])["systems"]
     _add_system("2026-10-26-rules-en-smoke", "aaa-new-system", "pii-guard aaa new system")
@@ -150,9 +150,9 @@ def test_a_new_text_system_leaves_other_colours_and_unrelated_files_unchanged(
 
 @pytest.mark.slow
 def test_a_new_visual_system_keeps_existing_visual_colours(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    report_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.chdir(_copy_repo(tmp_path))
+    monkeypatch.chdir(report_repo)
     before = build_outputs()
     old_visual = json.loads(before[INDEX])["colours"]["visual"]
     _add_system("2026-10-27-visual-fictional-rules-captions", "visual:aaa-new", "pii-guard new")

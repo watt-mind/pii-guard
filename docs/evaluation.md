@@ -46,7 +46,7 @@ The test split is never used for training or prompt tuning.
 | **Leak rate (end to end)** | Share of labelled values that appear, in any surface form, in the request the gateway sends upstream. This is the number that matters most. |
 | **Over-masking rate** | Share of masked spans (spans, not characters) that overlap no gold span: not personal data (hurts answer quality). Predictions on an *ignore region* are left out (below). |
 | **Re-identification accuracy** | Share of placeholders in responses restored to the correct, correctly inflected value |
-| **Placeholder consistency** | Share of gold entities (per document; the gold spans of one type that are surface forms of each other, `Minta Anna` / `Minta Annának`) whose occurrences are all fully masked by one and the same placeholder. Fully: every letter and digit of the gold span is inside the placeholder, except a case ending right after it (`[[PERSON_x]]nak`, `[[PERSON_x]]'s`) and words that identify no one by the partial-leak rule (`Ms`, `Frau`). An unmasked or partly masked occurrence (`Próba [[PERSON_x]]`, `[[ID_DOCUMENT_x]]010`) counts as inconsistent. Until LAB-1355 any overlap counted, so the consistency of earlier run records is an upper bound ([comparison](../eval/results/2026-10-28-consistency-metric/README.md)). Also reported over entities with 2+ occurrences (`multi_rate`). |
+| **Placeholder consistency** | Share of gold entities (per document; the gold spans of one type that are surface forms of each other, `Minta Anna` / `Minta Annának`) whose occurrences are all fully masked by one and the same placeholder. Fully: every letter and digit of the gold span is inside the placeholder, except a case ending right after it (`[[PERSON_x]]nak`, `[[PERSON_x]]'s`) and words that identify no one by the partial-leak rule (`Ms`, `Frau`). An unmasked or partly masked occurrence (`Próba [[PERSON_x]]`, `[[ID_DOCUMENT_x]]010`, digits joined to the placeholder by `.`, `-` or `/`: `[[ID_DOCUMENT_x]].91`) counts as inconsistent. Until LAB-1355 any overlap counted, so the consistency of earlier run records is an upper bound ([comparison](../eval/results/2026-10-28-consistency-metric/README.md)). Also reported over entities with 2+ occurrences (`multi_rate`). |
 | **Number validity** (public sets) | Recall and leak rate split by whether a structured identifier passes the language packs' validators, plus the leak of every other value; the headline is unchanged ([below](#number-validity)) |
 | **Visual recall** | Share of labelled image regions covered by a mask (IoU threshold) |
 | **Latency** | p50 / p95 per request, per pipeline stage |
@@ -81,15 +81,55 @@ Each detection change reports against these:
 
 The hackathon claim is the difference between 2 and 4, on the test split.
 
+## Decontamination
+
+A held-out number only means something if the model never saw the held-out text. Exact checks
+(hash and uid) already run: `training/ner/openpii.py` refuses any uid or text of the
+evaluation sample, and `tests/eval/test_datasets_disjoint.py` checks document hashes. They
+miss near copies, though: a generated document with one word changed, or a later release of a
+dataset that extends the one we evaluate on. So training data also passes a near-duplicate
+gate, [`training/ner/decontam.py`](../training/ner/decontam.py) (LAB-1392):
+
+- **What it compares against: every evaluation text.** That is every `test` set of the
+  [dataset registry](datasets.md): Ai4Privacy OpenPII validation, Nemotron-PII, Gretel
+  finance, CEE-PII-Bench, agent traffic, pl-pii-bench and MAPA EUR-Lex. TAB and MAPA are
+  compared by text when `fetch` has rebuilt them locally, and by manifest hash always. It also
+  covers every fixture file under `eval/fixtures/`: the smoke sets, inflection, injection,
+  company and brand names, uncued numbers, known values and secrets. The registry's `dev`
+  splits (`agent-traffic-dev`) are indexed too, under their own set name: NER candidates are
+  selected on them, so a training copy would inflate the selection (LAB-1409).
+- **How.** Text is NFKC-normalised, case-folded and split into words. A document's shingles
+  are its word 5-grams. MinHash signatures (128 hashes) go into an LSH index of 32 bands × 4
+  rows. Every candidate pair is then checked with its exact Jaccard similarity. A training
+  document is dropped if its whitespace-folded text hash equals an evaluation document's, or
+  if its Jaccard similarity to one is **0.8 or more**. At that threshold, LSH finds a pair
+  with probability above 0.999.
+- **What 0.8 means.** On a 40-word document, a changed last word keeps J at 0.95, so the
+  document is dropped. A changed word in the middle removes five shingles and gives J = 0.76,
+  so the document is kept. The gate removes copies and light edits. It doesn't remove a
+  template filled with other values: that is the same distribution, not the same text.
+- **Where it runs.** `train.py` loads its train and dev files through the gate by default and
+  records the counts in `training_meta.json`. `decontam = false` or `--no-decontam` turns it
+  off, and the run then records `"decontam": "off"`. The gate fails closed: if it finds no
+  evaluation text (for example, when run from the wrong directory), it refuses to train. The
+  Modal image ships `eval/fixtures` and `eval/datasets` for it. On its own,
+  `uv run --no-sync python training/ner/decontam.py --config <toml> --json <report>`
+  reports the counts per file and per evaluation set, with ids only and never text.
+
+The first run, on the NER v2.0 training mix, is in
+[`eval/results/2026-10-28-decontam/`](../eval/results/2026-10-28-decontam/README.md).
+
 ## Languages
 
 Evaluation is multilingual from the start: every fixture record carries a `language`, which
 is passed to detectors and the vault, and fixtures are kept one file per language and set
 (`eval/fixtures/hu-smoke.jsonl`, `eval/fixtures/en-smoke.jsonl`;
 `eval/fixtures/hu-inflection.jsonl` holds names whose stem changes before a suffix, in several
-cases). Leak-rate matching goes
+cases, and stacked suffixes: the family `-ék` and possessive `-é`/`-éi` with a case ending
+after them, `Ottóéknál`, `Hajnáéknak`, LAB-1342). Leak-rate matching goes
 through a per-language surface-form hook (`pii_guard.eval.forms`): Hungarian case suffixes
-and stem changes (`Annának`, `Kováccsal`) for `hu`, exact matching as the default elsewhere.
+and stem changes (`Annának`, `Kováccsal`, `Hajnáéknál`) for `hu`, exact matching as the
+default elsewhere.
 The scorecard reports every metric per language and per entity type, plus an overall row.
 
 ## Leak rate in practice
@@ -102,6 +142,12 @@ a Hungarian IBAN also by the giro number inside it). A value is **leaked** if an
 survives. It is **partially leaked** if not, but an identifying token of it survives (for
 example the street of an address whose postcode alone was masked). Tokens that also occur
 outside the labelled spans, and generic words such as `utca` or month names, don't count.
+A value is also partially leaked when a placeholder covers an occurrence of it in part and
+leaves digits of it right at its edge: a digit run the edge cuts (`[[ID_DOCUMENT_x]]010`,
+`8[[NATIONAL_ID_HU_TAX_x]]`) or one joined to it by `.`, `-` or `/` (`[[ID_DOCUMENT_x]].91`).
+Those are too short to be a token, but they are part of the identifier. This uses the vault's
+replacements, so it is checked per occurrence; a system that doesn't report them (a comparison
+tool) gets the token rule only (LAB-1367).
 
 ## Reporting
 
@@ -588,6 +634,150 @@ What it shows: pii-guard's rules find and mask **every** valid number (0 of 166 
 fast-mode NER adds nothing on numbers; fast mode's 27.6 % headline is mostly invalid numbers
 (63.4 % of them leak), while on names, addresses and e-mail it leaks 10.4 %. The comparison
 tools match a number's shape, so they don't care whether it validates.
+
+### NER comparison: tabularisai/eu-pii-safeguard (LAB-1386)
+
+[`tabularisai/eu-pii-safeguard`](https://huggingface.co/tabularisai/eu-pii-safeguard) is the
+closest public alternative to pii-guard's own NER: XLM-RoBERTa **large** (about 560M
+parameters) fine-tuned for PII in 26 EU languages with 42 BIO labels, self-reported F1 97.0 % on
+its own (undisclosed) data. It is scored as a **comparison model, never as a product default**:
+nothing outside `pii_guard.eval` imports it, and fast mode keeps resolving its model through
+`pii_guard.detect.ner_resolve`.
+
+**Its licence is conflicting, pending the owner's decision.** The card's metadata says
+`apache-2.0`, but the repository's `LICENSE.md` at the pinned revision is the "Tabularis AI
+Commercial License" v1.0 (30-day free evaluation, free academic research, an annual paid
+licence for commercial use), and the card shows an "Accept License & Download" prompt that the
+hub does not enforce. pii-guard uses it for this evaluation only; its weights are never
+committed or bundled.
+
+Unlike the tools above it is a bare NER model, so it is not wrapped as a `--baselines` tool
+with its own masking. `pii_guard.eval.baselines.eu_pii_safeguard.EuPiiSafeguardDetector` runs
+it through pii-guard's own `NerDetector` post-processing (thresholds 0.5, word and token snap,
+number checks, the resolver, the vault), which makes two configurations directly comparable
+with ours, placeholder consistency included: the model alone (in place of `ner`) and rules +
+the model (in place of fast mode's NER). Pinned to revision
+`c928cd51d4f28723289098a4ad59955413afcc05`, weights `sha256:206f8317…770e33` (2.24 GB),
+fetched once into `$PII_GUARD_MODELS_DIR/ner/` (outside the repository) and checked:
+
+```bash
+uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py score --record
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py latency
+```
+
+**Label mapping** (`LABEL_MAP` in that module; every one of the 42 labels has an entry):
+
+| Model labels | pii-guard type | Note |
+|---|---|---|
+| `FIRSTNAME`, `MIDDLENAME`, `LASTNAME` | `PERSON` | neighbouring parts merged into one span |
+| `PREFIX` | dropped | honorifics are outside `PERSON` in the gold |
+| `EMAIL`, `PHONE_NUMBER` | `EMAIL`, `PHONE` | |
+| `ADDRESS`, `STREET`, `BUILDING_NUMBER`, `POSTAL_CODE` | `ADDRESS` | neighbouring parts merged |
+| `CITY`, `STATE`, `COUNTRY` | `ADDRESS` inside an address | on their own dropped: a lone town is not an address under pii-guard's policy (the datasets mark it as an ignore region) |
+| `DOB` | `DATE_OF_BIRTH` | |
+| `IBAN`, `ACCOUNT_NUMBER`, `CREDIT_CARD_NUMBER` | `BANK_ACCOUNT` | cards are `BANK_ACCOUNT` in pii-guard's taxonomy |
+| `TAX_ID` | `NATIONAL_ID_HU_TAX` on `hu` text, else `ID_DOCUMENT` | the Ai4Privacy conversion's rule |
+| `HEALTH_INSURANCE_ID` | `NATIONAL_ID_HU_TAJ` on `hu` text, else `ID_DOCUMENT` | TAJ is the Hungarian health insurance number |
+| `NATIONAL_ID`, `PASSPORT_NUMBER`, `DRIVER_LICENSE` | `ID_DOCUMENT` | |
+| `COMPANY_NAME` | `ORGANIZATION` | `keep` policy, as for our NER |
+| `PASSWORD` | `SECRET` | |
+| `USERNAME`, `URL`, `IP_ADDRESS`, `MAC_ADDRESS`, `DEVICE_ID`, `LATITUDE`, `LONGITUDE` | dropped | no pii-guard type |
+| `AGE`, `GENDER`, `JOB_TITLE`, `AMOUNT`, `CURRENCY`, `SALARY` | dropped | no pii-guard type; policy-excluded in the public sets' gold |
+| `ETHNICITY`, `RELIGION`, `POLITICAL_OPINION`, `SEXUAL_ORIENTATION`, `HEALTH_CONDITION` | dropped | GDPR Art. 9 special categories: pii-guard has no type for them (a gap, not a scoring choice) |
+
+Parts are merged when only up to three spaces, tabs or commas separate them, the gap the gold
+conversions merge across, so one name is one placeholder and placeholder consistency is not
+penalised for the model's finer labels. **Dropped labels are removed before scoring** and
+counted per set (`eval/results/2026-10-28-eu-pii-safeguard/unmapped.json`, and in each run
+record's notes). The gold never contains them, so masking them could only count as
+over-masking, and dropping them can't count as a leak: neither direction is unfair. In a
+deployment that masks them, over-masking under pii-guard's policy would be higher than shown.
+The model labels words (`aggregation="first"`, its default): its spans can carry trailing
+punctuation (`john@example.com.`), which costs exact-match F1 but not overlap F1 or leak.
+
+**Result (2026-10-28):** pii-guard's NER v2.0 leaks less on every set, alone and with the
+rules: fast mode 0.0–0.7 % on smoke, agent-traffic, ai4privacy, nemotron-pii and cee-pii against
+2.8–8.8 % with this model in its place, at 2× the size and about 3× the CPU latency. It finds
+more organisations (a `keep` type), which doesn't change what leaks. Full table, latency and
+caveats: [eval/results/2026-10-28-eu-pii-safeguard](../eval/results/2026-10-28-eu-pii-safeguard/README.md).
+
+### NER comparison: public encoders (LAB-1391)
+
+Three newer public PII encoders, all mmBERT (ModernBERT) token classifiers, benchmarked the same
+way as `eu-pii-safeguard` above, against pii-guard's NER v2.0. They are **comparison models,
+never product defaults**: nothing outside `pii_guard.eval` imports them.
+
+| Registry name | Checkpoint (pinned revision) | Licence, as read from the files at that revision |
+|---|---|---|
+| `bardsai-v3` | [`bardsai/eu-pii-anonimization-multilang-v3`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang-v3) `091984b5fbce` | `apache-2.0` in the card metadata only: **no LICENSE file** in the repository |
+| `horizon-base` | [`Horizon-Labs/pii-redactor-base`](https://huggingface.co/Horizon-Labs/pii-redactor-base) `42dfb0dccb08` | Apache-2.0: card, `LICENSE` (Apache 2.0 text) and `NOTICE` (mmBERT, MIT) agree |
+| `horizon-small` | [`Horizon-Labs/pii-redactor-small`](https://huggingface.co/Horizon-Labs/pii-redactor-small) `3f6a99b99063` | as base |
+| `wismut-nym` | [`Wismut/nym-pii-multilingual`](https://huggingface.co/Wismut/nym-pii-multilingual) `0ed0242d67a3` | `mit` in the card metadata and text only: **no LICENSE file**; part of its training labels come from an LLM teacher on CC-BY-SA Wikipedia text |
+
+None is gated; nothing was accepted. The shared harness is
+`pii_guard.eval.baselines.encoders` (`EncoderSpec`, `LabelAdapter`, `ComparisonDetector`), which
+`eu_pii_safeguard` now uses too; the four specs are in `pii_guard.eval.baselines.new_encoders`.
+ModernBERT is supported by the `ner` extra's `transformers>=5.21`, so no pin changed.
+
+```bash
+uv run --extra ner python -m pii_guard.eval.baselines.new_encoders download
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score \
+  --configs fast-bardsai-v3 bardsai-v3 --record
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency \
+  --model bardsai-v3
+```
+
+**Word-level decoding.** Their tokenizer (Gemma-style) attaches the preceding space to a token
+and splits numbers into single digits, often with a bare `" "` token first, so pii-guard's
+first-sub-token decoder cuts names and numbers into fragments (the LAB-1192 sanity check).
+`WordLevelBackend` decodes words instead (`decode_words`): text in 512-token windows with
+128 overlap, each token's probabilities averaged over its windows, B- and I- pooled per type;
+each word (split on whitespace and `, ; | " < > ( ) [ ] { } * ^`, edge punctuation trimmed)
+takes the type with the highest mean probability over its sub-tokens, and neighbouring words
+of one type are merged unless the next word's first token is more likely a B- than not. This is
+a fresh implementation of the decoding the bardsai v3 card describes, without its format checks
+and e-mail regex (pii-guard's number checks and rules do that job). Horizon-Labs and Wismut
+recommend the `transformers` pipeline with `aggregation_strategy="simple"` plus a merge of close
+pieces, which this approximates; every mmBERT model is decoded alike. The rest of the
+post-processing is pii-guard's own (`NerDetector`: thresholds 0.5, snapping, number checks).
+
+**Label mapping** (each spec's `LabelAdapter`; every model label has an entry, checked by
+`tests/eval/test_new_encoders.py`). The rules are those of `eu-pii-safeguard`: name and address
+parts merged, a lone town or country dropped, tax and health-insurance numbers become the
+Hungarian types on `hu` text, and labels with no pii-guard type are dropped before scoring and
+counted (`eval/results/2026-10-28-new-encoders/unmapped-<model>.json`).
+
+| pii-guard type | bardsai v3 | Horizon (base, small) | Wismut nym |
+|---|---|---|---|
+| `PERSON` | `PERSON_NAME` | `PERSON` | `GIVEN_NAME`, `SURNAME` |
+| `ORGANIZATION` | `ORGANIZATION_NAME` | `ORGANIZATION` | `COMPANY_NAME` |
+| `EMAIL`, `PHONE` | `EMAIL_ADDRESS`, `PHONE_NUMBER` | `EMAIL`, `PHONE` | `EMAIL`, `PHONE`, `FAX_NUMBER` |
+| `ADDRESS` | `POSTAL_ADDRESS`; `LOCATION` only inside one | `STREET_ADDRESS`, `POSTCODE`; `LOCATION` only inside one | `STREET_ADDRESS`, `STREET_NAME`, `BUILDING_NUMBER`, `SECONDARY_ADDRESS`, `ZIP_CODE`; `CITY`, `STATE`, `COUNTRY` only inside one |
+| `DATE_OF_BIRTH` | `DATE_OF_BIRTH` | `DATE_OF_BIRTH` | `DATE_OF_BIRTH` |
+| `BANK_ACCOUNT` | `BANK_ACCOUNT_IDENTIFIER`, `PAYMENT_CARD` | `BANK_ACCOUNT`, `CREDIT_CARD` | `IBAN`, `ACCOUNT_NUMBER`, `CREDIT_DEBIT_CARD` |
+| `ID_DOCUMENT` | `PERSON_IDENTIFIER`, `DOCUMENT_IDENTIFIER` | `NATIONAL_ID`, `PASSPORT`, `DRIVER_LICENSE`, `TAX_ID`†, `MEDICAL_ID`‡ | `GOVERNMENT_ID`, `SSN`, `PASSPORT`, `DRIVERS_LICENSE`, `TAX_ID`† |
+| `SECRET` | `AUTH_SECRET` | `SECRET`, `PASSWORD` | `API_KEY`, `PASSWORD` |
+| dropped | dates and times, URLs, links, IP and device ids, handles, aliases, accounts, amounts, card CVVs, document references, vehicle and organisation ids, proper names, roles and attributes, the GDPR Art. 9 categories | `DATE`, `AGE`, `URL`, `USERNAME`, `ACCOUNT_ID`, `IP_ADDRESS`, `MAC_ADDRESS`, `DEVICE_ID`, `COORDINATE`, `CREDIT_CARD_CVV`, `LICENSE_NUMBER`, `VEHICLE_ID` | `DATE`, `TIME`, `AGE`, `GENDER`, `URL`, `USERNAME`, `CUSTOMER_ID`, `EMPLOYEE_ID`, `MEDICAL_RECORD_NUMBER`, `CVV`, `PIN`, `ROUTING_NUMBER`, `SWIFT_BIC`, `LICENSE_PLATE`, `MAC_ADDRESS` |
+
+† `NATIONAL_ID_HU_TAX` on `hu` text. ‡ `NATIONAL_ID_HU_TAJ` on `hu` text.
+
+**Contamination.** Our ai4privacy fixtures are OpenPII-1M validation rows and nemotron-pii is
+the Nemotron-PII test split. bardsai v3 trained on the OpenPII-1M and Nemotron-PII train splits
+(in distribution, like our v2.0 on ai4privacy). Horizon-Labs trained on a 256k sample of
+OpenPII-**1.5M** with no split stated, so its ai4privacy numbers **may be contaminated**: they
+are shown, marked, and left out of every ranking. Wismut reports ai4privacy as out of
+distribution and **does not cover Hungarian**, so its `hu` rows measure a language it wasn't
+trained for.
+
+**Result (2026-10-28):** none replaces NER v2.0 or the v1 fallback. In fast mode v2.0 leaks
+less on every uncontaminated set (smoke 0.0 % vs 4.0–9.8 %, cee-pii 0.4 % vs 5.6–16.3 %); bardsai
+v3 and Horizon lose Hungarian names and numbers (hu-inflection 16–34 %), and Wismut, the closest
+on agent traffic (0.3 % vs 0.1 %), over-masks 20.6 %. Base-size models cost about 1.6× v2.0's CPU
+latency; Horizon small matches it. bardsai v3 and Horizon base recall far more on nemotron-pii
+(96 % vs 88 %, in distribution for them), which makes them distillation-teacher candidates for
+English and German documents (LAB-1393). Full table, latency, contamination and
+recommendation: [eval/results/2026-10-28-new-encoders](../eval/results/2026-10-28-new-encoders/README.md).
 
 ## Prompt injection
 
