@@ -14,6 +14,10 @@ answer (tool-call arguments included) comes back restored.
 | cURL, Python (OpenAI SDK), LangChain, LiteLLM, Open WebUI, ... | Chat Completions or Responses | base URL `http://127.0.0.1:8787/v1`, see below | | |
 | Claude Code | Anthropic Messages (`/v1/messages`) | not supported yet: the gateway serves the OpenAI APIs only | | |
 
+The versions installed on a developer Mac (Codex 0.163.0, pi 1.3.0, OpenCode 1.18.26, Muse Code
+1.4.14, Claude Code 2.1.289) were also run by hand against the Meta Model API, with the
+published NER: [results matrix, 2026-10-28](harness-matrix-2026-10-28.md).
+
 Each end-to-end test installs the pinned version into a throwaway directory, runs one task on
 the fictional mini-repo through the gateway against a scripted upstream (CI), and asserts that
 no gold value reached the upstream and that the files the agent wrote hold the real values
@@ -128,10 +132,11 @@ on every answer says which one it used.
 ## 4. Check it end to end
 
 ```bash
-pii-guard connect pi --check
+pii-guard connect pi --check          # also muse-code, codex, opencode
 ```
 
-This sends one fictional canary through the client's configured path and prints what was
+This sends one fictional canary through the client's configured path (for Codex and
+OpenCode, which have no config file, the way their Connect block sends requests) and prints what was
 sent, what the model saw and what came back. With the traffic log on
 (`PII_GUARD_TRAFFIC_LOG=masked`, as `make demo` sets), the call also shows on the UI's
 **Live traffic** tab at <http://localhost:5173/#traffic>.

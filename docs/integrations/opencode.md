@@ -43,6 +43,10 @@ opencode
   `pii-guard serve`, set `PII_GUARD_GATEWAY_MODE=fast`.
 - Besides the agent turns, OpenCode sends one short side request without tools to title the
   session; it goes through the gateway too (masked like any other).
+- `pii-guard connect opencode --check` sends one fictional canary the way OpenCode does
+  (`POST <base_url>/chat/completions` through a path session, no pii-guard headers).
+- OpenCode's tool schemas carry `Number.MAX_SAFE_INTEGER` as bounds; the gateway checks them
+  without the NER (LAB-1469: it read them as bank accounts and refused every request).
 
 ## End-to-end test
 
