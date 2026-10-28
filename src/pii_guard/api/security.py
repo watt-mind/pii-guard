@@ -117,6 +117,13 @@ class BearerTokenMiddleware:
             await self.app(scope, receive, send)
             return
         headers: list[tuple[bytes, bytes]] = list(scope.get("headers") or [])
+        # Endpoint authentication is confined and checked by ProjectMiddleware.
+        if scope.get("path", "").startswith("/e/") and any(
+            name.lower() == b"authorization" and value.lower().startswith(b"bearer pg_ep_")
+            for name, value in headers
+        ):
+            await self.app(scope, receive, send)
+            return
         ok = False
         for name, value in headers:
             if name.lower() == TOKEN_HEADER.encode() and self._matches(value):

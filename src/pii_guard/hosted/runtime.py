@@ -7,7 +7,7 @@ import hmac
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from fastapi import Request
@@ -29,14 +29,44 @@ from pii_guard.types import Analyzer, PiiGuardError, Span
 from pii_guard.vault import Vault
 from pii_guard.workers import BoundedWorkers
 
+if TYPE_CHECKING:
+    from pii_guard.projects.runtime import ProjectService
+
 
 class HostedCapacityError(PiiGuardError):
     code = "hosted_capacity"
     status_code = 429
 
 
+class SessionBudget:
+    """One account session ceiling shared by all project and endpoint namespaces."""
+
+    def __init__(self, maximum: int) -> None:
+        self.maximum = maximum
+        self.lock = threading.RLock()
+        self.vaults: list[HostedVault] = []
+
+
 class HostedVault(Vault):
     """Refuse session growth rather than evicting a session an active stream may use."""
+
+    def __init__(self, *args: Any, budget: SessionBudget | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._budget = budget
+        if budget is not None:
+            with budget.lock:
+                budget.vaults.append(self)
+
+    def _create_locked(self, session_id: str) -> Any:
+        budget = self._budget
+        if budget is None:
+            return super()._create_locked(session_id)
+        with budget.lock:
+            if sum(len(vault._sessions) for vault in budget.vaults) >= budget.maximum:
+                raise HostedCapacityError(
+                    "Account session capacity reached; delete an unused session"
+                )
+            return super()._create_locked(session_id)
 
     def _evict_locked(self, keep: int) -> None:
         if len(self._sessions) > keep:
@@ -49,6 +79,10 @@ class HostedVault(Vault):
             self._sessions.clear()
             self._generations.clear()
             self._tenant_key = b""
+        if self._budget is not None:
+            with self._budget.lock:
+                if self in self._budget.vaults:
+                    self._budget.vaults.remove(self)
 
 
 @dataclass(repr=False)
@@ -78,7 +112,10 @@ class BoundedAnalyzer:
 
 
 class HostedService:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, projects: ProjectService | None = None) -> None:
+        from pii_guard.projects.runtime import ProjectService
+
+        self.projects = projects or ProjectService(settings)
         key = settings.tenant_key_bytes()
         origin = urlsplit(settings.hosted_public_origin or "")
         if (
@@ -129,23 +166,29 @@ class HostedService:
         self._spend_workers = BoundedWorkers(2, "pii-guard-sponsored-spend")
         self._spend_refresh_lock = threading.Lock()
         self._runtimes: dict[str, Runtime] = {}
+        self._session_budgets: dict[str, SessionBudget] = {}
         self._lock = threading.Lock()
         self.rest_slots = threading.BoundedSemaphore(4)
         self._ingress = 0
         self._workers = {Mode.FAST: BoundedWorkers(4, "pii-guard-hosted-fast")}
 
-    def acquire(self, principal: Principal) -> Runtime:
+    def acquire(self, principal: Principal, *, namespace: str | None = None) -> Runtime:
         self.purge_expired()
         with self._lock:
             now = time.monotonic()
-            runtime = self._runtimes.get(principal.id)
+            identity = principal.id + (":" + namespace if namespace else "")
+            runtime = self._runtimes.get(identity)
             if runtime is None:
                 if len(self._runtimes) >= self.settings.hosted_max_principals:
                     raise HostedCapacityError("Hosted runtime capacity reached; try later")
-                key = hmac.digest(self.master_key, b"vault\0" + principal.id.encode(), "sha256")
+                key = hmac.digest(self.master_key, b"vault\0" + identity.encode(), "sha256")
+                budget = self._session_budgets.setdefault(
+                    principal.id, SessionBudget(self.settings.hosted_max_sessions)
+                )
                 runtime = Runtime(
                     HostedVault(
                         key,
+                        budget=budget,
                         ttl_seconds=self.settings.hosted_runtime_ttl,
                         max_sessions=self.settings.hosted_max_sessions,
                         max_entries=2000,
@@ -162,7 +205,7 @@ class HostedService:
                     ),
                     SessionDirectory(self.settings.hosted_max_sessions),
                 )
-                self._runtimes[principal.id] = runtime
+                self._runtimes[identity] = runtime
             runtime.active += 1
             runtime.touched = now
             return runtime
@@ -180,6 +223,9 @@ class HostedService:
                     runtime.vault.close()
                     self.connections.clear_owner(owner)
                     del self._runtimes[owner]
+            for owner, budget in list(self._session_budgets.items()):
+                if not budget.vaults:
+                    del self._session_budgets[owner]
         self.keys.purge_expired()
         self.connections.purge_expired()
         self.abuse.purge_expired()
@@ -249,7 +295,8 @@ class HostedService:
         existing = getattr(request.state, "hosted_gateway", None)
         if existing is not None:
             return existing
-        from pii_guard.api.deps import get_analyzer
+        from pii_guard.api.deps import get_analyzer, get_policies
+        from pii_guard.projects.runtime import policy_pipeline
 
         runtime = request.state.hosted_runtime
         analyzer = get_analyzer(request)
@@ -263,6 +310,30 @@ class HostedService:
                 Mode.FAST: ModeDetector(
                     Mode.FAST, pipeline, "hosted-fast", request.app.state.policies, batches=True
                 )
+            }
+        policies = get_policies(request)
+        if getattr(request.state, "project_policy", None) is not None:
+            from pii_guard.detect.pipeline import DetectionPipeline
+
+            detectors = {
+                mode: ModeDetector(
+                    mode,
+                    policy_pipeline(
+                        item.detector
+                        if isinstance(item.detector, DetectionPipeline)
+                        else DetectionPipeline([item.detector]),
+                        policies,
+                    ),
+                    item.config_id
+                    + ";project="
+                    + request.state.project_id
+                    + ";policy="
+                    + request.state.project_policy["policy_version_id"],
+                    policies,
+                    item.unavailable,
+                    item.batches,
+                )
+                for mode, item in detectors.items()
             }
         gateway = Gateway(
             settings=self.provider_settings(request),

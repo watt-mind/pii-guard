@@ -43,6 +43,10 @@ router = v1_router(GatewayRoute)
 
 def get_gateway(request: Request) -> Gateway:
     state = request.app.state
+    if getattr(request.state, "project_routed_endpoint", False) or (
+        getattr(request.state, "hosted_runtime", None) is not None and not state.settings.hosted
+    ):
+        return state.projects.gateway(request)
     hosted = getattr(state, "hosted", None)
     if hosted is not None:
         return hosted.gateway(request)
@@ -61,6 +65,7 @@ def get_gateway(request: Request) -> Gateway:
                     observability=getattr(state, "observability", None),
                     image_workers=image_workers_for(state, state.settings.image_concurrency),
                 )
+                gateway._detect_workers = state.projects.workers
                 state.gateway = gateway
     from pii_guard.detection_profile import DetectionProfileError, is_local_only
 

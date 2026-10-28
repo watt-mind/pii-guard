@@ -27,7 +27,15 @@ from pii_guard.types import DetectionError, EntityType, Span
 TEXT = "Teszt Elek"
 #: POST routes that never run a detector, so never wait for the model.
 NON_DETECTING_POSTS = frozenset(
-    {"/v1/unmask", "/v1/sessions", "/v1/sessions/{session_id}/known-values"}
+    {
+        "/v1/unmask",
+        "/v1/sessions",
+        "/v1/sessions/{session_id}/known-values",
+        "/v1/projects",
+        "/v1/projects/{project_id}/policies",
+        "/v1/projects/{project_id}/endpoints",
+        "/v1/projects/{project_id}/endpoints/{endpoint_id}/keys",
+    }
 )
 
 

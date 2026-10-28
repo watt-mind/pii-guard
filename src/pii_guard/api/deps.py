@@ -116,9 +116,7 @@ def get_analyzer(request: Request) -> Analyzer:
                 names = getattr(state, "detector_names", None) or rest_detector_names(
                     state.settings
                 )
-                analyzer = RegistryAnalyzer(
-                    names, policies=get_policies(request), settings=state.settings
-                )
+                analyzer = RegistryAnalyzer(names, policies=state.policies, settings=state.settings)
                 state.analyzer = analyzer
                 logger.info("analyzer ready with detectors: %s", list(names))
     from pii_guard.detection_profile import (
@@ -131,6 +129,11 @@ def get_analyzer(request: Request) -> Analyzer:
         if type(analyzer) is not RegistryAnalyzer:
             raise DetectionProfileError("local-only requires the built-in registry analyzer")
         require_detector_instance(state.settings, analyzer.pipeline)
+    project_policies = getattr(request.state, "project_policies", None)
+    if project_policies is not None:
+        from pii_guard.projects.runtime import PolicyAnalyzer
+
+        analyzer = PolicyAnalyzer(analyzer, project_policies)
     hosted = getattr(state, "hosted", None)
     if hosted is not None:
         from pii_guard.hosted.runtime import BoundedAnalyzer
@@ -141,6 +144,9 @@ def get_analyzer(request: Request) -> Analyzer:
 
 def get_policies(request: Request) -> PolicySet:
     """The app's entity policies (``create_app`` sets them from the settings)."""
+    selected = getattr(request.state, "project_policies", None)
+    if selected is not None:
+        return selected
     state = request.app.state
     policies = getattr(state, "policies", None)
     if policies is None:
@@ -174,7 +180,10 @@ def get_vault(request: Request) -> Vault:
 
 def get_language(request: Request, language: str | None) -> str:
     """The request's language, or ``Settings.default_language``."""
-    return language or request.app.state.settings.default_language
+    policy = getattr(request.state, "project_policy", None)
+    return language or (
+        policy["language"] if policy else request.app.state.settings.default_language
+    )
 
 
 def get_max_text_chars(request: Request) -> int:
