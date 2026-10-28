@@ -120,7 +120,9 @@ def test_decontam_eval_corpus_covers_every_eval_set() -> None:
     hashed = {s for s, _ in index.hashes.values()}
     # Fetch-only sets are covered by their manifest hashes even without their text.
     assert {"tab-echr", "mapa-eur-lex"} <= hashed
-    assert "agent-traffic-dev" not in sets  # a dev split may be tuned on
+    # The dev split NER candidates are selected on is indexed under its own name (LAB-1409).
+    assert "agent-traffic-dev" in sets
+    assert index.sources["agent-traffic-dev"] > 0
     # A committed eval document is caught, by hash and by its near-duplicate.
     pl = _pl_core_text()
     assert index.match(_doc("x", pl)) is not None

@@ -95,8 +95,9 @@ gate, [`training/ner/decontam.py`](../training/ner/decontam.py) (LAB-1392):
   finance, CEE-PII-Bench, agent traffic, pl-pii-bench and MAPA EUR-Lex. TAB and MAPA are
   compared by text when `fetch` has rebuilt them locally, and by manifest hash always. It also
   covers every fixture file under `eval/fixtures/`: the smoke sets, inflection, injection,
-  company and brand names, uncued numbers, known values and secrets. `dev` splits are not
-  included, because they may be tuned on.
+  company and brand names, uncued numbers, known values and secrets. The registry's `dev`
+  splits (`agent-traffic-dev`) are indexed too, under their own set name: NER candidates are
+  selected on them, so a training copy would inflate the selection (LAB-1409).
 - **How.** Text is NFKC-normalised, case-folded and split into words. A document's shingles
   are its word 5-grams. MinHash signatures (128 hashes) go into an LSH index of 32 bands × 4
   rows. Every candidate pair is then checked with its exact Jaccard similarity. A training
