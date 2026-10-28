@@ -26,7 +26,7 @@ export function ProfileMenu({ session }: { session: HostedSession }) {
       <button
         {...triggerProps}
         aria-label={shown ? `Account menu for ${shown}` : "Account menu"}
-        className="grid size-11 place-items-center rounded-full lg:size-9 border border-accent/25 bg-accent-soft text-sm font-semibold text-accent-ink transition-shadow hover:shadow-[0_0_0_3px_var(--accent-soft)] aria-expanded:shadow-[0_0_0_3px_var(--accent-soft)]"
+        className="grid size-11 place-items-center rounded-full lg:size-9 border border-accent/25 bg-accent-soft text-sm font-medium text-accent-ink transition-shadow hover:shadow-[0_0_0_3px_var(--accent-soft)] aria-expanded:shadow-[0_0_0_3px_var(--accent-soft)]"
       >
         {initial ? (
           <span aria-hidden="true">{initial}</span>

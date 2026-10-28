@@ -14,6 +14,7 @@ import { MOCK_SESSION_PREFIX, createMockClient } from "./api/mock";
 import type { GuardClient } from "./api/types";
 import type { ServerStatus } from "./api/status";
 import { Sidebar } from "./components/Sidebar";
+import { PageHeader, SegmentedControl } from "./components/ui";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { ProjectSwitcher } from "./projects/ProjectSwitcher";
 import { DEFAULT_SAMPLE, SAMPLES, sampleBehind, type Sample } from "./content/samples";
@@ -227,7 +228,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
       />
 
       <div className="min-w-0">
-        <PageHeader route={route} caps={caps} />
+        <HeaderBar route={route} caps={caps} />
         {engine.engine === "mock" && (
           <div role="status" className={apiDown ? "border-b border-danger/30 bg-danger-soft" : "border-b border-warn/30 bg-warn-soft"}>
             <p className="mx-auto max-w-[1280px] px-4 py-2 text-xs text-ink sm:px-6 sm:text-sm">
@@ -278,26 +279,21 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           </section>
 
           <section id="section-playground" aria-label="Playground" hidden={section !== "playground"} className="space-y-6">
+            <PageHeader
+              title="Playground"
+              lead="pii-guard finds personal data before a request leaves your network, swaps it for reversible placeholders, and puts the real values back into the answer."
+            />
             <PlaygroundTabs tab={tab} onTab={openTab} caps={caps} />
             <div id="panel-text" role="tabpanel" aria-labelledby="tab-text" hidden={tab !== "text"} className="space-y-6">
-              <div role="group" aria-label="Text view" className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-sm">
-                {(
-                  [
-                    ["mask", "Mask a document"],
-                    ["roundtrip", "Round trip"],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    aria-pressed={textView === id}
-                    onClick={() => setTextView(id)}
-                    className={["rounded-md px-3 py-1.5 font-medium", textView === id ? "bg-primary text-on-primary" : "text-muted hover:text-ink"].join(" ")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                label="Text view"
+                value={textView}
+                onChange={setTextView}
+                options={[
+                  { value: "mask", label: "Mask a document" },
+                  { value: "roundtrip", label: "Round trip" },
+                ]}
+              />
               <div hidden={textView !== "mask"}>
                 <Playground
                   text={text}
@@ -428,7 +424,7 @@ function statusDetailOf(s: ServerStatus): string {
 /** The bar above every section, over the accent hairline: where you are on the left (from
  *  1024 px; below it the menu's top bar names the section) and, on the right, the project
  *  switcher and, for a signed-in hosted owner, the profile menu. */
-function PageHeader({ route, caps }: { route: Route; caps: Capabilities }) {
+function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
   const section = SECTIONS.find((s) => s.id === route.section)!;
   const tab = route.section === "playground" ? PLAYGROUND_TABS.find((t) => t.id === route.tab) : undefined;
   const session = useHostedSession();

@@ -40,7 +40,7 @@ describe("App in demo mode", () => {
     expect(masked).not.toHaveTextContent("Bárdos Kinga");
     expect(within(playground).getByRole("table")).toHaveTextContent("Tax ID (HU)");
 
-    await user.click(screen.getByRole("button", { name: "Round trip" }));
+    await user.click(screen.getByRole("radio", { name: "Round trip" }));
     const panel = screen.getByRole("tabpanel", { name: "Text" });
     const answer = within(panel).getByRole("textbox", { name: "Simulated model answer" }) as HTMLTextAreaElement;
     expect(answer.value).toMatch(/Seller: \[\[PERSON_[0-9a-f]{4,}\]\]/);
@@ -57,7 +57,7 @@ describe("App in demo mode", () => {
     render(<App api={offlineApi()} mock={createMockClient()} />);
     await user.click(screen.getByRole("button", { name: /mask document/i }));
     await within(screen.getByRole("tabpanel", { name: "Text" })).findByTestId("masked-text");
-    await user.click(screen.getByRole("button", { name: "Round trip" }));
+    await user.click(screen.getByRole("radio", { name: "Round trip" }));
 
     const panel = screen.getByRole("tabpanel", { name: "Text" });
     await user.click(within(panel).getByRole("button", { name: /invented placeholder/i }));
@@ -138,7 +138,7 @@ describe("App against a live API", () => {
     await user.unhover(firstMark);
     expect(screen.queryByTestId("entity-popover")).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: "Round trip" }));
+    await user.click(screen.getByRole("radio", { name: "Round trip" }));
     expect(screen.getByRole("heading", { level: 2, name: /masked values restored/ })).toBeInTheDocument();
   });
 });
