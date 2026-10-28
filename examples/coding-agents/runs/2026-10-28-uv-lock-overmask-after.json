@@ -1,0 +1,11 @@
+{
+  "detectors": "fast:rules",
+  "files": [
+    "uv.lock"
+  ],
+  "chars": 243195,
+  "masked": 0,
+  "by_kind": {},
+  "by_kind_and_type": {},
+  "code_spans": []
+}

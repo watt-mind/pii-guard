@@ -39,6 +39,7 @@ from pii_guard.detect.rules._base import (
     NO_GROUP_AFTER,
     NO_GROUP_BEFORE,
     NOT_AMOUNT,
+    NOT_IN_WORD_AFTER,
     NUM_END,
     NUM_START,
     Rule,
@@ -74,8 +75,12 @@ def _find_hu_tax_id(text: str) -> Iterator[_Hit]:
 
 
 _TAJ_RE = re.compile(
-    NUM_START + NO_GROUP_BEFORE + r"(\d{3})([ -]?)(\d{3})\2(\d{3})"
-    r"(?!\d)(?![-./,]\d)" + NO_GROUP_AFTER + NOT_AMOUNT
+    NUM_START
+    + NO_GROUP_BEFORE
+    + r"(\d{3})([ -]?)(\d{3})\2(\d{3})"
+    + NUM_END
+    + NO_GROUP_AFTER
+    + NOT_AMOUNT
 )
 # ``123.456.788`` and ``123/456/788``: printed this way too, but a dotted nine-digit number is
 # far more often a thousands-grouped amount or count and a slashed one a file reference, so
@@ -253,7 +258,7 @@ _HU_PHONE_RE = re.compile(
     r"(?P<open>\()?"
     r"(?P<prefix>\+36|0036|06)"
     r"(?P<nsn>[ \-/]?\(?\d(?:(?:[ \-/.]|\)[ \-/]?)?\d){5,9})"
-    r"(?!\d)"
+    r"(?!\d)" + NOT_IN_WORD_AFTER
 )
 _HU_MOBILE_CODES = frozenset({"20", "21", "30", "31", "50", "70"})
 _HU_GEO_CODES = frozenset({

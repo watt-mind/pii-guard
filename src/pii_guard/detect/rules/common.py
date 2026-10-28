@@ -14,7 +14,13 @@ import re
 from collections.abc import Iterator
 
 from pii_guard.detect.checksums import IBAN_LENGTHS, is_valid_iban
-from pii_guard.detect.rules._base import Rule, _Hit, context_before, reference_or_amount_before
+from pii_guard.detect.rules._base import (
+    NOT_IN_WORD_AFTER,
+    Rule,
+    _Hit,
+    context_before,
+    reference_or_amount_before,
+)
 from pii_guard.types import EntityType
 
 __all__ = ["RULES", "is_valid_card_number", "luhn_check_digit"]
@@ -107,7 +113,7 @@ def _find_email(text: str) -> Iterator[_Hit]:
 # the opening parenthesis, so it stays balanced.
 _INTL_PHONE_RE = re.compile(
     r"(?:(?<![\w+(])\(\+(?!36)[1-9]\d{0,2}\)|(?<![\w+])\+(?!36)[1-9]\d{0,2})"
-    r"(?:[ \-./]?(?:\(\d{1,4}\)|\d{1,4})){2,6}(?!\d)"
+    r"(?:[ \-./]?(?:\(\d{1,4}\)|\d{1,4})){2,6}(?!\d)" + NOT_IN_WORD_AFTER
 )
 
 

@@ -30,6 +30,7 @@ from collections.abc import Iterator
 from pii_guard.detect.rules._base import (
     NO_GROUP_AFTER,
     NO_GROUP_BEFORE,
+    NOT_IN_WORD_AFTER,
     NUM_END,
     NUM_START,
     Rule,
@@ -118,7 +119,7 @@ def _find_nino(text: str) -> Iterator[_Hit]:
 _UK_PHONE_RE = re.compile(
     r"(?<![\w+])(?<!\d[-./])"
     r"(?:\(0\d{2,4}\)|0\d{2,4})[ -]?\d{3,4}(?:[ -]?\d{3,4})?"
-    r"(?!\d)(?![-./]\d)"
+    r"(?!\d)(?![-./]\d)" + NOT_IN_WORD_AFTER
 )
 _UK_TRUNK_SECOND = frozenset("123789")
 
@@ -140,7 +141,7 @@ _US_PHONE_RE = re.compile(
     r"(?:1[ .-]?)?"
     r"(?:\((?P<area>[2-9]\d{2})\)[ .-]?|(?P<area2>[2-9]\d{2})(?P<sep>[ .-]))"
     r"(?P<exchange>[2-9]\d{2})[ .-](?P<line>\d{4})"
-    r"(?!\d)(?![-./]\d)"
+    r"(?!\d)(?![-./]\d)" + NOT_IN_WORD_AFTER
 )
 
 
