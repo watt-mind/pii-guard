@@ -6,7 +6,8 @@ import { createMockChat } from "../api/chat";
 import type { HttpGuardClient } from "../api/http";
 import { createMockClient } from "../api/mock";
 import type { ServerStatus, StatusResult } from "../api/status";
-import { capabilitiesOf, HOSTED_CAPABILITIES, LOCAL_CAPABILITIES, offersSection } from "../lib/capabilities";
+import { capabilitiesOf, chatModesOf, HOSTED_CAPABILITIES, LOCAL_CAPABILITIES, offersDemoTraffic, offersSection, playgroundHint } from "../lib/capabilities";
+import type { TrafficConnectOptions } from "../api/traffic";
 import { fetchSnippets, parseSnippets } from "../api/connect";
 import { parseStatus } from "../api/status";
 import { setSelectedEndpoint, setSelectedProject } from "../projects/selection";
@@ -48,7 +49,19 @@ const withStatus = () => Promise.resolve<StatusResult>({ state: "ok", status: pa
 // Today's hosted image refuses /v1/status, so the console runs on the mode's defaults.
 const noStatus = () => Promise.resolve<StatusResult>({ state: "offline" });
 
-function renderHosted(call: Requester, loadStatus: () => Promise<StatusResult> = noStatus) {
+// The owner's default project policy (fictional): two versions, the newest keeps organisations.
+const policyV1 = { id: "pv-1", policy_id: "policy-one", policy_version_id: "pv-1", name: "Support default", version: 1, entity_policies: { PERSON: "mask", ORGANIZATION: "mask", EMAIL: "block" }, language: "hu", mode: "fast", detection_profile: "default" };
+const policyV2 = { ...policyV1, id: "pv-2", policy_version_id: "pv-2", version: 2, entity_policies: { ...policyV1.entity_policies, ORGANIZATION: "keep" } };
+const otherPolicy = { ...policyV1, id: "pv-x", policy_id: "policy-other", policy_version_id: "pv-x", name: "Strict", version: 7 };
+const withPolicies = (path: string) => (path.endsWith("/policies") ? { policies: [otherPolicy, policyV1, policyV2] } : undefined);
+
+/** A traffic log that reports itself live and empty, as an owner's fresh log does. */
+const liveEmptyLog = (o: TrafficConnectOptions) => {
+  queueMicrotask(() => act(() => o.onStatus({ state: "live", via: "sse", level: "masked", size: 200 })));
+  return { close() {} };
+};
+
+function renderHosted(call: Requester, loadStatus: () => Promise<StatusResult> = noStatus, connect: (o: TrafficConnectOptions) => { close(): void } = () => ({ close() {} })) {
   const mock = createMockClient();
   return render(
     <HostedApp
@@ -59,7 +72,7 @@ function renderHosted(call: Requester, loadStatus: () => Promise<StatusResult> =
           api={liveApi()}
           mock={mock}
           chat={{ api: createMockChat(mock), mock: createMockChat(mock) }}
-          traffic={{ connect: () => ({ close() {} }) }}
+          traffic={{ connect, sendDemo: vi.fn() }}
           loadStatus={loadStatus}
           loadBenchmarks={() => Promise.resolve(bundled as BenchmarkIndex)}
         />
@@ -80,8 +93,10 @@ describe("hosted console for a signed-in owner", () => {
   it("opens the console's menu, without the sections the hosted server doesn't offer", async () => {
     renderHosted(requester());
     await screen.findByRole("navigation", { name: "Console" });
-    for (const name of ["Overview", "Playground", "Logs", "Vault", "Projects", "Connect", "Evaluation"]) expect(within(menu()).getByRole("link", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
-    expect(within(menu()).queryByRole("link", { name: /^Policy/ })).not.toBeInTheDocument();
+    for (const name of ["Overview", "Playground", "Logs", "Vault", "Projects", "Connect", "Policy", "Evaluation"]) expect(within(menu()).getByRole("link", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+    // The menu hint names only the tabs the server offers (no images here).
+    expect(within(menu()).getByRole("link", { name: /^Playground/ })).toHaveTextContent("Try text and chat");
+    expect(within(menu()).getByRole("link", { name: /^Playground/ })).not.toHaveTextContent(/images/i);
     expect(within(menu()).getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByLabelText("Engine")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View site" })).toHaveAttribute("href", "#site");
@@ -132,11 +147,62 @@ describe("hosted console for a signed-in owner", () => {
     expect(masked).toHaveTextContent(/\[\[PERSON_[0-9a-f]{4,}\]\]/);
   });
 
-  it("sends the old server Policy link to the Overview", async () => {
+  it("shows the owner's default project policy, read-only, on Policy, never the server's", async () => {
     history.replaceState(null, "", "#policy");
-    renderHosted(requester());
-    await screen.findByRole("region", { name: "Your account" });
-    await waitFor(() => expect(location.hash).toBe("#overview"));
+    const call = requester(true, withPolicies);
+    renderHosted(call, withStatus);
+    const region = await screen.findByRole("region", { name: "Policy" });
+    expect(await within(region).findByText("Example support desk")).toBeInTheDocument();
+    expect(location.hash).toBe("#policy");
+    expect(call).toHaveBeenCalledWith("/v1/projects/project-one/policies");
+    // The default policy's newest version, not another family's.
+    expect(within(region).getByText("Support default")).toBeInTheDocument();
+    expect(within(region).getByText("· v2")).toBeInTheDocument();
+    expect(within(region).queryByText("Strict")).not.toBeInTheDocument();
+    const text = within(region).getByRole("table");
+    expect(within(within(text).getByRole("row", { name: /ORGANIZATION/ })).getByText("Kept in place")).toBeInTheDocument();
+    expect(within(within(text).getByRole("row", { name: /EMAIL/ })).getByText("Blocks the request")).toBeInTheDocument();
+    expect(within(region).getByRole("link", { name: "Edit policies in Projects" })).toHaveAttribute("href", "#projects");
+    // No server configuration, no editing here.
+    for (const gone of ["Upstream", "Authentication", "Traffic log", "PII_GUARD_POLICY_OVERRIDES"]) expect(within(region).queryByText(gone, { exact: false })).not.toBeInTheDocument();
+    expect(within(region).queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("says why the owner's policy can't be shown, and retries", async () => {
+    history.replaceState(null, "", "#policy");
+    let fail = true;
+    const call = requester(true, (path) => {
+      if (path === "/v1/projects" && fail) throw new Error("sensitive server text");
+      return withPolicies(path);
+    });
+    const user = userEvent.setup();
+    renderHosted(call, withStatus);
+    const region = await screen.findByRole("region", { name: "Policy" });
+    expect(await within(region).findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText(/sensitive server text/)).not.toBeInTheDocument();
+    fail = false;
+    await user.click(within(region).getByRole("button", { name: "Retry" }));
+    expect(await within(region).findByText("Support default")).toBeInTheDocument();
+  });
+
+  it("offers Chat's fast mode only, before and after the status answers", async () => {
+    history.replaceState(null, "", "#playground/chat");
+    renderHosted(requester(), withStatus);
+    const group = await screen.findByRole("radiogroup", { name: "Detection mode" });
+    expect(within(group).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Fast"]);
+  });
+
+  it("doesn't offer Send demo traffic on the Overview or Logs", async () => {
+    renderHosted(requester(), withStatus, liveEmptyLog);
+    expect(await screen.findByText("Nothing has gone through the gateway yet.")).toBeInTheDocument();
+    const overview = screen.getByRole("region", { name: "Overview" });
+    expect(within(overview).getByText(/Connect a client to one of your endpoints/)).toBeInTheDocument();
+    expect(within(overview).queryByRole("button", { name: "Send demo traffic" })).not.toBeInTheDocument();
+    history.replaceState(null, "", "#logs");
+    act(() => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
+    const logs = screen.getByRole("region", { name: "Logs" });
+    expect(await within(logs).findByText(/Connect a client to one of your endpoints/)).toBeInTheDocument();
+    expect(within(logs).queryByRole("button", { name: "Send demo traffic" })).not.toBeInTheDocument();
   });
 
   it("manages the owner's projects through the session's requester", async () => {
@@ -195,7 +261,7 @@ describe("hosted console for a signed-in owner", () => {
     renderHosted(requester(), withStatus);
     expect(await screen.findByText("Mode and detectors")).toBeInTheDocument();
     expect(screen.queryByText("Upstream")).not.toBeInTheDocument();
-    expect(within(menu()).queryByRole("link", { name: /^Policy/ })).not.toBeInTheDocument();
+    expect(within(menu()).getByRole("link", { name: /^Policy/ })).toHaveAttribute("href", "#policy");
   });
 
   it("asks for one endpoint's snippets on Connect when an endpoint is picked", async () => {
@@ -218,7 +284,25 @@ describe("hosted console for a signed-in owner", () => {
     // A local server with its traffic log off keeps Logs and Vault in the menu, as before.
     expect(offersSection(LOCAL_CAPABILITIES, "logs")).toBe(true);
     expect(offersSection({ ...LOCAL_CAPABILITIES, vault: false }, "vault")).toBe(true);
-    expect(offersSection(HOSTED_CAPABILITIES, "policy")).toBe(false);
+    // Policy is the server's, or else the owner's project policies; neither: no Policy.
+    expect(offersSection(HOSTED_CAPABILITIES, "policy")).toBe(true);
+    expect(offersSection({ ...HOSTED_CAPABILITIES, projects: false }, "policy")).toBe(false);
+    expect(offersSection(LOCAL_CAPABILITIES, "policy")).toBe(true);
+  });
+
+  it("derives the Playground hint, Chat's modes and demo traffic from the capabilities", () => {
+    expect(playgroundHint(LOCAL_CAPABILITIES)).toBe("Try text, chat and images");
+    expect(playgroundHint(HOSTED_CAPABILITIES)).toBe("Try text and chat");
+    expect(playgroundHint({ ...HOSTED_CAPABILITIES, images: true })).toBe("Try text, chat and images");
+    expect(playgroundHint({ ...HOSTED_CAPABILITIES, chat: false })).toBe("Try text");
+    const hosted = parseStatus(hostedStatus)!;
+    const local = { ...hosted, gateway: { ...hosted.gateway, modes: { ...hosted.gateway.modes, audit: { detectors: ["rules", "ner", "llm"], available: false, reason: "no key" } } } };
+    expect(chatModesOf(hosted, HOSTED_CAPABILITIES)).toEqual(["fast"]);
+    expect(chatModesOf(local, LOCAL_CAPABILITIES)).toEqual(["fast", "audit"]);
+    expect(chatModesOf(null, HOSTED_CAPABILITIES)).toEqual(["fast"]);
+    expect(chatModesOf(null, LOCAL_CAPABILITIES)).toEqual(["fast", "audit"]);
+    expect(offersDemoTraffic(LOCAL_CAPABILITIES)).toBe(true);
+    expect(offersDemoTraffic(HOSTED_CAPABILITIES)).toBe(false);
   });
 
   it("parses endpoint snippets, which pin their URL and carry no session", async () => {

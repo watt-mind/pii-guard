@@ -791,7 +791,7 @@ caller's own view (the server's settings locally, the owner's runtime when hoste
 | `images` | `true` | `false` | Image masking (`/v1/mask/image`); `images.available` says whether it can run. |
 | `logs` | `traffic_log != "off"` | `true` | The traffic log (`/v1/traffic`). |
 | `vault` | `vault_inspect != "off"` | `true` | The vault inspector (`/v1/vault/sessions`). |
-| `server_policy` | `true` | `false` | The server-wide entity policy page (`policies`); hosted owners use project policies. |
+| `server_policy` | `true` | `false` | The server-wide entity policy page (`policies`). Without it, Policy shows the owner's default project policy read-only (from the project API) and points to Projects. |
 | `projects` | `true` | `true` | Projects, policies and endpoints (`/v1/projects`). |
 | `connect` | `true` | `true` | Connect (`/v1/connect/snippets`). |
 | `evaluation` | `true` | `true` | The benchmark and evaluation pages. |

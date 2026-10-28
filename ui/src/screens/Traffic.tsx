@@ -51,18 +51,20 @@ export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureInterv
   focus?: { id: string; nonce: number } | null;
   /** Open a call's vault session in the Vault screen (by its `session_ref`). */
   onOpenSession?: (ref: string) => void;
+  /** Offer "Send demo traffic" (`offersDemoTraffic`); off where the server has accounts. */
+  demoTraffic?: boolean;
 }
 
 
 type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 
 /** The Logs screen with its own traffic connection (tests, and embedding on its own). */
-export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps) {
+export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic">) {
   const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
   return <Logs t={t} forceFixture={forceFixture} {...rest} />;
 }
 
-export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null, onOpenSession }: LogsProps) {
+export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null, onOpenSession, demoTraffic = true }: LogsProps) {
   const [filters, setFilters] = useState<Filters>({ mode: "all", type: "all", problems: false });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cleared, setCleared] = useState(0);
@@ -149,7 +151,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
           >
             Clear view
           </Button>
-          {t.source === "api" && t.status.state === "live" && <DemoButton key={cleared} send={sendDemo} />}
+          {t.source === "api" && t.status.state === "live" && demoTraffic && <DemoButton key={cleared} send={sendDemo} />}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <label className="flex items-center gap-2 text-muted">
@@ -205,7 +207,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
           </header>
           {filtered.length === 0 ? (
             <div className="p-4">
-              <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} />
+              <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} demoTraffic={demoTraffic} />
             </div>
           ) : (
             <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
@@ -357,7 +359,7 @@ function SourceBanner({
   );
 }
 
-function EmptyCalls({ hasAny, source, status, replayDone }: { hasAny: boolean; source: TrafficSource; status: TrafficStatus; replayDone: boolean }) {
+function EmptyCalls({ hasAny, source, status, replayDone, demoTraffic }: { hasAny: boolean; source: TrafficSource; status: TrafficStatus; replayDone: boolean; demoTraffic: boolean }) {
   if (hasAny) return <p className="py-6 text-center text-sm text-muted">No call matches these filters.</p>;
   if (source === "fixture" && replayDone)
     return (
@@ -369,7 +371,8 @@ function EmptyCalls({ hasAny, source, status, replayDone }: { hasAny: boolean; s
   return (
     <div className="py-6 text-center text-sm text-muted">
       <p className="font-medium text-ink">{status.state === "connecting" ? "Connecting…" : "Waiting for the first call"}</p>
-      {source === "api" && status.state === "live" && (
+      {source === "api" && status.state === "live" && !demoTraffic && <p className="mt-1">Connect a client to one of your endpoints (Connect), or mask a text in the Playground.</p>}
+      {source === "api" && status.state === "live" && demoTraffic && (
         <p className="mt-1">
           Press <strong className="text-ink">Send demo traffic</strong>, run <code className="font-mono text-xs">make demo-traffic</code>, or point an OpenAI client at{" "}
           <code className="font-mono text-xs">/v1</code> of the gateway.

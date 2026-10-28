@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { isFullStatus, type FullServerStatus } from "../api/status";
+import { recovery, request, type Requester } from "../hosted/api";
+import { projectPath, type PolicyVersion, type Project, type ProjectList } from "../projects/api";
 import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type EntityType } from "../api/types";
 import { NerHint } from "../components/NerHint";
 import type { ServerStatusState } from "../hooks/useServerStatus";
@@ -102,8 +104,8 @@ export function Policy({ status }: PolicyProps) {
           {mono("ORGANIZATION=mask,EMAIL=block")}.
         </p>
         <div className="mt-4 grid gap-x-8 gap-y-6 md:grid-cols-2">
-          <PolicyTable title="Text" types={TEXT_ENTITY_TYPES} server={server} />
-          <PolicyTable title="Image regions" types={VISUAL_ENTITY_TYPES} server={server} />
+          <PolicyTable title="Text" types={TEXT_ENTITY_TYPES} policies={server?.policies ?? null} />
+          <PolicyTable title="Image regions" types={VISUAL_ENTITY_TYPES} policies={server?.policies ?? null} />
         </div>
         <p className="mt-4 text-xs text-muted">
           <span className="font-medium text-ink">Allow-list:</span> none. pii-guard has no per-value allow-list; a detected value stays in place only when its type's policy is keep.
@@ -114,12 +116,126 @@ export function Policy({ status }: PolicyProps) {
   );
 }
 
+export interface OwnerPolicyProps {
+  /** The owner's project API (the hosted session's requester); defaults to the cookie requester. */
+  call?: Requester;
+  /** The project the console is scoped to; else the owner's default project. */
+  projectId?: string;
+}
+
+type OwnerState =
+  | { state: "loading" }
+  | { state: "error"; message: string }
+  | { state: "ok"; project: Project; policy: PolicyVersion | null };
+
+/** The default policy's latest version: what new endpoints in the project start from. */
+function defaultPolicyOf(project: Project, policies: PolicyVersion[]): PolicyVersion | null {
+  const family = policies.filter((p) => p.policy_id === project.default_policy_id);
+  return family.reduce<PolicyVersion | null>((best, p) => (best === null || p.version > best.version ? p : best), null);
+}
+
+/**
+ * Policy where the server has no policy of its own to show (a hosted owner): the owner's
+ * project default policy, read-only, from the owner-scoped project API. Editing stays under
+ * Projects, where policies are versioned and pinned per endpoint.
+ */
+export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
+  const [state, setState] = useState<OwnerState>({ state: "loading" });
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const list = await call<ProjectList>("/v1/projects");
+      if (!Array.isArray(list.projects)) throw new Error("Invalid projects");
+      const project = list.projects.find((p) => p.id === projectId) ?? list.projects.find((p) => p.id === list.default_project_id) ?? list.projects[0];
+      if (!project) throw new Error("No project");
+      const data = await call<{ policies: PolicyVersion[] }>(`${projectPath(project.id)}/policies`);
+      if (!Array.isArray(data.policies)) throw new Error("Invalid policies");
+      return { project, policy: defaultPolicyOf(project, data.policies) };
+    })().then(
+      (ok) => active && setState({ state: "ok", ...ok }),
+      (e: unknown) => active && setState({ state: "error", message: recovery(e) }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [call, projectId, retry]);
+
+  const policy = state.state === "ok" ? state.policy : null;
+  return (
+    <div className="space-y-6">
+      <div className="max-w-3xl">
+        <h1 className="text-2xl font-medium text-balance text-ink">Policy</h1>
+        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
+          What happens to each kind of personal data in your project. Policies belong to projects and are versioned: each endpoint applies the version it is pinned to. Read-only
+          here; create policies and new versions under Projects.
+        </p>
+      </div>
+
+      {state.state === "loading" && (
+        <p role="status" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
+          Loading your project's policy…
+        </p>
+      )}
+      {state.state === "error" && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-ink">
+          <span>{state.message}</span>
+          <button type="button" onClick={() => {
+              setState({ state: "loading" });
+              setRetry((n) => n + 1);
+            }} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-line-strong">
+            Retry
+          </button>
+        </div>
+      )}
+      {state.state === "ok" && !policy && (
+        <p role="status" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
+          The project {state.project.name} has no default policy yet. Create one under Projects.
+        </p>
+      )}
+
+      {state.state === "ok" && policy && (
+        <>
+          <Card title="Default policy">
+            <Rows>
+              <Row label="Project">{state.project.name}</Row>
+              <Row label="Policy">
+                {policy.name} <span className="text-muted">· v{policy.version}</span>
+              </Row>
+              <Row label="Detection mode">
+                <span className="capitalize">{policy.mode}</span>
+              </Row>
+              <Row label="Language">{mono(policy.language)}</Row>
+            </Rows>
+          </Card>
+          <section aria-labelledby="policies-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
+            <h2 id="policies-title" className="text-lg font-normal text-ink">
+              Entity policies
+            </h2>
+            <p className="mt-0.5 text-sm text-muted">
+              As {policy.name} v{policy.version} applies them. An endpoint pinned to another policy or version applies that one.
+            </p>
+            <div className="mt-4 grid gap-x-8 gap-y-6 md:grid-cols-2">
+              <PolicyTable title="Text" types={TEXT_ENTITY_TYPES} policies={policy.entity_policies} />
+            </div>
+          </section>
+        </>
+      )}
+
+      <a href="#projects" className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3 text-sm text-on-primary transition-colors hover:bg-primary-hover">
+        Edit policies in Projects
+      </a>
+    </div>
+  );
+}
+
 function imageGaps(server: FullServerStatus): string {
   const needs: Record<string, string> = { ocr: "no OCR (the ocr extra)", tesseract: "no Tesseract", segmenter: "no face detector (the local-vision extra, or SAM 3.1 with META_API_KEY)" };
   return server.images.gaps.map((g) => needs[g] ?? g).join(", ");
 }
 
-function PolicyTable({ title, types, server }: { title: string; types: readonly EntityType[]; server: FullServerStatus | null }) {
+/** Each type's policy; `policies` null shows the documented defaults, otherwise changes are marked. */
+function PolicyTable({ title, types, policies }: { title: string; types: readonly EntityType[]; policies: Partial<Record<EntityType, EntityPolicy>> | null }) {
   return (
     <table className="w-full self-start text-sm">
       <caption className="mb-1 text-left text-xs font-medium text-muted">{title}</caption>
@@ -131,8 +247,8 @@ function PolicyTable({ title, types, server }: { title: string; types: readonly 
       </thead>
       <tbody>
         {types.map((t) => {
-          const policy = (server?.policies[t] ?? ENTITY_META[t]?.policy ?? "mask") as EntityPolicy;
-          const changed = server && ENTITY_META[t] && ENTITY_META[t].policy !== policy;
+          const policy = (policies?.[t] ?? ENTITY_META[t]?.policy ?? "mask") as EntityPolicy;
+          const changed = policies && ENTITY_META[t] && ENTITY_META[t].policy !== policy;
           return (
             <tr key={t} className="border-b border-line last:border-0">
               <th scope="row" className="py-1.5 pr-3 text-left font-normal">

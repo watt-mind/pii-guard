@@ -136,3 +136,26 @@ describe("Chat empty reasoning answer (LAB-1335)", () => {
     expect(screen.getByTestId("empty-answer-hint")).toHaveTextContent("raise max tokens");
   });
 });
+
+describe("Chat detection modes (LAB-1435)", () => {
+  const radios = () => screen.getAllByRole("radio").map((r) => r.textContent);
+
+  it("offers fast and audit by default, as the local console always has", async () => {
+    const { client } = liveChat();
+    render(<Chat client={client} live draft={null} />);
+    await screen.findByRole("combobox", { name: "Model" });
+    expect(radios()).toEqual(["Fast", "Audit"]);
+  });
+
+  it("offers only the server's modes, and never sends one it doesn't offer", async () => {
+    const user = userEvent.setup();
+    const { client, calls } = liveChat();
+    render(<Chat client={client} live draft={null} modes={["fast"]} />);
+    await screen.findByRole("combobox", { name: "Model" });
+    expect(radios()).toEqual(["Fast"]);
+    expect(screen.getByRole("radio", { name: "Fast" })).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]!.mode).toBe("fast");
+  });
+});
