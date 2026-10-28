@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Explicit public hosted shell; omitted builds retain the local console. */
+  readonly VITE_PII_GUARD_HOSTED?: string;
   /** "mock" forces the built-in demo engine, "api" forces the live API; anything else means auto. */
   readonly VITE_PII_GUARD_MODE?: string;
   /** Model the Chat screen asks the gateway's upstream for. */
