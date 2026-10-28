@@ -51,7 +51,10 @@ def route_app(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, list[dict[str, 
                 "choices": [
                     {
                         "index": 0,
-                        "message": {"role": "assistant", "content": body["messages"][0]["content"]},
+                        "message": {
+                            "role": "assistant",
+                            "content": body["messages"][-1]["content"],
+                        },
                     }
                 ]
             },
@@ -214,7 +217,7 @@ def test_demo_real_masking_and_exact_roundtrip(
         "request_id",
     }
     assert result["original"] == routes.DEMO_SAMPLES[sample][1]
-    assert result["masked"] == calls[0]["messages"][0]["content"]
+    assert result["masked"] == calls[0]["messages"][-1]["content"]
     assert result["answer"] == result["masked"]
     assert result["restored"] == result["original"]
     assert calls[0]["max_completion_tokens"] == DEMO_MAX_OUTPUT_TOKENS

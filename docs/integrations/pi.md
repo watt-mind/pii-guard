@@ -145,5 +145,5 @@ values. Two things showed up with the real model:
 | pi shows `400 unsupported_content` | A request field the gateway can't mask yet (fail closed). The message names the field, never the value. Please report it; newer pi versions may add fields |
 | pi shows `401` | The gateway runs with `PII_GUARD_API_TOKEN`: export it in pi's shell, and rerun `connect pi` so the provider uses `$PII_GUARD_API_TOKEN` |
 | The model writes placeholders into files | It invented or changed one (`[[EMAIL_xyz]]` that isn't in the conversation). Only placeholders the session issued are restored |
-| The model refuses to copy personal data | It sees placeholders and plays safe. Tell it they are restored locally (see above) |
+| The model refuses to copy personal data | It sees placeholders and plays safe. The gateway tells it they are opaque tokens restored locally ([placeholder note](../architecture-gateway.md#placeholder-note), on by default since LAB-1471); if it still refuses, say so in `AGENTS.md` too (see above) |
 | `--check` says "no pii_guard echo" or "no pii-guard headers" | `baseUrl` points at the model itself, not at pii-guard |

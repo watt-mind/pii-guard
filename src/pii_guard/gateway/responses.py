@@ -39,6 +39,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
+from pii_guard.gateway.placeholder_note import add_responses_note
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
 from pii_guard.gateway.responses_restore import (
@@ -268,7 +269,7 @@ class ResponsesGateway:
         gw._release_session(session, created, masked=True)
 
         forwarding = time.perf_counter()
-        payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        payload = gw._forwarded(body, session, stats, add_responses_note)
         try:
             check_upstream_payload(payload)
         except PayloadTooLargeError:

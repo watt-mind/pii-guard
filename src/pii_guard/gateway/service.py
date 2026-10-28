@@ -42,7 +42,7 @@ import re
 import threading
 import time
 from collections import Counter
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -57,6 +57,7 @@ from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
 from pii_guard.gateway.opaque_ids import IssuedIds, upstream_ids, without_opaque_ids
+from pii_guard.gateway.placeholder_note import NOTE_HEADER, add_chat_note, needs_note
 from pii_guard.gateway.request import (
     ImageSlot,
     InvalidChatRequestError,
@@ -171,6 +172,8 @@ class RequestStats:
     image_ocr: bool | None = None
     image_ms: float = 0.0
     session_source: SessionSource | None = None
+    #: The placeholder note went upstream with the request (LAB-1471).
+    note: bool = False
 
     def headers(self, session_id: str) -> dict[str, str]:
         out = {
@@ -182,6 +185,8 @@ class RequestStats:
         }
         if self.session_source is not None:
             out[SESSION_SOURCE_HEADER] = self.session_source.value
+        if self.note:
+            out[NOTE_HEADER] = "added"
         if self.mode_alias:
             out["Deprecation"] = "true"
             out["Warning"] = (
@@ -503,6 +508,25 @@ class Gateway:
                 return
             self.vault.drop(session_id)
             self.cache.drop_session(session_id)
+
+    def _forwarded(
+        self,
+        body: dict[str, Any],
+        session: VaultSession,
+        stats: RequestStats,
+        add_note: Callable[[dict[str, Any]], None],
+    ) -> bytes:
+        """The masked body as sent upstream, with the placeholder note if it needs one.
+
+        The note goes in after masking, so it is never scanned; it is a constant, so it can't
+        carry a value (LAB-1471).
+        """
+        text = json.dumps(body, ensure_ascii=False)
+        if self.config.placeholder_note and needs_note(text, session):
+            add_note(body)
+            stats.note = True
+            text = json.dumps(body, ensure_ascii=False)
+        return text.encode("utf-8")
 
     def _upstream_url(self) -> str:
         base = self.settings.upstream_base_url
@@ -866,7 +890,7 @@ class Gateway:
         self._release_session(session, created, masked=True)
 
         forwarding = time.perf_counter()
-        payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        payload = self._forwarded(body, session, stats, add_chat_note)
         try:
             check_upstream_payload(payload)
         except PayloadTooLargeError:
@@ -874,7 +898,9 @@ class Gateway:
             raise
         if trace.payloads:
             trace.masked_request = payload
-        masked_messages = _masked_messages(body) if echo else None
+        # The client's messages as masked: the note is a flag, not a message, so a UI that
+        # picks the first system message still finds its own.
+        masked_messages = _masked_messages(body)[int(stats.note) :] if echo else None
         client = self.upstream_client()
         request = client.build_request(
             "POST",
@@ -942,6 +968,7 @@ class Gateway:
             if echo:
                 answer["pii_guard"] = {
                     "masked_messages": masked_messages,
+                    "placeholder_note": stats.note,
                     "masked_answer": masked_answer,
                 }
             stats.log("ok")
@@ -994,7 +1021,11 @@ class Gateway:
             if echo:
                 yield sse_event(
                     json.dumps(
-                        {"object": "pii_guard.masked_request", "messages": masked_messages},
+                        {
+                            "object": "pii_guard.masked_request",
+                            "messages": masked_messages,
+                            "placeholder_note": stats.note,
+                        },
                         ensure_ascii=False,
                     )
                 )

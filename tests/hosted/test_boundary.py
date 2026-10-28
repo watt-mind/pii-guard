@@ -83,7 +83,7 @@ def boundary(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, list
                     ],
                 },
             )
-        text = body["messages"][0]["content"]
+        text = body["messages"][-1]["content"]
         return httpx.Response(
             200,
             json={
@@ -241,8 +241,8 @@ def test_same_explicit_session_is_owner_scoped(
     two = chat(client, auth("synthetic-two"), "/s/shared-synthetic/v1/chat/completions")
     assert one.status_code == two.status_code == 200, (one.text, two.text)
     assert one.headers["x-pii-guard-session"] == two.headers["x-pii-guard-session"]
-    masked_one = json.loads(seen[0].content)["messages"][0]["content"]
-    masked_two = json.loads(seen[1].content)["messages"][0]["content"]
+    masked_one = json.loads(seen[0].content)["messages"][-1]["content"]
+    masked_two = json.loads(seen[1].content)["messages"][-1]["content"]
     assert EMAIL not in masked_one + masked_two
     assert masked_one != masked_two
     body = {"session_id": "shared-synthetic", "text": masked_one}
@@ -880,7 +880,7 @@ def test_project_endpoints_tag_only_the_sponsored_route(
 
     def project_upstream(request: httpx.Request) -> httpx.Response:
         recorded.append(request)
-        text = json.loads(request.content)["messages"][0]["content"]
+        text = json.loads(request.content)["messages"][-1]["content"]
         return httpx.Response(
             200,
             json={

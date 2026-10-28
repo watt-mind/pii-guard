@@ -19,6 +19,7 @@ from fastapi import FastAPI
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
 from pii_guard.gateway import GatewayConfig, Mode, build_mode_detectors
+from pii_guard.gateway.placeholder_note import PLACEHOLDER_NOTE
 from pii_guard.types import DetectionError, EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE
 
@@ -70,6 +71,17 @@ class FakeLlm:
 Handler = Callable[[httpx.Request], httpx.Response]
 
 
+def without_note(body: dict[str, Any]) -> dict[str, Any]:
+    """``body`` without the gateway's placeholder note (LAB-1471)."""
+    messages = body.get("messages")
+    if isinstance(messages, list) and messages and messages[0] == NOTE_MESSAGE:
+        body = {**body, "messages": messages[1:]}
+    return body
+
+
+NOTE_MESSAGE = {"role": "system", "content": PLACEHOLDER_NOTE}
+
+
 @dataclass
 class MockUpstream:
     """Records every forwarded request; answers by echoing the placeholders it received."""
@@ -82,6 +94,12 @@ class MockUpstream:
 
     @property
     def bodies(self) -> list[dict[str, Any]]:
+        """The forwarded bodies without the placeholder note, so message indexes match the
+        client's (``raw_bodies`` keeps it; the note itself: ``test_placeholder_note.py``)."""
+        return [without_note(body) for body in self.raw_bodies]
+
+    @property
+    def raw_bodies(self) -> list[dict[str, Any]]:
         return [json.loads(r.content) for r in self.requests]
 
     def default_answer(self, body: dict[str, Any]) -> str:
