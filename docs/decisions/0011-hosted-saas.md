@@ -79,15 +79,20 @@ privacy/acceptable-use review and provider-terms verification before editable te
 
 [Hosted operations and privacy](../hosted.md) defines the runnable steps and current limits.
 
-## Dev/prod follow-on
+## Dev/prod implementation boundary
 
-`develop` is intended for tailnet-only dev and the actual production branch for prod, using the
-same image with isolated credentials/state/budgets. Dev cloud/app deployment is currently
-blocked pending a reviewed private VNet/Container Apps environment plus always-on tailnet
-proxy/router, DNS/TLS and OAuth callback. A sleeping app sidecar cannot wake itself. The
-finite sponsored default remains subject to provider permission and reconciled allocation
-policy; see the [dev/prod plan](../hosted.md#devprod-deployment-plan--private-dev-networking-pending).
-No branch deployment workflow or public dev app is enabled here.
+`develop` targets tailnet-only dev and `main` targets prod, using the same image with isolated
+credentials/state/budgets. The [private dev runbook](../private-dev.md) describes the dedicated
+internal VNet/ACA environment and always-on tailnet-only HTTPS/DNS proxy. No VNet routes,
+public dev/Funnel or reused infrastructure node are permitted. Front TLS credentials and
+one-use enrollment are fetched by a per-secret-scoped router identity; the key stays in sealed
+memory. Easy Auth has an explicit custom proxy-header contract; caller headers are stripped.
+Live OAuth, spoof, internet-denial and zero-replica wake tests remain activation gates.
+
+The operator foundation and app-only CI release templates are separate. CI receives no direct
+storage keys, role-assignment or funding rights. Durable Blob total/daily accounting resumes
+finite approved authority after restart, but owner data stays ephemeral. No release creates
+credit; provider permission still gates sponsored use. A sleeping app sidecar cannot wake itself.
 
 ## Consequences
 
