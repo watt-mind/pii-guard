@@ -10,7 +10,7 @@ import { capabilitiesOf, chatModesOf, HOSTED_CAPABILITIES, LOCAL_CAPABILITIES, o
 import type { TrafficConnectOptions } from "../api/traffic";
 import { fetchSnippets, parseSnippets } from "../api/connect";
 import { parseStatus } from "../api/status";
-import { setSelectedEndpoint, setSelectedProject } from "../projects/selection";
+import { getSelectedEndpoint, setSelectedEndpoint, setSelectedProject } from "../projects/selection";
 import type { BenchmarkIndex } from "../api/benchmarks";
 import bundled from "virtual:pii-guard/benchmarks-index";
 import { HostedApp } from "./HostedApp";
@@ -53,6 +53,9 @@ const noStatus = () => Promise.resolve<StatusResult>({ state: "offline" });
 const policyV1 = { id: "pv-1", policy_id: "policy-one", policy_version_id: "pv-1", name: "Support default", version: 1, entity_policies: { PERSON: "mask", ORGANIZATION: "mask", EMAIL: "block" }, language: "hu", mode: "fast", detection_profile: "default" };
 const policyV2 = { ...policyV1, id: "pv-2", policy_version_id: "pv-2", version: 2, entity_policies: { ...policyV1.entity_policies, ORGANIZATION: "keep" } };
 const otherPolicy = { ...policyV1, id: "pv-x", policy_id: "policy-other", policy_version_id: "pv-x", name: "Strict", version: 7 };
+// Two enabled endpoints and a disabled one (fictional).
+const endpointOf = (id: string, name: string, enabled = true) => ({ id, name, enabled, project_id: "project-one", policy_id: "policy-one", policy_version_id: "pv-1", policy_version: 1, provider: "sponsored", base_url: "", model: "example-model", credential_configured: false, base_path: `/e/${id}/v1` });
+const withEndpoints = (path: string) => (path.endsWith("/endpoints") ? { endpoints: [endpointOf("ep-off", "Retired", false), endpointOf("ep-one", "Support bot"), endpointOf("ep-two", "Billing bot")] } : undefined);
 const withPolicies = (path: string) => (path.endsWith("/policies") ? { policies: [otherPolicy, policyV1, policyV2] } : undefined);
 
 /** A traffic log that reports itself live and empty, as an owner's fresh log does. */
@@ -297,10 +300,52 @@ describe("hosted console for a signed-in owner", () => {
     setSelectedEndpoint("ep-one");
     history.replaceState(null, "", "#connect");
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { code: "unavailable" } }), { status: 503 }));
-    renderHosted(requester(), withStatus);
+    renderHosted(requester(true, withEndpoints), withStatus);
     await waitFor(() => expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/v1/connect/snippets?endpoint=ep-one"))).toBe(true));
     expect(fetchSpy.mock.calls.some(([url]) => /snippets\?.*session=/.test(String(url)))).toBe(false);
     expect(screen.queryByTestId("gateway-url")).not.toBeInTheDocument();
+  });
+
+  // Hosted Connect's client setup (LAB-1448): the three states.
+  it("Connect, no endpoint yet: previews the client setup, disabled, and sends the owner to Projects", async () => {
+    setSelectedProject("project-one");
+    setSelectedEndpoint(null);
+    history.replaceState(null, "", "#connect");
+    renderHosted(requester(), withStatus);
+    const setup = await screen.findByRole("region", { name: "Connect your app or agent" });
+    const preview = await within(setup).findByTestId("client-setup-preview");
+    for (const tab of within(preview).getAllByRole("tab")) expect(tab).toBeDisabled();
+    expect(within(preview).getByRole("tab", { name: "Claude Code" })).toBeInTheDocument();
+    expect(within(preview).getByRole("link", { name: /Create an endpoint/ })).toHaveAttribute("href", "#projects");
+    expect(within(setup).getByRole("link", { name: /Projects → Connect & keys/ })).toHaveAttribute("href", "#projects");
+    // Client setup comes before the Playground's provider keys.
+    const keys = screen.getByRole("region", { name: "Model provider keys for the Playground" });
+    expect(setup.compareDocumentPosition(keys) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("Connect, endpoints but none picked: preselects the first enabled one and shows its client blocks", async () => {
+    setSelectedProject("project-one");
+    setSelectedEndpoint(null);
+    history.replaceState(null, "", "#connect");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { code: "unavailable" } }), { status: 503 }));
+    renderHosted(requester(true, withEndpoints), withStatus);
+    const setup = await screen.findByRole("region", { name: "Connect your app or agent" });
+    const select = await within(setup).findByRole("combobox", { name: "Endpoint" });
+    expect(select).toHaveValue("ep-one");
+    await waitFor(() => expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/v1/connect/snippets?endpoint=ep-one"))).toBe(true));
+    expect(within(setup).getByRole("region", { name: "Start building with your coding agent" })).toBeInTheDocument();
+    // Picking another endpoint here is the console's selection (the header's menu shows the same).
+    await userEvent.setup().selectOptions(select, "ep-two");
+    await waitFor(() => expect(getSelectedEndpoint()).toBe("ep-two"));
+  });
+
+  it("Connect, an endpoint picked in the header: Connect shows that one", async () => {
+    setSelectedProject("project-one");
+    setSelectedEndpoint("ep-two");
+    history.replaceState(null, "", "#connect");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { code: "unavailable" } }), { status: 503 }));
+    renderHosted(requester(true, withEndpoints), withStatus);
+    expect(await screen.findByRole("combobox", { name: "Endpoint" })).toHaveValue("ep-two");
   });
 
   it("follows the server's reported capabilities when it has them", async () => {

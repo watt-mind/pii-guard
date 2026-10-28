@@ -6,6 +6,7 @@ import { Announcer, Button, Card, Checkbox, ConfirmAction, Field, Input, Notice,
 import { localRequest } from "./request";
 import { request, recovery, type Requester } from "../hosted/api";
 import { useHostedSession } from "../hosted/session";
+import { setSelectedEndpoint } from "./selection";
 import { projectPath, type Endpoint, type EndpointKey, type PolicyVersion, type Project, type ProjectList } from "./api";
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
@@ -20,6 +21,9 @@ const configurationRecovery = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ?
   }
   return "The guard could not complete this request. Check its connection and retry.";
 };
+
+/** The confirmation of a project just created, across the console's remount on the new scope. */
+let carried: string | null = null;
 
 interface Props { call?: Requester; hosted?: boolean; projectId?: string; onProject?: (project: Project) => void }
 const defaults = Object.fromEntries(TEXT_ENTITY_TYPES.map((type) => [type, ENTITY_META[type].policy])) as Record<TextEntityType, Policy>;
@@ -69,7 +73,10 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
   const [selected, setSelected] = useState(projectId ?? "");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
-  const [created, setCreated] = useState("");
+  // A new project becomes the console's scope, which remounts the console: its confirmation and
+  // the focus move are carried across that remount.
+  const [created, setCreated] = useState(() => carried ?? "");
+  const [refocus] = useState(() => carried !== null);
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(0);
   const focusLater = useFocusLater();
@@ -87,6 +94,13 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
     return () => { active = false; };
   }, [call, projectId, onProject, retry, hosted]);
   const project = projects.find((p) => p.id === selected);
+  // Read once, at mount (above); cleared when this instance goes, so it never reaches a later mount.
+  useEffect(() => () => {
+    carried = null;
+  }, []);
+  useEffect(() => {
+    if (refocus && projects.length) projectSelect.current?.focus();
+  }, [refocus, projects.length]);
   return (
     <div className="space-y-6">
       <PageHeader title="Projects" lead="Keep each application’s endpoints, endpoint keys and policies together. Every endpoint pins one upstream, one model and one policy version." />
@@ -112,10 +126,12 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
                 if (!wanted) return;
                 setBusy(true); setError(""); setCreated("");
                 void call<Project>("/v1/projects", { name }).then((next) => {
-                  setProjects((prev) => [...prev, next]); setSelected(next.id); setName(""); onProject?.(next);
-                  // The submit button is disabled again (empty name): keep focus on the form's result.
+                  const message = `Project '${next.name || wanted}' created.`;
+                  carried = message;
+                  setProjects((prev) => [...prev, next]); setSelected(next.id); setName(""); setCreated(message);
+                  // The submit button is disabled again (empty name): focus moves to the new project.
                   focusLater(() => projectSelect.current);
-                  setCreated(`Project '${next.name || wanted}' created.`);
+                  onProject?.(next);
                 }).catch((e: unknown) => setError(configurationRecovery(e, hosted))).finally(() => setBusy(false));
               }}
             >
@@ -541,6 +557,20 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => copy(url, "URL")}>Copy URL</Button>
           <Button size="sm" onClick={() => copy(snippet, "Snippet")}>Copy Python snippet</Button>
+          {hosted && (
+            <a
+              href="#connect"
+              className="text-sm text-ink underline underline-offset-4"
+              onClick={(e) => {
+                // Open Connect first, then pick this endpoint (the console remounts on the new scope).
+                e.preventDefault();
+                globalThis.location.hash = "#connect";
+                setSelectedEndpoint(endpoint.id);
+              }}
+            >
+              Client setup for this endpoint
+            </a>
+          )}
           <p role="status" className="text-xs text-muted">{copied}</p>
         </div>
         <pre className="overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-ui whitespace-pre text-ink sm:p-4">{snippet}</pre>

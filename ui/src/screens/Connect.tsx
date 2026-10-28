@@ -21,11 +21,13 @@ export interface ConnectProps {
   serverSnippets?: boolean;
   /** The server's gateway URL line; off where each endpoint has its own URL (hosted). */
   gatewayLine?: boolean;
-  /** Account settings shown first, such as a hosted owner's provider connections. */
+  /** Account settings, such as a hosted owner's provider connections (shown after the client setup). */
   accounts?: ReactNode;
+  /** Hosted: the owner's endpoint picker, which renders the client blocks for the picked endpoint. */
+  clientSetup?: (quickstart: (load: SnippetsLoader) => ReactNode) => ReactNode;
 }
 
-export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts }: ConnectProps) {
+export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts, clientSetup }: ConnectProps) {
   const server = status.state === "ok" ? status.status : null;
   const gateway = server?.gateway.url ?? DEFAULT_GATEWAY_URL;
 
@@ -36,9 +38,18 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
         lead="Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back restored."
       />
 
-      {accounts}
+      {clientSetup ? (
+        <>
+          {clientSetup((load) => (
+            <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={load} />
+          ))}
+          {accounts}
+        </>
+      ) : (
+        accounts
+      )}
 
-      {serverSnippets ? (
+      {clientSetup ? null : serverSnippets ? (
         <>
           <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} />
 

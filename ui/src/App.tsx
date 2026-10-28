@@ -4,6 +4,7 @@ import { getSelectedEndpoint, getSelectedProject, setSelectedProject, useSelecte
 import { HostedApp } from "./hosted/HostedApp";
 import { AccountSummary, ProviderConnections } from "./hosted/AccountPanels";
 import { useSetupPending } from "./hosted/setup";
+import { ClientSetup } from "./hosted/ClientSetup";
 import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
 import { chatModesOf, offersDemoTraffic, offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -404,6 +405,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               loadSnippets={hostedSnippets}
               gatewayLine={!caps.accounts}
               accounts={caps.accounts ? <ProviderConnections /> : undefined}
+              clientSetup={caps.accounts && hosted ? (quickstart) => <ClientSetup call={hosted.call} quickstart={quickstart} /> : undefined}
               traffic={trafficOpened ? trafficHandle : undefined}
               onOpenLog={(id) => {
                 setLogFocus({ id, nonce: Date.now() });

@@ -1,20 +1,11 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
-import { firstRequest, loadSnippets, newSessionId, type Snippets, type SnippetsLoader, type SnippetsResult, type ToolId, type ToolSnippet } from "../api/connect";
+import { TOOLS, firstRequest, loadSnippets, newSessionId, type Snippets, type SnippetsLoader, type SnippetsResult, type ToolId, type ToolSnippet } from "../api/connect";
 import type { TrafficEvent, TrafficStatus } from "../api/traffic";
 import { Button, SegmentedControl, Select } from "../components/ui";
 import { readPref, writePref } from "../lib/storage";
 import { totalMasked } from "../lib/traffic";
 
 /** The tabs, in order, while the server can't be asked (the server's list wins when it answers). */
-const TOOLS: { id: ToolId; label: string }[] = [
-  { id: "muse-code", label: "Muse Code" },
-  { id: "pi", label: "pi" },
-  { id: "codex", label: "Codex" },
-  { id: "opencode", label: "OpenCode" },
-  { id: "curl", label: "cURL" },
-  { id: "python", label: "Python" },
-  { id: "claude-code", label: "Claude Code" },
-];
 const isTool = (v: string | null): v is ToolId => TOOLS.some((t) => t.id === v);
 const SESSION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 

@@ -180,8 +180,8 @@ export function ProviderConnections() {
   return (
     <section aria-labelledby="connections-title" className="space-y-4">
       <div>
-        <h2 id="connections-title" className="text-lg font-normal text-ink">Provider connections</h2>
-        <p className="mt-0.5 text-sm text-muted">Connect your own model key for the Playground. Endpoint keys for your application are created per endpoint in <a className="underline underline-offset-4" href="#projects">Projects</a>, and shown once.</p>
+        <h2 id="connections-title" className="text-lg font-normal text-ink">Model provider keys for the Playground</h2>
+        <p className="mt-0.5 text-sm text-muted">Connect your own model key for Playground chat. Your application doesn&apos;t use these: it uses an endpoint key from <a className="underline underline-offset-4" href="#projects">Projects</a>, as above.</p>
       </div>
       <div className="space-y-6 rounded-xl border border-line bg-surface p-4 sm:p-5">
         <Field label="Playground chat sends through" className="sm:max-w-md">
