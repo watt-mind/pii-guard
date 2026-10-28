@@ -150,6 +150,7 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_UPSTREAM_API_KEY` | Versioned Key Vault reference; sponsored Meta Standard key |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `https://api.meta.ai/v1`; server-owned sponsored route |
 | `PII_GUARD_HOSTED_MODELS` | `muse-spark-1.3` allowlist |
+| `PII_GUARD_HOSTED_SOURCE_TAG` | Default `pii-guard-hosted-demo`, `[A-Za-z0-9._-]{1,64}`; sent as `X-PII-Guard-Source` on sponsored Meta calls only ([attribution](#sponsored-upstream-attribution)) |
 | `PII_GUARD_NER_MODEL`, `PII_GUARD_DETECTORS` | `/app/models/ner`, `rules,ner`; cannot silently drop NER |
 | `PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS` | Default `0`; approved cumulative ceiling, max USD 10 |
 | `PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID` | Exact operator-approved ID; reused across Blob-backed restarts |
@@ -344,9 +345,11 @@ release evidence and `latest=ready`. No app/image yet means these checks are pen
   verify private Blob DNS/MI access and missing-object refusal. After provider authorization,
   use approved synthetic finite authority to prove exact-pin validation, concurrent CAS
   charging, expiry, exhaustion and restart resumption without resetting total/daily charges.
-- **Spend and rollback:** require written provider authorization, Standard routing, reviewed
-  pricing/reservations and exact approved ID/ceiling/expiry pins before setting positive
-  sponsorship. Keep it zero for technical-only releases. Save the previous immutable image
+- **Spend and rollback:** require written provider authorization **or** the owner's recorded
+  risk acceptance (LAB-1389, [below](#owner-risk-acceptance-is-not-authorization)), Standard
+  routing, reviewed pricing/reservations and exact approved ID/ceiling/expiry pins before
+  setting positive sponsorship. Before any general-availability launch, remove sponsored Meta
+  as the default route unless written authorization has arrived. Keep it zero for technical-only releases. Save the previous immutable image
   and secret-version references, exercise `disable`, and require fresh review before public
   rollback. Preserve the ledger; rollback never restores spent credit. Record an owner for
   provider-spend reconciliation and Azure budget alerts.
@@ -398,10 +401,47 @@ The script checks pre-existing Easy Auth before opening external ingress and run
 landing/readiness/anonymous-API-refusal smoke. On failure it restores internal ingress. This
 smoke does not replace browser sign-in, provider streaming or privacy review.
 
-Sponsored budget remains zero until written provider authorization and the other launch gates
-are recorded, and the operator supplies `HOSTED_SPONSORED_MICRODOLLARS`,
-`HOSTED_ALLOCATION_ID` and `HOSTED_ALLOCATION_EXPIRES_AT`. The `meta_proxy_authorized` key is required for positive allocations and may be set only
-after the maintainer records written Meta authorization. Releases reuse the operator's exact
+Sponsored budget remains zero until written provider authorization (or the owner risk
+acceptance below) and the other launch gates are recorded, and the operator supplies
+`HOSTED_SPONSORED_MICRODOLLARS`, `HOSTED_ALLOCATION_ID` and `HOSTED_ALLOCATION_EXPIRES_AT`.
+A positive allocation needs **one** of two evidence keys. `meta_proxy_authorized: true` may be
+set only after the maintainer records written Meta authorization.
+
+### Owner risk acceptance is not authorization
+
+No written Meta gateway/proxy authorization exists today. On 2026-10-28 the account owner
+decided, on LAB-1389, to run the sponsored route for the hackathon demo anyway and to accept
+responsibility for the possible non-compliance with the Meta Model API Terms (§10.1(i)). That
+is a **risk acceptance, not an authorization**, and the evidence says so with a separately
+named key; never record `meta_proxy_authorized: true` on the strength of it:
+
+```json
+"meta_proxy_owner_risk_accepted": {
+  "by": "owner", "ref": "LAB-1389", "date": "2026-10-28", "scope": "hackathon-demo"
+}
+```
+
+`deploy.sh` accepts exactly these four keys with these values (`date` a real, non-future
+`YYYY-MM-DD`), refuses any other shape even next to `meta_proxy_authorized`, and prints that the
+allocation is admitted under risk acceptance. It replaces no other gate: LAB-1372, image
+binding, the dev network keys, the USD 10 ceiling and the operator's allocation pins all still
+apply. Its conditions: hosted demo only (dev now, prod for judges), a finite allocation of at
+most USD 10 per environment with a fixed expiry after the hackathon, and attribution headers on
+every sponsored call. **Before any general-availability launch, sponsored Meta stops being the
+default route unless written authorization arrives**; delete the waiver from new evidence then.
+
+### Sponsored upstream attribution
+
+Every sponsored upstream call (the server-owned Meta route: no own connection selected, or a
+project endpoint whose provider is `sponsored`) sends `User-Agent:
+pii-guard/<version> (+https://github.com/watt-mind/pii-guard)` and `X-PII-Guard-Source:
+<PII_GUARD_HOSTED_SOURCE_TAG>`, so Meta can attribute the traffic to this deployment. Both are
+fixed per deployment and carry no user, principal, project, session or network identifier;
+the tag is validated at startup (`[A-Za-z0-9._-]{1,64}`). Bring-your-own-key and custom
+endpoints, including an own Meta key, get neither header, and a client-sent
+`X-PII-Guard-Source` is never forwarded.
+
+Releases reuse the operator's exact
 existing authority pins. The operator precreates the private object; neither bootstrap nor
 app release funds it. Changing the ID or cumulative ceiling must preserve charged total and
 current-day charges. Reconcile actual upstream usage and outstanding reservations before

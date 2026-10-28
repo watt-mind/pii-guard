@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import ClassVar
 
 SCRIPT = Path(__file__).with_name("deploy.sh").resolve()
 IMAGE = "piiguardexample.azurecr.io/pii-guard@sha256:" + "a" * 64
@@ -490,6 +491,98 @@ class DeploymentAdmissionTests(unittest.TestCase):
                     self.run_deploy(mode, HOSTED_SPONSORED_MICRODOLLARS=budget),
                     "HOSTED_RELEASE_EVIDENCE",
                 )
+
+    WAIVER: ClassVar[dict[str, str]] = {
+        "by": "owner",
+        "ref": "LAB-1389",
+        "date": "2026-10-28",
+        "scope": "hackathon-demo",
+    }
+
+    def run_sponsored_stage(self, evidence: object, *, dev: bool = False, budget: str = "1"):
+        with tempfile.TemporaryDirectory() as directory:
+            review = Path(directory) / "review.json"
+            review.write_text(json.dumps(evidence))
+            overrides = {
+                "HOSTED_RELEASE_EVIDENCE": str(review),
+                "HOSTED_SPONSORED_MICRODOLLARS": budget,
+                "HOSTED_ALLOCATION_ID": "synthetic-allocation-1",
+                "HOSTED_ALLOCATION_EXPIRES_AT": "4102444800",
+            }
+            if dev:
+                overrides.update(
+                    AZURE_ENVIRONMENT="dev",
+                    AZURE_RESOURCE_GROUP="rg-pii-guard-dev",
+                    AZURE_DEV_NETWORK_APPROVED="true",
+                    HOSTED_PUBLIC_ORIGIN="https://guard-dev.watt-mind.com",
+                )
+            return self.run_deploy("stage", **overrides)
+
+    def test_positive_allocation_accepts_authorization_or_named_owner_risk_acceptance(self) -> None:
+        base = {"image": IMAGE, "lab_1372_done": True}
+        authorized = self.run_sponsored_stage({**base, "meta_proxy_authorized": True})
+        self.assertEqual(authorized.returncode, 0, authorized.stderr)
+        self.assertNotIn("risk acceptance", authorized.stderr)
+        self.assertIn("sponsoredMicrodollars=1", self.calls)
+        waived = self.run_sponsored_stage({**base, "meta_proxy_owner_risk_accepted": self.WAIVER})
+        self.assertEqual(waived.returncode, 0, waived.stderr)
+        self.assertIn("not Meta authorization", waived.stderr)
+        self.assertIn("sponsoredMicrodollars=1", self.calls)
+        dev = self.run_sponsored_stage(
+            {
+                **base,
+                **dict.fromkeys(
+                    ("private_dev_reviewed", "tailnet_acl", "proxy_tls", "proxy_headers"), True
+                ),
+                "meta_proxy_owner_risk_accepted": self.WAIVER,
+            },
+            dev=True,
+        )
+        self.assertEqual(dev.returncode, 0, dev.stderr)
+        self.assertIn("sponsoredMicrodollars=1", self.calls)
+
+    def test_positive_allocation_without_authorization_or_waiver_is_refused(self) -> None:
+        base = {"image": IMAGE, "lab_1372_done": True}
+        for evidence in (base, {**base, "meta_proxy_authorized": False}):
+            with self.subTest(evidence=evidence):
+                self.assert_refused(self.run_sponsored_stage(evidence), "positive allocation")
+        # The waiver never substitutes for other gates: LAB-1372 and image binding still apply.
+        for evidence in (
+            {"image": IMAGE, "meta_proxy_owner_risk_accepted": self.WAIVER},
+            {**base, "image": "other", "meta_proxy_owner_risk_accepted": self.WAIVER},
+        ):
+            with self.subTest(evidence=evidence):
+                self.assert_refused(
+                    self.run_sponsored_stage(evidence), "Release evidence incomplete"
+                )
+
+    def test_malformed_owner_risk_acceptance_is_refused(self) -> None:
+        base = {"image": IMAGE, "lab_1372_done": True}
+        for waiver in (
+            True,
+            "LAB-1389",
+            {},
+            {**self.WAIVER, "by": "agent"},
+            {**self.WAIVER, "ref": "LAB-1372"},
+            {**self.WAIVER, "scope": "general-availability"},
+            {**self.WAIVER, "date": "28/10/2026"},
+            {**self.WAIVER, "date": "2026-02-30"},
+            {**self.WAIVER, "date": "2999-01-01"},
+            {**self.WAIVER, "extra": True},
+            {k: v for k, v in self.WAIVER.items() if k != "date"},
+        ):
+            with self.subTest(waiver=waiver):
+                self.assert_refused(
+                    self.run_sponsored_stage({**base, "meta_proxy_owner_risk_accepted": waiver}),
+                    "Malformed owner risk acceptance",
+                )
+        # Even alongside written authorization, a malformed waiver is refused, not ignored.
+        self.assert_refused(
+            self.run_sponsored_stage(
+                {**base, "meta_proxy_authorized": True, "meta_proxy_owner_risk_accepted": {}}
+            ),
+            "Malformed owner risk acceptance",
+        )
 
     def test_enable_readiness_timeout_restores_internal_ingress(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
