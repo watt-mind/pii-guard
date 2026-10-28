@@ -1,11 +1,14 @@
 """Streaming re-identification of ``chat.completion.chunk`` server-sent events.
 
-Every text field of a delta (``content``, ``refusal``, reasoning) and every tool call's
-``function.arguments`` gets its own :class:`~pii_guard.vault.StreamUnmasker`, keyed by choice
-index (and tool-call index), so a placeholder split across chunks (``[[PERS`` + ``ON_7f3a]]``)
+Every text field of a delta (``content``, ``refusal``, reasoning), every tool call's
+``function.arguments`` and custom ``custom.input``, and the legacy ``function_call.arguments``
+gets its own :class:`~pii_guard.vault.StreamUnmasker`, keyed by choice index (and tool-call
+index), so a placeholder split across chunks (``[[PERS`` + ``ON_7f3a]]``)
 is held back until it is complete. When a choice finishes (``finish_reason``) or the stream
 ends, whatever is still held back is flushed into that chunk (or a final synthetic chunk).
 Concatenating the emitted deltas gives exactly ``session.unmask()`` of the upstream text.
+Arguments (JSON) get JSON-string-escaped values; custom tool input is freeform text and is
+restored as is (LAB-1354). One restore budget covers every field of the response (LAB-1350).
 
 Upstream ``error`` events are replaced by a generic error: they may quote the masked request.
 """
@@ -128,12 +131,25 @@ class SseRestorer:
                     self._masked_content.setdefault(index, []).append(value)
                 delta[name] = self._unmasker((index, name)).feed(value)
         for position_in_delta, call in enumerate(delta.get("tool_calls") or []):
-            function = call.get("function") if isinstance(call, dict) else None
+            if not isinstance(call, dict):
+                continue
+            tool_index = call.get("index", position_in_delta)
+            function = call.get("function")
             if isinstance(function, dict) and isinstance(function.get("arguments"), str):
-                key = (index, "tool", call.get("index", position_in_delta))
-                function["arguments"] = self._unmasker(key, json_safe=True).feed(
-                    function["arguments"]
+                function["arguments"] = self._unmasker(
+                    (index, "tool", tool_index), json_safe=True
+                ).feed(function["arguments"])
+            custom = call.get("custom")
+            if isinstance(custom, dict) and isinstance(custom.get("input"), str):
+                custom["input"] = self._unmasker((index, "custom", tool_index)).feed(
+                    custom["input"]
                 )
+        # The legacy (pre-tools) single function call: ``delta.function_call.arguments``.
+        function_call = delta.get("function_call")
+        if isinstance(function_call, dict) and isinstance(function_call.get("arguments"), str):
+            function_call["arguments"] = self._unmasker(
+                (index, "function_call"), json_safe=True
+            ).feed(function_call["arguments"])
         if choice.get("finish_reason") and isinstance(index, int):
             self._flush_choice(index, delta)
 
@@ -144,18 +160,7 @@ class SseRestorer:
             self._retired_unresolved.update(dict.fromkeys(unmasker.unresolved))
             if not rest:
                 continue
-            if key[1] == "tool":
-                calls = delta.setdefault("tool_calls", [])
-                target = next(
-                    (c for c in calls if isinstance(c, dict) and c.get("index") == key[2]), None
-                )
-                if target is None:
-                    target = {"index": key[2], "function": {"arguments": ""}}
-                    calls.append(target)
-                function = target.setdefault("function", {})
-                function["arguments"] = (function.get("arguments") or "") + rest
-            else:
-                delta[key[1]] = (delta.get(key[1]) or "") + rest
+            _append_rest(delta, key, rest)
 
     def finish(self) -> list[str]:
         """Payloads for anything still held back when the stream ends without a finish."""
@@ -167,13 +172,7 @@ class SseRestorer:
             rest = unmasker.flush()
             if not rest or not isinstance(key[0], int):
                 continue
-            delta = pending.setdefault(key[0], {})
-            if key[1] == "tool":
-                delta.setdefault("tool_calls", []).append(
-                    {"index": key[2], "function": {"arguments": rest}}
-                )
-            else:
-                delta[key[1]] = rest
+            _append_rest(pending.setdefault(key[0], {}), key, rest)
         if not pending:
             return []
         chunk = dict(self._template or {"object": "chat.completion.chunk"})
@@ -182,3 +181,25 @@ class SseRestorer:
             for index, delta in sorted(pending.items())
         ]
         return [json.dumps(chunk, ensure_ascii=False)]
+
+
+#: Unmasker key kind -> (tool-call field, its text field). Text fields sit on the delta itself.
+_TOOL_FIELDS = {"tool": ("function", "arguments"), "custom": ("custom", "input")}
+
+
+def _append_rest(delta: dict[str, Any], key: tuple[Any, ...], rest: str) -> None:
+    """Append a flushed remainder to the field of ``delta`` its unmasker ``key`` restores."""
+    kind = key[1]
+    if kind in _TOOL_FIELDS:
+        container, name = _TOOL_FIELDS[kind]
+        calls = delta.setdefault("tool_calls", [])
+        target = next((c for c in calls if isinstance(c, dict) and c.get("index") == key[2]), None)
+        if target is None:
+            target = {"index": key[2]}
+            calls.append(target)
+        holder = target.setdefault(container, {})
+    elif kind == "function_call":
+        holder, name = delta.setdefault("function_call", {}), "arguments"
+    else:
+        holder, name = delta, kind
+    holder[name] = (holder.get(name) or "") + rest
