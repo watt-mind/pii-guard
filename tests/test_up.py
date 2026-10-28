@@ -203,18 +203,26 @@ def _free_port() -> int:
 def test_up_process_serves_everything_and_stops_on_sigint(tmp_path: Path) -> None:
     port = _free_port()
     env = {k: v for k, v in os.environ.items() if not k.startswith("PII_GUARD_")}
-    proc = subprocess.Popen(  # noqa: S603 - fixed argument list
-        [sys.executable, "-m", "pii_guard", "up", "--no-browser", "--port", str(port)],
-        cwd=tmp_path,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
+    # Rules only (LAB-1321): never load or download the NER (1.1 GB). An empty models dir keeps a
+    # cached or pinned checkpoint out too. `make smoke-fast` covers the NER-loading `up`.
+    env["PII_GUARD_NER_FALLBACK"] = "off"
+    env["PII_GUARD_MODELS_DIR"] = str(tmp_path / "no-models")
+    # The child writes to a file, not a pipe nobody reads: a full pipe blocks it mid-request and
+    # the chat call times out (the flake in LAB-1321 / LAB-1319).
+    log = tmp_path / "up.log"
+    with log.open("wb") as sink:
+        proc = subprocess.Popen(  # noqa: S603 - fixed argument list
+            [sys.executable, "-m", "pii_guard", "up", "--no-browser", "--port", str(port)],
+            cwd=tmp_path,
+            env=env,
+            stdout=sink,
+            stderr=subprocess.STDOUT,
+        )
     base = f"http://127.0.0.1:{port}"
     try:
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 120
         while True:
-            assert proc.poll() is None, proc.stdout.read().decode() if proc.stdout else ""
+            assert proc.poll() is None, log.read_text(errors="replace")
             try:
                 if httpx.get(f"{base}/healthz", timeout=1).status_code == 200:
                     break
@@ -222,24 +230,33 @@ def test_up_process_serves_everything_and_stops_on_sigint(tmp_path: Path) -> Non
                 pass
             assert time.monotonic() < deadline, "pii-guard up did not start"
             time.sleep(0.2)
-        assert httpx.get(f"{base}/").status_code == 200
+        assert httpx.get(f"{base}/", timeout=30).status_code == 200
         reply = httpx.post(
             f"{base}/v1/chat/completions",
             json={"model": "pii-guard-mock", "messages": [{"role": "user", "content": EMAIL}]},
-            timeout=30,
+            timeout=60,
         )
         assert reply.json()["choices"][0]["message"]["content"] == f"Echo: {EMAIL}"
-        traffic = httpx.get(f"{base}/v1/traffic").text
+        traffic = httpx.get(f"{base}/v1/traffic", timeout=30).text
         assert "EMAIL" in traffic
         assert EMAIL not in traffic
     finally:
-        proc.send_signal(signal.SIGINT)
-        out, _ = proc.communicate(timeout=20)
-    assert proc.returncode == 0, out.decode()
-    assert "pii-guard is up" in out.decode()
-    assert "offline mock model" in out.decode()
-    assert "pii-guard stopped" in out.decode()
-    assert "Traceback" not in out.decode()
+        if proc.poll() is None:
+            proc.send_signal(signal.SIGINT)
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            pytest.fail(f"pii-guard up did not stop on SIGINT:\n{log.read_text(errors='replace')}")
+    out = log.read_text(errors="replace")
+    assert proc.returncode == 0, out
+    assert "pii-guard is up" in out
+    detectors = next(line for line in out.splitlines() if "detectors" in line)
+    assert detectors.split()[1:2] == ["rules"] and "ner" not in detectors  # no model, no download
+    assert "offline mock model" in out
+    assert "pii-guard stopped" in out
+    assert "Traceback" not in out
 
 
 def test_banner_names_the_ner_model_or_why_there_is_none(
