@@ -65,7 +65,19 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
         403,
         "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
     ),
+    "vault_inspect_not_local": (
+        403,
+        "`PII_GUARD_VAULT_INSPECT=full` and the connection is not loopback on both ends.",
+    ),
+    "vault_reveal_disabled": (
+        403,
+        "`reveal=true` on the vault inspector while `PII_GUARD_VAULT_INSPECT` is not `full`.",
+    ),
     "not_found": (404, "Unknown route, or an unknown or expired `session_id`."),
+    "vault_inspect_disabled": (
+        404,
+        "The vault inspector is off (`PII_GUARD_VAULT_INSPECT=off`).",
+    ),
     "traffic_log_disabled": (404, "The traffic log is off (`PII_GUARD_TRAFFIC_LOG=off`)."),
     "payload_too_large": (413, "The body, text or image is larger than the configured limit."),
     "unsupported_media_type": (415, "The image is not a PNG or JPEG (sniffed from its bytes)."),

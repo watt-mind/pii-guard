@@ -13,6 +13,12 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pii_guard import __version__
 from pii_guard.api.errors import error_responses, install_error_handlers
 from pii_guard.api.routes import include_routers
+from pii_guard.api.routes.vault import (
+    InspectMode,
+    SessionDirectory,
+    SessionRecorderMiddleware,
+    check_inspect_bind,
+)
 from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware, allowed_hosts
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect import stack
@@ -92,6 +98,11 @@ def create_app(
     hosts = allowed_hosts(settings)
     check_bind(obs_settings.traffic_log, settings.host)
     check_allowed_hosts(obs_settings.traffic_log, hosts)
+    # The vault inspector (LAB-1328): `full` reveals originals, so it is loopback-only too.
+    inspect_mode = InspectMode(settings.vault_inspect)
+    check_inspect_bind(inspect_mode, settings.host, hosts)
+    app.state.vault_inspect = inspect_mode
+    app.state.vault_directory = SessionDirectory(settings.vault_max_sessions)
     upstream_key = settings.upstream_api_key
     app.state.observability = Observability(
         obs_settings,
@@ -121,6 +132,8 @@ def create_app(
     include_routers(app)
     # Innermost: /s/<session>/v1/... reaches the /v1 routes with that vault session (LAB-1286);
     # the Host, loopback and token checks see the URL as sent.
+    if inspect_mode is not InspectMode.OFF:  # where each gateway session came from
+        app.add_middleware(SessionRecorderMiddleware, directory=app.state.vault_directory)
     app.add_middleware(SessionPathMiddleware)
 
     # Outermost last: Host check, then (full only) loopback sockets, then the token.
