@@ -3,6 +3,7 @@ import { Workspace } from "./projects/Workspace";
 import { getSelectedEndpoint, getSelectedProject, setSelectedProject, useSelectedScope } from "./projects/selection";
 import { HostedApp } from "./hosted/HostedApp";
 import { AccountSummary, ProviderConnections } from "./hosted/AccountPanels";
+import { useSetupPending } from "./hosted/setup";
 import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
 import { chatModesOf, offersDemoTraffic, offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -216,9 +217,10 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
     const t = setTimeout(() => setSettleTimedOut(true), SETTLE_CAP_MS);
     return () => clearTimeout(t);
   }, []);
-  const settled =
-    settleTimedOut ||
-    (engine.state.status.state !== "checking" && (!trafficOpened || trafficHandle.status.state !== "connecting" || trafficHandle.source === "fixture"));
+  const setupPending = useSetupPending() && caps.accounts && route.section === "overview";
+  // An unreachable traffic log switches to the recorded demo by itself: wait for that switch too.
+  const trafficSettled = !trafficOpened || trafficHandle.source === "fixture" || (trafficHandle.status.state !== "connecting" && trafficHandle.status.state !== "offline");
+  const settled = settleTimedOut || (engine.state.status.state !== "checking" && trafficSettled && !setupPending);
 
   // Overview's usage counters come from /v1/account: read it again each time Overview opens.
   const refreshAccount = hosted?.refresh;

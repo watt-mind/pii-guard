@@ -85,7 +85,8 @@ active nav item is marked by `aria-current`, its fill and a 500 weight, not by f
 ## Type
 
 - **Geist** for interface text and **Geist Mono** for documents, placeholders, values, codes
-  and the boundary labels ("Inside your network", "Sent to the model"), both self-hosted from
+  and the boundary labels ("Inside your network", or "Your input" on the hosted console, where the
+  input is processed on our server; "Sent to the model"), both self-hosted from
   `@fontsource-variable/*` (SIL OFL 1.1, latin-ext included for Hungarian).
 - Why Geist: the reference uses Monument Grotesk, a commercial neo-grotesk. Geist is the
   closest open match in proportion and tone (a neutral, slightly squared grotesk with open
@@ -104,7 +105,8 @@ active nav item is marked by `aria-current`, its fill and a 500 weight, not by f
   | Body, controls, table cells, card subtitles | `text-sm` | 14 / 20 / 400 |
   | Item title, step title, field label, emphasis | `text-sm font-medium` | 14 / 20 / 500 |
   | Help text, hints, metric label | `text-xs text-muted` | 12 / 16 / 400 |
-  | Dense meta text and documents (`.doc`, text areas) | `text-ui` / `.doc` | 13 / 20 |
+  | Dense meta text, code blocks and text areas | `text-ui` | 13 / 20 |
+  | Documents (`.doc`: masked and restored text) | `.doc` | 13 / 24 (1.85), so highlights on adjacent lines don't touch |
   | Group label, badge, pane eyebrow | `text-2xs` (+ `uppercase tracking-[0.04em]` for sidebar groups only) | 11 / 16 / 500 |
 
   Mono (`font-mono`) is for values, codes, IDs and documents, never for counts.
@@ -147,7 +149,9 @@ merged.
   `secondary` (surface, `--line-strong` border deepening to `--field` on hover), `ghost` (text
   only, low-weight actions inside a pane) and `danger` (red text and border: destructive actions
   and their confirmation). `size`: `sm` 32 px, `md` 36 px; both become 44 px on a coarse pointer
-  (`pointer-coarse:`), so touch sizing follows the device, not hosted or local mode. Every
+  (`pointer-coarse:`), so touch sizing follows the device, not hosted or local mode or the window
+  width (the header's project switcher and avatar included). Icons are 16 px line glyphs at a
+  1.5 stroke; only the 24 px brand and boundary marks are heavier. Every
   button has the 10 px radius and 14 px text at 400. `busy` keeps it focusable (`aria-disabled`,
   clicks ignored), so keyboard focus is never dropped while work runs. `ButtonLink` is the same
   look on an `<a>`, for navigation.
@@ -155,7 +159,9 @@ merged.
   `aria-describedby`, never inside the label), an error slot (12 px danger) and a required
   marker. **`Input`**, **`Select`** and **`Textarea`** share the height (36 px, `sm` 32 px,
   44 px on touch), the 10 px radius, the `--field` outline and the neutral focus ring; text areas
-  are 13 px mono on `--surface-2`.
+  are 13 px mono on `--surface-2`. `Select` draws one chevron of its own (`appearance: none`, the
+  `--chevron` token, 10 px from the right edge) and keeps `pr-8`, so the arrow's room is reserved once.
+  Disabled buttons and controls take no hover (`not-disabled:hover:`).
 - **`Checkbox`**: a native 16 px checkbox with the primary as its accent and its label beside it.
 - **`SegmentedControl`**: native radios in a `radiogroup` (one tab stop, arrow keys). The track is
   `--surface-2`; the selected segment is a raised `--surface` with a `--line-strong` ring and ink
@@ -177,6 +183,19 @@ merged.
   latency and total.
 - **`PageHeader`**: the screen's one `h1`, the section name as the menu says it, and its lead
   sentence. Playground's tabs and their views sit below it.
+- **`Pane`** pairs (Text, Images): the header holds only the eyebrow and title (a Copy action at
+  most), so side-by-side headers are equal at every width; the controls for the input (language,
+  Run, Show regions) sit in a toolbar row above the panes. Grids inside a column that sits beside
+  another (Logs' call detail) use container queries (`@container`, `@2xl:`, `@3xl:`) so they follow
+  the column, not the viewport.
+- **Visually hidden inputs** (`sr-only` radios and checkboxes in sample cards and chips) are
+  absolutely positioned: their label is always `relative`, or the input escapes a horizontal
+  scroller and widens the page.
+- **First paint** waits (at most 1.2 s) until the engine, the traffic log and, on a hosted
+  Overview, the setup list have answered, and `<main>` is at least a viewport tall, so notices and
+  late cards never push a painted page down (CLS under 0.1 on every screen).
+- **Hosted setup list** (Overview): one ordered list (model → policy → endpoint → endpoint key →
+  first call) ticked from the owner's own data, with one primary button: the next step.
 - **`Card`**: white, 1 px `--line`, 20 px radius, `p-4 sm:p-5`, an 18/400 title and a 14 px muted
   subtitle (`mt-0.5`). `Pane` uses the same insets and title; side-by-side cards share them so
   their titles line up.
