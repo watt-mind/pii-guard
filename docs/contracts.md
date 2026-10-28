@@ -853,7 +853,8 @@ only.
 - `?endpoint=<id>`: the same blocks for one of the caller's project endpoints
   ([ADR 0013](decisions/0013-one-console-owner-scoped-api.md)). `gateway_url` is
   `<origin>/e/<endpoint>/v1`: `HOSTED_PUBLIC_ORIGIN` hosted, the request's base URL locally.
-  The model is the endpoint's, `auth` is `{"token_required": true, "token_env":
+  The model is the endpoint's (pass-through: `model` and `endpoint.model` are `null`, `models`
+  is empty and the blocks carry the `<model-id>` placeholder for the client's own), `auth` is `{"token_required": true, "token_env":
   "PII_GUARD_ENDPOINT_KEY"}`, `session`/`session_url`/`session_ref` are `null`, `presets` is
   empty, and `upstream` has the preset name but `origin: null`. `endpoint` is
   `{"id", "name", "model", "enabled"}`. Muse Code is `supported: false` (it reads its catalog
@@ -1542,7 +1543,8 @@ single-owner routes keep their default namespace.
 | `PUT /v1/projects/{project_id}/policies/{policy_id}` | Same policy fields | 201 next immutable version; existing endpoints remain pinned |
 | `GET /v1/projects/{project_id}/policies/versions/{version_id}` | — | Exact policy-version snapshot |
 | `GET /v1/projects/{project_id}/endpoints` | — | `{endpoints:[...]}`; credentials are never returned |
-| `POST /v1/projects/{project_id}/endpoints` | `{name,provider,model,policy_version_id,base_url?,api_key?,enabled?}` | 201 endpoint metadata; maximum 128 per project |
+| `POST /v1/projects/{project_id}/endpoints` | `{name,provider,policy_version_id,model?,base_url?,api_key?,enabled?}` | 201 endpoint metadata; maximum 128 per project. `model` is `null` for a pass-through endpoint |
+| `POST /v1/projects/{project_id}/endpoints/models` | `{provider,base_url?,api_key?,endpoint_id?}` | `{models:[id,...]}` for the endpoint form: the provider's `GET /models` asked with `api_key` (never stored) or, without it, `endpoint_id`'s stored key (same provider and base URL only, else 422); `sponsored` returns the hosted allow-list. No key is 422; a provider failure is a generic `502 upstream_unavailable` |
 | `PUT /v1/projects/{project_id}/endpoints/{endpoint_id}` | Complete endpoint fields; `api_key` may be omitted to keep current credential | Updated metadata; explicit `policy_version_id` required. `enabled:false` atomically revokes active keys; re-enabling does not restore them |
 | `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}` | — | 204; permanently deletes endpoint and all its key records |
 | `GET /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | — | `{keys:[id,name,created_at,revoked_at]}`; no raw keys |
@@ -1556,18 +1558,36 @@ policies require `fast`; self-hosted policies must use the deployment's detectio
 `local-only` refuses `audit`. A policy revision appends a version and never mutates a prior
 version or silently changes endpoint pins. A project can contain up to 256 policy versions.
 
-An endpoint pins one policy version and one provider/model/upstream/credential tuple. Providers
+An endpoint pins one policy version and one provider/upstream/credential tuple, and optionally
+one model (LAB-1451). Providers
 are `meta`, `openai`, `fireworks`, `openrouter`, `custom`, and hosted-only `sponsored` Meta.
 Preset providers use their fixed base URL. `custom` requires a base URL. Hosted destinations
 must pass the public HTTPS port-443 and DNS validation; local/self-hosted destinations accept
 HTTP or HTTPS, including loopback, and reject embedded URL credentials, queries and fragments.
 New BYOK endpoints require an API key; on edit, omitting `api_key` preserves the current key.
 Provider credentials are encrypted in SQLite and omitted from all endpoint metadata. Sponsored
-endpoints store no credential and require an allowlisted hosted model.
+endpoints store no credential and require an allowlisted hosted model: an empty or
+non-allowlisted `model` is `422 invalid_project_config`.
+
+**Endpoint model: pinned or pass-through.** With a `model`, the endpoint is pinned: gateway
+requests get that model injected and any other `model` fails closed with `403`. BYOK endpoints
+(`meta`, `openai`, `fireworks`, `openrouter`, `custom`) may omit `model` (or send `null` or
+`""`): the endpoint is pass-through, metadata reports `model: null`, and the client's own
+`model` is forwarded unchanged, so agent harnesses (Codex, Muse Code, OpenCode, Claude Code)
+can choose theirs. A pass-through request without a non-empty string `model` (at most 256
+characters, no control characters) is `400 invalid_request`, before anything is sent. Storage:
+pass-through is `''` in the existing `model TEXT NOT NULL` column, so the SQLite schema and
+every existing local store or blob snapshot are unchanged and load as is; existing rows keep
+their pinned model. A build from before LAB-1451 reading a pass-through row fails closed (it
+refuses every client `model`).
 
 Endpoint gateway URLs are `/e/{endpoint_id}/v1/chat/completions`,
 `/e/{endpoint_id}/v1/responses`, and `/e/{endpoint_id}/v1/models`. Send the endpoint key as a
-Bearer credential. These routes accept only that endpoint's configured model, language, mode,
+Bearer credential. `/models` lists only the pinned model for a pinned endpoint (the provider is
+not asked) and, for pass-through, the provider's own catalog asked with the endpoint's stored
+credential (`id`, `object`, `created`, `owned_by` only; a provider failure is a generic
+`502 upstream_unavailable`; hosted, through the public-HTTPS egress client). These routes accept
+only that endpoint's configured model (when pinned), language, mode,
 upstream and policy version; caller overrides fail closed. Endpoint keys cannot call owner,
 account, management, traffic or vault routes. A revoked key or disabled endpoint rejects new
 admission; an already admitted call uses its captured endpoint/policy/credential snapshot and
