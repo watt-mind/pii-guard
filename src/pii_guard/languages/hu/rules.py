@@ -227,8 +227,8 @@ def _find_mrz(text: str) -> Iterator[_Hit]:
 
 # Two or three blocks of 8 digits separated by a hyphen, a space or a dot, or nothing.
 _GIRO_RE = re.compile(NUM_START + r"(\d{8})([- .]?)(\d{8})(?:\2(\d{8}))?" + NUM_END)
-# The same account printed in groups of four (``1177 3016 1111 1018``), one consistent space
-# or hyphen, 16 or 24 digits, and not part of a longer grouped number (LAB-1216).
+# The same account printed in four-character groups, using one consistent space or hyphen,
+# and not as part of a longer grouped number (LAB-1095).
 _GIRO_QUAD_RE = re.compile(
     NUM_START
     + NO_GROUP_BEFORE

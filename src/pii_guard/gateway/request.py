@@ -762,7 +762,7 @@ def _collect_json(
     if isinstance(value, str):
         out.slots.append(TextSlot(value, _setter(container, key), kind))
     elif (number := _number_text(value)) is not None:
-        # Numbers carry values too ({"tax_id": 8123456786}); a masked one becomes a string.
+        # Numeric JSON fields can hold identifiers; a masked number becomes a string.
         out.slots.append(TextSlot(number, _number_setter(container, key), kind))
     elif isinstance(value, list):
         for i in range(len(value)):
