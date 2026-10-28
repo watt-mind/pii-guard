@@ -2,8 +2,24 @@ import { useSyncExternalStore } from "react";
 
 // Selection is tab-local. A project switch must remount request/session state in the UI;
 // never persist vault session ids, provider credentials, or response data alongside it.
-let selectedProject: string | null = null;
-let selectedEndpoint: string | null = null;
+// The project and endpoint ids (never secrets) survive a reload in this tab: sessionStorage.
+const KEY = "pii-guard:selection";
+function readSelection(): [string | null, string | null] {
+  try {
+    const v = JSON.parse(globalThis.sessionStorage?.getItem(KEY) ?? "null");
+    return Array.isArray(v) ? [typeof v[0] === "string" ? v[0] : null, typeof v[1] === "string" ? v[1] : null] : [null, null];
+  } catch {
+    return [null, null];
+  }
+}
+function saveSelection() {
+  try {
+    globalThis.sessionStorage?.setItem(KEY, JSON.stringify([selectedProject, selectedEndpoint]));
+  } catch {
+    // storage can be blocked; the selection still holds for this page
+  }
+}
+let [selectedProject, selectedEndpoint] = readSelection();
 const listeners = new Set<() => void>();
 
 export function getSelectedProject(): string | null { return selectedProject; }
@@ -15,12 +31,14 @@ export function setSelectedProject(id: string | null): void {
   if (selectedProject === id && selectedEndpoint === null) return;
   selectedProject = id;
   selectedEndpoint = null;
+  saveSelection();
   for (const listener of listeners) listener();
 }
 
 export function setSelectedEndpoint(id: string | null): void {
   if (selectedEndpoint === id) return;
   selectedEndpoint = id;
+  saveSelection();
   for (const listener of listeners) listener();
 }
 

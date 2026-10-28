@@ -1,3 +1,4 @@
+import { MENU_OPENED } from "../hooks/useMenu";
 import { useEffect, useId, useRef, useState } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
@@ -31,6 +32,25 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const menuButton = useRef<HTMLButtonElement>(null);
+
+  // A route change from outside the menu (a link, Back, a chart) closes the phone menu.
+  const routeKey = `${route.section}/${route.tab}`;
+  const [shownFor, setShownFor] = useState(routeKey);
+  if (shownFor !== routeKey) {
+    setShownFor(routeKey);
+    setOpen(false);
+  }
+  // So does another menu opening (the profile or project menu: useMenu announces it).
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener(MENU_OPENED, close);
+    window.addEventListener("hashchange", close);
+    return () => {
+      window.removeEventListener(MENU_OPENED, close);
+      window.removeEventListener("hashchange", close);
+    };
+  }, [open]);
 
   // Escape closes the phone menu and returns focus to its button.
   useEffect(() => {
