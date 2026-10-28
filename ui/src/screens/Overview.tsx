@@ -149,7 +149,7 @@ const code = (s: string) => <code className="rounded-sm bg-surface-2 px-1 font-m
 function ScopeNote({ t, forced, since }: { t: TrafficHandle; forced: boolean; since: string | null }) {
   if (t.source === "fixture") {
     return (
-      <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+      <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4 text-ink">
         <p className="min-w-0 flex-1">
           <strong className="font-medium text-warn">Recorded demo traffic, not your server.</strong>{" "}
           {forced

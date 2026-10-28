@@ -269,7 +269,7 @@ function SourceBanner({
   const code = (s: string) => <code className="rounded bg-surface px-1 font-mono text-xs">{s}</code>;
   if (source === "fixture") {
     return (
-      <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+      <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4 text-ink">
         <p className="min-w-0 flex-1">
           <strong className="font-medium text-warn">Recorded demo traffic.</strong>{" "}
           {forced
@@ -309,7 +309,7 @@ function SourceBanner({
   }
   if (status.state === "disabled") {
     return (
-      <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+      <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-surface p-3 text-sm sm:p-4 text-ink">
         <p className="min-w-0 flex-1">
           <strong className="font-medium">The traffic log is off on this server.</strong>{" "}
           {status.reason === "off" ? (
@@ -329,7 +329,7 @@ function SourceBanner({
   }
   if (status.state === "offline") {
     return (
-      <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-ink">
+      <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4 text-ink">
         <strong className="font-medium text-danger">Lost the connection to the API.</strong> Retrying every few seconds; the calls already shown stay. ({status.message})
       </div>
     );
@@ -337,14 +337,14 @@ function SourceBanner({
   if (status.state === "limited") {
     const wait = status.retryAfterMs ? ` in about ${Math.ceil(status.retryAfterMs / 1000)} s` : " shortly";
     return (
-      <div role="status" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+      <div role="status" className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4 text-ink">
         <strong className="font-medium text-warn">Too many requests just now.</strong> The API is up but asked this page to slow down; it retries{wait}. The calls already shown stay.
       </div>
     );
   }
   if (status.state === "denied") {
     return (
-      <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-ink">
+      <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4 text-ink">
         {status.reason === "signed_out" ? (
           <>
             <strong className="font-medium text-danger">You're signed out.</strong> The API is up but answered 401. Sign in again; this page reconnects by itself.
@@ -652,7 +652,7 @@ function CallDetail({
       </section>
 
       {e.outcome !== "ok" && (!forwarded || upstreamSide) && (
-        <div role="note" data-error-kind={upstreamSide ? upstreamCopy.kind : e.outcome === "blocked" ? "policy" : "fail_closed"} className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
+        <div role="note" data-error-kind={upstreamSide ? upstreamCopy.kind : e.outcome === "blocked" ? "policy" : "fail_closed"} className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4">
           <p className="font-medium text-warn">
             {upstreamSide ? upstreamCopy.title : `${e.outcome === "blocked" ? "Blocked by policy." : "Refused."} Nothing was sent to the model.`}
           </p>
