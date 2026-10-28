@@ -90,7 +90,7 @@ jobs:
     timeout-minutes: 15
     env:
       FULL: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
-      PYTEST_ADDOPTS: --durations=15
+      PYTEST_ADDOPTS: --durations=30
       # Tests of the committed report follow the smoke job's choice (LAB-1269).
       RENDER_DOCS_ON_MERGE: ${{ vars.RENDER_DOCS_ON_MERGE }}
     steps:

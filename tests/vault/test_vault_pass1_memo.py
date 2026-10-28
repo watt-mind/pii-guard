@@ -50,6 +50,10 @@ def test_memo_matches_a_mask_from_scratch(turns: list[Turn], case_sensitive: boo
     _same_with_and_without_memo(turns, case_sensitive)
 
 
+# untraced: one request per turn over the whole history, twice, is about 7x slower under the
+# branch tracer (42-52 s each on CI). The vault code it runs is covered by the property test
+# above and the unit tests below; this one guards the outputs on the corpus (LAB-1447).
+@pytest.mark.untraced
 @pytest.mark.parametrize("case_sensitive", [False, True])
 @pytest.mark.parametrize("late", [False, True])
 def test_memo_changes_no_output_on_the_prefilter_corpus(case_sensitive: bool, late: bool) -> None:
