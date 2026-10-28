@@ -1451,9 +1451,13 @@ downstream application scope. This does not configure platform or server access 
 Secondary admission immediately HMACs each normalized IPv4 address or IPv6 /64 with a
 random process-only key; mapped IPv4 uses the same bucket as IPv4. Its bounded in-memory
 tables hold digests and counters/timestamps only. Each table holds at most 4096 entries,
-with one-hour idle and 24-hour absolute expiry; a full table refuses new entries without
-evicting live allowances. Anonymous sponsored demo requests share a 30-request network
-burst, refilling 30/minute, and 120 requests per fixed hour starting at bucket creation.
+with one-hour idle and 24-hour absolute expiry; a full table evicts its least recently used
+bucket once it has been idle for five minutes (a fully refilled burst), and otherwise
+refuses new entries without evicting live allowances. Anonymous sponsored demo requests
+share a 30-request network burst, refilling 30/minute, and 120 requests per fixed hour
+starting at bucket creation. Each request also charges its aggregate (IPv4 /24, IPv6 /48):
+a 120-request burst refilling 60/minute and 480 requests per fixed hour, tracking at most
+64 networks, so one allocation cannot fill the network table or multiply its allowance.
 Guest cookie rotation does not reset that network allowance. Authenticated principals
 have separate 10-request work bursts refilling 30/minute, independent of network usage and
 without requiring an address signal, plus a separate read bucket (120 burst, 10/s) for
@@ -1461,7 +1465,8 @@ without requiring an address signal, plus a separate read bucket (120 burst, 10/
 Secondary charges happen after identity/path/origin validation, before body reads, and
 survive downstream failure. Clock/accounting failure refuses admission.
 
-Burst or capacity exhaustion returns 429 `abuse_throttled` with `Retry-After` seconds.
+Burst or capacity exhaustion returns 429 `abuse_throttled` with `Retry-After` seconds:
+the wait for the slowest refusing level, or until a full table's first slot can free.
 Anonymous hourly exhaustion returns 429 `sign_in_required`, `Retry-After` until the hour
 ends and a message directing Google sign-in or the free walkthrough. Sign-in never
 replenishes global requests, tokens, daily spend or the finite sponsored allocation.
