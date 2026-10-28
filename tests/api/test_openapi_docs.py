@@ -22,6 +22,7 @@ from pii_guard.api.routes._common import ephemeral_session
 from pii_guard.api.routes.traffic import TrafficLogDisabledError
 from pii_guard.config import Settings
 from pii_guard.detect.stack import DetectionUnavailableError
+from pii_guard.detection_profile import DetectionProfileError
 from pii_guard.policy import BlockedEntityError
 from pii_guard.types import (
     DetectionError,
@@ -152,6 +153,14 @@ def test_routes_declare_the_errors_they_raise(spec: dict[str, Any]) -> None:
     assert "not_found" in codes("/v1/unmask")
     assert "traffic_log_disabled" in codes("/v1/traffic", "get")
     assert set(COMMON_ERRORS) <= codes("/v1/analyze")
+    for path in (
+        "/v1/analyze",
+        "/v1/mask",
+        "/v1/mask/image",
+        "/v1/chat/completions",
+        "/v1/responses",
+    ):
+        assert "detection_profile_denied" in codes(path)
     assert codes("/healthz", "get") == {"traffic_log_not_local"}  # no token on /healthz
 
 
@@ -178,6 +187,7 @@ def test_documented_error_codes_are_in_contracts(spec: dict[str, Any]) -> None:
     [
         (PiiGuardError, "internal_error"),
         (DetectionError, "detection_failed"),
+        (DetectionProfileError, "detection_profile_denied"),
         (DetectionUnavailableError, "detection_unavailable"),
         (MaskingError, "masking_failed"),
         (PlaceholderInInputError, "placeholder_in_input"),

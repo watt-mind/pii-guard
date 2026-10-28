@@ -667,6 +667,10 @@ class LlmDetector:
         settings: Settings | None = None,
     ) -> None:
         settings = settings if settings is not None else get_settings()
+        from pii_guard.detection_profile import refuse_remote
+
+        refuse_remote(settings, "LLM detection, including loopback HTTP detectors")
+        self._profile_settings = settings
         url = (base_url or settings.llm_detector_url or DEFAULT_BASE_URL).rstrip("/")
         self.url = url if url.endswith("/chat/completions") else url + "/chat/completions"
         key = api_key if api_key is not None else settings.llm_detector_api_key
@@ -721,6 +725,9 @@ class LlmDetector:
     def detect(self, text: str, language: str = "hu") -> list[Span]:
         """Spans over ``text``. The model sees :func:`normalize_for_detection`'s cleaned text;
         its spans are mapped back, covering any invisible characters inside a value."""
+        from pii_guard.detection_profile import refuse_remote
+
+        refuse_remote(self._profile_settings, "LLM detection")
         self.require_available()  # before anything else: no key, no request (LAB-1290)
         if not text.strip():
             return []

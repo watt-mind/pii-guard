@@ -34,6 +34,7 @@ from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
 from pii_guard.api.deps import get_max_text_chars
+from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import log_extra, v1_router
 from pii_guard.api.routes.chat import get_gateway
 from pii_guard.api.routes.models import ModelsConfig, list_models
@@ -79,7 +80,9 @@ def get_responses_gateway(request: Request) -> ResponsesGateway:
     return responses
 
 
-@router.post("/v1/responses", tags=["gateway"])
+@router.post(
+    "/v1/responses", tags=["gateway"], responses=error_responses("detection_profile_denied")
+)
 async def responses(request: Request) -> Response:
     gateway = get_responses_gateway(request)
     raw = await request.body()

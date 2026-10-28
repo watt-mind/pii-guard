@@ -109,6 +109,7 @@ class MaskResponse(BaseModel):
         "vault_not_configured",
         "masking_failed",
         "detection_failed",
+        "detection_profile_denied",
         "detection_unavailable",
         "detector_loading",
     ),
