@@ -2,7 +2,7 @@
 
 LAB-1391. Four mmBERT (ModernBERT) token classifiers from three publishers, each pinned to a hub
 revision and the SHA-256 of its weights, against the published
-`hdkiller/pii-guard-ner-xlmr-base` v2.0 at `95f612a9ad65` (XLM-R base, 277M). All ran on one
+`watt-mind/pii-guard-ner-xlmr-base` v2.0 at `95f612a9ad65` (published as `hdkiller/…` when these runs were recorded; same revision and weights, LAB-1402) (XLM-R base, 277M). All ran on one
 commit (`97ee284` + this branch's evaluation-only code), fast mode, CPU
 (`PII_GUARD_NER_DEVICE=cpu`), Apple M-series, 10 cores, offline after the downloads, $0.
 Evaluation only: no model is in any product path and the production default is unchanged.

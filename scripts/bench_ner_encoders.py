@@ -68,7 +68,7 @@ _OURS_DETECTOR = {
     "name": "ner",
     "model": "xlmr-base-v2-hn",
     "model_ref": (
-        f"hdkiller/pii-guard-ner-xlmr-base v2.0 (LAB-1306), revision {_OURS.revision[:12]}; "
+        f"{_OURS.repo_id} v2.0 (LAB-1306), revision {_OURS.revision[:12]}; "
         "the LAB-1150 checkpoint pii-guard-ner-xlmr-base-v2-hn"
     ),
     "revision": f"sha256:{_OURS.weights_sha256}",
