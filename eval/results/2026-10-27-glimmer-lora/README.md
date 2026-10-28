@@ -1,6 +1,7 @@
 # Answer-only Muse Glimmer LoRA vs the other detectors (2026-10-27, LAB-1109)
 
-Status: **the fine-tuned model is trained but not evaluated yet.** Its adapter has to be
+Update 2026-10-28: the fine-tuned model is now evaluated on Fireworks, see
+[2026-10-28-glimmer-lora](../2026-10-28-glimmer-lora/README.md). Original status: **the fine-tuned model is trained but not evaluated yet.** Its adapter has to be
 downloaded from Fireworks before it can be served on Modal, and Fireworks only allows that
 after an interactive sign-in (see [docs/models.md](../../../docs/models.md#answer-only-muse-glimmer-lora-fine-tune-lab-1109)).
 This directory holds the fast-mode reference runs on the same sets; the fine-tuned rows are
@@ -44,7 +45,7 @@ document in seconds.
 
 | System | `hu-smoke` | `en-smoke` | Source |
 |---|---|---|---|
-| rules + **Glimmer LoRA, answer-only** | pending | pending | this ticket |
+| rules + **Glimmer LoRA, answer-only** (Fireworks H200, n-gram speculation) | 97.7 / 2.9, 1.1 s (hu+en pooled, 41 docs) | (pooled) | [2026-10-28-glimmer-lora](../2026-10-28-glimmer-lora/README.md) |
 | rules + Glimmer zero-shot, `reasoning_strength` low (Modal H100) | 99.3 / 0.0, 9.4 s (hu 28 docs + en pooled) | (pooled) | LAB-1109 ticket comment, 2026-10-26, older commit |
 | rules + Muse Spark Open, Baseten, `reasoning_effort` low | 98.4 / 0.9, 1.8 s | 97.1 / 0.0, 1.2 s | [2026-10-27-baseten](../2026-10-27-baseten/README.md) |
 | rules + Muse Spark 1.3, Meta Model API | 98.2 / 1.0, 10.6 s (28-doc version) | 97.1 / 0.0, 7.0 s | [2026-10-26-baselines](../2026-10-26-baselines/README.md) |

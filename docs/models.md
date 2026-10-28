@@ -450,8 +450,12 @@ modal app stop pii-guard-glimmer --yes   # always, when done
 
 Glimmer zero-shot is accurate but always reasons first (about 320 completion tokens per short
 document at `low`, 9.4 s p50). A LoRA fine-tune that answers with the span JSON directly keeps
-the open-weights model and removes the reasoning. Status: **trained; evaluation pending** (the
-adapter has to be downloaded with an interactive Fireworks sign-in first, see "Serving" below).
+the open-weights model and removes the reasoning. Status: **trained and evaluated
+(2026-10-28): fast but leaky.** On the same Fireworks H200 it answers with ~5x fewer tokens and,
+with n-gram speculation, at half the latency of zero-shot Glimmer (agent traffic p50 1.03 s vs
+2.28 s), but with the rules in front it leaks 1.0-1.1 % of agent-traffic values against
+zero-shot's 0.4 % (mostly names and ID numbers). Not a production default. Results:
+[eval/results/2026-10-28-glimmer-lora](../eval/results/2026-10-28-glimmer-lora/README.md).
 
 **Data** (`training/llm/build_sft.py`, manifest `training/llm/data-manifest.json`). One chat
 example per LAB-1128 distillation document (train split, seed 11): system and user are exactly
@@ -497,8 +501,24 @@ the model learns to address the user at once. Serve with the strength it was tra
 | Option | Price | Status |
 |---|---|---|
 | a. Fireworks serverless LoRA inference | n/a | Not offered: the base model reports `supportsServerlessLora: false`, and the docs say trained LoRAs can't be served serverless |
-| b. Fireworks on-demand deployment (live merge) | $8.00 per GPU-hour on H100 or H200, $13.00 on B200, billed while a replica runs | Needs the owner's approval (paid) |
-| c. vLLM on Modal with the adapter (`deploy/modal/glimmer.py`, `GLIMMER_LORA=...`) | Modal H100 $3.95 per hour, on the monthly free credit | Ready; needs the adapter downloaded, and Fireworks only allows that after an interactive `firectl signin` (API keys get `403: API keys cannot download models`) |
+| b. Fireworks on-demand deployment (live merge) | $8.00 per GPU-hour on H100 or H200, $13.00 on B200, billed per GPU-second while a replica runs, start-up free | **Used for the 2026-10-28 eval** (owner-approved, $25 cap): 1x H200 BF16, shape `dkuwotf7`, three short deployments, about $8 in all |
+| c. vLLM on Modal with the adapter (`deploy/modal/glimmer.py`, `GLIMMER_LORA=...`) | Modal H100 $3.95 per hour, on the monthly free credit | Ready, but blocked: the account can't download models (`model downloading is restricted, please contact Fireworks AI`), even after `firectl signin` |
+
+**Pointing the detector at the Fireworks deployment** (option b). Fireworks ignores
+`chat_template_kwargs`, so `..._REASONING_STRENGTH` has no effect there; `reasoning_effort` is
+mapped onto Glimmer's template, and with `low` the served prompt equals the training render byte
+for byte (checked with `raw_output`):
+
+```
+PII_GUARD_LLM_DETECTOR_URL=https://api.fireworks.ai/inference/v1
+PII_GUARD_LLM_DETECTOR_MODEL='accounts/<account>/models/pii-guard-glimmer-lab1109-v1#accounts/<account>/deployments/<deployment>'
+PII_GUARD_LLM_DETECTOR_API_KEY=<FIREWORKS_API_KEY>
+PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low
+```
+
+A live-merged LoRA gets no speculative decoding by default (`draftTokenCount 0`; the base model
+gets 15) and decodes at about 45 tokens/s; create the deployment with
+`"ngramSpeculationLength": 3, "draftTokenCount": 8` for about 1.8x lower latency.
 
 Option (c), once the adapter is on the volume:
 

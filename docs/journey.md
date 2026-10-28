@@ -1384,11 +1384,21 @@ with the detector's own prompts as input, on Fireworks' free Serverless Training
 - **Template:** the training renderer and the model's own chat template agree byte for byte
   (50/50 prompts); the trained answer is addressed straight to the user, with no reasoning
   turn.
-- **Blocked on:** Fireworks lets API keys train but not download models, and it doesn't serve
-  trained LoRAs serverless. Serving on our own vLLM (Modal) needs one interactive sign-in to
-  download the adapter; a Fireworks deployment would cost $8 per GPU-hour.
-- **Bar to clear:** fast mode (rules + distilled NER) now scores 98.6-99.6 F1 and 0.5 % leak
-  on the held-out split at 0.1 s, so the fine-tune has to win on leak to earn a GPU.
+- **Evaluated (2026-10-28)** on Fireworks, the LoRA and the base model each on one H200, owner
+  cap $25, **about $8 spent**, all deployments deleted the same hour. The LoRA really skips
+  the reasoning: 0 reasoning tokens on 682 documents, ~100 completion tokens per document
+  instead of ~475.
+- **Speed:** on agent traffic p50 1.03 s with n-gram speculation (1.88 s without) against
+  2.28 s for zero-shot, which Fireworks serves with speculative decoding. 2.2x, not the 10x
+  the token count promised.
+- **Leaks:** with the rules in front, the LoRA leaks 1.0-1.1 % of agent-traffic values and
+  2.9-4.4 % on smoke, zero-shot 0.4 % and 0.7 %: it misses names and ID numbers. Alone it
+  beats zero-shot on agent traffic (F1 96.9 vs 93.8), but the rules already cover what
+  zero-shot misses. *(eval/results/2026-10-28-glimmer-lora)*.
+- **Gotcha:** Fireworks ignores `chat_template_kwargs`; `reasoning_effort: low` is what reaches
+  Glimmer's template, and then the served prompt equals the training render byte for byte.
+- **Verdict:** fast but leaky. Fast mode (rules + NER: 96.1 F1, 0.13 % leak, 0.02 s) stays
+  the product; the fine-tune stays an experiment.
 
 ## How pii-guard uses Meta's models
 

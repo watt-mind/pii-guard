@@ -1089,3 +1089,12 @@ recipe is in [models.md](models.md#answer-only-muse-glimmer-lora-fine-tune-lab-1
 - **Status (2026-10-27).** Trained; the fine-tuned rows are pending the adapter download.
   Fast mode on the test split: hu 99.6 F1 / 0.5 % leak, en 98.6 / 0.5 %, 0.08-0.10 s p50.
   Scorecards: [eval/results/2026-10-27-glimmer-lora](../eval/results/2026-10-27-glimmer-lora/README.md).
+- **Result (2026-10-28), Fireworks 1x H200, both models on the same shape.** The LoRA answers
+  with no reasoning (0 reasoning tokens, 0 `to=self` turns on 682 documents) and ~80-110
+  completion tokens per document instead of ~470-480. `rules,llm` on hu+en smoke (41 docs):
+  LoRA F1 97.0-97.7 / leak 2.9-4.4 % vs zero-shot 97.8 / 0.7 %; on agent-traffic-dev (300 docs):
+  LoRA 96.6 / 1.0-1.1 % vs zero-shot 94.9 / 0.4 %. p50 on agent traffic: LoRA 1.88 s (live
+  merge), 1.03 s (with n-gram speculation), zero-shot 2.28 s (served with speculative decoding).
+  Fast but leaky; fast mode (96.1 / 0.13 %, 0.02 s) stays ahead. Scorecards, cost ($8 upper
+  bound of a $25 cap) and teardown proof:
+  [eval/results/2026-10-28-glimmer-lora](../eval/results/2026-10-28-glimmer-lora/README.md).
