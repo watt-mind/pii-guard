@@ -304,8 +304,8 @@ def test_committed_labels_and_manifest_are_consistent() -> None:
 
 def test_pipeline_of_text_detectors_and_captions_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     from pii_guard import registry
-    from pii_guard.api.routes.image_masking import AnalyzerDetector
     from pii_guard.visual import ocr as ocr_module
+    from pii_guard.visual.masking import AnalyzerDetector
 
     monkeypatch.setattr(ocr_module, "tesseract_available", lambda: True)
     monkeypatch.setitem(registry._registry, "rules-copy", "pii_guard.detect.rules:RuleDetector")

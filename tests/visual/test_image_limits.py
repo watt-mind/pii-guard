@@ -20,7 +20,6 @@ from visual_helpers import FakeOcr, card_words, id_card_png, png_bytes
 
 from pii_guard.api.app import create_app
 from pii_guard.api.deps import PayloadTooLargeError
-from pii_guard.api.routes.image_masking import ImageMasker
 from pii_guard.config import Settings
 from pii_guard.detect.rules import RuleDetector
 from pii_guard.gateway import Gateway, GatewayConfig
@@ -28,6 +27,7 @@ from pii_guard.gateway.detection import build_mode_detectors
 from pii_guard.policy import PolicySet
 from pii_guard.types import EntityType
 from pii_guard.vault import Vault
+from pii_guard.visual.masking import ImageMasker
 from pii_guard.visual.ocr import (
     OcrTimeoutError,
     OcrWord,

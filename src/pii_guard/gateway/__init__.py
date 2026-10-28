@@ -1,7 +1,8 @@
 """OpenAI-compatible gateway: mask every request, forward it, restore the (streamed) answer.
 
-``POST /v1/chat/completions`` is served by :mod:`pii_guard.api.routes.chat`, which hands the
-body to :class:`Gateway`. See ``docs/architecture.md`` (gateway) and the README quickstart.
+``POST /v1/chat/completions`` is served by the API's chat route (``api/routes/chat.py``), which
+hands the body to :class:`Gateway`; the gateway itself never imports the API layer. See
+``docs/architecture.md`` (gateway) and the README quickstart.
 """
 
 from pii_guard.gateway.cache import DetectionCache

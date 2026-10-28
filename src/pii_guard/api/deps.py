@@ -28,7 +28,6 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Sequence
-from typing import Protocol, runtime_checkable
 
 from fastapi import Request
 
@@ -43,7 +42,7 @@ from pii_guard.detect.stack import (
     unavailable_reason,
 )
 from pii_guard.policy import PolicySet
-from pii_guard.types import Detector, PiiGuardError, Span
+from pii_guard.types import Analyzer, Detector, PayloadTooLargeError, PiiGuardError, Span
 from pii_guard.vault import Vault
 
 __all__ = [
@@ -67,20 +66,6 @@ DEFAULT_DETECTOR_NAMES: tuple[str, ...] = DEFAULT_DETECTORS
 DEFAULT_MAX_TEXT_CHARS = 200_000
 
 _init_lock = threading.Lock()
-
-
-class PayloadTooLargeError(PiiGuardError):
-    """The request body or text is larger than the configured limit."""
-
-    code = "payload_too_large"
-    status_code = 413
-
-
-@runtime_checkable
-class Analyzer(Protocol):
-    """Detection as the API sees it: non-overlapping spans sorted by ``start``."""
-
-    def analyze(self, text: str, language: str) -> list[Span]: ...
 
 
 class RegistryAnalyzer:

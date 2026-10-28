@@ -200,7 +200,7 @@ def test_without_ocr_the_image_is_refused_and_nothing_is_forwarded() -> None:
 
 def test_tesseract_not_installed_refuses_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """The shipped-container case: the gateway picks its OCR engine itself and finds none."""
-    import pii_guard.api.routes.image_masking as image_masking
+    import pii_guard.visual.masking as image_masking
 
     monkeypatch.setattr(image_masking, "tesseract_available", lambda: False)
     upstream = MockUpstream()

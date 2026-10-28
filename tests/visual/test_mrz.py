@@ -264,7 +264,7 @@ def test_text_regions_returns_the_zone_even_when_the_detector_finds_nothing() ->
 
 
 def test_image_masker_covers_the_zone_pixels() -> None:
-    from pii_guard.api.routes.image_masking import ImageMasker
+    from pii_guard.visual.masking import ImageMasker
 
     empty = json.loads((FIXTURES / "sam_signature.json").read_text(encoding="utf-8"))
     sam = SamClient(

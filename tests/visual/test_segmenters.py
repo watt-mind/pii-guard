@@ -15,10 +15,10 @@ import httpx
 import pytest
 from PIL import Image
 
-from pii_guard.api.routes.image_masking import ImageMasker
 from pii_guard.config import Settings
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import DetectionError, EntityType
+from pii_guard.visual.masking import ImageMasker
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.sam import SamClient
 from pii_guard.visual.segment import LocalSegmenter

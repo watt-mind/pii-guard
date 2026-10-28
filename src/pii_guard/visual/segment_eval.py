@@ -38,7 +38,8 @@ Candidates (the extra packages are needed only for the candidate that uses them)
   EfficientSAM-ViT-T mask prompted with it (``yformer/EfficientSAM`` ONNX export,
   Apache-2.0; needs ``onnxruntime``).
 
-**End-to-end bench** (``--e2e-bench``, LAB-1245): ``POST /v1/mask/image`` through the real app
+**End-to-end bench** (``--e2e-bench``, LAB-1245; :func:`pii_guard.bench.segment_e2e.e2e_bench`):
+``POST /v1/mask/image`` through the real app
 (OCR with Tesseract, the rules detector, ``render=opaque``) for each image of the set, with the
 ``hybrid`` and ``sam-api`` segmenters alternating per image (which goes first alternates too)
 for ``--rounds`` rounds, SAM called live (no cache) so its latency is real. Reports per mode
@@ -69,7 +70,7 @@ from pii_guard.eval.data_dirs import specimens_dir, visual_cache_dir
 from pii_guard.eval.stats import percentile
 from pii_guard.types import DetectionError, EntityType, PiiGuardError
 from pii_guard.visual.image import load_image
-from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.regions import Box, Region, iou
 from pii_guard.visual.segment import (
     YUNET,
     LocalSegmenter,
@@ -406,8 +407,6 @@ def score_image(
     ``expected`` holds (type, pixel box) of the labelled regions, ``coverage`` the share of
     each one under the union of ``covered`` (same order).
     """
-    from pii_guard.eval.visual import iou
-
     out = {t: SegmentScore() for t in SCORED_TYPES}
     for (kind, _box), cov in zip(expected, coverage, strict=True):
         if kind in out:
@@ -455,7 +454,6 @@ def run(
     log: Callable[[str], None] = lambda _m: None,
 ) -> _Run:
     """Segment and score every labelled image of ``set_name``."""
-    from pii_guard.api.routes.image_masking import _grow_face
     from pii_guard.eval.visual import (
         DEFAULT_MAX_SIDE,
         SpecimenResult,
@@ -464,6 +462,7 @@ def run(
         prepare_image,
         score_regions,
     )
+    from pii_guard.visual.masking import grow_face
 
     specimens = load_specimens(*set_paths(set_name), log=log)
     if not specimens:
@@ -501,7 +500,7 @@ def run(
             elapsed = wall
         out.per_image_ms.append(elapsed)
         covered = [
-            Region(r.entity_type, _pad(_grow_face(r, *size).box, 2, size), None, r.source)
+            Region(r.entity_type, _pad(grow_face(r, *size).box, 2, size), None, r.source)
             for r in found
         ]
         expected = [e for e in specimen.regions if e.type in SCORED_TYPES]
@@ -719,88 +718,10 @@ def add_e2e(card: dict[str, Any], bench: dict[str, Any], mode: str) -> None:
     card["sam"]["mask_image_calls_per_image"] = row["sam_calls_per_image"]
 
 
-def e2e_bench(
-    set_name: str,
-    *,
-    rounds: int = 3,
-    modes: Sequence[str] = E2E_MODES,
-    log: Callable[[str], None] = lambda _m: None,
-) -> dict[str, Any]:  # pragma: no cover - live SAM calls and the data sets
-    """``POST /v1/mask/image`` per image, ``modes`` alternating; see the module docstring."""
-    from fastapi.testclient import TestClient
-
-    from pii_guard.api.app import create_app
-    from pii_guard.config import Settings
-    from pii_guard.eval.visual import DEFAULT_MAX_SIDE, load_specimens, prepare_image
-    from pii_guard.visual.ocr import tesseract_available
-    from pii_guard.visual.sam import SamClient
-    from pii_guard.visual.segmenters import HybridSegmenter, build_segmenter
-
-    if not tesseract_available():
-        raise DetectionError("the end-to-end bench needs Tesseract (OCR on, as served)")
-    specimens = load_specimens(*set_paths(set_name), log=log)
-    if not specimens:
-        raise DetectionError(f"no labelled images found for {set_name}")
-    images = [prepare_image(s.path.read_bytes(), DEFAULT_MAX_SIDE) for s in specimens]
-    settings = Settings()
-    transport = _CountingTransport()
-    sam = SamClient(settings=settings, transport=transport, max_retries=2)
-    segmenters: dict[str, Any] = {}
-    for mode in modes:
-        built = build_segmenter(settings, mode=mode)
-        if isinstance(built, HybridSegmenter):
-            if built.local is None:
-                raise DetectionError("hybrid bench needs YuNet (uv sync --extra local-vision)")
-            built = HybridSegmenter(sam=sam, local=built.local)
-        elif isinstance(built, SamClient):
-            built = sam
-        segmenters[mode] = built
-    apps = {}
-    for mode in modes:
-        app = create_app(settings)
-        app.state.sam_client = segmenters[mode]
-        apps[mode] = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000))
-    per_mode: dict[str, list[list[float]]] = {m: [] for m in modes}
-    calls: dict[str, list[int]] = {m: [] for m in modes}
-    errors: dict[str, int] = {}
-    try:
-        for r in range(rounds):
-            times: dict[str, list[float]] = {m: [] for m in modes}
-            for i, data in enumerate(images):
-                order = list(modes) if (i + r) % 2 == 0 else list(reversed(modes))
-                for mode in order:
-                    before = transport.calls
-                    start = time.perf_counter()
-                    response = apps[mode].post(
-                        "/v1/mask/image?render=opaque",
-                        content=data,
-                        headers={"Content-Type": "image/png"},
-                    )
-                    times[mode].append((time.perf_counter() - start) * 1000)
-                    calls[mode].append(transport.calls - before)
-                    if response.status_code != 200:
-                        errors[mode] = errors.get(mode, 0) + 1
-                        code = response.json().get("error", {}).get("code", response.status_code)
-                        log(f"{specimens[i].id} {mode}: {code}")
-            for mode in modes:
-                per_mode[mode].append(times[mode])
-            log(f"round {r + 1}/{rounds} done")
-    finally:
-        transport.close()
-        for client in apps.values():
-            client.close()
-    load = os.getloadavg()[0] if hasattr(os, "getloadavg") else None
-    return {
-        "set": set_name,
-        "images": len(images),
-        "endpoint": "POST /v1/mask/image (render=opaque, OCR tesseract, detectors rules)",
-        "platform": f"{platform.system()} {platform.machine()}",
-        "host_load_average": round(load, 1) if load is not None else None,
-        "modes": e2e_summary(per_mode, calls, errors),
-    }
-
-
 def _e2e_main(args: argparse.Namespace, log: Callable[[str], None]) -> int:  # pragma: no cover
+    # The bench drives the HTTP app, so it lives outside the visual package (LAB-1271).
+    from pii_guard.bench.segment_e2e import e2e_bench
+
     try:
         result = e2e_bench(args.set_name, rounds=args.rounds, log=log)
     except PiiGuardError as exc:

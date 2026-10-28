@@ -44,7 +44,7 @@ import httpx
 
 from pii_guard.types import DetectionError, EntityType
 from pii_guard.visual.image import load_image
-from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.regions import Box, Region, iou_xyxy
 
 __all__ = [
     "DEFAULT_MODEL_DIR",
@@ -161,21 +161,13 @@ def fetch_model(
     return path
 
 
-def _iou(a: tuple[float, ...], b: tuple[float, ...]) -> float:
-    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
-    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
-    inter = ix * iy
-    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
-    return inter / union if union > 0 else 0.0
-
-
 def nms(
     boxes: Sequence[tuple[float, float, float, float, float]], threshold: float = 0.3
 ) -> list[tuple[float, float, float, float, float]]:
     """Greedy non-maximum suppression of ``(x1, y1, x2, y2, score)`` boxes, best first."""
     kept: list[tuple[float, float, float, float, float]] = []
     for box in sorted(boxes, key=lambda b: -b[4]):
-        if all(_iou(box, k) < threshold for k in kept):
+        if all(iou_xyxy(box, k) < threshold for k in kept):
             kept.append(box)
     return kept
 

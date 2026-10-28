@@ -455,7 +455,7 @@ expired `session_id` → 404 `not_found`.
 ### `POST /v1/mask/image`
 
 Cover faces, signatures, ID photos and text personal data in a PNG or JPEG image
-(`pii_guard.api.routes.image`, shared pipeline in `pii_guard.api.routes.image_masking`).
+(`pii_guard.api.routes.image`, shared pipeline in `pii_guard.visual.masking`).
 
 Request, either form:
 
