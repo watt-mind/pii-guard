@@ -358,6 +358,8 @@ class SessionDetail(SessionSummary):
 
 
 def _mode(request: Request) -> InspectMode:
+    if getattr(request.app.state, "hosted", None) is not None:
+        return InspectMode.MASKED
     mode = InspectMode(getattr(request.app.state, "vault_inspect", InspectMode.MASKED))
     if mode is InspectMode.OFF:
         raise VaultInspectDisabledError(
@@ -375,6 +377,9 @@ def _mode(request: Request) -> InspectMode:
 
 
 def _observability(request: Request) -> Observability:
+    runtime = getattr(request.state, "hosted_runtime", None)
+    if runtime is not None:
+        return runtime.observability
     obs = getattr(request.app.state, "observability", None)
     if obs is None:
         obs = Observability()
@@ -383,6 +388,9 @@ def _observability(request: Request) -> Observability:
 
 
 def _directory(request: Request) -> SessionDirectory:
+    runtime = getattr(request.state, "hosted_runtime", None)
+    if runtime is not None:
+        return runtime.directory
     directory = getattr(request.app.state, "vault_directory", None)
     if directory is None:
         directory = SessionDirectory()

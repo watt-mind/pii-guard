@@ -289,7 +289,7 @@ class Gateway:
         self.vault = vault
         self.config = config or GatewayConfig()
         self._detectors = dict(detectors) if detectors is not None else None
-        self.cache = cache or DetectionCache(self.config.cache_size)
+        self.cache = cache if cache is not None else DetectionCache(self.config.cache_size)
         self._transport = transport
         # One upstream client per gateway, created on first use (LAB-1176): building one is
         # ~4.5 ms of blocking TLS and proxy setup on the event loop, and only a shared pool
@@ -330,6 +330,8 @@ class Gateway:
             client = httpx.AsyncClient(
                 timeout=self.upstream_timeout(),
                 transport=self._transport,
+                trust_env=not self.settings.hosted,
+                follow_redirects=False,
                 limits=httpx.Limits(
                     max_connections=config.upstream_max_connections,
                     max_keepalive_connections=config.upstream_max_keepalive,

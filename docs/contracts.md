@@ -1315,3 +1315,105 @@ skipped detectors, language filter, fixture paths with SHA-256), `overall` and `
 (one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
 `leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
 contains document text or labelled values.
+
+## Hosted boundary (implemented, opt-in)
+
+`PII_GUARD_HOSTED=true` opts into a separate security boundary. Local behavior is unchanged.
+Startup requires a 32-byte tenant key, an HTTPS `HOSTED_PUBLIC_ORIGIN`,
+`HOSTED_TRUST_EASY_AUTH=true` and `HOSTED_SINGLE_PROCESS=true`. These last two settings are
+operator assertions: Azure Easy Auth must strip/replace identity headers on the only ingress
+path, and the deployment must run exactly one worker and one replica without overlapping
+revisions. Setting a flag does not secure a directly accessible application origin.
+Google's stable subject claim, never email, establishes ownership. Account linking is not
+implemented. Invalid identity headers or invalid guard keys fail closed; they do not become
+guests. Guard authorization and platform identity headers are removed before downstream calls.
+
+Only `/v1/account` and the curated `/v1/demo` are anonymous API routes. Landing/static assets
+and health probes remain public. Other data routes require Google identity or an owned guard
+API key. Hosted mode refuses operator status/connect configuration, docs/OpenAPI, metrics,
+image masking and audit detection. Cookie-authenticated mutations require `Origin` to equal
+`HOSTED_PUBLIC_ORIGIN`; cross-site requests are rejected. Responses use `Cache-Control: no-store`.
+The host-prefixed guest cookie is signed, Secure, HttpOnly, SameSite=Strict and lasts one hour.
+A new/expired cookie creates a different guest, with global quotas bounding cookie rotation.
+
+Each owner has a separately HMAC-derived vault key, bounded vault, detection cache, session
+coordination, masked traffic log and inspector directory. Identical caller-chosen session IDs
+never cross an owner boundary. Detectors are shared, with globally bounded compute workers
+(including work whose HTTP caller has timed out). Active requests pin their runtime through
+stream completion/cancellation; inactive runtimes expire after one hour. A 30-second cleanup
+loop forgets expired state. Session capacity refuses new sessions rather than evicting active
+ones. Defaults: 256 runtimes, 20 sessions per owner, 256 cached detections, 50 masked traffic
+events. Full vault reveal is never available. All state is ephemeral; restart loses mappings,
+connections and guard API keys. Durable multi-replica state is deferred to LAB-1376.
+
+### Account and credentials
+
+`GET /v1/account` returns:
+
+```json
+{"mode":"hosted","authenticated":false,"principal":null,"login_url":"/.auth/login/google","logout_url":"/.auth/logout","tier":"anonymous","providers":["meta","openai","fireworks","openrouter","custom"],"limits":{"requests_per_day":5,"tokens_per_day":100000,"concurrent_requests":2,"max_output_tokens":8192,"sponsored_enabled":false},"usage":{"requests_today":0,"tokens_today":0,"resets_at":"2026-10-29T00:00:00+00:00"},"state":{"persistence":"ephemeral","restart_loses_sessions":true},"connections":[]}
+```
+
+Authenticated `principal` is `{id,provider:"google"}` with an opaque ID; tier is `standard`.
+The account remains readable when quota is exhausted. `POST /v1/account/api-keys {name}`
+returns 201 `{id,name,key,prefix,created_at}`; only that response contains the raw key.
+`GET /v1/account/api-keys` returns metadata arrays; `DELETE /v1/account/api-keys/{id}` returns
+204 and revokes future use. Keys last 24 hours, at most five per owner and 1000 globally;
+only SHA-256 verifiers are stored. Send a guard key as `Authorization: Bearer <key>` or
+`X-PII-Guard-Token`; it is never an upstream credential.
+
+`POST /v1/account/connections {provider,api_key,base_url?}` returns 201
+`{id,provider,origin,expires_at}`; delete the same owner-scoped resource with
+`DELETE /v1/account/connections/{id}` (204). At most five profiles per owner and 256 globally,
+with a fixed one-hour expiry. Secrets stay in server memory and never appear in metadata.
+Select one immutable connection explicitly using `X-PII-Guard-Connection` on chat, Responses
+or model catalogs. No selection means sponsored Meta. An unknown, deleted, expired or
+another owner's connection fails, never falls back to sponsored. Already admitted requests
+may finish with their selected connection after deletion. Supported presets are Meta,
+OpenAI, Fireworks and OpenRouter; custom connections require public HTTPS on port 443.
+
+### Curated demo
+
+`POST /v1/demo {sample_id,language?}` accepts `hu-support` or `en-support`; an optional
+language must match the sample. Extra properties, caller text/model, connection selection
+and session/mode overrides are refused. Only server-owned fictional scenarios reach detection
+and the upstream. The result is `{sample_id,language,original,masked,answer,restored,entities,
+model,session_id,request_id}`, where `answer` is the masked upstream response and `entities`
+is an array of `{start,end,type}` referring to the original. No partial result is returned on
+failure or an empty model answer. The static UI walkthrough remains available without budget.
+
+### Admission, cost and egress
+
+All data routes and account mutations require atomic admission before detector/provider work.
+Defaults are five guest or 100 standard requests per UTC day, 100,000 guest or 1,000,000
+standard reserved tokens, two active requests per owner, eight globally, 10,000 requests and
+10,000,000 tokens globally per day. A separate 32-slot ingress bound and ten-second body-read
+deadline cover slow clients before parsed admission. Bodies are capped at 32 KiB; hosted
+requests have a 180-second deadline, fast text detection, one completion and at most 8192
+output/reasoning tokens. Sponsored models are an explicit server allowlist, initially
+`muse-spark-1.3`; model selection cannot change the sponsored destination.
+
+Reservations charge a conservative input expansion bound plus the full output limit before
+work. Completion, cancellation, invalid provider responses and client retries never refund
+requests, tokens or money. Concurrency releases only after the response stream and cleanup.
+There are no automatic upstream retries. Monetary units are integer microdollars, and configured
+per-token rates must upper-bound every permitted model and all reasoning charges. The global
+daily ceiling is $10 and a finite allocation adds a stricter process-lifetime cap.
+
+Sponsored calls default to disabled. Enabling them requires a positive reconciled allocation,
+an expiry timestamp, unique allocation ID and an existing durable allocation directory.
+Startup uses an atomic exclusive file claim, fsyncs it, and forfeits the entire allocation on
+restart. Reusing an ID, missing storage, expiry or accounting failure disables sponsored work.
+A new process/day cannot silently replenish spend authority. The operator must reconcile
+provider spend before issuing another allocation; claims must never be removed or stored on
+an ephemeral container filesystem. An operator can disable admission through the ledger kill
+switch; restarting with the same allocation also fails closed. No billing persistence or
+cross-replica accounting is claimed.
+
+All hosted upstream paths (chat, Responses and catalogs) share the secure transport: no URL
+credentials, query, fragment, IP literal, local domain, non-HTTPS or non-443 endpoint; every
+resolved A/AAAA address must be globally routable. At each new TCP connection DNS is checked
+again and the connection uses a checked numeric address, preserving original Host and TLS
+SNI/certificate verification. Redirects and environment proxies are disabled. A preflight DNS
+check alone is not considered sufficient. Sponsored credentials only go to the fixed Meta
+endpoint and never to a custom origin.
