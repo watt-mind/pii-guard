@@ -1,6 +1,8 @@
+import { Workspace } from "../projects/Workspace";
+import { setSelectedProject, useSelectedProject } from "../projects/selection";
 import { useEffect, useRef, useState } from "react";
 import { createHttpChat, pickDefaultModel, SYSTEM_PROMPT } from "../api/chat";
-import { request, recovery, type Account, type DemoResult, type GuardKey, type Requester } from "./api";
+import { request, recovery, type Account, type DemoResult, type Requester } from "./api";
 import "./hosted.css";
 
 const SOURCE = "https://github.com/watt-mind/pii-guard";
@@ -16,6 +18,12 @@ function time(value: string | undefined) {
 }
 
 export function HostedApp({ call = request }: { call?: Requester }) {
+  const project = useSelectedProject();
+  return <HostedContent key={project ?? "default"} call={call} projectId={project ?? undefined} />;
+}
+const selectProject = (project: { id: string }) => setSelectedProject(project.id);
+
+function HostedContent({ call, projectId }: { call: Requester; projectId?: string }) {
   const [account, setAccount] = useState<Account | null>(null);
   const [accountError, setAccountError] = useState("");
   const [language, setLanguage] = useState<"hu" | "en">("hu");
@@ -131,11 +139,11 @@ export function HostedApp({ call = request }: { call?: Requester }) {
         </section>
         <section className="account-panel stack" id="account" aria-labelledby="account-heading">
           <h2 id="account-heading">Try it now. Connect when you’re ready.</h2>
-          {!account?.authenticated && <p>No login needed for curated live examples. Sign in with Google to edit text, bring your own provider key and manage guard API keys.</p>}
+          {!account?.authenticated && <p>No login needed for curated live examples. Sign in with Google to edit text, create projects and connect your application through a gateway endpoint.</p>}
           {accountError ? <div className="stack"><p className="error" role="alert">{accountError}</p><div><button onClick={() => void refresh()}>Reconnect to API</button></div></div> : !account ? <p role="status">Checking live availability…</p> : <>
             <p className="muted">{account.usage.requests_today} requests used today. Allowance resets: {time(account.usage.resets_at)}.</p>
             <Limits account={account} />
-            {account.authenticated ? <><p>You’re signed in. Your text, provider connections and guard keys belong to this account.</p><Settings call={call} account={account} refresh={refresh} onDisconnect={(id) => { if (connection === id) setConnection(""); }} /><a href="/.auth/logout">Sign out</a></> : <div className="stack"><div><a className="button primary" href="/.auth/login/google">Continue with Google</a></div></div>}
+            {account.authenticated ? <><p>You’re signed in. Each project keeps its endpoints, policies and temporary sessions together.</p><Workspace call={call} hosted projectId={projectId} onProject={selectProject} /><Settings call={call} account={account} refresh={refresh} onDisconnect={(id) => { if (connection === id) setConnection(""); }} /><a href="/.auth/logout">Sign out</a></> : <div className="stack"><div><a className="button primary" href="/.auth/login/google">Continue with Google</a></div></div>}
             <small>Sessions and provider connections are temporary. A guard restart loses ephemeral state; start a fresh request if restoration expires. Provider keys are kept by the guard for the connection lifetime, never saved in browser storage.</small>
           </>}
         </section>
@@ -161,13 +169,8 @@ function Settings({ call, account, refresh, onDisconnect }: { call: Requester; a
   const [provider, setProvider] = useState("openai");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
-  const [name, setName] = useState("");
-  const [keys, setKeys] = useState<GuardKey[]>([]);
-  const [created, setCreated] = useState("");
-  const [copy, setCopy] = useState("Copy key");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { call<GuardKey[] | { keys: GuardKey[] }>("/v1/account/api-keys").then((payload) => setKeys(Array.isArray(payload) ? payload : payload.keys)).catch((e: unknown) => setError(recovery(e))); }, [call]);
   async function action(run: () => Promise<void>) { setBusy(true); setError(""); try { await run(); } catch (e) { setError(recovery(e)); } finally { setBusy(false); } }
   return <div className="stack settings">
     <div className="account-columns">
@@ -179,11 +182,7 @@ function Settings({ call, account, refresh, onDisconnect }: { call: Requester; a
         </form>
         <ul className="list">{account.connections.map((c) => <li key={c.id}><div>{c.provider} · {c.origin}<br /><small>Expires {time(c.expires_at)}</small></div><button disabled={busy} onClick={() => void action(async () => { await call(`/v1/account/connections/${encodeURIComponent(c.id)}`, undefined, "DELETE"); onDisconnect(c.id); await refresh(); })}>Disconnect</button></li>)}</ul>
       </div>
-      <div className="stack"><h3>Your guard API keys</h3><p className="muted">Use a guard key to authenticate an integration. Copy a new key now; it is shown only once.</p>
-        <form className="stack" onSubmit={(e) => { e.preventDefault(); void action(async () => { setCreated(""); const key = await call<GuardKey & { key: string }>("/v1/account/api-keys", { name }); setCreated(key.key); setCopy("Copy key"); setKeys((prev) => [...prev, { id: key.id, name: key.name, prefix: key.prefix, created_at: key.created_at }]); setName(""); }); }}><label>Key name<input required value={name} onChange={(e) => setName(e.target.value)} maxLength={64} /></label><button disabled={busy || !name.trim()} type="submit">Create guard key</button></form>
-        {created && <div className="stack"><p className="secret">{created}</p><div className="actions"><button onClick={() => { void navigator.clipboard.writeText(created).then(() => setCopy("Copied")).catch(() => setCopy("Select and copy key")); }}>{copy}</button><button onClick={() => setCreated("")}>Dismiss key</button></div></div>}
-        <ul className="list">{keys.map((key) => <li key={key.id}><div>{key.name}<br /><small>{key.prefix}… · {time(key.created_at)}</small></div><button disabled={busy} onClick={() => void action(async () => { await call(`/v1/account/api-keys/${encodeURIComponent(key.id)}`, undefined, "DELETE"); setKeys((prev) => prev.filter((k) => k.id !== key.id)); setCreated(""); })}>Revoke</button></li>)}</ul>
-      </div>
+
     </div>
     {error && <p className="error" role="alert">{error}</p>}
   </div>;

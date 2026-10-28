@@ -1,0 +1,164 @@
+# No standalone triggers: only the trusted push jobs after ci-ok may call this flow.
+name: hosted-deploy
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'watt-mind/pii-guard' && github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
+      vars.HOSTED_DEPLOYMENTS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      target: ${{ steps.plan.outputs.target }}
+      source_tree: ${{ steps.plan.outputs.source_tree }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: plan
+        name: Verify actual ci-ok, trusted source and production promotion evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOSTED_PRIVATE_RUNNER_READY: ${{ vars.HOSTED_PRIVATE_RUNNER_READY }}
+        run: python3 scripts/ci/hosted_deploy.py prepare
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: hosted-plan-${{ github.run_id }}
+          path: .hosted-deploy/candidate.json
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.target == 'dev'
+    environment: hosted-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      HOSTED_REGISTRY: ${{ vars.HOSTED_REGISTRY }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: hosted-plan-${{ github.run_id }}
+          path: .hosted-deploy
+      - name: Require configured publisher and exact Environment branch policy before OIDC
+        run: python3 scripts/ci/hosted_deploy.py config --publisher
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Authenticate to the dedicated candidate registry
+        run: az acr login --name "${HOSTED_REGISTRY%%.*}" --output none
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - id: image
+        name: Publish the hosted candidate once
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile.hosted
+          push: true
+          tags: ${{ vars.HOSTED_REGISTRY }}/pii-guard:sha-${{ github.sha }}
+          provenance: true
+          sbom: true
+      - name: Record candidate digest for review before any application deployment
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          python3 scripts/ci/hosted_deploy.py candidate --image "$HOSTED_REGISTRY/pii-guard@$DIGEST"
+          printf 'Hosted candidate: %s/pii-guard@%s\n' "$HOSTED_REGISTRY" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: hosted-built-${{ github.run_id }}
+          path: .hosted-deploy/candidate.json
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    needs: [prepare, publish]
+    if: >-
+      always() && needs.prepare.result == 'success' &&
+      (needs.prepare.outputs.target == 'prod' || needs.publish.result == 'success')
+    environment: ${{ needs.prepare.outputs.target }}
+    # The dedicated dev runner must reach the reviewed tailnet path. Never fall back to public CI.
+    runs-on: ${{ needs.prepare.outputs.target == 'dev' && fromJSON('["self-hosted","linux","pii-guard-dev"]') || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    concurrency:
+      group: hosted-deploy-${{ needs.prepare.outputs.target }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOSTED_ENVIRONMENT_READY: ${{ vars.HOSTED_ENVIRONMENT_READY }}
+      HOSTED_NETWORK_READY: ${{ vars.HOSTED_NETWORK_READY }}
+      AZURE_DEV_NETWORK_APPROVED: ${{ vars.AZURE_DEV_NETWORK_APPROVED }}
+      HOSTED_BUDGET_READY: ${{ vars.HOSTED_BUDGET_READY }}
+      HOSTED_REGISTRY: ${{ vars.HOSTED_REGISTRY }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_PROJECT_PREFIX: ${{ vars.AZURE_PROJECT_PREFIX }}
+      HOSTED_PUBLIC_ORIGIN: ${{ vars.HOSTED_PUBLIC_ORIGIN }}
+      GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+      META_KEY_SECRET_URI: ${{ vars.META_KEY_SECRET_URI }}
+      TENANT_KEY_SECRET_URI: ${{ vars.TENANT_KEY_SECRET_URI }}
+      GOOGLE_SECRET_URI: ${{ vars.GOOGLE_SECRET_URI }}
+      HOSTED_RELEASE_EVIDENCE_JSON: ${{ vars.HOSTED_RELEASE_EVIDENCE_JSON }}
+      HOSTED_SPONSORED_MICRODOLLARS: ${{ vars.HOSTED_SPONSORED_MICRODOLLARS }}
+      HOSTED_ALLOCATION_ID: ${{ vars.HOSTED_ALLOCATION_ID }}
+      HOSTED_ALLOCATION_EXPIRES_AT: ${{ vars.HOSTED_ALLOCATION_EXPIRES_AT }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.prepare.outputs.target == 'dev' && format('hosted-built-{0}', github.run_id) || format('hosted-plan-{0}', github.run_id) }}
+          path: .hosted-deploy
+      - name: Require runtime, private network, budget and exact image approval before OIDC
+        run: python3 scripts/ci/hosted_deploy.py config
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Stage private dev or promote and enable approved production image
+        run: python3 scripts/ci/hosted_deploy.py deploy
+      - name: Record successful dev smoke evidence
+        if: needs.prepare.outputs.target == 'dev'
+        run: python3 scripts/ci/hosted_deploy.py tested
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: needs.prepare.outputs.target == 'dev'
+        with:
+          name: hosted-tested-${{ needs.prepare.outputs.source_tree }}
+          path: .hosted-deploy/evidence.json
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error

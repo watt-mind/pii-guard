@@ -184,14 +184,18 @@ def test_config_defaults(settings: Settings) -> None:
 def test_config_covers_env_example(monkeypatch: pytest.MonkeyPatch) -> None:
     keys = _env_example_keys()
     assert keys, ".env.example has no keys"
+    samples = {
+        "PII_GUARD_HOSTED_PROJECT_STORE": "azure_blob",
+        "PII_GUARD_HOSTED_PROJECT_ENVIRONMENT": "prod",
+    }
     for key in keys:
-        monkeypatch.setenv(key, "00ff")
+        monkeypatch.setenv(key, samples.get(key, "00ff"))
     settings = Settings()
     for key in keys:
         field = key.removeprefix("PII_GUARD_").lower()
         value = getattr(settings, field)
         raw = value.get_secret_value() if hasattr(value, "get_secret_value") else value
-        assert raw == "00ff", key
+        assert raw == samples.get(key, "00ff"), key
 
 
 def test_config_empty_values_are_unset(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -186,6 +186,7 @@ class QuotaLedger:
         self._allocation = sponsored_allocation_microdollars
         self._allocation_expires_at = allocation_expires_at
         self._sponsored_enabled = False
+        self._sponsored_killed = False
         if allocation_id is not None and allocation_directory is not None:
             if claim_allocation is not None:
                 raise ValueError("supply only one allocation claim mechanism")
@@ -244,6 +245,12 @@ class QuotaLedger:
         """Operator kill switch for future sponsored admissions, irreversible this process."""
         with self._lock:
             self._sponsored_enabled = False
+            self._sponsored_killed = True
+
+    @property
+    def sponsored_killed(self) -> bool:
+        with self._lock:
+            return self._sponsored_killed
 
     def admit(
         self,

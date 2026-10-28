@@ -77,7 +77,9 @@ function benchmarksIndex(): Plugin {
 const API_TARGET = process.env.PII_GUARD_API_URL ?? "http://127.0.0.1:8787";
 
 const proxy = {
-  "/v1": { target: API_TARGET, changeOrigin: true },
+  // Preserve the browser-facing Host so cookie/origin checks see the same origin.
+  "/v1": { target: API_TARGET, changeOrigin: false },
+  "/e": { target: API_TARGET, changeOrigin: false },
   "/healthz": { target: API_TARGET, changeOrigin: true },
 };
 

@@ -1,3 +1,4 @@
+import { createProjectFetch } from "./project";
 // "Send demo traffic" on the Live traffic screen: the same scripted, fictional requests as
 // `make demo-traffic`, sent from the browser through the gateway. With `make demo` the
 // upstream is the offline mock, which echoes what it received.
@@ -158,7 +159,7 @@ async function readAnswer(res: Response, stream: boolean): Promise<string | null
  */
 export async function sendDemoTraffic(options: DemoTrafficOptions = {}): Promise<DemoProgress> {
   const baseUrl = (options.baseUrl ?? "").replace(/\/$/, "");
-  const doFetch = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+  const doFetch = createProjectFetch(options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args)));
   const model = options.model ?? DEMO_MODEL;
   const progress: DemoProgress = { done: 0, total: DEMO_REQUESTS, refused: 0 };
   const post = async (path: string, body: unknown, headers: Record<string, string> = {}) => {

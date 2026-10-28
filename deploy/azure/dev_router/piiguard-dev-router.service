@@ -1,0 +1,27 @@
+[Unit]
+Description=PII Guard development tailnet HTTPS proxy and split DNS
+Wants=network-online.target
+After=network-online.target tailscaled.service nftables.service
+Requires=tailscaled.service nftables.service
+StartLimitIntervalSec=900
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=root
+Group=www-data
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/piiguard-dev-router/bootstrap.py
+TimeoutStartSec=600
+RuntimeDirectory=piiguard-dev-router
+RuntimeDirectoryMode=0750
+Restart=on-failure
+RestartSec=30
+LimitCORE=0
+StandardOutput=null
+StandardError=null
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

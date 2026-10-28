@@ -19,7 +19,10 @@ set -euo pipefail
 IMAGE="${1:-pii-guard:dev}"
 # 375 MB until LAB-1245; the local-vision extra (OpenCV headless + numpy, ~160 MB unpacked) and
 # the YuNet model for the default hybrid segmenter take the arm64 image from ~317 to ~478 MB.
-IMAGE_BUDGET_MB="${IMAGE_BUDGET_MB:-525}"
+# LAB-1407 adds vetted authenticated encryption for persisted provider credentials.
+# The first amd64 CI build with cryptography measured 541 MB; reserve 9 MB headroom.
+# Keep OCR/vision in the image rather than dropping protection to meet the old footprint.
+IMAGE_BUDGET_MB="${IMAGE_BUDGET_MB:-550}"
 NET="pii-guard-smoke-$$"
 API_PORT="${SMOKE_API_PORT:-18797}"
 MOCK_PORT="${SMOKE_MOCK_PORT:-18798}"

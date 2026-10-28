@@ -1,3 +1,4 @@
+import { createProjectFetch, projectHeaders } from "./project";
 // `GET /v1/connect/snippets`: the Connect quickstart's copy-paste blocks
 // (src/pii_guard/api/routes/connect.py). `pii-guard connect <tool> --print` prints the same
 // text, so the UI never builds a block itself. Keys appear only as variable names.
@@ -70,7 +71,7 @@ export async function fetchSnippets(
   if (query.model) params.set("model", query.model);
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl.replace(/\/$/, "")}/v1/connect/snippets?${params}`, { headers: { Accept: "application/json" }, signal });
+    res = await createProjectFetch(doFetch)(`${baseUrl.replace(/\/$/, "")}/v1/connect/snippets?${params}`, { headers: projectHeaders({ Accept: "application/json" }), signal });
   } catch {
     return { state: "offline" };
   }

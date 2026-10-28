@@ -1,3 +1,5 @@
+import { getSelectedEndpoint, getSelectedProject } from "../projects/selection";
+import { createProjectFetch, inspectionHeaders } from "./project";
 // The gateway's traffic log (docs/operations.md, "Traffic log"): one event per LLM call.
 //
 // - `GET /v1/traffic?limit=&after=` returns the stored events, oldest first.
@@ -17,6 +19,7 @@
 //   settles, and each request is aborted after `timeoutMs`.
 // - The dedup set keeps the newest `dedupWindow` ids, not every id ever seen.
 
+import { getOwnerToken } from "./localOwner";
 import type { EntityType } from "./types";
 import { ApiError, UnreachableError } from "./http";
 
@@ -179,13 +182,15 @@ export async function fetchTraffic(
   baseUrl: string,
   query: { limit?: number; after?: number },
   signal?: AbortSignal,
+  projectId: string | null = getSelectedProject(),
+  endpointId: string | null = getSelectedEndpoint(),
 ): Promise<TrafficPage> {
   const params = new URLSearchParams();
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.after !== undefined) params.set("after", String(query.after));
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl}/v1/traffic?${params}`, { headers: { Accept: "application/json" }, signal });
+    res = await createProjectFetch(doFetch, projectId, endpointId)(`${baseUrl}/v1/traffic?${params}`, { headers: inspectionHeaders({ Accept: "application/json" }, projectId, endpointId), signal });
   } catch (err) {
     if (signal?.aborted) throw err;
     throw new UnreachableError();
@@ -215,7 +220,11 @@ export async function fetchTraffic(
 export function connectTraffic(options: TrafficConnectOptions): TrafficConnection {
   const baseUrl = (options.baseUrl ?? "").replace(/\/$/, "");
   const doFetch = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
-  const ES: EventSourceCtor | null =
+  const projectId = getSelectedProject();
+  const endpointId = getSelectedEndpoint();
+  // EventSource cannot send the project header. Polling retains the same authorization
+  // boundary as REST, without adding another selector to URLs or browser history.
+  const ES: EventSourceCtor | null = projectId || endpointId || (import.meta.env.VITE_PII_GUARD_HOSTED !== "true" && getOwnerToken()) ? null :
     options.EventSource === undefined ? ((globalThis as { EventSource?: EventSourceCtor }).EventSource ?? null) : options.EventSource;
   const pollMs = options.pollMs ?? 2000;
   const timeoutMs = options.timeoutMs ?? TRAFFIC_TIMEOUT_MS;
@@ -273,7 +282,7 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
       request.signal.addEventListener("abort", onAbort);
       timer = setTimeout(abort, timeoutMs);
     });
-    return Promise.race([fetchTraffic(doFetch, baseUrl, query, request.signal), stop]).finally(() => {
+    return Promise.race([fetchTraffic(doFetch, baseUrl, query, request.signal, projectId, endpointId), stop]).finally(() => {
       clearTimeout(timer);
       controller.signal.removeEventListener("abort", abort);
     });

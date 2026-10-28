@@ -22,7 +22,7 @@ from pii_guard.gateway.detection import ModeDetector
 from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.identity import easy_auth_principal
 from pii_guard.hosted.middleware import HostedMiddleware
-from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits
+from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits, SponsoredUnavailableError
 from pii_guard.hosted.runtime import BoundedAnalyzer, HostedCapacityError, HostedService
 from pii_guard.types import DetectionError
 
@@ -133,6 +133,247 @@ def status(messages):
     return next(
         message["status"] for message in messages if message["type"] == "http.response.start"
     )
+
+
+def test_durable_money_failure_denies_before_paid_work_and_releases_local_permit():
+    async def exercise():
+        service = HostedService(settings())
+
+        class MissingMoney:
+            available = False
+
+            def charge(self, cost, cancelled):
+                raise SponsoredUnavailableError
+
+            def close(self):
+                pass
+
+        service.spend = MissingMoney()
+
+        async def downstream(*args):
+            raise AssertionError("No detector/provider work before durable charge")
+
+        messages = await invoke(HostedMiddleware(downstream, service))
+        assert status(messages) == 503
+        assert service.quotas.usage(owner().id)["requests_today"] == 1
+        assert service._ingress == service.quotas._active == 0
+        assert not service._runtimes
+        assert not service.sponsored_enabled
+        await service.close()
+
+    asyncio.run(exercise())
+
+
+def test_durable_charge_is_before_downstream_and_survives_downstream_failure():
+    async def exercise():
+        service = HostedService(settings())
+        costs = []
+
+        class Money:
+            available = True
+
+            def charge(self, cost, cancelled):
+                costs.append(cost)
+
+            def close(self):
+                pass
+
+        service.spend = Money()
+
+        async def downstream(*args):
+            assert len(costs) == 1
+            raise RuntimeError("synthetic downstream failure")
+
+        with pytest.raises(RuntimeError):
+            await invoke(HostedMiddleware(downstream, service))
+        assert len(costs) == 1 and costs[0] > 0
+        assert service._ingress == service.quotas._active == 0
+        assert all(runtime.active == 0 for runtime in service._runtimes.values())
+        # Completion/failure never triggers another monetary operation or refund.
+        assert service.quotas._spent_allocation == 0
+        await service.close()
+
+    asyncio.run(exercise())
+
+
+def test_cancelled_durable_write_holds_worker_until_late_completion_without_outbound():
+    async def exercise():
+        service = HostedService(settings())
+        entered, finish = threading.Event(), threading.Event()
+        cancelled_events = []
+        costs = []
+
+        class SlowMoney:
+            available = True
+
+            def charge(self, cost, cancelled):
+                cancelled_events.append(cancelled)
+                entered.set()
+                finish.wait(timeout=5)
+                costs.append(cost)
+
+            def close(self):
+                pass
+
+        service.spend = SlowMoney()
+
+        async def downstream(*args):
+            raise AssertionError("Cancelled caller must never reach paid work")
+
+        task = asyncio.create_task(invoke(HostedMiddleware(downstream, service)))
+        try:
+            assert await asyncio.to_thread(entered.wait, 2)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert cancelled_events[0].is_set()
+            assert service._spend_workers.running == 1
+            assert service._ingress == service.quotas._active == 0
+            assert not costs
+            assert not service._runtimes
+        finally:
+            finish.set()
+            for _ in range(100):
+                if not service._spend_workers.running:
+                    break
+                await asyncio.sleep(0.01)
+            await service.close()
+        assert len(costs) == 1  # Unknown/late write may consume authority, never outbound.
+
+    asyncio.run(exercise())
+
+
+def test_kill_switch_denies_durable_money_before_store_and_keeps_compute_available():
+    async def exercise():
+        service = HostedService(settings())
+
+        class Money:
+            available = True
+
+            def charge(self, *args):
+                raise AssertionError("Kill switch must precede monetary work")
+
+            def close(self):
+                pass
+
+        service.spend = Money()
+        service.quotas.disable_sponsored()
+
+        async def downstream(*args):
+            raise AssertionError("Killed sponsorship must not reach paid work")
+
+        assert status(await invoke(HostedMiddleware(downstream, service))) == 503
+        assert not service.sponsored_enabled
+        with service.quotas.admit(
+            owner().id, authenticated=True, input_tokens=1, output_tokens=1, sponsored=False
+        ):
+            pass
+        assert service.quotas._active == 0
+        await service.close()
+
+    asyncio.run(exercise())
+
+
+def test_spend_hint_refresh_is_single_flight_and_cancellation_keeps_worker_bounded():
+    async def exercise():
+        service = HostedService(settings())
+        entered, finish = threading.Event(), threading.Event()
+        reads = []
+
+        class Money:
+            available = False
+
+            def refresh(self):
+                reads.append("read-only")
+                entered.set()
+                finish.wait(timeout=5)
+                self.available = True
+
+            def charge(self, *args):
+                raise AssertionError("Availability refresh must never write/charge")
+
+            def close(self):
+                pass
+
+        service.spend = Money()
+        task = asyncio.create_task(service.refresh_spend())
+        try:
+            assert await asyncio.to_thread(entered.wait, 2)
+            await asyncio.wait_for(service.refresh_spend(), 1)
+            assert reads == ["read-only"]
+            assert not service.sponsored_enabled
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert service._spend_workers.running == 1
+            # A later cleaner tick cannot duplicate an already-running store read.
+            await asyncio.wait_for(service.refresh_spend(), 1)
+            assert reads == ["read-only"]
+        finally:
+            finish.set()
+            for _ in range(100):
+                if not service._spend_workers.running:
+                    break
+                await asyncio.sleep(0.01)
+        assert service.sponsored_enabled
+        await service.close()
+
+    asyncio.run(exercise())
+
+
+def test_spend_hint_recovers_after_outage_and_daily_rollover_without_new_funds():
+    from datetime import UTC, datetime
+
+    from pii_guard.hosted.spend import Approval, DurableSpend
+
+    async def exercise():
+        service = HostedService(settings())
+        now = [datetime(2026, 10, 28, 23, 59, tzinfo=UTC).timestamp()]
+        state = {
+            "version": 1,
+            "environment": "dev",
+            "allocation_id": "synthetic-approved",
+            "ceiling_microdollars": 1000,
+            "expires_at": int(now[0]) + 86400,
+            "charged_total": 500,
+            "day": "2026-10-28",
+            "daily_charged": 500,
+            "enabled": True,
+        }
+
+        class Store:
+            broken = True
+
+            def read(self):
+                if self.broken:
+                    raise RuntimeError("synthetic unavailable store")
+                return json.dumps(state).encode(), '"synthetic-etag"'
+
+            def compare_and_swap(self, *args):
+                raise AssertionError("Periodic recovery must never fund or charge")
+
+            def close(self):
+                pass
+
+        store = Store()
+        service.spend = DurableSpend(
+            store,
+            Approval("dev", "synthetic-approved", 1000, state["expires_at"]),
+            daily_ceiling=500,
+            clock=lambda: now[0],
+        )
+        await service.refresh_spend()
+        assert not service.sponsored_enabled
+        store.broken = False
+        await service.refresh_spend()
+        assert not service.sponsored_enabled  # Known current-day quota is exhausted.
+        now[0] += 120
+        await service.refresh_spend()
+        assert service.sponsored_enabled
+        assert state["charged_total"] == state["daily_charged"] == 500
+        await service.close()
+
+    asyncio.run(exercise())
 
 
 def test_secondary_denials_happen_before_body_runtime_and_paid_work():

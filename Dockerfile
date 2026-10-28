@@ -46,7 +46,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 10001 piiguard \
-    && useradd --system --uid 10001 --gid piiguard --no-create-home piiguard
+    && useradd --system --uid 10001 --gid piiguard --no-create-home piiguard \
+    && install -d -m 0700 -o piiguard -g piiguard /var/lib/pii-guard/projects
 
 COPY --from=build --chown=piiguard:piiguard /app/.venv /app/.venv
 COPY --from=build --chown=piiguard:piiguard /app/models /app/models
@@ -61,6 +62,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PII_GUARD_HOST=0.0.0.0 \
     PII_GUARD_PORT=8787 \
+    PII_GUARD_PROJECT_STATE_PATH=/var/lib/pii-guard/projects/state.sqlite3 \
     PII_GUARD_MODEL_DIR=/app/models
 
 WORKDIR /app

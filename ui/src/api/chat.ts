@@ -1,3 +1,4 @@
+import { createProjectFetch } from "./project";
 // Chat through the pii-guard gateway (`POST /v1/chat/completions`, OpenAI-compatible).
 //
 // The UI asks the gateway to echo what the model saw and said (`X-PII-Guard-Echo: masked`),
@@ -134,7 +135,7 @@ export interface HttpChatOptions {
 
 export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
   const baseUrl = (options.baseUrl ?? "").replace(/\/$/, "");
-  const doFetch = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+  const doFetch = createProjectFetch(options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args)));
 
   return {
     kind: "api",

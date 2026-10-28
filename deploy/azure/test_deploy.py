@@ -1,9 +1,13 @@
 """Compile production contracts and exercise admission without contacting Azure."""
 
+from __future__ import annotations
+
 import json
 import os
+import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +19,48 @@ GROUP = (
     "/subscriptions/test-subscription/resourceGroups/rg-operations/"
     "providers/Microsoft.Insights/actionGroups/existing-alerts"
 )
+
+
+FAKE_AZ = r"""#!/bin/sh
+echo "$*" >> "$AZURE_TEST_LOG"
+case "$*" in
+  "bicep build "*) exit 0;;
+  "account show "*"user.type"*) echo "${TEST_ACCOUNT_TYPE:-user}";;
+  "account show "*) echo test-subscription;;
+  "group exists "*) echo true;;
+  "group show "*"tags.project"*) echo pii-guard;;
+  "group show "*"tags.environment"*) echo "${AZURE_ENVIRONMENT:-prod}";;
+  "group show "*"location"*) echo swedencentral;;
+  "monitor action-group show "*) echo "${TEST_ALERT_ENABLED:-true}";;
+  "resource show "*"properties.amount"*)
+    [ "${TEST_BUDGET_EXISTS:-true}" = true ] || exit 1
+    echo "${TEST_BUDGET_AMOUNT:-25.0}";;
+  "resource show "*"Actual50.contactGroups"*) echo '["__GROUP__"]';;
+  "resource show "*"startDate"*) echo 2026-10-01T00:00:00Z;;
+  *properties.outputs.vaultUri.value*) echo __VAULT__;;
+  *properties.outputs.registryServer.value*) echo piiguardexample.azurecr.io;;
+  *properties.outputs.ledgerAccountUrl.value*) echo https://ledgerexample.blob.core.windows.net;;
+  *properties.outputs.projectAccountUrl.value*) echo "${TEST_PROJECT_ACCOUNT:-https://ledgerexample.blob.core.windows.net}";;
+  "containerapp env show "*)
+    printf '{"internal":%s,"public":"%s"}\n' \
+      "${TEST_INTERNAL:-true}" "${TEST_PUBLIC_NETWORK:-Disabled}";;
+  "vm show "*) echo Succeeded;;
+  "containerapp show "*"customDomains"*)
+    case "${TEST_BINDINGS_ERROR:-}" in
+      forbidden) echo 'ERROR: (AuthorizationFailed) synthetic refusal' >&2; exit 1;;
+      absent) echo 'ERROR: (ContainerAppNotFound) synthetic missing' >&2; exit 3;;
+    esac
+    echo '[{"name":"guard.example.com","bindingType":"SniEnabled",
+           "certificateId":"/synthetic/cert"}]';;
+  "deployment group validate "*|"deployment group create "*) exit 0;;
+  "rest "*) echo true;;
+  "containerapp ingress update "*) exit 0;;
+  "containerapp show "*"latestReadyRevisionName"*)
+    echo "${TEST_READY_REVISION:-reviewed-revision}";;
+  "containerapp show "*) echo reviewed-revision;;
+  *) echo 'UNEXPECTED AZURE CALL' >&2; exit 99;;
+esac
+"""
 
 
 @unittest.skipUnless(shutil.which("az"), "Azure CLI is required to compile Bicep")
@@ -67,28 +113,18 @@ class TemplateContractTests(unittest.TestCase):
         ):
             self.assertIn("environmentName", self.resource(kind)["name"])
 
-    def test_hosts_probes_and_scale_to_zero(self) -> None:
-        template = self.resource("Microsoft.App/containerApps")["properties"]["template"]
-        self.assertEqual(template["scale"], {"minReplicas": 0, "maxReplicas": 1})
-        container = template["containers"][0]
-        allowed = next(
-            e["value"] for e in container["env"] if e["name"] == "PII_GUARD_ALLOWED_HOSTS"
-        )
-        self.assertIn("publicOrigin", allowed)
-        self.assertIn("defaultDomain", allowed)
-        for probe in container["probes"]:
-            self.assertEqual(
-                probe["httpGet"]["httpHeaders"], [{"name": "Host", "value": "localhost"}]
-            )
+    def test_operator_foundation_never_deploys_an_application(self) -> None:
+        types = {r["type"] for r in self.template["resources"]}
+        self.assertNotIn("Microsoft.App/containerApps", types)
+        self.assertNotIn("Microsoft.App/containerApps/authConfigs", types)
+        self.assertNotIn("Microsoft.Insights/metricAlerts", types)
 
-    def test_dev_app_resource_is_disabled_pending_private_network(self) -> None:
-        guard = self.template["variables"]["appDeploymentEnabled"]
-        self.assertIn("environmentName", guard)
-        self.assertIn("'prod'", guard)
-        self.assertEqual(
-            self.resource("Microsoft.App/containerApps")["condition"],
-            "[variables('appDeploymentEnabled')]",
-        )
+    def test_dev_environment_requires_internal_network(self) -> None:
+        props = self.resource("Microsoft.App/managedEnvironments")["properties"]
+        self.assertIn("Disabled", props["publicNetworkAccess"])
+        self.assertIn("environmentName", props["publicNetworkAccess"])
+        self.assertIn("true", props["vnetConfiguration"])
+        self.assertIn("acaSubnetId", props["vnetConfiguration"])
 
     def test_budget_and_secret_recovery_contract(self) -> None:
         budget = self.resource("Microsoft.Consumption/budgets")["properties"]
@@ -109,34 +145,17 @@ class DeploymentAdmissionTests(unittest.TestCase):
     def run_deploy(self, mode: str, **overrides: str) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as directory:
             fake = Path(directory) / "az"
-            fake.write_text(
-                "#!/bin/sh\n"
-                'echo "$*" >> "$AZURE_TEST_LOG"\n'
-                'case "$*" in\n'
-                '  "bicep build "*) exit 0;;\n'
-                '  "account show "*) echo test-subscription;;\n'
-                '  "group exists "*) echo true;;\n'
-                '  "group show "*"tags.project"*) echo pii-guard;;\n'
-                '  "group show "*"tags.environment"*) echo "${AZURE_ENVIRONMENT:-prod}";;\n'
-                '  "group show "*"location"*) echo swedencentral;;\n'
-                '  "monitor action-group show "*) echo true;;\n'
-                '  "resource show "*"properties.amount"*) '
-                '[ "${TEST_BUDGET_EXISTS:-true}" = true ] || exit 1; '
-                'echo "${TEST_BUDGET_AMOUNT:-25.0}";;\n'
-                f'  "resource show "*"Actual50.contactGroups"*) echo \'["{GROUP}"]\';;\n'
-                '  "resource show "*"startDate"*) echo 2026-10-01T00:00:00Z;;\n'
-                f"  *properties.outputs.vaultUri.value*) echo {VAULT};;\n"
-                "  *properties.outputs.registryServer.value*) echo piiguardexample.azurecr.io;;\n"
-                '  "deployment group validate "*|"deployment group create "*) exit 0;;\n'
-                '  "rest "*) echo true;;\n'
-                '  "containerapp ingress update "*) exit 0;;\n'
-                '  "containerapp show "*"latestReadyRevisionName"*) '
-                'echo "${TEST_READY_REVISION:-reviewed-revision}";;\n'
-                '  "containerapp show "*) echo reviewed-revision;;\n'
-                '  *) echo "UNEXPECTED AZURE CALL" >&2; exit 99;;\n'
-                "esac\n"
-            )
+            fake.write_text(FAKE_AZ.replace("__GROUP__", GROUP).replace("__VAULT__", VAULT))
             fake.chmod(0o700)
+            python = Path(directory) / "python3"
+            python.write_text(
+                '#!/bin/sh\nif [ "$1" = deploy/azure/smoke.py ]; then\n'
+                '  echo synthetic-smoke >> "$AZURE_TEST_LOG"; exit 0; fi\n'
+                + "exec "
+                + shlex.quote(sys.executable)
+                + ' "$@"\n'
+            )
+            python.chmod(0o700)
             sleeper = Path(directory) / "sleep"
             sleeper.write_text("#!/bin/sh\nexit 0\n")
             sleeper.chmod(0o700)
@@ -158,7 +177,7 @@ class DeploymentAdmissionTests(unittest.TestCase):
                 **overrides,
             }
             result = subprocess.run(  # noqa: S603 - repository script and controlled env
-                ["/bin/bash", str(SCRIPT), mode],
+                ["/bin/bash", str(SCRIPT), *mode.split()],
                 env=env,
                 capture_output=True,
                 text=True,
@@ -166,6 +185,118 @@ class DeploymentAdmissionTests(unittest.TestCase):
             )
             self.calls = log.read_text() if log.exists() else ""
             return result
+
+    def run_technical_stage(
+        self, *, mode: str = "technical-stage", evidence: dict | None = None, **overrides: str
+    ) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            review = Path(directory) / "technical.json"
+            review.write_text(
+                json.dumps(
+                    evidence
+                    if evidence is not None
+                    else {
+                        "image": IMAGE,
+                        "purpose": "private-synthetic-verification",
+                        "network_reviewed": True,
+                        "tailnet_acl": True,
+                        "proxy_tls": True,
+                        "synthetic_only": True,
+                    }
+                )
+            )
+            return self.run_deploy(
+                mode,
+                **{
+                    "AZURE_ENVIRONMENT": "dev",
+                    "AZURE_RESOURCE_GROUP": "rg-pii-guard-dev",
+                    "AZURE_DEV_NETWORK_APPROVED": "true",
+                    "AZURE_TECHNICAL_STAGE_APPROVED": "true",
+                    "HOSTED_PUBLIC_ORIGIN": "https://guard-dev.watt-mind.com",
+                    "HOSTED_TECHNICAL_STAGE_EVIDENCE": str(review),
+                    **overrides,
+                },
+            )
+
+    def test_private_technical_stage_allows_initial_app_without_claiming_acceptance(self) -> None:
+        result = self.run_technical_stage(TEST_BINDINGS_ERROR="absent")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("full live acceptance remains pending", result.stdout)
+        self.assertIn("--query user.type", self.calls)
+        self.assertIn("privateDevReviewed=true", self.calls)
+        self.assertIn("publicEnabled=false", self.calls)
+        self.assertIn("customDomains=[]", self.calls)
+        self.assertIn("--template-file deploy/azure/release.bicep", self.calls)
+        self.assertIn("synthetic-smoke", self.calls)
+        self.assertNotIn("allocationId=", self.calls)
+        self.assertNotIn("allocationExpiresAt=", self.calls)
+        self.assertNotIn("sponsoredMicrodollars=", self.calls)
+
+    def test_technical_stage_operator_environment_and_funding_admission(self) -> None:
+        cases = [
+            ({"AZURE_TECHNICAL_STAGE_APPROVED": "false"}, "Explicit operator"),
+            ({"GITHUB_ACTIONS": "true"}, "unavailable to CI"),
+            ({"CI": "true"}, "unavailable to CI"),
+            ({"TEST_ACCOUNT_TYPE": "servicePrincipal"}, "interactive operator"),
+            ({"HOSTED_SPONSORED_MICRODOLLARS": "1"}, "zero sponsorship"),
+            ({"HOSTED_SPONSORED_MICRODOLLARS": "00"}, "zero sponsorship"),
+            ({"HOSTED_ALLOCATION_ID": "synthetic-allocation"}, "no allocation pins"),
+            ({"HOSTED_ALLOCATION_EXPIRES_AT": "0"}, "no allocation pins"),
+            ({"HOSTED_PUBLIC_ORIGIN": "https://other.example.com"}, "exact private dev"),
+            (
+                {"AZURE_ENVIRONMENT": "prod", "AZURE_RESOURCE_GROUP": "rg-pii-guard-prod"},
+                "exact private dev",
+            ),
+        ]
+        for overrides, reason in cases:
+            with self.subTest(overrides=overrides):
+                self.assert_refused(self.run_technical_stage(**overrides), reason)
+
+    def test_technical_stage_keeps_actual_network_and_budget_checks(self) -> None:
+        for overrides, reason in [
+            ({"TEST_PUBLIC_NETWORK": "Enabled"}, "actual internal environment"),
+            ({"TEST_BUDGET_EXISTS": "false"}, "budget must exist"),
+            ({"TEST_ALERT_ENABLED": "false"}, "Budget action group"),
+            ({"TEST_BINDINGS_ERROR": "forbidden"}, "existing_app_bindings_unavailable"),
+        ]:
+            with self.subTest(overrides=overrides):
+                self.assert_refused(self.run_technical_stage(**overrides), reason)
+
+    def test_technical_evidence_cannot_replace_normal_release_acceptance(self) -> None:
+        self.assert_refused(self.run_technical_stage(mode="stage"), "HOSTED_RELEASE_EVIDENCE")
+        for evidence in (
+            {},
+            {
+                "image": IMAGE,
+                "purpose": "private-synthetic-verification",
+                "network_reviewed": True,
+                "tailnet_acl": True,
+                "proxy_tls": True,
+                "synthetic_only": True,
+                "lab_1372_done": True,
+            },
+            {
+                "image": IMAGE,
+                "purpose": "private-synthetic-verification",
+                "network_reviewed": True,
+                "tailnet_acl": True,
+                "proxy_tls": True,
+                "synthetic_only": False,
+            },
+            {
+                "image": "different",
+                "purpose": "private-synthetic-verification",
+                "network_reviewed": True,
+                "tailnet_acl": True,
+                "proxy_tls": True,
+                "synthetic_only": True,
+            },
+        ):
+            with self.subTest(evidence=evidence):
+                self.assert_refused(
+                    self.run_technical_stage(evidence=evidence),
+                    "Technical-stage evidence incomplete",
+                )
 
     def assert_refused(self, result: subprocess.CompletedProcess[str], reason: str) -> None:
         self.assertNotEqual(result.returncode, 0)
@@ -200,6 +331,41 @@ class DeploymentAdmissionTests(unittest.TestCase):
                 )
                 self.assertNotIn("account show", self.calls)
 
+    def test_ci_preflight_has_no_azure_calls(self) -> None:
+        result = self.run_deploy("ci-preflight dev")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)["app_only"])
+        self.assertTrue(json.loads(result.stdout)["private_dev"])
+        self.assertEqual(self.calls, "")
+
+    def test_binding_read_failure_blocks_all_writes(self) -> None:
+        self.assert_refused(
+            self.run_deploy("stage", TEST_BINDINGS_ERROR="forbidden"),
+            "existing_app_bindings_unavailable",
+        )
+
+    def test_proven_missing_bindings_allow_first_stage(self) -> None:
+        result = self.run_deploy("stage", TEST_BINDINGS_ERROR="absent")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("customDomains=[]", self.calls)
+
+    def test_disabled_budget_action_group_blocks_release(self) -> None:
+        self.assert_refused(
+            self.run_deploy("stage", TEST_ALERT_ENABLED="false"),
+            "Budget action group must remain enabled",
+        )
+
+    def test_actual_public_dev_environment_is_refused(self) -> None:
+        result = self.run_deploy(
+            "stage",
+            AZURE_ENVIRONMENT="dev",
+            AZURE_RESOURCE_GROUP="rg-pii-guard-dev",
+            AZURE_DEV_NETWORK_APPROVED="true",
+            HOSTED_PUBLIC_ORIGIN="https://guard-dev.watt-mind.com",
+            TEST_PUBLIC_NETWORK="Enabled",
+        )
+        self.assert_refused(result, "actual internal environment")
+
     def test_wrong_subscription_is_refused(self) -> None:
         self.assert_refused(
             self.run_deploy("bootstrap", AZURE_SUBSCRIPTION_ID="different-subscription"),
@@ -215,6 +381,17 @@ class DeploymentAdmissionTests(unittest.TestCase):
         self.assertIn("environmentName=prod", self.calls)
         self.assertNotIn("deployApp=true", self.calls)
 
+    def test_release_requires_reviewed_project_configuration_account(self) -> None:
+        self.assert_refused(
+            self.run_deploy("stage", TEST_PROJECT_ACCOUNT="None"), "project configuration"
+        )
+        self.assert_refused(
+            self.run_deploy(
+                "stage", TEST_PROJECT_ACCOUNT="https://different.blob.core.windows.net"
+            ),
+            "project configuration",
+        )
+
     def test_stage_refuses_missing_budget(self) -> None:
         self.assert_refused(
             self.run_deploy("stage", TEST_BUDGET_EXISTS="false"), "budget must exist"
@@ -223,7 +400,7 @@ class DeploymentAdmissionTests(unittest.TestCase):
     def test_mutable_image_is_refused(self) -> None:
         self.assert_refused(
             self.run_deploy("stage", HOSTED_IMAGE="piiguardexample.azurecr.io/pii-guard:latest"),
-            "immutable ACR digest",
+            "Canonical HTTPS origin and immutable ACR digest",
         )
 
     def test_other_vault_is_refused(self) -> None:
@@ -231,13 +408,13 @@ class DeploymentAdmissionTests(unittest.TestCase):
             self.run_deploy(
                 "stage", **{"META_KEY_SECRET_URI": "https://other.example.com/secrets/meta"}
             ),
-            "versioned secrets from this deployment",
+            "versioned secrets from this foundation",
         )
 
     def test_budget_over_ceiling_is_refused(self) -> None:
         self.assert_refused(
             self.run_deploy("stage", HOSTED_SPONSORED_MICRODOLLARS="10000001"),
-            "USD 10 deployment ceiling",
+            "maximum USD 10",
         )
 
     def test_enable_and_positive_budget_require_lab_gate(self) -> None:
@@ -294,9 +471,13 @@ class DeploymentAdmissionTests(unittest.TestCase):
         self.assertIn(GROUP, self.calls)
         self.assertIn("alertActionGroupIds=", self.calls)
         self.assertNotIn("alertActionGroupIds=[]", self.calls)
-        self.assertIn("budgetStartDate=2026-10-01T00:00:00Z", self.calls)
-        self.assertIn("monthlyBudgetAmount=25", self.calls)
-        self.assertNotIn("monthlyBudgetAmount=25.0", self.calls)
+        self.assertNotIn("budgetStartDate=", self.calls)
+        self.assertNotIn("monthlyBudgetAmount=", self.calls)
+        self.assertIn("--template-file deploy/azure/release.bicep", self.calls)
+        self.assertIn("projectAccountUrl=https://ledgerexample.blob.core.windows.net", self.calls)
+        self.assertIn("customDomains=", self.calls)
+        self.assertIn("guard.example.com", self.calls)
+        self.assertIn("monitor action-group show", self.calls)
 
 
 if __name__ == "__main__":

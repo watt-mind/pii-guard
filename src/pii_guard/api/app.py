@@ -139,6 +139,7 @@ def create_app(
             while True:
                 await asyncio.sleep(30)
                 app.state.hosted.purge_expired()
+                await app.state.hosted.refresh_spend()
 
         cleaner = asyncio.create_task(cleanup_hosted()) if settings.hosted else None
         try:
@@ -153,6 +154,7 @@ def create_app(
                 await close()
             if settings.hosted:
                 await app.state.hosted.close()
+            app.state.projects.close()
 
     app = FastAPI(
         title="pii-guard",
@@ -210,12 +212,15 @@ def create_app(
         vault or upstream."""
         return {"status": "ok", "version": __version__, "ner": warmup.state}
 
+    from pii_guard.projects.runtime import ProjectService
+
+    app.state.projects = ProjectService(settings)
     include_routers(app)
     if settings.hosted:
         from pii_guard.hosted.routes import router as hosted_router
         from pii_guard.hosted.runtime import HostedService
 
-        app.state.hosted = HostedService(settings)
+        app.state.hosted = HostedService(settings, projects=app.state.projects)
         app.include_router(hosted_router)
 
         @app.get("/readyz", include_in_schema=False)
@@ -236,6 +241,9 @@ def create_app(
     if inspect_mode is not InspectMode.OFF and not settings.hosted:
         app.add_middleware(SessionRecorderMiddleware, directory=app.state.vault_directory)
     app.add_middleware(SessionPathMiddleware)
+    from pii_guard.projects.middleware import ProjectMiddleware
+
+    app.add_middleware(ProjectMiddleware, service=app.state.projects)
     if settings.hosted:
         from pii_guard.hosted.middleware import HostedMiddleware
 

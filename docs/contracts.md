@@ -218,6 +218,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
+| `PII_GUARD_PROJECT_STATE_PATH` | `project_state_path` | `str` (SQLite project metadata path) | `~/.local/share/pii-guard/projects/state.sqlite3` |
 | `PII_GUARD_KNOWN_VALUES_MAX` | `known_values_max` | `int` (known values per session) | `1000` |
 | `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` | `known_values_max_length` | `int` (characters per value) | `256` |
 | `PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS` | `vault_case_sensitive_placeholders` | `bool` | `false` |
@@ -367,11 +368,14 @@ Every non-2xx response, including validation errors and unknown routes, has this
 |---|---|---|
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
+| 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
 | 403 | `vault_inspect_not_local` | `PII_GUARD_VAULT_INSPECT=full` and a `/v1/vault/*` connection is not loopback on both ends. |
 | 403 | `vault_reveal_disabled` | `GET /v1/vault/sessions/{ref}?reveal=true` while `PII_GUARD_VAULT_INSPECT` is not `full`. |
 | 404 | `not_found` | Unknown route, or an unknown or expired `session_id` on any route that takes one (`/v1/analyze`, `/v1/mask`, `/v1/mask/image`, `/v1/unmask`, the session and known-values routes, the gateway) |
+| 404 | `project_not_found` | The project-owned resource is unknown or does not belong to the selected project/owner. |
 | 404 | `traffic_log_disabled` | `GET /v1/traffic` and `/v1/traffic/stream` while `PII_GUARD_TRAFFIC_LOG=off` (the default). |
 | 404 | `vault_inspect_disabled` | The `/v1/vault/*` routes while `PII_GUARD_VAULT_INSPECT=off`. |
+| 408 | `project_request_timeout` | An endpoint gateway request body did not finish within its bounded read deadline. |
 | 413 | `payload_too_large` | The body, text or image is larger than the configured limit (see docs/operations.md). |
 | 413 | `unmask_output_too_large` | Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values: one `/v1/unmask` text, or one gateway response (non-streaming: this error; streaming: the stream ends with an error event of this code). Nothing past the limit is returned. |
 | 415 | `unsupported_media_type` | `/v1/mask/image`: the image is not a PNG or JPEG (sniffed from its bytes). |
@@ -380,11 +384,14 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `invalid_known_value` | A pre-loaded known value is too short (< 3 non-space characters), too long, or has an unknown or visual type. The message names its index and type, never the value. |
 | 422 | `too_many_known_values` | The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values; nothing is added. |
 | 422 | `blocked_entity` | `/v1/mask` (or the gateway) found an entity type whose policy is `block`. The message lists types and counts only; nothing is masked, stored or forwarded. |
+| 422 | `invalid_project_config` | A project, policy, endpoint or endpoint-key configuration is invalid. |
+| 422 | `upstream_destination_not_allowed` | Hosted endpoint destination does not satisfy the public HTTPS/port policy. |
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
 | 503 | `detection_profile_denied` | The selected or cached raw-processing component is not permitted by `PII_GUARD_DETECTION_PROFILE`; nothing is forwarded. |
+| 503 | `project_storage_unavailable` | The local SQLite project configuration store cannot safely be opened or used. |
 | 503 | `detection_unavailable` | `DetectionUnavailableError` (a `DetectionError`): a configured detector can't run safely, so nothing ran and nothing was sent. Today: the LLM detector without `PII_GUARD_LLM_DETECTOR_API_KEY` (gateway audit mode, or `PII_GUARD_DETECTORS` with `llm` on `/v1/*`); the message is "audit mode needs PII_GUARD_LLM_DETECTOR_API_KEY …". Refused before any detection, image segmentation or request, so the text never leaves the machine. A keyless endpoint on loopback (`localhost`, `127.0.0.1`, `::1`) is allowed: the text stays on the machine. |
 | 503 | `detector_loading` | `DetectorLoadingError` (a `DetectionError`): the NER model is still loading in the background after `PII_GUARD_NER_WARMUP_TIMEOUT` (default 120 s, see "NER warm-up" above). Nothing ran and nothing was sent; the response has `Retry-After`. |
 | 503 | `ocr_unavailable` | `/v1/mask/image` (and gateway images): no OCR engine, so the text in the image can't be checked (`PII_GUARD_IMAGE_REQUIRE_OCR`, the default). |
@@ -1401,6 +1408,68 @@ another owner's connection fails, never falls back to sponsored. Already admitte
 may finish with their selected connection after deletion. Supported presets are Meta,
 OpenAI, Fireworks and OpenRouter; custom connections require public HTTPS on port 443.
 
+### Projects, policies and endpoints
+
+The project store persists configuration in local SQLite or hosted authenticated encrypted
+Azure Blob snapshots (see [projects.md](projects.md#hosted-encrypted-blob-snapshots)). Blob
+operations use fresh bounded in-memory SQLite state and conditional ETag commits; storage
+failures and conflicts return sanitized 503 without automatic replay or local fallback. Hosted
+management requires the authenticated Google owner. Self-hosted management uses the single
+`local-owner`, protected by the configured API token or trusted loopback access. The first
+listing/request for an owner atomically creates a default project with the deployment's default
+policy. `X-PII-Guard-Project` selects a project for owner-scoped data routes; on vault, session,
+unmask and traffic inspection routes, `X-PII-Guard-Endpoint` may further select an endpoint
+namespace. Duplicate selection headers fail closed. Without a selection, existing local
+single-owner routes keep their default namespace.
+
+| Method and path | Request | Response / behavior |
+|---|---|---|
+| `GET /v1/projects` | — | `{projects:[...],default_project_id}`; creates the default if needed |
+| `POST /v1/projects` | `{name}` | 201 project metadata; maximum 32 projects per owner |
+| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` |
+| `GET /v1/projects/{project_id}/policies` | — | `{policies:[...]}`; every immutable version |
+| `POST /v1/projects/{project_id}/policies` | `{name,entity_policies?,language?,mode?,detection_profile?}` | 201 first version in a new policy family |
+| `PUT /v1/projects/{project_id}/policies/{policy_id}` | Same policy fields | 201 next immutable version; existing endpoints remain pinned |
+| `GET /v1/projects/{project_id}/policies/versions/{version_id}` | — | Exact policy-version snapshot |
+| `GET /v1/projects/{project_id}/endpoints` | — | `{endpoints:[...]}`; credentials are never returned |
+| `POST /v1/projects/{project_id}/endpoints` | `{name,provider,model,policy_version_id,base_url?,api_key?,enabled?}` | 201 endpoint metadata; maximum 128 per project |
+| `PUT /v1/projects/{project_id}/endpoints/{endpoint_id}` | Complete endpoint fields; `api_key` may be omitted to keep current credential | Updated metadata; explicit `policy_version_id` required. `enabled:false` atomically revokes active keys; re-enabling does not restore them |
+| `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}` | — | 204; permanently deletes endpoint and all its key records |
+| `GET /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | — | `{keys:[id,name,created_at,revoked_at]}`; no raw keys |
+| `POST /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | `{name}` | 201 key metadata plus raw `key`, returned once; maximum 32 active and 128 retained records per endpoint |
+| `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}/keys/{key_id}` | — | 204; revokes future admissions |
+
+Policy versions capture a complete text-entity action map, language and detection mode. Omitted
+entity actions use deployment defaults. Only text entities accept `mask`, `keep` or `block`;
+unknown entities and extra fields are rejected with sanitized validation messages. Hosted
+policies require `fast`; self-hosted policies must use the deployment's detection profile, and
+`local-only` refuses `audit`. A policy revision appends a version and never mutates a prior
+version or silently changes endpoint pins. A project can contain up to 256 policy versions.
+
+An endpoint pins one policy version and one provider/model/upstream/credential tuple. Providers
+are `meta`, `openai`, `fireworks`, `openrouter`, `custom`, and hosted-only `sponsored` Meta.
+Preset providers use their fixed base URL. `custom` requires a base URL. Hosted destinations
+must pass the public HTTPS port-443 and DNS validation; local/self-hosted destinations accept
+HTTP or HTTPS, including loopback, and reject embedded URL credentials, queries and fragments.
+New BYOK endpoints require an API key; on edit, omitting `api_key` preserves the current key.
+Provider credentials are encrypted in SQLite and omitted from all endpoint metadata. Sponsored
+endpoints store no credential and require an allowlisted hosted model.
+
+Endpoint gateway URLs are `/e/{endpoint_id}/v1/chat/completions`,
+`/e/{endpoint_id}/v1/responses`, and `/e/{endpoint_id}/v1/models`. Send the endpoint key as a
+Bearer credential. These routes accept only that endpoint's configured model, language, mode,
+upstream and policy version; caller overrides fail closed. Endpoint keys cannot call owner,
+account, management, traffic or vault routes. A revoked key or disabled endpoint rejects new
+admission; an already admitted call uses its captured endpoint/policy/credential snapshot and
+may finish. Disabling an endpoint atomically revokes all active keys while preserving its
+configuration; re-enabling it leaves those keys revoked. Deleting an endpoint permanently
+removes its configuration and key records. At most 32 keys remain active per
+endpoint; the store can retain at most 128 records and prunes the oldest revoked records to
+enforce that bound. A global 65,536-record cap also applies. Hosted vault/session capacity is
+shared across all of an account's project and endpoint namespaces (20 sessions by default).
+Hosted request, token, concurrency and sponsored accounting remains account/global and does
+not multiply with project count.
+
 ### Curated demo
 
 `POST /v1/demo {sample_id,language?}` accepts `hu-support` or `en-support`; an optional
@@ -1450,3 +1519,59 @@ Successful upstream responses and complete SSE streams are limited to 2 MiB befo
 or event parsing. Hosted requests explicitly ask for identity encoding and refuse compressed
 responses, so a compressed payload cannot bypass the memory bound during decompression.
 An over-limit stream ends with a sanitized stream failure and releases its admission permit.
+
+### Durable sponsored allowance (opt-in)
+
+The default `PII_GUARD_HOSTED_SPEND_STORE=marker` retains the one-use allocation claim above.
+`azure_blob` selects a separate monetary-only allowance; it does not persist vault mappings,
+owners, keys, connections or local request/token/concurrency quotas. Install the
+`hosted-azure` extra. The configured storage account must use its public Azure Blob HTTPS
+hostname, without SAS, URL credentials, paths, queries or fragments. Authentication uses
+`ManagedIdentityCredential` only, optionally with
+`PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID`; no developer-login fallback exists.
+`HOSTED_SPEND_ACCOUNT_URL`, `HOSTED_SPEND_CONTAINER` and `HOSTED_SPEND_ENVIRONMENT=dev|prod`
+(all with the `PII_GUARD_` prefix) select one fixed `<environment>.json` blob. Dev/prod
+resources and identities must be separate. The app never creates a blob or issues funds.
+
+The operator pre-creates a private block blob of at most 4096 bytes with exactly these keys:
+
+```json
+{"version":1,"environment":"dev","allocation_id":"synthetic-approved","ceiling_microdollars":1000000,"expires_at":1900000000,"charged_total":0,"day":"2026-10-28","daily_charged":0,"enabled":false}
+```
+
+Integers are exact, not booleans or floats; unknown/duplicate keys, malformed dates, future
+UTC days and values outside `0 <= daily_charged <= charged_total <= ceiling_microdollars`
+deny sponsorship. Environment, allocation ID, ceiling and expiry must equal the approved
+deployment configuration on **every read**. The existing
+`HOSTED_SPONSORED_ALLOCATION_ID`, `HOSTED_SPONSORED_MICRODOLLARS` and
+`HOSTED_ALLOCATION_EXPIRES_AT` pin that authority; the last must be an integral Unix expiry.
+The ceiling is finite, at most 10^15 microdollars. Configuration alone never funds the blob.
+
+Startup reads remaining authority without writes, claims, new IDs or expiry extensions.
+Each sponsored call first holds local admission, then reads and atomically charges the full
+conservative input/output cost to both lifetime and UTC-day totals using the GET's ETag as
+`If-Match`. Detector/provider work starts only after a confirmed write and an expiry/day
+recheck. The daily ceiling remains the configured quota limit ($10 by default); daily
+rollover changes only the daily counter, never the lifetime total. Completion, cancellation,
+retry, missing usage and duplicate completion never refund or perform a monetary update.
+
+Only a known HTTP 412 precondition conflict may retry, at most three attempts. SDK retries
+are disabled. Connection/read timeouts and a ten-second admission deadline bound I/O; a
+dedicated two-worker pool keeps slots occupied until underlying synchronous work finishes.
+Timeouts, unknown commits, cancellation, denied permissions, missing/malformed state and all
+accounting errors return sanitized `503 sponsored_unavailable` without outbound work.
+An ambiguous/late write may consume credit; it is never retried or refunded. Account/health
+and permitted BYOK remain available. The process kill switch and blob `enabled=false` deny
+future sponsored admission; account availability is a conservative cached hint, not an
+authorization check. The hosted cleanup loop refreshes that hint using bounded, single-flight,
+read-only I/O from the 30-second cleanup loop, allowing recovery after an outage or daily rollover.
+Every admission still rereads and charges independently of the hint.
+
+ETags protect competing app writes, not malicious or mistaken authorized storage writers.
+The app's managed identity and operators with write permission are trusted budget owners.
+They must never restore/reset the same allocation, even across cold starts. Local high-water
+marks detect rollback only within a process. An explicit operator funding change must keep
+the cumulative charged total and current UTC day's daily charge, then approve a new finite
+cumulative ceiling/ID/expiry in both blob and deployment configuration. Neither CI, scaling
+nor startup may do this. No automatic refill or tamper-proof accounting is claimed.
+See [operations.md](operations.md#durable-sponsored-allowance) for release checks.

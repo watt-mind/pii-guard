@@ -8,13 +8,15 @@ import re
 from http.cookies import SimpleCookie
 from typing import Any
 
+import anyio.to_thread
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pii_guard.api.errors import error_response
 from pii_guard.hosted.abuse import AbuseAdmissionError
-from pii_guard.hosted.identity import GUEST_COOKIE_NAME, easy_auth_principal
+from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
 from pii_guard.hosted.runtime import HostedService
+from pii_guard.projects.middleware import endpoint_body, endpoint_path, prepare_project
 from pii_guard.types import PiiGuardError
 
 
@@ -39,7 +41,7 @@ class HostedMiddleware:
         path = scope.get("path", "")
         if path in {"/healthz", "/readyz"} or (
             not path.startswith(
-                ("/v1", "/s/", "/muse-code", "/metrics", "/docs", "/redoc", "/openapi")
+                ("/v1", "/e/", "/s/", "/muse-code", "/metrics", "/docs", "/redoc", "/openapi")
             )
         ):
             await self.app(scope, receive, send)
@@ -57,6 +59,14 @@ class HostedMiddleware:
                 message = dict(message)
                 headers = list(message.get("headers", []))
                 headers.append((b"cache-control", b"no-store"))
+                if state.get("project_policy"):
+                    headers.append(
+                        (
+                            b"x-pii-guard-policy-version",
+                            state["project_policy"]["policy_version_id"].encode(),
+                        )
+                    )
+                    headers.append((b"x-pii-guard-project", state["project_id"].encode()))
                 if cookie_header is not None:
                     headers.append((b"set-cookie", cookie_header.encode("ascii")))
                 message["headers"] = headers
@@ -74,17 +84,36 @@ class HostedMiddleware:
                 "origin",
                 "x-pii-guard-connection",
                 "cookie",
+                "x-pii-guard-project",
+                "x-pii-guard-endpoint",
             }
             for name in protected_headers:
                 if len(headers.getlist(name)) > 1:
                     raise HostedRequestError("Duplicate security header")
             auth = headers.get("authorization") or headers.get("x-pii-guard-token")
+            routed = endpoint_path(path)
+            endpoint_snapshot = None
+            if path.startswith("/e/") and routed is None:
+                raise HostedRequestError("Endpoint route is unavailable")
             if auth:
                 if headers.get("authorization"):
                     scheme, _, auth = auth.partition(" ")
                     if scheme.lower() != "bearer":
                         raise HostedUnauthorizedError("Invalid guard API key")
-                principal = self.service.keys.resolve(auth)
+                if auth.startswith("pg_ep_"):
+                    if routed is None or headers.get("x-pii-guard-token"):
+                        raise HostedUnauthorizedError("Endpoint key requires its endpoint path")
+                    endpoint_snapshot = await anyio.to_thread.run_sync(
+                        self.service.projects.store.resolve_key, auth, routed[0]
+                    )
+                    principal = (
+                        Principal(endpoint_snapshot.owner_id, True, "api_key")
+                        if endpoint_snapshot
+                        else None
+                    )
+                    state["endpoint_key"] = True
+                else:
+                    principal = self.service.keys.resolve(auth)
                 if principal is None:
                     raise HostedUnauthorizedError("Invalid or expired guard API key")
             elif encoded := headers.get("x-ms-client-principal"):
@@ -101,7 +130,7 @@ class HostedMiddleware:
                 principal, fresh = self.service.guests.resolve(item.value if item else None)
                 if fresh:
                     cookie_header = self.service.guests.cookie_header(fresh)
-            canonical = re.sub(r"^/s/[^/]+(?=/v1/|/muse-code/)", "", path)
+            canonical = routed[1] if routed else re.sub(r"^/s/[^/]+(?=/v1/|/muse-code/)", "", path)
             allowed = {
                 "/v1/account",
                 "/v1/demo",
@@ -124,7 +153,21 @@ class HostedMiddleware:
                 r"account/(?:api-keys|connections)/[^/]+)",
                 canonical,
             )
-            if canonical not in allowed and parameterized is None:
+            project_management = canonical == "/v1/projects" or bool(
+                re.fullmatch(
+                    r"/v1/projects/[A-Za-z0-9_-]+(?:/(?:policies|endpoints)"
+                    r"(?:/[A-Za-z0-9_-]+(?:/keys(?:/[A-Za-z0-9_-]+)?)?)?)?",
+                    canonical,
+                )
+            )
+            project_management = project_management or bool(
+                re.fullmatch(
+                    r"/v1/projects/[A-Za-z0-9_-]+/policies/versions/[A-Za-z0-9_-]+", canonical
+                )
+            )
+            if project_management and principal.auth_method != "google":
+                raise HostedUnauthorizedError("Project management requires signed-in owner access")
+            if canonical not in allowed and parameterized is None and not project_management:
                 raise HostedRequestError("This endpoint is unavailable in hosted mode")
             if canonical not in {"/v1/account", "/v1/demo"} and not principal.authenticated:
                 raise HostedUnauthorizedError("Sign in with Google to use this endpoint")
@@ -152,6 +195,18 @@ class HostedMiddleware:
                     authenticated=principal.authenticated,
                     anonymous_sponsored=canonical == "/v1/demo" and scope.get("method") == "POST",
                 )
+            if principal.authenticated and canonical not in {"/v1/account", "/v1/demo"}:
+                state = await anyio.to_thread.run_sync(
+                    prepare_project,
+                    self.service.projects,
+                    {**scope, "state": state},
+                    principal.id,
+                    endpoint_snapshot,
+                )
+                scope, receive = await endpoint_body(
+                    scope, receive, state, self.service.settings.hosted_max_body_bytes
+                )
+                headers = Headers(scope=scope)
             raw = bytearray()
             if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}:
                 async with asyncio.timeout(min(10, self.service.settings.hosted_request_timeout)):
@@ -164,6 +219,7 @@ class HostedMiddleware:
                             raise HostedRequestError("Hosted request body is too large")
                         if not message.get("more_body", False):
                             break
+            selected_endpoint = state.get("project_endpoint")
             connection_id = headers.get("x-pii-guard-connection")
             if connection_id:
                 state["hosted_connection"] = self.service.connections.get(
@@ -179,6 +235,7 @@ class HostedMiddleware:
                     raise HostedRequestError("Hosted requests require fast text mode")
                 if (
                     not connection_id
+                    and (selected_endpoint is None or selected_endpoint.provider == "sponsored")
                     and body.get("model") not in self.service.settings.hosted_models
                 ):
                     raise HostedRequestError("Model is not allowed for sponsored requests")
@@ -199,14 +256,36 @@ class HostedMiddleware:
             # Account inspection remains available after exhaustion; all mutations and data
             # routes consume compute quotas. The full conservative charge survives failure.
             if not account_inspection:
+                input_tokens = (max(len(raw), 1024) * 32 + 4096) if paid else len(raw)
+                output_tokens = self.service.settings.hosted_max_output_tokens if paid else 0
+                sponsored = (
+                    paid
+                    and not connection_id
+                    and (selected_endpoint is None or selected_endpoint.provider == "sponsored")
+                )
                 reservation = self.service.quotas.admit(
                     principal.id,
                     authenticated=principal.authenticated,
-                    input_tokens=(max(len(raw), 1024) * 32 + 4096) if paid else len(raw),
-                    output_tokens=self.service.settings.hosted_max_output_tokens if paid else 0,
-                    sponsored=paid and not connection_id,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    sponsored=sponsored and self.service.spend is None,
                 )
-                runtime = self.service.acquire(principal)
+                if sponsored and self.service.spend is not None:
+                    await self.service.charge_spend(input_tokens, output_tokens)
+                project_id = state.get("project_id")
+                default = (
+                    (
+                        await anyio.to_thread.run_sync(
+                            self.service.projects.store.default_project, principal.id
+                        )
+                    )["id"]
+                    if project_id
+                    else None
+                )
+                namespace = project_id if project_id != default else None
+                if selected_endpoint is not None:
+                    namespace = str(project_id) + ":" + selected_endpoint.id
+                runtime = self.service.acquire(principal, namespace=namespace)
                 state["hosted_runtime"] = runtime
             filtered = [
                 (k, v)
@@ -249,7 +328,7 @@ class HostedMiddleware:
                     scope, receive, tracked_send
                 )
         finally:
-            gateway = state.get("hosted_gateway")
+            gateway = state.get("project_gateway") or state.get("hosted_gateway")
             try:
                 if gateway is not None:
                     async with asyncio.timeout(5):

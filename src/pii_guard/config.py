@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     allowed_hosts: Annotated[tuple[str, ...], NoDecode] = ()
     # Bearer token required on every route but /healthz; unset: no authentication.
     api_token: SecretStr | None = None
+    # Durable project metadata and encrypted upstream credentials (raw mappings remain ephemeral).
+    project_state_path: str = "~/.local/share/pii-guard/projects/state.sqlite3"
+    hosted_project_store: Literal["sqlite", "azure_blob"] = "sqlite"
+    hosted_project_account_url: str | None = None
+    hosted_project_container: str = "project-configuration"
+    hosted_project_environment: Literal["dev", "prod"] = "dev"
+    hosted_project_managed_identity_client_id: str | None = None
 
     # Hosted mode requires the Azure Easy Auth sidecar to own the only ingress path.
     # Defaults deliberately retain the local/self-hosted behavior.
@@ -61,6 +68,11 @@ class Settings(BaseSettings):
     hosted_sponsored_allocation_id: str | None = None
     hosted_allocation_directory: str | None = None
     hosted_allocation_expires_at: float | None = None
+    hosted_spend_store: Literal["marker", "azure_blob"] = "marker"
+    hosted_spend_account_url: str | None = None
+    hosted_spend_container: str = "sponsored-allowance"
+    hosted_spend_environment: Literal["dev", "prod"] = "dev"
+    hosted_spend_managed_identity_client_id: str | None = None
     # Conservative ceilings, including reasoning tokens. Operator verifies against prices.
     hosted_input_microdollars_per_token: int = Field(default=100, ge=1)
     hosted_output_microdollars_per_token: int = Field(default=100, ge=1)

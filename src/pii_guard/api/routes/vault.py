@@ -202,7 +202,9 @@ class SessionRecorderMiddleware:
                         k.decode("latin-1").lower(): v.decode("latin-1")
                         for k, v in scope.get("headers") or []
                     }
-                    self.directory.record(session_id, source, _client(headers))
+                    runtime = scope.get("state", {}).get("hosted_runtime")
+                    directory = runtime.directory if runtime is not None else self.directory
+                    directory.record(session_id, source, _client(headers))
             await send(message)
 
         await self.app(scope, receive, recording_send)
