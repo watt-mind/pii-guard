@@ -47,6 +47,10 @@ def is_name(word: str) -> bool:
         ("Próba Jakabbal", "Próba Jakab", "Próba Jakab", "bal"),
         ("Próba Kornélnak", "Próba Kornél", "Próba Kornél", "nak"),
         ("Kovácsnál", "Kovács", "Kovács", "nál"),
+        # Stacked: -ék/-é/-éi, then a case ending (LAB-1337).
+        ("Kerekes Ottóéknál", "Kerekes Ottó", "Kerekes Ottó", "éknál"),
+        ("Minta Béláéknak", "Minta Bélá", "Minta Béla", "éknak"),
+        ("Teszt Zoltánéit", "Teszt Zoltán", "Teszt Zoltán", "éit"),
     ],
 )
 def test_inflected_names_split_at_the_stem(
