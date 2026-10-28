@@ -160,7 +160,7 @@ class ImageSlot:
         return f"ImageSlot(where={self.where!r}, bytes={len(self.data)})"
 
     def annotate(self, text: str) -> bool:
-        """Add a ``{"type": "text", "text": text}`` part right after this image's part, when
+        """Add a text part (``text`` or ``input_text``) right after this image's part, when
         the body is finalized. ``False`` if the image is not in a content array."""
         if self.annotate_with is None:
             return False
@@ -637,8 +637,16 @@ def _collect_part(
 
 
 def _collect_image(
-    part: dict[str, Any], where: str, out: CollectedTexts, content: list[Any] | None = None
+    part: dict[str, Any],
+    where: str,
+    out: CollectedTexts,
+    content: list[Any] | None = None,
+    *,
+    text_type: str = "text",
 ) -> None:
+    """An inline PNG/JPEG data URL (``image_url`` as an object with ``url`` or as a string),
+    queued for the visual pipeline. ``text_type`` is the part type of the transcript added
+    after it (``"text"`` for Chat Completions, ``"input_text"`` for the Responses API)."""
     image_url = part.get("image_url")
     holder: dict[str, Any]
     if isinstance(image_url, dict) and isinstance(image_url.get("url"), str):
@@ -678,7 +686,7 @@ def _collect_image(
         def annotate_with(text: str) -> None:
             def insert() -> None:
                 index = next(i for i, p in enumerate(container) if p is part)
-                container.insert(index + 1, {"type": "text", "text": text})
+                container.insert(index + 1, {"type": text_type, "text": text})
 
             out.finalizers.append(insert)
 

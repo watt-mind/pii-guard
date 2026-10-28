@@ -403,7 +403,7 @@ def test_upstream_error_events_are_replaced() -> None:
                     }
                 ]
             },
-            "input_image parts are not masked",
+            "remote image URLs are not fetched",
         ),
         ({"input": [{"type": "item_reference", "id": "msg_0"}]}, "'item_reference'"),
         ({"input": [{"type": "message", "role": "user", "content": "x", "extra": 1}]}, "extra"),

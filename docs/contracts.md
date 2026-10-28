@@ -635,6 +635,11 @@ masked; …]`, its document summary (JSON) and its masked transcript. The model'
 unmasked as usual. Responses to requests with images carry `X-PII-Guard-Images`,
 `X-PII-Guard-Image-Regions-Masked` and `X-PII-Guard-Image-OCR: on|off`.
 
+`POST /v1/responses` does the same for `input_image` parts (`{"type": "input_image",
+"image_url": "data:image/png;base64,…", "detail": …}`, as Muse Code `--image` sends them), in
+message content and in tool-call output arrays; the text that follows each image is an
+`input_text` part. `file_id` images and remote URLs are `400 unsupported_content` (LAB-1285).
+
 ### `GET /v1/status`
 
 What this server runs, read-only, for the web UI's Overview, Connect and Policy pages
@@ -817,9 +822,9 @@ with the treatments of the table above. Any other key, item type or part type is
 | body | `previous_response_id`, `conversation`, `prompt` | `400`: server-side state would hold another vault session's placeholders; send the whole `input` with `store: false` |
 | every item | `type`, `id`, `call_id`, `status`, `phase` | check |
 | `message` item (or `{role, content}` without `type`) | `role` | one of `system`, `developer`, `user`, `assistant` |
-| `message` item | `content` | string mask; or parts: `input_text`/`output_text` (`text` mask, `annotations`/`logprobs` mask JSON), `refusal` (`refusal` mask); `input_image`/`input_file`/`input_audio` `400` |
+| `message` item | `content` | string mask; or parts: `input_text`/`output_text` (`text` mask, `annotations`/`logprobs` mask JSON), `refusal` (`refusal` mask); `input_image` with an inline PNG/JPEG data URL `image_url` (masked image, `detail` check; `file_id` or remote URL `400`); `input_file`/`input_audio` `400` |
 | `function_call` item | `name` check; `arguments` | as a chat tool call's `arguments` (JSON parsed, mask JSON, re-serialised) |
-| `function_call_output` item | `output` | string mask, or text parts as above |
+| `function_call_output` item | `output` | string mask, or text and `input_image` parts as above |
 | `custom_tool_call` item | `name` check; `input` | mask |
 | `custom_tool_call_output` item | `output` | as `function_call_output` |
 | `reasoning` item | `summary[]` (`summary_text`), `content[]` (`reasoning_text`) | `text` mask |
