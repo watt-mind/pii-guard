@@ -316,6 +316,16 @@ Image values are registered in the vault session only when the whole request suc
 work masks into a private fork of the session, committed afterwards. A refused or timed-out
 image leaves nothing in the session, even while its thread is still finishing.
 
+### Values held in memory outside the vault
+
+Deleting a session or letting its TTL expire drops its values from the vault. The detectors
+keep no copy of their own: the LLM detector builds the patterns that place a reported value in
+the text per request and caches none of them (it used to keep every value ever reported, with
+no bound; LAB-1353). The one process-wide remnant is Python's `re` compile cache, shared by the
+vault and every detector: at most 512 recently compiled patterns (on Python 3.12), the oldest
+evicted first, some containing a recent value. A restart clears it; so does
+`pii_guard.detect.llm.clear_alignment_caches()` (`re.purge()`) in the API process.
+
 ## Traffic log
 
 Every call to `POST /v1/chat/completions` produces one event, kept **in memory only**, when the
