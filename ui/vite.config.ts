@@ -1,11 +1,13 @@
 /// <reference types="vitest/config" />
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
+import { splitIndex, type BenchmarkManifest } from "./src/api/benchmarksSplit.ts";
 
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
@@ -13,10 +15,15 @@ const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 process.env.VITE_PII_GUARD_HOSTED ??= "false";
 
 /**
- * `virtual:pii-guard/benchmarks-index`: the benchmark index, built from the committed run
- * records when the UI is built, served or tested. It used to be committed as
- * `src/api/benchmarks.index.json`, and every pair of pull requests that added a run record
- * conflicted on it (LAB-1269).
+ * The benchmark index, built from the committed run records when the UI is built, served or
+ * tested. It used to be committed as `src/api/benchmarks.index.json`, and every pair of pull
+ * requests that added a run record conflicted on it (LAB-1269).
+ *
+ * The screen fetches it in parts (`src/api/benchmarksSplit.ts`, LAB-1454): each part is a
+ * content-hashed static file, `assets/benchmarks-<part>-<hash>.json`, emitted into the build (and
+ * served from memory by the dev server), and `virtual:pii-guard/benchmarks-manifest` maps part
+ * names to those files. `virtual:pii-guard/benchmarks-index` is the whole index as one module,
+ * for tests only: the app never imports it.
  *
  * The index is built by `pii-guard eval report --print-index`, with the repository's
  * `.venv` when there is one (`uv sync`), otherwise through `uv run`. `PII_GUARD_PYTHON` picks
@@ -25,9 +32,12 @@ process.env.VITE_PII_GUARD_HOSTED ??= "false";
  * mounts only `ui/` and gets the index from its `benchmarks-index` service (LAB-1356).
  */
 function benchmarksIndex(): Plugin {
-  const id = "virtual:pii-guard/benchmarks-index";
-  const resolved = "\0" + id;
+  const indexId = "virtual:pii-guard/benchmarks-index";
+  const manifestId = "virtual:pii-guard/benchmarks-manifest";
   let cached: string | undefined;
+  let split: { manifest: BenchmarkManifest; files: Map<string, string> } | undefined;
+  let base = "/";
+  let building = false;
   const prebuilt = process.env.PII_GUARD_BENCHMARKS_INDEX || undefined;
   const python = (): [string, string[]] => {
     const args = ["-m", "pii_guard.eval.report_cli", "--print-index"];
@@ -48,29 +58,67 @@ function benchmarksIndex(): Plugin {
       );
     }
   };
+  const indexText = (ctx: { addWatchFile: (f: string) => void }): string => {
+    if (prebuilt) {
+      ctx.addWatchFile(prebuilt);
+      try {
+        return readFileSync(prebuilt, "utf-8").trim();
+      } catch (err) {
+        throw new Error(`benchmark index: cannot read PII_GUARD_BENCHMARKS_INDEX (${prebuilt}).`, { cause: err });
+      }
+    }
+    const runs = join(REPO_ROOT, "eval", "results", "runs");
+    for (const name of readdirSync(runs)) if (name.endsWith(".json")) ctx.addWatchFile(join(runs, name));
+    ctx.addWatchFile(join(REPO_ROOT, "docs", "benchmarks", "config.json"));
+    cached ??= build().trim();
+    return cached;
+  };
+  const splitParts = (text: string) => {
+    if (split) return split;
+    const { layout, parts } = splitIndex(JSON.parse(text) as Record<string, unknown>);
+    const files = new Map<string, string>();
+    const names: Record<string, string> = {};
+    for (const [name, value] of Object.entries(parts)) {
+      const json = JSON.stringify(value);
+      const hash = createHash("sha256").update(json).digest("base64url").slice(0, 10);
+      const slug = name.replace(/[^A-Za-z0-9_-]+/g, "-");
+      const fileName = `assets/benchmarks-${slug}-${hash}.json`;
+      files.set(fileName, json);
+      names[name] = fileName;
+    }
+    split = { manifest: { ...layout, parts: names }, files };
+    return split;
+  };
   return {
     name: "pii-guard-benchmarks-index",
-    resolveId: (source) => (source === id ? resolved : null),
+    configResolved(config) {
+      base = config.base;
+      building = config.command === "build";
+    },
+    resolveId: (source) => (source === indexId || source === manifestId ? "\0" + source : null),
     load(source) {
-      if (source !== resolved) return null;
-      if (prebuilt) {
-        this.addWatchFile(prebuilt);
-        try {
-          return `export default ${readFileSync(prebuilt, "utf-8").trim()};`;
-        } catch (err) {
-          throw new Error(`benchmark index: cannot read PII_GUARD_BENCHMARKS_INDEX (${prebuilt}).`, {
-            cause: err,
-          });
-        }
-      }
-      const runs = join(REPO_ROOT, "eval", "results", "runs");
-      for (const name of readdirSync(runs)) if (name.endsWith(".json")) this.addWatchFile(join(runs, name));
-      this.addWatchFile(join(REPO_ROOT, "docs", "benchmarks", "config.json"));
-      cached ??= build();
-      return `export default ${cached.trim()};`;
+      if (source === "\0" + indexId) return `export default ${indexText(this)};`;
+      if (source !== "\0" + manifestId) return null;
+      const { manifest, files } = splitParts(indexText(this));
+      if (building) for (const [fileName, json] of files) this.emitFile({ type: "asset", fileName, source: json });
+      return `export default ${JSON.stringify(manifest)};`;
+    },
+    configureServer(server) {
+      // The dev server has no build output: it answers the part files from memory.
+      server.middlewares.use((req, res, next) => {
+        const path = req.url?.split("?")[0] ?? "";
+        const json = path.startsWith(base) ? split?.files.get(path.slice(base.length)) : undefined;
+        if (json === undefined) return next();
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Cache-Control", "no-cache");
+        res.end(json);
+      });
     },
     handleHotUpdate({ file }) {
-      if (file.startsWith(join(REPO_ROOT, "eval")) || file.startsWith(join(REPO_ROOT, "docs"))) cached = undefined;
+      if (file.startsWith(join(REPO_ROOT, "eval")) || file.startsWith(join(REPO_ROOT, "docs"))) {
+        cached = undefined;
+        split = undefined;
+      }
     },
   };
 }

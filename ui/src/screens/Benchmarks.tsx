@@ -9,7 +9,8 @@ import {
   coverageTag,
   FAST_MODE_SYSTEM,
   tidyLabels,
-  loadBenchmarks,
+  benchmarkSource,
+  sourceOf,
   originLabel,
   pick,
   snapshotsFor,
@@ -17,6 +18,8 @@ import {
   textSets,
   type BenchmarkIndex,
   type BenchmarkLoader,
+  type BenchmarkSource,
+  type SetResults,
   readerNote,
   visualRunLabel,
   type LanguageFilter,
@@ -43,23 +46,28 @@ function withoutTickets(index: BenchmarkIndex): BenchmarkIndex {
 }
 
 type Load = { state: "loading" } | { state: "ready"; index: BenchmarkIndex } | { state: "error"; message: string };
+type SetLoad = { state: "ready"; data: SetResults } | { state: "error"; message: string };
+
+const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /**
  * Every recorded evaluation run, browsable: the same data as docs/benchmarks.md, read from
- * the index bundled at build time (so it works in demo mode, without the API).
+ * the index shipped with the page (so it works in demo mode, without the API). The summary
+ * loads first; each fixture set's results load when the set is picked (LAB-1454).
  */
-export function Benchmarks({ load = loadBenchmarks }: { load?: BenchmarkLoader }) {
+export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader }) {
+  const source = useMemo(() => sourceOf(load), [load]);
   const [data, setData] = useState<Load>({ state: "loading" });
   useEffect(() => {
     let live = true;
-    load().then(
+    source.summary().then(
       (index) => live && setData({ state: "ready", index: withoutTickets(tidyLabels(index)) }),
-      (err: unknown) => live && setData({ state: "error", message: err instanceof Error ? err.message : String(err) }),
+      (err: unknown) => live && setData({ state: "error", message: messageOf(err) }),
     );
     return () => {
       live = false;
     };
-  }, [load]);
+  }, [source]);
 
   return (
     <div className="space-y-6">
@@ -77,14 +85,30 @@ export function Benchmarks({ load = loadBenchmarks }: { load?: BenchmarkLoader }
           <p className="text-muted">{data.message}</p>
         </Notice>
       )}
-      {data.state === "ready" && <Explorer index={data.index} />}
+      {data.state === "ready" && <Explorer summary={data.index} source={source} />}
     </div>
   );
 }
 
-function Explorer({ index }: { index: BenchmarkIndex }) {
-  const sets = useMemo(() => textSets(index), [index]);
+function Explorer({ summary, source }: { summary: BenchmarkIndex; source: BenchmarkSource }) {
+  const sets = useMemo(() => textSets(summary), [summary]);
   const [set, setSet] = useState(sets[0] ?? "");
+  // Each set's results, fetched the first time the set is picked and kept.
+  const [loaded, setLoaded] = useState<Record<string, SetLoad>>({});
+  const part = loaded[set];
+  useEffect(() => {
+    if (!set || part) return;
+    let live = true;
+    source.set(set).then(
+      (data) => live && setLoaded((m) => ({ ...m, [set]: { state: "ready", data } })),
+      (err: unknown) => live && setLoaded((m) => ({ ...m, [set]: { state: "error", message: messageOf(err) } })),
+    );
+    return () => {
+      live = false;
+    };
+  }, [source, set, part]);
+  const ready = part?.state === "ready";
+  const index = useMemo(() => (part?.state === "ready" ? { ...summary, ...part.data } : summary), [summary, part]);
   const [lang, setLang] = useState<LanguageFilter>("all");
   const available = useMemo(() => systemsOn(index, set), [index, set]);
   const featured = useMemo(() => available.filter((k) => index.systems[k]?.featured), [available, index]);
@@ -112,7 +136,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         <Metric label="Latest run" value={lastRun} />
       </dl>
 
-      <Headline index={index} set={set} lang={lang} />
+      {ready && <Headline index={index} set={set} lang={lang} />}
 
       <section aria-label="Filters" className="space-y-4 rounded-xl border border-line bg-surface p-4 sm:p-5">
         <Segmented
@@ -143,7 +167,8 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
             </span>
           </legend>
           <div className="space-y-2">
-            {(["pii-guard", "comparison"] as const).map((family) => {
+            {!ready && <SetStatus set={set} part={part} />}
+            {ready && (["pii-guard", "comparison"] as const).map((family) => {
               const keys = available.filter((k) => index.systems[k]?.family === family);
               if (!keys.length) return null;
               return (
@@ -175,7 +200,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
                 </div>
               );
             })}
-            {Object.values(index.systems).some((v) => v.family === "comparison") && !available.some((k) => index.systems[k]?.family === "comparison") && (
+            {ready && Object.values(index.systems).some((v) => v.family === "comparison") && !available.some((k) => index.systems[k]?.family === "comparison") && (
               <p className="text-xs text-muted">The open-source tools weren’t run on this set; pick another set to compare with them.</p>
             )}
           </div>
@@ -197,7 +222,7 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         </p>
       )}
 
-      {selected.length === 0 ? (
+      {!ready ? null : selected.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">Pick at least one system to compare.</p>
       ) : (
         <>
@@ -254,6 +279,21 @@ function Explorer({ index }: { index: BenchmarkIndex }) {
         <code className="font-mono">pii-guard eval --record &lt;slug&gt;</code>.
       </p>
     </>
+  );
+}
+
+/** In place of a set's results while they load, or when they could not be loaded. */
+function SetStatus({ set, part }: { set: string; part: SetLoad | undefined }) {
+  if (part?.state === "error")
+    return (
+      <Notice tone="danger" live title={`The results for ${set} could not be loaded.`}>
+        <p className="text-muted">{part.message}</p>
+      </Notice>
+    );
+  return (
+    <p role="status" className="text-sm text-muted">
+      Loading results for {set}…
+    </p>
   );
 }
 

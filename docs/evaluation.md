@@ -237,8 +237,9 @@ existed were converted by `python -m pii_guard.eval.record_import` and are marke
   chart colours and markers), `fixture_sets`, `languages` and `entity_types`. Rates are 0 to 1,
   latency in milliseconds. Latency percentiles can't be pooled: a pooled value built from
   several runs is their document-weighted mean and says `latency_pooled: true`;
-- the same, compact, on stdout with `--print-index`: the UI build bundles it into the
-  Benchmarks tab (`ui/vite.config.ts`);
+- the same, compact, on stdout with `--print-index`: the UI build ships it with the
+  Benchmarks tab as hashed static JSON parts, the summary and run log first and each fixture
+  set's results when the set is picked (`ui/vite.config.ts`, `ui/src/api/benchmarksSplit.ts`);
 - `docs/benchmarks/*.svg`: leak vs latency, F1 and leak by language, leak over time, recall
   per entity type and visual recall: hand-written SVG, 1600 x 900, each captioned with the
   fixture set, its size, the run dates and the commits;
