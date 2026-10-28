@@ -74,19 +74,9 @@ _ID_CARD_CONTEXT = (
 _PASSPORT_CONTEXT = ("paszport", "passport", *_ID_CARD_CONTEXT[2:])
 
 # A Polish order, invoice, shipment, case or amount label right before a number makes it a
-# business number, as ``reference_or_amount_before`` does for the English, Hungarian and German
-# ones: "Faktura nr 7770001246", "numer zamówienia: ...", "sygn. akt ...".
-_PL_REFERENCE_BEFORE_RE = re.compile(
-    r"(?i:(?<!\w)(?:faktur\w*|zam[óo]wieni\w*|paragon\w*|przesy[łl]k\w*|sygn\.?(?:[ \t]*akt)?"
-    r"|sygnatur\w*|kwot\w*|suma|saldo|uchwa[łl]\w*|referencyjn\w*|klienta)"
-    r"(?:[ \t]*(?:nr|numer)(?!\w)\.?)?)[ \t:#=()\-]*$"
-)
-
-
-def _reference_before(text: str, start: int) -> bool:
-    if reference_or_amount_before(text, start):
-        return True
-    return _PL_REFERENCE_BEFORE_RE.search(text, max(0, start - 40), start) is not None
+# business number ("Faktura nr 7770001246", "numer zamówienia: ...", "sygn. akt ..."): the
+# shared ``reference_or_amount_before`` knows the Polish words (LAB-1433).
+_reference_before = reference_or_amount_before
 
 
 # --- Numbers: PESEL, NIP, REGON -------------------------------------------------------
@@ -173,9 +163,9 @@ _find_passport = _unlabelled(_PASSPORT_RE, is_valid_passport, _PASSPORT_CONTEXT,
 
 # Mobile: nine digits starting 4-8 in groups of three (compact ones need a cue, cues.tsv: a
 # bare nine-digit run is as often a REGON or a reference). Landline: a two-digit area code,
-# then 3-2-2 digits, the area code optionally in parentheses. The score is just above an
-# unlabelled Hungarian TAJ (0.8, nine digits in groups of three, run everywhere): in Polish text
-# a grouped nine-digit number is a phone number; a labelled TAJ (0.95) still wins.
+# then 3-2-2 digits, the area code optionally in parentheses. An unlabelled Hungarian TAJ
+# (also nine digits in groups of three) runs only for Hungarian text (LAB-1433), so it no
+# longer competes here; a labelled TAJ (0.95) still wins.
 _PHONE_RE = re.compile(
     r"(?<![\w+(])(?<!\d[-./ ])"
     r"(?:[4-8]\d{2}(?P<sep>[ -])\d{3}(?P=sep)\d{3}"
@@ -187,7 +177,7 @@ _PHONE_RE = re.compile(
 def _find_phone(text: str) -> Iterator[_Hit]:
     for m in _PHONE_RE.finditer(text):
         if not _reference_before(text, m.start()):
-            yield _Hit(m.start(), m.end(), EntityType.PHONE, 0.82)
+            yield _Hit(m.start(), m.end(), EntityType.PHONE, 0.8)
 
 
 # --- Addresses ------------------------------------------------------------------------

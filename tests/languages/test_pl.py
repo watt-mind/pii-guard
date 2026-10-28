@@ -6,7 +6,11 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from pii_guard.detect.checksums import taj_check_digit
+from pii_guard.detect.ner import NerDetector, RawEntity
+from pii_guard.detect.ner_numbers import number_verdict
 from pii_guard.detect.rules import RuleDetector
+from pii_guard.detect.rules._base import reference_or_amount_before
 from pii_guard.languages.pl.checksums import (
     id_card_check_digit,
     is_valid_id_card,
@@ -33,6 +37,7 @@ REGON_9 = "99000123" + str(regon_check_digit("99000123"))
 REGON_14 = REGON_9 + "0001" + str(regon_check_digit(REGON_9 + "0001"))
 ID_CARD = "ZZB" + str(id_card_check_digit("ZZB", "00123")) + "00123"
 PASSPORT = "ZS" + str(passport_check_digit("ZS", "000321")) + "000321"
+TAJ = "55501234" + str(taj_check_digit("55501234"))  # nine digits, valid as a Hungarian TAJ
 
 
 def _bump(value: str, index: int = -1) -> str:
@@ -331,3 +336,95 @@ def test_llm_profile_and_prompt() -> None:
     assert (profile.code, profile.name, profile.allow_suffix) == ("pl", "Polish", True)
     system = build_messages("Tekst", "pl")[0]["content"]
     assert "PESEL" in system and "dowód" in system
+
+
+# --- LAB-1433 follow-ups -----------------------------------------------------------------
+
+
+def test_a_licence_number_that_looks_like_a_date_tail_is_masked(detector: RuleDetector) -> None:
+    # "2345/42/00" sits inside the value and "5936/42/00" has no month 42: neither is a date.
+    for value in ("12345/42/00", "05936/42/00", "5936/42/00"):
+        spans = detector.detect(f"Prawo jazdy nr {value}.", "pl")
+        assert [(s.entity_type, s.text) for s in spans] == [(E.ID_DOCUMENT, value)], value
+
+
+def test_a_real_date_after_a_cue_is_still_not_masked(detector: RuleDetector) -> None:
+    for text in ("prawo jazdy wydane 2026/10/26", "telefon 2026-10-27", "PESEL od 26.10.2026"):
+        assert _found(detector, text) == [], text
+
+
+def test_an_unlabelled_taj_is_hungarian_only(detector: RuleDetector) -> None:
+    grouped = f"{TAJ[:3]} {TAJ[3:6]} {TAJ[6:]}"
+    assert _found(detector, f"Kontakt: {grouped}.", "hu") == [("NATIONAL_ID_HU_TAJ", grouped)]
+    assert _found(detector, f"Kontakt: {grouped}.", "pl") == [("PHONE", grouped)]
+    assert _found(detector, f"Contact: {TAJ}.", "en") == []
+    # After its label a TAJ is still found in every language.
+    for language in ("pl", "en", "de"):
+        assert _found(detector, f"TAJ: {grouped}", language) == [("NATIONAL_ID_HU_TAJ", grouped)]
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Faktura nr",
+        "numer zamówienia:",
+        "Zamówienie nr",
+        "nr przesyłki",
+        "Paragon",
+        "numer zlecenia",
+        "Nr rezerwacji:",
+        "Kwota",
+        "PLN",
+    ],
+)
+def test_polish_reference_labels_are_shared(label: str) -> None:
+    text = f"{label} 123456789"
+    assert reference_or_amount_before(text, len(text) - 9)
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Numer zamówienia:",
+        "Faktura nr",
+        "numer przesyłki",
+        "Paczka nr",
+        "Nr rezerwacji:",
+        "Zgłoszenie",
+        "nr transakcji",
+        "Przesyłka",
+    ],
+)
+def test_ner_numbers_after_a_polish_reference_label_are_dropped(label: str) -> None:
+    text = f"{label} 5550123456 jest gotowe."
+    start = text.index("5550123456")
+    assert not number_verdict(text, start, start + 10)
+
+
+def test_numer_alone_is_no_positive_cue() -> None:
+    # "numer" is in many cues ("numer konta", "numer dowodu") but names nothing by itself.
+    text = "Faktura numer 5550123456"
+    start = text.index("5550123456")
+    assert not number_verdict(text, start, start + 10)
+    text = "numer 5550123456"
+    assert number_verdict(text, 6, 16)  # no cue at all: the shape decides, and keeps it
+
+
+class _TagBackend:
+    def __init__(self, value: str) -> None:
+        self.value = value
+
+    def predict(self, text: str) -> list[RawEntity]:
+        start = text.find(self.value)
+        return [RawEntity("ID_DOCUMENT", start, start + len(self.value), 0.9)]
+
+
+def test_ner_keeps_an_identifier_after_its_polish_label() -> None:
+    for text, value in (
+        (f"PESEL {_bump(PESEL)}", _bump(PESEL)),
+        ("nr konta 5550123456", "5550123456"),
+    ):
+        detector = NerDetector(backend=_TagBackend(value))
+        assert [s.text for s in detector.detect(text, "pl")] == [value], text
+    detector = NerDetector(backend=_TagBackend("5550123456"))
+    assert detector.detect("Numer zamówienia 5550123456", "pl") == []

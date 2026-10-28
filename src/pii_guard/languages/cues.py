@@ -230,8 +230,15 @@ _WORD_RE = re.compile(r"[^\W\d_]{1,15}(\.?)")
 #: A word ending in "." longer than this ends a sentence; shorter ones are "no.", "Nr.", "Tel.".
 _MAX_ABBREVIATION = 4
 
+# A date inside a cued value rejects it: a year, month and day in range, with digit boundaries
+# on both sides. So neither the tail of a longer number (``12345/42/00`` holds ``2345/42/00``)
+# nor a same-shape number with no such month (``5936/42/00``, a Polish driving licence) is a
+# date (LAB-1433).
+_MONTH = r"(?:0?[1-9]|1[0-2])"
+_DAY = r"(?:0?[1-9]|[12]\d|3[01])"
 _DATE_RE = re.compile(
-    r"\d{4}[-./ ]{1,2}\d{1,2}[-./ ]{1,2}\d{1,2}(?!\d)|(?<!\d)\d{1,2}[./]\d{1,2}[./]\d{2,4}(?!\d)"
+    rf"(?<!\d)[12]\d{{3}}[-./ ]{{1,2}}{_MONTH}[-./ ]{{1,2}}{_DAY}(?!\d)"
+    rf"|(?<!\d)(?:{_DAY}[./]{_MONTH}|{_MONTH}[./]{_DAY})[./](?:\d{{2}}|[12]\d{{3}})(?!\d)"
 )
 _CURRENCY_AFTER_RE = re.compile(r"[ \t\u00a0]?(?:Ft|HUF|forint|EUR|USD|GBP|CHF|€|\$|£)(?!\w)")
 _CURRENCY_BEFORE = ("$", "€", "£")

@@ -93,8 +93,8 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
   numbers). It adds deliberate noise (stripped diacritics, OCR confusions) and unlabelled
   order and tracking numbers. Another detector's authors wrote it as their benchmark, so it
   is a fair third-party set for pii-guard.
-- **`pl-pii-bench`**: the first Polish set, and a language pii-guard has no language pack for.
-  It has complete, exhaustively annotated synthetic administrative documents, so precision is
+- **`pl-pii-bench`**: the first Polish set. It was scored before the `pl` language pack existed
+  (LAB-1392) and again with it (LAB-1400, report-only: the pack was tuned on other sets). It has complete, exhaustively annotated synthetic administrative documents, so precision is
   meaningful. Its identifiers are checksum-valid, and a separate negative lane holds
   same-shape values that fail their check digits. An inflection lane puts names in all seven
   Polish cases. Five of its seven public lanes are used; the `robustness` and `pdf` lanes

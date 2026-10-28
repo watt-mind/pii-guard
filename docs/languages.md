@@ -100,7 +100,9 @@ handles compact values, groups joined by hyphens, spaces or dots, and four-group
 matching also accepts lowercase text and variable spaces between its groups. When a grouping
 is also common for something that is not personal data, require a label instead of dropping
 the form: dotted or slashed numeric groups can be thousands-grouped amounts, so those TAJ
-variants require a TAJ cue. Unlabelled TAJ matching remains limited to the format and checksum.
+variants require a TAJ cue. An unlabelled TAJ (format and checksum only) runs for Hungarian
+text only: a one-in-ten check is too weak for another language's nine-digit numbers, such as
+a Polish phone number (LAB-1433).
 
 Put check-digit functions next to the rules (`languages/de/checksums.py`) with tests against
 the algorithm's published examples. Use the helpers in `detect/rules/_base.py`
@@ -145,6 +147,12 @@ und	-
 - Cues run for every text, like `EVERYWHERE` rules: a form in your language may carry
   English labels and the other way round. Pick words that are unambiguous next to a number;
   when two packs map one cue to different types, the text's own language wins.
+- Two shared word lists are not read from `cues.tsv` yet, so add your language's order,
+  invoice, shipment and amount words to them by hand: `_REFERENCE_WORD` in
+  `detect/rules/_base.py` (`reference_or_amount_before`: a validated number right after such a
+  label is a business number) and `_NEGATIVE` in `detect/ner_numbers.py` (an NER number right
+  after one is dropped). List the generic "number" word of your language in `_GENERIC` and
+  `_FILLER` there too (`Nummer`, `numer`), or every cue containing it makes it a positive cue.
 - Check them against `eval/fixtures/negative/` (order numbers, amounts, dates, postcodes and
   references without a cue: nothing may be masked) and add a `<code>-uncued-numbers.jsonl`
   there; `PII_GUARD_RULES_CUED_NUMBERS=false` turns the rule off for comparison.
