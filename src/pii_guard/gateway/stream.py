@@ -16,9 +16,10 @@ Upstream ``error`` events are replaced by a generic error: they may quote the ma
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
+from pii_guard.gateway.issued_ids import upstream_ids
 from pii_guard.gateway.restore import MESSAGE_TEXT_FIELDS, JsonEscapingSession
 from pii_guard.vault import StreamUnmasker, VaultSession
 
@@ -55,8 +56,12 @@ def error_event(code: str, message: str) -> str:
 class SseRestorer:
     """Rewrites SSE data payloads; feed them in order with :meth:`process`, then :meth:`finish`."""
 
-    def __init__(self, session: VaultSession) -> None:
+    def __init__(
+        self, session: VaultSession, on_ids: Callable[[list[str]], None] | None = None
+    ) -> None:
+        """``on_ids`` receives the ids each chunk carries, raw (LAB-1469)."""
         self._session = session
+        self._on_ids = on_ids
         # One budget for the whole response: every choice, field and tool call (LAB-1350).
         self._budget = session.restore_budget()
         self._json_session = JsonEscapingSession(session, self._budget)
@@ -105,6 +110,8 @@ class SseRestorer:
             return [data]
         if "error" in chunk:
             return [error_event("upstream_error", "upstream stream error")]
+        if self._on_ids is not None:
+            self._on_ids(upstream_ids(chunk))
         choices = chunk.get("choices")
         if isinstance(choices, list):
             for position, choice in enumerate(choices):

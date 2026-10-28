@@ -56,6 +56,7 @@ from pii_guard.detect.known import KNOWN_DETECTOR, WIDENED_TYPES, merge_known, w
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
+from pii_guard.gateway.issued_ids import IssuedIds, upstream_ids, without_issued_ids
 from pii_guard.gateway.request import (
     ImageSlot,
     InvalidChatRequestError,
@@ -323,6 +324,9 @@ class Gateway:
         # Fixed headers added to every upstream call of this gateway (the hosted sponsored
         # route's attribution, LAB-1461); they never override content type or credentials.
         self.upstream_extra_headers: dict[str, str] = {}
+        # Ids the upstream issued per session (LAB-1469): sent back as identifiers, they are
+        # forwarded without detection (the NER reads some random call ids as phone numbers).
+        self.issued_ids = IssuedIds()
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
@@ -656,6 +660,7 @@ class Gateway:
         remask: bool,
         since: int | None = None,
         names: frozenset[str] = frozenset(),
+        issued: frozenset[str] = frozenset(),
     ) -> None:
         """Write ``masked`` back. With ``remask``, values first seen in an image are masked in
         the texts too; ``since`` (the session generation before the images) scans only the
@@ -663,7 +668,10 @@ class Gateway:
 
         ``names``: the tool names the request declares. An identifier whose only rewrites are
         those names is written as sent, whatever the session holds (LAB-1324); a declared name
-        that is also a pre-loaded known value gets no exemption and still fails closed."""
+        that is also a pre-loaded known value gets no exemption and still fails closed.
+
+        ``issued``: the ids the upstream issued in this session (LAB-1469). An identifier that
+        is one of them is written as sent."""
         if remask:
             masked = [
                 session.mask(text, [], language=language, remask=True, since=since)
@@ -682,7 +690,10 @@ class Gateway:
             if (
                 slot.kind == "identifier"
                 and text != slot.text
-                and identifier_keeps_tool_names(slot.text, text, exempt, original)
+                and (
+                    slot.text in issued
+                    or identifier_keeps_tool_names(slot.text, text, exempt, original)
+                )
             ):
                 text = slot.text
             slot.write(text)
@@ -828,6 +839,8 @@ class Gateway:
                 spans = await self._detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
                 spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
+                issued = self.issued_ids.of(session.session_id)
+                spans = without_issued_ids(collected.slots, spans, issued)
             # Every older entry has scanned every text by the end of _mask: an image's remask
             # needs only the entries this request added (LAB-1278).
             generation = session.generation
@@ -841,7 +854,9 @@ class Gateway:
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                self._write(collected.slots, masked, session, language, remask, generation, names)
+                self._write(
+                    collected.slots, masked, session, language, remask, generation, names, issued
+                )
                 collected.finalize()
             _count_masked(stats, before, session)
         except BaseException:
@@ -919,6 +934,7 @@ class Gateway:
             if not isinstance(answer, dict):
                 raise UpstreamError("upstream returned a body that is not a JSON object")
             masked_answer = _masked_answer(answer) if echo else None
+            self.issued_ids.add(session.session_id, upstream_ids(answer))
             report = restore_completion(session, answer)
             stats.unresolved = len(report.unresolved)
             self._seed_cache(session, language, detector, report.restored_spans, stats)
@@ -938,7 +954,9 @@ class Gateway:
             timer.finish()
             return result, stats
 
-        restorer = SseRestorer(session)
+        restorer = SseRestorer(
+            session, on_ids=lambda ids: self.issued_ids.add(session.session_id, ids)
+        )
         trace.streaming = True
 
         async def timed_lines() -> AsyncIterator[str]:

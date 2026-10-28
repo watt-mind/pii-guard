@@ -38,6 +38,7 @@ import httpx
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
+from pii_guard.gateway.issued_ids import upstream_ids, without_issued_ids
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
 from pii_guard.gateway.responses_restore import (
@@ -240,6 +241,8 @@ class ResponsesGateway:
                 spans = await gw._detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
                 spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
+                issued = gw.issued_ids.of(session.session_id)
+                spans = without_issued_ids(collected.slots, spans, issued)
             # Inline images go through the chat path (LAB-1285): mask the texts, then the
             # images, then remask the texts with the values the images added (LAB-1278).
             generation = session.generation
@@ -253,7 +256,9 @@ class ResponsesGateway:
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                gw._write(collected.slots, masked, session, language, remask, generation, names)
+                gw._write(
+                    collected.slots, masked, session, language, remask, generation, names, issued
+                )
                 collected.finalize()
             _count_masked(stats, before, session)
         except BaseException:
@@ -365,6 +370,7 @@ class ResponsesGateway:
         if not isinstance(answer, dict):
             raise UpstreamError("upstream returned a body that is not a JSON object")
         masked_output = _masked_output(answer) if echo else None
+        self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
         report = restore_response(session, answer)
         stats.unresolved = len(report.unresolved)
         self.gateway._seed_cache(session, language, detector, report.restored_spans, stats)
@@ -392,7 +398,10 @@ class ResponsesGateway:
         detector: Any,
         out_headers: dict[str, str],
     ) -> tuple[Response, RequestStats]:
-        restorer = ResponsesSseRestorer(session)
+        issued = self.gateway.issued_ids
+        restorer = ResponsesSseRestorer(
+            session, on_ids=lambda ids: issued.add(session.session_id, ids)
+        )
         trace.streaming = True
 
         async def timed_lines() -> AsyncIterator[str]:
