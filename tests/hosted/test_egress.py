@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 from pii_guard.hosted.egress import (
+    MAX_RESPONSE_BYTES,
     EgressPolicyError,
     PublicNetworkBackend,
     SecureTransport,
@@ -70,7 +71,7 @@ class RecordingStream(httpcore.AsyncNetworkStream):
         self.closed = False
 
     async def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
-        result, self.response = self.response, b""
+        result, self.response = self.response[:max_bytes], self.response[max_bytes:]
         return result
 
     async def write(self, buffer: bytes, timeout: float | None = None) -> None:
@@ -135,6 +136,8 @@ def test_pins_actual_socket_preserves_host_and_tls_ignores_proxy(
         assert backend.streams[0].sni == ["api.example.com"]
         wire = b"".join(backend.streams[0].writes)
         assert b"Host: api.example.com\r\n" in wire
+        assert b"Accept-Encoding: identity\r\n" in wire
+        assert b"gzip" not in wire
         assert b"private.internal" not in wire
 
     asyncio.run(run())
@@ -362,5 +365,84 @@ def test_secure_client_preserves_structured_timeout() -> None:
             assert client.timeout.pool == 2
         async with secure_client(timeout=45) as client:
             assert client.timeout == httpx.Timeout(45, connect=10)
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("encoding", [b"gzip", b"deflate", b"br", b"identity, gzip", b""])
+def test_compressed_response_refused_before_decoding(encoding: bytes) -> None:
+    async def run() -> None:
+        backend = RecordingBackend(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\nContent-Encoding: "
+            + encoding
+            + b"\r\n\r\nzip"
+        )
+        async with httpx.AsyncClient(
+            transport=SecureTransport(resolver=public, backend=backend)
+        ) as client:
+            with pytest.raises(httpx.ReadError, match="compressed upstream responses are disabled"):
+                await client.get("https://api.example.com/v1/models")
+        assert backend.streams[0].closed
+
+    asyncio.run(run())
+
+
+def test_oversized_content_length_refused_before_body() -> None:
+    async def run() -> None:
+        backend = RecordingBackend(
+            f"HTTP/1.1 200 OK\r\nContent-Length: {MAX_RESPONSE_BYTES + 1}\r\n\r\n".encode()
+        )
+        async with httpx.AsyncClient(
+            transport=SecureTransport(resolver=public, backend=backend)
+        ) as client:
+            with pytest.raises(httpx.ReadError, match="hosted size limit"):
+                await client.get("https://api.example.com/v1/models")
+        assert backend.streams[0].closed
+
+    asyncio.run(run())
+
+
+def test_chunked_stream_total_capped_before_oversized_chunk_yield() -> None:
+    async def run() -> None:
+        # One unterminated SSE event spread over many HTTP chunks must also be bounded.
+        piece = b"a" * 65536
+        chunk = f"{len(piece):x}\r\n".encode() + piece + b"\r\n"
+        backend = RecordingBackend(
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n"
+            b"Content-Type: text/event-stream\r\n\r\n"
+            + chunk * (MAX_RESPONSE_BYTES // len(piece) + 1)
+            + b"0\r\n\r\n"
+        )
+        total = 0
+        async with httpx.AsyncClient(
+            transport=SecureTransport(resolver=public, backend=backend)
+        ) as client:
+            with pytest.raises(httpx.ReadError, match="hosted size limit"):
+                async with client.stream("GET", "https://api.example.com/v1/responses") as response:
+                    async for data in response.aiter_bytes():
+                        total += len(data)
+        assert 0 < total <= MAX_RESPONSE_BYTES
+        assert backend.streams[0].closed
+
+    asyncio.run(run())
+
+
+def test_exact_size_limit_and_identity_encoding_allowed() -> None:
+    async def run() -> None:
+        backend = RecordingBackend(
+            f"HTTP/1.1 200 OK\r\nContent-Length: {MAX_RESPONSE_BYTES}\r\n".encode()
+            + b"Content-Encoding: identity\r\n\r\n"
+            + b"a" * MAX_RESPONSE_BYTES
+        )
+        async with httpx.AsyncClient(
+            transport=SecureTransport(resolver=public, backend=backend)
+        ) as client:
+            response = await client.get(
+                "https://api.example.com/v1/models", headers={"Accept-Encoding": "gzip, br"}
+            )
+        assert len(response.content) == MAX_RESPONSE_BYTES
+        wire = b"".join(backend.streams[0].writes)
+        assert b"Accept-Encoding: identity\r\n" in wire
+        assert b"gzip" not in wire
 
     asyncio.run(run())

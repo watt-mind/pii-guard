@@ -278,6 +278,7 @@ class ResponsesGateway:
         timer.upstream_sent = started
         try:
             response = await client.send(request, stream=True)
+            await gw.bound_upstream_response(response)
         except httpx.HTTPError as exc:
             timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")

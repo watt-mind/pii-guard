@@ -1417,3 +1417,7 @@ again and the connection uses a checked numeric address, preserving original Hos
 SNI/certificate verification. Redirects and environment proxies are disabled. A preflight DNS
 check alone is not considered sufficient. Sponsored credentials only go to the fixed Meta
 endpoint and never to a custom origin.
+Successful upstream responses and complete SSE streams are limited to 2 MiB before buffering
+or event parsing. Hosted requests explicitly ask for identity encoding and refuse compressed
+responses, so a compressed payload cannot bypass the memory bound during decompression.
+An over-limit stream ends with a sanitized stream failure and releases its admission permit.
