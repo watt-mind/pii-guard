@@ -187,3 +187,40 @@ def test_app_startup_fails_closed_when_warm_up_fails(monkeypatch: pytest.MonkeyP
     app = create_app(Settings(detectors=("rules",)))
     with pytest.raises(DetectionError), TestClient(app):
         pass
+
+
+def _cached_published_model(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    """A fake, already-verified published checkpoint in the (test) model cache."""
+    from pii_guard.detect import ner_resolve
+
+    base = tmp_path / "models"
+    monkeypatch.setenv("PII_GUARD_MODELS_DIR", str(base))
+    root = ner_resolve.PUBLISHED.local_dir(base)
+    root.mkdir(parents=True)
+    (root / "config.json").write_text("{}", encoding="utf-8")
+    (root / "model.safetensors").write_bytes(b"fictional")
+    (root / ner_resolve._MARKER).write_text(ner_resolve.PUBLISHED.weights_sha256 + "\n")
+
+
+def test_background_warm_up_loads_the_resolved_model_once_for_api_and_gateway(
+    fake_model: type[FakeModel], monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """LAB-1303: no PII_GUARD_NER_MODEL, the published model resolves; the lifespan loads it in
+    the background and the REST analyzer and the gateway reuse that one load."""
+    from pii_guard.gateway.config import GatewayConfig
+    from pii_guard.gateway.detection import build_mode_detectors
+
+    _cached_published_model(monkeypatch, tmp_path)
+    monkeypatch.setattr(stack, "_ner_available", lambda: True)
+    settings = Settings(tenant_key="ab" * 32, ner_device="cpu")  # fictional test key
+    assert stack.ner_in_stack(settings)
+    assert stack.warm_up(settings) is False  # nothing configured: not the blocking path
+    app = create_app(settings)
+    with TestClient(app) as client:
+        app.state.ner_warmup.wait(5)
+        assert app.state.ner_warmup.state == "ready"
+        assert client.get("/healthz").json()["ner"] == "ready"
+        r = client.post("/v1/analyze", json={"text": TEXT, "language": "hu"})
+        assert r.status_code == 200, r.text
+        build_mode_detectors(settings, GatewayConfig())
+    assert fake_model.built == 1

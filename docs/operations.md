@@ -68,8 +68,11 @@ What it does:
   banner and a strip above the UI say so. `--mock` forces it.
 - **Mode.** Fast: rules, plus NER when the `ner` extra is installed (it pulls torch). The
   NER model resolves as in [models.md](models.md#which-ner-model-fast-mode-runs): on the
-  first run the published checkpoint or the public fallback is downloaded once (about 1.1 GB)
-  before the server starts. The strip and the banner list the active detectors, the banner
+  first run the published checkpoint or the public fallback is downloaded once (about 1.1 GB).
+  The server answers at once and loads (or downloads) it in the background: `/healthz` and
+  `/v1/status` say `"ner": "loading"`, and requests that need detection wait for it (up to
+  `PII_GUARD_NER_WARMUP_TIMEOUT`, 120 s, then `503 detector_loading` with `Retry-After`;
+  LAB-1303). The strip and the banner list the active detectors, the banner
   names the NER model (`NER model  …@… (public fallback, Apache-2.0)`), and without the extra
   it prints the exact `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up`
   line to add NER.

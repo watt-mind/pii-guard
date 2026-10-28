@@ -11,6 +11,10 @@ what they return, so ``/v1/mask`` and gateway fast mode can't drift apart:
 - :func:`rest_detector_names` -- an explicit ``PII_GUARD_DETECTORS``, else the default stack.
 - :func:`warm_up` -- load the NER model before serving (LAB-1274), when ``PII_GUARD_NER_MODEL``
   is set and the ``ner`` extra is installed.
+- :class:`NerWarmup` -- without ``PII_GUARD_NER_MODEL``, load the resolved NER (download
+  included) in a background thread at startup (LAB-1303); requests that need it wait for it,
+  bounded, and get ``503 detector_loading`` or ``503 detection_unavailable`` only when it is
+  still loading after the wait or failed to load.
 - :func:`build_detector` -- a registry detector, configured from the settings (``llm`` gets
   the settings, ``ner`` gets ``ner_model`` / ``ner_revision`` / ``ner_device``).
 - :class:`CheckedDetector` / :func:`check_spans` -- detector output must be a list of spans
@@ -26,8 +30,9 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, Literal
 
 from pii_guard.config import Settings
 from pii_guard.detect import ner_resolve
@@ -38,11 +43,14 @@ __all__ = [
     "NER_EXTRA_MISSING",
     "CheckedDetector",
     "DetectionUnavailableError",
+    "DetectorLoadingError",
+    "NerWarmup",
     "build_detector",
     "build_detectors",
     "check_spans",
     "default_detector_names",
     "ner_choice",
+    "ner_in_stack",
     "rest_detector_names",
     "unavailable_reason",
     "warm_up",
@@ -61,6 +69,16 @@ class DetectionUnavailableError(DetectionError):
     """
 
     code = "detection_unavailable"
+    status_code = 503
+
+
+class DetectorLoadingError(DetectionError):
+    """The NER model is still loading after the bounded wait (LAB-1303): retry shortly.
+
+    Nothing ran and nothing was sent. A ``DetectionError``, so callers fail closed on it.
+    """
+
+    code = "detector_loading"
     status_code = 503
 
 
@@ -175,11 +193,117 @@ def warm_up(settings: Settings) -> bool:
     """
     if not settings.ner_model or not _ner_available():
         return False
+    _load_ner(settings)
+    return True
+
+
+def _load_ner(settings: Settings) -> None:
+    """Build the ``ner`` detector and load its model (process-wide, shared: ``detect.ner``)."""
     detector = build_detector("ner", settings)
     load = getattr(detector, "load", None)
     if callable(load):
         load()
-    return True
+
+
+def ner_in_stack(settings: Settings) -> bool:
+    """Whether the REST API's or the gateway's detectors include ``ner`` for ``settings``."""
+    try:
+        names = {*rest_detector_names(settings), *default_detector_names(settings)}
+    except DetectionError:
+        return False
+    return "ner" in names
+
+
+NerState = Literal["off", "loading", "ready", "failed"]
+
+
+class NerWarmup:
+    """Loads the NER model in a background thread so the server answers while it loads.
+
+    ``state`` is ``off`` (no NER in the stack, or not started), ``loading``, ``ready`` or
+    ``failed`` (``error`` says why: the exception type only, ADR 0006). Requests that need a
+    detector call :meth:`wait` / :meth:`wait_async` first: they wait for the load, up to a
+    timeout, instead of loading the model themselves (on the event loop, for the gateway) or
+    racing it. A failed load is not retried: restart the server.
+    """
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.state: NerState = "off"
+        self.error: str | None = None
+        #: Wall time of the load, once it finished (ready or failed).
+        self.seconds: float | None = None
+        self._done = threading.Event()
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+
+    @property
+    def pending(self) -> bool:
+        """Requests must wait (``loading``) or be refused (``failed``)."""
+        return self.state in ("loading", "failed")
+
+    def mark_ready(self) -> None:
+        """The model was loaded some other way (``PII_GUARD_NER_MODEL``: :func:`warm_up`)."""
+        with self._lock:
+            self.state = "ready"
+            self._done.set()
+
+    def start(self) -> bool:
+        """Start the background load if ``ner`` is in the stack; returns whether it started."""
+        with self._lock:
+            if self.state != "off" or not ner_in_stack(self.settings):
+                return False
+            self.state = "loading"
+            self._thread = threading.Thread(
+                target=self._run, name="pii-guard-ner-warmup", daemon=True
+            )
+            self._thread.start()
+        return True
+
+    def _run(self) -> None:
+        started = time.monotonic()
+        try:
+            _load_ner(self.settings)
+        except DetectionError as exc:
+            self._finish("failed", exc.message, started)
+        except Exception as exc:  # never str(exc): it may quote a path or the input
+            self._finish("failed", f"ner model could not be loaded ({type(exc).__name__})", started)
+        else:
+            self._finish("ready", None, started)
+
+    def _finish(self, state: NerState, error: str | None, started: float) -> None:
+        with self._lock:
+            self.state, self.error = state, error
+            self.seconds = time.monotonic() - started
+            self._done.set()
+        if error is None:
+            logger.info("ner model ready after %.1fs (background warm-up)", self.seconds)
+        else:
+            logger.error("ner warm-up failed (requests get 503 detection_unavailable): %s", error)
+
+    def check(self, waited: float | None = None) -> None:
+        """Raise unless requests may run now (``off`` or ``ready``)."""
+        if self.state == "failed":
+            raise DetectionUnavailableError(f"ner model unavailable: {self.error}")
+        if self.state == "loading":
+            after = f" after waiting {waited:g}s" if waited is not None else ""
+            raise DetectorLoadingError(f"the ner model is still loading{after}; retry shortly")
+
+    def wait(self, timeout: float) -> None:
+        """Block until the load finished, up to ``timeout`` seconds, then :meth:`check`."""
+        if self.state == "loading":
+            self._done.wait(timeout)
+        self.check(timeout)
+
+    async def wait_async(self, timeout: float, poll: float = 0.05) -> None:
+        """:meth:`wait` without blocking the event loop (or holding a worker thread)."""
+        import anyio  # the API's event loop library; not needed by the rest of the stack
+
+        if self.state == "loading":
+            with anyio.move_on_after(timeout):
+                while not self._done.is_set():
+                    await anyio.sleep(poll)
+        self.check(timeout)
 
 
 def check_spans(found: object, text: str, name: str) -> list[Span]:

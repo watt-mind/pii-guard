@@ -148,9 +148,16 @@ def server_status(request: Request) -> dict[str, Any]:
     traffic = getattr(obs, "traffic", None)
     level = getattr(getattr(traffic, "level", None), "value", "off")
     base = str(request.base_url).rstrip("/")
+    warmup = getattr(state, "ner_warmup", None)
     return {
         **cached,
         "gateway": {**cached["gateway"], "url": f"{base}/v1"},
+        # Live (LAB-1303): off | loading | ready | failed, and why it failed (type only).
+        "ner": {
+            **cached["ner"],
+            "state": getattr(warmup, "state", "off"),
+            "error": getattr(warmup, "error", None),
+        },
         "traffic_log": level,
         "vault_inspect": str(getattr(state, "vault_inspect", "masked")),
         "metrics": getattr(obs, "metrics", None) is not None,
