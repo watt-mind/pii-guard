@@ -1455,8 +1455,9 @@ with one-hour idle and 24-hour absolute expiry; a full table refuses new entries
 evicting live allowances. Anonymous sponsored demo requests share a 30-request network
 burst, refilling 30/minute, and 120 requests per fixed hour starting at bucket creation.
 Guest cookie rotation does not reset that network allowance. Authenticated principals
-have separate 10-request bursts refilling 30/minute, independent of network usage and
-without requiring an address signal. Account inspection and sign-in remain reachable.
+have separate 10-request work bursts refilling 30/minute, independent of network usage and
+without requiring an address signal, plus a separate read bucket (120 burst, 10/s) for
+`GET`/`HEAD`. `/v1/account` (every method) is never charged; sign-in remains reachable.
 Secondary charges happen after identity/path/origin validation, before body reads, and
 survive downstream failure. Clock/accounting failure refuses admission.
 
@@ -1474,8 +1475,13 @@ never cross an owner boundary. Detectors are shared, with globally bounded compu
 (including work whose HTTP caller has timed out). Active requests pin their runtime through
 stream completion/cancellation; inactive runtimes expire after one hour. A 30-second cleanup
 loop forgets expired state. Session capacity refuses new sessions rather than evicting active
-ones. Defaults: 256 runtimes, 20 sessions per owner, 256 cached detections, 50 masked traffic
-events. Full vault reveal is never available. All state is ephemeral; restart loses mappings,
+ones. Runtimes are taken only by routes that use one: no `/v1/account` method, no `OPTIONS`
+request and no key or connection management route takes one, and a guest takes one only for
+`POST /v1/demo`. Guests draw on a separate pool (`HOSTED_MAX_GUEST_RUNTIMES`, default 8),
+so anonymous traffic never occupies a signed-in owner's runtime, and a guest's runtime is
+dropped as soon as its demo finishes. Defaults: 256 signed-in runtimes, 20 sessions per
+owner, 256 cached detections, 50 masked traffic events; the owner's traffic log scrubs the
+provider key a request may send (sponsored or the selected connection's). Full vault reveal is never available. All state is ephemeral; restart loses mappings,
 connections and guard API keys. Durable multi-replica state is deferred to LAB-1376.
 
 ### Account and credentials
@@ -1487,7 +1493,10 @@ connections and guard API keys. Durable multi-replica state is deferred to LAB-1
 ```
 
 Authenticated `principal` is `{id,provider:"google"}` with an opaque ID; tier is `standard`.
-The account remains readable when quota is exhausted. `POST /v1/account/api-keys {name}`
+The account remains readable when quota is exhausted. Key and connection management
+(`/v1/account/api-keys*`, `/v1/account/connections*`) requires a signed-in Google session:
+a guard API key gets `401 unauthorized`, so a leaked key cannot mint successors that
+outlive its revocation. `POST /v1/account/api-keys {name}`
 returns 201 `{id,name,key,prefix,created_at}`; only that response contains the raw key.
 `GET /v1/account/api-keys` returns metadata arrays; `DELETE /v1/account/api-keys/{id}` returns
 204 and revokes future use. Keys last 24 hours, at most five per owner and 1000 globally;
@@ -1578,20 +1587,32 @@ failure or an empty model answer. The static UI walkthrough remains available wi
 
 ### Admission, cost and egress
 
-All data routes and account mutations require atomic admission before detector/provider work.
-Defaults are five guest or 100 standard requests per UTC day, 100,000 guest or 1,000,000
-standard reserved tokens, two active requests per owner, eight globally, 10,000 requests and
-10,000,000 tokens globally per day. A separate 32-slot ingress bound and ten-second body-read
-deadline cover slow clients before parsed admission. Bodies are capped at 32 KiB; hosted
+Every signed-in mutation and data request (any method but `GET`, `HEAD` and `OPTIONS`) and a
+guest's `POST /v1/demo` require atomic admission before detector/provider work. Reads (`GET`,
+`HEAD`, including the console's polling of `/v1/traffic` and `/v1/status`) spend no daily
+request or token budget and hold no inference concurrency; the per-owner read bucket above
+bounds them. `/v1/account` is never admitted. Defaults are five guest or 100 standard
+requests per UTC day, 100,000 guest or 1,000,000 standard reserved tokens, two active requests
+per owner, eight globally, 10,000 requests and 10,000,000 tokens globally per day. A separate
+32-slot ingress bound and ten-second body-read deadline cover slow clients before parsed
+admission. `GET /v1/traffic/stream` gives its ingress slot back once admitted and holds a
+stream slot instead: two per owner, sixteen in all (`429 hosted_capacity` beyond). Bodies are capped at 32 KiB; hosted
 requests have a 180-second deadline, fast text detection, one completion and at most 8192
 output/reasoning tokens. Sponsored models are an explicit server allowlist, initially
 `muse-spark-1.3`; model selection cannot change the sponsored destination.
 
-Reservations charge a conservative input expansion bound plus the full output limit before
-work. Completion, cancellation, invalid provider responses and client retries never refund
+Reservations are sized from the request before work. The input charge is the upstream
+payload bound `2 × body bytes + 4096` (in tokens: a byte-level tokenizer never emits more
+tokens than bytes), and the gateway refuses with `413 payload_too_large`, before any upstream
+call, a masked payload larger than that bound. The output charge is the request's own output
+token limit (at most 8192; the default when it sets none), and 512 for the curated demo. With
+the defaults a guest gets its five demos (about 4,700 reserved tokens and $0.04 each) and a
+fresh signed-in user can send a chat close to the 32 KiB body limit. Completion, cancellation, invalid provider responses and client retries never refund
 requests, tokens or money. Concurrency releases only after the response stream and cleanup.
 There are no automatic upstream retries. Monetary units are integer microdollars, and configured
-per-token rates must upper-bound every permitted model and all reasoning charges. The global
+per-token rates must upper-bound every permitted model and all reasoning charges. The rate
+defaults have one source (`hosted/quotas.py`): 5 input and 30 output microdollars per token
+(`HOSTED_INPUT_MICRODOLLARS_PER_TOKEN`, `HOSTED_OUTPUT_MICRODOLLARS_PER_TOKEN`). The global
 daily ceiling is $10 and a finite allocation adds a stricter process-lifetime cap.
 
 Sponsored calls default to disabled. Enabling them requires a positive reconciled allocation,
@@ -1600,13 +1621,18 @@ Startup uses an atomic exclusive file claim, fsyncs it, and forfeits the entire 
 restart. Reusing an ID, missing storage, expiry or accounting failure disables sponsored work.
 A new process/day cannot silently replenish spend authority. The operator must reconcile
 provider spend before issuing another allocation; claims must never be removed or stored on
-an ephemeral container filesystem. An operator can disable admission through the ledger kill
-switch; restarting with the same allocation also fails closed. No billing persistence or
+an ephemeral container filesystem. The kill switch is a file: with
+`PII_GUARD_HOSTED_SPONSORED_KILL_SWITCH_PATH` set (an absolute path), creating that file
+disables sponsored admission for the rest of the process. It is checked before every
+sponsored admission and on each cleanup tick; any error other than a missing file also
+disables it, and removing the file does not re-enable it. Restarting with the same allocation
+also fails closed. No billing persistence or
 cross-replica accounting is claimed.
 
 All hosted upstream paths (chat, Responses and catalogs) share the secure transport: no URL
 credentials, query, fragment, IP literal, local domain, non-HTTPS or non-443 endpoint; every
-resolved A/AAAA address must be globally routable. At each new TCP connection DNS is checked
+resolved A/AAAA address must be globally routable (NAT64 `64:ff9b::/96` and
+`64:ff9b:1::/48` are refused, as are IPv4-mapped, 6to4 and Teredo addresses). At each new TCP connection DNS is checked
 again and the connection uses a checked numeric address, preserving original Host and TLS
 SNI/certificate verification. Redirects and environment proxies are disabled. A preflight DNS
 check alone is not considered sufficient. Sponsored credentials only go to the fixed Meta
