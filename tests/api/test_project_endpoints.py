@@ -275,3 +275,18 @@ def test_owner_runtime_capacity_cannot_consume_global_namespace_limit(tmp_path):
         service.acquire(first, namespace="project-b:endpoint-b")
     other = service.acquire(Principal("u_synthetic_other", True, "google"), namespace="project-c")
     service.release(other)
+
+
+def test_endpoint_and_legacy_gateway_share_configured_worker_capacity(endpoint_client):
+    from pii_guard.gateway.config import GatewayConfig
+
+    client, app, _, _, endpoint, _ = endpoint_client
+    app.state.gateway_config = GatewayConfig(concurrency=2)
+    resource, key = endpoint()
+    assert _chat(client, resource, key).status_code == 200
+    shared = app.state.projects.workers
+    assert {pool.size for pool in shared.values()} == {2}
+    # The generic route builds its global gateway without sending anything upstream.
+    assert client.post("/v1/chat/completions", json={}).status_code in {400, 503}
+    assert app.state.gateway._detect_workers is shared
+    assert app.state.gateway.config.concurrency == 2
