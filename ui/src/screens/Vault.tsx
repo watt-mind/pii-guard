@@ -201,7 +201,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
       {!usable ? (
         <Notice live>
           {!live ? (
-            <>The vault lives in the pii-guard server, so this needs the live API. Start it with {mono("pii-guard up")}, or switch the engine to Auto or Live API.</>
+            <>The vault lives in the pii-guard server, so this needs the live API. Start it with {mono("pii-guard up")}; if the engine is set to Demo engine, switch it to Auto.</>
           ) : status.state === "loading" ? (
             "Asking the server…"
           ) : server === null ? (
@@ -402,6 +402,7 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
           <p className="py-6 text-center text-sm text-muted">This session holds no placeholders yet.</p>
         ) : (
           <>
+            <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
             <table className="w-full text-sm">
               <caption className="sr-only">
                 Placeholders of session {d.ref}
@@ -432,10 +433,10 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
               <tbody>
                 {d.items.map((item, i) => (
                   <tr key={item.placeholder ?? `pending-${i}`} className="border-b border-line align-top last:border-0">
-                    <td className="py-2 pr-3 font-mono text-xs break-all text-masked">
+                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-masked">
                       {item.placeholder ?? <span className="font-sans text-muted">not matched yet</span>}
-                      {item.variant_of && <span className="block font-sans text-2xs break-normal text-muted">variant of {item.variant_of}</span>}
-                      <span className="block font-sans text-2xs break-normal text-muted sm:hidden">
+                      {item.variant_of && <span className="block font-sans text-2xs whitespace-normal text-muted">variant of {item.variant_of}</span>}
+                      <span className="block font-sans text-2xs whitespace-normal text-muted sm:hidden">
                         {typeLabel(item.entity_type)} · {item.origin === "known" ? "known value" : "detected"} · masked {item.count}×
                       </span>
                     </td>
@@ -451,14 +452,15 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                         <span className="text-muted">{item.hint}</span>
                       )}
                     </td>
-                    <td className="hidden px-2 py-2 text-xs sm:table-cell">{typeLabel(item.entity_type)}</td>
-                    <td className="hidden px-2 py-2 text-xs text-muted md:table-cell">{item.origin === "known" ? "Known value" : "Detected"}</td>
+                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap sm:table-cell">{typeLabel(item.entity_type)}</td>
+                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted md:table-cell">{item.origin === "known" ? "Known value" : "Detected"}</td>
                     <td className="hidden px-2 py-2 text-right text-xs tabular-nums sm:table-cell">{item.count}</td>
                     <td className="hidden py-2 pl-2 text-right text-xs tabular-nums md:table-cell">{item.forms}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
             <p className="mt-3 text-xs text-pretty text-muted">
               <span className="text-ink">Hint</span>: a redacted shape of the value (a word's first letter and length, a number's last two digits, nothing of a secret).{" "}
               <span className="text-ink">Masked</span>: occurrences replaced by the placeholder so far. <span className="text-ink">Forms</span>: other written forms matched onto
