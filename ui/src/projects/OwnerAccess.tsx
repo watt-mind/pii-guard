@@ -12,7 +12,7 @@ export default function OwnerAccess() {
         <span className="text-lg font-normal text-ink">
           Local guard access{configured && <span className="text-sm text-muted"> · owner token set</span>}
         </span>
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0 text-muted transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0 text-muted transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="m4 6 4 4 4-4" />
         </svg>
       </summary>

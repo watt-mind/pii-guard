@@ -960,7 +960,7 @@ function PlayIcon() {
 }
 function SendIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className={icon} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className={icon} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
       <path d="M2.5 8 13.5 2.5 11 13.5 8 9.5 2.5 8Z" />
       <path d="M8 9.5 13.5 2.5" />
     </svg>

@@ -38,7 +38,7 @@ export function KnownValues({ rows, onRows, counts, error, onTry, found }: Props
           </span>
         </span>
         <span aria-hidden="true" className={buttonClass("secondary", "sm")}>
-          <svg viewBox="0 0 16 16" className="size-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 16 16" className="size-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="m4 6 4 4 4-4" />
           </svg>
           <span className="group-open:hidden">Add values</span>

@@ -71,7 +71,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
             onClick={() => setOpen((o) => !o)}
             className={buttonClass("secondary", "md", "lg:hidden")}
           >
-            <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               {open ? <path d="M4 4l8 8M12 4l-8 8" /> : <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />}
             </svg>
             Menu

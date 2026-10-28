@@ -70,7 +70,7 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
       <button
         {...triggerProps}
         aria-label={`Project: ${current?.name ?? "none"}${currentEndpoint ? `, inspecting ${currentEndpoint.name}` : ""}`}
-        className="inline-flex h-11 max-w-full min-w-0 items-center gap-2 rounded-lg lg:h-9 border border-line bg-surface px-3 text-sm text-ink transition-colors hover:bg-surface-2 aria-expanded:bg-surface-2"
+        className="inline-flex h-9 max-w-full min-w-0 items-center gap-2 rounded-lg pointer-coarse:h-11 border border-line-strong bg-surface px-3 text-sm text-ink transition-colors hover:bg-surface-2 aria-expanded:bg-surface-2"
       >
         <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-accent" />
         <span className="truncate font-medium">{current?.name ?? "Choose a project"}</span>
@@ -137,7 +137,7 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
 
 function Chevron({ open }: { open: boolean }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className={["size-3.5 shrink-0 text-muted transition-transform", open ? "rotate-180" : ""].join(" ")} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className={["size-3.5 shrink-0 text-muted transition-transform", open ? "rotate-180" : ""].join(" ")} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="m4 6 4 4 4-4" />
     </svg>
   );
@@ -145,7 +145,7 @@ function Chevron({ open }: { open: boolean }) {
 
 function Check({ on }: { on: boolean }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className={["size-4 shrink-0 text-accent", on ? "" : "invisible"].join(" ")} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className={["size-4 shrink-0 text-accent", on ? "" : "invisible"].join(" ")} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="m3.5 8.5 3 3 6-7" />
     </svg>
   );

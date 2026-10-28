@@ -34,7 +34,7 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
           side === "model" ? "border-model/20 bg-model-soft/60" : "border-line bg-surface-2",
         ].join(" ")}
       >
-        <div className="min-w-[11rem] flex-1">
+        <div className="min-w-0 flex-[1_1_11rem]">
           <p
             className={[
               "flex items-center gap-1.5 font-mono text-2xs",
@@ -58,12 +58,12 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
 
 function SideIcon({ side }: { side: Side }) {
   return side === "you" ? (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="3" y="7" width="10" height="7" rx="1.5" />
       <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
     </svg>
   ) : (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M4.5 12.5h7a3 3 0 0 0 .4-6 4 4 0 0 0-7.7.9A2.6 2.6 0 0 0 4.5 12.5Z" />
     </svg>
   );

@@ -27,7 +27,7 @@ export function Limits({ account }: { account: Account }) {
   return (
     <details className="group">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-sm text-sm text-ink pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0 text-muted transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0 text-muted transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="m6 4 4 4-4 4" />
         </svg>
         Current server limits

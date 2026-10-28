@@ -135,7 +135,8 @@ export function Input({ size = "md", className = "", ...rest }: Omit<InputHTMLAt
 
 export function Select({ size = "md", className = "", ...rest }: Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> & { size?: ControlSize; ref?: Ref<HTMLSelectElement> }) {
   const field = useFieldProps(rest);
-  return <select {...rest} {...field} className={[CONTROL_BASE, CONTROL_SIZE[size], "pr-8", className].join(" ")} />;
+  // One chevron (ours, not the browser's), so the room it takes is reserved once: pr-8.
+  return <select {...rest} {...field} className={[CONTROL_BASE, CONTROL_SIZE[size], "select-chevron pr-8", className].join(" ")} />;
 }
 
 export function Textarea({ className = "", ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) {
@@ -601,7 +602,7 @@ export function BlockedNotice({ error, phase = "outbound", onRetry }: { error: R
   return (
     <div role="alert" data-error-kind={phase === "inbound" ? "inbound" : copy.kind} className="rounded-lg border border-blocked/40 bg-blocked-soft p-3 text-sm sm:p-4">
       <p className="flex items-center gap-2 font-medium text-blocked">
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <circle cx="8" cy="8" r="6" />
           <path d="M3.8 12.2 12.2 3.8" />
         </svg>
