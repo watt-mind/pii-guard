@@ -1,3 +1,4 @@
+import { HostedApp } from "./hosted/HostedApp";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
 import { engineReason } from "./api/engine";
@@ -47,6 +48,11 @@ export interface AppProps {
   vault?: VaultClient;
 }
 
+/** Hosted deployment is an explicit build choice; the local console remains the default. */
+export function App(props: AppProps) {
+  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <HostedApp /> : <LocalApp {...props} />;
+}
+
 /** A user's navigation adds a history entry (Back returns); a redirect replaces the current one. */
 function writeHash(route: Route, how: "push" | "replace") {
   try {
@@ -58,7 +64,7 @@ function writeHash(route: Route, how: "push" | "replace") {
   }
 }
 
-export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks, chat, traffic, loadStatus, vault }: AppProps) {
+function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, loadImage, loadBenchmarks, chat, traffic, loadStatus, vault }: AppProps) {
   const apiClient = useMemo(() => api ?? createHttpClient(), [api]);
   const mockClient = useMemo(() => mock ?? createMockClient({ latencyMs: 220 }), [mock]);
   const engine = useEngine(apiClient, mockClient, envMode);
