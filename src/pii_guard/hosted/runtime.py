@@ -36,6 +36,17 @@ if TYPE_CHECKING:
 
 STREAMS_PER_OWNER = 2
 MAX_STREAMS = 16
+# Ingress slots (LAB-1442) are taken only after identity, path, origin and abuse checks,
+# and are held from the body read to the end of the response. Signed-in principals and
+# guests draw on separate pools, and each principal has its own share, so neither
+# anonymous nor one signed-in client's slow uploads can starve everyone else.
+INGRESS_SLOTS = 32
+INGRESS_PER_PRINCIPAL = 8
+GUEST_INGRESS_SLOTS = 8
+GUEST_INGRESS_PER_PRINCIPAL = 2
+# The one pre-authentication await (endpoint-key lookup) has its own small bound. No body
+# is read under it, so a slow client cannot hold it.
+PREAUTH_SLOTS = 8
 
 
 class HostedCapacityError(PiiGuardError):
@@ -194,6 +205,9 @@ class HostedService:
         self._lock = threading.Lock()
         self.rest_slots = threading.BoundedSemaphore(4)
         self._ingress = 0
+        self._guest_ingress = 0
+        self._ingress_held: dict[str, int] = {}
+        self._preauth = 0
         # Live traffic streams leave the ingress bound for their own (LAB-1412): an open
         # console must not occupy request capacity for its whole 180-second deadline.
         self._streams: dict[str, int] = {}
@@ -467,15 +481,39 @@ class HostedService:
         self.quotas.disable_sponsored()
         return True
 
-    def enter_ingress(self) -> None:
+    def enter_ingress(self, principal: Principal) -> None:
+        """Take one ingress slot for an identified, admitted principal; never queue."""
+        guest = not principal.authenticated
         with self._lock:
-            if self._ingress >= 32:
+            pooled = self._guest_ingress if guest else self._ingress - self._guest_ingress
+            held = self._ingress_held.get(principal.id, 0)
+            if pooled >= (GUEST_INGRESS_SLOTS if guest else INGRESS_SLOTS) or held >= (
+                GUEST_INGRESS_PER_PRINCIPAL if guest else INGRESS_PER_PRINCIPAL
+            ):
                 raise HostedCapacityError("Request capacity reached; try later")
             self._ingress += 1
+            self._guest_ingress += guest
+            self._ingress_held[principal.id] = held + 1
 
-    def leave_ingress(self) -> None:
+    def leave_ingress(self, principal: Principal) -> None:
         with self._lock:
             self._ingress -= 1
+            self._guest_ingress -= not principal.authenticated
+            remaining = self._ingress_held.get(principal.id, 0) - 1
+            if remaining > 0:
+                self._ingress_held[principal.id] = remaining
+            else:
+                self._ingress_held.pop(principal.id, None)
+
+    def enter_preauth(self) -> None:
+        with self._lock:
+            if self._preauth >= PREAUTH_SLOTS:
+                raise HostedCapacityError("Request capacity reached; try later")
+            self._preauth += 1
+
+    def leave_preauth(self) -> None:
+        with self._lock:
+            self._preauth -= 1
 
 
 def hosted_state(request: Request, name: str) -> Any:
