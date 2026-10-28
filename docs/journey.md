@@ -1408,10 +1408,12 @@ data** ([models.md](models.md)).
 
 | Meta model | Where it runs here | Job | Why this model |
 |---|---|---|---|
-| **Muse Spark Open** | Baseten Model APIs; or your own GPUs | Production LLM detector (strict mode) | Open weights, so the same detector can move inside your boundary; 1.2–1.8 s p50 at Muse Spark quality (milestone 15) |
+| **Muse Spark Open** | Baseten Model APIs; or your own GPUs | Opt-in LLM detector (audit mode); fast mode is the default | Open weights, so the same detector can move inside your boundary; 1.2–1.8 s p50 at Muse Spark quality (milestone 15) |
 | **Muse Spark 1.3** | Meta Model API | Development detector; the downstream model in the demo, which only sees placeholders | Strong Hungarian, including inflected names and stem changes ([models.md](models.md#llm-detector)) |
 | **Muse Spark 1.3 contributor tier** | Meta Model API | Writes the synthetic benchmark and the distillation corpus | Cheap ($0.10 / $0.20 per million tokens); acceptable only because every value is fictional |
 | **Muse Glimmer 30B** | vLLM on one H100, Modal | Teacher for the distilled NER model | Best zero-shot quality we measured (F1 99.3, leak 0.0 %), open weights, Apache-2.0; too slow for the request path, so we distilled it |
+| **XLM-RoBERTa base** (FacebookAI) | In process, CPU or Apple MPS | The production NER of fast mode, published as `watt-mind/pii-guard-ner-xlmr-base` v2.0 | Small, multilingual, open weights; distilled from Glimmer's labels, about 18 ms per document (milestone 37) |
+| **Muse Glimmer 30B, LoRA** | Fireworks, one H200 (experiment) | Answer-only detector without the reasoning turn | 2.2x faster than zero-shot but leakier, so it stayed an experiment (milestone 46) |
 | **SAM 3.1** | Meta Model API | Faces, ID photos, signatures in images | Finds regions from a text prompt; 90.8 % portrait recall on specimen IDs (milestone 8) |
 
 The pattern we would reuse: use the big model where its cost doesn't matter (writing fictional
@@ -1452,6 +1454,7 @@ As of 2026-10-28, `develop` at `5581013`.
   LAB-1138, triage).
 - **Re-identification from residual context** (39.2 % re-identified with a five-name candidate list,
   chance 20 %; LAB-1152, triage).
-- **Glimmer as a fine-tuned detector** (LAB-1109) is blocked.
+- **Polish.** Fast mode leaks 17.5 % on the public pl-pii-bench set, nearly all national ID
+  numbers; a `pl` language pack with checksum validators is in progress (LAB-1400).
 - **Confirm Baseten's data terms** (LAB-1139, triage) before recommending the hosted endpoint
   for real data.

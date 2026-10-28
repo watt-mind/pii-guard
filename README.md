@@ -41,6 +41,9 @@ will do it without a clone: `uvx --from wattmind-pii-guard pii-guard up`.
 **Muse** (Wonder, Spark 1.3) also writes the fictional benchmark ([models](docs/models.md#which-model-does-what)),
 **Muse Spark Open** red-teams the masking ([red team](eval/results/2026-10-27-redteam/README.md)), and
 **Muse Spark 1.3** is the demo's downstream model, which only ever sees placeholders.
+We also fine-tuned **Muse Glimmer** itself as an answer-only detector (LoRA): 2.2x faster than
+zero-shot Glimmer but leakier (1.0 % vs 0.4 % of agent-traffic values with the rules in front),
+so the small NER stays the product ([results](eval/results/2026-10-28-glimmer-lora/README.md)).
 
 The rule behind it: anything that sees real personal data is an open-weight model you can run
 yourself; hosted models only see fictional or already-masked text. All jobs, with status:
