@@ -7,7 +7,7 @@ mode=${1:-validate}
 if [[ "$mode" == ci-preflight ]]; then
   exec python3 deploy/azure/release_contract.py "${2:?Specify dev or prod}"
 fi
-case "$mode" in validate|bootstrap|bootstrap-router|stage|enable|disable|bind-domain) ;; *) echo 'Use validate|ci-preflight|bootstrap|bootstrap-router|stage|enable|disable|bind-domain' >&2; exit 2;; esac
+case "$mode" in validate|bootstrap|bootstrap-router|stage|technical-stage|enable|disable|bind-domain) ;; *) echo 'Use validate|ci-preflight|bootstrap|bootstrap-router|stage|technical-stage|enable|disable|bind-domain' >&2; exit 2;; esac
 operator=false
 [[ "$mode" != bootstrap && "$mode" != bootstrap-router ]] || operator=true
 template=deploy/azure/release.bicep
@@ -29,6 +29,25 @@ if [[ "$AZURE_ENVIRONMENT" == dev && "$mode" != disable ]]; then
   [[ "${AZURE_DEV_NETWORK_APPROVED:-false}" == true ]] || { echo 'Reviewed tailnet-only private network is required for dev' >&2; exit 2; }
   [[ "$mode" != enable && "$mode" != bind-domain ]] || { echo 'Dev uses private stage; public enable/domain binding is forbidden' >&2; exit 2; }
 fi
+technical_stage=false
+if [[ "$mode" == technical-stage ]]; then
+  technical_stage=true
+  [[ "$AZURE_ENVIRONMENT" == dev && "${HOSTED_PUBLIC_ORIGIN:-}" == https://guard-dev.watt-mind.com ]] || { echo 'Technical stage requires the exact private dev environment and origin' >&2; exit 2; }
+  [[ "${AZURE_TECHNICAL_STAGE_APPROVED:-false}" == true ]] || { echo 'Explicit operator technical-stage approval is required' >&2; exit 2; }
+  [[ -z "${GITHUB_ACTIONS:-}" && -z "${CI:-}" ]] || { echo 'Technical stage is unavailable to CI' >&2; exit 2; }
+  [[ "${HOSTED_SPONSORED_MICRODOLLARS:-0}" == 0 && -z "${HOSTED_ALLOCATION_ID:-}" && -z "${HOSTED_ALLOCATION_EXPIRES_AT:-}" ]] || { echo 'Technical stage requires zero sponsorship and no allocation pins' >&2; exit 2; }
+  : "${HOSTED_TECHNICAL_STAGE_EVIDENCE:?Provide image-bound private synthetic verification evidence}"
+  python3 - "$HOSTED_TECHNICAL_STAGE_EVIDENCE" "${HOSTED_IMAGE:-}" <<'PYTECHNICAL'
+import json, sys
+with open(sys.argv[1]) as stream: evidence = json.load(stream)
+required = {'network_reviewed', 'tailnet_acl', 'proxy_tls', 'synthetic_only'}
+if (not isinstance(evidence, dict) or set(evidence) != required | {'image', 'purpose'}
+    or evidence.get('image') != sys.argv[2]
+    or evidence.get('purpose') != 'private-synthetic-verification'
+    or not all(evidence.get(key) is True for key in required)):
+    raise SystemExit('Technical-stage evidence incomplete')
+PYTECHNICAL
+fi
 name_prefix="${AZURE_PROJECT_PREFIX}-${AZURE_ENVIRONMENT}"
 app="${name_prefix}-app"
 budget_id="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.Consumption/budgets/${name_prefix}-budget"
@@ -44,6 +63,9 @@ rollback_public() {
 }
 trap rollback_public ERR
 [[ $(az account show --query id --output tsv) == "$AZURE_SUBSCRIPTION_ID" ]] || { echo 'Active Azure subscription differs from explicit target' >&2; exit 2; }
+if [[ "$technical_stage" == true ]]; then
+  [[ $(az account show --query user.type --output tsv) == user ]] || { echo 'Technical stage requires an interactive operator account' >&2; exit 2; }
+fi
 params=(--parameters "projectPrefix=$AZURE_PROJECT_PREFIX" "environmentName=$AZURE_ENVIRONMENT" "location=$AZURE_LOCATION")
 if [[ "$operator" == true ]]; then
   : "${AZURE_MONTHLY_BUDGET_AMOUNT:?Set owner-approved amount in subscription billing currency}"
@@ -142,7 +164,9 @@ if [[ "$operator" != true ]]; then
   ledger=$(az deployment group show --resource-group "$AZURE_RESOURCE_GROUP" --name hosted-foundation --query properties.outputs.ledgerAccountUrl.value --output tsv)
   [[ "$HOSTED_IMAGE" == "$registry/"* ]] || { echo 'Image must come from this environment registry' >&2; exit 2; }
   [[ "$ledger" =~ ^https://[a-z0-9]+\.blob\.core\.windows\.net$ ]] || { echo 'Operator must provision durable identity-only ledger first' >&2; exit 2; }
-  domains=$(python3 deploy/azure/app_bindings.py "$app" "$AZURE_RESOURCE_GROUP" "$mode")
+  bindings_mode=$mode
+  [[ "$technical_stage" != true ]] || bindings_mode=stage
+  domains=$(python3 deploy/azure/app_bindings.py "$app" "$AZURE_RESOURCE_GROUP" "$bindings_mode")
   private=false
   if [[ "$AZURE_ENVIRONMENT" == dev ]]; then
     [[ "$HOSTED_PUBLIC_ORIGIN" == https://guard-dev.watt-mind.com ]] || { echo 'Dev requires its exact private origin' >&2; exit 2; }
@@ -159,7 +183,7 @@ PYPRIVATE
   sponsored=${HOSTED_SPONSORED_MICRODOLLARS:-0}
   [[ "$sponsored" =~ ^[0-9]+$ && ${#sponsored} -le 8 ]] || { echo 'Invalid cumulative allowance ceiling' >&2; exit 2; }
   ((10#$sponsored <= 10000000)) || { echo 'Invalid cumulative allowance ceiling (maximum USD 10)' >&2; exit 2; }
-  if [[ "$mode" == enable || "$AZURE_ENVIRONMENT" == dev ]] || ((sponsored > 0)); then
+  if [[ "$technical_stage" != true ]] && { [[ "$mode" == enable || "$AZURE_ENVIRONMENT" == dev ]] || ((sponsored > 0)); }; then
     : "${HOSTED_RELEASE_EVIDENCE:?Provide reviewed image-bound release evidence}"
     python3 - "$HOSTED_RELEASE_EVIDENCE" "$HOSTED_IMAGE" "$mode" "$sponsored" "$AZURE_ENVIRONMENT" <<'PYEVIDENCE'
 import json,sys
@@ -208,3 +232,6 @@ if [[ "$operator" != true ]]; then
   fi
 fi
 echo "Completed $mode using $template; no ledger was created, funded or reset by app release."
+if [[ "$technical_stage" == true ]]; then
+  echo 'Private synthetic technical stage completed with zero sponsorship; full live acceptance remains pending. Normal stage/enable evidence is still required.'
+fi

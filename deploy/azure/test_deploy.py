@@ -1,5 +1,7 @@
 """Compile production contracts and exercise admission without contacting Azure."""
 
+from __future__ import annotations
+
 import json
 import os
 import shlex
@@ -23,6 +25,7 @@ FAKE_AZ = r"""#!/bin/sh
 echo "$*" >> "$AZURE_TEST_LOG"
 case "$*" in
   "bicep build "*) exit 0;;
+  "account show "*"user.type"*) echo "${TEST_ACCOUNT_TYPE:-user}";;
   "account show "*) echo test-subscription;;
   "group exists "*) echo true;;
   "group show "*"tags.project"*) echo pii-guard;;
@@ -145,7 +148,8 @@ class DeploymentAdmissionTests(unittest.TestCase):
             fake.chmod(0o700)
             python = Path(directory) / "python3"
             python.write_text(
-                '#!/bin/sh\nif [ "$1" = deploy/azure/smoke.py ]; then exit 0; fi\n'
+                '#!/bin/sh\nif [ "$1" = deploy/azure/smoke.py ]; then\n'
+                '  echo synthetic-smoke >> "$AZURE_TEST_LOG"; exit 0; fi\n'
                 + "exec "
                 + shlex.quote(sys.executable)
                 + ' "$@"\n'
@@ -180,6 +184,118 @@ class DeploymentAdmissionTests(unittest.TestCase):
             )
             self.calls = log.read_text() if log.exists() else ""
             return result
+
+    def run_technical_stage(
+        self, *, mode: str = "technical-stage", evidence: dict | None = None, **overrides: str
+    ) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            review = Path(directory) / "technical.json"
+            review.write_text(
+                json.dumps(
+                    evidence
+                    if evidence is not None
+                    else {
+                        "image": IMAGE,
+                        "purpose": "private-synthetic-verification",
+                        "network_reviewed": True,
+                        "tailnet_acl": True,
+                        "proxy_tls": True,
+                        "synthetic_only": True,
+                    }
+                )
+            )
+            return self.run_deploy(
+                mode,
+                **{
+                    "AZURE_ENVIRONMENT": "dev",
+                    "AZURE_RESOURCE_GROUP": "rg-pii-guard-dev",
+                    "AZURE_DEV_NETWORK_APPROVED": "true",
+                    "AZURE_TECHNICAL_STAGE_APPROVED": "true",
+                    "HOSTED_PUBLIC_ORIGIN": "https://guard-dev.watt-mind.com",
+                    "HOSTED_TECHNICAL_STAGE_EVIDENCE": str(review),
+                    **overrides,
+                },
+            )
+
+    def test_private_technical_stage_allows_initial_app_without_claiming_acceptance(self) -> None:
+        result = self.run_technical_stage(TEST_BINDINGS_ERROR="absent")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("full live acceptance remains pending", result.stdout)
+        self.assertIn("--query user.type", self.calls)
+        self.assertIn("privateDevReviewed=true", self.calls)
+        self.assertIn("publicEnabled=false", self.calls)
+        self.assertIn("customDomains=[]", self.calls)
+        self.assertIn("--template-file deploy/azure/release.bicep", self.calls)
+        self.assertIn("synthetic-smoke", self.calls)
+        self.assertNotIn("allocationId=", self.calls)
+        self.assertNotIn("allocationExpiresAt=", self.calls)
+        self.assertNotIn("sponsoredMicrodollars=", self.calls)
+
+    def test_technical_stage_operator_environment_and_funding_admission(self) -> None:
+        cases = [
+            ({"AZURE_TECHNICAL_STAGE_APPROVED": "false"}, "Explicit operator"),
+            ({"GITHUB_ACTIONS": "true"}, "unavailable to CI"),
+            ({"CI": "true"}, "unavailable to CI"),
+            ({"TEST_ACCOUNT_TYPE": "servicePrincipal"}, "interactive operator"),
+            ({"HOSTED_SPONSORED_MICRODOLLARS": "1"}, "zero sponsorship"),
+            ({"HOSTED_SPONSORED_MICRODOLLARS": "00"}, "zero sponsorship"),
+            ({"HOSTED_ALLOCATION_ID": "synthetic-allocation"}, "no allocation pins"),
+            ({"HOSTED_ALLOCATION_EXPIRES_AT": "0"}, "no allocation pins"),
+            ({"HOSTED_PUBLIC_ORIGIN": "https://other.example.com"}, "exact private dev"),
+            (
+                {"AZURE_ENVIRONMENT": "prod", "AZURE_RESOURCE_GROUP": "rg-pii-guard-prod"},
+                "exact private dev",
+            ),
+        ]
+        for overrides, reason in cases:
+            with self.subTest(overrides=overrides):
+                self.assert_refused(self.run_technical_stage(**overrides), reason)
+
+    def test_technical_stage_keeps_actual_network_and_budget_checks(self) -> None:
+        for overrides, reason in [
+            ({"TEST_PUBLIC_NETWORK": "Enabled"}, "actual internal environment"),
+            ({"TEST_BUDGET_EXISTS": "false"}, "budget must exist"),
+            ({"TEST_ALERT_ENABLED": "false"}, "Budget action group"),
+            ({"TEST_BINDINGS_ERROR": "forbidden"}, "existing_app_bindings_unavailable"),
+        ]:
+            with self.subTest(overrides=overrides):
+                self.assert_refused(self.run_technical_stage(**overrides), reason)
+
+    def test_technical_evidence_cannot_replace_normal_release_acceptance(self) -> None:
+        self.assert_refused(self.run_technical_stage(mode="stage"), "HOSTED_RELEASE_EVIDENCE")
+        for evidence in (
+            {},
+            {
+                "image": IMAGE,
+                "purpose": "private-synthetic-verification",
+                "network_reviewed": True,
+                "tailnet_acl": True,
+                "proxy_tls": True,
+                "synthetic_only": True,
+                "lab_1372_done": True,
+            },
+            {
+                "image": IMAGE,
+                "purpose": "private-synthetic-verification",
+                "network_reviewed": True,
+                "tailnet_acl": True,
+                "proxy_tls": True,
+                "synthetic_only": False,
+            },
+            {
+                "image": "different",
+                "purpose": "private-synthetic-verification",
+                "network_reviewed": True,
+                "tailnet_acl": True,
+                "proxy_tls": True,
+                "synthetic_only": True,
+            },
+        ):
+            with self.subTest(evidence=evidence):
+                self.assert_refused(
+                    self.run_technical_stage(evidence=evidence),
+                    "Technical-stage evidence incomplete",
+                )
 
     def assert_refused(self, result: subprocess.CompletedProcess[str], reason: str) -> None:
         self.assertNotEqual(result.returncode, 0)
