@@ -173,32 +173,50 @@ app sidecar cannot provide this wake path. Repeat streaming and synthetic error 
 that OAuth code/state, auth, cookie and body canaries appear in neither proxy output nor generated
 files. Local Linux Nginx tests exercise these properties but cannot prove the deployed Azure path.
 
-## Merge to dev: build in parallel, deploy after `ci-ok`
+## Merge to dev: the image CI built, deployed after `ci-ok`
 
-The dev image is built by the operator in the dev registry, not by CI, so start it as soon as
-the pull request merges instead of waiting for develop CI (LAB-1446):
+The dev image is built once, by CI (LAB-1446). On every push to `develop`, `hosted-infra` builds
+and smoke-tests Dockerfile.hosted, then `hosted-image-push` rebuilds it from the same layer cache
+(all hits) and pushes `<dev registry>.azurecr.io/pii-guard:develop-<short sha>`. It runs in the
+`dev-image` GitHub Environment (deployable from `develop` only) with an OIDC identity that has
+`AcrPush` on the dev registry and nothing else: no secret, no deploy right. The job summary
+shows the pushed `HOSTED_IMAGE` (`...pii-guard@sha256:...`). `hosted-image-push` is a delivery
+job outside `ci-ok`, so a registry hiccup leaves CI green without an image; use the fallback.
+
+Develop pushes run the fast test suite (`make test`, the pull-request profile), so `ci-ok`
+lands about as fast as on the pull request; the full suite runs nightly, on `main` and on manual
+dispatch. After a merge:
+
+```bash
+run=$(gh run list --branch develop --workflow ci --event push --limit 1 \
+  --json databaseId -q '.[0].databaseId')
+gh run watch "$run" --exit-status            # wait for ci-ok on that exact commit
+gh run view "$run" --log --job "$(gh run view "$run" --json jobs \
+  -q '.jobs[] | select(.name == "hosted-image-push") | .databaseId')" | grep 'IMAGE '
+```
+
+Deploy only after `ci-ok` on that commit is green: pass the `IMAGE` digest as `HOSTED_IMAGE` to
+`deploy/azure/deploy.sh technical-stage` (or `stage`) with the evidence described above, bound
+to that digest. If `ci-ok` is red, do not deploy that digest; fix forward.
+
+### Manual fallback: `acr_build.sh`
+
+When `hosted-image-push` did not run or failed, build the same commit in the registry. Start it
+as soon as the pull request merges, in parallel with develop CI, and still deploy only after
+`ci-ok` is green:
 
 ```bash
 git fetch origin develop
-ACR_NAME=<dev registry> deploy/azure/acr_build.sh origin/develop   # in parallel with CI
-gh run watch "$(gh run list --branch develop --workflow ci --event push --limit 1 \
-  --json databaseId -q '.[0].databaseId')" --exit-status        # wait for ci-ok
+ACR_NAME=<dev registry> deploy/azure/acr_build.sh origin/develop
 ```
 
-`acr_build.sh` exports the commit with `git archive` (committed files only), runs
-`az acr run` with BuildKit, tags `pii-guard:develop-<sha>` and prints `TAG`, `DIGEST` and
+`acr_build.sh` exports the commit with `git archive` (committed files only), runs `az acr run`
+with BuildKit, tags `pii-guard:develop-<sha>` and prints `TAG`, `DIGEST` and
 `IMAGE <registry>.azurecr.io/pii-guard@sha256:...` on stdout (build logs on stderr). It needs
-only the operator's existing `az login` and holds no secret. Each Dockerfile.hosted stage is also
-pushed as `pii-guard:buildcache-*`, an inline BuildKit layer cache the next build reads, so a
-change under `src/` reuses the dependency, NER model and apt layers. The cache tags are
+only the operator's existing `az login` and holds no secret. Each Dockerfile.hosted stage is
+also pushed as `pii-guard:buildcache-*`, an inline BuildKit layer cache the next build reads, so
+a change under `src/` reuses the dependency, NER model and apt layers. The cache tags are
 overwritten on every build; delete them to force a cold build.
-
-Develop pushes run the fast test suite (`make test`, the pull-request profile), so `ci-ok`
-lands about as fast as on the pull request; the full suite runs nightly, on `main` and on
-manual dispatch. Deploy only after `ci-ok` on that exact commit is green, and pass the printed
-`IMAGE` as `HOSTED_IMAGE` to `deploy/azure/deploy.sh technical-stage` (or `stage`) with the
-evidence described above, bound to that digest. If `ci-ok` is red, do not deploy that digest;
-fix forward and build the next commit.
 
 ## Durable encrypted project configuration
 

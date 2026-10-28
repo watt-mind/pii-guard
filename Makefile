@@ -26,6 +26,9 @@ test: ## fast suite as pull-request CI runs it: parallel, no slow tests, line co
 	COVERAGE_CORE=sysmon COVERAGE_BRANCH=false \
 		uv run pytest -n auto --dist worksteal -m "not slow" --cov-fail-under=$(FAST_COV_FLOOR)
 
+# test-all keeps the default (C) tracer: its floor is branch coverage, and on Python 3.12
+# sys.monitoring measures lines only, so COVERAGE_CORE=sysmon would fall back to it anyway, with
+# a warning (coverage.py no-sysmon). Revisit on Python 3.14, where sysmon measures branches.
 test-all: ## every test, as main, nightly and manual CI run it: parallel, full coverage floor
 	uv run pytest -n auto --dist worksteal
 
