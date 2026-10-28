@@ -170,7 +170,7 @@ def test_ner_settings_reach_the_detector(monkeypatch: pytest.MonkeyPatch) -> Non
     assert seen == {
         "name": "ner",
         "model": "./models/fictional-ner",
-        "published": "hdkiller/pii-guard-ner-xlmr-base",
+        "published": "watt-mind/pii-guard-ner-xlmr-base",
         "fallback": "download",
     }
 

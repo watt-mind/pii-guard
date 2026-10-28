@@ -15,7 +15,7 @@ SHA-256, the two values ``pii_guard.detect.ner_resolve.PUBLISHED`` pins. The tok
 the local Hugging Face login (``hf auth login``); it is never read, printed or passed here::
 
     uv run --no-sync python training/ner/publish_hf.py models/ner/pii-guard-ner-xlmr-base-v2-hn \\
-        --repo hdkiller/pii-guard-ner-xlmr-base --tag v2.0 --dry-run
+        --repo watt-mind/pii-guard-ner-xlmr-base --tag v2.0 --dry-run
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ tags:
 
 """
 
-NOTICE = """pii-guard NER (hdkiller/pii-guard-ner-xlmr-base)
+NOTICE = """pii-guard NER (watt-mind/pii-guard-ner-xlmr-base)
 Copyright 2026 the pii-guard contributors
 
 The model weights are licensed under the Apache License, Version 2.0
@@ -122,7 +122,7 @@ def stage(checkpoint: Path, dest: Path, extra_meta: Mapping[str, Any] | None = N
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("checkpoint", type=Path)
-    parser.add_argument("--repo", default="hdkiller/pii-guard-ner-xlmr-base")
+    parser.add_argument("--repo", default="watt-mind/pii-guard-ner-xlmr-base")
     parser.add_argument("--tag", required=True, help="release tag for the upload commit")
     parser.add_argument("--meta", type=Path, help="JSON merged into training_meta.json")
     parser.add_argument("--dry-run", action="store_true", help="stage and list, upload nothing")

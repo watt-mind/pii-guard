@@ -36,7 +36,7 @@ loaded and any inference error raise `DetectionError` (fail closed).
 |---|---|---|
 | Model (hub id or directory) | `PII_GUARD_NER_MODEL` | unset: the published checkpoint, else the public fallback ([below](#which-ner-model-fast-mode-runs)) |
 | Revision | `PII_GUARD_NER_REVISION` | pinned for the published and fallback models |
-| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `hdkiller/pii-guard-ner-xlmr-base`, pinned to release `v2.0` (LAB-1306); `repo` or `repo@revision` |
+| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `watt-mind/pii-guard-ner-xlmr-base`, pinned to release `v2.0` (LAB-1306); `repo` or `repo@revision` |
 | Fallback | `PII_GUARD_NER_FALLBACK` | `download`: fetch it on first use; `cached`: only if already downloaded; `off`: never |
 | Model cache | `PII_GUARD_MODELS_DIR` | `~/.cache/pii-guard/models` |
 | Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
@@ -57,7 +57,7 @@ would run, without downloading).
 1. **`PII_GUARD_NER_MODEL`**, a local directory or a hub id (with `PII_GUARD_NER_REVISION`).
    If it is set and can't load, startup stops (fail closed, ADR 0006).
 2. **The published pii-guard checkpoint**, the default:
-   [`hdkiller/pii-guard-ner-xlmr-base`](https://huggingface.co/hdkiller/pii-guard-ner-xlmr-base)
+   [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
    (`PII_GUARD_NER_PUBLISHED_MODEL`), release `v2.0` at revision
    `95f612a9ad65cc5ade5b9248bd152020541e7097`, `model.safetensors` SHA-256
    `4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9`, both pinned in
@@ -66,7 +66,12 @@ would run, without downloading).
    Ai Suisse SA"); see [NER v2.1](#ner-v21-and-the-published-checkpoint) and its
    [model card](../training/ner/model-card.md). A checkpoint is never loaded unpinned: another
    repo needs `repo@revision`. It downloads like the fallback below (1.1 GB, first run only,
-   into `~/.cache/pii-guard/models/ner/hdkiller--pii-guard-ner-xlmr-base-95f612a9ad65/`).
+   into `~/.cache/pii-guard/models/ner/watt-mind--pii-guard-ner-xlmr-base-95f612a9ad65/`).
+   The repo moved from `hdkiller/` to the `watt-mind` organisation (LAB-1402) with its
+   history, so the revision is unchanged: a checked download under the old directory name,
+   `hdkiller--pii-guard-ner-xlmr-base-95f612a9ad65/`, is reused (offline and under `cached`
+   too), and `PII_GUARD_NER_PUBLISHED_MODEL` set to the old `hdkiller` id still names this
+   checkpoint.
 3. **The public fallback**, a **stop-gap** used only when step 2 is turned off or replaced by
    an unpinned repo:
    [`bardsai/eu-pii-anonimization-multilang`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang)
@@ -278,7 +283,7 @@ ablation, which never saw those rows, is the held-out figure.
 - Use `xlmr-base-v2-hn` for fast mode. It meets the ~150 ms CPU p95 limit everywhere,
   including 85 ms on a 4-vCPU T4 container.
 - Use large + hard negatives on GPU or MPS hosts.
-- The base checkpoint is published as `hdkiller/pii-guard-ner-xlmr-base` release `v2.0`
+- The base checkpoint is published as `watt-mind/pii-guard-ner-xlmr-base` release `v2.0`
   (LAB-1306), step 2 of [the resolution order](#which-ner-model-fast-mode-runs). The large one
   is not published.
 

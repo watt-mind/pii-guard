@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     ner_model: str | None = None
     ner_revision: str | None = None
     ner_device: str | None = None
-    ner_published_model: str = "hdkiller/pii-guard-ner-xlmr-base"
+    ner_published_model: str = "watt-mind/pii-guard-ner-xlmr-base"
     ner_fallback: Literal["download", "cached", "off"] = "download"
     # Without ner_model, the resolved model loads (and downloads) in the background at startup
     # (LAB-1303); a detecting request that arrives meanwhile waits up to this many seconds,
