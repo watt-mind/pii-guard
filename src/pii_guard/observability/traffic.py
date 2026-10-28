@@ -104,6 +104,9 @@ class TrafficLog:
         self._lock = threading.Lock()
         self._seq = itertools.count(1)
         self._key = secrets.token_bytes(32)  # per process: refs change on restart
+        # Per process too: ``seq`` restarts at 1 with a new boot id, so a client polling with
+        # ``after=<seq>`` can tell its cursor is from an earlier run (LAB-1357).
+        self.boot = "b_" + secrets.token_hex(8)
         self._subscribers: set[tuple[asyncio.AbstractEventLoop, asyncio.Queue[Any]]] = set()
         self.dropped = 0
 
