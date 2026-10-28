@@ -67,6 +67,7 @@ __all__ = [
     "gate",
     "jaccard",
     "load_training_docs",
+    "max_jaccard",
     "shingles",
     "signature",
 ]
@@ -347,6 +348,40 @@ def load_training_docs(
         docs = load_fixtures([path])
         out.extend(docs if index is None else gate(docs, index, name=str(path), report=report))
     return out
+
+
+def max_jaccard(train_docs: Iterable[Document], eval_docs: Sequence[Document]) -> dict[str, Any]:
+    """The highest exact Jaccard similarity of any training document to any of ``eval_docs``.
+
+    Exhaustive, not LSH: an inverted index over the evaluation shingles finds every pair that
+    shares at least one shingle (every other pair has J = 0), and each is scored exactly. The
+    gate only reports pairs at or above :data:`THRESHOLD`; this says how far below it the
+    closest pair is (LAB-1410 reports it against the selection set). Ids only, never text.
+    """
+    evals = [(d.id, shingles(d.text)) for d in eval_docs]
+    inverted: dict[int, list[int]] = defaultdict(list)
+    for i, (_, sh) in enumerate(evals):
+        for h in sh:
+            inverted[h].append(i)
+    best, best_pair, n = 0.0, (None, None), 0
+    for doc in train_docs:
+        n += 1
+        sh = shingles(doc.text)
+        shared: Counter[int] = Counter()
+        for h in sh:
+            shared.update(inverted.get(h, ()))
+        for i, inter in shared.items():
+            j = inter / (len(sh) + len(evals[i][1]) - inter)
+            if j > best:
+                best, best_pair = j, (doc.id, evals[i][0])
+    return {
+        "jaccard": round(best, 4),
+        "train_id": best_pair[0],
+        "eval_id": best_pair[1],
+        "train_documents": n,
+        "eval_documents": len(evals),
+        "method": f"exact Jaccard of word {NGRAM}-gram sets over every pair sharing a shingle",
+    }
 
 
 def summary_line(report: Report) -> str:

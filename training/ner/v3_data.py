@@ -536,8 +536,17 @@ def build(
     only: Sequence[str] | None = None,
     tokenizer_name: str | None = None,
     fetch: Callable[[str, str, Path], Path] = download,
+    openpii_train: Mapping[str, int] | None = None,
+    openpii_manifest: Path = OPENPII_MANIFEST,
+    ticket: str = "LAB-1393",
 ) -> dict[str, Any]:
-    """Download (if needed), convert and sample every source; return the manifest."""
+    """Download (if needed), convert and sample every source; return the manifest.
+
+    ``openpii_train`` (default :data:`OPENPII_TRAIN`) and ``openpii_manifest`` let a later mix
+    (v3.1, LAB-1410) take more OpenPII rows of a language; the seeded order makes a larger
+    sample a superset of a smaller one, and the dev rows stay the same.
+    """
+    openpii_train = dict(openpii_train or OPENPII_TRAIN)
     tokenizer = None
     if tokenizer_name:
         from transformers import AutoTokenizer
@@ -545,7 +554,7 @@ def build(
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     want = set(only or ("openpii", "privy", "wismut", "nemotron", "gretel", "agent", "s11",
                         "negatives"))  # fmt: skip
-    manifest: dict[str, Any] = {"seed": SEED, "ticket": "LAB-1393", "rows_committed": False}
+    manifest: dict[str, Any] = {"seed": SEED, "ticket": ticket, "rows_committed": False}
     sources: dict[str, Any] = {}
 
     def local(src: Source) -> Path:
@@ -553,25 +562,26 @@ def build(
 
     if "openpii" in want:
         path = local(OPENPII)
-        train = ",".join(f"{k}={v}" for k, v in OPENPII_TRAIN.items())
-        dev = ",".join(f"{k}={v}" for k, v in OPENPII_DEV.items())
+        train = ",".join(f"{k}={v}" for k, v in openpii_train.items())
+        dev = ",".join(f"{k}={OPENPII_DEV[k]}" for k in openpii_train)
         rc = openpii_mod.main(
             ["--source", str(path), "--train", train, "--dev", dev, "--seed", str(SEED),
-             "--out", str(out / "openpii"), "--manifest", str(OPENPII_MANIFEST)]
+             "--out", str(out / "openpii"), "--manifest", str(openpii_manifest)]
         )  # fmt: skip
         if rc:
             raise RuntimeError("openpii.py failed")
         files = {}
         from pii_guard.eval.fixtures import load_fixtures
 
-        for lang in OPENPII_TRAIN:
+        for lang in openpii_train:
             for split in ("train", "dev"):
                 p = out / "openpii" / f"{lang}-openpii-{split}.jsonl"
                 files[f"{lang}-{split}"] = file_block(p, load_fixtures([p]), tokenizer)
         sources["openpii"] = source_entry(
             OPENPII,
-            sample_manifest=str(OPENPII_MANIFEST),
-            languages=sorted(OPENPII_TRAIN),
+            sample_manifest=str(openpii_manifest),
+            requested=dict(openpii_train),
+            languages=sorted(openpii_train),
             note="train split only; eval sample uids and texts excluded (openpii.py)",
             files=files,
         )

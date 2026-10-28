@@ -1,0 +1,38 @@
+{
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "torch": "2.14.1",
+  "torch_threads": 8,
+  "messages": 122,
+  "mean_chars": 382.5,
+  "load_average_end": [
+    38.27,
+    22.81,
+    19.32
+  ],
+  "results": {
+    "v20": {
+      "p50_ms": 45.5,
+      "p95_ms": 58.4,
+      "mean_ms": 48.7,
+      "load_s": 7.8
+    },
+    "v31-a": {
+      "p50_ms": 45.5,
+      "p95_ms": 55.7,
+      "mean_ms": 46.1,
+      "load_s": 1.9
+    },
+    "v31-b": {
+      "p50_ms": 45.7,
+      "p95_ms": 57.2,
+      "mean_ms": 46.5,
+      "load_s": 2.1
+    },
+    "v31-c": {
+      "p50_ms": 45.4,
+      "p95_ms": 56.1,
+      "mean_ms": 46.8,
+      "load_s": 2.4
+    }
+  }
+}
