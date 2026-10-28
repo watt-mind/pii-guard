@@ -78,6 +78,7 @@ const API_TARGET = process.env.PII_GUARD_API_URL ?? "http://127.0.0.1:8787";
 
 const proxy = {
   "/v1": { target: API_TARGET, changeOrigin: true },
+  "/e": { target: API_TARGET, changeOrigin: true },
   "/healthz": { target: API_TARGET, changeOrigin: true },
 };
 

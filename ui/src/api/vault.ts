@@ -1,3 +1,4 @@
+import { createProjectFetch } from "./project";
 // The vault inspector, `/v1/vault/sessions*` (src/pii_guard/api/routes/vault.py, LAB-1328).
 // Sessions are addressed by their `ref` (the traffic log's `session_ref`), never by the session
 // id. Values come back only from a revealed read, which the server allows in `full` mode only;
@@ -64,7 +65,7 @@ export const SOURCE_LABEL: Record<SessionSource, string> = {
 
 export function createVaultClient(options: { baseUrl?: string; fetch?: typeof fetch; timeoutMs?: number } = {}): VaultClient {
   const baseUrl = (options.baseUrl ?? "").replace(/\/$/, "");
-  const doFetch = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+  const doFetch = createProjectFetch(options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args)));
   const timeoutMs = options.timeoutMs ?? 15_000;
 
   async function call(method: "GET" | "DELETE", path: string): Promise<unknown> {

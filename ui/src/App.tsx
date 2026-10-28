@@ -1,3 +1,5 @@
+import { Workspace } from "./projects/Workspace";
+import { getSelectedProject, setSelectedProject, useSelectedScope } from "./projects/selection";
 import { HostedApp } from "./hosted/HostedApp";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
@@ -50,7 +52,8 @@ export interface AppProps {
 
 /** Hosted deployment is an explicit build choice; the local console remains the default. */
 export function App(props: AppProps) {
-  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <HostedApp /> : <LocalApp {...props} />;
+  const scope = useSelectedScope();
+  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <HostedApp /> : <LocalApp key={scope} {...props} />;
 }
 
 /** A user's navigation adds a history entry (Back returns); a redirect replaces the current one. */
@@ -342,6 +345,9 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               }}
             />
           </section>
+          <section id="section-projects" aria-label="Projects" hidden={section !== "projects"}>
+            {section === "projects" && <Workspace onProject={selectProject} projectId={getCurrentProject()} />}
+          </section>
           <section id="section-policy" aria-label="Policy" hidden={section !== "policy"}>
             <Policy status={status} />
           </section>
@@ -428,3 +434,6 @@ function PlaygroundTabs({ tab, onTab }: { tab: PlaygroundTab; onTab: (t: Playgro
     </div>
   );
 }
+
+const selectProject = (project: { id: string }) => setSelectedProject(project.id);
+const getCurrentProject = () => getSelectedProject() ?? undefined;
