@@ -292,6 +292,11 @@ class ProjectService:
             transport=transport,
             observability=observability,
         )
+        if hosted is not None and (endpoint is None or endpoint.provider == "sponsored"):
+            from pii_guard.hosted.attribution import sponsored_upstream_headers
+
+            # The operator-key route only; own endpoints (BYOK/custom) get neither header.
+            gateway.upstream_extra_headers = sponsored_upstream_headers(settings)
         gateway._detect_workers = (
             hosted._workers if hosted is not None else self.worker_pools(config.concurrency)
         )

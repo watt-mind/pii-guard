@@ -320,6 +320,9 @@ class Gateway:
         # the session it created only once no other request holds it and none succeeded.
         self._session_holds: dict[str, _SessionHold] = {}
         self._holds_lock = threading.Lock()
+        # Fixed headers added to every upstream call of this gateway (the hosted sponsored
+        # route's attribution, LAB-1461); they never override content type or credentials.
+        self.upstream_extra_headers: dict[str, str] = {}
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
@@ -507,7 +510,11 @@ class Gateway:
         return base if base.endswith("/chat/completions") else base + "/chat/completions"
 
     def _upstream_headers(self, headers: Mapping[str, str]) -> dict[str, str]:
-        out = {"Content-Type": "application/json", "Accept": "application/json"}
+        out = {
+            **self.upstream_extra_headers,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
         if self.settings.hosted:
             out["Accept-Encoding"] = "identity"
         key = self.settings.upstream_api_key

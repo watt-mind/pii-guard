@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     hosted_spend_account_url: str | None = None
     hosted_spend_container: str = "sponsored-allowance"
     hosted_spend_environment: Literal["dev", "prod"] = "dev"
+    # Sent as X-PII-Guard-Source on sponsored (Meta) upstream calls only, so the provider can
+    # attribute the traffic (LAB-1461). A fixed deployment label, never a user identifier.
+    hosted_source_tag: str = Field(
+        default="pii-guard-hosted-demo", pattern=r"^[A-Za-z0-9._-]{1,64}$"
+    )
     hosted_spend_managed_identity_client_id: str | None = None
     # Operator kill switch: once a file exists at this absolute path, sponsored admission is
     # disabled until restart (checked per sponsored request and every cleanup tick).

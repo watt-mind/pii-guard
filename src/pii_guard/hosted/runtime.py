@@ -20,6 +20,7 @@ from pii_guard.gateway.config import GatewayConfig, Mode
 from pii_guard.gateway.detection import ModeDetector
 from pii_guard.gateway.service import Gateway
 from pii_guard.hosted.abuse import AbuseAdmission
+from pii_guard.hosted.attribution import sponsored_upstream_headers
 from pii_guard.hosted.connections import ConnectionStore
 from pii_guard.hosted.egress import SecureTransport
 from pii_guard.hosted.identity import ApiKeyStore, GuestIdentity, Principal
@@ -427,6 +428,9 @@ class HostedService:
             transport=SecureTransport(),
             observability=observability,
         )
+        if getattr(request.state, "hosted_connection", None) is None:
+            # Sponsored (operator-key) route only; a selected own connection gets neither.
+            gateway.upstream_extra_headers = sponsored_upstream_headers(self.settings)
         gateway._detect_workers = self._workers
         gateway._session_holds = runtime.session_holds
         gateway._holds_lock = runtime.holds_lock
