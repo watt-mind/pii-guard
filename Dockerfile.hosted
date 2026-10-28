@@ -6,13 +6,20 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --no-install-project
+# The pinned NER checkpoint (about 1 GB) is fetched before `COPY src`, from only the modules that
+# hold its pin and SHA-256 verifier, so a change elsewhere in src/ reuses this layer from the
+# registry cache (deploy/azure/acr_build.sh, LAB-1446). Changing the pin re-fetches it.
+COPY src/pii_guard/__init__.py src/pii_guard/types.py /app/pin/pii_guard/
+COPY src/pii_guard/detect/__init__.py src/pii_guard/detect/ner_resolve.py /app/pin/pii_guard/detect/
+RUN mkdir -p /app/models && PYTHONPATH=/app/pin .venv/bin/python -c "import shutil; from pathlib import Path; from pii_guard.detect.ner_resolve import PUBLISHED, ensure, resolve; p=ensure(resolve(published=PUBLISHED.repo_id + '@' + PUBLISHED.revision, fallback='download'), base=Path('/tmp/ner-fetch')); shutil.move(p, '/app/models/ner')" \
+    && rm -rf /tmp/ner-fetch /app/pin
 COPY src ./src
 COPY eval/results ./eval/results
 COPY docs/benchmarks/config.json ./docs/benchmarks/config.json
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --no-editable \
     && .venv/bin/python -m pii_guard.eval.report_cli --print-index > /app/benchmarks-index.json
-# Uses the existing pinned checkpoint + SHA-256 verifier, and warms a CPU forward pass.
-RUN .venv/bin/python -c "import shutil; from pii_guard.detect.ner_resolve import PUBLISHED, ensure, resolve; from pii_guard.detect.ner import NerDetector; p=ensure(resolve(published=PUBLISHED.repo_id + '@' + PUBLISHED.revision, fallback='download')); shutil.copytree(p, '/app/models/ner'); NerDetector(model='/app/models/ner', device='cpu')"
+# Loads the fetched checkpoint with this commit's detector and warms a CPU forward pass.
+RUN .venv/bin/python -c "from pii_guard.detect.ner import NerDetector; NerDetector(model='/app/models/ner', device='cpu')"
 # The YuNet face/ID-photo model (0.23 MB, MIT), fetched from its pinned URL and checked against
 # its pinned SHA-256 (pii_guard.visual.segment.YUNET); the build fails on a mismatch.
 RUN PII_GUARD_MODEL_DIR=/app/models .venv/bin/python -m pii_guard.visual.segment fetch

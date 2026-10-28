@@ -110,15 +110,15 @@ Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml). 
 one check to require. All jobs run in parallel on GitHub-hosted runners, cost nothing and need
 no secret.
 
-Pull requests run a **fast** suite so CI answers in about two minutes; pushes to `develop` and
-`main`, the merge queue, the nightly run and manual runs run **everything**:
+Pull requests, the merge queue and pushes to `develop` run a **fast** suite so CI answers in
+about two minutes; pushes to `main`, the nightly run and manual runs run **everything**:
 
-| | Pull request | `develop`, `main`, merge queue, nightly, manual |
+| | Pull request, merge queue, `develop` | `main`, nightly, manual |
 |---|---|---|
 | Tests | `make test`: every test except those marked `@pytest.mark.slow` | `make test-all`: every test |
 | Coverage | line coverage (faster to measure), floor `FAST_COV_FLOOR` in the `Makefile` | branch coverage, floor `fail_under` in `pyproject.toml` |
 | Hypothesis | `ci` profile: 25 examples where a test sets no `max_examples` | `ci-full` profile: the default 100 |
-| `docker` | only when the image's inputs changed (`src/`, `Dockerfile`, `pyproject.toml`, `uv.lock`, ...) | always |
+| `docker` | on a pull request, only when the image's inputs changed (`src/`, `Dockerfile`, `pyproject.toml`, `uv.lock`, ...); always on the merge queue and `develop` | always |
 
 Both run pytest in parallel (pytest-xdist, `-n auto`). Mark a test `slow` when it takes seconds
 on its own and something else already covers the same ground on every pull request (the
@@ -184,8 +184,8 @@ When a gate fails:
   --update`) and record a new run when quality improves. Don't loosen a threshold to make your
   PR pass; if a regression is a deliberate trade-off, say so in the PR and change
   `eval/gates.json` in the same commit.
-- **Hypothesis:** CI uses the derandomized `ci` profile on pull requests and `ci-full` on
-  everything else (`HYPOTHESIS_PROFILE`, in `tests/conftest.py`), so
+- **Hypothesis:** CI uses the derandomized `ci` profile on pull requests, the merge queue
+  and `develop`, and `ci-full` on `main`, nightly and manual runs (`HYPOTHESIS_PROFILE`, in `tests/conftest.py`), so
   `HYPOTHESIS_PROFILE=ci uv run pytest <test>` (or `ci-full`) replays the same examples locally.
 - **pii-in-diff:** replace the value with a fictional one (an `example.com` address, an
   identifier with a wrong check digit). If it is fictional and has to be valid, add it to
