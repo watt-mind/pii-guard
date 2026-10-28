@@ -60,6 +60,14 @@ class ErrorResponse(BaseModel):
 #: ``status_code`` of the :class:`~pii_guard.types.PiiGuardError` subclass that carries
 #: the code (``tests/api/test_openapi_docs.py`` checks both against ``docs/contracts.md``).
 ERROR_CODES: Mapping[str, tuple[int, str]] = {
+    "project_access_denied": (403, "Project owner authorization or selection is denied."),
+    "project_not_found": (404, "The project resource is unknown or belongs to another owner."),
+    "invalid_project_config": (422, "A policy or endpoint configuration is invalid."),
+    "project_storage_unavailable": (503, "The project configuration store is unavailable."),
+    "upstream_destination_not_allowed": (
+        422,
+        "Hosted upstream destinations must use public HTTPS on port 443.",
+    ),
     "unauthorized": (401, "`PII_GUARD_API_TOKEN` is set and the request has no valid token."),
     "traffic_log_not_local": (
         403,
