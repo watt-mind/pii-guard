@@ -275,10 +275,9 @@ class ResponsesGateway:
             _count_masked(stats, before, session)
         except BaseException:
             stats.log("blocked")
-            if created:
-                gw.vault.drop(session.session_id)
-                gw.cache.drop_session(session.session_id)
+            gw._release_session(session, created, masked=False)
             raise
+        gw._release_session(session, created, masked=True)
 
         forwarding = time.perf_counter()
         payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
