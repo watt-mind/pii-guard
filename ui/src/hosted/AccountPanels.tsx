@@ -15,6 +15,10 @@ const LIMIT_LABEL: Record<string, string> = {
   max_input_chars: "Longest input (characters)",
   max_body_bytes: "Largest request (bytes)",
   max_connections: "Provider connections",
+  concurrent_requests: "Requests at the same time",
+  max_output_tokens: "Longest answer (tokens)",
+  images_per_day: "Images per day",
+  max_image_bytes: "Largest image (bytes)",
 };
 function limitLabel(key: string) {
   if (LIMIT_LABEL[key]) return LIMIT_LABEL[key];
@@ -22,9 +26,10 @@ function limitLabel(key: string) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** The server's limits for this account, behind a disclosure with a visible chevron. */
-export function Limits({ account }: { account: Account }) {
-  const entries = Object.entries(account.limits).filter(([, value]) => value !== null && typeof value !== "boolean");
+/** The server's limits for this account, behind a disclosure with a visible chevron. `hideZero` drops limits that are off (0), as on the public page. */
+export function Limits({ account, hideZero = false }: { account: Account; hideZero?: boolean }) {
+  const entries = Object.entries(account.limits).filter(([, value]) => value !== null && typeof value !== "boolean" && !(hideZero && value === 0));
+  if (entries.length === 0) return null;
   return (
     <details className="group">
       <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-sm text-sm text-ink pointer-coarse:min-h-11 [&::-webkit-details-marker]:hidden">
