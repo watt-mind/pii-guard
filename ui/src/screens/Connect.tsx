@@ -48,7 +48,7 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
         </>
       ) : (
         <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
-          Each endpoint has its own base URL, client snippets and keys. Pick one under <span className="text-ink">Inspect activity &amp; vault</span> in the menu for its
+          Each endpoint has its own base URL, client snippets and keys. Pick one under <span className="text-ink">Inspect activity &amp; vault</span> in the project menu at the top for its
           snippets here, or open{" "}
           <a className="text-ink underline underline-offset-4" href="#projects">
             Projects
