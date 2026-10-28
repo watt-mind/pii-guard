@@ -7,6 +7,9 @@ Every block is filled in with the gateway's session URL (``http://127.0.0.1:8787
 LAB-1286: the same value keeps the same placeholder across turns, and Connect recognises the
 tool's first request by that session) and a model id from ``GET /v1/models``.
 
+:func:`build_endpoint` fills the same blocks for one project endpoint instead (ADR 0013):
+``<origin>/e/<endpoint>/v1``, the endpoint's model, and its key as ``$PII_GUARD_ENDPOINT_KEY``.
+
 How each tool is pointed at the gateway (each checked on the version in :data:`TESTED`):
 
 - **Codex**: a launch command, no config file. ``-c`` overrides define a ``pii-guard`` model
@@ -37,11 +40,13 @@ from pii_guard.upstreams import PRESETS, Upstream
 
 __all__ = [
     "CODEX_VERSION",
+    "ENDPOINT_KEY_ENV",
     "OPENCODE_VERSION",
     "PI_VERSION",
     "TESTED",
     "TOOL_IDS",
     "build",
+    "build_endpoint",
     "chat_models",
     "pick_model",
     "printable",
@@ -60,6 +65,8 @@ TESTED = {
     "opencode": OPENCODE_VERSION,
 }
 TOKEN_ENV = "PII_GUARD_API_TOKEN"  # noqa: S105 - the variable's name, not a token
+#: Where an endpoint's blocks (``/e/<endpoint>/v1``) read its ``pg_ep_`` key from.
+ENDPOINT_KEY_ENV = "PII_GUARD_ENDPOINT_KEY"
 MODEL_PLACEHOLDER = "<model-id>"
 #: The fictional request the cURL and Python blocks send (ADR 0005).
 #: No free-text name: on a rules-only server (no NER) a name would reach the model as written.
@@ -98,7 +105,7 @@ def _q(value: str) -> str:
     return shlex.quote(value)
 
 
-def _muse(url: str, model: str, token: bool) -> tuple[str, str]:
+def _muse(url: str, model: str, key: str | None) -> tuple[str, str]:
     code = (
         "# Muse needs META_API_KEY set (any value works when the gateway holds the key)\n"
         f"pii-guard connect muse-code --gateway {_q(url)}\n"
@@ -112,7 +119,7 @@ def _muse(url: str, model: str, token: bool) -> tuple[str, str]:
     return code, note
 
 
-def _pi(url: str, model: str, token: bool) -> tuple[str, str]:
+def _pi(url: str, model: str, key: str | None) -> tuple[str, str]:
     code = (
         f"pii-guard connect pi --gateway {_q(url)} --model {_q(model)}\n"
         f"pi --provider pii-guard --model {_q(model)}"
@@ -120,15 +127,15 @@ def _pi(url: str, model: str, token: bool) -> tuple[str, str]:
     note = (
         "pi reads custom providers only from ~/.pi/agent/models.json, so this adds a pii-guard "
         "provider there first (backup kept, --dry-run to preview)."
-        + (f" It writes ${TOKEN_ENV} as the key: export it first." if token else "")
+        + (f" It writes ${key} as the key: export it first." if key else "")
     )
     return code, note
 
 
-def _codex(url: str, model: str, token: bool) -> tuple[str, str]:
+def _codex(url: str, model: str, key: str | None) -> tuple[str, str]:
     provider = f'name="pii-guard", base_url="{url}", wire_api="responses"'
-    if token:
-        provider += f', env_key="{TOKEN_ENV}"'
+    if key:
+        provider += f', env_key="{key}"'
     code = (
         f"codex -m {_q(model)} \\\n"
         "  -c model_provider=pii-guard \\\n"
@@ -143,10 +150,10 @@ def _codex(url: str, model: str, token: bool) -> tuple[str, str]:
     return code, note
 
 
-def _opencode(url: str, model: str, token: bool) -> tuple[str, str]:
+def _opencode(url: str, model: str, key: str | None) -> tuple[str, str]:
     options: dict[str, Any] = {"baseURL": url}
-    if token:
-        options["apiKey"] = "{env:" + TOKEN_ENV + "}"
+    if key:
+        options["apiKey"] = "{env:" + key + "}"
     config = {
         "provider": {
             "pii-guard": {
@@ -168,9 +175,9 @@ def _opencode(url: str, model: str, token: bool) -> tuple[str, str]:
     return code, note
 
 
-def _curl(url: str, model: str, token: bool) -> tuple[str, str]:
+def _curl(url: str, model: str, key: str | None) -> tuple[str, str]:
     body = {"model": model, "messages": [{"role": "user", "content": SAMPLE_PROMPT}]}
-    auth = f' \\\n  -H "Authorization: Bearer ${TOKEN_ENV}"' if token else ""
+    auth = f' \\\n  -H "Authorization: Bearer ${key}"' if key else ""
     code = (
         f"curl -si {url}/chat/completions \\\n"
         f'  -H "Content-Type: application/json"{auth} \\\n'
@@ -183,7 +190,7 @@ def _curl(url: str, model: str, token: bool) -> tuple[str, str]:
     return code, note
 
 
-def _curl_responses(url: str, model: str, token: bool) -> str:
+def _curl_responses(url: str, model: str, key: str | None) -> str:
     """The same request through the Responses API (``POST /responses``, as Muse and Codex
     send), with ``X-PII-Guard-Echo: masked``: the answer's ``pii_guard`` field shows the
     ``masked_input`` the model saw and its ``masked_output``."""
@@ -192,7 +199,7 @@ def _curl_responses(url: str, model: str, token: bool) -> str:
         "input": [{"role": "user", "content": [{"type": "input_text", "text": SAMPLE_PROMPT}]}],
         "stream": False,
     }
-    auth = f' \\\n  -H "Authorization: Bearer ${TOKEN_ENV}"' if token else ""
+    auth = f' \\\n  -H "Authorization: Bearer ${key}"' if key else ""
     return (
         f"curl -s {url}/responses \\\n"
         f'  -H "Content-Type: application/json" -H "X-PII-Guard-Echo: masked"{auth} \\\n'
@@ -204,11 +211,11 @@ def _curl_responses(url: str, model: str, token: bool) -> str:
 _MORE = {"curl": (("Responses API", _curl_responses),)}
 
 
-def _python(url: str, model: str, token: bool) -> tuple[str, str]:
-    key = f'os.environ["{TOKEN_ENV}"]' if token else '"unused"'
+def _python(url: str, model: str, key: str | None) -> tuple[str, str]:
+    api_key = f'os.environ["{key}"]' if key else '"unused"'
     code = (
-        ("import os\n" if token else "") + "from openai import OpenAI\n\n"
-        f'client = OpenAI(base_url="{url}", api_key={key})\n'
+        ("import os\n" if key else "") + "from openai import OpenAI\n\n"
+        f'client = OpenAI(base_url="{url}", api_key={api_key})\n'
         "reply = client.chat.completions.create(\n"
         f'    model="{model}",\n'
         f'    messages=[{{"role": "user", "content": "{SAMPLE_PROMPT}"}}],\n'
@@ -217,19 +224,46 @@ def _python(url: str, model: str, token: bool) -> tuple[str, str]:
     )
     note = "pip install openai. " + (
         "The gateway checks the token."
-        if token
+        if key
         else "The gateway holds the upstream key, so the client's key is not used."
     )
     return code, note
 
 
-def _claude(url: str, model: str, token: bool) -> tuple[str, str]:
+def _claude(url: str, model: str, key: str | None) -> tuple[str, str]:
     note = (
         "Coming soon. Claude Code speaks the Anthropic Messages API (POST /v1/messages); the "
         "gateway serves the OpenAI APIs, so pointing ANTHROPIC_BASE_URL at it would fail every "
         "request rather than mask it."
     )
     return "", note
+
+
+def _muse_endpoint(url: str, model: str, key: str | None) -> tuple[str, str]:
+    note = (
+        "Not for endpoint URLs yet. Muse Code loads its model catalog from the gateway's root "
+        "(/muse-code/models), which an /e/<endpoint>/v1 URL doesn't serve; use another tool."
+    )
+    return "", note
+
+
+def _pi_endpoint(url: str, model: str, key: str | None) -> tuple[str, str]:
+    code = (
+        f"pii-guard connect pi --gateway {_q(url)} --no-session-path --model {_q(model)}"
+        + (f" --api-key {_q('$' + key)}" if key else "")
+        + f"\npi --provider pii-guard --model {_q(model)}"
+    )
+    note = (
+        "pi reads custom providers only from ~/.pi/agent/models.json, so this adds a pii-guard "
+        "provider for this endpoint there first (backup kept, --dry-run to preview)."
+        + (f" It writes ${key} as the key: export it first." if key else "")
+    )
+    return code, note
+
+
+#: Endpoint URLs (``/e/<endpoint>/v1``, ADR 0013) where a tool's session block doesn't fit:
+#: no ``/s/<session>`` segment, and only the gateway routes an endpoint serves.
+_RENDER_ENDPOINT = {"muse-code": _muse_endpoint, "pi": _pi_endpoint}
 
 
 _RENDER = {
@@ -251,22 +285,33 @@ def safe_model(model: str | None) -> str | None:
     return model if model is not None and _MODEL_RE.fullmatch(model) else None
 
 
-def tool_snippet(tool_id: str, url: str, model: str | None, *, token: bool) -> dict[str, Any]:
-    """One tool's block for the session URL ``url``."""
+def tool_snippet(
+    tool_id: str,
+    url: str,
+    model: str | None,
+    *,
+    token: bool,
+    key_env: str = TOKEN_ENV,
+    endpoint: bool = False,
+) -> dict[str, Any]:
+    """One tool's block for the session URL ``url``, or with ``endpoint`` for an endpoint URL
+    (``/e/<endpoint>/v1``). ``key_env`` names the variable holding the key when ``token``."""
     tool = next(t for t in _TOOLS if t.id == tool_id)
     url = url.rstrip("/")
     name = safe_model(model) or MODEL_PLACEHOLDER
-    code, note = _RENDER[tool.id](url, name, token)
+    key = key_env if token else None
+    render_main = (_RENDER_ENDPOINT if endpoint else {}).get(tool.id, _RENDER[tool.id])
+    code, note = render_main(url, name, key)
+    kind = tool.kind if code else "unsupported"
     more = [
-        {"title": title, "code": render(url, name, token)}
-        for title, render in _MORE.get(tool.id, ())
+        {"title": title, "code": render(url, name, key)} for title, render in _MORE.get(tool.id, ())
     ]
     return {
         "id": tool.id,
         "label": tool.label,
         "api": tool.api,
-        "kind": tool.kind,
-        "supported": tool.kind != "unsupported",
+        "kind": kind,
+        "supported": kind != "unsupported",
         "code": code,
         "note": note,
         "tested_version": TESTED.get(tool.id),
@@ -354,4 +399,34 @@ def build(
         },
         "presets": [p.public() for p in PRESETS.values()],
         "tools": [tool_snippet(t, session_url, model, token=token) for t in TOOL_IDS],
+    }
+
+
+def build_endpoint(
+    *, gateway_url: str, endpoint: str, name: str, model: str, preset: Upstream | None
+) -> dict[str, Any]:
+    """The quickstart for one owned endpoint (ADR 0013): every block at ``gateway_url``
+    (``<origin>/e/<endpoint>/v1``) with the endpoint's model and its key as
+    ``$PII_GUARD_ENDPOINT_KEY``. The same fields as :func:`build`; no session, no upstream
+    origin and no ``pii-guard up`` presets (the endpoint pins its own provider)."""
+    return {
+        "gateway_url": gateway_url,
+        "session": None,
+        "session_url": None,
+        "endpoint": {"id": endpoint, "name": name, "model": safe_model(model)},
+        "models": chat_models([model]),
+        "model": safe_model(model),
+        "auth": {"token_required": True, "token_env": ENDPOINT_KEY_ENV},
+        "upstream": {
+            "connected": True,
+            "mock": False,
+            "origin": None,
+            "preset": preset.id if preset is not None else None,
+            "label": preset.label if preset is not None else None,
+        },
+        "presets": [],
+        "tools": [
+            tool_snippet(t, gateway_url, model, token=True, key_env=ENDPOINT_KEY_ENV, endpoint=True)
+            for t in TOOL_IDS
+        ],
     }

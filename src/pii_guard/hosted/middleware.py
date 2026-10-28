@@ -147,7 +147,11 @@ class HostedMiddleware:
                 "/v1/vault/sessions",
                 "/v1/account/api-keys",
                 "/v1/account/connections",
+                "/v1/status",
+                "/v1/connect/snippets",
             }
+            # The shared console's reads (ADR 0013): the owner's projection, never by key.
+            console = canonical in {"/v1/status", "/v1/connect/snippets"}
             parameterized = re.fullmatch(
                 r"/v1/(?:sessions/[^/]+/known-values|vault/sessions/[^/]+|"
                 r"account/(?:api-keys|connections)/[^/]+)",
@@ -167,6 +171,8 @@ class HostedMiddleware:
             )
             if project_management and principal.auth_method != "google":
                 raise HostedUnauthorizedError("Project management requires signed-in owner access")
+            if console and principal.auth_method != "google":
+                raise HostedUnauthorizedError("The console requires signed-in owner access")
             if canonical not in allowed and parameterized is None and not project_management:
                 raise HostedRequestError("This endpoint is unavailable in hosted mode")
             if canonical not in {"/v1/account", "/v1/demo"} and not principal.authenticated:
