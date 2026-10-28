@@ -71,6 +71,7 @@ def local_test_client(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 NER_AUTODETECT = "ner_autodetect"
+UNTRACED = "untraced"
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -79,6 +80,37 @@ def pytest_configure(config: pytest.Config) -> None:
         f"{NER_AUTODETECT}: let build_mode_detectors add NER when the ner extra is installed "
         "(by default the suite pins the gateway base detectors to rules only)",
     )
+    config.addinivalue_line(
+        "markers",
+        f"{UNTRACED}: run the test body with coverage measurement stopped (LAB-1447); for "
+        "checks of committed data or a whole corpus whose code other tests measure",
+    )
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Iterator[None]:
+    """Stop every running coverage measurement around an ``untraced`` test body.
+
+    Under the branch tracer a pure-Python hot loop runs 7-16x slower. pytest-cov's own
+    ``no_cover`` is not enough: in an xdist worker a second, automatically started
+    ``Coverage`` keeps tracing, and with ``--no-cov`` it fails. Fixtures stay measured.
+    """
+    if item.get_closest_marker(UNTRACED) is None:
+        return (yield)
+    stopped = []
+    try:
+        import coverage
+    except ImportError:  # pragma: no cover - coverage is a dev dependency
+        pass
+    else:
+        while (cov := coverage.Coverage.current()) is not None and cov not in stopped:
+            cov.stop()
+            stopped.append(cov)
+    try:
+        return (yield)
+    finally:
+        for cov in reversed(stopped):
+            cov.start()
 
 
 @pytest.fixture(autouse=True)

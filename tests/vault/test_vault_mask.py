@@ -501,9 +501,9 @@ def _late_turns() -> list[tuple[str, list[Span], str]]:
     return [t for t in turns if not t[1]] + [t for t in turns if t[1]]
 
 
-# no_cover: about 16x slower under the branch tracer (26-28 s each on CI); the remask code is
+# untraced: about 16x slower under the branch tracer (26-28 s each on CI); the remask code is
 # covered by the property and unit tests in this file, this one guards the corpus (LAB-1447).
-@pytest.mark.no_cover
+@pytest.mark.untraced
 @pytest.mark.parametrize("case_sensitive", [False, True])
 @pytest.mark.parametrize("late", [False, True])
 def test_remask_since_changes_no_output(

@@ -39,9 +39,9 @@ def index(records: list[dict[str, Any]]) -> dict[str, Any]:
 # --- The committed report ------------------------------------------------------------------
 
 
-# no_cover: a check of the committed outputs over every run record, about 7x slower under the
+# untraced: a check of the committed outputs over every run record, about 7x slower under the
 # branch tracer; the same code is covered on the bounded ``report_repo`` copy (LAB-1447).
-@pytest.mark.no_cover
+@pytest.mark.untraced
 def test_committed_report_is_up_to_date(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(REPO_ROOT)
     assert cli.main(["eval", "report", "--validate" if RENDERED_ON_MERGE else "--check"]) == 0

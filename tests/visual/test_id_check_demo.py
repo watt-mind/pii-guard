@@ -91,14 +91,14 @@ def _evaluated(matcher: str, noise: float) -> dict[str, Any]:
 
 # Coverage (LAB-1447): the evals spend their time in pure-Python edit distances over all 24
 # specimens, 2-3x slower under the branch tracer (34-47 s each on CI). The full-set checks
-# below run unmeasured (no_cover), with their thresholds unchanged; the same code is measured
+# below run unmeasured (untraced), with their thresholds unchanged; the same code is measured
 # on three specimens by test_the_evals_run_on_a_small_set. Unmeasured, the cache is safe.
 @pytest.mark.parametrize(
     ("noise", "accuracy"),
     [(0.0, 0.95), (0.05, 0.85)],
 )
 @pytest.mark.slow
-@pytest.mark.no_cover
+@pytest.mark.untraced
 def test_fuzzy_matching_meets_the_acceptance_bar(noise: float, accuracy: float) -> None:
     report = _evaluated("fuzzy", noise)
     assert report["match_accuracy"] >= accuracy, report
@@ -107,13 +107,13 @@ def test_fuzzy_matching_meets_the_acceptance_bar(noise: float, accuracy: float) 
 
 
 @pytest.mark.slow
-@pytest.mark.no_cover
+@pytest.mark.untraced
 def test_fuzzy_beats_exact_matching() -> None:
     assert _evaluated("fuzzy", 0.0)["matched"] > _evaluated("exact", 0.0)["matched"]
 
 
 @pytest.mark.slow
-@pytest.mark.no_cover
+@pytest.mark.untraced
 def test_labels_cover_at_least_what_opaque_boxes_cover() -> None:
     report = coverage()
     for key in ("recall_iou50", "recall_cov90", "gold_pixels_overwritten"):

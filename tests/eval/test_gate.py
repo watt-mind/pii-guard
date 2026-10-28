@@ -83,11 +83,11 @@ def test_baseline_is_the_newest_record_on_the_same_files(tmp_path: Path) -> None
     assert gate.baseline_record(records[2:3], detectors=["rules"], fixtures=[fixture]) is None
 
 
-# no_cover: under the branch tracer this one call took 106 s of the CI test job (LAB-1447);
+# untraced: under the branch tracer this one call took 106 s of the CI test job (LAB-1447);
 # without it, about 5 s. It checks the committed data, not the code: the gate's code paths
 # are covered by the other tests here (test_a_tightened_limit_fails runs a whole suite).
 @pytest.mark.slow
-@pytest.mark.no_cover
+@pytest.mark.untraced
 def test_committed_gates_pass(in_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert gate.main([]) == 0
     out = capsys.readouterr().out
