@@ -103,6 +103,7 @@ def account(request: Request) -> dict[str, Any]:
     hosted = request.app.state.hosted
     limits = hosted.quotas.limits
     authenticated = principal.authenticated
+    images = authenticated and bool(getattr(hosted.settings, "hosted_images", False))
     return {
         "mode": "hosted",
         "authenticated": authenticated,
@@ -117,6 +118,9 @@ def account(request: Request) -> dict[str, Any]:
             "concurrent_requests": limits.principal_concurrency,
             "max_output_tokens": hosted.settings.hosted_max_output_tokens,
             "sponsored_enabled": hosted.sponsored_enabled,
+            # Hosted images (ADR 0014): signed-in owners only; the decoded upload limit.
+            "images_per_day": limits.user_images if images else 0,
+            "max_image_bytes": hosted.settings.hosted_max_image_bytes if images else 0,
         },
         "usage": hosted.quotas.usage(principal.id),
         "state": {"persistence": "ephemeral", "restart_loses_sessions": True},

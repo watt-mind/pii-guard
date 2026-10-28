@@ -76,6 +76,17 @@ class Settings(BaseSettings):
     # Conservative ceilings, including reasoning tokens. Operator verifies against prices.
     hosted_input_microdollars_per_token: int = Field(default=100, ge=1)
     hosted_output_microdollars_per_token: int = Field(default=100, ge=1)
+    # Hosted image masking (LAB-1390, ADR 0014): signed-in Google owners only, processed in
+    # memory on the replica with Tesseract and the on-device segmenter; nothing remote. With it
+    # on, readiness requires OCR and the local segmenter. Bounded separately from text: the
+    # decoded upload, the decoded pixels, one image job per replica, a deadline and a per-owner
+    # daily image count reserved before work.
+    hosted_images: bool = True
+    hosted_max_image_bytes: int = Field(default=4 * 1024 * 1024, ge=65536, le=10 * 1024 * 1024)
+    hosted_image_max_pixels: int = Field(default=8_000_000, ge=65536, le=16_000_000)
+    hosted_image_timeout: float = Field(default=60, gt=0, le=120)
+    hosted_user_images_per_day: int = Field(default=20, ge=1, le=1000)
+    hosted_global_images_per_day: int = Field(default=500, ge=1, le=100_000)
 
     # Detection and policies for the REST API (/v1/analyze, /v1/mask).
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:

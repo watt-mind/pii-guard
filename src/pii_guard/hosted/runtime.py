@@ -139,6 +139,16 @@ class HostedService:
                 "Hosted mode requires trusted ingress, one process, HTTPS origin, "
                 "a 32-byte tenant key and local fast detectors"
             )
+        if settings.hosted_images and (
+            not settings.image_require_ocr
+            or ("segmenter" in settings.model_fields_set and settings.segmenter != "local")
+        ):
+            # ADR 0014: hosted images are processed on the replica only. A remote segmenter
+            # (hybrid, sam-api) would send the original image out; "off" refuses every image;
+            # SAM-only masking leaves the image's text unchecked.
+            raise ValueError(
+                "Hosted images require OCR and the local segmenter (PII_GUARD_SEGMENTER=local)"
+            )
         self.settings = settings
         self.master_key = key
         self.origin = f"https://{origin.hostname}"
@@ -150,6 +160,8 @@ class HostedService:
             QuotaLimits(
                 input_microdollars_per_token=settings.hosted_input_microdollars_per_token,
                 output_microdollars_per_token=settings.hosted_output_microdollars_per_token,
+                user_images=settings.hosted_user_images_per_day,
+                global_images=settings.hosted_global_images_per_day,
             ),
             sponsored_allocation_microdollars=settings.hosted_sponsored_microdollars
             if settings.hosted_spend_store == "marker"
@@ -171,6 +183,9 @@ class HostedService:
         self.rest_slots = threading.BoundedSemaphore(4)
         self._ingress = 0
         self._workers = {Mode.FAST: BoundedWorkers(4, "pii-guard-hosted-fast")}
+        # One image job per replica (OCR is CPU- and memory-heavy); a busy slot is a 429,
+        # never a queue. A timed-out job keeps the slot until its thread has finished.
+        self.image_workers = BoundedWorkers(1, "pii-guard-hosted-image")
 
     def acquire(self, principal: Principal, *, namespace: str | None = None) -> Runtime:
         self.purge_expired()
@@ -371,6 +386,7 @@ class HostedService:
         self.connections.clear()
         for workers in self._workers.values():
             workers.close()
+        self.image_workers.close()
         self._spend_workers.close()
         if self.spend is not None:
             self.spend.close()

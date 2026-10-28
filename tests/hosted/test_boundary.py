@@ -298,8 +298,9 @@ def test_anonymous_data_routes_refused(
     assert not seen
 
 
-@pytest.mark.parametrize("path", ["/metrics", "/docs", "/redoc", "/openapi.json", "/v1/mask/image"])
-def test_operator_and_image_routes_refused(
+# Hosted images (LAB-1390) are admitted for signed-in owners: see test_images.py.
+@pytest.mark.parametrize("path", ["/metrics", "/docs", "/redoc", "/openapi.json"])
+def test_operator_routes_refused(
     boundary: tuple[TestClient, list[httpx.Request]], path: str
 ) -> None:
     client, _ = boundary

@@ -3,6 +3,7 @@
 - **Status:** accepted
 - **Date:** 2026-10-28
 - **Builds on:** [ADR 0011](0011-hosted-saas.md), [ADR 0012](0012-hosted-projects-and-endpoint-configuration.md)
+- **Amended by:** [ADR 0014](0014-hosted-local-images.md): hosted `images` is `true` (see the table)
 
 ## Context
 
@@ -38,6 +39,14 @@ flat object of booleans (`text`, `chat`, `images`, `logs`, `vault`, `server_poli
 UI's only source for which sections to show; the UI does not branch on the mode or the build.
 `logs` and `vault` come from the caller's own view (the server-wide setting locally, the
 owner's runtime when hosted), so the same expression serves both modes.
+
+| Capability | Local | Hosted |
+|---|---|---|
+| `text`, `chat`, `projects`, `connect`, `evaluation` | `true` | `true` |
+| `images` | `true` | `true` ([ADR 0014](0014-hosted-local-images.md)): while `PII_GUARD_HOSTED_IMAGES` is on and no masked visual type needs SAM |
+| `logs`, `vault` | the server's settings | the owner's runtime (`true`) |
+| `server_policy` | `true` | `false` |
+| `accounts` | `false` | `true` |
 
 **Hosted projection of `/v1/status`.** Hosted owners see the version, the gateway's default
 mode and URL, the fast mode only (audit detection is not offered hosted), NER availability and

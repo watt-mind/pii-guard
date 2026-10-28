@@ -11,10 +11,14 @@ service has passed review. Start with internal ingress and zero sponsored budget
 |---|---|---|---|
 | Anonymous walkthrough | Curated server-owned HU/EN synthetic sample; local rules and CPU NER | Masked sample to sponsored Meta, only when budget permits | Public; sample IDs only |
 | Signed-in editable text | Azure hosted service receives original text; local rules and CPU NER | Masked text to configured sponsored Meta or approved BYOK destination | Google identity or owner API key; owner-scoped vault |
+| Signed-in images | Azure hosted service receives the original image in memory; local Tesseract OCR, on-device face/ID-photo detector, local rules and CPU NER; never stored | None: the masked image returns to the owner | Google identity only (no API keys, no guests); owner-scoped vault |
 | BYOK | The service receives the provider key and configured endpoint | Masked input, key sent only to that approved public HTTPS destination | Signed-in owner; the endpoint credential is encrypted in project configuration (see [projects](projects.md)) |
 | Self-hosted | Original input stays in the operator's chosen guard/detector infrastructure | Masked input to the operator's provider | The operator controls access and retention |
 
-Hosted images/uploads and remote LLM detection are outside the initial scope. A remote detector
+Hosted images are processed on the replica only ([ADR 0014](decisions/0014-hosted-local-images.md)):
+no SAM, no remote detector, no image spend. The on-device segmenter cannot find signatures or
+stamps, so the deployment sets `SIGNATURE=keep` (they stay visible) or every image is refused.
+Document uploads (PDF/DOCX) and remote LLM detection are outside the initial scope. A remote detector
 is different from downstream generation: it receives originals. Never enable one without an
 explicitly approved trust boundary and terms review. See [models](models.md) and LAB-1139 for
 remote detector terms still requiring confirmation.
@@ -158,6 +162,12 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_PROJECT_CONTAINER` | `project-configuration`; fixed `<environment>.projects.v1.enc` snapshot |
 | `PII_GUARD_HOSTED_PROJECT_ENVIRONMENT` | `dev` or `prod`; separate account, identity and stable tenant key |
 | `PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID` | The environment runtime identity's client ID |
+| `PII_GUARD_HOSTED_IMAGES` | Default `true`: signed-in image masking; `/readyz` then requires Tesseract and the on-device segmenter |
+| `PII_GUARD_SEGMENTER` | `local` (image default); `hybrid`/`sam-api`/`off` refuse startup while hosted images are on |
+| `PII_GUARD_POLICY_OVERRIDES` | `SIGNATURE=keep`: the on-device segmenter cannot find signatures; without it images are refused and not offered |
+| `PII_GUARD_HOSTED_MAX_IMAGE_BYTES`, `PII_GUARD_HOSTED_IMAGE_MAX_PIXELS` | Defaults 4 MiB decoded and 8 MP, checked before OCR |
+| `PII_GUARD_HOSTED_IMAGE_TIMEOUT` | Default 60 s per image; one image job per replica, a busy replica answers `429` |
+| `PII_GUARD_HOSTED_USER_IMAGES_PER_DAY`, `PII_GUARD_HOSTED_GLOBAL_IMAGES_PER_DAY` | Defaults 20 and 500, reserved before work, never refunded |
 | `PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` | Dedicated runtime UAMI client ID |
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
 | `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |

@@ -15,6 +15,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from pii_guard.api.errors import error_response
 from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
+from pii_guard.hosted.images import IMAGE_COMPUTE_TOKENS, IMAGE_PATH, image_body_limit
 from pii_guard.hosted.runtime import HostedService
 from pii_guard.projects.middleware import endpoint_body, endpoint_path, prepare_project
 from pii_guard.types import PiiGuardError
@@ -150,6 +151,15 @@ class HostedMiddleware:
                 "/v1/status",
                 "/v1/connect/snippets",
             }
+            # Hosted images (ADR 0014): signed-in Google owners only, never by key or as a
+            # guest, never through an endpoint path, and only while the operator offers them.
+            image = canonical == IMAGE_PATH and self.service.settings.hosted_images
+            if image:
+                allowed.add(IMAGE_PATH)
+                if principal.auth_method != "google":
+                    raise HostedUnauthorizedError("Image masking requires signed-in owner access")
+                if routed is not None or scope.get("method") != "POST":
+                    raise HostedRequestError("Image masking accepts a direct POST only")
             # The shared console's reads (ADR 0013): the owner's projection, never by key.
             console = canonical in {"/v1/status", "/v1/connect/snippets"}
             parameterized = re.fullmatch(
@@ -213,6 +223,12 @@ class HostedMiddleware:
                     scope, receive, state, self.service.settings.hosted_max_body_bytes
                 )
                 headers = Headers(scope=scope)
+            # Text routes stay text-sized; the image route gets its own bounded limit.
+            body_limit = (
+                image_body_limit(self.service.settings)
+                if image
+                else self.service.settings.hosted_max_body_bytes
+            )
             raw = bytearray()
             if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}:
                 async with asyncio.timeout(min(10, self.service.settings.hosted_request_timeout)):
@@ -221,7 +237,7 @@ class HostedMiddleware:
                         if message["type"] == "http.disconnect":
                             return
                         raw.extend(message.get("body", b""))
-                        if len(raw) > self.service.settings.hosted_max_body_bytes:
+                        if len(raw) > body_limit:
                             raise HostedRequestError("Hosted request body is too large")
                         if not message.get("more_body", False):
                             break
@@ -263,6 +279,10 @@ class HostedMiddleware:
             # routes consume compute quotas. The full conservative charge survives failure.
             if not account_inspection:
                 input_tokens = (max(len(raw), 1024) * 32 + 4096) if paid else len(raw)
+                if image:
+                    # A fixed compute charge plus one from the separate daily image count:
+                    # reserved here, before any decoding or OCR, and never refunded.
+                    input_tokens = IMAGE_COMPUTE_TOKENS
                 output_tokens = self.service.settings.hosted_max_output_tokens if paid else 0
                 sponsored = (
                     paid
@@ -275,6 +295,7 @@ class HostedMiddleware:
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     sponsored=sponsored and self.service.spend is None,
+                    images=1 if image else 0,
                 )
                 if sponsored and self.service.spend is not None:
                     await self.service.charge_spend(input_tokens, output_tokens)

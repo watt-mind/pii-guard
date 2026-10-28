@@ -36,7 +36,11 @@ Local rules and NER process originals in the initial hosted image. The downstrea
 receives masked text, which can still identify someone through missed values or context.
 A hosted **detector** endpoint would receive originals and needs separate explicit trust and
 terms review. Anonymous hosted traffic uses curated synthetic samples only; editable text and
-session-only BYOK require an authenticated owner. Hosted image/upload routes are disabled.
+session-only BYOK require an authenticated owner. Hosted image masking is for signed-in Google
+owners only: the original image is decoded in the replica's memory, read by local Tesseract and
+the on-device face detector, never stored or logged, and only the masked image and the owner's
+session mappings remain ([ADR 0014](decisions/0014-hosted-local-images.md)). Document uploads
+are disabled.
 
 The initial hosted runtime scales from zero to one replicas with one worker and ephemeral
 owner state. Each owner also retains up to 50 masked traffic events in memory, released on
