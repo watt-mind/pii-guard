@@ -15,8 +15,8 @@ resource routerNsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
     securityRules: [
       { name: 'deny-unsolicited-inbound', properties: { priority: 100, direction: 'Inbound', access: 'Deny', protocol: '*', sourcePortRange: '*', destinationPortRange: '*', sourceAddressPrefix: '*', destinationAddressPrefix: '*' } }
       { name: 'private-aca-https', properties: { priority: 100, direction: 'Outbound', access: 'Allow', protocol: 'Tcp', sourcePortRange: '*', destinationPortRanges: ['443', '31443'], sourceAddressPrefix: '*', destinationAddressPrefix: acaPrefix } }
-      { name: 'platform-dns', properties: { priority: 110, direction: 'Outbound', access: 'Allow', protocol: '*', sourcePortRange: '*', destinationPortRange: '53', sourceAddressPrefix: '*', destinationAddressPrefix: 'AzurePlatformDNS' } }
-      { name: 'managed-identity', properties: { priority: 120, direction: 'Outbound', access: 'Allow', protocol: 'Tcp', sourcePortRange: '*', destinationPortRange: '80', sourceAddressPrefix: '*', destinationAddressPrefix: 'AzurePlatformIMDS' } }
+      // Azure DNS and IMDS bypass NSGs by default; their platform tags support Deny only.
+      // Keep those defaults: https://learn.microsoft.com/azure/virtual-network/network-security-groups-overview#azure-platform-considerations
       // Signed apt metadata/packages, Vault GET, and encrypted Tailscale control/DERP.
       { name: 'bootstrap-and-tailnet-https', properties: { priority: 130, direction: 'Outbound', access: 'Allow', protocol: 'Tcp', sourcePortRange: '*', destinationPortRanges: ['80', '443'], sourceAddressPrefix: '*', destinationAddressPrefix: 'Internet' } }
       { name: 'tailnet-stun', properties: { priority: 140, direction: 'Outbound', access: 'Allow', protocol: 'Udp', sourcePortRange: '*', destinationPortRanges: ['3478', '41641'], sourceAddressPrefix: '*', destinationAddressPrefix: 'Internet' } }
