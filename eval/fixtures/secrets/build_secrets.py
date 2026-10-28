@@ -21,7 +21,7 @@ fields after a password key as a hard negative.
 Known miss, not in the JSONL: a *literal* quoted password that contains a ``{word}`` group
 (``password="Fake{0000}pw"``) is read as a format field and left unmasked, the same as
 ``"{password}"``. The suite's leak limit is 0.0 (``eval/gates.json``), so the case is
-documented here and tracked as a follow-up rather than added as a failing document.
+documented here and tracked as a follow-up (LAB-1383) rather than added as a failing document.
 
 Regenerate after editing (a test fails if the committed file is stale)::
 
