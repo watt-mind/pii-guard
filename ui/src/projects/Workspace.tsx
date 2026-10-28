@@ -23,7 +23,7 @@ export function Workspace({ call = request, hosted = false, projectId, onProject
       if (!active) return;
       setProjects(data.projects);
       const project = data.projects.find((p) => p.id === projectId) ?? data.projects.find((p) => p.id === data.default_project_id) ?? data.projects[0];
-      if (project) { setSelected(project.id); onProject?.(project); }
+      if (project) { setSelected(project.id); if (project.id !== projectId) onProject?.(project); }
       setError("");
     }).catch((e: unknown) => { if (active) setError(recovery(e)); });
     return () => { active = false; };
