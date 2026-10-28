@@ -42,7 +42,7 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
             <SideIcon side={side} />
             {eyebrow}
           </p>
-          <h2 id={headingId} className="mt-0.5 text-base font-semibold tracking-tight text-balance text-ink">
+          <h2 id={headingId} className="mt-0.5 text-lg font-normal text-balance text-ink">
             {title}
           </h2>
         </div>

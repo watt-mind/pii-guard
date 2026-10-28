@@ -60,7 +60,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
   return (
     <div className="space-y-6">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Overview</h1>
+        <h1 className="text-2xl font-medium text-balance text-ink">Overview</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
           pii-guard masks personal data before a request reaches the model and puts it back in the answer. This page counts what it protected: every call through the
           gateway, from its traffic log. Values never appear here, only their types and counts.
@@ -106,7 +106,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
       {!empty && (
         <section aria-labelledby="latency-title" className="space-y-4">
           <div>
-            <h2 id="latency-title" className="text-lg font-semibold tracking-tight text-ink">
+            <h2 id="latency-title" className="text-lg font-normal text-ink">
               Latency, live
             </h2>
             <p className="text-sm text-muted">From the timing block of each call: the overhead is the call's total time minus the time spent waiting on the model.</p>
@@ -143,7 +143,7 @@ function ScopeNote({ t, forced, since }: { t: TrafficHandle; forced: boolean; si
     return (
       <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
         <p className="min-w-0 flex-1">
-          <strong className="font-semibold text-warn">Recorded demo traffic, not your server.</strong>{" "}
+          <strong className="font-medium text-warn">Recorded demo traffic, not your server.</strong>{" "}
           {forced
             ? "The engine is set to Demo engine, so these numbers count calls recorded from the demo stack, replayed in your browser."
             : t.apiStatus.state === "disabled"
@@ -183,7 +183,7 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
           : "Nothing has gone through the gateway yet.";
   return (
     <section aria-labelledby="empty-title" className="rounded-xl border border-line bg-surface px-5 py-8 sm:px-8">
-      <h2 id="empty-title" className="text-lg font-semibold tracking-tight text-ink">
+      <h2 id="empty-title" className="text-lg font-normal text-ink">
         {title}
       </h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
@@ -203,7 +203,7 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
         )}
       </p>
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <a href="#connect" className="inline-flex h-9 items-center justify-center rounded-lg bg-ink px-3.5 text-sm font-medium text-canvas transition-colors hover:bg-ink/85">
+        <a href="#connect" className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3 text-sm text-on-primary transition-colors hover:bg-primary-hover">
           Connect a client
         </a>
         <a href="#playground/text" className="inline-flex h-9 items-center justify-center rounded-lg border border-line px-3.5 text-sm font-medium text-ink transition-colors hover:border-line-strong">
@@ -235,7 +235,7 @@ function Panel({ title, note, children }: { title: string; note: string; childre
   const id = `panel-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
   return (
     <section aria-labelledby={id} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <h2 id={id} className="text-base font-semibold tracking-tight text-ink">
+      <h2 id={id} className="text-lg font-normal text-ink">
         {title}
       </h2>
       <p className="mt-0.5 mb-4 text-sm text-muted">{note}</p>
@@ -370,7 +370,7 @@ function Detectors({ server, status }: { server: ServerStatus | null; status: Se
       </dl>
       {!server.ner.available && (
         <p role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-ink">
-          <span className="font-semibold text-warn">Rules only: free-text names are not masked.</span> Names need <NerHint />.
+          <span className="font-medium text-warn">Rules only: free-text names are not masked.</span> Names need <NerHint />.
         </p>
       )}
     </div>

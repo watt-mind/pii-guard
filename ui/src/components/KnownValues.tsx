@@ -76,7 +76,7 @@ export function KnownValues({ rows, onRows, counts, error, onTry, found }: Props
                       id={`${base}-t${r.id}`}
                       value={r.entity_type}
                       onChange={(e) => set(r.id, { entity_type: e.target.value as TextEntityType })}
-                      className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+                      className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink"
                     >
                       {TEXT_ENTITY_TYPES.map((t) => (
                         <option key={t} value={t}>

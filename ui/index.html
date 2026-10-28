@@ -6,13 +6,13 @@
     <meta name="description" content="pii-guard demo: what the model saw vs what you got back." />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>pii-guard · demo</title>
+    <title>pii-guard · privacy firewall for AI agents</title>
     <script>
       // Apply the theme before first paint so dark mode doesn't flash.
       (function () {
-        var pref = "system";
+        var pref = "light";
         try {
-          pref = localStorage.getItem("pii-guard:theme") || "system";
+          pref = localStorage.getItem("pii-guard:theme") || "light";
         } catch (e) {}
         var dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.classList.toggle("dark", dark);

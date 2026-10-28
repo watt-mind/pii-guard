@@ -4,6 +4,7 @@ import { engineReason } from "./api/engine";
 import { createHttpClient, type HttpGuardClient } from "./api/http";
 import { MOCK_SESSION_PREFIX, createMockClient } from "./api/mock";
 import type { GuardClient } from "./api/types";
+import type { ServerStatus } from "./api/status";
 import { Sidebar } from "./components/Sidebar";
 import { DEFAULT_SAMPLE, SAMPLES, sampleBehind, type Sample } from "./content/samples";
 import type { BenchmarkLoader } from "./api/benchmarks";
@@ -12,7 +13,7 @@ import { useServerStatus, type StatusLoader } from "./hooks/useServerStatus";
 import { useTheme } from "./hooks/useTheme";
 import { useTraffic } from "./hooks/useTraffic";
 import { initialAnswer, runGuard, toRunError, type RunError, type RunResult } from "./lib/run";
-import { PLAYGROUND_TABS, hashOf, parseHash, routeFromLocation, sameRoute, type PlaygroundTab, type Route, type Section } from "./lib/routes";
+import { PLAYGROUND_TABS, SECTIONS, hashOf, parseHash, routeFromLocation, sameRoute, type PlaygroundTab, type Route, type Section } from "./lib/routes";
 import { Playground } from "./screens/Playground";
 import { Benchmarks } from "./screens/Benchmarks";
 import { Connect } from "./screens/Connect";
@@ -154,11 +155,13 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
   };
 
   const chatClient = engine.engine === "api" ? apiChat : mockChat;
+  // Nobody chose the demo engine and the API does not answer: the notice turns red.
+  const apiDown = engine.engine === "mock" && engine.state.preference !== "mock" && engine.state.status.state === "offline";
   const section = route.section;
   const tab = route.tab;
 
   return (
-    <div className="min-h-dvh bg-canvas text-ink lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
+    <div className="min-h-dvh bg-canvas text-ink lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)]">
       <Sidebar
         route={route}
         onSection={openSection}
@@ -168,13 +171,15 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
         onRecheck={engine.recheck}
         theme={theme}
         onTheme={setTheme}
+        statusDetail={server ? statusDetailOf(server) : null}
       />
 
       <div className="min-w-0">
+        <PageHeader route={route} />
         {engine.engine === "mock" && (
-          <div role="status" className="border-b border-warn/30 bg-warn-soft">
+          <div role="status" className={apiDown ? "border-b border-danger/30 bg-danger-soft" : "border-b border-warn/30 bg-warn-soft"}>
             <p className="mx-auto max-w-[1280px] px-4 py-2 text-xs text-ink sm:px-6 sm:text-sm">
-              <strong className="font-semibold text-warn">Demo mode.</strong> {engineReason(engine.state)}.{" "}
+              {apiDown ? <strong className="font-medium text-danger">API not reachable.</strong> : <strong className="font-medium text-warn">Demo mode.</strong>} {engineReason(engine.state)}.{" "}
               {section === "playground" && tab === "images"
                 ? "Images replay regions recorded from a real SAM 3.1 run on the built-in samples; uploads need the API."
                 : section === "evaluation"
@@ -230,7 +235,7 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
                     type="button"
                     aria-pressed={textView === id}
                     onClick={() => setTextView(id)}
-                    className={["rounded-md px-3 py-1.5 font-medium", textView === id ? "bg-ink text-canvas" : "text-muted hover:text-ink"].join(" ")}
+                    className={["rounded-md px-3 py-1.5 font-medium", textView === id ? "bg-primary text-on-primary" : "text-muted hover:text-ink"].join(" ")}
                   >
                     {label}
                   </button>
@@ -310,6 +315,35 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
         </footer>
       </div>
     </div>
+  );
+}
+
+/** The status tooltip's detail: "fast mode · rules+ner". */
+function statusDetailOf(s: ServerStatus): string {
+  const mode = s.gateway.modes[s.gateway.default_mode as keyof ServerStatus["gateway"]["modes"]];
+  return [`${s.gateway.default_mode} mode`, mode?.detectors.join("+")].filter(Boolean).join(" · ");
+}
+
+/** The bar above every section: where you are, over the accent hairline. Below 1024 px the
+ *  menu's top bar names the section, so only the hairline shows. */
+function PageHeader({ route }: { route: Route }) {
+  const section = SECTIONS.find((s) => s.id === route.section)!;
+  const tab = route.section === "playground" ? PLAYGROUND_TABS.find((t) => t.id === route.tab) : undefined;
+  return (
+    <header>
+      <p className="hidden h-12 items-center gap-2 px-6 text-base text-ink lg:flex">
+        <span>{section.label}</span>
+        {tab && (
+          <>
+            <span aria-hidden="true" className="text-faint">
+              /
+            </span>
+            <span className="text-muted">{tab.label}</span>
+          </>
+        )}
+      </p>
+      <div aria-hidden="true" className="header-hairline" />
+    </header>
   );
 }
 

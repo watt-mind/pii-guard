@@ -189,7 +189,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-3xl">
-          <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">
+          <h1 className="text-2xl font-medium text-balance text-ink">
             Chat through the gateway. The model only ever sees placeholders.
           </h1>
           <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
@@ -202,20 +202,20 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
       <>
           {client.kind === "mock" && (
             <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
-              <strong className="font-semibold text-warn">Simulated model.</strong> The demo engine masks in your browser and a scripted
+              <strong className="font-medium text-warn">Simulated model.</strong> The demo engine masks in your browser and a scripted
               reply stands in for the LLM.{" "}
               {live ? "Switch the engine to Auto or Live API to chat with the real model." : "Start the API with an upstream model to chat for real."}
             </p>
           )}
           {client.kind === "api" && ner === false && (
             <p role="note" data-testid="rules-only-note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
-              <strong className="font-semibold text-warn">Names are not detected.</strong> This server runs fast mode with the rules only, so e-mail addresses, phone numbers,
+              <strong className="font-medium text-warn">Names are not detected.</strong> This server runs fast mode with the rules only, so e-mail addresses, phone numbers,
               IBANs and IDs are masked but free-text names reach the model as written. Names need <NerHint />.
             </p>
           )}
           {client.kind === "api" && mockUpstream && (
             <p role="note" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
-              <strong className="font-semibold">Mock upstream.</strong> The server's model is the offline mock: it answers by echoing the masked text it received, whatever model
+              <strong className="font-medium">Mock upstream.</strong> The server's model is the offline mock: it answers by echoing the masked text it received, whatever model
               is named. Start pii-guard with <code className="font-mono text-xs">--upstream-url</code> for a real one.
             </p>
           )}
@@ -233,7 +233,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
           <section ref={conversationRef} tabIndex={-1} aria-label="Conversation" className="space-y-5 focus:outline-none">
             {turns.length === 0 && (
               <div className="rounded-xl border border-line px-6 py-8 text-center">
-                <p className="text-sm font-semibold text-ink">No messages yet</p>
+                <p className="text-sm font-medium text-ink">No messages yet</p>
                 <p className="mx-auto mt-1 max-w-md text-sm text-muted">
                   Send the sample below, or write your own (fictional data only). You will see the message as the model received it, its
                   raw answer, and the answer with the real values put back.
@@ -500,7 +500,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
         rows={4}
         spellCheck={false}
         placeholder="Write a message with some (fictional) personal data in it…"
-        className="doc block w-full resize-y rounded-lg border border-line bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-line-strong"
+        className="doc block w-full resize-y rounded-lg border border-field bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-ink"
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div role="radiogroup" aria-label="Detection mode" className="flex rounded-lg border border-line bg-surface-2 p-0.5 text-sm">
@@ -512,7 +512,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
               aria-checked={mode === m.id}
               title={m.hint}
               onClick={() => onMode(m.id)}
-              className={["rounded-md px-3 py-1.5 font-medium", mode === m.id ? "bg-ink text-canvas" : "text-muted hover:text-ink"].join(" ")}
+              className={["rounded-md px-3 py-1.5 font-medium", mode === m.id ? "bg-primary text-on-primary" : "text-muted hover:text-ink"].join(" ")}
             >
               {m.label}
             </button>
@@ -523,7 +523,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
           <select
             value={language}
             onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
-            className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
+            className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink"
           >
             <option value="hu">Hungarian</option>
             <option value="en">English</option>
@@ -547,7 +547,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
         </div>
       </div>
       <p className="text-xs text-muted">
-        <span className="font-semibold text-ink">{mock ? "Demo engine" : `${MODES.find((m) => m.id === mode)!.label} mode`}:</span> {modeHint}{" "}
+        <span className="font-medium text-ink">{mock ? "Demo engine" : `${MODES.find((m) => m.id === mode)!.label} mode`}:</span> {modeHint}{" "}
         <kbd className="rounded border border-line px-1 font-mono text-2xs">⌘/Ctrl ↵</kbd> sends.
       </p>
       <details className="text-xs text-muted">
@@ -568,7 +568,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
                   id="chat-model"
                   value={model}
                   onChange={(e) => onModel(e.target.value)}
-                  className="h-7 w-full max-w-sm rounded border border-line bg-surface-2 px-2 font-mono text-xs text-ink"
+                  className="h-7 w-full max-w-sm rounded border border-field bg-surface-2 px-2 font-mono text-xs text-ink"
                 />
               </>
             )}

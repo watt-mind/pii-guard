@@ -25,7 +25,7 @@ will do it without a clone: `uvx --from wattmind-pii-guard pii-guard up`.
 [More ways to run it](#try-it).
 
 <p align="center">
-  <img src="docs/assets/demo/demo.webp" alt="Demo of the console in the dark theme with fictional English data: the Overview counts real gateway calls, a support e-mail is masked in the Playground, the same session continues in Chat and comes back restored, Logs shows each call, and Connect gives the commands for a client" width="100%">
+  <img src="docs/assets/demo/demo.webp" alt="Demo of the console in the light theme with fictional English data: the Overview counts real gateway calls, a support e-mail is masked in the Playground, the same session continues in Chat and comes back restored, Logs shows each call, and Connect gives the commands for a client" width="100%">
 </p>
 
 <p align="center"><sub>Recorded from <code>pii-guard up</code> in fast mode (rules only, no NER, so free-text names pass); the offline mock upstream echoes the masked text back (with a key, the same flow runs on Muse Spark). <b>▶ Video walkthrough:</b> <i>link coming with the submission</i><!-- LAB-1123: video link --></sub></p>

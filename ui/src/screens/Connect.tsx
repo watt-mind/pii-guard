@@ -37,7 +37,7 @@ export function Connect({ status }: ConnectProps) {
   return (
     <div className="space-y-6">
       <div className="max-w-3xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance text-ink sm:text-3xl">Connect</h1>
+        <h1 className="text-2xl font-medium text-balance text-ink">Connect</h1>
         <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
           Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back
           restored.
@@ -167,7 +167,7 @@ function ClientSteps({ client, gateway, server }: { client: ClientId; gateway: s
   if (client === "claude-code") {
     return (
       <div role="note" className="space-y-3 text-sm">
-        <p className="font-semibold text-ink">Claude Code can't go through pii-guard yet.</p>
+        <p className="font-medium text-ink">Claude Code can't go through pii-guard yet.</p>
         <p className="text-ink">
           Claude Code speaks the Anthropic Messages API ({mono("POST /v1/messages")}). The gateway serves the OpenAI APIs ({mono("/chat/completions")} and{" "}
           {mono("/responses")}), so pointing {mono("ANTHROPIC_BASE_URL")} at it would fail every request rather than mask it.
@@ -227,7 +227,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
         {n}
       </span>
       <div className="min-w-0 space-y-2">
-        <h2 className="pt-1 text-sm font-semibold text-ink">
+        <h2 className="pt-1 text-sm font-medium text-ink">
           <span className="sr-only">Step {n}: </span>
           {title}
         </h2>

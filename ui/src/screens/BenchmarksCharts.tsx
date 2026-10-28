@@ -68,7 +68,7 @@ function niceMax(v: number): number {
 }
 
 function textWidth(text: string, size = FONT): number {
-  return text.length * size * 0.6; // semibold Instrument Sans averages about 0.58 em
+  return text.length * size * 0.6; // Geist at weight 500 averages about 0.57 em; 0.6 leaves a margin
 }
 
 interface Box {
@@ -444,7 +444,7 @@ export function TypeHeatmap({
         <caption className="sr-only">Overlap recall per entity type and system</caption>
         <thead>
           <tr>
-            <th scope="col" className="sticky left-0 z-10 bg-surface px-2 py-1 text-left font-semibold text-faint">
+            <th scope="col" className="sticky left-0 z-10 bg-surface px-2 py-1 text-left font-medium text-faint">
               Type
             </th>
             {cols.map(({ s }) => (
@@ -472,8 +472,9 @@ export function TypeHeatmap({
                         v === null
                           ? undefined
                           : {
-                              background: `color-mix(in oklab, var(--series-1) ${Math.round(v * 92 + 4)}%, var(--surface))`,
-                              color: v > 0.55 ? "var(--surface)" : "var(--ink)",
+                              // --heat is tuned so ink text keeps 4.5:1 on every step of the ramp.
+                              background: `color-mix(in oklab, var(--heat) ${Math.round(v * 92 + 4)}%, var(--surface))`,
+                              color: "var(--ink)",
                             }
                       }
                     >

@@ -129,7 +129,7 @@ function Figure({ label, value, strong, testId }: { label: string; value: string
   return (
     <div className="flex flex-col-reverse">
       <dt className="mt-0.5 text-2xs text-muted">{label}</dt>
-      <dd data-testid={testId} className={["text-lg leading-none font-semibold tabular-nums", strong ? "text-guard" : "text-ink"].join(" ")}>
+      <dd data-testid={testId} className={["text-lg leading-none font-medium tabular-nums", strong ? "text-guard" : "text-ink"].join(" ")}>
         {value}
       </dd>
     </div>
@@ -222,10 +222,10 @@ export function OverheadChart({ events }: { events: TrafficEvent[] }) {
       {h && hover !== null && (
         <div
           role="presentation"
-          className="pointer-events-none absolute top-0 z-10 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs"
+          className="pointer-events-none absolute top-0 z-10 rounded-lg border border-field bg-surface px-2.5 py-1.5 text-xs"
           style={{ left: Math.min(Math.max(sx(hover) - 70, 0), width - 150) }}
         >
-          <p className="font-semibold text-ink tabular-nums">This call {formatMsShort(h.overhead)}</p>
+          <p className="font-medium text-ink tabular-nums">This call {formatMsShort(h.overhead)}</p>
           <p className="text-muted tabular-nums">
             p50 {formatMsShort(h.p50)} · p95 {formatMsShort(h.p95)}
           </p>

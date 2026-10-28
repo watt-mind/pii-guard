@@ -24,6 +24,9 @@ describe("App in demo mode", () => {
     expect(await screen.findByText("Demo mode", { selector: "span" })).toBeInTheDocument();
     expect(await screen.findByText(/API is not reachable, using the demo engine/)).toBeInTheDocument();
     expect(screen.getByText("API offline")).toBeInTheDocument();
+    // Nobody chose the demo engine, so the notice above the content escalates.
+    expect(screen.getByText("API not reachable.")).toBeInTheDocument();
+    expect(screen.queryByText("Demo mode.")).toBeNull();
   });
 
   it("masks a sample, then restores the simulated answer on the round-trip screen", async () => {
@@ -118,6 +121,10 @@ describe("App against a live API", () => {
     const user = userEvent.setup();
     render(<App api={liveApi()} mock={createMockClient()} />);
     expect(await screen.findByText("API up", { selector: "span" })).toBeInTheDocument();
+    // A quiet footer line: the version, with the state in the tooltip and for screen readers.
+    expect(screen.getByText("v0.1.0")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /^API up\./ })).toBeInTheDocument();
+    expect(screen.queryByText("API not reachable.")).toBeNull();
     await user.click(screen.getByRole("button", { name: /mask document/i }));
     const note = await screen.findByTestId("scope-note");
     expect(note).toHaveTextContent(/\d+ values masked by /);
