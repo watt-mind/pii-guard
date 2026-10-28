@@ -6,7 +6,9 @@ Order of operations (fail closed at every step, ADR 0006):
    mask (remote image URLs, audio, files)?
 2. detect every text (cache first; misses run concurrently, under one per-request timeout),
    then add the session's pre-loaded known values (:mod:`pii_guard.detect.known`), which win
-   their conflicts and are masked even for a ``keep`` type (a ``block`` type still refuses);
+   their conflicts and are masked even for a ``keep`` type (a ``block`` type still refuses),
+   and drop the detections that are exactly a tool name the request declares
+   (:func:`~pii_guard.gateway.tool_names.without_tool_names`, LAB-1317);
 3. widen a name detected only in part to a full name known from this request or the session
    (:func:`~pii_guard.detect.known.widen_request`: ``1,Jane Placeholder`` with only the surname
    detected becomes one span), then
@@ -65,6 +67,7 @@ from pii_guard.gateway.sessions import (
     resolve_session,
 )
 from pii_guard.gateway.stream import DONE, SseRestorer, error_event, iter_sse_data, sse_event
+from pii_guard.gateway.tool_names import tool_names, without_tool_names
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
@@ -740,6 +743,9 @@ class Gateway:
         try:
             with timer.span("detect"):
                 spans = await self._detect_all(collected.slots, detector, session, language, stats)
+                spans = without_tool_names(
+                    [slot.text for slot in collected.slots], spans, tool_names(body)
+                )
             # Every older entry has scanned every text by the end of _mask: an image's remask
             # needs only the entries this request added (LAB-1278).
             generation = session.generation

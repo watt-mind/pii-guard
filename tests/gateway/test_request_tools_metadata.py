@@ -17,6 +17,7 @@ from gateway_helpers import (
     EMAILS,
     NAMES,
     UPSTREAM_KEY,
+    FakeLlm,
     MockUpstream,
     chunk,
     completion,
@@ -24,6 +25,7 @@ from gateway_helpers import (
 )
 
 from pii_guard.gateway.request import collect_texts
+from pii_guard.gateway.tool_names import tool_names
 from pii_guard.vault import PLACEHOLDER_RE
 
 PERSON, OTHER, THIRD = NAMES[0], NAMES[1], NAMES[3]  # Teszt Elek, Minta Mária, Jane Placeholder
@@ -314,3 +316,74 @@ def test_flat_tool_definition_is_masked() -> None:
     assert forwarded["type"] == "function"
     assert forwarded["name"] == "send_letter"
     assert_masked_schema(forwarded["parameters"])
+
+
+# --- a declared tool name is vocabulary, not personal data (LAB-1317) ---------------------
+
+
+def muse_chat(content: str) -> dict[str, Any]:
+    """A coding agent's turn: tools named after the product, one call in the history."""
+    call = {"id": "call_1", "type": "function", "function": {"name": "muse", "arguments": "{}"}}
+    return {
+        "model": "m",
+        "messages": [
+            {"role": "system", "content": content},
+            {"role": "user", "content": f"Írj levelet {PERSON} nevében."},
+            {"role": "assistant", "content": None, "tool_calls": [call]},
+            {"role": "tool", "tool_call_id": "call_1", "content": "ok"},
+        ],
+        "tools": [tool(name="muse"), tool(name="write_file")],
+    }
+
+
+def test_a_tool_name_read_as_a_name_does_not_refuse_the_chat_request() -> None:
+    """The NER reads "Muse" in the system prompt as a PERSON; without the filter the vault
+    masks ``muse`` in ``tools[].function.name`` and ``tool_calls[].function.name`` as another
+    occurrence and the request is refused (parity with LAB-1299). Real names stay masked."""
+    upstream = MockUpstream()
+    app = make_app(upstream, llm=FakeLlm((*NAMES, "Muse", "Write_File")))
+    with TestClient(app) as http:
+        response = http.post(
+            "/v1/chat/completions", json=muse_chat("You are Muse, a coding agent.")
+        )
+    assert response.status_code == 200, response.text
+    forwarded = upstream.bodies[0]
+    assert [t["function"]["name"] for t in forwarded["tools"]] == ["muse", "write_file"]
+    assert forwarded["messages"][2]["tool_calls"][0]["function"]["name"] == "muse"
+    assert forwarded["messages"][0]["content"] == "You are Muse, a coding agent."
+    assert PLACEHOLDER_RE.search(forwarded["messages"][1]["content"])
+    assert_no_values(upstream.requests[0].content)
+
+
+def test_a_preloaded_known_value_equal_to_a_tool_name_is_still_masked() -> None:
+    """The operator's ``known`` values win: "Muse" stays personal data, so the identifier it
+    would rewrite fails closed instead of going upstream unmasked."""
+    upstream = MockUpstream()
+    app = make_app(upstream, llm=FakeLlm(NAMES))
+    with TestClient(app) as http:
+        created = http.post(
+            "/v1/sessions", json={"known_values": [{"value": "Muse", "entity_type": "PERSON"}]}
+        )
+        assert created.status_code == 201, created.text
+        response = http.post(
+            "/v1/chat/completions",
+            json=muse_chat("You are Muse, a coding agent."),
+            headers={"X-PII-Guard-Session": created.json()["session_id"]},
+        )
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "unsupported_content"
+    assert upstream.requests == []
+
+
+def test_chat_tool_names() -> None:
+    body = {
+        "tools": [
+            tool(name="send_letter"),
+            {"type": "function", "name": "Flat_Tool", "parameters": {}},
+            {"type": "custom", "custom": {"name": "grep"}},
+            tool(name=PERSON),  # not identifier-shaped: no exemption, still refused
+        ],
+        "functions": [{"name": "legacy_fn", "parameters": {}}, "not an object"],
+    }
+    assert tool_names(body) == frozenset({"send_letter", "flat_tool", "grep", "legacy_fn"})
+    assert tool_names({"functions": "not a list"}) == frozenset()
