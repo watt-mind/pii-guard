@@ -653,6 +653,16 @@ response carries `X-PII-Guard-Session` (the id used, including a derived `d_…`
 `X-PII-Guard-Session-Source`; the traffic record has `session_source` next to `session_ref`.
 Steps 2-4 go through `Vault.session_or_create` and its `PII_GUARD_VAULT_MAX_ENTRIES` cap.
 
+Lifetime of a session a refused call created (LAB-1316): a call holds its session from
+resolving it until masking finished or failed. When the call that created the session is
+refused, the session is dropped only once no other call holds it and no call on it finished
+masking; the last holder to leave does the drop. So a refused call never turns a concurrent
+call on the same session (Muse Code sends its main turn and reminder observers together) into
+`404 not_found`, and with nobody succeeding the refused call's values are still forgotten
+(fail closed). Once any call on the session finished masking, the session stays, including
+the entries the refused call added. A refused call never drops a session it did not create
+(as before), and a lone refused call still drops the one it created.
+
 ## Gateway request fields (implemented)
 
 `POST /v1/chat/completions` walks the whole body against an allow-list

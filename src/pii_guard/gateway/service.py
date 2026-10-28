@@ -35,6 +35,7 @@ import base64
 import json
 import logging
 import re
+import threading
 import time
 from collections import Counter
 from collections.abc import AsyncIterator, Mapping
@@ -241,6 +242,17 @@ def image_annotation(number: int, outcome: ImageMaskOutcome) -> str:
     return "\n".join(lines)
 
 
+@dataclass
+class _SessionHold:
+    """The requests between resolving a session and finishing masking into it (LAB-1316)."""
+
+    in_flight: int = 0
+    #: A request on the session finished masking: its placeholders are in use, keep it.
+    kept: bool = False
+    #: The request that created the session was refused.
+    refused_creator: bool = False
+
+
 class Gateway:
     """One per app. Everything is injectable for tests: detectors, cache, upstream transport."""
 
@@ -281,6 +293,10 @@ class Gateway:
         self._image_workers = image_workers
         self._sam = sam
         self._ocr = ocr
+        # Session id -> the requests masking into it now (LAB-1316): a refused request drops
+        # the session it created only once no other request holds it and none succeeded.
+        self._session_holds: dict[str, _SessionHold] = {}
+        self._holds_lock = threading.Lock()
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
@@ -385,12 +401,44 @@ class Gateway:
         trace: CallTrace,
     ) -> tuple[VaultSession, bool]:
         """The request's vault session: header, URL path, ``prompt_cache_key``, default
-        (:mod:`pii_guard.gateway.sessions`). Recorded on ``stats`` and ``trace``."""
-        session, created, source = resolve_session(self.vault, headers, body, path_session)
+        (:mod:`pii_guard.gateway.sessions`). Recorded on ``stats`` and ``trace``.
+
+        The request holds the session until :meth:`_release_session`, which every caller
+        must call once masking finished or failed."""
+        with self._holds_lock:
+            session, created, source = resolve_session(self.vault, headers, body, path_session)
+            hold = self._session_holds.setdefault(session.session_id, _SessionHold())
+            hold.in_flight += 1
         stats.session_source = source
         trace.session_id, trace.session_new = session.session_id, created
         trace.session_source = source.value
         return session, created
+
+    def _release_session(self, session: VaultSession, created: bool, *, masked: bool) -> None:
+        """End the hold :meth:`_session` took, once masking finished (``masked``) or failed.
+
+        A refused request used to drop the session it created at once, under any concurrent
+        request that had already resolved the same client-named id (404 for that one,
+        LAB-1316). Now the drop waits for the last holder: the session is dropped only if its
+        creator was refused, nobody holds it any more and no request on it finished masking.
+        Fail closed: with nobody succeeding, a refused request's values are forgotten; once a
+        request succeeded, its placeholders are in use and the session stays.
+        """
+        session_id = session.session_id
+        with self._holds_lock:
+            hold = self._session_holds[session_id]
+            hold.in_flight -= 1
+            if masked:
+                hold.kept = True
+            elif created:
+                hold.refused_creator = True
+            if hold.in_flight > 0:
+                return
+            del self._session_holds[session_id]
+            if not hold.refused_creator or hold.kept:
+                return
+            self.vault.drop(session_id)
+            self.cache.drop_session(session_id)
 
     def _upstream_url(self) -> str:
         base = self.settings.upstream_base_url
@@ -710,10 +758,9 @@ class Gateway:
             _count_masked(stats, before, session)
         except BaseException:
             stats.log("blocked")
-            if created:
-                self.vault.drop(session.session_id)
-                self.cache.drop_session(session.session_id)
+            self._release_session(session, created, masked=False)
             raise
+        self._release_session(session, created, masked=True)
 
         forwarding = time.perf_counter()
         payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
