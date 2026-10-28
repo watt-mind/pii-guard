@@ -236,9 +236,8 @@ class ResponsesGateway:
         try:
             with timer.span("detect"):
                 spans = await gw._detect_all(collected.slots, detector, session, language, stats)
-                spans = without_tool_names(
-                    [slot.text for slot in collected.slots], spans, tool_names(body)
-                )
+                names = tool_names(body)
+                spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
             # Inline images go through the chat path (LAB-1285): mask the texts, then the
             # images, then remask the texts with the values the images added (LAB-1278).
             generation = session.generation
@@ -252,7 +251,7 @@ class ResponsesGateway:
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                gw._write(collected.slots, masked, session, language, remask, since=generation)
+                gw._write(collected.slots, masked, session, language, remask, generation, names)
                 collected.finalize()
             _count_masked(stats, before, session)
         except BaseException:

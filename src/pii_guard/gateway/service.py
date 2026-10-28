@@ -8,7 +8,9 @@ Order of operations (fail closed at every step, ADR 0006):
    then add the session's pre-loaded known values (:mod:`pii_guard.detect.known`), which win
    their conflicts and are masked even for a ``keep`` type (a ``block`` type still refuses),
    and drop the detections that are exactly a tool name the request declares
-   (:func:`~pii_guard.gateway.tool_names.without_tool_names`, LAB-1317);
+   (:func:`~pii_guard.gateway.tool_names.without_tool_names`, LAB-1317); an identifier whose
+   only rewrites are those names is written back as sent, whatever the session holds
+   (:func:`~pii_guard.gateway.tool_names.identifier_keeps_tool_names`, LAB-1324);
 3. widen a name detected only in part to a full name known from this request or the session
    (:func:`~pii_guard.detect.known.widen_request`: ``1,Jane Placeholder`` with only the surname
    detected becomes one span), then
@@ -67,12 +69,16 @@ from pii_guard.gateway.sessions import (
     resolve_session,
 )
 from pii_guard.gateway.stream import DONE, SseRestorer, error_event, iter_sse_data, sse_event
-from pii_guard.gateway.tool_names import tool_names, without_tool_names
+from pii_guard.gateway.tool_names import (
+    identifier_keeps_tool_names,
+    tool_names,
+    without_tool_names,
+)
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PayloadTooLargeError, PiiGuardError, Span
-from pii_guard.vault import Vault, VaultSession
+from pii_guard.vault import Vault, VaultSession, normalize_value
 from pii_guard.vault.known import KnownValues
 from pii_guard.visual.masking import (
     ImageMasker,
@@ -592,16 +598,36 @@ class Gateway:
         language: str,
         remask: bool,
         since: int | None = None,
+        names: frozenset[str] = frozenset(),
     ) -> None:
         """Write ``masked`` back. With ``remask``, values first seen in an image are masked in
         the texts too; ``since`` (the session generation before the images) scans only the
-        entries the images added (LAB-1278)."""
+        entries the images added (LAB-1278).
+
+        ``names``: the tool names the request declares. An identifier whose only rewrites are
+        those names is written as sent, whatever the session holds (LAB-1324); a declared name
+        that is also a pre-loaded known value gets no exemption and still fails closed."""
         if remask:
             masked = [
                 session.mask(text, [], language=language, remask=True, since=since)
                 for text in masked
             ]
+        exempt = names
+        if names and session.known_values:
+            known = {normalize_value(v.value) for v in session.known_values.values()}
+            exempt = names - known
+
+        def original(placeholder: str) -> str | None:
+            value = session.unmask(placeholder)
+            return None if value == placeholder else value
+
         for slot, text in zip(slots, masked, strict=True):
+            if (
+                slot.kind == "identifier"
+                and text != slot.text
+                and identifier_keeps_tool_names(slot.text, text, exempt, original)
+            ):
+                text = slot.text
             slot.write(text)
 
     def _seed_cache(
@@ -743,9 +769,8 @@ class Gateway:
         try:
             with timer.span("detect"):
                 spans = await self._detect_all(collected.slots, detector, session, language, stats)
-                spans = without_tool_names(
-                    [slot.text for slot in collected.slots], spans, tool_names(body)
-                )
+                names = tool_names(body)
+                spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
             # Every older entry has scanned every text by the end of _mask: an image's remask
             # needs only the entries this request added (LAB-1278).
             generation = session.generation
@@ -759,7 +784,7 @@ class Gateway:
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                self._write(collected.slots, masked, session, language, remask, since=generation)
+                self._write(collected.slots, masked, session, language, remask, generation, names)
                 collected.finalize()
             _count_masked(stats, before, session)
         except BaseException:
