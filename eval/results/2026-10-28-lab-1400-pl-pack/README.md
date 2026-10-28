@@ -6,9 +6,10 @@ Fast mode is rules + the published NER v2.0 (`watt-mind/pii-guard-ner-xlmr-base`
 in both. Run records:
 [before](../runs/2026-10-28-lab-1400-pl-pii-bench-before.json),
 [after](../runs/2026-10-28-lab-1400-pl-pii-bench-after.json),
-[rules only, after](../runs/2026-10-28-lab-1400-pl-pii-bench-rules.json),
-[pl-smoke rules](../runs/2026-10-28-lab-1400-pl-smoke-rules.json),
-[pl-smoke fast](../runs/2026-10-28-lab-1400-pl-smoke-fast.json).
+[rules only, after](../runs/2026-10-28-lab-1400-pl-pii-bench-rules.json). The pl-smoke
+scorecards are in this folder ([rules](pl-smoke-rules.json), [fast](pl-smoke-fast.json)), not in
+the run log: a run record there would add Polish to the headline `smoke` set, which no
+comparison tool has run on yet.
 
 ## Selection discipline
 

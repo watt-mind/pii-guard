@@ -10,8 +10,6 @@
 <text x="264.4" y="159" font-size="21" fill="#1B1B1F">en (10 docs)</text>
 <rect x="412.70000000000005" y="140" width="22" height="22" fill="#DDCC77"/>
 <text x="442.7" y="159" font-size="21" fill="#1B1B1F">hu (31 docs)</text>
-<rect x="591.0500000000001" y="140" width="22" height="22" fill="#CC6677"/>
-<text x="621.1" y="159" font-size="21" fill="#1B1B1F">pl (11 docs)</text>
 <text x="538.9" y="196" font-size="22" fill="#1B1B1F" font-weight="600">Overlap F1 (higher is better)</text>
 <line x1="538.9" y1="210" x2="538.9" y2="740" stroke="#E3E3E8" stroke-width="2"/>
 <text x="538.9" y="770" font-size="20" fill="#4A4A52" text-anchor="middle">0%</text>
@@ -36,113 +34,97 @@
 <text x="1520" y="770" font-size="20" fill="#4A4A52" text-anchor="middle">100%</text>
 <circle cx="66" cy="247.9" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
 <text x="84" y="255.9" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
-<rect x="538.9" y="219" width="299.9" height="11.4" fill="#332288"/>
-<text x="846.8" y="226.4" font-size="19" fill="#1B1B1F">68.8</text>
-<rect x="1084.5" y="219" width="188.3" height="11.4" fill="#332288"/>
-<text x="1280.8" y="226.4" font-size="19" fill="#1B1B1F">43.2</text>
-<rect x="538.9" y="234.4" width="278.7" height="11.4" fill="#44AA99"/>
-<text x="825.7" y="241.9" font-size="19" fill="#1B1B1F">64.0</text>
-<rect x="1084.5" y="234.4" width="203.3" height="11.4" fill="#44AA99"/>
-<text x="1295.7" y="241.9" font-size="19" fill="#1B1B1F">46.7</text>
-<rect x="538.9" y="249.9" width="315.1" height="11.4" fill="#DDCC77"/>
-<text x="862" y="257.3" font-size="19" fill="#1B1B1F">72.3</text>
-<rect x="1084.5" y="249.9" width="172.6" height="11.4" fill="#DDCC77"/>
-<text x="1265" y="257.3" font-size="19" fill="#1B1B1F">39.6</text>
-<rect x="538.9" y="265.3" width="310.2" height="11.4" fill="#CC6677"/>
-<text x="857.2" y="272.7" font-size="19" fill="#1B1B1F">71.2</text>
-<rect x="1084.5" y="265.3" width="172.2" height="11.4" fill="#CC6677"/>
-<text x="1264.6" y="272.7" font-size="19" fill="#1B1B1F">39.5</text>
+<rect x="538.9" y="219" width="299.9" height="16.6" fill="#332288"/>
+<text x="846.8" y="231.6" font-size="19" fill="#1B1B1F">68.8</text>
+<rect x="1084.5" y="219" width="188.3" height="16.6" fill="#332288"/>
+<text x="1280.8" y="231.6" font-size="19" fill="#1B1B1F">43.2</text>
+<rect x="538.9" y="239.6" width="278.7" height="16.6" fill="#44AA99"/>
+<text x="825.7" y="252.1" font-size="19" fill="#1B1B1F">64.0</text>
+<rect x="1084.5" y="239.6" width="203.3" height="16.6" fill="#44AA99"/>
+<text x="1295.7" y="252.1" font-size="19" fill="#1B1B1F">46.7</text>
+<rect x="538.9" y="260.1" width="315.1" height="16.6" fill="#DDCC77"/>
+<text x="862" y="272.7" font-size="19" fill="#1B1B1F">72.3</text>
+<rect x="1084.5" y="260.1" width="172.6" height="16.6" fill="#DDCC77"/>
+<text x="1265" y="272.7" font-size="19" fill="#1B1B1F">39.6</text>
 <circle cx="66" cy="323.6" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
 <text x="84" y="331.6" font-size="21" fill="#1B1B1F" font-weight="600">rules + ner (xlmr-large-distilled-glimmer)</text>
-<rect x="538.9" y="294.7" width="435.5" height="11.4" fill="#332288"/>
-<text x="982.5" y="302.1" font-size="19" fill="#1B1B1F">100.0</text>
-<rect x="1084.5" y="294.7" width="2" height="11.4" fill="#332288"/>
-<text x="1094.5" y="302.1" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="538.9" y="310.1" width="429" height="11.4" fill="#44AA99"/>
-<text x="976" y="317.6" font-size="19" fill="#1B1B1F">98.5</text>
-<rect x="1084.5" y="310.1" width="2" height="11.4" fill="#44AA99"/>
-<text x="1094.5" y="317.6" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="538.9" y="325.6" width="426.5" height="11.4" fill="#DDCC77"/>
-<text x="973.5" y="333" font-size="19" fill="#1B1B1F">97.9</text>
-<rect x="1084.5" y="325.6" width="4.1" height="11.4" fill="#DDCC77"/>
-<text x="1096.6" y="333" font-size="19" fill="#1B1B1F">0.9</text>
-<text x="544.9" y="349.4" font-size="18" fill="#4A4A52">no current run</text>
-<text x="1090.5" y="349.4" font-size="18" fill="#4A4A52">no current run</text>
+<rect x="538.9" y="294.7" width="435.5" height="16.6" fill="#332288"/>
+<text x="982.5" y="307.3" font-size="19" fill="#1B1B1F">100.0</text>
+<rect x="1084.5" y="294.7" width="2" height="16.6" fill="#332288"/>
+<text x="1094.5" y="307.3" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="538.9" y="315.3" width="429" height="16.6" fill="#44AA99"/>
+<text x="976" y="327.9" font-size="19" fill="#1B1B1F">98.5</text>
+<rect x="1084.5" y="315.3" width="2" height="16.6" fill="#44AA99"/>
+<text x="1094.5" y="327.9" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="538.9" y="335.9" width="426.5" height="16.6" fill="#DDCC77"/>
+<text x="973.5" y="348.4" font-size="19" fill="#1B1B1F">97.9</text>
+<rect x="1084.5" y="335.9" width="4.1" height="16.6" fill="#DDCC77"/>
+<text x="1096.6" y="348.4" font-size="19" fill="#1B1B1F">0.9</text>
 <circle cx="66" cy="399.3" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
 <text x="84" y="407.3" font-size="21" fill="#1B1B1F" font-weight="600">rules + Muse Spark Open (Baseten)</text>
-<text x="544.9" y="378.9" font-size="18" fill="#4A4A52">no current run</text>
-<text x="1090.5" y="378.9" font-size="18" fill="#4A4A52">no current run</text>
-<rect x="538.9" y="385.9" width="435.5" height="11.4" fill="#44AA99"/>
-<text x="982.5" y="393.3" font-size="19" fill="#1B1B1F">100.0</text>
-<rect x="1084.5" y="385.9" width="2" height="11.4" fill="#44AA99"/>
-<text x="1094.5" y="393.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="538.9" y="401.3" width="428.4" height="11.4" fill="#DDCC77"/>
-<text x="975.3" y="408.7" font-size="19" fill="#1B1B1F">98.4</text>
-<rect x="1084.5" y="401.3" width="4.1" height="11.4" fill="#DDCC77"/>
-<text x="1096.6" y="408.7" font-size="19" fill="#1B1B1F">0.9</text>
-<text x="544.9" y="425.1" font-size="18" fill="#4A4A52">no current run</text>
-<text x="1090.5" y="425.1" font-size="18" fill="#4A4A52">no current run</text>
+<text x="544.9" y="384" font-size="18" fill="#4A4A52">no current run</text>
+<text x="1090.5" y="384" font-size="18" fill="#4A4A52">no current run</text>
+<rect x="538.9" y="391" width="435.5" height="16.6" fill="#44AA99"/>
+<text x="982.5" y="403.6" font-size="19" fill="#1B1B1F">100.0</text>
+<rect x="1084.5" y="391" width="2" height="16.6" fill="#44AA99"/>
+<text x="1094.5" y="403.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="538.9" y="411.6" width="428.4" height="16.6" fill="#DDCC77"/>
+<text x="975.3" y="424.1" font-size="19" fill="#1B1B1F">98.4</text>
+<rect x="1084.5" y="411.6" width="4.1" height="16.6" fill="#DDCC77"/>
+<text x="1096.6" y="424.1" font-size="19" fill="#1B1B1F">0.9</text>
 <circle cx="66" cy="475" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
 <text x="84" y="483" font-size="21" fill="#1B1B1F" font-weight="600">rules + Muse Glimmer (low)</text>
-<text x="544.9" y="454.6" font-size="18" fill="#4A4A52">no current run</text>
-<text x="1090.5" y="454.6" font-size="18" fill="#4A4A52">no current run</text>
-<rect x="538.9" y="461.6" width="435.5" height="11.4" fill="#44AA99"/>
-<text x="982.5" y="469" font-size="19" fill="#1B1B1F">100.0</text>
-<rect x="1084.5" y="461.6" width="2" height="11.4" fill="#44AA99"/>
-<text x="1094.5" y="469" font-size="19" fill="#1B1B1F">0.0</text>
-<text x="544.9" y="485.4" font-size="18" fill="#4A4A52">no current run</text>
-<text x="1090.5" y="485.4" font-size="18" fill="#4A4A52">no current run</text>
+<text x="544.9" y="459.7" font-size="18" fill="#4A4A52">no current run</text>
+<text x="1090.5" y="459.7" font-size="18" fill="#4A4A52">no current run</text>
+<rect x="538.9" y="466.7" width="435.5" height="16.6" fill="#44AA99"/>
+<text x="982.5" y="479.3" font-size="19" fill="#1B1B1F">100.0</text>
+<rect x="1084.5" y="466.7" width="2" height="16.6" fill="#44AA99"/>
+<text x="1094.5" y="479.3" font-size="19" fill="#1B1B1F">0.0</text>
 <text x="544.9" y="500.9" font-size="18" fill="#4A4A52">no current run</text>
 <text x="1090.5" y="500.9" font-size="18" fill="#4A4A52">no current run</text>
 <rect x="58.4" y="543.1" width="15.3" height="15.3" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
 <text x="84" y="558.7" font-size="21" fill="#1B1B1F" font-weight="600">Presidio</text>
-<rect x="538.9" y="521.9" width="241.1" height="11.4" fill="#332288"/>
-<text x="788" y="529.3" font-size="19" fill="#1B1B1F">55.4</text>
-<rect x="1084.5" y="521.9" width="47.1" height="11.4" fill="#332288"/>
-<text x="1139.6" y="529.3" font-size="19" fill="#1B1B1F">10.8</text>
-<rect x="538.9" y="537.3" width="298" height="11.4" fill="#44AA99"/>
-<text x="844.9" y="544.7" font-size="19" fill="#1B1B1F">68.4</text>
-<rect x="1084.5" y="537.3" width="43.6" height="11.4" fill="#44AA99"/>
-<text x="1136" y="544.7" font-size="19" fill="#1B1B1F">10.0</text>
-<rect x="538.9" y="552.7" width="294.4" height="11.4" fill="#DDCC77"/>
-<text x="841.3" y="560.1" font-size="19" fill="#1B1B1F">67.6</text>
-<rect x="1084.5" y="552.7" width="143.8" height="11.4" fill="#DDCC77"/>
-<text x="1236.3" y="560.1" font-size="19" fill="#1B1B1F">33.0</text>
-<text x="544.9" y="576.6" font-size="18" fill="#4A4A52">no current run</text>
-<text x="1090.5" y="576.6" font-size="18" fill="#4A4A52">no current run</text>
+<rect x="538.9" y="521.9" width="241.1" height="16.6" fill="#332288"/>
+<text x="788" y="534.4" font-size="19" fill="#1B1B1F">55.4</text>
+<rect x="1084.5" y="521.9" width="47.1" height="16.6" fill="#332288"/>
+<text x="1139.6" y="534.4" font-size="19" fill="#1B1B1F">10.8</text>
+<rect x="538.9" y="542.4" width="298" height="16.6" fill="#44AA99"/>
+<text x="844.9" y="555" font-size="19" fill="#1B1B1F">68.4</text>
+<rect x="1084.5" y="542.4" width="43.6" height="16.6" fill="#44AA99"/>
+<text x="1136" y="555" font-size="19" fill="#1B1B1F">10.0</text>
+<rect x="538.9" y="563" width="294.4" height="16.6" fill="#DDCC77"/>
+<text x="841.3" y="575.6" font-size="19" fill="#1B1B1F">67.6</text>
+<rect x="1084.5" y="563" width="143.8" height="16.6" fill="#DDCC77"/>
+<text x="1236.3" y="575.6" font-size="19" fill="#1B1B1F">33.0</text>
 <polygon points="66,616.1 75.9,633.6 56.1,633.6" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
 <text x="84" y="634.4" font-size="21" fill="#1B1B1F" font-weight="600">LLM Guard</text>
-<rect x="538.9" y="597.6" width="287.5" height="11.4" fill="#332288"/>
-<text x="834.5" y="605" font-size="19" fill="#1B1B1F">66.0</text>
-<rect x="1084.5" y="597.6" width="188.3" height="11.4" fill="#332288"/>
-<text x="1280.8" y="605" font-size="19" fill="#1B1B1F">43.2</text>
-<rect x="538.9" y="613" width="332.6" height="11.4" fill="#44AA99"/>
-<text x="879.5" y="620.4" font-size="19" fill="#1B1B1F">76.4</text>
-<rect x="1084.5" y="613" width="130.7" height="11.4" fill="#44AA99"/>
-<text x="1223.1" y="620.4" font-size="19" fill="#1B1B1F">30.0</text>
-<rect x="538.9" y="628.4" width="203.3" height="11.4" fill="#DDCC77"/>
-<text x="750.2" y="635.9" font-size="19" fill="#1B1B1F">46.7</text>
-<rect x="1084.5" y="628.4" width="217.8" height="11.4" fill="#DDCC77"/>
-<text x="1310.2" y="635.9" font-size="19" fill="#1B1B1F">50.0</text>
-<text x="544.9" y="652.3" font-size="18" fill="#4A4A52">no current run</text>
-<text x="1090.5" y="652.3" font-size="18" fill="#4A4A52">no current run</text>
+<rect x="538.9" y="597.6" width="287.5" height="16.6" fill="#332288"/>
+<text x="834.5" y="610.1" font-size="19" fill="#1B1B1F">66.0</text>
+<rect x="1084.5" y="597.6" width="188.3" height="16.6" fill="#332288"/>
+<text x="1280.8" y="610.1" font-size="19" fill="#1B1B1F">43.2</text>
+<rect x="538.9" y="618.1" width="332.6" height="16.6" fill="#44AA99"/>
+<text x="879.5" y="630.7" font-size="19" fill="#1B1B1F">76.4</text>
+<rect x="1084.5" y="618.1" width="130.7" height="16.6" fill="#44AA99"/>
+<text x="1223.1" y="630.7" font-size="19" fill="#1B1B1F">30.0</text>
+<rect x="538.9" y="638.7" width="203.3" height="16.6" fill="#DDCC77"/>
+<text x="750.2" y="651.3" font-size="19" fill="#1B1B1F">46.7</text>
+<rect x="1084.5" y="638.7" width="217.8" height="16.6" fill="#DDCC77"/>
+<text x="1310.2" y="651.3" font-size="19" fill="#1B1B1F">50.0</text>
 <polygon points="66,690.9 77.2,702.1 66,713.4 54.8,702.1" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
 <text x="84" y="710.1" font-size="21" fill="#1B1B1F" font-weight="600">PrivAiTe</text>
-<rect x="538.9" y="673.3" width="287.6" height="11.4" fill="#332288"/>
-<text x="834.6" y="680.7" font-size="19" fill="#1B1B1F">66.0</text>
-<rect x="1084.5" y="673.3" width="35.3" height="11.4" fill="#332288"/>
-<text x="1127.8" y="680.7" font-size="19" fill="#1B1B1F">8.1</text>
-<rect x="538.9" y="688.7" width="325.9" height="11.4" fill="#44AA99"/>
-<text x="872.8" y="696.1" font-size="19" fill="#1B1B1F">74.8</text>
-<rect x="1084.5" y="688.7" width="2" height="11.4" fill="#44AA99"/>
-<text x="1094.5" y="696.1" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="538.9" y="704.1" width="202.3" height="11.4" fill="#DDCC77"/>
-<text x="749.2" y="711.6" font-size="19" fill="#1B1B1F">46.5</text>
-<rect x="1084.5" y="704.1" width="78" height="11.4" fill="#DDCC77"/>
-<text x="1170.5" y="711.6" font-size="19" fill="#1B1B1F">17.9</text>
-<text x="544.9" y="728" font-size="18" fill="#4A4A52">no current run</text>
-<text x="1090.5" y="728" font-size="18" fill="#4A4A52">no current run</text>
-<text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs + pl 11 docs). Bars: runs on the current fixture files only.</text>
+<rect x="538.9" y="673.3" width="287.6" height="16.6" fill="#332288"/>
+<text x="834.6" y="685.9" font-size="19" fill="#1B1B1F">66.0</text>
+<rect x="1084.5" y="673.3" width="35.3" height="16.6" fill="#332288"/>
+<text x="1127.8" y="685.9" font-size="19" fill="#1B1B1F">8.1</text>
+<rect x="538.9" y="693.9" width="325.9" height="16.6" fill="#44AA99"/>
+<text x="872.8" y="706.4" font-size="19" fill="#1B1B1F">74.8</text>
+<rect x="1084.5" y="693.9" width="2" height="16.6" fill="#44AA99"/>
+<text x="1094.5" y="706.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="538.9" y="714.4" width="202.3" height="16.6" fill="#DDCC77"/>
+<text x="749.2" y="727" font-size="19" fill="#1B1B1F">46.5</text>
+<rect x="1084.5" y="714.4" width="78" height="16.6" fill="#DDCC77"/>
+<text x="1170.5" y="727" font-size="19" fill="#1B1B1F">17.9</text>
+<text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs). Bars: runs on the current fixture files only.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">Full leak = labelled values of mask-policy types surviving masking in any surface form. F1 = span overlap match, micro.</text>
-<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-27 to 2026-10-28 · commits 752ff9a, 793ddf9, 8944f96, 9fad0fa, c759b54 · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-27 · commits 752ff9a, 8944f96, 9fad0fa, c759b54 · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>
