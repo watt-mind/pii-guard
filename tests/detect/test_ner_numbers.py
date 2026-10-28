@@ -6,6 +6,8 @@ fictional: order numbers, ids, phone numbers and amounts are made up (ADR 0005).
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from pii_guard.detect.ner import NerDetector, RawEntity
@@ -114,6 +116,54 @@ def test_csv_without_a_header_falls_back_to_the_line() -> None:
 def test_a_cue_on_another_line_does_not_count() -> None:
     text = "order:\n  SO1234567"
     assert cue_before(text, text.index("SO")) is None
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        '"note,order",passport,memo',  # a quoted comma: "order" is not the passport column
+        '"say ""hi"", order",passport,memo',  # escaped quotes inside the quoted field
+        ' "note, order" , passport , memo',  # spaces around the fields and separators
+    ],
+)
+def test_a_quoted_comma_in_the_csv_header_does_not_shift_the_columns(header: str) -> None:
+    # LAB-1352: the header was split on every comma, the row only on unquoted ones.
+    text = f"{header}\nAnn Smith,SO1234567,x\n"
+    assert cue_before(text, text.index("SO1234567")) is True
+    assert detect(text, ("SO1234567", "ID_DOCUMENT")) == [(E.ID_DOCUMENT, "SO1234567")]
+
+
+def test_a_quoted_comma_in_the_row_does_not_shift_the_columns() -> None:
+    text = 'memo,order,passport\n"Smith, Ann",SO7654321,SO1234567\n'
+    assert cue_before(text, text.index("SO7654321")) is False
+    assert cue_before(text, text.index("SO1234567")) is True
+
+
+def test_each_csv_block_has_its_own_header() -> None:
+    text = (
+        "name,passport,memo\nAnn,SO1234567,x\n\n"
+        "name,order,memo\nBob,SO7654321,y\n"
+        "id,name\n17,Cy\n"  # one comma: not a row
+    )
+    assert cue_before(text, text.index("SO1234567")) is True
+    assert cue_before(text, text.index("SO7654321")) is False
+    assert cue_before(text, text.index("17,")) is None
+
+
+def test_a_large_csv_is_checked_in_linear_time() -> None:
+    # LAB-1352: every value walked back over the rows above it to find the header again;
+    # 4,000 rows took 8-17 s, now a few hundredths. The bound leaves room for a loaded runner.
+    rows = ["name,passport,memo", *(f"Ann {i},AB{i:07d},note {i}" for i in range(4000))]
+    text = "\n".join(rows) + "\n"
+    spans = []
+    for i in range(4000):
+        start = text.index(f",AB{i:07d},") + 1
+        spans.append(Span(start, start + 9, E.ID_DOCUMENT, text[start : start + 9], 0.9, "ner"))
+    t0 = time.perf_counter()
+    kept = check_numbers(text, spans)
+    elapsed = time.perf_counter() - t0
+    assert kept == spans
+    assert elapsed < 2.0, f"check_numbers took {elapsed:.2f}s on 4,000 rows"
 
 
 # --- shapes without a cue -----------------------------------------------------------------

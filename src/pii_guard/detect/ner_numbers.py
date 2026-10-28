@@ -42,7 +42,9 @@ The rules are unchanged, and a validated rule span still wins in the resolver.
 from __future__ import annotations
 
 import re
+from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Sequence
+from contextvars import ContextVar
 from functools import lru_cache
 
 from pii_guard.types import EntityType, Span
@@ -105,6 +107,7 @@ _S10_RE = re.compile(r"[A-Z]{2}\d{9}[A-Z]{2}")
 _DECIMAL_RE = re.compile(r"\d{1,3}(?:[ ,.]\d{3})*[.,]\d{2}|\d+[.,]\d{2}")
 _DECIMAL_AFTER_RE = re.compile(r"[.,]\d{1,2}(?![\w.,])")
 _TOKEN_CHAR = re.compile(r"[0-9A-Za-z_]")
+_COMMA_RE = re.compile(",")
 
 
 def _lexicon(entries: Iterable[str]) -> tuple[frozenset[str], tuple[str, ...]]:
@@ -195,6 +198,9 @@ def cue_before(text: str, start: int, *, label_words: int = _LABEL_WORDS) -> boo
 
 
 def _unquoted_commas(line: str) -> list[int]:
+    """Offsets of the commas outside double quotes (a ``""`` escape toggles twice)."""
+    if '"' not in line:
+        return [m.start() for m in _COMMA_RE.finditer(line)]
     out, quoted = [], False
     for i, ch in enumerate(line):
         if ch == '"':
@@ -204,31 +210,84 @@ def _unquoted_commas(line: str) -> list[int]:
     return out
 
 
+def _split_fields(line: str) -> list[str]:
+    """``line`` cut at its unquoted commas, each field trimmed and unquoted (``""`` -> ``"``).
+
+    The same quoting rules as :func:`_unquoted_commas`, so a header and its rows count their
+    columns alike (``"note,order",passport`` is two fields).
+    """
+    fields, prev = [], 0
+    for c in [*_unquoted_commas(line), len(line)]:
+        field = line[prev:c].strip()
+        if len(field) >= 2 and field[0] == field[-1] == '"':
+            field = field[1:-1].replace('""', '"')
+        fields.append(field.strip().strip('"'))
+        prev = c + 1
+    return fields
+
+
+class _CsvIndex:
+    """The lines of one text and, per line, the first line of its CSV block, built once.
+
+    A row's block is the run of lines just above it with the same number of unquoted commas,
+    and its first line is the header candidate. Walking back over the block again for every
+    number was quadratic in rows (LAB-1352); this is one pass over the text, on first use.
+    """
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.starts: list[int] = []
+        self.commas: list[list[int]] = []
+        self.top: list[int] = []
+        self._fields: dict[int, list[str] | None] = {}
+
+    def _build(self) -> None:
+        text = self.text
+        self.starts = [0, *(m.end() for m in re.finditer("\n", text))]
+        ends = [*(s - 1 for s in self.starts[1:]), len(text)]
+        for i, (start, end) in enumerate(zip(self.starts, ends, strict=True)):
+            self.commas.append(_unquoted_commas(text[start:end]))
+            same = i > 0 and len(self.commas[i - 1]) == len(self.commas[i])
+            self.top.append(self.top[i - 1] if same else i)
+
+    def header(self, pos: int) -> str | None:
+        if not self.starts:
+            self._build()
+        line = bisect_right(self.starts, pos) - 1
+        commas = self.commas[line]
+        top = self.top[line]
+        if len(commas) < 2 or top == line:
+            return None
+        if top not in self._fields:
+            end = self.starts[top + 1] - 1
+            header = self.text[self.starts[top] : end]
+            digit = any(ch.isdigit() for ch in header)
+            self._fields[top] = None if digit else _split_fields(header)
+        fields = self._fields[top]
+        if fields is None:
+            return None  # the block's first line holds a digit: a data row, no header
+        column = bisect_left(commas, pos - self.starts[line])
+        return fields[column] if column < len(fields) else None
+
+
+#: The index of the text :func:`check_numbers` is checking, shared by all its spans.
+_INDEX: ContextVar[_CsvIndex | None] = ContextVar("ner_numbers_csv_index", default=None)
+
+
 def _csv_header(text: str, pos: int) -> str | None:
     """The column header of ``pos`` if it sits in a CSV row under a header line, else None.
 
     A row has two commas or more; the header is the first line of the block of lines with the
-    same number of fields, and holds no digit.
+    same number of fields, and holds no digit. Commas inside double quotes, in the header as in
+    the row, don't separate fields.
     """
-    line_start = text.rfind("\n", 0, pos) + 1
     line_end = text.find("\n", pos)
-    line = text[line_start : line_end if line_end >= 0 else len(text)]
-    commas = _unquoted_commas(line)
-    if len(commas) < 2:
-        return None
-    column = sum(1 for c in commas if line_start + c < pos)
-    top = line_start
-    header: str | None = None
-    while top > 0:
-        prev_start = text.rfind("\n", 0, top - 1) + 1
-        prev = text[prev_start : top - 1]
-        if len(_unquoted_commas(prev)) != len(commas):
-            break
-        header, top = prev, prev_start
-    if header is None or any(ch.isdigit() for ch in header):
-        return None
-    fields = [f.strip().strip('"') for f in header.split(",")]
-    return fields[column] if column < len(fields) else None
+    if text.count(",", text.rfind("\n", 0, pos) + 1, line_end if line_end >= 0 else len(text)) < 2:
+        return None  # not a row (most values): no index needed
+    index = _INDEX.get()
+    if index is None or index.text is not text:
+        index = _CsvIndex(text)
+    return index.header(pos)
 
 
 def _token(text: str, start: int, end: int) -> tuple[int, int]:
@@ -308,6 +367,14 @@ def _fields(text: str, start: int, end: int) -> list[tuple[int, int]]:
 
 def check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
     """``spans`` with the NER numbers that fail :func:`number_verdict` removed or cut down."""
+    token = _INDEX.set(_CsvIndex(text))
+    try:
+        return _check_numbers(text, spans)
+    finally:
+        _INDEX.reset(token)
+
+
+def _check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
     out: list[Span] = []
     for span in spans:
         if span.entity_type not in NUMBER_TYPES:
