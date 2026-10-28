@@ -206,6 +206,8 @@ def _maps_back(text: str, norm: NormalizedText, value: str) -> str:
         ("anna(at)beispiel(punkt)de bitte", "anna@beispiel.de bitte"),
         ("írj: teszt.elek {AT} pelda (pont) hu", "írj: teszt.elek@pelda.hu"),
         ("x [at] example.co.uk", "x@example.co.uk"),
+        ("john [ät] beispiel [punkt] de", "john@beispiel.de"),
+        ("teszt (kukac) pelda (pont) hu", "teszt@pelda.hu"),
         ("x@example [dot] com", "x@example.com"),
         (
             '"email": "d4ncs.r3n4t4 [ at ] example [ dot ] com"',

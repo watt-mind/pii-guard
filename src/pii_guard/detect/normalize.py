@@ -44,11 +44,11 @@ The rules:
 - **Fullwidth and mathematical alphanumerics** (``\\uff21``, ``\\U0001d400``) are folded with NFKC
   when that gives a single character.
 - **Obfuscated e-mail addresses** (``name [at] example [dot] com``, ``name(at)example.com``)
-  read as ``name@example.com``: a bracketed ``at`` (``[at]``, ``(at)``, ``{at}``, ``<at>``) and
-  a bracketed ``dot`` (also ``punkt``, ``pont``), with the spaces around them, stand for ``@``
-  and ``.`` when the whole reads as an address: a local part, ``@`` and at least two domain
-  labels, the last of letters, at least one separator bracketed. Bare ``at`` and ``dot`` words
-  in prose are left alone.
+  read as ``name@example.com``: a bracketed ``at`` (``[at]``, ``(at)``, ``{at}``, ``<at>``; also
+  ``ät``, ``kukac``) and a bracketed ``dot`` (also ``punkt``, ``pont``), with the spaces
+  around them, stand for ``@`` and ``.`` when the whole reads as an address: a local part,
+  ``@`` and at least two domain labels, the last of letters, at least one separator
+  bracketed. Bare ``at`` and ``dot`` words in prose are left alone.
 - **A value spelled out one character at a time** (``D E 6 3 1 4 ...``, ``0 1 1 3 4 9 6 ...``):
   a run of at least six single letters or digits separated by single spaces, with at least six
   digits, has the spaces dropped.
@@ -172,7 +172,7 @@ _CONTINUATION_RE = re.compile(r"[0-9]+(?:[ -][0-9]+)*[ \t]*[.,;:!?)]?[ \t]*")
 
 # Obfuscated e-mail separators: ``[at]``, ``(dot)`` ... with the spaces around them (LAB-1297).
 _OPEN, _CLOSE = r"[\[({<]", r"[\])}>]"
-_AT_WORD = rf"[ \t]*{_OPEN}[ \t]*at[ \t]*{_CLOSE}[ \t]*"
+_AT_WORD = rf"[ \t]*{_OPEN}[ \t]*(?:at|ät|kukac)[ \t]*{_CLOSE}[ \t]*"
 _DOT_WORD = rf"[ \t]*{_OPEN}[ \t]*(?:dot|punkt|pont)[ \t]*{_CLOSE}[ \t]*"
 _LABEL = r"[^\W_](?:[\w-]*[^\W_])?"
 _OBFUSCATED_EMAIL_RE = re.compile(
@@ -190,7 +190,7 @@ _DOTTED_GROUPS_RE = re.compile(
 _CURRENCY_RE = re.compile(r"(?:[$€£¥₽]|\b(?:Ft|HUF|EUR|USD|GBP|CHF|Euro|Forint)\b)", re.IGNORECASE)
 # A cheap test for the three folds above, so plain text keeps the fast path.
 _REGROUPED_HINT_RE = re.compile(
-    rf"{_OPEN}[ \t]*(?:at|dot|punkt|pont)[ \t]*{_CLOSE}|(?:[^\W_] ){{5}}[^\W_]"
+    rf"{_OPEN}[ \t]*(?:at|ät|kukac|dot|punkt|pont)[ \t]*{_CLOSE}|(?:[^\W_] ){{5}}[^\W_]"
     r"|[^\W_]{3}\.[^\W_]{3}\.[^\W_]",
     re.IGNORECASE,
 )
