@@ -29,6 +29,37 @@ from pydantic import SecretStr
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import TEXT_ENTITY_TYPES, EntityType, PiiGuardError
 
+_SCHEMA = """
+                CREATE TABLE IF NOT EXISTS store_metadata (
+                    name TEXT PRIMARY KEY, value BLOB NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS projects (
+                    id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, name TEXT NOT NULL,
+                    is_default INTEGER NOT NULL DEFAULT 0, default_policy_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS owner_default ON projects(owner_id)
+                    WHERE is_default = 1;
+                CREATE TABLE IF NOT EXISTS policy_versions (
+                    policy_version_id TEXT PRIMARY KEY, policy_id TEXT NOT NULL,
+                    project_id TEXT NOT NULL REFERENCES projects(id), version INTEGER NOT NULL,
+                    name TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL,
+                    UNIQUE(policy_id, version)
+                );
+                CREATE TABLE IF NOT EXISTS endpoints (
+                    id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id),
+                    name TEXT NOT NULL, policy_version_id TEXT NOT NULL
+                        REFERENCES policy_versions(policy_version_id),
+                    provider TEXT NOT NULL, base_url TEXT NOT NULL, model TEXT NOT NULL,
+                    credential BLOB, enabled INTEGER NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS endpoint_keys (
+                    id TEXT PRIMARY KEY, endpoint_id TEXT NOT NULL REFERENCES endpoints(id),
+                    name TEXT NOT NULL, digest BLOB NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL, revoked_at TEXT
+                );
+                """
+
 
 class ProjectNotFoundError(PiiGuardError):
     code = "project_not_found"
@@ -123,38 +154,7 @@ class ProjectStore:
             # DELETE journals inherit the database's mode; WAL has no durability benefit here.
             self._db.execute("PRAGMA journal_mode = DELETE")
             self._db.execute("PRAGMA secure_delete = ON")
-            self._db.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS store_metadata (
-                    name TEXT PRIMARY KEY, value BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS projects (
-                    id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, name TEXT NOT NULL,
-                    is_default INTEGER NOT NULL DEFAULT 0, default_policy_id TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                CREATE UNIQUE INDEX IF NOT EXISTS owner_default ON projects(owner_id)
-                    WHERE is_default = 1;
-                CREATE TABLE IF NOT EXISTS policy_versions (
-                    policy_version_id TEXT PRIMARY KEY, policy_id TEXT NOT NULL,
-                    project_id TEXT NOT NULL REFERENCES projects(id), version INTEGER NOT NULL,
-                    name TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL,
-                    UNIQUE(policy_id, version)
-                );
-                CREATE TABLE IF NOT EXISTS endpoints (
-                    id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id),
-                    name TEXT NOT NULL, policy_version_id TEXT NOT NULL
-                        REFERENCES policy_versions(policy_version_id),
-                    provider TEXT NOT NULL, base_url TEXT NOT NULL, model TEXT NOT NULL,
-                    credential BLOB, enabled INTEGER NOT NULL, created_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS endpoint_keys (
-                    id TEXT PRIMARY KEY, endpoint_id TEXT NOT NULL REFERENCES endpoints(id),
-                    name TEXT NOT NULL, digest BLOB NOT NULL UNIQUE,
-                    created_at TEXT NOT NULL, revoked_at TEXT
-                );
-                """
-            )
+            self._db.executescript(_SCHEMA)
             # Refuse opening an existing store with another key before serving any requests.
             with self._db:
                 self._db.execute(
@@ -167,6 +167,86 @@ class ProjectStore:
                 if self._cipher.decrypt(sentinel) != b"pii-guard-project-store-v1":
                     raise ProjectStorageError()
         except (OSError, sqlite3.Error, InvalidToken):
+            raise ProjectStorageError() from None
+
+    @classmethod
+    def memory(
+        cls,
+        key: bytes,
+        defaults: PolicySet,
+        detection_profile: str,
+        snapshot: bytes | None = None,
+    ) -> ProjectStore:
+        """Build a bounded private in-memory engine; existing snapshots are never migrated."""
+        if len(key) < 32 or detection_profile not in {"standard", "local-only"}:
+            raise ProjectStorageError()
+        instance = cls.__new__(cls)
+        instance._lock = threading.RLock()
+        instance._defaults = {t.value: defaults.of(t).value for t in TEXT_ENTITY_TYPES}
+        instance._profile = detection_profile
+        derived = hmac.digest(key, b"pii-guard-project-credentials-v1", "sha256")
+        instance._cipher = Fernet(base64.urlsafe_b64encode(derived))
+        instance._db = sqlite3.connect(":memory:", check_same_thread=False)
+        db = instance._db
+        try:
+            db.row_factory = sqlite3.Row
+            if snapshot is None:
+                db.executescript(_SCHEMA)
+                db.execute(
+                    "INSERT INTO store_metadata VALUES ('key_check', ?)",
+                    (instance._cipher.encrypt(b"pii-guard-project-store-v1"),),
+                )
+                db.commit()
+            else:
+                if not isinstance(snapshot, bytes) or not 0 < len(snapshot) <= 8 * 1024 * 1024:
+                    raise ProjectStorageError()
+                db.deserialize(snapshot)
+                # No extension loading, triggers, views or implicit migrations are accepted.
+                reference = sqlite3.connect(":memory:")
+                try:
+                    reference.executescript(_SCHEMA)
+                    expected = reference.execute(
+                        "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name"
+                    ).fetchall()
+                finally:
+                    reference.close()
+                actual = db.execute(
+                    "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name"
+                ).fetchall()
+                if [tuple(row) for row in actual] != expected:
+                    raise ProjectStorageError()
+                if [tuple(row) for row in db.execute("PRAGMA integrity_check")] != [("ok",)]:
+                    raise ProjectStorageError()
+                if db.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                    raise ProjectStorageError()
+                sentinels = db.execute("SELECT name, value FROM store_metadata").fetchall()
+                if (
+                    len(sentinels) != 1
+                    or sentinels[0]["name"] != "key_check"
+                    or instance._cipher.decrypt(sentinels[0]["value"])
+                    != b"pii-guard-project-store-v1"
+                ):
+                    raise ProjectStorageError()
+            if db.execute("PRAGMA page_size").fetchone()[0] != 4096:
+                raise ProjectStorageError()
+            db.execute("PRAGMA max_page_count = 2048")
+            db.execute("PRAGMA foreign_keys = ON")
+            db.execute("PRAGMA temp_store = MEMORY")
+            db.execute("PRAGMA secure_delete = ON")
+            db.execute("PRAGMA trusted_schema = OFF")
+            return instance
+        except Exception:
+            db.close()
+            raise ProjectStorageError() from None
+
+    def serialized(self) -> bytes:
+        """Serialize only configuration; the caller encrypts it before persistence."""
+        try:
+            raw = self._db.serialize()
+            if len(raw) > 8 * 1024 * 1024:
+                raise ProjectStorageError()
+            return raw
+        except sqlite3.Error:
             raise ProjectStorageError() from None
 
     @contextmanager

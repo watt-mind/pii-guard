@@ -98,6 +98,58 @@ The optional `demo` Compose profile deliberately uses `/tmp/pii-guard-projects` 
 a new tenant key for each container. Its project configuration and credentials are ephemeral
 and are expected to be lost when the demo container is replaced.
 
+### Hosted encrypted Blob snapshots
+
+Set `PII_GUARD_HOSTED_PROJECT_STORE=azure_blob` and install the `hosted-azure` extra to
+persist hosted configuration without relying on a mounted filesystem's SQLite locks.
+`PII_GUARD_HOSTED_PROJECT_ACCOUNT_URL` must be the account's public HTTPS Blob origin,
+with no path, SAS, credentials, query or fragment. Set `PII_GUARD_HOSTED_PROJECT_CONTAINER`
+(default `project-configuration`) and `PII_GUARD_HOSTED_PROJECT_ENVIRONMENT=dev|prod`.
+Only managed identity authenticates; an optional
+`PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID` chooses a user-assigned identity.
+Use separate private dev/prod containers or accounts, identities and stable tenant keys.
+Give the app data access only to its environment's configuration container.
+
+The fixed blob is `<environment>.projects.v1.enc`. The outer authenticated encryption key
+uses a distinct tenant-key derivation domain and environment binding. Provider credentials
+remain encrypted independently inside the database, and the existing encrypted key sentinel
+is verified on every load. Losing or changing the stable 32-byte tenant key makes the store
+unreadable. Backups and authorized writers are trusted: ETags prevent concurrent lost updates,
+but do not prevent an authorized operator from restoring an older snapshot and its old key
+revocations. Never roll back configuration storage to roll back application code.
+
+Serving code never creates missing blobs, containers or encryption keys. Before first use,
+an authorized operator runs the following once with the target environment's settings and
+managed identity (for example as a one-off job in that environment):
+
+```bash
+uv run python -m pii_guard.projects.blob --initialize-empty
+```
+
+This initializes an empty encrypted database only if the blob does not exist. Repeating it,
+including after an unknown write outcome, cannot overwrite existing configuration. It is an
+explicit bootstrap command, never a startup/deploy hook. It does not import local SQLite state;
+a migration requires a separately reviewed operator procedure. Set the private container up
+before initialization; anonymous/public blob access must be disabled at the storage account.
+
+Every operation fetches fresh encrypted state, validates its environment, exact schema,
+integrity, foreign keys and credential sentinel, and uses a private in-memory SQLite engine.
+The database is capped at 8 MiB and ciphertext at 12 MiB; downloads and SDK timeouts are
+bounded and SDK retries are disabled. No plaintext snapshot, SQLite journal or fallback file
+is written to disk. Read-only operations issue no PUT. Establishing a missing owner default
+is a mutation even when triggered by a GET. Each mutation commits through the read ETag's
+`If-Match` and returns success, including a newly issued raw endpoint key, only after a
+confirmed write. Conflicts, missing state, corruption, wrong keys, unavailable storage and
+ambiguous commits return sanitized `503 project_storage_unavailable`; mutations are never
+automatically retried or replayed. After a failed mutation, inspect current configuration
+before making an explicit new request. Revocation is observed on each subsequent instance's
+admission; already admitted requests can finish with their captured snapshot.
+
+Project routes execute in worker threads, and middleware offloads project operations before
+ASGI routing. This durable store does not enable multiple application workers/replicas:
+request/session state and quota counters still require the existing single-process topology.
+There is no connection, vault, session, traffic or sponsored allowance persistence in this blob.
+
 ### Owner access in Docker Compose
 
 The Compose API joins a bridge network. A request reaching the container through that network
