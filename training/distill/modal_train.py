@@ -45,6 +45,8 @@ image = (
     # The decontamination gate in train.py (LAB-1392) needs every evaluation text.
     .add_local_dir(ROOT / "eval" / "fixtures", f"{REMOTE}/eval/fixtures", ignore=["visual"])
     .add_local_dir(ROOT / "eval" / "datasets", f"{REMOTE}/eval/datasets", ignore=["results"])
+    # agent-traffic test and dev (LAB-1226) live here; without them the gate can't see them.
+    .add_local_dir(ROOT / "eval" / "synthetic", f"{REMOTE}/eval/synthetic")
 )
 if modal.is_local() and (ROOT / "data" / "datasets" / "fixtures").is_dir():  # fetch-only sets
     image = image.add_local_dir(

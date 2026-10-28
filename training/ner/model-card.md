@@ -136,6 +136,28 @@ some over-masking. But it leaked more real ID numbers and e-mail addresses on un
 traffic (2.4 % vs 1.7 % on the selection set), so v2.0 stays the release. The selection rule is
 always the lowest leak on held-out agent traffic, because a leak is worse than an extra mask.
 
+### Next candidate (v3, not published)
+
+LAB-1393 trained a v3 candidate on a wider mix:
+[eval/results/2026-10-28-ner-v3](https://github.com/watt-mind/pii-guard/tree/develop/eval/results/2026-10-28-ner-v3).
+It didn't pass the selection rule, so v2.0 above is still the release. If a later v3.x is
+published, its data and attribution are:
+
+| Part | Train rows | Source | Licence, attribution |
+|---|--:|---|---|
+| Ai4Privacy OpenPII-1M, train split | 30,000 (hu/en/de 5,000; pl/cs/sk/ro/hr/sl 2,500) | [`ai4privacy/pii-masking-openpii-1m`](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m) | CC-BY-4.0, "Ai4Privacy / Ai Suisse SA" |
+| Privy protocol traces | 12,000 | [`piimb/privy`](https://huggingface.co/datasets/piimb/privy) | MIT, Privy (Pixie) |
+| nym-pii multilingual | 13,000 (en/de/pl/cs/ro) | [`Wismut/nym-pii-multilingual-data`](https://huggingface.co/datasets/Wismut/nym-pii-multilingual-data) | MIT, byteowlz / Wismut |
+| Nemotron-PII, train split | 1,500 | [`nvidia/Nemotron-PII`](https://huggingface.co/datasets/nvidia/Nemotron-PII) | CC-BY-4.0, NVIDIA Corporation |
+| Gretel PII masking EN v1, train split | 2,500 | [`gretelai/gretel-pii-masking-en-v1`](https://huggingface.co/datasets/gretelai/gretel-pii-masking-en-v1) | Apache-2.0, Gretel.ai |
+| Synthetic agent traffic, s11 corpus, hard negatives | 12,023 | pii-guard generators | Apache-2.0 |
+
+Every source is pinned to a revision and file hash, and none is gated, CC-BY-SA or
+non-commercial. Labels with no pii-guard NER type are left out of the loss: secrets, URLs and
+IPs, which the rules handle, and the GDPR special categories. `Horizon-Labs/pii-redactor-base`
+(Apache-2.0) took unlabelled English and German PII out of the loss and added no labels. No
+training document is a near-copy of an evaluation text: 0 of 72,664 were dropped.
+
 ## Licence and attribution
 
 - **This model:** Apache-2.0.
