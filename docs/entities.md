@@ -119,7 +119,8 @@ numbers after an order, invoice or reference cue are never masked
 | Identifier | Type | Validation | Scope |
 |---|---|---|---|
 | Personal tax ID (adóazonosító jel) | `NATIONAL_ID_HU_TAX` | mod 11 | everywhere |
-| Social security (TAJ) number; without its `TAJ` cue, not right after an order, invoice or reference label, an ID prefix (`INV-`, `#`) or a currency | `NATIONAL_ID_HU_TAJ` | weighted mod 10 | everywhere |
+| Social security (TAJ) number next to its `TAJ` cue | `NATIONAL_ID_HU_TAJ` | weighted mod 10 + label | everywhere |
+| TAJ number without its cue, not right after an order, invoice or reference label, an ID prefix (`INV-`, `#`) or a currency (one nine-digit run in ten passes the check) | `NATIONAL_ID_HU_TAJ` | weighted mod 10 | language |
 | Giro account number (16 or 24 digits) | `BANK_ACCOUNT` | weights 9-7-3-1 per block | everywhere |
 | Phone number (`+36`, `0036`, `06`) | `PHONE` | area code and length | everywhere |
 | Company registration number (cégjegyzékszám) | `COMPANY_ID_HU` | court and form codes | everywhere |
@@ -219,7 +220,7 @@ business number, but a sole trader's identifies a person, as a NIP does.
 | National phone number (`555 123 456`, `(22) 555 12 34`) | `PHONE` | mobile 3-3-3 starting 4–8, landline 2-3-2-2, not an amount | language |
 | Street address (`ul. Kwiatowa 12/5[, 00-950 Warszawa]`, `al.`, `os.`, `pl.`) | `ADDRESS` | street-type word + name + house number | language |
 | Postcode and place (`31-008 Kraków`) | `ADDRESS` | `NN-NNN` + capitalised place | language |
-| Driving-licence number (`00123/16/1234`) after `prawo jazdy`; any number above with a bad check digit after its cue | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
+| Driving-licence number (`00123/16/1234`, `05936/42/00`) after `prawo jazdy`; any number above with a bad check digit after its cue | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
 
 Vault inflection: case endings that leave the written name intact are kept outside the
 placeholder (`Nowaka` → `[[PERSON_7f3a]]a`, `Kowalskiego` → `[[PERSON_7f3a]]ego`); forms

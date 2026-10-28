@@ -49,7 +49,8 @@ def context_before(text: str, start: int, keywords: tuple[str, ...], window: int
 
 
 # What directly before a number makes it a business number or an amount, not personal data:
-# an order, invoice or reference label ("Order number:", "Rendelésszám:", "Rechnung"), an
+# an order, invoice or reference label ("Order number:", "Rendelésszám:", "Rechnung",
+# "Faktura nr", "numer zamówienia:"), an
 # identifier prefix ("INV-", "SZ-", "#") or a currency ("$", "EUR"). Only the label's last
 # word and a little punctuation may stand between it and the number.
 _REFERENCE_WORD = (
@@ -59,13 +60,16 @@ _REFERENCE_WORD = (
     r"|ügysz[áa]m\w*|iktat[óo]sz[áa]m\w*|cikksz[áa]m\w*|össz?eg\w*|v[ée]g[öo]sszeg\w*"
     r"|bestell\w*|rechnung\w*|auftrag\w*|referenz\w*|artikel\w*|vorgang\w*|betrag\w*"
     r"|summe\w*"
+    r"|faktur\w*|zam[óo]wieni\w*|paragon\w*|przesy[łl]k\w*|sygn\.?(?:[ \t]*akt)?|sygnatur\w*"
+    r"|zleceni\w*|rezerwacj\w*|paczk\w*|zg[łl]oszeni\w*|transakcj\w*|kwot\w*|suma|saldo"
+    r"|uchwa[łl]\w*|referencyjn\w*|klienta"
 )
 _REFERENCE_BEFORE_RE = re.compile(
     rf"(?:(?i:(?<!\w)(?:{_REFERENCE_WORD})"
-    r"(?:[ \t]*(?:number|no|nr|num|id|sz[áa]m|sz[áa]ma|nummer)(?!\w)\.?)?)"
+    r"(?:[ \t]*(?:number|no|nr|num|id|sz[áa]m|sz[áa]ma|nummer|numer)(?!\w)\.?)?)"
     r"[ \t:#=()\-]*(?:[A-Z]{1,6}[-/#][ \t]?)?"
     r"|(?<![\w-])[A-Z]{1,6}-|#[ \t]?"
-    r"|(?:[$€£¥]|(?<!\w)(?:USD|EUR|GBP|CHF|HUF|Ft|forint)(?!\w)\.?)[ \t]?)$"
+    r"|(?:[$€£¥]|(?<!\w)(?:USD|EUR|GBP|CHF|HUF|Ft|forint|PLN|zł)(?!\w)\.?)[ \t]?)$"
 )
 _REFERENCE_WINDOW = 40
 
