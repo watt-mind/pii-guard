@@ -179,6 +179,12 @@ class HostedService:
             identity = principal.id + (":" + namespace if namespace else "")
             runtime = self._runtimes.get(identity)
             if runtime is None:
+                owner_runtimes = sum(
+                    runtime_id == principal.id or runtime_id.startswith(principal.id + ":")
+                    for runtime_id in self._runtimes
+                )
+                if owner_runtimes >= min(32, self.settings.hosted_max_sessions):
+                    raise HostedCapacityError("Account runtime capacity reached; try later")
                 if len(self._runtimes) >= self.settings.hosted_max_principals:
                     raise HostedCapacityError("Hosted runtime capacity reached; try later")
                 key = hmac.digest(self.master_key, b"vault\0" + identity.encode(), "sha256")
