@@ -218,7 +218,12 @@ function PasteStep({ snippets, snippet, onModel }: { snippets: Snippets; snippet
           </a>
         )}
       </div>
-      {!snippets.model && <p className="text-xs text-warn">The gateway lists no model yet: replace {mono("<model-id>")} with one your provider serves.</p>}
+      {!snippets.model &&
+        (snippets.endpoint ? (
+          <p className="text-xs text-muted">This endpoint lets your client choose the model: replace {mono("<model-id>")} with the model your client uses, or set it in the client’s own settings.</p>
+        ) : (
+          <p className="text-xs text-warn">The gateway lists no model yet: replace {mono("<model-id>")} with one your provider serves.</p>
+        ))}
     </Step>
   );
 }

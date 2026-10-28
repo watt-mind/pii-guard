@@ -7,7 +7,7 @@ import { localRequest } from "./request";
 import { request, recovery, type Requester } from "../hosted/api";
 import { useHostedSession } from "../hosted/session";
 import { setSelectedEndpoint } from "./selection";
-import { projectPath, type Endpoint, type EndpointKey, type PolicyVersion, type Project, type ProjectList } from "./api";
+import { projectPath, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList } from "./api";
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
 
@@ -103,7 +103,7 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
   }, [refocus, projects.length]);
   return (
     <div className="space-y-6">
-      <PageHeader title="Projects" lead="Keep each application’s endpoints, endpoint keys and policies together. Every endpoint pins one upstream, one model and one policy version." />
+      <PageHeader title="Projects" lead="Keep each application’s endpoints, endpoint keys and policies together. Every endpoint pins one upstream and one policy version, and can pin one model." />
       {!hosted && OwnerAccess && <Suspense fallback={null}><OwnerAccess /></Suspense>}
       {error && (
         <Notice tone="danger" live action={<Button size="sm" onClick={() => setRetry((n) => n + 1)}>Retry projects</Button>}>
@@ -151,7 +151,7 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
 }
 
 type Notified = { area: "endpoints" | "policies"; text: string; endpointId?: string } | null;
-interface EndpointBody { name: string; provider: string; model: string; policy_version_id: string; enabled: boolean; base_url?: string; api_key?: string }
+interface EndpointBody { name: string; provider: string; model: string | null; policy_version_id: string; enabled: boolean; base_url?: string; api_key?: string }
 interface PolicyBody { name: string; entity_policies: Record<TextEntityType, Policy>; language: string; mode: string }
 
 function ProjectConfiguration({ project, call, hosted }: { project: Project; call: Requester; hosted: boolean }) {
@@ -171,6 +171,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
   const versionRefs = useRef(new Map<string, HTMLButtonElement>());
   const noPolicyHint = useId();
   const base = projectPath(project.id);
+  const catalog = useCallback((query: EndpointModelsQuery) => call<EndpointModels>(`${base}/endpoints/models`, query, "POST"), [call, base]);
   async function reload() {
     const [policyData, endpointData] = await Promise.all([call<{ policies: PolicyVersion[] }>(`${base}/policies`), call<{ endpoints: Endpoint[] }>(`${base}/endpoints`)]);
     if (!Array.isArray(policyData.policies) || !Array.isArray(endpointData.endpoints)) throw new Error("Invalid configuration");
@@ -257,7 +258,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
       <Card
         title="Gateway endpoints"
         titleId={ENDPOINTS_TITLE}
-        subtitle="One upstream, model and pinned policy version per endpoint."
+        subtitle="One upstream and pinned policy version per endpoint, with a pinned model or the client’s own."
         actions={
           <Button ref={createEndpointRef} busy={busy} disabled={!loaded || !policies.length || endpointEdit === "new"} aria-describedby={loaded && !policies.length ? noPolicyHint : undefined} onClick={() => openEndpointForm("new")}>
             Create endpoint
@@ -285,7 +286,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
                     {endpoint.name}
                     {!endpoint.enabled && <span className="ml-1.5 font-normal text-muted">· Disabled</span>}
                   </h3>
-                  <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · <span className="font-mono text-xs">{endpoint.model}</span></p>
+                  <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · {endpoint.model ? <span className="font-mono text-xs">{endpoint.model}</span> : "Client chooses the model"}</p>
                   <p className="text-sm text-muted">{policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -315,6 +316,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
           policies={policies}
           busy={busy}
           hosted={hosted}
+          catalog={catalog}
           onCancel={closeEndpointForm}
           onSave={(body) => action(async () => {
             const creating = endpointEdit === "new";
@@ -351,7 +353,10 @@ function useFocusOnOpen(id: string) {
   }, [id]);
 }
 
-function EndpointForm({ endpoint, policies, busy, hosted, onSave, onCancel, onDisable }: { endpoint?: Endpoint; policies: PolicyVersion[]; busy: boolean; hosted: boolean; onSave: (body: EndpointBody) => Promise<void>; onCancel: () => void; onDisable?: () => Promise<void> }) {
+/** The model select's "type another id" choice; never a provider model id (it has a space). */
+const OTHER_MODEL = "other model";
+
+function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCancel, onDisable }: { endpoint?: Endpoint; policies: PolicyVersion[]; busy: boolean; hosted: boolean; catalog: (query: EndpointModelsQuery) => Promise<EndpointModels>; onSave: (body: EndpointBody) => Promise<void>; onCancel: () => void; onDisable?: () => Promise<void> }) {
   const [name, setName] = useState(endpoint?.name ?? "");
   const session = useHostedSession();
   const sponsored = hosted && session?.account.limits.sponsored_enabled !== false;
@@ -361,6 +366,38 @@ function EndpointForm({ endpoint, policies, busy, hosted, onSave, onCancel, onDi
   const [model, setModel] = useState(endpoint?.model ?? "");
   const [baseUrl, setBaseUrl] = useState(endpoint?.base_url ?? "");
   const [secret, setSecret] = useState("");
+  // Model choices: the provider's catalog (asked on request) or the sponsored allow-list.
+  const [models, setModels] = useState<string[] | null>(null);
+  const [modelsState, setModelsState] = useState<"idle" | "loading" | "failed">("idle");
+  const [typing, setTyping] = useState(false);
+  const isSponsored = provider === "sponsored";
+  const storedKey = Boolean(endpoint?.credential_configured && endpoint.provider === provider && (provider !== "custom" || endpoint.base_url === baseUrl));
+  const canLoadModels = !isSponsored && (Boolean(secret) || storedKey) && (provider !== "custom" || Boolean(baseUrl));
+  async function loadModels() {
+    setModelsState("loading");
+    try {
+      const query: EndpointModelsQuery = { provider, ...(provider === "custom" ? { base_url: baseUrl } : {}), ...(secret ? { api_key: secret } : endpoint ? { endpoint_id: endpoint.id } : {}) };
+      setModels((await catalog(query)).models);
+      setModelsState("idle");
+    } catch {
+      setModels(null);
+      setModelsState("failed");
+    }
+  }
+  // Sponsored needs no key: its allow-list loads as soon as it is the provider.
+  const [allowed, setAllowed] = useState<string[] | "failed" | null>(null);
+  useEffect(() => {
+    if (!isSponsored) return;
+    let active = true;
+    catalog({ provider: "sponsored" }).then((data) => {
+      if (!active) return;
+      const list = Array.isArray(data.models) ? data.models : [];
+      setAllowed(list);
+      setModel((current) => (current && list.includes(current) ? current : list[0] ?? ""));
+    }).catch(() => { if (active) setAllowed("failed"); });
+    return () => { active = false; };
+  }, [isSponsored, catalog]);
+  const chooseProvider = (next: string) => { setProvider(next); setSecret(""); setModels(null); setModelsState("idle"); setTyping(false); if (next === "sponsored" || provider === "sponsored") setModel(""); };
   // One policy version: nothing to choose, so it is preselected.
   const [policyId, setPolicyId] = useState(endpoint?.policy_version_id ?? (policies.length === 1 ? policies[0]!.policy_version_id : ""));
   const [reviewed, setReviewed] = useState(false);
@@ -371,7 +408,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, onSave, onCancel, onDi
   const selected = policies.find((p) => p.policy_version_id === policyId);
   const requiresCredential = provider !== "sponsored" && (!endpoint?.credential_configured || endpoint.provider !== provider);
   const keyLabel = requiresCredential ? "Provider API key" : "Replace provider API key (optional)";
-  const blockedReason = !policyId ? "Choose a policy version to save." : changed && !reviewed ? "Confirm the policy change below to save." : "";
+  const blockedReason = isSponsored && !model ? "Choose a sponsored model to save." : !policyId ? "Choose a policy version to save." : changed && !reviewed ? "Confirm the policy change below to save." : "";
   return (
     <Card
       title={endpoint ? `Edit ${endpoint.name}` : "Create endpoint"}
@@ -381,14 +418,14 @@ function EndpointForm({ endpoint, policies, busy, hosted, onSave, onCancel, onDi
       <form
         aria-labelledby={titleId}
         className="space-y-4"
-        onSubmit={(e) => { e.preventDefault(); const apiKey = secret; setSecret(""); void onSave({ name, provider, model, policy_version_id: policyId, enabled: endpoint ? endpoint.enabled || reenable : true, ...(provider === "custom" ? { base_url: baseUrl } : {}), ...(apiKey ? { api_key: apiKey } : {}) }); }}
+        onSubmit={(e) => { e.preventDefault(); const apiKey = secret; setSecret(""); void onSave({ name, provider, model: model.trim() || null, policy_version_id: policyId, enabled: endpoint ? endpoint.enabled || reenable : true, ...(provider === "custom" ? { base_url: baseUrl } : {}), ...(apiKey ? { api_key: apiKey } : {}) }); }}
       >
         <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2">
           <Field label="Endpoint name" required hint="Shown in logs and in the project switcher.">
             <Input maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Provider" required>
-            <Select value={provider} onChange={(e) => { setProvider(e.target.value); setSecret(""); }}>
+            <Select value={provider} onChange={(e) => chooseProvider(e.target.value)}>
               {[...(hosted ? ["sponsored"] : []), "meta", "openai", "fireworks", "openrouter", "custom"].map((value) => <option key={value} value={value}>{providerLabel(value)}</option>)}
             </Select>
           </Field>
@@ -397,9 +434,39 @@ function EndpointForm({ endpoint, policies, busy, hosted, onSave, onCancel, onDi
               <Input type="url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.example.com/v1" />
             </Field>
           )}
-          <Field label="Model ID" required hint="The provider’s exact model ID.">
-            <Input maxLength={200} value={model} onChange={(e) => setModel(e.target.value)} placeholder="example-model-v1" />
-          </Field>
+          {isSponsored ? (
+            <Field label="Model" required hint={allowed === "failed" ? "The allowed models could not be loaded. Enter one the operator allows." : "Sponsored requests use one of the operator’s allowed models."}>
+              {Array.isArray(allowed) && allowed.length ? (
+                <Select value={model} onChange={(e) => setModel(e.target.value)}>
+                  {allowed.map((m) => <option key={m} value={m}>{m}</option>)}
+                </Select>
+              ) : (
+                <Input maxLength={256} value={model} onChange={(e) => setModel(e.target.value)} placeholder={allowed === null ? "Loading allowed models…" : "muse-spark-1.3"} />
+              )}
+            </Field>
+          ) : (
+            <Field label="Model (optional)" hint={
+                modelsState === "failed" ? `${providerLabel(provider)} did not list its models. Type a model ID, or leave it empty.`
+                  : models && !models.length ? `${providerLabel(provider)} listed no models. Type a model ID, or leave it empty.`
+                    : "Leave empty to let your client choose, e.g. Codex or Muse Code."
+              }>
+              {models && models.length && !typing ? (
+                <Select value={model} onChange={(e) => { if (e.target.value === OTHER_MODEL) setTyping(true); else setModel(e.target.value); }}>
+                  <option value="">Client chooses (no pinned model)</option>
+                  {[...(model && !models.includes(model) ? [model] : []), ...models].map((m) => <option key={m} value={m}>{m}</option>)}
+                  <option value={OTHER_MODEL}>Other model ID…</option>
+                </Select>
+              ) : (
+                <Input maxLength={256} value={model} onChange={(e) => setModel(e.target.value)} placeholder="Client chooses" />
+              )}
+              {(canLoadModels || (models && models.length > 0)) && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {canLoadModels && <Button size="sm" busy={modelsState === "loading"} onClick={() => { setTyping(false); void loadModels(); }}>{modelsState === "loading" ? "Loading models…" : models ? "Reload models" : `Load models from ${providerLabel(provider)}`}</Button>}
+                  {models && models.length > 0 && typing && <Button size="sm" variant="ghost" onClick={() => setTyping(false)}>Choose from the list</Button>}
+                </div>
+              )}
+            </Field>
+          )}
           {provider !== "sponsored" && (
             <Field label={keyLabel} required={requiresCredential} hint={
                 endpoint?.credential_configured
@@ -538,7 +605,7 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
   useEffect(() => { let active = true; call<{ keys: EndpointKey[] }>(keyPath).then((data) => { if (!Array.isArray(data.keys)) throw new Error("Invalid keys"); if (active) { setKeys(data.keys); setLoaded(true); } }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); }); return () => { active = false; }; }, [call, keyPath, hosted]);
   async function action(work: () => Promise<void>) { setBusy(true); setError(""); try { await work(); } catch (e) { setError(configurationRecovery(e, hosted)); } finally { setBusy(false); } }
   const url = `${globalThis.location.origin}${endpoint.base_path}`;
-  const snippet = `from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url=${JSON.stringify(url)},\n    api_key=os.environ["PII_GUARD_ENDPOINT_KEY"],\n)\nresponse = client.chat.completions.create(\n    model=${JSON.stringify(endpoint.model)},\n    messages=[{"role": "user", "content": "Hello, Robin Example."}],\n)`;
+  const snippet = `from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url=${JSON.stringify(url)},\n    api_key=os.environ["PII_GUARD_ENDPOINT_KEY"],\n)\nresponse = client.chat.completions.create(\n    model=${JSON.stringify(endpoint.model ?? "<model-id>")},\n    messages=[{"role": "user", "content": "Hello, Robin Example."}],\n)`;
   function copy(value: string, label: string) { void navigator.clipboard.writeText(value).then(() => setCopied(`${label} copied`)).catch(() => setCopied("Copy failed. Select the text and copy it manually.")); }
   const revoke = (key: EndpointKey) => action(async () => {
     await call(`${keyPath}/${encodeURIComponent(key.id)}`, undefined, "DELETE");
@@ -574,6 +641,7 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
           <p role="status" className="text-xs text-muted">{copied}</p>
         </div>
         <pre className="overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-ui whitespace-pre text-ink sm:p-4">{snippet}</pre>
+        {!endpoint.model && <p className="text-xs text-muted">This endpoint has no pinned model: replace <span className="font-mono">&lt;model-id&gt;</span> with the model your client uses.</p>}
       </div>
 
       <div className="mt-6 space-y-4 border-t border-line pt-5">
