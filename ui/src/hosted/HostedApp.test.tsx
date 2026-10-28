@@ -62,23 +62,17 @@ describe("public hosted workflow", () => {
     expect(screen.getByText("Static illustration · synthetic")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reconnect to API" })).toBeInTheDocument();
   });
-  it("creates and revokes guard keys, and does not reload their secret from metadata", async () => {
-    const call = requester((path, body, method) => {
+  it("offers endpoint-scoped configuration without creating broad account keys", async () => {
+    const call = requester((path) => {
       if (path === "/v1/account") return { ...account, authenticated: true };
-      if (method === "DELETE") return undefined;
-      if (body) return { id: "key-one", name: "Test integration", prefix: "pg_test", created_at: "2026-10-28T00:00:00Z", key: "synthetic-once-only-secret" };
+      if (path === "/v1/projects") return { projects: [], default_project_id: "project-one" };
       return [];
     });
-    const user = userEvent.setup(); render(<HostedApp call={call} />);
-    expect(await screen.findByLabelText("Key name")).toHaveAttribute("maxlength", "64");
-    await user.type(screen.getByLabelText("Key name"), "Test integration");
-    await user.click(screen.getByRole("button", { name: "Create guard key" }));
-    await screen.findByText("synthetic-once-only-secret");
-    expect(localStorage.length).toBe(0); expect(sessionStorage.length).toBe(0);
-    await user.click(screen.getByRole("button", { name: "Dismiss key" }));
-    expect(screen.queryByText("synthetic-once-only-secret")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Revoke" }));
-    await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/account/api-keys/key-one", undefined, "DELETE"));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument());
+    render(<HostedApp call={call} />);
+    await screen.findByRole("heading", { name: "Projects & endpoints" });
+    expect(screen.queryByRole("button", { name: "Create guard key" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bring your own model key" })).toBeInTheDocument();
+    await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects"));
+    expect(call).not.toHaveBeenCalledWith("/v1/account/api-keys");
   });
 });

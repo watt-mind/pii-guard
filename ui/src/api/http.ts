@@ -1,3 +1,4 @@
+import { createProjectFetch } from "./project";
 import type {
   AnalyzeRequest,
   AnalyzeResponse,
@@ -61,7 +62,7 @@ export const IMAGE_TIMEOUT_MS = 120_000;
 
 export function createHttpClient(options: HttpClientOptions = {}): HttpGuardClient {
   const baseUrl = (options.baseUrl ?? "").replace(/\/$/, "");
-  const doFetch = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+  const doFetch = createProjectFetch(options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args)));
   const timeoutMs = options.timeoutMs ?? 15_000;
   const imageTimeoutMs = options.timeoutMs ?? IMAGE_TIMEOUT_MS;
 

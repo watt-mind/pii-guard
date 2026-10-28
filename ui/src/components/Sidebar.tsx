@@ -1,3 +1,4 @@
+import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { useEffect, useId, useRef, useState } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
@@ -75,6 +76,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
         </div>
 
         <div id={menuId} className={[open ? "block" : "hidden", "border-t border-line lg:flex lg:min-h-0 lg:flex-col lg:border-t-0"].join(" ")}>
+          <ProjectSwitcher />
           <nav aria-label="Console" className="px-2 py-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-2">
             {NAV_GROUPS.map((group, gi) => (
               <div key={group.label ?? "top"} className={group.label ? "mt-4" : undefined}>
@@ -149,7 +151,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
 const NAV_GROUPS: readonly { label: string | null; ids: readonly Section[] }[] = [
   { label: null, ids: ["overview"] },
   { label: "Inspect", ids: ["playground", "logs", "vault"] },
-  { label: "Set up", ids: ["connect", "policy"] },
+  { label: "Set up", ids: ["projects", "connect", "policy"] },
   { label: "Measure", ids: ["evaluation"] },
 ];
 
@@ -158,6 +160,7 @@ const ICONS: Record<Section, string> = {
   playground: "M4 3.5 2 8l2 4.5M12 3.5 14 8l-2 4.5M9.5 3 6.5 13",
   logs: "M2.5 4h11M2.5 8h11M2.5 12h7",
   vault: "M3 6.5h10v7H3zM5.5 6.5V5a2.5 2.5 0 0 1 5 0v1.5M8 9.5v1.5",
+  projects: "M2 4h5l1-2h6v11H2zM5 7h6M5 10h4",
   connect: "M6.5 9.5 9.5 6.5M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1",
   policy: "M8 2.5 3.5 4.5v3.2c0 2.8 1.9 5 4.5 5.8 2.6-.8 4.5-3 4.5-5.8V4.5L8 2.5ZM6 8l1.5 1.5L10.5 6.5",
   evaluation: "M3 13V3M3 13h10.5M5.5 10l2.5-3 2 2 3-4",

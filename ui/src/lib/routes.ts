@@ -1,7 +1,7 @@
 // The console's sections and their URL hashes. The open section lives in the hash, so a reload
 // or a shared link lands on the same screen; the demo-era tab hashes redirect here (LAB-1287).
 
-export type Section = "overview" | "playground" | "logs" | "vault" | "connect" | "policy" | "evaluation";
+export type Section = "overview" | "playground" | "logs" | "vault" | "connect" | "policy" | "projects" | "evaluation";
 export type PlaygroundTab = "text" | "chat" | "images";
 
 export interface Route {
@@ -15,6 +15,7 @@ export const SECTIONS: readonly { id: Section; label: string; hint: string }[] =
   { id: "playground", label: "Playground", hint: "Try text, chat and images" },
   { id: "logs", label: "Logs", hint: "Every call through the gateway" },
   { id: "vault", label: "Vault", hint: "Sessions and their placeholders" },
+  { id: "projects", label: "Projects", hint: "Gateway endpoints and versioned policies" },
   { id: "connect", label: "Connect", hint: "Point a client at the gateway" },
   { id: "policy", label: "Policy", hint: "Mode, detectors, entity policies" },
   { id: "evaluation", label: "Evaluation", hint: "Benchmarks" },

@@ -16,10 +16,10 @@ export interface DemoResult {
   answer: string; restored: string; entities: { start: number; end: number; type: string }[];
   model: string; session_id: string; request_id: string;
 }
-export type Requester = <T>(path: string, body?: unknown, method?: "GET" | "POST" | "DELETE") => Promise<T>;
+export type Requester = <T>(path: string, body?: unknown, method?: "GET" | "POST" | "PUT" | "DELETE") => Promise<T>;
 
 /** Same-origin only. Never expose server messages which could echo sensitive input. */
-export const request: Requester = async <T>(path: string, body?: unknown, method?: "GET" | "POST" | "DELETE"): Promise<T> => {
+export const request: Requester = async <T>(path: string, body?: unknown, method?: "GET" | "POST" | "PUT" | "DELETE"): Promise<T> => {
   const response = await fetch(path, {
     method: method ?? (body === undefined ? "GET" : "POST"),
     credentials: "same-origin",
