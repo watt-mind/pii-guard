@@ -122,6 +122,15 @@ active nav item is marked by `aria-current`, its fill and a 500 weight, not by f
   14 px with a 16 px icon, ink coloured; the active one has the `--surface-2` fill and a 4 px
   radius. Groups (Inspect, Set up, Measure) keep the sections in their order; Overview stands
   alone at the top. Hints under each label show only in the phone menu.
+- **Brand row:** one 36 px line in the nav items' gutter, so the mark sits over their icons: a
+  20 px shield glyph (no tile) and "pii-guard" in Geist 16/500. No tagline in the sidebar; it
+  lives on the Overview and in the page title.
+- **Sidebar footer:** the Engine select, then the connection as a quiet line beside the theme
+  toggle: a 6 px dot and the API version in muted 12 px, with "API connected · fast mode ·
+  rules" in the tooltip (a click checks again). The label only appears when something differs:
+  "Demo mode" in orange when the demo engine answers, in red when the API is down and nobody
+  chose the demo engine. Only that case also turns the notice above the content red ("API not
+  reachable.").
 - **Page header:** a 48 px bar with the section (and Playground tab) over the accent hairline,
   from 1024 px. Below that width the menu's top bar names the section and the hairline sits
   under it.

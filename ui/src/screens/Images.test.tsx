@@ -88,7 +88,7 @@ describe("Images screen", () => {
     await user.upload(input, new File([new Uint8Array([0x89, 0x50])], "mine.png", { type: "image/png" }));
     expect(within(panel).getByText("Nothing has been sent yet")).toBeInTheDocument();
     await user.click(within(panel).getByRole("button", { name: "Mask image" }));
-    expect(await within(panel).findByRole("alert")).toHaveTextContent(/switch Engine in the header to Live API/);
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(/switch Engine in the sidebar to Live API/);
   });
 
   it("says an undecodable image could not be decoded", async () => {

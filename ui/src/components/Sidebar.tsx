@@ -13,6 +13,8 @@ interface Props {
   onRecheck: () => void;
   theme: ThemePref;
   onTheme: (t: ThemePref) => void;
+  /** What the connected server runs, for the status tooltip ("fast mode · rules+ner"). */
+  statusDetail?: string | null;
 }
 
 /**
@@ -20,7 +22,7 @@ interface Props {
  * Sections are plain hash links, so they open in a new tab, can be copied, and keep working
  * with the back button.
  */
-export function Sidebar({ route, onSection, engineState, engine, onPreference, onRecheck, theme, onTheme }: Props) {
+export function Sidebar({ route, onSection, engineState, engine, onPreference, onRecheck, theme, onTheme, statusDetail }: Props) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -48,17 +50,14 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">
           Skip to content
         </a>
-        <div className="flex items-center gap-2.5 px-4 py-3 lg:flex-wrap lg:px-5 lg:pt-4 lg:pb-3">
-          <Logo />
-          <div className="min-w-0 leading-tight lg:grow lg:basis-0">
-            <p className="font-mono text-sm font-medium text-ink">pii-guard</p>
-            <p className="truncate text-xs text-muted lg:whitespace-normal">
-              <span className="lg:hidden">{current.label}</span>
-              <span className="hidden lg:inline">privacy firewall for AI agents</span>
-            </p>
-          </div>
+        {/* The brand row shares the nav items' gutter (px-2 + px-3), so the mark sits over their icons. */}
+        <div className="flex items-center gap-2 px-2 py-2.5 lg:pt-3 lg:pb-2">
+          <a href="#overview" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm px-3 text-ink">
+            <Logo />
+            <span className="text-base font-medium">pii-guard</span>
+          </a>
+          <span className="truncate text-sm text-muted lg:hidden">{current.label}</span>
           <span className="flex-1 lg:hidden" />
-          <EngineBadge state={engineState} engine={engine} onRecheck={onRecheck} className="lg:mt-1 lg:basis-full" />
           <button
             ref={menuButton}
             type="button"
@@ -118,8 +117,8 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
             ))}
           </nav>
 
-          <div className="border-t border-line px-4 py-3 lg:px-5">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="space-y-2.5 border-t border-line px-5 py-3">
+            <div className="flex items-center gap-2">
               <label className="text-xs text-muted" htmlFor="engine-mode">
                 Engine
               </label>
@@ -127,12 +126,15 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                 id="engine-mode"
                 value={engineState.preference}
                 onChange={(e) => onPreference(e.target.value as ModePreference)}
-                className="h-8 min-w-28 flex-1 rounded-lg border border-field bg-surface px-2 text-xs font-medium text-ink"
+                className="h-8 min-w-0 flex-1 rounded-lg border border-field bg-surface px-2 text-xs text-ink"
               >
                 <option value="auto">Auto</option>
                 <option value="api">Live API</option>
                 <option value="mock">Demo engine</option>
               </select>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <EngineStatus state={engineState} engine={engine} detail={statusDetail} onRecheck={onRecheck} />
               <ThemeToggle theme={theme} onTheme={onTheme} />
             </div>
           </div>
@@ -176,33 +178,38 @@ function SectionIcon({ id, active }: { id: Section; active: boolean }) {
   );
 }
 
-export function EngineBadge({ state, engine, onRecheck, className }: { state: EngineState; engine: EngineDisplay; onRecheck: () => void; className?: string }) {
+/**
+ * The connection, as a quiet footer line: a dot and the API version when all is well. The
+ * label grows only when something differs: the demo engine answers, or the API is down (red).
+ * A click checks again.
+ */
+export function EngineStatus({ state, engine, detail, onRecheck }: { state: EngineState; engine: EngineDisplay; detail?: string | null; onRecheck: () => void }) {
   const reason = engineReason(state);
   const status = state.status;
   const version = status.state === "online" ? `v${status.version}` : null;
-  // One indicator: what is answering right now, and the API's own state only when it differs.
-  const { label, detail, tone } =
+  // Down means nobody asked for the demo engine and the API does not answer: the one case
+  // worth attention, so it is red here and in the notice above the content.
+  const down = engine === "mock" && state.preference !== "mock" && status.state === "offline";
+  const { label, shown, sub, tone } =
     engine === "pending"
-      ? { label: "Connecting…", detail: null, tone: "pending" as const }
+      ? { label: "Connecting…", shown: true, sub: null, tone: "pending" as const }
       : engine === "mock"
-        ? { label: "Demo mode", detail: status.state === "online" ? `API ${version} up, not in use` : "API offline", tone: "demo" as const }
-        : { label: "API up", detail: version, tone: "live" as const };
-  const dot = tone === "live" ? "bg-guard-dot" : tone === "demo" ? "bg-warn" : "bg-faint motion-safe:animate-pulse";
+        ? { label: "Demo mode", shown: true, sub: status.state === "online" ? `API ${version} up, not in use` : "API offline", tone: down ? ("down" as const) : ("demo" as const) }
+        : { label: "API up", shown: false, sub: version, tone: "live" as const };
+  const dot = { live: "bg-guard-dot", demo: "bg-warn", down: "bg-danger", pending: "bg-faint motion-safe:animate-pulse" }[tone];
+  const tip = tone === "live" ? ["API connected", detail].filter(Boolean).join(" · ") : reason;
 
   return (
-    <div role="status" aria-label={`${label}. ${reason}.`} className={className}>
+    <div role="status" aria-label={`${label}. ${reason}.`} className="min-w-0">
       <button
         type="button"
         onClick={onRecheck}
-        title={`${reason}. Click to check again.`}
-        className={[
-          "inline-flex h-8 max-w-full items-center gap-2 rounded-lg border px-2.5 text-xs font-medium whitespace-nowrap transition-colors",
-          tone === "demo" ? "border-warn/40 bg-warn-soft text-warn" : "border-line text-ink hover:border-line-strong",
-        ].join(" ")}
+        title={`${tip}. Click to check again.`}
+        className="inline-flex h-7 max-w-full min-w-0 items-center gap-2 rounded-sm text-xs whitespace-nowrap text-muted transition-colors hover:text-ink"
       >
         <span aria-hidden="true" className={["size-1.5 shrink-0 rounded-full", dot].join(" ")} />
-        <span>{label}</span>
-        {detail && <span className="hidden truncate font-mono text-2xs font-normal text-muted tabular-nums lg:inline">{detail}</span>}
+        <span className={shown ? (tone === "down" ? "font-medium text-danger" : tone === "demo" ? "font-medium text-warn" : "") : "sr-only"}>{label}</span>
+        {sub && <span className="truncate tabular-nums">{sub}</span>}
       </button>
     </div>
   );
@@ -237,11 +244,9 @@ function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemeP
 
 function Logo() {
   return (
-    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-on-primary">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
-        <path d="M12 3 5 6v5.2c0 4.3 2.9 8 7 9.3 4.1-1.3 7-5 7-9.3V6l-7-3Z" />
-        <path d="M8.6 12h6.8" strokeLinecap="round" />
-      </svg>
-    </span>
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 shrink-0 text-ink" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round">
+      <path d="M12 3 5 6v5.2c0 4.3 2.9 8 7 9.3 4.1-1.3 7-5 7-9.3V6l-7-3Z" />
+      <path d="M8.6 12h6.8" strokeLinecap="round" />
+    </svg>
   );
 }

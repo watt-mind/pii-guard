@@ -4,6 +4,7 @@ import { engineReason } from "./api/engine";
 import { createHttpClient, type HttpGuardClient } from "./api/http";
 import { MOCK_SESSION_PREFIX, createMockClient } from "./api/mock";
 import type { GuardClient } from "./api/types";
+import type { ServerStatus } from "./api/status";
 import { Sidebar } from "./components/Sidebar";
 import { DEFAULT_SAMPLE, SAMPLES, sampleBehind, type Sample } from "./content/samples";
 import type { BenchmarkLoader } from "./api/benchmarks";
@@ -154,6 +155,8 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
   };
 
   const chatClient = engine.engine === "api" ? apiChat : mockChat;
+  // Nobody chose the demo engine and the API does not answer: the notice turns red.
+  const apiDown = engine.engine === "mock" && engine.state.preference !== "mock" && engine.state.status.state === "offline";
   const section = route.section;
   const tab = route.tab;
 
@@ -168,14 +171,15 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
         onRecheck={engine.recheck}
         theme={theme}
         onTheme={setTheme}
+        statusDetail={server ? statusDetailOf(server) : null}
       />
 
       <div className="min-w-0">
         <PageHeader route={route} />
         {engine.engine === "mock" && (
-          <div role="status" className="border-b border-warn/30 bg-warn-soft">
+          <div role="status" className={apiDown ? "border-b border-danger/30 bg-danger-soft" : "border-b border-warn/30 bg-warn-soft"}>
             <p className="mx-auto max-w-[1280px] px-4 py-2 text-xs text-ink sm:px-6 sm:text-sm">
-              <strong className="font-medium text-warn">Demo mode.</strong> {engineReason(engine.state)}.{" "}
+              {apiDown ? <strong className="font-medium text-danger">API not reachable.</strong> : <strong className="font-medium text-warn">Demo mode.</strong>} {engineReason(engine.state)}.{" "}
               {section === "playground" && tab === "images"
                 ? "Images replay regions recorded from a real SAM 3.1 run on the built-in samples; uploads need the API."
                 : section === "evaluation"
@@ -312,6 +316,12 @@ export function App({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, 
       </div>
     </div>
   );
+}
+
+/** The status tooltip's detail: "fast mode · rules+ner". */
+function statusDetailOf(s: ServerStatus): string {
+  const mode = s.gateway.modes[s.gateway.default_mode as keyof ServerStatus["gateway"]["modes"]];
+  return [`${s.gateway.default_mode} mode`, mode?.detectors.join("+")].filter(Boolean).join(" · ");
 }
 
 /** The bar above every section: where you are, over the accent hairline. Below 1024 px the

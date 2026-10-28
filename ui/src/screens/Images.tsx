@@ -621,7 +621,7 @@ function DemoUploadNotice({ switchEngine }: { switchEngine: boolean }) {
       <p className="mt-1 text-ink">Image masking runs on the pii-guard server, not in your browser. Your image was not sent anywhere.</p>
       <p className="mt-2 text-muted">
         {switchEngine ? (
-          <>The API is up: switch <strong className="font-medium text-ink">Engine</strong> in the header to <strong className="font-medium text-ink">Live API</strong>, then mask the image again.</>
+          <>The API is up: switch <strong className="font-medium text-ink">Engine</strong> in the sidebar to <strong className="font-medium text-ink">Live API</strong>, then mask the image again.</>
         ) : (
           <>
             Start it with <code className="rounded bg-surface px-1 font-mono text-xs">pii-guard up</code>, or try one of the samples, which replay a recorded run.
