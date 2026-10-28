@@ -111,6 +111,7 @@ class RouterTests(unittest.TestCase):
             "proxy_set_header X-Pii-Guard-External-Proto https;",
             "proxy_set_header X-Forwarded-For $remote_addr;",
             "proxy_ssl_verify on;",
+            "proxy_ssl_verify_depth 3;",
             "proxy_ssl_server_name on;",
             "proxy_buffering off;",
             "proxy_request_buffering off;",
