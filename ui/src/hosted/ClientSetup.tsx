@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { TOOLS, fetchSnippets, type Snippets, type ToolSnippet } from "../api/connect";
 import { Button, ButtonLink, Field, Input, Notice, Select } from "../components/ui";
 import { projectPath, type Endpoint, type ProjectList } from "../projects/api";
@@ -23,7 +23,7 @@ import {
   type IssuedKey,
   type TestRoundTrip,
 } from "./firstRun";
-import { useHostedSession } from "./session";
+import { SOURCE, useHostedSession } from "./session";
 
 type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoints: Endpoint[]; first: FirstRun | null; projectId: string };
 
@@ -137,7 +137,15 @@ function ConnectEndpoint({
   const url = first?.gateway_url || `${globalThis.location?.origin ?? ""}/e/${endpoint.id}/v1`;
   // The key this page was shown (first sign-in, or "Create a new guard key"): the blocks embed it.
   const [key, setKey] = useState<IssuedKey | null>(() => getShownKey(endpoint.id));
-  const upstream = endpoint.provider === "sponsored" ? "Sponsored Meta" : endpoint.provider === "meta" ? "Your Meta API key" : endpoint.provider;
+  // After the Meta key is saved its form goes away: focus moves on to step 1, not to <body>.
+  const wasNeedsKey = useRef(state === "needs_key");
+  const stepOne = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (wasNeedsKey.current && state === "ready") stepOne.current?.focus();
+    wasNeedsKey.current = state === "needs_key";
+  }, [state]);
+  const upstream =
+    endpoint.provider === "sponsored" ? (state === "needs_key" ? "Meta API key needed" : "Sponsored Meta") : endpoint.provider === "meta" ? "Your Meta API key" : endpoint.provider;
   return (
     <div className="space-y-5 rounded-xl border border-line bg-surface p-4 sm:p-5" data-testid="first-run">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
@@ -169,7 +177,7 @@ function ConnectEndpoint({
         <Notice tone="warn">This endpoint is disabled. Re-enable it in Projects to connect a client.</Notice>
       ) : (
         <ol className="space-y-6">
-          <Step n={1} title="Copy your guard key">
+          <Step n={1} title="Copy your guard key" headingRef={stepOne}>
             <KeyStep call={call} endpoint={endpoint} projectId={projectId} onKey={setKey} />
           </Step>
           <Step n={2} title="Paste one block into your tool">
@@ -249,6 +257,11 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
   const [key, setKeyState] = useState<IssuedKey | null>(() => getShownKey(endpoint.id));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const createRef = useRef<HTMLButtonElement>(null);
+  const dismissed = useRef(false);
+  useEffect(() => {
+    if (!key && dismissed.current) createRef.current?.focus();
+  }, [key]);
   const setKey = (next: IssuedKey | null) => {
     setKeyState(next);
     onKey(next);
@@ -268,20 +281,23 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
   };
   if (key) {
     return (
-      <div className="space-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 sm:p-4" role="status">
-        <p className="text-sm font-medium text-warn">Copy your guard key now. It is shown only once.</p>
+      <div className="space-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 sm:p-4">
+        <p role="status" className="text-sm font-medium text-warn">
+          Copy your guard key now. It is shown only once.
+        </p>
         <CodeBlock text={`export ${ENDPOINT_KEY_ENV}=${key.key}`} label="Copy the export line with your guard key" />
         <p className="text-xs text-pretty text-muted">
           The blocks below already contain it. pii-guard keeps only a hash, so after you leave or reload this page it can&apos;t be shown again: store it now (for example in a
           password manager). It works only for this endpoint; revoke it in Projects.
         </p>
         <div className="flex flex-wrap gap-2">
-          <CopyButton text={key.key} label="Copy the guard key only" />
+          <CopyKeyOnly text={key.key} />
           <Button
             size="sm"
             variant="ghost"
             onClick={() => {
               forgetShownKey();
+              dismissed.current = true;
               setKey(null);
             }}
           >
@@ -301,7 +317,7 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
         .
       </p>
       {error && <p className="text-sm text-danger" role="alert">{error}</p>}
-      <Button busy={busy} onClick={() => void create()}>
+      <Button ref={createRef} busy={busy} onClick={() => void create()}>
         {busy ? "Creating…" : "Create a new guard key"}
       </Button>
     </div>
@@ -345,9 +361,8 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
           </Notice>
         ) : !chosen.supported ? (
           <div role="note" className="space-y-1 text-sm">
-            <p className="font-medium text-ink">{LABEL[chosen.id] ?? chosen.label} can&apos;t use an endpoint URL yet.</p>
-            <p className="text-pretty text-muted">{chosen.note}</p>
-            <p className="text-muted">Codex, pi, the OpenAI SDK and cURL work with this endpoint today.</p>
+            <p className="text-pretty text-ink">{chosen.note.replace(/; use another tool\.?$/, ".")}</p>
+            <p className="text-muted">Codex, pi, OpenCode, the OpenAI SDK and cURL work with this endpoint today.</p>
           </div>
         ) : (
           <>
@@ -355,6 +370,16 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
             <p className="text-xs text-pretty text-muted">
               {guardKey ? "Your guard key is filled in: paste it as is. " : <>Reads your guard key from {mono(`$${ENDPOINT_KEY_ENV}`)}. </>}
               {chosen.note}
+              {chosen.id === "pi" && (
+                <>
+                  {" "}
+                  The first line needs the pii-guard command (
+                  <a href={`${SOURCE}#quick-start`} target="_blank" rel="noreferrer" className="text-ink underline underline-offset-2">
+                    install it ↗
+                  </a>
+                  ).
+                </>
+              )}
               {chosen.tested_version && <> Tested end to end with {chosen.label} {chosen.tested_version}.</>}{" "}
               {chosen.docs && (
                 <a href={chosen.docs} target="_blank" rel="noreferrer" className="text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink">
@@ -377,15 +402,20 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
 
 function ToolTabs({ tabs, tool, onTool }: { tabs: { id: string; label: string }[]; tool: string; onTool: (t: string) => void }) {
   const onKey = (e: KeyboardEvent<HTMLButtonElement>) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    e.preventDefault();
     const i = tabs.findIndex((t) => t.id === tool);
-    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]!;
+    const index = { ArrowRight: i + 1, ArrowLeft: i + tabs.length - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (index === undefined) return;
+    e.preventDefault();
+    const next = tabs[index % tabs.length]!;
     onTool(next.id);
     document.getElementById(`first-run-tab-${next.id}`)?.focus();
   };
   return (
-    <div role="tablist" aria-label="Your tool" className="-mx-1 flex gap-1 overflow-x-auto border-b border-line">
+    <div
+      role="tablist"
+      aria-label="Your tool"
+      className="-mx-1 flex gap-1 overflow-x-auto border-b border-line [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:[mask-image:none]"
+    >
       {tabs.map((t) => {
         const selected = t.id === tool;
         return (
@@ -446,7 +476,7 @@ function TestStep({ endpointId }: { endpointId: string }) {
       </Button>
       <div aria-live="polite">
         {running && (
-          <p role="status" className="text-sm text-muted">
+          <p className="text-sm text-muted">
             Masking, then waiting for the model. Reasoning models can take up to a minute.
           </p>
         )}
@@ -457,7 +487,7 @@ function TestStep({ endpointId }: { endpointId: string }) {
         )}
         {result && (
           <div id={resultId} className="space-y-3">
-            <p role="status" className="text-sm font-medium text-guard-ink">
+            <p className="text-sm font-medium text-guard-ink">
               ✓ Round trip complete{result.maskedCount !== null ? `: ${result.maskedCount} ${result.maskedCount === 1 ? "value" : "values"} masked before the model saw it` : ""} ·{" "}
               {(result.ms / 1000).toFixed(1)} s
             </p>
@@ -493,14 +523,14 @@ function Pane({ title, text, tone }: { title: string; text: string; tone?: "mode
 
 const mono = (s: string) => <code className="font-mono text-xs">{s}</code>;
 
-function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+function Step({ n, title, children, headingRef }: { n: number; title: string; children: ReactNode; headingRef?: Ref<HTMLHeadingElement> }) {
   return (
     <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 gap-y-2">
       <span aria-hidden="true" className="grid size-7 place-items-center rounded-full border border-line font-mono text-xs text-muted">
         {n}
       </span>
       <div className="min-w-0 space-y-2">
-        <h3 className="pt-1 text-sm font-medium text-ink">
+        <h3 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="pt-1 text-sm font-medium text-ink focus:outline-none">
           <span className="sr-only">Step {n}: </span>
           {title}
         </h3>
@@ -529,5 +559,26 @@ function NoEndpointPreview() {
         Create an endpoint <span aria-hidden="true">→</span>
       </ButtonLink>
     </div>
+  );
+}
+
+/** The raw key alone, for a password manager: its own visible label beside the export line's Copy. */
+function CopyKeyOnly({ text }: { text: string }) {
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
+  const copy = () => {
+    const done = (r: "ok" | "failed") => {
+      setCopied(r);
+      setTimeout(() => setCopied(null), 1600);
+    };
+    if (!navigator.clipboard) return done("failed");
+    navigator.clipboard.writeText(text).then(
+      () => done("ok"),
+      () => done("failed"),
+    );
+  };
+  return (
+    <Button size="sm" onClick={copy}>
+      <span aria-live="polite">{copied === "ok" ? "Copied" : copied === "failed" ? "Select and copy" : "Copy key only"}</span>
+    </Button>
   );
 }

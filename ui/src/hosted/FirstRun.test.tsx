@@ -119,7 +119,7 @@ describe("first run, sponsored on", () => {
     expect(python).toHaveTextContent(`api_key="${KEY}"`);
     expect(python.textContent).not.toContain("import os");
     await user.click(within(setup).getByRole("tab", { name: "Muse Code" }));
-    expect(within(setup).getByText("Muse Code can't use an endpoint URL yet.")).toBeInTheDocument();
+    expect(within(setup).getByText("Not for endpoint URLs yet.")).toBeInTheDocument();
 
     await user.click(within(setup).getByRole("button", { name: "Send a test request" }));
     expect(await within(setup).findByText(/Round trip complete: 2 values masked/)).toBeInTheDocument();
@@ -156,6 +156,7 @@ describe("first run, sponsored off", () => {
     const setup = await screen.findByRole("region", { name: "Connect your client" });
     expect(location.hash).toBe("#connect");
     expect(await within(setup).findByText("Needs a key")).toBeInTheDocument();
+    expect(within(setup).getByText(/Meta API key needed/)).toBeInTheDocument();
     const form = within(setup).getByRole("form", { name: "Add your Meta API key" });
     expect(form.querySelectorAll("input, textarea, select")).toHaveLength(1);
     expect(within(form).getByRole("link", { name: /Get one at dev.meta.ai/ })).toHaveAttribute("href", "https://dev.meta.ai");
@@ -167,6 +168,8 @@ describe("first run, sponsored off", () => {
     await user.click(within(form).getByRole("button", { name: "Save key and continue" }));
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/account/first-run", { meta_api_key: "example-meta-key", issue_key: true }));
     expect(await within(setup).findByText("Ready")).toBeInTheDocument();
+    // The form is gone: focus moves on to step 1, not back to the page.
+    await waitFor(() => expect(document.activeElement).toHaveTextContent("Copy your guard key"));
     // The guard key issued at sign-in is shown now, and the blocks embed it.
     expect(within(setup).getAllByText(`export PII_GUARD_ENDPOINT_KEY=${KEY}`, { exact: false }).length).toBeGreaterThan(0);
     expect(within(setup).getByText(/Your Meta API key/)).toBeInTheDocument();
