@@ -72,6 +72,12 @@ describe("project workspace", () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/endpoint-one/keys/key-one", undefined, "DELETE"));
   });
 
+  it("does not reset the inspection namespace when the selected project is already valid", async () => {
+    const selected = vi.fn(); render(<Workspace call={fixture()} projectId="project-one" onProject={selected} />);
+    await screen.findByText("Synthetic support");
+    expect(selected).not.toHaveBeenCalled();
+  });
+
   it("keeps endpoint editor and connection details distinct", async () => {
     const call = fixture(); const user = userEvent.setup(); render(<Workspace call={call} />);
     await user.click(await screen.findByRole("button", { name: "Connect & keys" }));
