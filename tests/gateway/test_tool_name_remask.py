@@ -14,6 +14,7 @@ import json
 from typing import Any
 
 import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gateway_helpers import (
@@ -30,7 +31,12 @@ from test_responses import ResponsesUpstream, muse_body
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
 from pii_guard.gateway import Gateway, GatewayConfig, Mode, build_mode_detectors
-from pii_guard.gateway.tool_names import identifier_keeps_tool_names
+from pii_guard.gateway.tool_names import (
+    identifier_keeps_tool_names,
+    tool_names,
+    without_tool_names,
+)
+from pii_guard.types import EntityType, Span
 from pii_guard.vault import Vault
 from pii_guard.visual import OcrWord, SamClient
 from pii_guard.visual.regions import Box
@@ -258,3 +264,68 @@ def test_identifier_keeps_tool_names() -> None:
     # Nothing masked: kept only if nothing changed at all.
     assert keeps("muse", "muse", names, original)
     assert not keeps("muse", "other", names, original)
+    # A placeholder of a type found by format or checksum is never a tool word (LAB-1348).
+    tax = {"[[NATIONAL_ID_HU_TAX_aaaa]]": "8123456786"}
+    assert not keeps("8123456786", "[[NATIONAL_ID_HU_TAX_aaaa]]", TAX_NAMES, tax.get)
+
+
+# --- the exemption covers word-like types only (LAB-1348) -----------------------------------
+
+TAX_ID = "8123456786"  # fictional, checksum-valid
+IBAN_COMPACT = "HU42117730161111101800000000"  # gateway_helpers.IBAN without spaces
+TAX_NAMES = frozenset({TAX_ID})
+
+
+def structured_chat(name: str, value: str) -> dict[str, Any]:
+    return {
+        "model": "m",
+        "messages": [{"role": "user", "content": f"Az azonosítóm {value}, kérlek ellenőrizd."}],
+        "tools": [chat_tool(name)],
+    }
+
+
+def structured_responses(name: str, value: str) -> dict[str, Any]:
+    return {
+        "model": "m",
+        "input": [{"role": "user", "content": f"Az azonosítóm {value}, kérlek ellenőrizd."}],
+        "tools": [{"type": "function", "name": name, "parameters": {}}],
+    }
+
+
+@pytest.mark.parametrize("value", [TAX_ID, IBAN_COMPACT, "teszt.elek@example.com"])
+def test_a_tool_named_after_a_structured_value_fails_closed_on_chat(value: str) -> None:
+    """A tool named after a valid tax ID used to keep that ID unmasked in every text, and the
+    name went upstream too. The value is personal data whatever the tools are called: the
+    identifier can't carry a placeholder, so the request is refused, nothing is forwarded."""
+    upstream = MockUpstream()
+    with TestClient(make_app(upstream)) as http:
+        response = http.post("/v1/chat/completions", json=structured_chat(value, value))
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "unsupported_content"
+    assert value not in response.text
+    assert upstream.requests == []
+
+
+@pytest.mark.parametrize("value", [TAX_ID, IBAN_COMPACT])
+def test_a_tool_named_after_a_structured_value_fails_closed_on_responses(value: str) -> None:
+    upstream = ResponsesUpstream()
+    with TestClient(make_app(upstream)) as http:
+        response = http.post("/v1/responses", json=structured_responses(value, value))
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "unsupported_content"
+    assert upstream.requests == []
+
+
+@pytest.mark.parametrize("value", [TAX_ID, IBAN_COMPACT])
+def test_a_structured_value_in_text_is_masked_when_a_tool_is_named_after_it(value: str) -> None:
+    """The texts: the value stays a detection, it is never dropped as tool vocabulary."""
+    texts = [f"Az azonosítóm {value}."]
+    start = texts[0].index(value)
+    entity = EntityType.NATIONAL_ID_HU_TAX if value == TAX_ID else EntityType.BANK_ACCOUNT
+    found = [[Span(start, start + len(value), entity, value, 0.99, "rules")]]
+    names = tool_names(structured_chat(value, value))
+    assert names  # identifier-shaped, so declared
+    assert without_tool_names(texts, found, names) == found
+    # A word-like type of the same name is still dropped (LAB-1299).
+    person = [[Span(start, start + len(value), EntityType.PERSON, value, 0.9, "ner")]]
+    assert without_tool_names(texts, person, names) == [[]]
