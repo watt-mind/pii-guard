@@ -51,6 +51,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from pii_guard.detect import ner_resolve
+from pii_guard.detect.ner_numbers import check_numbers
 from pii_guard.types import DetectionError, EntityType, Span
 
 __all__ = [
@@ -603,6 +604,9 @@ class NerDetector:
       zero-argument factory for one.
     - ``preload``: load the model in the constructor (default), so a missing or broken model
       fails when the detector is built; ``False`` defers it to the first call.
+    - ``number_checks``: drop the proposed ``ID_DOCUMENT``, ``BANK_ACCOUNT``, tax and TAJ
+      numbers that a negative cue or their shape rules out
+      (:mod:`pii_guard.detect.ner_numbers`, LAB-1293); default on.
 
     The model is loaded once per process, under a process-wide lock, and detectors with the
     same model, revision, device and window settings share it (LAB-1274). A load failure raises
@@ -628,7 +632,9 @@ class NerDetector:
         backend_kind: str | None = None,
         published: str | None = None,
         fallback: str | None = None,
+        number_checks: bool = True,
     ) -> None:
+        self.number_checks = number_checks
         kind = (backend_kind or os.environ.get(BACKEND_ENV_VAR) or "transformers").strip().lower()
         if kind not in BACKENDS:
             raise ValueError(f"ner backend must be one of {BACKENDS}")
@@ -823,7 +829,14 @@ class NerDetector:
                 continue
             start, end = trimmed
             spans.add(Span(start, end, entity_type, text[start:end], score, self.name))
-        return sorted(spans, key=lambda s: (s.start, s.end, s.entity_type.value))
+        found = sorted(spans, key=lambda s: (s.start, s.end, s.entity_type.value))
+        if self.number_checks:
+            # Format, checksum and cue checks for the numbers the model proposes (LAB-1293).
+            found = sorted(
+                set(check_numbers(text, found)),
+                key=lambda s: (s.start, s.end, s.entity_type.value),
+            )
+        return found
 
 
 def _trim(text: str, start: int, end: int, entity_type: EntityType) -> tuple[int, int] | None:
