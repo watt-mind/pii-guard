@@ -14,8 +14,10 @@ match wins:
    sends ``tbh:main:<conversation uuid>`` for its main agent and
    ``tbh:<kind>-reminder:<uuid[:8]>:...`` for each reminder observer; an observer key uses the
    session of the newest main key of the same client identity with that 8-hex prefix
-   (LAB-1300), so one task stays in one session. An observer whose main key this process hasn't
-   seen keeps a session of its own.
+   (LAB-1300), so one task stays in one session. Muse sends its first main turn and its first
+   observer at the same time, so either can be resolved first (LAB-1341): an observer whose
+   main key this process hasn't seen leaves its session under the prefix, and the first main
+   key with that prefix takes that session over instead of starting its own.
 4. ``default``: one session per client identity, ``HMAC(tenant key, "default:" + identity)``.
    Created on first use.
 
@@ -88,23 +90,50 @@ def client_identity(headers: Mapping[str, str]) -> str:
 
 
 class _Conversations:
-    """``(client identity, 8-hex prefix) -> derived session id`` of the newest Muse main key,
-    bounded by :data:`MAX_CONVERSATIONS`. Lives as long as its vault (sessions are in memory)."""
+    """Muse conversations per vault. Lives as long as its vault (sessions are in memory); each
+    index keeps :data:`MAX_CONVERSATIONS` entries (oldest forgotten first).
+
+    - ``_by_prefix``: ``(client identity, 8-hex prefix) -> session id`` of the newest main key.
+    - ``_mains``: ``(client identity, main key) -> session id``, so a main key that took an
+      observer's session over keeps it.
+    - ``_pending``: ``(client identity, 8-hex prefix) -> session id`` of an observer that came
+      before any main key with its prefix, until that main key takes it over.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._by_prefix: OrderedDict[tuple[str, str], str] = OrderedDict()
+        self._mains: OrderedDict[tuple[str, str], str] = OrderedDict()
+        self._pending: OrderedDict[tuple[str, str], str] = OrderedDict()
 
-    def remember(self, identity: str, prefix: str, derived: str) -> None:
+    def main(self, identity: str, prefix: str, key: str, derived: str) -> str:
+        """The session id for main key ``key`` (``derived``: the key's own derived id)."""
         with self._lock:
-            self._by_prefix[identity, prefix] = derived
-            self._by_prefix.move_to_end((identity, prefix))
-            while len(self._by_prefix) > MAX_CONVERSATIONS:
-                self._by_prefix.popitem(last=False)
+            found = self._mains.get((identity, key))
+            if found is None:
+                # An observer of this conversation came first: take its session over.
+                found = self._pending.pop((identity, prefix), derived)
+            _put(self._mains, (identity, key), found)
+            _put(self._by_prefix, (identity, prefix), found)
+            return found
 
-    def lookup(self, identity: str, prefix: str) -> str | None:
+    def observer(self, identity: str, prefix: str, derived: str) -> str:
+        """The session id for an observer key with ``prefix`` (``derived``: its own id)."""
         with self._lock:
-            return self._by_prefix.get((identity, prefix))
+            found = self._by_prefix.get((identity, prefix))
+            if found is None:
+                found = self._pending.get((identity, prefix))
+            if found is None:
+                found = derived
+                _put(self._pending, (identity, prefix), found)
+            return found
+
+
+def _put(index: OrderedDict[tuple[str, str], str], at: tuple[str, str], value: str) -> None:
+    index[at] = value
+    index.move_to_end(at)
+    while len(index) > MAX_CONVERSATIONS:
+        index.popitem(last=False)
 
 
 _CONVERSATIONS: weakref.WeakKeyDictionary[Vault, _Conversations] = weakref.WeakKeyDictionary()
@@ -120,16 +149,14 @@ def _conversations(vault: Vault) -> _Conversations:
 
 
 def _cache_key_session_id(vault: Vault, identity: str, key: str) -> str:
-    """The derived id for ``key`` (step 3), a Muse observer's mapped to its main key's."""
+    """The derived id for ``key`` (step 3); Muse's main and observer keys of one conversation
+    share one, whichever is resolved first."""
+    derived = vault.derive_session_id(f"pck:{identity}:{key}")
     if (main := _MUSE_MAIN_RE.match(key)) is not None:
-        derived = vault.derive_session_id(f"pck:{identity}:{key}")
-        _conversations(vault).remember(identity, main.group(1), derived)
-        return derived
+        return _conversations(vault).main(identity, main.group(1), key, derived)
     if (observer := _MUSE_OBSERVER_RE.match(key)) is not None:
-        found = _conversations(vault).lookup(identity, observer.group(1))
-        if found is not None:
-            return found
-    return vault.derive_session_id(f"pck:{identity}:{key}")
+        return _conversations(vault).observer(identity, observer.group(1), derived)
+    return derived
 
 
 def resolve_session(

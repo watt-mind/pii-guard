@@ -136,9 +136,11 @@ main key's session under its 8-hex prefix and client identity (in memory, the ne
 conversations), and an observer key with that prefix and identity uses that session. The
 prefix is a UUIDv7 timestamp (about 65 s), so when one client starts two Muse conversations in
 the same window, their observers follow the newer one; the main conversations keep their own
-sessions, and nothing is ever shared across client identities. An observer seen before its
-main key (e.g. right after a restart) keeps a session of its own. The path URL that `connect`
-writes needs none of this.
+sessions, and nothing is ever shared across client identities. Muse sends its first main turn
+and its first observer at the same time, so the observer can reach the gateway first: its
+session then waits under the prefix, and the first main key with that prefix and identity
+takes it over instead of starting a second one (LAB-1341). The path URL that `connect` writes
+needs none of this.
 
 ## Failing closed
 
