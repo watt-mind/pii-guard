@@ -551,3 +551,160 @@ def test_session_capacity_refuses_growth_without_evicting_existing_values(
     )
     assert restored.status_code == 200
     assert restored.json()["text"] == EMAIL
+
+
+class _ObservedUpstreamStream(httpx.AsyncByteStream):
+    """Expose resource cleanup and consumption without opening a network connection."""
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        self.chunks = chunks
+        self.reads = 0
+        self.closed = False
+
+    async def __aiter__(self) -> Any:
+        for chunk in self.chunks:
+            self.reads += 1
+            yield chunk
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+def _custom_profile(client: TestClient) -> dict[str, str]:
+    async def validated_destination(url: str) -> str:
+        assert url == "https://provider.example/v1"
+        return url
+
+    client.app.state.hosted.connections._validator = validated_destination
+    created = client.post(
+        "/v1/account/connections",
+        json={
+            "provider": "custom",
+            "api_key": "synthetic-own-upstream-key",
+            "base_url": "https://provider.example/v1",
+        },
+        headers=auth(),
+    )
+    assert created.status_code == 201, created.text
+    return auth(**{"x-pii-guard-connection": created.json()["id"]})
+
+
+def _assert_hosted_work_released(client: TestClient) -> None:
+    service = client.app.state.hosted
+    assert service.quotas._active == 0
+    assert all(runtime.active == 0 for runtime in service._runtimes.values())
+    # Connection creation plus the failed upstream call; failures never refund admission.
+    assert client.get("/v1/account", headers=auth()).json()["usage"]["requests_today"] == 2
+
+
+@pytest.mark.parametrize("path", ["/v1/chat/completions", "/v1/responses"])
+@pytest.mark.parametrize("prefetched", [False, True])
+@pytest.mark.parametrize("stream", [False, True])
+def test_custom_upstream_size_cap_covers_whole_prefetched_and_sse(
+    boundary: tuple[TestClient, list[httpx.Request]],
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    prefetched: bool,
+    stream: bool,
+) -> None:
+    client, _ = boundary
+    headers = _custom_profile(client)
+    # Deliberately exceed 2 MiB cumulatively with chunks below the cap individually.
+    # An SSE line without a newline must also be bounded before the parser buffers it.
+    padding = b"x" * (1024 * 1024)
+    if stream:
+        chunks = [b"data: " + padding, padding, b"\n\n"]
+        content_type = "text/event-stream"
+    else:
+        chunks = [b'{"synthetic_padding":"' + padding, padding, b'"}']
+        content_type = "application/json"
+    observed = _ObservedUpstreamStream(chunks)
+    upstream_responses: list[httpx.Response] = []
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "provider.example"
+        assert request.headers["authorization"] == "Bearer synthetic-own-upstream-key"
+        response = httpx.Response(
+            200,
+            headers={"content-type": content_type},
+            **({"content": b"".join(chunks)} if prefetched else {"stream": observed}),
+        )
+        upstream_responses.append(response)
+        return response
+
+    monkeypatch.setattr(
+        "pii_guard.hosted.runtime.SecureTransport", lambda: httpx.MockTransport(upstream)
+    )
+    body: dict[str, Any] = {"model": "synthetic-model", "stream": stream}
+    body.update(
+        {"input": EMAIL}
+        if path == "/v1/responses"
+        else {"messages": [{"role": "user", "content": EMAIL}]}
+    )
+    result = client.post(path, json=body, headers=headers)
+    if stream and not prefetched:
+        assert result.status_code == 200, result.text
+        assert "stream_failed" in result.text
+        assert result.headers["content-type"].startswith("text/event-stream")
+    else:
+        assert result.status_code == 502, result.text
+        assert result.json()["error"]["code"] == "upstream_unavailable"
+    assert len(result.content) < 4096
+    assert b"x" * 100 not in result.content
+    assert len(upstream_responses) == 1
+    assert upstream_responses[0].is_closed
+    if not prefetched:
+        assert observed.closed
+        assert observed.reads == 2  # The over-limit chunk ends consumption; no trailing read.
+    _assert_hosted_work_released(client)
+
+
+@pytest.mark.parametrize("path", ["/v1/chat/completions", "/v1/responses"])
+@pytest.mark.parametrize("prefetched", [False, True])
+@pytest.mark.parametrize("stream", [False, True])
+def test_compressed_custom_upstream_is_refused_before_consumption(
+    boundary: tuple[TestClient, list[httpx.Request]],
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    prefetched: bool,
+    stream: bool,
+) -> None:
+    import gzip
+
+    client, _ = boundary
+    headers = _custom_profile(client)
+    # Small, safe fixture: the policy blocks compression itself, not merely expansion size.
+    compressed = gzip.compress(b'{"synthetic":"small"}')
+    observed = _ObservedUpstreamStream([compressed])
+    upstream_responses: list[httpx.Response] = []
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        response = httpx.Response(
+            200,
+            headers={
+                "content-encoding": "gzip",
+                "content-type": "text/event-stream" if stream else "application/json",
+            },
+            **({"content": compressed} if prefetched else {"stream": observed}),
+        )
+        upstream_responses.append(response)
+        return response
+
+    monkeypatch.setattr(
+        "pii_guard.hosted.runtime.SecureTransport", lambda: httpx.MockTransport(upstream)
+    )
+    body: dict[str, Any] = {"model": "synthetic-model", "stream": stream}
+    body.update(
+        {"input": EMAIL}
+        if path == "/v1/responses"
+        else {"messages": [{"role": "user", "content": EMAIL}]}
+    )
+    result = client.post(path, json=body, headers=headers)
+    assert result.status_code == 502, result.text
+    assert result.json()["error"]["code"] == "upstream_unavailable"
+    assert len(result.content) < 4096
+    assert upstream_responses[0].is_closed
+    if not prefetched:
+        assert observed.closed
+        assert observed.reads == 0
+    _assert_hosted_work_released(client)

@@ -22,6 +22,8 @@ import httpx
 
 from pii_guard.types import PiiGuardError
 
+MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+
 Resolver = Callable[[str], Awaitable[tuple[str, ...]]]
 _HOST_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z")
 _LOCAL_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".home", ".test", ".invalid")
@@ -172,19 +174,30 @@ class PublicNetworkBackend(httpcore.AsyncNetworkBackend):
         await asyncio.sleep(seconds)
 
 
-class _ResponseStream(httpx.AsyncByteStream):
+class BoundedResponseStream(httpx.AsyncByteStream):
+    """Bound total raw response bytes before delivery, for catalogs and streamed answers."""
+
     def __init__(self, stream: Any) -> None:
         self._stream = stream
 
     async def __aiter__(self) -> AsyncIterator[bytes]:
+        total = 0
         try:
             async for chunk in self._stream:
+                total += len(chunk)
+                if total > MAX_RESPONSE_BYTES:
+                    await self._stream.aclose()
+                    raise httpx.ReadError("upstream response exceeds hosted size limit")
                 yield chunk
         except (httpcore.NetworkError, httpcore.ProtocolError, httpcore.TimeoutException):
             raise httpx.ReadError("upstream response interrupted") from None
 
     async def aclose(self) -> None:
         await self._stream.aclose()
+
+
+# Kept for callers that used the original internal transport adapter name.
+_ResponseStream = BoundedResponseStream
 
 
 class SecureTransport(httpx.AsyncBaseTransport):
@@ -210,8 +223,11 @@ class SecureTransport(httpx.AsyncBaseTransport):
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         validate_base_url(str(request.url))
         # Do not permit a mismatched Host or caller-selected TLS name, even via extensions.
-        headers = [(k, v) for k, v in request.headers.raw if k.lower() != b"host"]
+        headers = [
+            (k, v) for k, v in request.headers.raw if k.lower() not in (b"host", b"accept-encoding")
+        ]
         headers.insert(0, (b"Host", request.url.raw_host))
+        headers.append((b"Accept-Encoding", b"identity"))
         core_request = httpcore.Request(
             method=request.method,
             url=httpcore.URL(
@@ -233,10 +249,23 @@ class SecureTransport(httpx.AsyncBaseTransport):
         if 300 <= response.status < 400:
             await response.aclose()
             raise httpx.RemoteProtocolError("upstream redirects are disabled")
+        for name, value in response.headers:
+            if name.lower() == b"content-encoding" and value.strip().lower() != b"identity":
+                await response.aclose()
+                raise httpx.ReadError("compressed upstream responses are disabled")
+            if name.lower() == b"content-length":
+                try:
+                    length = int(value)
+                except ValueError:
+                    await response.aclose()
+                    raise httpx.ReadError("invalid upstream response size") from None
+                if length < 0 or length > MAX_RESPONSE_BYTES:
+                    await response.aclose()
+                    raise httpx.ReadError("upstream response exceeds hosted size limit")
         return httpx.Response(
             response.status,
             headers=response.headers,
-            stream=_ResponseStream(response.stream),
+            stream=BoundedResponseStream(response.stream),
             extensions=response.extensions,
         )
 
