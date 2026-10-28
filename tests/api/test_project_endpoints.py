@@ -248,3 +248,30 @@ def test_default_local_project_selection_preserves_legacy_sessions(endpoint_clie
     )
     assert restored.status_code == 200, restored.text
     assert restored.json()["text"] == "jane.placeholder@example.com"
+
+
+def test_owner_runtime_capacity_cannot_consume_global_namespace_limit(tmp_path):
+    from pii_guard.hosted.identity import Principal
+    from pii_guard.hosted.runtime import HostedCapacityError, HostedService
+
+    service = HostedService(
+        Settings(
+            _env_file=None,
+            hosted=True,
+            hosted_trust_easy_auth=True,
+            hosted_single_process=True,
+            hosted_public_origin="https://guard.example",
+            tenant_key="37" * 32,
+            hosted_max_sessions=1,
+            hosted_max_principals=3,
+            detectors=("rules",),
+            project_state_path=str(tmp_path / "runtime-state" / "state.sqlite3"),
+        )
+    )
+    first = Principal("u_synthetic_first", True, "google")
+    runtime = service.acquire(first, namespace="project-a:endpoint-a")
+    service.release(runtime)
+    with pytest.raises(HostedCapacityError):
+        service.acquire(first, namespace="project-b:endpoint-b")
+    other = service.acquire(Principal("u_synthetic_other", True, "google"), namespace="project-c")
+    service.release(other)
