@@ -22,7 +22,8 @@ pii-guard sits between an application and an LLM. It finds personal data in text
 ```text
 One rule decides where each model runs: anything that sees real personal data is an open-weights model you can host yourself; hosted models only see fictional or masked data.
 - Muse Spark Open (open weights, on Baseten Model APIs or your own GPUs) is the LLM detector of audit mode, the optional second opinion for quality checks and the benchmark upper bound: 0.9 % Hungarian and 0.0 % English leak. Production traffic runs fast mode (rules + the NER, local, about 18 ms per document, $0, nothing leaves the machine).
-- Muse Glimmer 30B (open weights, Apache-2.0) was the best zero-shot detector we measured (F1 99.3, 0.0 % leak) but takes 9.4 s per document, so we used it as the teacher: it labelled a 4,964-document fictional corpus, which, with public OpenPII rows and hard negatives, trained an XLM-RoBERTa base model. It is published as watt-mind/pii-guard-ner-xlmr-base v2.0 and runs in-process for fast mode. A LoRA fine-tune of Glimmer as a detector is blocked for now.
+- Muse Glimmer 30B (open weights, Apache-2.0) was the best zero-shot detector we measured (F1 99.3, 0.0 % leak) but takes 9.4 s per document, so we used it as the teacher: it labelled a 4,964-document fictional corpus, which, with public OpenPII rows and hard negatives, trained an XLM-RoBERTa base model. It is published as watt-mind/pii-guard-ner-xlmr-base v2.0 and runs in-process for fast mode. Two later retrains (v3, v3.1) were scored on a selection set fixed before training; none beat v2.0 on every gate, so v2.0 stays.
+- We also fine-tuned Muse Glimmer itself (LoRA, 3,883 fictional documents) to answer without reasoning: 2.2x faster than zero-shot Glimmer (agent traffic p50 1.03 s vs 2.28 s) but it leaks 1.0 % of values against 0.4 % with the rules in front, so the small NER (0.13 % at 0.02 s) stays the product.
 - Muse Spark 1.3 wrote the synthetic Hungarian and English benchmark and the distillation corpus around fictional identities ($1.05 for 5,004 calls), and is the downstream model in the demo, which only ever sees placeholders.
 - Muse Spark Open and Muse Spark 1.3 are also the attackers in our red teams: prompt injection against the detector, and re-identification of masked documents.
 - Muse Image painted the portraits, signatures and stamps for 24 fictional specimen ID documents, so image tests need no real ID.
@@ -58,6 +59,7 @@ One rule decides where each model runs: anything that sees real personal data is
 - Fewer false alarms in fast mode: reference and tracking numbers without a cue word are read as IDs (39.4 % over-masking on CEE-PII, 14.0 % on agent traffic).
 - Better finance coverage (19.1 % leak on Gretel finance) and an NER that generalises to unseen Ai4Privacy-style text (13.8 % held out).
 - A reader for security-printed ID cards: OCR returns no word for 108 of 274 specimen text values.
+- Polish next: on the public pl-pii-bench set fast mode leaks 17.5 %, nearly all national ID numbers, which a Polish language pack with checksum validators covers.
 - Publishing the package to PyPI, so `uvx --from wattmind-pii-guard pii-guard up` is the one-command start.
 - Confirming the hosted endpoint's data-retention terms before recommending it for real data.
 ```
@@ -71,7 +73,7 @@ One rule decides where each model runs: anything that sees real personal data is
 | Benchmarks (every run, with charts) | https://github.com/watt-mind/pii-guard/blob/develop/docs/benchmarks.md |
 | Journey (milestones, before/after numbers, spend) | https://github.com/watt-mind/pii-guard/blob/develop/docs/journey.md |
 | Models (which Meta model does what) | https://github.com/watt-mind/pii-guard/blob/develop/docs/models.md |
-| Demo video | *to be added by the owner* |
+| Demo video | *to be added by the owner* ([shot list](demo-script.md)) |
 
 ## Owner checklist before submitting
 
@@ -79,4 +81,4 @@ One rule decides where each model runs: anything that sees real personal data is
   [why-pii-guard.md](why-pii-guard.md) (why-pii-guard.md still carries some older figures).
 - Switch the links from `develop` to the submitted branch or tag if the form asks for a fixed
   version.
-- Add the demo video link.
+- Record the video from [demo-script.md](demo-script.md) and add its link.

@@ -16,6 +16,7 @@
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [journey.md](journey.md) | The project's story so far: dated milestones with before/after metrics, cost and the decisions made |
 | [submission.md](submission.md) | Draft hackathon submission text, consistent with why-pii-guard.md |
+| [demo-script.md](demo-script.md) | Shot list and voice-over for the 3-minute submission video, with the source of every number said aloud |
 | [roadmap.md](roadmap.md) | The 9-day hackathon plan, day-1 checks, what comes after |
 | [decisions/](decisions/) | Architecture decision records (ADRs) |
 
