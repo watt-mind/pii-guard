@@ -208,3 +208,27 @@ def test_active_key_limit_does_not_evict_existing_keys(store: ProjectStore) -> N
     with pytest.raises(InvalidProjectConfigError):
         store.issue_key("owner-a", project["id"], configured["id"], "Over capacity")
     assert all(store.resolve_key(key["key"], configured["id"]) is not None for key in keys)
+
+
+def test_disable_retains_endpoint_and_reenable_requires_new_key(store: ProjectStore) -> None:
+    project, _, configured = endpoint(store)
+    _, _, other = endpoint(store, name="Other endpoint")
+    first = store.issue_key("owner-a", project["id"], configured["id"], "First client")
+    second = store.issue_key("owner-a", project["id"], configured["id"], "Second client")
+    other_key = store.issue_key("owner-a", project["id"], other["id"], "Other client")
+    disabled = store.save_endpoint(
+        "owner-a", project["id"], {**configured, "enabled": False}, configured["id"]
+    )
+    assert disabled["id"] == configured["id"] and disabled["enabled"] is False
+    assert disabled in store.list_endpoints("owner-a", project["id"])
+    revoked = store.list_keys("owner-a", project["id"], configured["id"])
+    assert len(revoked) == 2 and all(key["revoked_at"] for key in revoked)
+    assert store.resolve_key(other_key["key"], other["id"]) is not None
+    store.save_endpoint("owner-a", project["id"], {**configured, "enabled": True}, configured["id"])
+    assert store.resolve_key(first["key"], configured["id"]) is None
+    assert store.resolve_key(second["key"], configured["id"]) is None
+    assert store.list_keys("owner-a", project["id"], configured["id"]) == revoked
+    fresh = store.issue_key("owner-a", project["id"], configured["id"], "Fresh client")
+    restored = store.resolve_key(fresh["key"], configured["id"])
+    assert restored is not None and restored.api_key is not None
+    assert restored.api_key.get_secret_value() == UPSTREAM_KEY
