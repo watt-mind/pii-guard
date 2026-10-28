@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createHttpChat, pickDefaultModel, SYSTEM_PROMPT } from "../api/chat";
+import { Button, ButtonLink, Field, Notice, Select, Textarea } from "../components/ui";
 import { request, recovery, type Account, type DemoResult, type Requester } from "./api";
 import { Limits } from "./AccountPanels";
 import { SITE_HASHES, SOURCE, time, useAccount, useHash, type HostedSession } from "./session";
@@ -71,7 +72,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       }
       setResult(next);
       void refresh();
-    } catch (e) { setError(recovery(e)); }
+    } catch (e) { setError(recovery(e, "site")); }
     finally { setRunning(false); }
   }
   const shown = kind === "static" ? EXAMPLES[language] : result;
@@ -84,15 +85,15 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <a className="brand" href="#">pii-guard</a>
         <nav aria-label="Main navigation" className="nav-links">
           <a href="#demo">Try demo</a><a href="#privacy">Privacy</a><a href={`${SOURCE}#quick-start`}>Self-host</a>
-          <a className="button" href={account?.authenticated ? (hasConsole ? "#overview" : "#account") : account?.login_url ?? LOGIN}>{account?.authenticated ? (hasConsole ? "Open console" : "Your account") : "Sign in"}</a>
+          <ButtonLink href={account?.authenticated ? (hasConsole ? "#overview" : "#account") : account?.login_url ?? LOGIN}>{account?.authenticated ? (hasConsole ? "Open console" : "Your account") : "Sign in"}</ButtonLink>
         </nav>
       </header>
       <main id="main">
         <section className="intro">
           <h1>Reduce personal data<br /><span>exposure to AI.</span></h1>
           <p>A privacy firewall between your application and an AI model. Replace detected personal data with keyed placeholders before forwarding the request, then restore the values in the answer. Built for Hungarian first. The self-hosted stack supports text and image masking; this hosted preview is text-only.</p>
-          <p className="compliance-note">Support data minimisation in your privacy and compliance work. PII Guard does not automatically make a deployment GDPR or EU AI Act compliant.</p>
-          <div className="actions"><a className="button primary" href="#demo">Try the demo ↓</a><a href={SOURCE}>Explore on GitHub ↗</a></div>
+          <p className="compliance-note">Support data minimisation in your privacy and compliance work. pii-guard does not automatically make a deployment GDPR or EU AI Act compliant.</p>
+          <div className="actions"><ButtonLink variant="primary" href="#demo">Try the demo ↓</ButtonLink><a href={SOURCE}>Explore on GitHub ↗</a></div>
         </section>
         <section className="demo" id="demo" aria-labelledby="demo-heading">
           <div className="demo-head">
@@ -100,21 +101,21 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <span className={`badge ${result ? "live" : ""}`}>{kind === "static" ? "Static illustration · synthetic" : running ? "Live request in progress" : result ? `Live result · ${result.model}` : "Live request did not complete"}</span>
           </div>
           <div className="controls">
-            <label>Scenario language<select value={language} disabled={running} onChange={(e) => reset(e.target.value as "hu" | "en")}><option value="hu">Hungarian</option><option value="en">English</option></select></label>
-            {account?.authenticated && <label>Input<select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">Curated scenario</option><option value="custom">Your text</option></select></label>}
-            <button className="primary" disabled={running || !account || (editable && !text.trim())} onClick={() => void run()}>{running ? "Processing…" : editable ? "Run your text" : "Run live example"}</button>
-            {kind === "live" && !running && <button onClick={() => reset()}>Show static example</button>}
+            <Field label="Scenario language" className="min-w-36 flex-1"><Select value={language} disabled={running} onChange={(e) => reset(e.target.value as "hu" | "en")}><option value="hu">Hungarian</option><option value="en">English</option></Select></Field>
+            {account?.authenticated && <Field label="Input" className="min-w-36 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">Curated scenario</option><option value="custom">Your text</option></Select></Field>}
+            <Button variant="primary" busy={running} disabled={!running && (!account || (editable && !text.trim()))} onClick={() => void run()}>{running ? "Processing…" : editable ? "Run your text" : "Run live example"}</Button>
+            {kind === "live" && !running && <Button onClick={() => reset()}>Show static example</Button>}
           </div>
           {!account && <p className="notice" role="status">{accountError ? <>Live API unavailable. <a href="#account">Check connection and retry ↓</a></> : "Checking live availability…"}</p>}
-          {editable && account?.authenticated && <div className="stage stack"><label>Your text<textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></label><label>Model connection<select value={connection} disabled={running} onChange={(e) => setConnection(e.target.value)}><option value="">Sponsored Meta</option>{account.connections.map((c) => <option key={c.id} value={c.id}>{c.provider} · {c.origin}</option>)}</select></label><small>The Azure-hosted guard receives this text. Use synthetic data while evaluating.</small></div>}
-          <div aria-live="polite">{running && <p className="notice" role="status">The guard is detecting and masking, then waiting for the model. This can take a few minutes.</p>}{error && <p className="error" role="alert">{error}</p>}</div>
+          {editable && account?.authenticated && <div className="stage"><Field label="Your text"><Textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field><Field label="Model connection" hint="The Azure-hosted guard receives this text. Use synthetic data while evaluating."><Select value={connection} disabled={running} onChange={(e) => setConnection(e.target.value)}><option value="">Sponsored Meta</option>{account.connections.map((c) => <option key={c.id} value={c.id}>{c.provider} · {c.origin}</option>)}</Select></Field></div>}
+          <div aria-live="polite">{running && <p className="notice" role="status">The guard is detecting and masking, then waiting for the model. This can take a few minutes.</p>}{error && <Notice tone="danger" live className="m-4 sm:m-6">{error}</Notice>}</div>
           <div className="flow">
             <Stage number="1" title="Original input" text={shown?.original} fallback="A fresh original will appear only when the live request completes." />
             <Stage number="2" title="Exact masked request" text={shown?.masked} className="model" fallback="No completed masked request is available."><div className="entities" aria-label="Detected entity types">{shown && types.map((type) => <span key={type}>{type}</span>)}{result?.sample_id === "custom" && <span>Placeholder types are visible in the request above.</span>}</div></Stage>
             <Stage number="3" title="Model answer" text={shown?.answer} className="model" fallback="No completed model answer is available." />
             <Stage number="4" title="Restored answer" text={shown?.restored} className="restored" fallback="No completed restored answer is available." />
           </div>
-          <p className="notice"><small>{kind === "static" ? "This hand-written illustration explains the mechanism. No detection or model ran. Live requests use server-curated synthetic scenarios and may produce different results." : result ? "A real guard and model completed this request. Inspect the masked request: detection can miss values. This is pseudonymization, not anonymization." : "No static answer is substituted for a failed live request."}</small></p>
+          <p className="notice note">{kind === "static" ? "This hand-written illustration explains the mechanism. No detection or model ran. Live requests use server-curated synthetic scenarios and may produce different results." : result ? "A real guard and model completed this request. Inspect the masked request: detection can miss values. This is pseudonymization, not anonymization." : "No static answer is substituted for a failed live request."}</p>
         </section>
         <section className="deployment stack" aria-labelledby="deployment-heading">
           <h2 id="deployment-heading">Text and images. Two ways to host.</h2>
@@ -131,11 +132,11 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <section className="account-panel stack" id="account" aria-labelledby="account-heading">
           <h2 id="account-heading">Try it now. Connect when you’re ready.</h2>
           {!account?.authenticated && <p>No login needed for curated live examples. Sign in with Google to edit text, create projects and connect your application through a gateway endpoint.</p>}
-          {accountError ? <div className="stack"><p className="error" role="alert">{accountError}</p><div><button onClick={() => void refresh()}>Reconnect to API</button></div></div> : !account ? <p role="status">Checking live availability…</p> : <>
+          {accountError ? <Notice tone="danger" live action={<Button size="sm" onClick={() => void refresh()}>Reconnect to API</Button>}>{accountError}</Notice> : !account ? <p role="status">Checking live availability…</p> : <>
             <p className="muted">{account.usage.requests_today} requests used today. Allowance resets: {time(account.usage.resets_at)}.</p>
             <Limits account={account} />
-            {account.authenticated ? <><p>You’re signed in. Your projects, endpoints, provider connections and activity are in the console.</p><div className="actions">{hasConsole && <a className="button primary" href="#overview">Open console</a>}<a href={account.logout_url || LOGOUT}>Sign out</a></div></> : <div className="stack"><div><a className="button primary" href={account.login_url || LOGIN}>Continue with Google</a></div></div>}
-            <small>Sessions and provider connections are temporary. A guard restart loses ephemeral state; start a fresh request if restoration expires. Provider keys are kept by the guard for the connection lifetime, never saved in browser storage.</small>
+            {account.authenticated ? <><p>You’re signed in. Your projects, endpoints, provider connections and activity are in the console.</p><div className="actions">{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<a href={account.logout_url || LOGOUT}>Sign out</a></div></> : <div><ButtonLink variant="primary" href={account.login_url || LOGIN}>Continue with Google</ButtonLink></div>}
+            <p className="note">Sessions and provider connections are temporary. A guard restart loses ephemeral state; start a fresh request if restoration expires. Provider keys are kept by the guard for the connection lifetime, never saved in browser storage.</p>
           </>}
         </section>
         <section className="privacy" id="privacy" aria-label="Privacy and evidence">
@@ -143,7 +144,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div className="stack"><h2>Measured, not guaranteed.</h2><p>Hungarian names, identifiers and inflections need more than an English rule list. Evaluate recall and leak rate against the versioned synthetic benchmark before using real data.</p><p>Results depend on the detector, mode, corpus and model. The source reports include run dates and configuration; this page does not present an undated headline score.</p><div className="actions"><a href={`${SOURCE}/tree/develop/eval/results/runs`}>Benchmark runs ↗</a><a href={`${SOURCE}/blob/develop/docs/evaluation.md`}>Evaluation method ↗</a></div></div>
         </section>
       </main>
-      <footer><a className="brand" href="#">pii-guard</a><p className="muted">Open-source privacy firewall for AI agents. All examples on this page are fictional.</p><div className="actions"><a href={SOURCE}>Source code</a><a href={`${SOURCE}#quick-start`}>Self-host</a><a href={`${SOURCE}/blob/develop/docs/architecture.md`}>Integrate</a><a href="#privacy">Privacy</a></div><small>Apache-2.0 · Hungarian first, other EU languages next.</small></footer>
+      <footer><a className="brand" href="#">pii-guard</a><p className="muted">Open-source privacy firewall for AI agents. All examples on this page are fictional.</p><div className="actions"><a href={SOURCE}>Source code</a><a href={`${SOURCE}#quick-start`}>Self-host</a><a href={`${SOURCE}/blob/develop/docs/architecture.md`}>Integrate</a><a href="#privacy">Privacy</a></div><p className="note">Apache-2.0 · Hungarian first, other EU languages next.</p></footer>
     </div>
   </div>;
 }

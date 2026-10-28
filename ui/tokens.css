@@ -1,30 +1,17 @@
-/* Hosted tokens extend ui/DESIGN.md; imported only by the opt-in hosted shell. */
+/* The public landing's layout scale, under `.hosted`. Colour, type and controls are the
+ * console's own (ui/DESIGN.md, src/index.css): the landing reads --ink, --muted, --line,
+ * --surface, --surface-2, --primary, --accent, --guard and --danger directly, so it follows
+ * the light and dark theme (the `.dark` class on <html>). Names are prefixed `--hosted-` so
+ * they never collide with the console's @theme tokens. */
 .hosted {
-  --color-paper: oklch(100% 0 0);
-  --color-wash: oklch(97.5% 0.005 65);
-  --color-ink: oklch(23% 0.005 65);
-  --color-muted: oklch(45% 0.005 65);
-  --color-line: oklch(88% 0.009 65);
-  --color-field: oklch(59% 0.012 65);
-  --color-primary: oklch(18% 0.065 350);
-  --color-primary-hover: oklch(26% 0.075 350);
-  --color-on-primary: oklch(100% 0 0);
-  --color-accent: oklch(49% 0.19 342);
-  --color-accent-soft: oklch(96% 0.025 342);
-  --color-guard: oklch(45% 0.105 163);
-  --color-guard-soft: oklch(96% 0.027 163);
-  --color-error: oklch(48% 0.19 25);
-  --color-error-soft: oklch(96% 0.025 25);
-  --color-focus: var(--color-ink);
-  --font-display: "Geist Variable", sans-serif;
-  --font-body: "Geist Variable", sans-serif;
-  --font-values: "Geist Mono Variable", monospace;
-  --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px;
-  --space-xl: 32px; --space-2xl: 48px; --space-3xl: 80px;
-  --text-small: .8125rem; --text-body: .9375rem; --text-title: 1.5rem;
-  --text-display: clamp(2rem, 5vw, 3.75rem);
-  --radius-control: 10px; --radius-pane: 20px;
-  --rule-thin: 1px;
-  --ease-out: cubic-bezier(.16,1,.3,1); --ease-in: cubic-bezier(.7,0,.84,0); --ease-in-out: cubic-bezier(.65,0,.35,1);
-  --dur-short: 120ms;
+  --hosted-space-xs: 4px;
+  --hosted-space-sm: 8px;
+  --hosted-space-md: 16px;
+  --hosted-space-lg: 24px;
+  --hosted-space-xl: 32px;
+  --hosted-space-2xl: 48px;
+  --hosted-space-3xl: 80px;
+  /* The hero only; every other heading is on the console's scale. */
+  --hosted-text-display: clamp(2rem, 5vw, 3.75rem);
+  --hosted-radius-pane: 20px;
 }

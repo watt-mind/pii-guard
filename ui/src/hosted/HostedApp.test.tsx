@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/http";
 import { HostedApp } from "./HostedApp";
-import type { Account, DemoResult, Requester } from "./api";
+import { recovery, type Account, type DemoResult, type Requester } from "./api";
 
 const account: Account = { mode: "hosted", authenticated: false, login_url: "/.auth/login/google?post_login_redirect_uri=%2F%23overview", logout_url: "/.auth/logout?post_logout_redirect_uri=%2F", tier: "anonymous", providers: ["meta"], limits: { requests_per_day: 3 }, usage: { requests_today: 0, resets_at: "2026-10-29T00:00:00Z" }, state: { persistence: "ephemeral", restart_loses_sessions: true }, connections: [] };
 const result: DemoResult = { sample_id: "hu-support", language: "hu", original: "Synthetic original", masked: "[[PERSON_live]]", answer: "Hello [[PERSON_live]]", restored: "Hello Synthetic Person", model: "test-model", session_id: "test-session", request_id: "test-request", entities: [{ start: 0, end: 9, type: "PERSON" }] };
@@ -78,5 +78,16 @@ describe("public hosted workflow", () => {
     expect(screen.queryByText("Local guard access")).not.toBeInTheDocument();
     expect(call).not.toHaveBeenCalledWith("/v1/account/api-keys");
     expect(call).not.toHaveBeenCalledWith("/v1/projects");
+  });
+});
+
+describe("hosted recovery copy", () => {
+  it("mentions the static example only on the public page, and never says reconnect for a 404", () => {
+    for (const error of [new ApiError(404, "not_found", "x"), new ApiError(429, "rate_limited", "x"), new ApiError(503, "unavailable", "x"), new Error("offline")]) {
+      expect(recovery(error)).not.toMatch(/static example/);
+      expect(recovery(error, "site")).toMatch(/static example/);
+    }
+    expect(recovery(new ApiError(404, "not_found", "x"))).not.toMatch(/Reconnect/);
+    expect(recovery(new ApiError(404, "not_found", "x"), "site")).not.toMatch(/Reconnect/);
   });
 });
