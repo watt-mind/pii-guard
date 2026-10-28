@@ -116,20 +116,32 @@ def test_muse_observer_keys_share_the_main_conversations_session() -> None:
     assert resolve(BEARER_1, MUSE_MAIN)[0] is main
 
 
-def test_muse_observer_without_a_known_main_key_keeps_its_own_session() -> None:
+def test_muse_main_key_takes_over_the_session_of_an_observer_that_came_first() -> None:
+    """LAB-1341: Muse sends its first main turn and first observer at the same time; when the
+    observer is resolved first, the main key joins its session instead of starting a second
+    one (two sessions: one value under two placeholders within one task)."""
     vault = Vault(KEY_A)
 
-    def resolve(key: str) -> Any:
-        return resolve_session(vault, BEARER_1, {"prompt_cache_key": key}, None)[0]
+    def resolve(key: str, headers: dict[str, str] = BEARER_1) -> Any:
+        return resolve_session(vault, headers, {"prompt_cache_key": key}, None)
 
-    alone = resolve(MUSE_OBSERVERS[0])
-    assert alone is not resolve(MUSE_OBSERVERS[1])
-    main = resolve(MUSE_MAIN)
-    assert main is not alone  # main keys never follow an observer
-    assert resolve(MUSE_OBSERVERS[0]) is main  # from now on the observer follows the main key
+    first, created, source = resolve(MUSE_OBSERVERS[0])
+    assert created and source is SessionSource.PROMPT_CACHE_KEY
+    assert resolve(MUSE_OBSERVERS[1])[:2] == (first, False)  # another observer, same task
+    assert resolve(MUSE_MAIN)[:2] == (first, False)  # the main key takes it over
+    for key in (MUSE_MAIN, *MUSE_OBSERVERS):
+        assert resolve(key)[0] is first
+    # Never across clients: another bearer's main key with the same prefix gets its own.
+    assert resolve(MUSE_MAIN, BEARER_2)[0] is not first
+    # Only the first main key takes an observer's session over: a second conversation with
+    # the same prefix keeps its own, and observers follow the newest main key, as before.
+    second = resolve("tbh:main:01a17f61-77b0-7d82-b7ef-857659db09bc")[0]
+    assert second is not first
+    assert resolve(MUSE_OBSERVERS[0])[0] is second
+    assert resolve(MUSE_MAIN)[0] is first
     # Look-alikes outside the grammar are ordinary keys.
     for key in ("tbh:main:01a17f61", "tbh:skill-reminder:01A17F61:x", "x:skill-reminder:01a17f61:"):
-        assert resolve(key) is not main
+        assert resolve(key)[0] not in (first, second)
 
 
 def test_muse_conversation_index_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
