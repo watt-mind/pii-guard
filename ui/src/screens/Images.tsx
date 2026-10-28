@@ -540,7 +540,7 @@ function ImageLegend({ regions, activeType }: { regions: ImageRegion[]; activeTy
               {s === "sam" ? "SAM" : s === "local" ? "On-device" : "OCR"}
             </span>
           ))}
-          {row.kept && <span className="font-mono text-2xs text-muted">kept</span>}
+          {row.kept && <span className="font-mono text-2xs text-kept-ink">kept</span>}
         </li>
       ))}
     </ul>
