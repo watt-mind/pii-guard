@@ -35,7 +35,13 @@ case "$*" in
   "resource show "*"properties.amount"*)
     [ "${TEST_BUDGET_EXISTS:-true}" = true ] || exit 1
     echo "${TEST_BUDGET_AMOUNT:-25.0}";;
-  "resource show "*"Actual50.contactGroups"*) echo '["__GROUP__"]';;
+  "resource show "*"properties.notifications"*)
+    if [ "${TEST_BUDGET_NOTIFICATIONS+x}" = x ]; then
+      printf '%s\n' "$TEST_BUDGET_NOTIFICATIONS"
+    else
+      echo '{"Actual50":{"enabled":true,"operator":"GreaterThanOrEqualTo",
+             "threshold":50.0,"thresholdType":"Actual","contactGroups":["__GROUP__"]}}'
+    fi;;
   "resource show "*"startDate"*) echo 2026-10-01T00:00:00Z;;
   *properties.outputs.vaultUri.value*) echo __VAULT__;;
   *properties.outputs.registryServer.value*) echo piiguardexample.azurecr.io;;
@@ -391,6 +397,66 @@ class DeploymentAdmissionTests(unittest.TestCase):
             ),
             "project configuration",
         )
+
+    def test_budget_notification_map_casing_does_not_change_release_admission(self) -> None:
+        for key in ("Actual50", "actual50", "arbitraryReviewedName"):
+            with self.subTest(key=key):
+                notifications = {
+                    key: {
+                        "enabled": True,
+                        "operator": "GreaterThanOrEqualTo",
+                        "threshold": 50.0,
+                        "thresholdType": "Actual",
+                        "contactGroups": [GROUP],
+                    }
+                }
+                result = self.run_deploy(
+                    "stage", TEST_BUDGET_NOTIFICATIONS=json.dumps(notifications)
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(GROUP, self.calls)
+                self.assertIn("monitor action-group show", self.calls)
+                self.assertIn("deployment group create", self.calls)
+                self.assertNotIn("notifications.Actual50", self.calls)
+
+    def test_unmonitored_budget_notification_refuses_deployment(self) -> None:
+        for notification in (
+            {
+                "enabled": False,
+                "operator": "GreaterThanOrEqualTo",
+                "threshold": 50,
+                "thresholdType": "Actual",
+                "contactGroups": [GROUP],
+            },
+            {
+                "enabled": True,
+                "operator": "GreaterThanOrEqualTo",
+                "threshold": 80,
+                "thresholdType": "Actual",
+                "contactGroups": [GROUP],
+            },
+            {
+                "enabled": True,
+                "operator": "GreaterThanOrEqualTo",
+                "threshold": 50,
+                "thresholdType": "Forecasted",
+                "contactGroups": [GROUP],
+            },
+            {
+                "enabled": True,
+                "operator": "GreaterThanOrEqualTo",
+                "threshold": 50,
+                "thresholdType": "Actual",
+                "contactGroups": [],
+            },
+        ):
+            with self.subTest(notification=notification):
+                self.assert_refused(
+                    self.run_deploy(
+                        "stage", TEST_BUDGET_NOTIFICATIONS=json.dumps({"actual50": notification})
+                    ),
+                    "Enabled Actual 50%",
+                )
 
     def test_stage_refuses_missing_budget(self) -> None:
         self.assert_refused(
