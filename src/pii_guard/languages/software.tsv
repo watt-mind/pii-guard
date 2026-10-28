@@ -1,0 +1,75 @@
+# Software products, file formats, languages and AI tools, for every language (detect/ner_context.py, LAB-1470).
+# One name per line, as it is written; matching ignores case. An NER PERSON span that is
+# exactly one of these is not masked: coding agents send these words in every request
+# (system prompts, skill lists, tool output), and a placeholder in their place changes the task.
+# Software only. Never a word that is also a person's given name or surname on its own
+# (Claude, Devin, Julia, Ruby, Grace ...): such a name may appear here only as part of a
+# longer product name (Claude Code), and a test checks every single-word entry against the
+# language packs' name lexicons. Companies and consumer brands go to brands.tsv instead.
+#
+# File and data formats
+JSON
+JSONL
+JSON5
+YAML
+TOML
+XML
+CSV
+TSV
+HTML
+XHTML
+CSS
+SQL
+SQLite
+GraphQL
+Markdown
+Protobuf
+OpenAPI
+# Programming languages and runtimes
+Python
+JavaScript
+TypeScript
+Node.js
+Deno
+Rust
+Golang
+Kotlin
+PowerShell
+Bash
+Zsh
+WebAssembly
+# Developer tools
+Git
+npm
+pnpm
+Docker
+Kubernetes
+Terraform
+Homebrew
+pytest
+Vite
+React
+Next.js
+FastAPI
+Django
+Postgres
+PostgreSQL
+Redis
+VS Code
+Neovim
+Tesseract
+YuNet
+# Coding agents and model names
+Codex
+OpenCode
+Claude Code
+Claude API
+Claude Opus
+Claude Sonnet
+Claude Haiku
+Muse Spark
+Muse Code
+Muse Wonder
+Gemini CLI
+Aider
+Cline

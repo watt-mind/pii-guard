@@ -24,6 +24,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pii_guard.detect.ner_context import sweep_vetoed
 from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
 from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
 from pii_guard.vault.fold import FoldedText, fold_value, fold_views, spaced
@@ -100,6 +101,13 @@ DEFAULT_MAX_RESTORED_CHARS = 1_000_000
 #: other natural-language values (and their inflection), and IBANs, plates, ID numbers and
 #: e-mail addresses, which are case-insensitive by their own rules.
 CASE_SENSITIVE_TYPES: frozenset[EntityType] = frozenset({EntityType.SECRET})
+
+#: Learned detectors whose values the sweep checks against the text's structure first
+#: (:func:`pii_guard.detect.ner_context.sweep_vetoed`, LAB-1470).
+MODEL_DETECTORS: frozenset[str] = frozenset({"ner", "ner_gliner"})
+#: Spans that only repeat a value the session already holds (the gateway's restored answer,
+#: ``gateway.restore.RESTORED_DETECTOR``): they leave an entry's provenance as it is.
+NEUTRAL_DETECTORS: frozenset[str] = frozenset({"gateway"})
 
 
 class SessionNotFoundError(PiiGuardError):
@@ -220,6 +228,7 @@ class _Entry:
         "exact",
         "initials",
         "language",
+        "model_only",
         "needles",
         "normalized",
         "order",
@@ -263,6 +272,11 @@ class _Entry:
         self.seen_folded: dict[str, str] = {}
         self.casing = casing_class(original)
         self.variants: dict[str, _Entry] = {}
+        # Only a learned model (the NER) has found this value so far: the sweep then leaves
+        # occurrences that the structure of the text rules out (a file extension, a path
+        # segment, a code identifier, a tool name; LAB-1470) alone. Any other detector's span
+        # (rules, the LLM, a known value) clears it for good.
+        self.model_only = False
         # Case-sensitive types only (:data:`CASE_SENSITIVE_TYPES`): the exact keys
         # (:func:`_exact`) an occurrence of this value or of a surface may be written as.
         self.exact: frozenset[str] | None = None
@@ -839,7 +853,7 @@ class VaultSession:
         depends: set[tuple[EntityType, str]] | None = set() if key is not None else None
         for plan in self._plans(text, ordered, matcher, depends):
             span, end = plan.span, plan.span.start + plan.stem_length
-            entry = self._entry_for(span.entity_type, plan.lemma, language)
+            entry = self._entry_for(span.entity_type, plan.lemma, language, span.detector)
             if entry.add_surface(span.text):
                 self._touch(entry)
             for alias in plan.aliases:
@@ -934,8 +948,11 @@ class VaultSession:
     ) -> None:
         """Add each occurrence in ``found`` (in its order) that overlaps nothing taken yet."""
         for entry, own, aliases in found:
+            guarded = entry.model_only
             for start, end in own:
                 if any(taken[start:end]):
+                    continue
+                if guarded and sweep_vetoed(text, start, end, entry.entity_type, language):
                     continue
                 replacements.append((start, end, self._cased(entry, text[start:end])))
                 taken[start:end] = b"\x01" * (end - start)
@@ -946,13 +963,20 @@ class VaultSession:
                 for start, end in occurrences:
                     if any(taken[start:end]):
                         continue
+                    if guarded and sweep_vetoed(text, start, end, entry.entity_type, language):
+                        continue
                     written = text[start:end]
                     owner = entry
                     kind = entry.entity_type
                     if not following_suffix(text, end) and _value_key(kind, written) == _value_key(
                         kind, alias
                     ):
-                        owner = self._entry_for(entry.entity_type, written, language)
+                        owner = self._entry_for(
+                            entry.entity_type,
+                            written,
+                            language,
+                            "ner" if entry.model_only else None,
+                        )
                     replacements.append((start, end, self._cased(owner, written)))
                     taken[start:end] = b"\x01" * (end - start)
 
@@ -1132,14 +1156,26 @@ class VaultSession:
                 plans[index] = _Plan(span, choice.lemma, len(choice.stem))
         return [plan for plan in plans if plan is not None]
 
-    def _entry_for(self, entity_type: EntityType, value: str, language: str = "hu") -> _Entry:
+    def _entry_for(
+        self,
+        entity_type: EntityType,
+        value: str,
+        language: str = "hu",
+        detector: str | None = None,
+    ) -> _Entry:
+        """The entry of ``value``, created if new. ``detector`` found it (``None``: unknown,
+        which counts as a validated source): see :attr:`_Entry.model_only`."""
         normalized = _value_key(entity_type, value)
         key = (entity_type, normalized)
         entry = self._by_key.get(key)
         if entry is not None:
+            if entry.model_only and detector not in MODEL_DETECTORS | NEUTRAL_DETECTORS:
+                entry.model_only = False
+                self._touch(entry)  # a remask ``since`` now must scan it everywhere
             return entry
         placeholder = self._new_placeholder(entity_type, normalized)
         entry = _Entry(placeholder, entity_type, value, normalized, language)
+        entry.model_only = detector in MODEL_DETECTORS
         entry.order = len(self._by_key)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
