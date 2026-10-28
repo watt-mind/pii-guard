@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
 from typing import Any
 
 import httpx
@@ -108,7 +107,7 @@ def test_timed_out_audit_detections_do_not_starve_fast_mode() -> None:
     llm = _HungLlm()
     app = make_app(MockUpstream(), llm=llm, config=GatewayConfig(detection_timeout=0.3))
 
-    async def main() -> tuple[set[int], httpx.Response, float]:
+    async def main() -> tuple[set[int], httpx.Response]:
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://localhost") as client:
 
@@ -122,17 +121,17 @@ def test_timed_out_audit_detections_do_not_starve_fast_mode() -> None:
                     for i in range(40)
                 )
             )
-            started = time.perf_counter()
             fast = await client.post(CHAT, json=body("fast"), headers={"X-PII-Guard-Mode": "fast"})
-            return {r.status_code for r in burst}, fast, time.perf_counter() - started
+            return {r.status_code for r in burst}, fast
 
     try:
-        statuses, fast, elapsed = asyncio.run(main())
+        statuses, fast = asyncio.run(main())
     finally:
         llm.release.set()
     assert statuses == {503}
+    # Starved, the fast request would wait out its own 0.3 s timeout and answer 503, so the
+    # status is the proof; no wall-clock bound (LAB-1275: it flaked under load).
     assert fast.status_code == 200, fast.text
-    assert elapsed < 0.3
 
 
 def test_timed_out_detections_keep_their_slots() -> None:
