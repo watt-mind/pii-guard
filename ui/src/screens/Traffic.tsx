@@ -31,6 +31,7 @@ import {
   type Message,
 } from "../lib/traffic";
 import { NerHint } from "../components/NerHint";
+import { useHostedSession } from "../hosted/session";
 import { TimingWaterfall } from "./TrafficCharts";
 
 export interface TrafficProps {
@@ -196,8 +197,8 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
         <Metric label="Blocked or failed" value={problems} />
       </dl>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(19rem,25rem)_minmax(0,1fr)]">
-        <section aria-labelledby="calls-title" className="flex min-w-0 flex-col rounded-xl border border-line bg-surface">
+      <div className="grid gap-6 lg:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)] xl:grid-cols-[minmax(19rem,25rem)_minmax(0,1fr)]">
+        <section aria-labelledby="calls-title" className="flex min-w-0 flex-col rounded-xl border border-line bg-surface lg:sticky lg:top-4 lg:self-start">
           <header className="flex items-start justify-between gap-2 border-b border-line p-4 sm:p-5">
             <div className="min-w-0">
               <h2 id="calls-title" className="text-lg font-normal text-ink">
@@ -214,7 +215,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
               <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} demoTraffic={demoTraffic} />
             </div>
           ) : (
-            <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
+            <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[calc(100dvh-10rem)]" data-testid="call-list">
               {[...filtered].reverse().map((e) => (
                 <li key={e.id}>
                   <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} />
@@ -224,7 +225,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
           )}
         </section>
 
-        <div ref={detailRef} className="min-w-0 scroll-mt-4 space-y-6">
+        <div ref={detailRef} className="@container min-w-0 scroll-mt-4 space-y-6">
           {selected ? (
             <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)}
               mockUpstream={mockUpstream}
@@ -548,10 +549,11 @@ function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: Traffi
       aria-current={selected ? "true" : undefined}
       className={[
         "flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors sm:px-5",
-        selected ? "bg-model-soft/70 shadow-[inset_3px_0_0_var(--model)]" : "hover:bg-surface-2",
+        selected ? "bg-surface-2 shadow-[inset_3px_0_0_var(--ink)]" : "hover:bg-surface-2",
       ].join(" ")}
     >
-      <span className="flex w-full items-center gap-2 text-xs">
+      <span className="flex w-full items-start gap-2 text-xs">
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-mono whitespace-nowrap text-muted tabular-nums">{clock(e.time)}</span>
         {e.mode && <Tag>{e.mode}</Tag>}
         {e.stream && <Tag>stream</Tag>}
@@ -559,7 +561,8 @@ function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: Traffi
         {hasImage && <Tag>image</Tag>}
         {labelled && <LabelTag match={labelled} />}
         <OutcomeBadge outcome={e.outcome} />
-        <span className="ml-auto font-medium whitespace-nowrap text-ink tabular-nums" title="pii-guard overhead">
+        </span>
+        <span className="shrink-0 font-medium whitespace-nowrap text-ink tabular-nums" title="pii-guard overhead">
           +{formatMsShort(e.timing.overhead_ms)}
         </span>
       </span>
@@ -597,6 +600,7 @@ function CallDetail({
   onOpenSession?: (ref: string) => void;
 }) {
   const showOriginals = canShowOriginals(e, pageHost, source);
+  const hosted = useHostedSession() !== null;
   const maskedBody = e.request?.masked;
   const forwarded = maskedBody !== undefined && maskedBody !== null;
   const labelled = labelledScenarioFor(e);
@@ -622,7 +626,7 @@ function CallDetail({
             </Button>
           )}
         </div>
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs @xl:grid-cols-3 @3xl:grid-cols-4">
           <Meta label="Mode" value={e.mode ?? "–"} />
           <Meta label="Model" value={modelOf(e, mockUpstream)} />
           <Meta label="Language" value={e.language ?? "auto"} />
@@ -674,7 +678,7 @@ function CallDetail({
         <TimingWaterfall event={e} />
       </section>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 @3xl:grid-cols-2">
         <DetailPane id="log-original" eyebrow="Your app sent" title="Original request" side="you">
           {showOriginals && e.request?.original ? (
             <OriginalView original={e.request.original} masked={maskedBody} />
@@ -682,6 +686,8 @@ function CallDetail({
             <Quiet>
               {source === "fixture" ? (
                 <>Recorded demo traffic never holds original values.</>
+              ) : hosted ? (
+                <>Not kept: the hosted service never stores original values. This log holds only what was sent to the model.</>
               ) : e.level === "full" ? (
                 <>The server logged originals, but they are only shown on a page served from localhost.</>
               ) : (
@@ -693,7 +699,7 @@ function CallDetail({
             </Quiet>
           )}
         </DetailPane>
-        <DetailPane id="log-masked" eyebrow="The model received" title="Masked request, as sent upstream" side="model">
+        <DetailPane id="log-masked" eyebrow="The model received" title="Masked request" side="model">
           {forwarded ? <MaskedRequestView body={maskedBody} event={e} /> : <Quiet>Nothing was forwarded.</Quiet>}
         </DetailPane>
         <DetailPane id="log-response" eyebrow="The model answered" title="Response, masked → restored" side="model" wide>
@@ -718,7 +724,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 /** A request or response pane: the shared `Pane`, its body capped and scrolled. */
 function DetailPane({ id, eyebrow, title, side, wide, children }: { id: string; eyebrow: string; title: string; side: "you" | "model"; wide?: boolean; children: ReactNode }) {
   return (
-    <Pane id={id} eyebrow={eyebrow} title={title} side={side} scroll className={wide ? "md:col-span-2" : ""}>
+    <Pane id={id} eyebrow={eyebrow} title={title} side={side} scroll className={wide ? "@3xl:col-span-2" : ""}>
       <div className="space-y-3">{children}</div>
     </Pane>
   );
@@ -847,7 +853,7 @@ function OriginalView({ original, masked }: { original: unknown; masked: unknown
 function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
   const free = e.detectors.some((d) => d === "ner" || d === "llm");
   return (
-    <p className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-muted">
+    <p className="text-xs text-muted">
       Only highlighted values were replaced; anything else reached the model as written.{" "}
       {free ? null : e.detectors.includes("known") ? (
         <>
@@ -867,6 +873,7 @@ function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
 const placeholdersIn = (text: string) => tokenize(text).filter((t) => t.kind === "placeholder").length;
 
 function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOriginals: boolean }) {
+  const hosted = useHostedSession() !== null;
   const masked = responseChoices(e.response?.masked);
   const unmasked = showOriginals ? responseChoices(e.response?.unmasked) : [];
   if (!e.response) return <Quiet>{e.outcome === "ok" ? "No answer was logged." : "No answer: the call did not reach the model."}</Quiet>;
@@ -874,7 +881,7 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
   const streamedTool = nothing && e.stream && e.outcome === "ok";
   const count = masked.reduce((n, c) => n + placeholdersIn(c.content ?? "") + c.toolCalls.reduce((k, t) => k + placeholdersIn(t.arguments), 0), 0);
   return (
-    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+    <div className="grid gap-4 @2xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
       <div data-testid="masked-response" className="min-w-0 space-y-2">
         <p className="mb-1 text-xs font-medium text-model">From the model{e.stream ? ` (streamed, ${e.response.chunks ?? "?"} chunks)` : ""}</p>
         {nothing ? (
@@ -892,14 +899,14 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
           ))
         )}
       </div>
-      <div aria-hidden="true" className="flex items-center gap-2 font-mono text-2xs text-guard md:flex-col md:justify-center">
-        <span className="h-px flex-1 bg-guard/40 md:h-auto md:w-px" />
+      <div aria-hidden="true" className="flex items-center gap-2 font-mono text-2xs text-guard @2xl:flex-col @2xl:justify-center">
+        <span className="h-px flex-1 bg-guard/40 @2xl:h-auto @2xl:w-px" />
         <span className="whitespace-nowrap">pii-guard</span>
         <span className="text-faint">
-          <span className="md:hidden">↓</span>
-          <span className="hidden md:inline">→</span>
+          <span className="@2xl:hidden">↓</span>
+          <span className="hidden @2xl:inline">→</span>
         </span>
-        <span className="h-px flex-1 bg-guard/40 md:h-auto md:w-px" />
+        <span className="h-px flex-1 bg-guard/40 @2xl:h-auto @2xl:w-px" />
       </div>
       <div data-testid="unmasked-response" className="min-w-0 space-y-2">
         <p className="mb-1 text-xs font-medium text-guard">To your app</p>
@@ -924,7 +931,7 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
               : count
                 ? `${count} placeholder${count === 1 ? " was" : "s were"} put back before the answer reached your app. `
                 : "Nothing to restore in this answer. "}
-            {showOriginals ? "" : "The restored answer holds real values, so it is only logged at level full, on localhost."}
+            {showOriginals ? "" : hosted ? "The restored answer holds real values, so the hosted service doesn't keep it." : "The restored answer holds real values, so it is only logged at level full, on localhost."}
           </Quiet>
         )}
       </div>

@@ -54,9 +54,10 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
   const w = waterfall(event.timing);
   if (!w.rows.length) return <ChartEmpty>No timing was recorded for this call.</ChartEmpty>;
   const pct = (ms: number) => `${(ms / w.span) * 100}%`;
+  // Its own size container: the figures and rows follow the card's width, not the viewport's.
   return (
-    <div>
-      <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+    <div className="@container">
+      <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-3 @xl:grid-cols-4">
         <Figure label="pii-guard added" value={formatMsShort(w.overhead)} strong testId="wf-overhead" />
         <Figure label="Model (upstream)" value={w.upstream > 0 ? formatMsShort(w.upstream) : "not called"} testId="wf-upstream" />
         <Figure label="Total" value={formatMsShort(w.total)} testId="wf-total" />
@@ -68,7 +69,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
       </dl>
       <ol aria-label="Timing waterfall, stages in pipeline order" className="space-y-1.5" data-testid="waterfall">
         {w.rows.map((r) => (
-          <li key={r.key} className="grid grid-cols-[5.5rem_1fr_4.25rem] items-center gap-2 text-xs sm:grid-cols-[8.5rem_1fr_5rem]">
+          <li key={r.key} className="grid grid-cols-[5.5rem_1fr_4.25rem] items-center gap-2 text-xs @md:grid-cols-[8.5rem_1fr_5rem]">
             <span className="flex min-w-0 items-center gap-1.5 text-ink">
               <span className="truncate" title={STAGE_HINT[r.key]}>
                 {r.label}
@@ -131,7 +132,7 @@ function Figure({ label, value, strong, testId }: { label: string; value: string
     <Metric
       label={label}
       value={
-        <span data-testid={testId} className={strong ? "text-guard" : undefined}>
+        <span data-testid={testId} className={["whitespace-nowrap", strong ? "text-guard" : ""].join(" ")}>
           {value}
         </span>
       }
