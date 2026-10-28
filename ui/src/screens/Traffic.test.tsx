@@ -88,9 +88,24 @@ describe("Live traffic", () => {
     f.push([asMasked(huChat), asMasked(deTools)]);
     await screen.findByTestId("masked-request");
     expect(screen.queryByTestId("original-request")).toBeNull();
-    expect(screen.getByText(/Not kept\. The traffic log runs at/)).toBeInTheDocument();
+    expect(screen.getByText(/Not kept: the traffic log holds only what left the machine/)).toBeInTheDocument();
     expect(within(screen.getByTestId("unmasked-response")).getByText(/put back before the answer reached your app/)).toBeInTheDocument();
     for (const v of [...ORIGINALS, "erika.mustermann@example.de"]) expect(container).not.toHaveTextContent(v);
+  });
+
+  it("renders one h1, the request and response as shared panes, and the summary as metrics (LAB-1441)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([asMasked(huChat)]);
+    await screen.findByTestId("masked-request");
+    expect(screen.getAllByRole("heading", { level: 1 }).map((h) => h.textContent)).toEqual(["Logs"]);
+    for (const name of ["Original request", "Masked request, as sent upstream", "Response, masked → restored"]) {
+      const pane = screen.getByRole("region", { name });
+      expect(pane).toHaveAttribute("data-side");
+      expect(within(pane).getByRole("heading", { level: 2, name })).toBeInTheDocument();
+    }
+    const summary = screen.getByLabelText("Summary of the calls shown");
+    expect(within(summary).getByText("Calls").nextElementSibling).toHaveTextContent("1");
   });
 
   it("hides originals a full-level server logged when the page is not on localhost", async () => {

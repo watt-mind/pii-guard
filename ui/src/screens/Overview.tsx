@@ -4,7 +4,7 @@ import type { ServerStatus } from "../api/status";
 import type { TrafficEvent } from "../api/traffic";
 import type { EntityType } from "../api/types";
 import { NerHint } from "../components/NerHint";
-import { Button } from "../components/ui";
+import { Button, ButtonLink, Card, KeyValues, Metric, PageHeader } from "../components/ui";
 import { useNow } from "../hooks/useNow";
 import type { ServerStatusState } from "../hooks/useServerStatus";
 import type { TrafficHandle } from "../hooks/useTraffic";
@@ -65,13 +65,10 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
 
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-medium text-balance text-ink">Overview</h1>
-        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          pii-guard masks personal data before a request reaches the model and puts it back in the answer. This page counts what it protected: every call through the
-          gateway, from its traffic log. Values never appear here, only their types and counts.
-        </p>
-      </div>
+      <PageHeader
+        title="Overview"
+        lead="pii-guard masks personal data before a request reaches the model and puts it back in the answer. This page counts what it protected: every call through the gateway, from its traffic log. Values never appear here, only their types and counts."
+      />
 
       {account}
 
@@ -88,7 +85,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
             <Counter label="pii-guard overhead" value={formatMsShort(s.overhead.p50)} note={`p50 · p95 ${formatMsShort(s.overhead.p95)}`} />
           </dl>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-6 lg:grid-cols-2">
             <Panel title="Top entity types" note="Values masked, by type, across the calls counted above.">
               <TopTypes types={s.types} />
             </Panel>
@@ -101,7 +98,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
 
       {/* Your server's setup, never mixed into the recorded demo's numbers. */}
       {!recorded && serverSetup && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
           {/* A hosted owner's status has no upstream: the owner's endpoints pick their own. */}
           {(!server || server.upstream) && (
             <Panel title="Upstream" note="Where the gateway forwards masked requests.">
@@ -120,9 +117,9 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
             <h2 id="latency-title" className="text-lg font-normal text-ink">
               Latency, live
             </h2>
-            <p className="text-sm text-muted">From the timing block of each call: the overhead is the call's total time minus the time spent waiting on the model.</p>
+            <p className="mt-0.5 text-sm text-muted">From the timing block of each call: the overhead is the call's total time minus the time spent waiting on the model.</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2">
             <ChartCard id="chart-overhead" title="Overhead per call" note="What pii-guard added to each call, with the rolling p50 and p95.">
               <OverheadChart events={t.events} />
             </ChartCard>
@@ -132,7 +129,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
             <ChartCard
               id="chart-stages"
               title="Where the time goes"
-              note="pii-guard's own stages, last 30 calls. Forward is serialising the masked body and opening the HTTP connection to the model. Pick a column to open that call in Logs."
+              note="pii-guard's own stages, the most recent calls (as many as fit). Forward is serialising the masked body and opening the HTTP connection to the model. Pick a column to open that call in Logs."
             >
               <StageChart events={t.events} onSelect={onOpenCall} />
             </ChartCard>
@@ -162,7 +159,7 @@ function ScopeNote({ t, forced, since }: { t: TrafficHandle; forced: boolean; si
               : "These numbers count calls recorded from the demo stack, replayed in your browser."}
         </p>
         {!forced && (
-          <Button className="h-8" onClick={t.retryApi}>
+          <Button size="sm" onClick={t.retryApi}>
             Back to the live API
           </Button>
         )}
@@ -173,8 +170,8 @@ function ScopeNote({ t, forced, since }: { t: TrafficHandle; forced: boolean; si
     return (
       <p className="text-xs text-muted">
         Counting {t.events.length} {t.events.length === 1 ? "call" : "calls"}
-        {since ? ` since ${clock(since)}` : ""}: the server's traffic log (it keeps the last {t.status.size} in memory) plus every new call while this page is open. Log level{" "}
-        {code(t.status.level)}.
+        {since ? ` since ${clock(since)}` : ""}: the server's traffic log (it keeps the last {t.status.size} in memory) plus every new call while this page is open.{" "}
+        {t.status.level === "full" ? "The log also keeps original values, in memory on this machine only" : "The log holds placeholders only, never values"} (log level {code(t.status.level)}).
       </p>
     );
   }
@@ -199,7 +196,7 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
                 : "This account can't read this traffic log."
               : "Nothing has gone through the gateway yet.";
   return (
-    <section aria-labelledby="empty-title" className="rounded-xl border border-line bg-surface px-5 py-8 sm:px-8">
+    <section aria-labelledby="empty-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
       <h2 id="empty-title" className="text-lg font-normal text-ink">
         {title}
       </h2>
@@ -207,8 +204,8 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
         {status.state === "disabled" ? (
           status.reason === "off" ? (
             <>
-              Restart with {code("PII_GUARD_TRAFFIC_LOG=masked")} ({code("pii-guard up")} and {code("make demo")} turn it on). The counters here are read from that log; nothing is
-              estimated.
+              Restart the server with its traffic log on ({code("PII_GUARD_TRAFFIC_LOG=masked")}); {code("pii-guard up")} and {code("make demo")} turn it on by themselves. The
+              counters here are read from that log; nothing is estimated.
             </>
           ) : (
             <>{status.message}.</>
@@ -232,13 +229,11 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
           </>
         )}
       </p>
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        <a href="#connect" className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3 text-sm text-on-primary transition-colors hover:bg-primary-hover">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <ButtonLink variant="primary" href="#connect">
           Connect a client
-        </a>
-        <a href="#playground/text" className="inline-flex h-9 items-center justify-center rounded-lg border border-line px-3.5 text-sm font-medium text-ink transition-colors hover:border-line-strong">
-          Try it in the Playground
-        </a>
+        </ButtonLink>
+        <ButtonLink href="#playground/text">Try it in the Playground</ButtonLink>
         {status.state === "live" && sendDemo && <DemoButton send={sendDemo} />}
         <Button variant="ghost" onClick={t.showFixture}>
           Watch a recorded demo
@@ -250,27 +245,15 @@ function EmptyOverview({ t, server, sendDemo }: { t: TrafficHandle; server: Serv
 }
 
 function Counter({ label, value, note, tone }: { label: string; value: number | string; note: string; tone?: "blocked" }) {
-  return (
-    <div className="flex flex-col-reverse justify-end bg-surface px-4 py-4 sm:px-5">
-      <dt className="mt-1 text-xs text-muted">
-        <span className="block font-medium text-ink">{label}</span>
-        {note}
-      </dt>
-      <dd className={["font-mono text-2xl leading-none font-medium tabular-nums", tone === "blocked" ? "text-blocked" : "text-ink"].join(" ")}>{value}</dd>
-    </div>
-  );
+  return <Metric label={label} value={tone === "blocked" ? <span className="text-blocked">{value}</span> : value} hint={note} className="bg-surface p-4 sm:p-5" />;
 }
 
 function Panel({ title, note, children }: { title: string; note: string; children: ReactNode }) {
   const id = `panel-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
   return (
-    <section aria-labelledby={id} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <h2 id={id} className="text-lg font-normal text-ink">
-        {title}
-      </h2>
-      <p className="mt-0.5 mb-4 text-sm text-muted">{note}</p>
+    <Card title={title} titleId={id} subtitle={note} className="min-w-0">
       {children}
-    </section>
+    </Card>
   );
 }
 
@@ -288,7 +271,7 @@ function TopTypes({ types }: { types: [EntityType, number][] }) {
           <span aria-hidden="true" className="h-2 rounded-full bg-surface-2">
             <span className="block h-2 rounded-full bg-masked" style={{ width: `${(n / max) * 100}%` }} />
           </span>
-          <span className="text-right font-mono text-xs tabular-nums text-ink">{n}</span>
+          <span className="text-right text-sm tabular-nums text-ink">{n}</span>
         </li>
       ))}
       {types.length > shown.length && <li className="text-xs text-muted">and {types.length - shown.length} more types</li>}
@@ -322,9 +305,9 @@ function StageTable({ stages }: { stages: ReturnType<typeof summarize>["stages"]
             <th scope="row" className="py-1.5 pr-2 text-left font-normal text-ink" title={STAGE_HINT[st.key]}>
               {STAGE_LABEL[st.key]}
             </th>
-            <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums">{formatMsShort(st.p50)}</td>
-            <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums">{formatMsShort(st.p95)}</td>
-            <td className="py-1.5 pl-2 text-right font-mono text-xs tabular-nums text-muted">{st.calls}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums">{formatMsShort(st.p50)}</td>
+            <td className="px-2 py-1.5 text-right tabular-nums">{formatMsShort(st.p95)}</td>
+            <td className="py-1.5 pl-2 text-right tabular-nums text-muted">{st.calls}</td>
           </tr>
         ))}
       </tbody>
@@ -348,31 +331,33 @@ function Upstream({ server, status, last, errors }: { server: ServerStatus | nul
   const up = server?.upstream;
   if (!up) return <Unknown status={status} />;
   return (
-    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
-      <dt className="text-muted">Model</dt>
-      <dd className="min-w-0 text-ink">
-        {up.mock ? (
-          <>
-            <span className="font-medium">Offline mock model</span>: it echoes the masked text it receives, so no model provider is involved.
-          </>
-        ) : up.origin ? (
-          <code className="font-mono text-xs break-all">{up.origin}</code>
-        ) : (
-          <>Not configured. Chat calls fail until {code("PII_GUARD_UPSTREAM_BASE_URL")} is set.</>
-        )}
-      </dd>
-      <dt className="text-muted">Last call</dt>
-      <dd className="text-ink">
-        {last ? (
-          <>
-            {last.upstream?.status ? `HTTP ${last.upstream.status}` : "no answer"} at {clock(last.time)}
-            {errors ? <span className="text-danger"> · {errors} upstream {errors === 1 ? "error" : "errors"} in the calls counted</span> : null}
-          </>
-        ) : (
-          <span className="text-muted">No call forwarded yet, so its reachability isn't known.</span>
-        )}
-      </dd>
-    </dl>
+    <KeyValues
+      items={[
+        {
+          label: "Forwards to",
+          value: up.mock ? (
+            <>
+              <span className="font-medium">Offline mock model</span>: it echoes the masked text it receives, so no model provider is involved.
+            </>
+          ) : up.origin ? (
+            <code className="font-mono text-xs break-all">{up.origin}</code>
+          ) : (
+            <>Not configured. Chat calls fail until the server is given an upstream base URL ({code("PII_GUARD_UPSTREAM_BASE_URL")}).</>
+          ),
+        },
+        {
+          label: "Last call",
+          value: last ? (
+            <>
+              {last.upstream?.status ? `HTTP ${last.upstream.status}` : "no answer"} at {clock(last.time)}
+              {errors ? <span className="text-danger"> · {errors} upstream {errors === 1 ? "error" : "errors"} in the calls counted</span> : null}
+            </>
+          ) : (
+            <span className="text-muted">No call forwarded yet, so its reachability isn't known.</span>
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -381,23 +366,34 @@ function Detectors({ server, status }: { server: ServerStatus | null; status: Se
   const { fast, audit } = server.gateway.modes;
   return (
     <div className="space-y-3 text-sm">
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2">
-        <dt className="text-muted">Default mode</dt>
-        <dd className="text-ink">
-          <span className="font-medium capitalize">{server.gateway.default_mode}</span>
-          <span className="text-muted"> · clients can pick per request with {code("X-PII-Guard-Mode")}</span>
-        </dd>
-        <dt className="text-muted">Fast</dt>
-        <dd className="text-ink">{fast.detectors.map(detectorName).join(" + ") || "none"}</dd>
-        {audit && <dt className="text-muted">Audit</dt>}
-        {audit && <dd className="text-ink">
-          {audit.available ? (
-            <>Fast + the LLM detector{audit.model ? ` (${audit.model.split("/").pop()})` : ""}: sends the text to that endpoint, for spot checks.</>
-          ) : (
-            <span className="text-muted [overflow-wrap:anywhere]">Unavailable: requests get 503 {code("detection_unavailable")}. {audit.reason}</span>
-          )}
-        </dd>}
-      </dl>
+      <KeyValues
+        items={[
+          {
+            label: "Default mode",
+            value: (
+              <>
+                <span className="font-medium capitalize">{server.gateway.default_mode}</span>
+                <span className="text-muted"> · a client can pick another mode per request (header {code("X-PII-Guard-Mode")})</span>
+              </>
+            ),
+          },
+          { label: "Fast", value: fast.detectors.map(detectorName).join(" + ") || "none" },
+          ...(audit
+            ? [
+                {
+                  label: "Audit",
+                  value: audit.available ? (
+                    <>Fast + the LLM detector{audit.model ? ` (${audit.model.split("/").pop()})` : ""}: sends the text to that endpoint, for spot checks.</>
+                  ) : (
+                    <span className="text-muted [overflow-wrap:anywhere]">
+                      Unavailable: requests get 503 {code("detection_unavailable")}. {audit.reason}
+                    </span>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
       {!server.ner.available && (
         <p role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-ink">
           <span className="font-medium text-warn">Rules only: free-text names are not masked.</span> Names need <NerHint />.

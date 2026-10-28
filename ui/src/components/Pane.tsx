@@ -11,10 +11,12 @@ interface Props {
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Cap the body's height and scroll it (Logs' request and response panes). */
+  scroll?: boolean;
 }
 
 /** A document pane. `side` says which side of the guard boundary its content lives on. */
-export function Pane({ side, eyebrow, title, id, actions, footer, children, className = "" }: Props) {
+export function Pane({ side, eyebrow, title, id, actions, footer, children, className = "", scroll = false }: Props) {
   const headingId = id ? `${id}-title` : undefined;
   return (
     <section
@@ -48,7 +50,7 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
         </div>
         {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
       </header>
-      <div className="min-h-0 flex-1 px-4 py-4 sm:px-5">{children}</div>
+      <div className={["min-h-0 flex-1 px-4 py-4 sm:px-5", scroll ? "max-h-[32rem] overflow-y-auto" : ""].join(" ")}>{children}</div>
       {footer && <footer className="border-t border-line px-4 py-2.5 text-xs text-muted sm:px-5">{footer}</footer>}
     </section>
   );
