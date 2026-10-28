@@ -137,62 +137,62 @@
 <text x="1322.5" y="250" font-size="18" fill="#1B1B1F" text-anchor="middle">4.4 ms</text>
 <rect x="1523.6" y="222" width="10.5" height="40" fill="#F0E442"/>
 <rect x="1534.1" y="222" width="9.9" height="40" fill="#BBBBBB"/>
-<text x="1060" y="320" font-size="20" fill="#1B1B1F" font-weight="600">fast: rules + ner</text>
-<rect x="1060" y="332" width="1.5" height="40" fill="#56B4E9"/>
-<rect x="1061.5" y="332" width="415" height="40" fill="#0072B2"/>
-<text x="1269" y="360" font-size="18" fill="#FFFFFF" text-anchor="middle">31 ms</text>
-<rect x="1476.5" y="332" width="2.3" height="40" fill="#009E73"/>
-<rect x="1478.8" y="332" width="60" height="40" fill="#E69F00"/>
-<rect x="1538.8" y="332" width="1.7" height="40" fill="#F0E442"/>
-<rect x="1540.5" y="332" width="3.5" height="40" fill="#BBBBBB"/>
-<text x="1060" y="430" font-size="20" fill="#1B1B1F" font-weight="600">audit: rules + llm</text>
-<rect x="1060" y="442" width="0" height="40" fill="#56B4E9"/>
-<rect x="1060" y="442" width="481.9" height="40" fill="#0072B2"/>
-<text x="1301" y="470" font-size="18" fill="#FFFFFF" text-anchor="middle">1.2 s</text>
-<rect x="1541.9" y="442" width="0.1" height="40" fill="#009E73"/>
-<rect x="1542" y="442" width="1.8" height="40" fill="#E69F00"/>
-<rect x="1543.9" y="442" width="0.1" height="40" fill="#F0E442"/>
-<rect x="1543.9" y="442" width="0.1" height="40" fill="#BBBBBB"/>
-<text x="1060" y="540" font-size="20" fill="#1B1B1F" font-weight="600">fast: rules + ner</text>
-<rect x="1060" y="552" width="2.1" height="40" fill="#56B4E9"/>
-<rect x="1062.1" y="552" width="371.5" height="40" fill="#0072B2"/>
-<text x="1247.9" y="580" font-size="18" fill="#FFFFFF" text-anchor="middle">19 ms</text>
-<rect x="1433.6" y="552" width="5.3" height="40" fill="#009E73"/>
-<rect x="1438.9" y="552" width="100" height="40" fill="#E69F00"/>
-<text x="1488.9" y="580" font-size="18" fill="#1B1B1F" text-anchor="middle">5.2 ms</text>
-<rect x="1538.8" y="552" width="2.7" height="40" fill="#F0E442"/>
-<rect x="1541.5" y="552" width="2.5" height="40" fill="#BBBBBB"/>
-<text x="1060" y="650" font-size="20" fill="#1B1B1F" font-weight="600">fast: rules + ner (cpu)</text>
-<rect x="1060" y="662" width="1.5" height="40" fill="#56B4E9"/>
-<rect x="1061.5" y="662" width="473.1" height="40" fill="#0072B2"/>
-<text x="1298.1" y="690" font-size="18" fill="#FFFFFF" text-anchor="middle">33 ms</text>
-<rect x="1534.6" y="662" width="4.6" height="40" fill="#009E73"/>
-<rect x="1539.3" y="662" width="1.5" height="40" fill="#E69F00"/>
-<rect x="1540.8" y="662" width="1.9" height="40" fill="#F0E442"/>
-<rect x="1542.7" y="662" width="1.3" height="40" fill="#BBBBBB"/>
-<text x="1060" y="760" font-size="20" fill="#1B1B1F" font-weight="600">fast: rules + ner (mps)</text>
-<rect x="1060" y="772" width="2.4" height="40" fill="#56B4E9"/>
-<rect x="1062.4" y="772" width="467.9" height="40" fill="#0072B2"/>
-<text x="1296.4" y="800" font-size="18" fill="#FFFFFF" text-anchor="middle">20 ms</text>
-<rect x="1530.3" y="772" width="7.8" height="40" fill="#009E73"/>
-<rect x="1538.1" y="772" width="2.7" height="40" fill="#E69F00"/>
-<rect x="1540.9" y="772" width="3.1" height="40" fill="#F0E442"/>
-<rect x="1060" y="852" width="20" height="20" fill="#56B4E9"/>
-<text x="1088" y="870" font-size="19" fill="#1B1B1F">parse</text>
-<rect x="1153.5" y="852" width="20" height="20" fill="#0072B2"/>
-<text x="1181.5" y="870" font-size="19" fill="#1B1B1F">detect</text>
-<rect x="1252.7" y="852" width="20" height="20" fill="#CC79A7"/>
-<text x="1280.7" y="870" font-size="19" fill="#1B1B1F">image</text>
-<rect x="1351.9" y="852" width="20" height="20" fill="#009E73"/>
-<text x="1379.9" y="870" font-size="19" fill="#1B1B1F">mask</text>
-<rect x="1060" y="886" width="20" height="20" fill="#E69F00"/>
-<text x="1088" y="904" font-size="19" fill="#1B1B1F">forward</text>
-<rect x="1170.6" y="886" width="20" height="20" fill="#D55E00"/>
-<text x="1198.6" y="904" font-size="19" fill="#1B1B1F">unmask</text>
-<rect x="1285" y="886" width="20" height="20" fill="#F0E442"/>
-<text x="1313" y="904" font-size="19" fill="#1B1B1F">response</text>
-<rect x="1409.8" y="886" width="20" height="20" fill="#BBBBBB"/>
-<text x="1437.8" y="904" font-size="19" fill="#1B1B1F">other</text>
+<text x="1060" y="311" font-size="20" fill="#1B1B1F" font-weight="600">fast: rules + ner</text>
+<rect x="1060" y="323" width="1.5" height="40" fill="#56B4E9"/>
+<rect x="1061.5" y="323" width="415" height="40" fill="#0072B2"/>
+<text x="1269" y="351" font-size="18" fill="#FFFFFF" text-anchor="middle">31 ms</text>
+<rect x="1476.5" y="323" width="2.3" height="40" fill="#009E73"/>
+<rect x="1478.8" y="323" width="60" height="40" fill="#E69F00"/>
+<rect x="1538.8" y="323" width="1.7" height="40" fill="#F0E442"/>
+<rect x="1540.5" y="323" width="3.5" height="40" fill="#BBBBBB"/>
+<text x="1060" y="412" font-size="20" fill="#1B1B1F" font-weight="600">audit: rules + llm</text>
+<rect x="1060" y="424" width="0" height="40" fill="#56B4E9"/>
+<rect x="1060" y="424" width="481.9" height="40" fill="#0072B2"/>
+<text x="1301" y="452" font-size="18" fill="#FFFFFF" text-anchor="middle">1.2 s</text>
+<rect x="1541.9" y="424" width="0.1" height="40" fill="#009E73"/>
+<rect x="1542" y="424" width="1.8" height="40" fill="#E69F00"/>
+<rect x="1543.9" y="424" width="0.1" height="40" fill="#F0E442"/>
+<rect x="1543.9" y="424" width="0.1" height="40" fill="#BBBBBB"/>
+<text x="1060" y="513" font-size="20" fill="#1B1B1F" font-weight="600">fast: rules + ner</text>
+<rect x="1060" y="525" width="2.1" height="40" fill="#56B4E9"/>
+<rect x="1062.1" y="525" width="371.5" height="40" fill="#0072B2"/>
+<text x="1247.9" y="553" font-size="18" fill="#FFFFFF" text-anchor="middle">19 ms</text>
+<rect x="1433.6" y="525" width="5.3" height="40" fill="#009E73"/>
+<rect x="1438.9" y="525" width="100" height="40" fill="#E69F00"/>
+<text x="1488.9" y="553" font-size="18" fill="#1B1B1F" text-anchor="middle">5.2 ms</text>
+<rect x="1538.8" y="525" width="2.7" height="40" fill="#F0E442"/>
+<rect x="1541.5" y="525" width="2.5" height="40" fill="#BBBBBB"/>
+<text x="1060" y="614" font-size="20" fill="#1B1B1F" font-weight="600">fast: rules + ner (cpu)</text>
+<rect x="1060" y="626" width="1.5" height="40" fill="#56B4E9"/>
+<rect x="1061.5" y="626" width="473.1" height="40" fill="#0072B2"/>
+<text x="1298.1" y="654" font-size="18" fill="#FFFFFF" text-anchor="middle">33 ms</text>
+<rect x="1534.6" y="626" width="4.6" height="40" fill="#009E73"/>
+<rect x="1539.3" y="626" width="1.5" height="40" fill="#E69F00"/>
+<rect x="1540.8" y="626" width="1.9" height="40" fill="#F0E442"/>
+<rect x="1542.7" y="626" width="1.3" height="40" fill="#BBBBBB"/>
+<text x="1060" y="715" font-size="20" fill="#1B1B1F" font-weight="600">fast: rules + ner (mps)</text>
+<rect x="1060" y="727" width="2.4" height="40" fill="#56B4E9"/>
+<rect x="1062.4" y="727" width="467.9" height="40" fill="#0072B2"/>
+<text x="1296.4" y="755" font-size="18" fill="#FFFFFF" text-anchor="middle">20 ms</text>
+<rect x="1530.3" y="727" width="7.8" height="40" fill="#009E73"/>
+<rect x="1538.1" y="727" width="2.7" height="40" fill="#E69F00"/>
+<rect x="1540.9" y="727" width="3.1" height="40" fill="#F0E442"/>
+<rect x="1060" y="798" width="20" height="20" fill="#56B4E9"/>
+<text x="1088" y="816" font-size="19" fill="#1B1B1F">parse</text>
+<rect x="1153.5" y="798" width="20" height="20" fill="#0072B2"/>
+<text x="1181.5" y="816" font-size="19" fill="#1B1B1F">detect</text>
+<rect x="1252.7" y="798" width="20" height="20" fill="#CC79A7"/>
+<text x="1280.7" y="816" font-size="19" fill="#1B1B1F">image</text>
+<rect x="1351.9" y="798" width="20" height="20" fill="#009E73"/>
+<text x="1379.9" y="816" font-size="19" fill="#1B1B1F">mask</text>
+<rect x="1060" y="832" width="20" height="20" fill="#E69F00"/>
+<text x="1088" y="850" font-size="19" fill="#1B1B1F">forward</text>
+<rect x="1170.6" y="832" width="20" height="20" fill="#D55E00"/>
+<text x="1198.6" y="850" font-size="19" fill="#1B1B1F">unmask</text>
+<rect x="1285" y="832" width="20" height="20" fill="#F0E442"/>
+<text x="1313" y="850" font-size="19" fill="#1B1B1F">response</text>
+<rect x="1409.8" y="832" width="20" height="20" fill="#BBBBBB"/>
+<text x="1437.8" y="850" font-size="19" fill="#1B1B1F">other</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;latency-corpus&#x27; (hand-written, fictional hu/en/de messages), a new session per request, mock upstream delay 50 ms; c = concurrent requests.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">Overhead = gateway total - time waiting on the upstream; &#x27;other&#x27; = untimed work (HTTP, scheduling). Hardware: Apple M1 Max, 10 CPUs, local loopback.</text>
 <text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-27 to 2026-10-28 · commits 4ee1b15, 6750a17, e126829 · generated by `pii-guard eval report` from eval/results/runs/</text>
