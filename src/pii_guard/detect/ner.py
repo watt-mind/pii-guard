@@ -156,6 +156,9 @@ _REQUIRED_MODULES = ("torch", "transformers")
 DEFAULT_BATCH_SIZE = 8
 DEFAULT_MAX_BATCH_TOKENS = 4096
 DEFAULT_MAX_PADDING = 2.0
+#: Texts that :meth:`TransformersBackend.predict_batch` runs together from concurrent callers
+#: (LAB-1177). A caller's own texts are never split, so one large request may exceed it.
+DEFAULT_MAX_COMBINED_TEXTS = 64
 #: What a backend runs once on its device before it is published (fictional, no PII).
 WARM_UP_TEXT = "Warm-up sentence for the model."
 
@@ -304,6 +307,28 @@ def select_device(requested: str | None = None) -> str:
     return device
 
 
+class _Call:
+    """One :meth:`TransformersBackend.predict_batch` call waiting in the queue (LAB-1177).
+
+    ``event`` is set when the call is done or when its thread is promoted to run the queue.
+    """
+
+    __slots__ = ("done", "error", "event", "result", "texts")
+
+    def __init__(self, texts: list[str]) -> None:
+        self.texts = texts
+        self.result: list[list[RawEntity]] | None = None
+        self.error: BaseException | None = None
+        self.done = False
+        self.event = threading.Event()
+
+    def finish(
+        self, result: list[list[RawEntity]] | None = None, error: BaseException | None = None
+    ) -> None:
+        self.result, self.error, self.done = result, error, True
+        self.event.set()
+
+
 class TransformersBackend:
     """A Hugging Face token-classification model run with PyTorch.
 
@@ -311,6 +336,13 @@ class TransformersBackend:
     :meth:`predict_batch` runs the windows of several texts in length-sorted micro-batches of
     at most ``batch_size`` windows, ``max_batch_tokens`` padded tokens and ``max_padding``
     times their real tokens (LAB-1279).
+
+    Concurrent callers share forward passes (LAB-1177): the tokenizer and the model are used by
+    one thread at a time, and callers that arrive while a run is in progress queue up; the next
+    run takes every queued caller's texts (up to ``max_combined_texts``, never splitting one
+    caller) as one batch. A caller that finds the model idle runs at once, so there is no wait
+    window and nothing is added at concurrency 1. Several forwards at once are not used: two at
+    once on Apple MPS crashed the process (LAB-1274).
     """
 
     def __init__(
@@ -326,11 +358,14 @@ class TransformersBackend:
         batch_size: int = DEFAULT_BATCH_SIZE,
         max_batch_tokens: int = DEFAULT_MAX_BATCH_TOKENS,
         max_padding: float = DEFAULT_MAX_PADDING,
+        max_combined_texts: int = DEFAULT_MAX_COMBINED_TEXTS,
     ) -> None:
         if stride >= max_length // 2:
             raise ValueError("stride must be less than half of max_length")
-        if batch_size < 1 or max_batch_tokens < 1 or max_padding < 1:
-            raise ValueError("batch_size, max_batch_tokens and max_padding must be positive")
+        if batch_size < 1 or max_batch_tokens < 1 or max_padding < 1 or max_combined_texts < 1:
+            raise ValueError(
+                "batch_size, max_batch_tokens, max_padding and max_combined_texts must be positive"
+            )
         import torch
         from transformers import AutoModelForTokenClassification, AutoTokenizer
 
@@ -355,7 +390,13 @@ class TransformersBackend:
         self.batch_size = batch_size
         self.max_batch_tokens = max_batch_tokens
         self.max_padding = max_padding
+        self.max_combined_texts = max_combined_texts
         self._lock = threading.Lock()  # fast tokenizers are not safe for concurrent calls
+        # Callers waiting for a run, oldest first, and whether a run is in progress (LAB-1177).
+        # While ``_running`` is set, exactly one thread runs or is about to run the queue.
+        self._queue_lock = threading.Lock()
+        self._queue: list[_Call] = []
+        self._running = False
         # One forward on the device before anyone else can see this backend (LAB-1274).
         self.predict(WARM_UP_TEXT)
 
@@ -364,6 +405,73 @@ class TransformersBackend:
 
     def predict_batch(self, texts: Sequence[str]) -> list[list[RawEntity]]:
         """Raw entities for each of ``texts``, in order, from batched forward passes.
+
+        Concurrent calls are combined into shared runs of :meth:`_predict_now` (see the class
+        docstring); each caller gets exactly its own results. When a combined run fails, its
+        callers are run one at a time, so only the caller whose texts fail gets the error.
+        """
+        if not texts:
+            return []
+        call = _Call(list(texts))
+        with self._queue_lock:
+            self._queue.append(call)
+            # Invariant: a non-empty queue has a runner. If none is running, this call is
+            # alone in the queue and runs now; otherwise it waits to be served or promoted.
+            lead = not self._running
+            self._running = True
+        if not lead:
+            call.event.wait()
+        if not call.done:  # this thread runs the queue (first in line, or promoted)
+            self._run_queue()
+        if call.error is not None:
+            raise call.error
+        return call.result or []
+
+    def _run_queue(self) -> None:
+        """Run the oldest queued calls as one batch, then hand the queue to the next caller.
+
+        Called by the thread whose call is first in the queue. The next run is done by the
+        next waiting caller's own thread, so a caller is never kept busy serving later ones.
+        """
+        with self._queue_lock:
+            taken = [self._queue.pop(0)]
+            size = len(taken[0].texts)
+            while self._queue and size + len(self._queue[0].texts) <= self.max_combined_texts:
+                size += len(self._queue[0].texts)
+                taken.append(self._queue.pop(0))
+        try:
+            self._serve(taken)
+        finally:
+            for call in taken:
+                if not call.done:  # BaseException from the run: never leave a caller hanging
+                    call.finish(error=DetectionError("ner batch was interrupted"))
+            with self._queue_lock:
+                if self._queue:
+                    self._queue[0].event.set()  # promoted: its thread runs the next batch
+                else:
+                    self._running = False
+
+    def _serve(self, calls: list[_Call]) -> None:
+        if len(calls) == 1:
+            call = calls[0]
+            try:
+                call.finish(result=self._predict_now(call.texts))
+            except Exception as exc:
+                call.finish(error=exc)
+            return
+        try:
+            results = self._predict_now([t for call in calls for t in call.texts])
+        except Exception:
+            for call in calls:  # isolate the failure: only the failing caller gets an error
+                self._serve([call])
+            return
+        start = 0
+        for call in calls:
+            call.finish(result=results[start : start + len(call.texts)])
+            start += len(call.texts)
+
+    def _predict_now(self, texts: Sequence[str]) -> list[list[RawEntity]]:
+        """:meth:`predict_batch` for ``texts`` in this thread, without combining callers.
 
         All texts are tokenized together into windows (``overflow_to_sample_mapping`` maps a
         window back to its text). The windows run longest first in micro-batches, each padded
