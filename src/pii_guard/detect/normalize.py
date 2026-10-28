@@ -165,10 +165,6 @@ _HEX_ID_RE = re.compile(r"[0-9a-f]{4,}")
 # A line break directly between two digits: ``+36 30 123\n4567``, ``DE89\r\n3704 ...``.
 _WRAPPED_NUMBER_RE = re.compile(r"(?<=[0-9])(\r\n|[\n\r\x0b\x0c\x85\u2028\u2029])(?=[0-9])")
 _LINE_BREAK_RE = re.compile(f"[{_LINE_BREAKS}]")
-# A line of nothing but a number (a list or a table column): never joined to the next one.
-_NUMBER_LINE_RE = re.compile(r"[ \t]*[+(]?[0-9][0-9 ()+\-./]*[ \t]*")
-# The rest of a wrapped number: digit groups and nothing else on the line but a closing mark.
-_CONTINUATION_RE = re.compile(r"[0-9]+(?:[ -][0-9]+)*[ \t]*[.,;:!?)]?[ \t]*")
 
 # Obfuscated e-mail separators: ``[at]``, ``(dot)`` ... with the spaces around them (LAB-1297).
 _OPEN, _CLOSE = r"[\[({<]", r"[\])}>]"
@@ -390,6 +386,36 @@ def _blank_spoofed_placeholders(chars: list[str]) -> None:
             chars[k] = " "
 
 
+def _is_number_line(text: str) -> bool:
+    """Recognize a bare numeric line in linear time, including optional sign and padding."""
+    line = text.strip(" \t")
+    if not line:
+        return False
+    start = int(line[0] in "+(")
+    if start == len(line) or not "0" <= line[start] <= "9":
+        return False
+    # Tabs are padding only; spaces and these marks may also occur inside the number.
+    return all(char in "0123456789 ()+-./" for char in line[start + 1 :])
+
+
+def _is_number_continuation(text: str) -> bool:
+    """Recognize digit groups, optional closing punctuation and space/tab padding linearly."""
+    line = text.rstrip(" \t")
+    if line and line[-1] in ".,;:!?)":
+        line = line[:-1].rstrip(" \t")
+    # A separator must have digits on both sides. Each character has exactly one role;
+    # trailing whitespace is removed above rather than backtracked between repetitions.
+    needs_digit = True
+    for char in line:
+        if "0" <= char <= "9":
+            needs_digit = False
+        elif char in " -" and not needs_digit:
+            needs_digit = True
+        else:
+            return False
+    return not needs_digit
+
+
 def _join_wrapped_numbers(chars: list[str]) -> list[int]:
     """Turn a line break inside a number into a space; the indices to drop (CR of a CR LF).
 
@@ -407,7 +433,7 @@ def _join_wrapped_numbers(chars: list[str]) -> list[int]:
         following = _LINE_BREAK_RE.search(joined, end)
         before = joined[line_start:start]
         after = joined[end : following.start() if following else len(joined)]
-        if _NUMBER_LINE_RE.fullmatch(before) or not _CONTINUATION_RE.fullmatch(after):
+        if _is_number_line(before) or not _is_number_continuation(after):
             continue
         chars[end - 1] = " "
         drop.extend(range(start, end - 1))
