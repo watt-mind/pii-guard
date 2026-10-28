@@ -20,8 +20,8 @@
     "note": null
   },
   "system": {
-    "key": "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base",
-    "label": "pii-guard gateway, fast mode (rules + ner hdkiller/pii-guard-ner-xlmr-base)",
+    "key": "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base@mps",
+    "label": "pii-guard gateway, fast mode (rules + ner hdkiller/pii-guard-ner-xlmr-base on mps)",
     "family": "pii-guard",
     "tool": "pii-guard",
     "version": "0.1.0",
@@ -39,7 +39,9 @@
         "model": "hdkiller/pii-guard-ner-xlmr-base",
         "model_ref": "published v2.0, revision 95f612a9ad65cc5ade5b9248bd152020541e7097 (LAB-1306)",
         "revision": null,
-        "settings": {},
+        "settings": {
+          "device": "mps"
+        },
         "serving": "in-process, PyTorch on Apple MPS"
       }
     ]

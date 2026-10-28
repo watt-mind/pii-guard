@@ -4,6 +4,8 @@
     "gateway-latency:fast:rules": "#0072B2",
     "gateway-latency:fast:rules+ner:bardsai/eu-pii-anonimization-multilang": "#CC79A7",
     "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base": "#332288",
+    "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base@cpu": "#999933",
+    "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base@mps": "#0072B2",
     "gateway-latency:fast:rules+ner:pii-guard-ner-xlmr-large-distilled": "#009E73",
     "gateway-latency:strict:rules+llm:muse-spark-open": "#D55E00"
   },

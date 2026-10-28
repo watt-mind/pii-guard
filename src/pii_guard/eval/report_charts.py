@@ -1134,6 +1134,7 @@ def latency(index: Mapping[str, Any]) -> str:
         _text(rx0 - 20, 165, "Where it goes (p50, c=1, not streamed)", size=24, weight="700")
     )
     ry = 210
+    step = min(110, 610 // max(len(runs), 1))  # keep the stage legend inside the canvas
     for run in runs:
         cell = next(
             (c for c in run["cells"] if c["concurrency"] == 1 and not c["stream"]),
@@ -1160,7 +1161,7 @@ def latency(index: Mapping[str, Any]) -> str:
                     _text(x + w / 2, ry + 40, fmt_duration(v), size=18, fill=ink, anchor="middle")
                 )
             x += w
-        ry += 110
+        ry += step
     lx, ly = float(rx0 - 20), float(max(ry, 560))
     for name, color in STAGE_COLORS.items():
         tw = text_width(name, 19) + 46
