@@ -414,3 +414,32 @@ def test_vault_masks_the_widened_row_with_one_placeholder() -> None:
     tokens = [PLACEHOLDER_RE.search(m).group(0) for m in masked]
     assert masked[0] == f"1,{tokens[0]},x"
     assert tokens[0] == tokens[1]
+
+
+# --- LAB-1182: a span cut at a stem keeps its end ---------------------------------------------
+
+
+def test_a_stem_span_is_not_widened_over_its_suffix() -> None:
+    # The session confirmed the inflected surface whole; the known detector cut at the stem.
+    text = "A ház kulcsait Gyakorló Tihamérnak kell átadni."
+    stem = _span(text, "Gyakorló Tihamér")
+    assert widen_to_known(text, [stem], ["Gyakorló Tihamérnak"], "hu") == [stem]
+
+
+def test_a_stem_span_still_widens_its_start() -> None:
+    text = "A ház kulcsait Gyakorló Tihamérnak kell átadni."
+    out = widen_to_known(text, [_span(text, "Tihamér")], ["Gyakorló Tihamérnak"], "hu")
+    assert texts(out) == ["Gyakorló Tihamér"]
+
+
+def test_a_stem_span_keeps_an_english_possessive_outside() -> None:
+    text = "1,Jane Placeholder's file"
+    out = widen_to_known(text, [_span(text, "Placeholder")], ["Jane Placeholder's"], "en")
+    assert texts(out) == ["Jane Placeholder"]
+
+
+def test_a_span_ending_in_letters_that_are_not_a_suffix_still_widens() -> None:
+    # "Placehold" is a fragment, not a stem: "er" is no suffix, so the whole value is taken.
+    text = "1,Jane Placeholder,x"
+    out = widen_to_known(text, [_span(text, "Placehold")], ["Jane Placeholder"], "en")
+    assert texts(out) == ["Jane Placeholder"]

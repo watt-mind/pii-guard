@@ -131,6 +131,20 @@ def _is_suffix(text: str, start: int, end: int) -> bool:
     return all(ch.isalnum() for ch in text[start:end])
 
 
+def _stops_before_suffix(text: str, span: Span, end: int, language: str) -> bool:
+    """``span`` ends where ``text[span.end:end]`` is an inflectional suffix of its value.
+
+    The known detector, the vault and LLM alignment cut a span at the stem on purpose
+    (``Gyakorló Tihamér|nak``); a widening must not move that end over the suffix.
+    """
+    if span.end >= end or not text[span.end - 1].isalnum():
+        return False
+    pattern = inflection_for(language).suffix_pattern(fold_value(span.text), span.entity_type)
+    if not pattern:
+        return False
+    return re.fullmatch(pattern, fold_value(text[span.end : end]), re.IGNORECASE) is not None
+
+
 def widen_to_known(
     text: str,
     spans: Sequence[Span],
@@ -149,7 +163,9 @@ def widen_to_known(
     János``), the span becomes the occurrence: ``Jane Placeholder``. Several fragments of the
     value (``Jane`` and ``Placeholder``) become one span. Longest values first.
 
-    A span ending in a suffix keeps it (``Minta Jánosnak``; the vault splits it). An
+    A span ending in a suffix keeps it (``Minta Jánosnak``; the vault splits it); a span that
+    stops at a stem before a suffix keeps its end (``Tihamér|nak`` with the value ``Gyakorló
+    Tihamérnak`` becomes ``Gyakorló Tihamér|nak``: the suffix stays outside). An
     occurrence that would take in or cut through any other span (another person, an e-mail
     address) is not used, so a widening never joins two values. Values of one word widen
     nothing. Returns the spans in order; ``spans`` themselves are never changed.
@@ -199,9 +215,14 @@ def _widen(
         ]
         if not seeds or len(seeds) != len(overlapping):
             continue  # nothing to widen, or the occurrence would take in another value
-        if len(seeds) == 1 and seeds[0].start == start and seeds[0].end >= end:
+        last = max(seeds, key=lambda s: s.end)
+        # The value is itself an inflected surface (``Gyakorló Tihamérnak``, confirmed whole in
+        # an earlier turn) and the seed already stops at its stem: the end stays (LAB-1182).
+        new_end = (
+            last.end if _stops_before_suffix(text, last, end, language) else max(end, last.end)
+        )
+        if len(seeds) == 1 and seeds[0].start == start and seeds[0].end >= new_end:
             continue  # already the whole value
-        new_end = max(end, *(s.end for s in seeds))
         widened = Span(
             start,
             new_end,
