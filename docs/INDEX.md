@@ -36,3 +36,4 @@
 | [0010](decisions/0010-language-pack-plugins.md) | Language packs as one plugin unit: one `LanguagePack`, entry-point discovery, a conformance suite |
 | [0011](decisions/0011-hosted-saas.md) | Opt-in hosted demo: Google-first identity, scoped ephemeral state and conservative sponsored allocations |
 | [0012](decisions/0012-hosted-projects-and-endpoint-configuration.md) | Persist project configuration separately from ephemeral request state |
+| [0013](decisions/0013-one-console-owner-scoped-api.md) | One console, one API: owner-scoped runtime, hosted projections and server-declared capabilities |

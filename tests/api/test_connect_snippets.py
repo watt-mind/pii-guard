@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shlex
 import tomllib
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -182,3 +183,89 @@ def test_session_ref_matches_the_traffic_log() -> None:
     assert body["session_ref"] == app.state.observability.traffic.session_ref("c_ref")
     off = _client(settings).get("/v1/connect/snippets").json()
     assert off["session_ref"] is None and off["traffic_log"] == "off"
+
+
+# --- ?endpoint=<id> (LAB-1431, ADR 0013): the same blocks for one owned project endpoint ----
+
+PROVIDER_KEY = "fictional-provider-key-0000"
+
+
+def _endpoint_client(tmp_path: Path, **extra: Any) -> tuple[TestClient, str]:
+    settings = Settings(
+        _env_file=None,
+        tenant_key=TEST_TENANT_KEY,
+        project_state_path=str(tmp_path / "projects.sqlite3"),
+        **extra,
+    )
+    client = _client(settings)
+    project = client.get("/v1/projects").json()["projects"][0]
+    policy = client.get(f"/v1/projects/{project['id']}/policies").json()["policies"][0]
+    created = client.post(
+        f"/v1/projects/{project['id']}/endpoints",
+        json={
+            "name": "Synthetic endpoint",
+            "provider": "openai",
+            "model": "synthetic-model",
+            "api_key": PROVIDER_KEY,
+            "policy_version_id": policy["policy_version_id"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    return client, created.json()["id"]
+
+
+def test_endpoint_blocks_use_the_endpoint_url_model_and_key(tmp_path: Path) -> None:
+    client, endpoint = _endpoint_client(tmp_path)
+    res = client.get("/v1/connect/snippets", params={"endpoint": endpoint})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    url = f"http://127.0.0.1:8899/e/{endpoint}/v1"
+    assert body["gateway_url"] == url
+    assert body["session"] is None and body["session_url"] is None
+    assert body["endpoint"] == {
+        "id": endpoint,
+        "name": "Synthetic endpoint",
+        "model": "synthetic-model",
+        "enabled": True,
+    }
+    assert body["model"] == "synthetic-model" and body["models"] == ["synthetic-model"]
+    assert body["auth"] == {"token_required": True, "token_env": "PII_GUARD_ENDPOINT_KEY"}
+    assert body["upstream"]["origin"] is None and body["upstream"]["preset"] == "openai"
+    assert body["presets"] == [] and body["session_ref"] is None
+    for tool in body["tools"]:
+        if tool["supported"]:
+            assert url in tool["code"], tool["id"]
+            assert "/s/" not in tool["code"], tool["id"]
+    assert "$PII_GUARD_ENDPOINT_KEY" in _tool(body, "curl")["code"]
+    assert 'env_key="PII_GUARD_ENDPOINT_KEY"' in _tool(body, "codex")["code"]
+    assert "{env:PII_GUARD_ENDPOINT_KEY}" in _tool(body, "opencode")["code"]
+    assert "--no-session-path" in _tool(body, "pi")["code"]
+    assert "--api-key '$PII_GUARD_ENDPOINT_KEY'" in _tool(body, "pi")["code"]
+    # Muse Code reads its catalog from the gateway root, which an endpoint URL doesn't serve.
+    assert not _tool(body, "muse-code")["supported"]
+    compile(_tool(body, "python")["code"], "<snippet>", "exec")
+    for secret in (PROVIDER_KEY, "api.openai.com", "pg_ep_"):
+        assert secret not in res.text
+
+
+def test_unknown_endpoint_is_404_and_bad_endpoint_queries_are_refused(tmp_path: Path) -> None:
+    client, endpoint = _endpoint_client(tmp_path)
+    missing = client.get("/v1/connect/snippets", params={"endpoint": "synthetic-unknown"})
+    assert missing.status_code == 404
+    assert missing.json()["error"]["code"] == "project_not_found"
+    for query in (
+        {"endpoint": "bad endpoint"},
+        {"endpoint": endpoint, "session": "c_x"},
+        {"endpoint": endpoint, "model": "muse-spark-1.3"},
+    ):
+        assert client.get("/v1/connect/snippets", params=query).status_code == 422, query
+
+
+def test_endpoint_blocks_need_local_owner_access(tmp_path: Path) -> None:
+    client, endpoint = _endpoint_client(tmp_path)
+    remote = TestClient(client.app, base_url="http://127.0.0.1:8899", client=("192.0.2.7", 5000))
+    res = remote.get("/v1/connect/snippets", params={"endpoint": endpoint})
+    assert res.status_code == 403
+    assert "Synthetic endpoint" not in res.text
+    # The session blocks are unchanged for the same caller.
+    assert remote.get("/v1/connect/snippets").status_code == 200

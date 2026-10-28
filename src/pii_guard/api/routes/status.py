@@ -7,6 +7,10 @@ upstream is reported by origin (scheme, host, port), without a path, user or pas
 
 ``gateway_url`` is this request's own base URL plus ``/v1``: the address a client on the same
 network path (the browser that asked) reaches the gateway at.
+
+One route in both modes (ADR 0013). ``capabilities`` tells the UI which sections this server
+offers. Hosted owners get :func:`hosted_projection`: an explicit allow-list of fields, with
+``gateway.url`` from ``HOSTED_PUBLIC_ORIGIN`` and their own traffic-log and vault views.
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ from pii_guard.api.routes._common import v1_router
 from pii_guard.config import Settings
 from pii_guard.types import DetectionError
 
-__all__ = ["router", "server_status", "upstream_origin"]
+__all__ = ["capabilities", "hosted_projection", "router", "server_status", "upstream_origin"]
 
 logger = logging.getLogger("pii_guard.api")
 
@@ -135,6 +139,51 @@ def _static_status(request: Request) -> dict[str, Any]:
     }
 
 
+def capabilities(*, hosted: bool, traffic_log: str, vault_inspect: str) -> dict[str, bool]:
+    """Which console sections this server offers (ADR 0013): the UI's only source for them.
+
+    ``traffic_log`` and ``vault_inspect`` are the caller's own view (the server's settings
+    locally, the owner's runtime when hosted), so ``logs`` and ``vault`` are one expression in
+    both modes."""
+    return {
+        "text": True,
+        "chat": True,
+        "images": not hosted,
+        "logs": traffic_log != "off",
+        "vault": vault_inspect != "off",
+        "server_policy": not hosted,
+        "projects": True,
+        "connect": True,
+        "evaluation": True,
+        "accounts": hosted,
+    }
+
+
+def hosted_projection(status: dict[str, Any], public_origin: str) -> dict[str, Any]:
+    """What a signed-in hosted owner may see of :func:`server_status` (ADR 0013).
+
+    An allow-list, so a new field stays local until it is added here: no upstream, image
+    pipeline, ``auth``, REST detector list, metrics or server-wide traffic-log level. Hosted
+    requests run fast mode only, so audit is not listed. ``gateway.url`` is the public origin,
+    never the request's ``Host`` (an internal one behind the hosted router)."""
+    gateway, ner = status["gateway"], status["ner"]
+    return {
+        "version": status["version"],
+        "gateway": {
+            "default_mode": "fast",
+            "url": f"{public_origin.rstrip('/')}/v1",
+            "modes": {"fast": gateway["modes"]["fast"]},
+        },
+        # No model: PII_GUARD_NER_MODEL may name an operator's local directory.
+        "ner": {k: ner[k] for k in ("available", "state", "error")},
+        "policies": status["policies"],
+        "default_language": status["default_language"],
+        "traffic_log": status["traffic_log"],
+        "vault_inspect": status["vault_inspect"],
+        "capabilities": status["capabilities"],
+    }
+
+
 def server_status(request: Request) -> dict[str, Any]:
     state = request.app.state
     cached = getattr(state, "status_static", None)
@@ -144,12 +193,17 @@ def server_status(request: Request) -> dict[str, Any]:
             if cached is None:
                 cached = _static_status(request)
                 state.status_static = cached
-    obs = getattr(state, "observability", None)
+    runtime = getattr(request.state, "hosted_runtime", None)
+    hosted = bool(state.settings.hosted)
+    # The caller's own view: a hosted owner's runtime, else the server's (as /v1/traffic).
+    obs = runtime.observability if runtime is not None else getattr(state, "observability", None)
     traffic = getattr(obs, "traffic", None)
     level = getattr(getattr(traffic, "level", None), "value", "off")
+    # Hosted runtimes always inspect masked (api/routes/vault.py).
+    inspect = "masked" if hosted else str(getattr(state, "vault_inspect", "masked"))
     base = str(request.base_url).rstrip("/")
     warmup = getattr(state, "ner_warmup", None)
-    return {
+    status = {
         **cached,
         "gateway": {**cached["gateway"], "url": f"{base}/v1"},
         # Live (LAB-1303): off | loading | ready | failed, and why it failed (type only).
@@ -159,9 +213,13 @@ def server_status(request: Request) -> dict[str, Any]:
             "error": getattr(warmup, "error", None),
         },
         "traffic_log": level,
-        "vault_inspect": str(getattr(state, "vault_inspect", "masked")),
+        "vault_inspect": inspect,
         "metrics": getattr(obs, "metrics", None) is not None,
+        "capabilities": capabilities(hosted=hosted, traffic_log=level, vault_inspect=inspect),
     }
+    if hosted:
+        return hosted_projection(status, state.hosted.origin)
+    return status
 
 
 @router.get(
@@ -175,5 +233,7 @@ def status(request: Request) -> dict[str, Any]:
     Detector names, whether NER and the audit mode can run, the entity policies, the
     traffic-log level, the image pipeline's gaps and the upstream's origin (scheme, host,
     port). Never a key, a token, a value or a session: secrets appear only as configured or
-    not. ``gateway.url`` is this request's own base URL plus ``/v1``."""
+    not. ``gateway.url`` is this request's own base URL plus ``/v1``. ``capabilities`` lists the
+    console sections this server offers. Hosted: signed-in owners only, and a projection without
+    upstream, image, auth or server-wide log details (`docs/contracts.md`)."""
     return server_status(request)

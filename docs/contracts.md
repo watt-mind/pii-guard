@@ -702,7 +702,9 @@ message content and in tool-call output arrays; the text that follows each image
 
 What this server runs, read-only, for the web UI's Overview, Connect and Policy pages
 (`pii_guard.api.routes.status`). It takes no body and no parameters, never touches a vault
-session and never calls a detector or the upstream.
+session and never calls a detector or the upstream. One route in both modes
+([ADR 0013](decisions/0013-one-console-owner-scoped-api.md)): hosted owners get the
+[hosted projection](#hosted-projection) below.
 
 **Auth.** Like every route but `/healthz`: when `PII_GUARD_API_TOKEN` is set the request needs
 `Authorization: Bearer <token>` or `X-PII-Guard-Token: <token>`, otherwise
@@ -736,7 +738,10 @@ without its path, query, user or password.
   "default_language": "hu",
   "traffic_log": "off",
   "vault_inspect": "masked",
-  "metrics": false
+  "metrics": false,
+  "capabilities": {"text": true, "chat": true, "images": true, "logs": false, "vault": true,
+                   "server_policy": true, "projects": true, "connect": true,
+                   "evaluation": true, "accounts": false}
 }
 ```
 
@@ -771,9 +776,98 @@ without its path, query, user or password.
 | `traffic_log` | `"off"` \| `"masked"` \| `"full"` | `PII_GUARD_TRAFFIC_LOG` level. |
 | `vault_inspect` | `"off"` \| `"masked"` \| `"full"` | `PII_GUARD_VAULT_INSPECT`: whether the vault inspector answers, and whether it can reveal values. |
 | `metrics` | bool | Request metrics are collected (`/metrics`). |
+| `capabilities` | object | Which console sections this server offers, below. The UI's only source for them: it never branches on the mode or the build. |
 
-Everything but `gateway.url`, `traffic_log` and `metrics` is fixed for the life of the app and
-computed on the first call; a settings change needs a restart.
+Everything but `gateway.url`, `traffic_log`, `metrics` and `capabilities` is fixed for the life
+of the app and computed on the first call; a settings change needs a restart.
+
+**`capabilities`.** Booleans computed from settings and mode. `logs` and `vault` come from the
+caller's own view (the server's settings locally, the owner's runtime when hosted).
+
+| Key | Local | Hosted | Section |
+|---|---|---|---|
+| `text` | `true` | `true` | Text masking (`/v1/analyze`, `/v1/mask`, `/v1/unmask`). |
+| `chat` | `true` | `true` | The gateway chat (`/v1/chat/completions`, `/v1/responses`). |
+| `images` | `true` | `false` | Image masking (`/v1/mask/image`); `images.available` says whether it can run. |
+| `logs` | `traffic_log != "off"` | `true` | The traffic log (`/v1/traffic`). |
+| `vault` | `vault_inspect != "off"` | `true` | The vault inspector (`/v1/vault/sessions`). |
+| `server_policy` | `true` | `false` | The server-wide entity policy page (`policies`); hosted owners use project policies. |
+| `projects` | `true` | `true` | Projects, policies and endpoints (`/v1/projects`). |
+| `connect` | `true` | `true` | Connect (`/v1/connect/snippets`). |
+| `evaluation` | `true` | `true` | The benchmark and evaluation pages. |
+| `accounts` | `false` | `true` | Account, API keys and connections (`/v1/account`). |
+
+#### Hosted projection
+
+Hosted, `/v1/status` needs a signed-in Google principal: guests get `401 unauthorized`, and
+guard API keys and endpoint keys are refused with `401` (keys are for the gateway and REST).
+The response is an allow-list of the fields above: a field not listed here is not returned.
+
+```json
+// response 200, hosted
+{
+  "version": "0.1.0",
+  "gateway": {
+    "default_mode": "fast",
+    "url": "https://guard.example/v1",
+    "modes": {"fast": {"detectors": ["rules", "ner"], "available": true, "reason": null}}
+  },
+  "ner": {"available": true, "state": "ready", "error": null},
+  "policies": {"PERSON": "mask", "ORGANIZATION": "keep"},
+  "default_language": "hu",
+  "traffic_log": "masked",
+  "vault_inspect": "masked",
+  "capabilities": {"text": true, "chat": true, "images": false, "logs": true, "vault": true,
+                   "server_policy": false, "projects": true, "connect": true,
+                   "evaluation": true, "accounts": true}
+}
+```
+
+| Field | Local | Hosted |
+|---|---|---|
+| `version` | yes | yes |
+| `gateway.default_mode` | `PII_GUARD_GATEWAY_MODE` | always `fast` |
+| `gateway.url` | the request's base URL + `/v1` | `HOSTED_PUBLIC_ORIGIN` + `/v1`, never the request's `Host` |
+| `gateway.modes` | `fast` and `audit` | `fast` only (audit is not offered hosted) |
+| `rest` | yes | dropped |
+| `ner` | `available`, `model`, `state`, `error` | `available`, `state`, `error` (no model: it may name a local path) |
+| `upstream` | yes | dropped |
+| `images` | yes | dropped |
+| `policies` | effective server policies | the default policies (projects pin their own) |
+| `auth` | yes | dropped |
+| `default_language` | yes | yes |
+| `traffic_log` | server-wide level | the owner's own log (`masked`) |
+| `vault_inspect` | `PII_GUARD_VAULT_INSPECT` | the owner's own inspector (`masked`) |
+| `metrics` | yes | dropped |
+| `capabilities` | yes | yes (hosted values) |
+
+### `GET /v1/connect/snippets`
+
+The Connect quickstart's copy-paste blocks (`pii_guard.api.routes.connect`,
+`pii_guard.integrations.snippets`); `pii-guard connect <tool> --print` prints the same code.
+Never a key: blocks name keys as `$VARIABLE`, and an upstream appears by origin and preset name
+only.
+
+- `?session=<id>`, `?model=<id>` (local): blocks at `<base>/s/<session>/v1` with the
+  operator's upstream and models, `auth.token_env` `PII_GUARD_API_TOKEN`.
+- `?endpoint=<id>`: the same blocks for one of the caller's project endpoints
+  ([ADR 0013](decisions/0013-one-console-owner-scoped-api.md)). `gateway_url` is
+  `<origin>/e/<endpoint>/v1`: `HOSTED_PUBLIC_ORIGIN` hosted, the request's base URL locally.
+  The model is the endpoint's, `auth` is `{"token_required": true, "token_env":
+  "PII_GUARD_ENDPOINT_KEY"}`, `session`/`session_url`/`session_ref` are `null`, `presets` is
+  empty, and `upstream` has the preset name but `origin: null`. `endpoint` is
+  `{"id", "name", "model", "enabled"}`. Muse Code is `supported: false` (it reads its catalog
+  from the gateway root, which endpoint URLs don't serve); pi's block adds
+  `--no-session-path --api-key '$PII_GUARD_ENDPOINT_KEY'`. `session` or `model` with
+  `endpoint` is `422 invalid_request`.
+
+**Owner check.** The endpoint must belong to the caller: the signed-in Google principal hosted,
+`local-owner` locally (with no `PII_GUARD_API_TOKEN`, only from loopback on both ends, else
+`403 project_access_denied`, as project management). An unknown id and another owner's id both
+get the same `404 project_not_found`.
+
+**Hosted.** Signed-in Google principals only, as `/v1/status`: guests `401`, API keys and
+endpoint keys `401`. `endpoint` is required (`422 invalid_request` without it).
 
 ### `GET /v1/traffic`
 
@@ -1338,8 +1432,9 @@ guests. Guard authorization and platform identity headers are removed before dow
 
 Only `/v1/account` and the curated `/v1/demo` are anonymous API routes. Landing/static assets
 and health probes remain public. Other data routes require Google identity or an owned guard
-API key. Hosted mode refuses operator status/connect configuration, docs/OpenAPI, metrics,
-image masking and audit detection. Cookie-authenticated mutations require `Origin` to equal
+API key. Hosted mode serves `/v1/status` and `/v1/connect/snippets` only to signed-in Google
+principals, as owner projections (ADR 0013, [`GET /v1/status`](#hosted-projection)), and
+refuses docs/OpenAPI, metrics, image masking and audit detection. Cookie-authenticated mutations require `Origin` to equal
 `HOSTED_PUBLIC_ORIGIN`; cross-site requests are rejected. Responses use `Cache-Control: no-store`.
 The host-prefixed guest cookie is signed, Secure, HttpOnly, SameSite=Strict and lasts one hour.
 A new/expired cookie creates a different guest, with global quotas bounding cookie rotation.
