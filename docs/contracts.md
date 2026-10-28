@@ -1424,3 +1424,59 @@ Successful upstream responses and complete SSE streams are limited to 2 MiB befo
 or event parsing. Hosted requests explicitly ask for identity encoding and refuse compressed
 responses, so a compressed payload cannot bypass the memory bound during decompression.
 An over-limit stream ends with a sanitized stream failure and releases its admission permit.
+
+### Durable sponsored allowance (opt-in)
+
+The default `PII_GUARD_HOSTED_SPEND_STORE=marker` retains the one-use allocation claim above.
+`azure_blob` selects a separate monetary-only allowance; it does not persist vault mappings,
+owners, keys, connections or local request/token/concurrency quotas. Install the
+`hosted-azure` extra. The configured storage account must use its public Azure Blob HTTPS
+hostname, without SAS, URL credentials, paths, queries or fragments. Authentication uses
+`ManagedIdentityCredential` only, optionally with
+`PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID`; no developer-login fallback exists.
+`HOSTED_SPEND_ACCOUNT_URL`, `HOSTED_SPEND_CONTAINER` and `HOSTED_SPEND_ENVIRONMENT=dev|prod`
+(all with the `PII_GUARD_` prefix) select one fixed `<environment>.json` blob. Dev/prod
+resources and identities must be separate. The app never creates a blob or issues funds.
+
+The operator pre-creates a private block blob of at most 4096 bytes with exactly these keys:
+
+```json
+{"version":1,"environment":"dev","allocation_id":"synthetic-approved","ceiling_microdollars":1000000,"expires_at":1900000000,"charged_total":0,"day":"2026-10-28","daily_charged":0,"enabled":false}
+```
+
+Integers are exact, not booleans or floats; unknown/duplicate keys, malformed dates, future
+UTC days and values outside `0 <= daily_charged <= charged_total <= ceiling_microdollars`
+deny sponsorship. Environment, allocation ID, ceiling and expiry must equal the approved
+deployment configuration on **every read**. The existing
+`HOSTED_SPONSORED_ALLOCATION_ID`, `HOSTED_SPONSORED_MICRODOLLARS` and
+`HOSTED_ALLOCATION_EXPIRES_AT` pin that authority; the last must be an integral Unix expiry.
+The ceiling is finite, at most 10^15 microdollars. Configuration alone never funds the blob.
+
+Startup reads remaining authority without writes, claims, new IDs or expiry extensions.
+Each sponsored call first holds local admission, then reads and atomically charges the full
+conservative input/output cost to both lifetime and UTC-day totals using the GET's ETag as
+`If-Match`. Detector/provider work starts only after a confirmed write and an expiry/day
+recheck. The daily ceiling remains the configured quota limit ($10 by default); daily
+rollover changes only the daily counter, never the lifetime total. Completion, cancellation,
+retry, missing usage and duplicate completion never refund or perform a monetary update.
+
+Only a known HTTP 412 precondition conflict may retry, at most three attempts. SDK retries
+are disabled. Connection/read timeouts and a ten-second admission deadline bound I/O; a
+dedicated two-worker pool keeps slots occupied until underlying synchronous work finishes.
+Timeouts, unknown commits, cancellation, denied permissions, missing/malformed state and all
+accounting errors return sanitized `503 sponsored_unavailable` without outbound work.
+An ambiguous/late write may consume credit; it is never retried or refunded. Account/health
+and permitted BYOK remain available. The process kill switch and blob `enabled=false` deny
+future sponsored admission; account availability is a conservative cached hint, not an
+authorization check. The hosted cleanup loop refreshes that hint using bounded, single-flight,
+read-only I/O from the 30-second cleanup loop, allowing recovery after an outage or daily rollover.
+Every admission still rereads and charges independently of the hint.
+
+ETags protect competing app writes, not malicious or mistaken authorized storage writers.
+The app's managed identity and operators with write permission are trusted budget owners.
+They must never restore/reset the same allocation, even across cold starts. Local high-water
+marks detect rollback only within a process. An explicit operator funding change must keep
+the cumulative charged total and current UTC day's daily charge, then approve a new finite
+cumulative ceiling/ID/expiry in both blob and deployment configuration. Neither CI, scaling
+nor startup may do this. No automatic refill or tamper-proof accounting is claimed.
+See [operations.md](operations.md#durable-sponsored-allowance) for release checks.

@@ -4,6 +4,57 @@ How to run pii-guard end to end on one machine, watch what the gateway does to e
 and measure the latency it adds. Everything here works offline and free: a mock upstream
 stands in for the model unless you configure a real one.
 
+## Durable sponsored allowance
+
+The optional `hosted-azure` dependency extra enables
+`PII_GUARD_HOSTED_SPEND_STORE=azure_blob`. The default remains `marker`; local/self-hosted
+behavior is unchanged. Azure mode reads one existing, private `<environment>.json` block
+blob selected by `HOSTED_SPEND_ACCOUNT_URL`, `HOSTED_SPEND_CONTAINER` (default
+`sponsored-allowance`) and `HOSTED_SPEND_ENVIRONMENT=dev|prod`, all prefixed `PII_GUARD_`.
+Use separate dev/prod resources and managed identities. The SDK accepts managed identity
+only; an optional `HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` selects a user-assigned identity.
+Never configure a SAS, connection string or shared key.
+
+The [strict monetary document](contracts.md#durable-sponsored-allowance) contains no prompt,
+response, mapping, principal, IP or request identifiers. An operator must explicitly approve
+and pre-fund it, then pin the exact allocation ID, cumulative ceiling and integral Unix
+expiry using the existing hosted allocation settings. Startup never creates, overwrites,
+refills or extends this authority, and an unavailable store disables sponsorship while
+keeping permitted BYOK and account inspection operational. Keep `enabled=false` and the
+configured sponsored amount zero until store validation and provider authorization pass.
+
+Provision a private container with public access disabled and narrowly scoped managed
+identity permissions for blob reads/conditional writes. The app has no funding API. Blob
+write permissions necessarily let a compromised identity alter the balance: operators and
+storage writers are trusted, and restoring/resetting the same allocation is forbidden.
+ETags prevent lost updates, not tampering. Do not use lifecycle rules, restore jobs or CI to
+replace the allowance document. Fund an additional allowance only by an explicit reviewed
+operator change that preserves cumulative `charged_total` and the current UTC day's
+`daily_charged`, with a new approved finite cumulative ceiling/ID/expiry. Deployments and
+scale-to-zero must reuse the same approved authority without changing those fields.
+
+Before a positive public default, validate real Azure conditional writes and restart with
+synthetic accounting operations only: two competing writers cannot exceed the finite
+ceiling; a stale ETag receives 412; cold starts/deploys read the same charged totals;
+disabled/expired/missing/oversized blobs and revoked RBAC deny sponsorship; and injected
+ambiguous PUT outcomes cannot start provider work. Record sanitized verdicts and amounts,
+never raw SDK exceptions, tokens or headers. Separate storage diagnostic logging from app
+logging, with request/response body logging disabled. Do not issue a refill or call the
+provider as part of these checks. Actual cloud behavior remains a release gate until this
+validation is recorded; mocked tests alone do not establish it.
+
+The adapter follows Azure's [ETag optimistic concurrency contract](https://learn.microsoft.com/en-us/azure/storage/blobs/concurrency-manage).
+It retries only known precondition conflicts (at most three), disables SDK retries and
+conservatively consumes the full upper-bound cost. A timeout or cancellation can leave a
+late committed charge without provider work; do not compensate automatically. The two
+accounting workers remain bounded until synchronous I/O finishes. The finite lifetime
+ceiling survives day rollover; the daily ceiling is still $10 by default. Vault/session,
+principal quota and abuse state remain ephemeral and require the existing single-process
+boundary; this change does not implement general durable tenant state (LAB-1376).
+The account's cached availability hint refreshes through single-flight, bounded read-only
+I/O in the 30-second cleanup loop, so a recovered store or daily rollover does not require
+an app restart. This never grants authority to admission without a fresh successful CAS.
+
 ## Hosted secondary abuse admission
 
 Hosted mode has optional network admission in addition to owner/global quotas, concurrent

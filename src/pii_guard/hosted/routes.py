@@ -110,7 +110,7 @@ def account(request: Request) -> dict[str, Any]:
             "tokens_per_day": limits.user_tokens if authenticated else limits.guest_tokens,
             "concurrent_requests": limits.principal_concurrency,
             "max_output_tokens": hosted.settings.hosted_max_output_tokens,
-            "sponsored_enabled": hosted.quotas.sponsored_enabled,
+            "sponsored_enabled": hosted.sponsored_enabled,
         },
         "usage": hosted.quotas.usage(principal.id),
         "state": {"persistence": "ephemeral", "restart_loses_sessions": True},

@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     hosted_sponsored_allocation_id: str | None = None
     hosted_allocation_directory: str | None = None
     hosted_allocation_expires_at: float | None = None
+    hosted_spend_store: Literal["marker", "azure_blob"] = "marker"
+    hosted_spend_account_url: str | None = None
+    hosted_spend_container: str = "sponsored-allowance"
+    hosted_spend_environment: Literal["dev", "prod"] = "dev"
+    hosted_spend_managed_identity_client_id: str | None = None
     # Conservative ceilings, including reasoning tokens. Operator verifies against prices.
     hosted_input_microdollars_per_token: int = Field(default=100, ge=1)
     hosted_output_microdollars_per_token: int = Field(default=100, ge=1)

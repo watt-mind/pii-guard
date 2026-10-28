@@ -199,13 +199,18 @@ class HostedMiddleware:
             # Account inspection remains available after exhaustion; all mutations and data
             # routes consume compute quotas. The full conservative charge survives failure.
             if not account_inspection:
+                input_tokens = (max(len(raw), 1024) * 32 + 4096) if paid else len(raw)
+                output_tokens = self.service.settings.hosted_max_output_tokens if paid else 0
+                sponsored = paid and not connection_id
                 reservation = self.service.quotas.admit(
                     principal.id,
                     authenticated=principal.authenticated,
-                    input_tokens=(max(len(raw), 1024) * 32 + 4096) if paid else len(raw),
-                    output_tokens=self.service.settings.hosted_max_output_tokens if paid else 0,
-                    sponsored=paid and not connection_id,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    sponsored=sponsored and self.service.spend is None,
                 )
+                if sponsored and self.service.spend is not None:
+                    await self.service.charge_spend(input_tokens, output_tokens)
                 runtime = self.service.acquire(principal)
                 state["hosted_runtime"] = runtime
             filtered = [

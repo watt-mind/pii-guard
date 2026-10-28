@@ -70,6 +70,10 @@ gliner = [
     "torch>=2.14.1",
     "transformers>=4.51.3,<5.17",
 ]
+hosted-azure = [
+    "azure-identity>=1.27.0",
+    "azure-storage-blob>=12.31.0",
+]
 
 [build-system]
 requires = ["hatchling"]
