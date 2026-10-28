@@ -7,26 +7,32 @@ link goes to that write-up and says so. All data behind these numbers is fiction
 ([ADR 0005](decisions/0005-synthetic-data-only.md)).
 
 **Status** means: **shipped** = merged to `develop`; **in review** = pull request open;
-**in progress** / **planned** = tracked on the named ticket, not merged.
+**in progress** / **planned** = tracked on the named ticket, not merged; **blocked** = tracked
+on the named ticket, waiting on something outside the code.
 
-As of 2026-10-27. When a number changes, update it here, in the README's "Why pii-guard"
-section, in [submission.md](submission.md) and in [journey.md](journey.md) together.
+As of 2026-10-28, `develop` at `5581013`. Fast mode below means the published NER `v2.0`
+(`NER v2 base + hard negatives` in the reports). Leak figures are copied from the generated
+[benchmarks.md](benchmarks.md): the hand-written set from [results by fixture
+set](benchmarks.md#smoke), the public and agent-traffic test splits from [results per
+dataset](benchmarks.md#results-per-dataset). When a number changes, update it here, in the
+README's "Why pii-guard" section, in [submission.md](submission.md) and in
+[journey.md](journey.md) together.
 
 | # | Differentiator | Headline evidence | Status |
 |---|---|---|---|
-| 1 | [Reversible placeholders, consistent for a whole session](#1-reversible-placeholders-consistent-for-a-whole-session) | 100 % round trip; one placeholder per person on every repeated mention (`hu-smoke`) | shipped |
+| 1 | [Reversible placeholders, consistent for a whole session](#1-reversible-placeholders-consistent-for-a-whole-session) | 100 % round trip on the hand-written set; placeholder consistency 98.3 % of entities, but only one entity there repeats (n = 1) | shipped |
 | 2 | [Grammar-aware: Hungarian inflection in and out](#2-grammar-aware-hungarian-inflection-in-and-out) | inflected-name leak 18/30 → 0/30 | shipped |
-| 3 | [Built on Meta's models end to end](#3-built-on-metas-models-end-to-end) | 6 Meta models, each with a job and a reason | shipped; Glimmer LoRA in progress |
-| 4 | [Two modes with published leak, latency and cost](#4-two-modes-with-published-leak-latency-and-cost) | fast (production default): 0.0 % English leak at 36 ms, $0, nothing leaves the machine; audit: 0.9 % / 0.0 % at 1.8 s / 1.2 s, ~$2–2.50 per 1k messages | shipped |
-| 5 | [Head-to-head with Presidio, LLM Guard and PrivAiTe](#5-head-to-head-with-presidio-llm-guard-and-privaite) | Hungarian leak 1.0 % vs 19.6–49.5 % | shipped; refresh in progress |
+| 3 | [Built on Meta's models end to end](#3-built-on-metas-models-end-to-end) | 6 Meta models, each with a job and a reason | shipped; Glimmer LoRA blocked |
+| 4 | [Two modes with published leak, latency and cost](#4-two-modes-with-published-leak-latency-and-cost) | fast (production default): 0.0 % leak on the hand-written set at 18 ms, $0, nothing leaves the machine; audit (optional): 0.6 % at 1.9 s, about $2–3 per 1k messages | shipped |
+| 5 | [Head-to-head with Presidio, LLM Guard and PrivAiTe](#5-head-to-head-with-presidio-llm-guard-and-privaite) | hand-written set: fast 0.0 % leak vs 12.7–45.1 %; ahead on Nemotron-PII and CEE-PII, level with the best other tool on finance text and agent traffic | shipped |
 | 6 | [The LLM can only point, never write; red-teamed](#6-the-llm-can-only-point-never-write-red-teamed) | prompt-injection leak 3.4 % → 0.0 % (two runs), no partial leaks left | shipped |
 | 7 | [Honest about re-identification](#7-honest-about-re-identification) | exposure 1.4 % from masked text; 39.9 % with a 5-name candidate list | shipped |
 | 8 | [A drop-in gateway that fails closed](#8-a-drop-in-gateway-that-fails-closed) | masks tools, metadata and response schemas; rejects pasted placeholders | shipped |
-| 9 | [Images: faces, signatures, machine-readable zones](#9-images-faces-signatures-machine-readable-zones) | portrait recall 90.8 % on official specimen IDs; MRZ 0 % → 76.7 % | shipped; text on IDs in progress; labelled images planned |
+| 9 | [Images: faces, signatures, machine-readable zones](#9-images-faces-signatures-machine-readable-zones) | portrait recall 90.8 % on official specimen IDs; MRZ 0 % → 76.7 %; masked regions carry the text session's placeholder | shipped |
 | 10 | [Hungarian depth as a showcase for hard languages](#10-hungarian-depth-as-a-showcase-for-hard-languages) | names inside company names 61.1 % → 0 % leaked | shipped |
 | 11 | [Add a language with a checklist](#11-add-a-language-with-a-checklist) | German pack: every structured identifier found, other languages unchanged | shipped |
 | 12 | [Known values and per-type policies](#12-known-values-and-per-type-policies) | pre-loaded values: leak 93.3 % → 0 % | shipped |
-| 13 | [Benchmarking in the open](#13-benchmarking-in-the-open) | 61 run records, report checked in CI, about $12 total spend | shipped |
+| 13 | [Benchmarking in the open](#13-benchmarking-in-the-open) | every run a committed record, report checked in CI, spend itemised | shipped |
 
 ## 1. Reversible placeholders, consistent for a whole session
 
@@ -37,11 +43,18 @@ puts the real value back in the answer, also while it streams, also inside tool-
 arguments. Placeholders are HMAC-derived, so they are unlinkable across sessions and tenants,
 and the mapping never leaves pii-guard's vault.
 
-- **Evidence:** round trip 100 % (every document unmasks back to the original exactly) and
-  placeholder consistency 97.2 % of entities, 100 % of entities mentioned more than once, on
-  `hu-smoke` with rules + Muse Spark Open; the remaining 2.8 % are values not masked at all,
-  which the metric counts as inconsistent
-  ([run record](../eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json)). Design:
+- **Evidence:** round trip 100 % (every document unmasks back to the original exactly) on the
+  hand-written set, in fast mode ([benchmarks.md](benchmarks.md#smoke)). Placeholder
+  consistency is 170 of 173 entities (98.3 %) over the Hungarian, English and German smoke
+  documents in fast mode (run records
+  [hu](../eval/results/runs/2026-10-27-ner-v2-hu-smoke-xlmr-base-v2-hn.json),
+  [en](../eval/results/runs/2026-10-27-ner-v2-en-smoke-xlmr-base-v2-hn.json),
+  [de](../eval/results/runs/2026-10-27-ner-v2-de-smoke-xlmr-base-v2-hn.json)); the missing 3
+  are values not masked at all, which the metric counts as inconsistent. **n = 1:** only one
+  entity in those documents is mentioned more than once, so these runs say little about
+  repeated mentions. That claim rests on the Hungarian inflection fixtures (section 2:
+  "same person, same placeholder" 18/18) and the vault tests
+  ([tests/vault/test_vault_mask.py](../tests/vault/test_vault_mask.py)). Design:
   [ADR 0007](decisions/0007-keyed-pseudonyms.md). Streaming: placeholders split across chunks
   are held back until complete
   ([tests/vault/test_vault_stream.py](../tests/vault/test_vault_stream.py)).
@@ -74,9 +87,9 @@ masked data** ([models.md](models.md)).
 | Role | Meta model | Why this model | Evidence | Status |
 |---|---|---|---|---|
 | Audit-mode detector (second opinion) | **Muse Spark Open** (open weights) on Baseten Model APIs, or your own GPUs | Open weights, so the detector can move inside your boundary; Muse Spark quality at 1.2–1.8 s p50 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md) | shipped |
-| Teacher for the fast-mode NER | **Muse Glimmer 30B** (open weights, Apache-2.0), vLLM on one H100 | Best zero-shot quality we measured (F1 99.3, leak 0.0 % on the smoke sets), too slow for the request path (9.4 s p50), so we distilled it | [run record](../eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [models.md](models.md#distilled-from-muse-glimmer) | shipped |
-| Fast-mode NER student | **XLM-RoBERTa** base and large (FacebookAI, MIT) | Multilingual encoder, in-process, tens of milliseconds | [eval/results/ner/distilled/](../eval/results/ner/distilled/) | shipped (train it yourself; weights not published yet) |
-| Glimmer as a fine-tuned detector | **Muse Glimmer** LoRA on Fireworks | An answer-only detector that is fast enough for the request path | LAB-1109 | in progress |
+| Teacher for the fast-mode NER | **Muse Glimmer 30B** (open weights, Apache-2.0), vLLM on one H100 | Best zero-shot quality we measured (F1 99.3, leak 0.0 % on the 38 Hungarian and English smoke documents of that run), too slow for the request path (9.4 s p50), so we distilled it | [run record](../eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [models.md](models.md#distilled-from-muse-glimmer) | shipped |
+| Fast-mode NER student | **XLM-RoBERTa** base (FacebookAI, MIT), fine-tuned on Glimmer's labels, public OpenPII train rows and hard negatives; published as [`hdkiller/pii-guard-ner-xlmr-base`](https://huggingface.co/hdkiller/pii-guard-ner-xlmr-base) `v2.0` | Multilingual encoder, in-process, 18 ms p50 per document on the hand-written set | [model card](../training/ner/model-card.md), [selection](../eval/results/2026-10-27-ner-v21/README.md), [benchmarks.md](benchmarks.md#smoke) | shipped (published, downloaded and hash-checked on first use) |
+| Glimmer as a fine-tuned detector | **Muse Glimmer** LoRA on Fireworks | An answer-only detector that is fast enough for the request path | LAB-1109 | blocked |
 | Synthetic benchmark and distillation corpus | **Muse Spark 1.3**, contributor tier | Writes realistic Hungarian and English documents around fictional identities; $1.05 for the 5,004-call distillation corpus | [models.md](models.md#distilled-from-muse-glimmer) | shipped |
 | Red-team attacker | **Muse Spark Open**, and **Muse Spark 1.3** for comparison | Meta's own model tries to undo the masking | [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md) | shipped |
 | Fictional ID specimens | **Muse Image** | Portraits, signatures and stamps of people who don't exist, so image tests need no real ID | [eval/fixtures/visual/generation.json](../eval/fixtures/visual/generation.json) | shipped |
@@ -86,8 +99,8 @@ masked data** ([models.md](models.md)).
 The pattern: use the big model where its cost doesn't matter (writing fictional data,
 labelling it, attacking the guard) and ship a small, fast model distilled from it.
 
-- **Status:** shipped (LAB-1086, LAB-1087, LAB-1089, LAB-1108, LAB-1121, LAB-1128); the
-  Glimmer LoRA fine-tune is in progress (LAB-1109).
+- **Status:** shipped (LAB-1086, LAB-1087, LAB-1089, LAB-1108, LAB-1121, LAB-1128, LAB-1306);
+  the Glimmer LoRA fine-tune is blocked (LAB-1109) and is not part of the shipped path.
 
 ## 4. Two modes with published leak, latency and cost
 
@@ -98,42 +111,78 @@ generation and the benchmark upper bound; it is not meant for production traffic
 the text goes to the detector endpoint and each message costs a remote call. Both are
 published, including the cost per 1,000 messages.
 
-| Mode | Language | Leak | F1 (overlap) | p50 latency | $ / 1k messages | Source |
+| Mode | Set | Leak | F1 (overlap) | p50 latency | $ / 1k messages | Source |
 |---|---|---:|---:|---:|---:|---|
-| fast (rules + distilled NER, large) | English | **0.0 %** | 98.5 | 36 ms (MPS) | no API call | [run record](../eval/results/runs/2026-10-27-distilled-large-en-smoke.json), [latency](../eval/results/ner/distilled/latency-large.json) |
-| fast | Hungarian | 0.9 % | 97.9 | 36 ms (MPS) | no API call | [models.md](models.md#distilled-from-muse-glimmer) (no committed scorecard yet; the committed one, before the ID rules, says 10.3 %) |
-| audit (rules + Muse Spark Open, Baseten) | Hungarian | 0.9 % | 98.4 | 1.8 s | 2.42 | [hu-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json) |
-| audit | English | 0.0 % | 97.1 | 1.2 s | 1.99 | [en-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-en-smoke.json) |
-| rules only (floor) | Hungarian / English | 52.6 % / 46.7 % | 62.1 / 64.0 | < 1 ms | no API call | [ner/distilled/rules/](../eval/results/ner/distilled/rules/) |
+| fast (rules + NER `v2.0`) | hand-written, de + en + hu (51 docs) | **0.0 %** | 94.3 | 18 ms* | no API call | [benchmarks.md](benchmarks.md#smoke) |
+| fast, per language | hu / en / de | 0.0 / 0.0 / 0.0 % | 93.3 / 94.2 / 97.4 | | no API call | [hu](../eval/results/runs/2026-10-27-ner-v2-hu-smoke-xlmr-base-v2-hn.json), [en](../eval/results/runs/2026-10-27-ner-v2-en-smoke-xlmr-base-v2-hn.json), [de](../eval/results/runs/2026-10-27-ner-v2-de-smoke-xlmr-base-v2-hn.json) run records |
+| audit (rules + NER + Muse Spark Open, Baseten) | hand-written, de + en + hu (51 docs) | 0.6 % | 98.2 | 1.9 s* | 2.03–2.95 | [benchmarks.md](benchmarks.md#smoke), [comparison](../eval/results/2026-10-27-comparison/README.md) |
+| audit, earlier configuration (rules + Muse Spark Open, no NER) | hu-smoke (31 docs) | 0.9 % | 98.4 | 1.8 s | 2.42 | [hu-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json) |
+| same | en-smoke (10 docs) | 0.0 % | 97.1 | 1.2 s | 1.99 | [en-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-en-smoke.json) |
+| rules only (floor) | hand-written, de + en + hu (51 docs) | 41.6 % (hu 39.6, en 46.7, de 43.2) | 70.2 | 0.28 ms | no API call | [benchmarks.md](benchmarks.md#smoke) |
 
-- **Caveats:** the smoke sets are small (31 Hungarian, 10 English documents; one leaked value
-  is about 1 point on Hungarian and 3 on English). NER latency was measured under heavy
-  unrelated load; CPU p50 is 241 ms. Fast mode needs a NER checkpoint you train yourself
-  ([models.md](models.md#ner-detector)); without one it is rules only.
-- **Status:** shipped. A committed fast-mode Hungarian scorecard comes with the fresh
-  comparison (LAB-1148, in progress).
+Fast mode on test sets it was not trained on (leak, 95 % intervals in
+[benchmarks.md](benchmarks.md#results-per-dataset)): Nemotron-PII 0.7 %, CEE-PII 0.4 %, agent
+traffic 2.6 %, finance text 19.1 %. Audit mode on the same sets was run on 10–30 documents
+each (0.0–1.0 % except 26.7 % on 20 finance documents), too few to compare.
+
+- **Caveats:** the hand-written set is small (31 Hungarian, 10 English and 10 German
+  documents; one leaked value is about 1 point on Hungarian and 3 on English or German).
+  `*` marks a latency averaged over several runs, measured on Apple MPS under unrelated load;
+  NER alone on a loaded M1 Max CPU is 47 ms p50, 55 ms p95
+  ([latency record](../eval/results/2026-10-27-ner-v21/latency/xlmr-base-v2-hn.json)). Fast
+  mode over-masks reference numbers without a cue word: 39.4 % of masked spans on CEE-PII
+  and 14.0 % on agent traffic
+  ([model card, limitations](../training/ner/model-card.md#limitations)). The 0.0 % on the
+  hand-written set is not the whole picture: finance text leaks 19.1 %. Fast mode downloads
+  the published NER on first use and checks its hash; without one it is rules only
+  ([models.md](models.md#which-ner-model-fast-mode-runs)).
+- **Status:** shipped (LAB-1128, LAB-1150, LAB-1186, LAB-1192, LAB-1306). The committed
+  Hungarian fast-mode scorecard and the fresh comparison landed with LAB-1148.
 
 ## 5. Head-to-head with Presidio, LLM Guard and PrivAiTe
 
 The three closest open-source tools, each in its default configuration, scored with the same
-scorer on the same hand-written fixtures.
+scorer, on our hand-written set and on public and generated test sets.
 
-| `hu-smoke` (28 docs) | F1 | Leak | Over-masking |
+| Hand-written (de + en + hu, 51 docs) | F1 | Leak | Over-masking |
 |---|---:|---:|---:|
-| Presidio | 70.1 | 28.9 | 15.5 |
-| LLM Guard | 49.2 | 49.5 | 41.7 |
-| PrivAiTe | 50.2 | 19.6 | 26.6 |
-| **pii-guard rules + Muse Spark 1.3** | **98.2** | **1.0** | **0.0** |
+| Presidio | 64.9 | 24.3 | 27.5 |
+| LLM Guard | 53.2 | 45.1 | 36.7 |
+| PrivAiTe | 55.2 | 12.7 | 25.8 |
+| **pii-guard fast (rules + NER `v2.0`)** | **94.3** | **0.0** | **1.1** |
+| pii-guard audit (rules + NER + Muse Spark Open) | 98.2 | 0.6 | 1.1 |
 
-- **Evidence:** [eval/results/2026-10-26-baselines/comparison.md](../eval/results/2026-10-26-baselines/comparison.md).
-  On English the gap is smaller: PrivAiTe also leaks 0.0 %, at 22.0 % over-masking.
-- **Caveats:** this run predates the distilled NER, the Hungarian ID and address rules and the
-  Baseten detector; the sets are small. The comparison runs on the hand-written sets because
-  the Muse-generated ones flatter a Muse-based detector
-  ([evaluation.md](evaluation.md#reading-the-numbers)).
-- **Status:** shipped (LAB-1098). A fresh comparison with today's fast and audit modes and a
-  public benchmark (ai4privacy OpenPII-1M) is **in progress** (LAB-1148). An image baseline
-  against Presidio Image Redactor is **planned** (LAB-1164).
+Leak on the test splits of the public and generated datasets, in %:
+
+| System | Nemotron-PII (300) | CEE-PII (451) | Agent traffic (990) | Gretel finance (400) | Ai4Privacy (600) |
+|---|---:|---:|---:|---:|---:|
+| Presidio | 12.8 | 36.5 | 12.4 | **18.8** | 29.6 |
+| LLM Guard | 28.8 | 75.8 | 20.2 | 59.3 | 43.8 |
+| PrivAiTe | 4.0 | 4.4 | **2.4** | 27.6 | 9.5 |
+| **pii-guard fast** | **0.7** | **0.4** | 2.6 | 19.1 | 0.4 † |
+
+† In-distribution: the NER trained on rows of this dataset's train split. The same recipe
+trained without any of them leaks 13.8 %, behind PrivAiTe's 9.5 %
+([model card](../training/ner/model-card.md#evaluation)).
+
+- **Evidence:** [benchmarks.md, hand-written set](benchmarks.md#smoke) and [results per
+  dataset](benchmarks.md#results-per-dataset), generated from the run records, with 95 %
+  bootstrap intervals for the second table. The first Hungarian-only comparison, with the
+  tools' configurations and the label mapping:
+  [eval/results/2026-10-26-baselines/comparison.md](../eval/results/2026-10-26-baselines/comparison.md);
+  the fresh one: [eval/results/2026-10-27-comparison/README.md](../eval/results/2026-10-27-comparison/README.md).
+- **Where pii-guard is not ahead:** on finance text it is level with Presidio (19.1 vs 18.8 %)
+  and on agent traffic within 0.2 points of PrivAiTe (2.6 vs 2.4 %). Fast mode also
+  over-masks more than the leak numbers show on CEE-PII (39.4 %) and agent traffic (14.0 %);
+  Presidio and PrivAiTe over-mask more still on most sets (Presidio 52.5 % on CEE-PII).
+- **Caveats:** the hand-written set is small, and the comparison runs on it because the
+  Muse-generated sets flatter a Muse-based detector
+  ([evaluation.md](evaluation.md#reading-the-numbers)). LLM Guard's model was fine-tuned on an
+  earlier Ai4Privacy release, so its Ai4Privacy number is probably optimistic. Dates, titles
+  and bare towns are policy-excluded, which raises every system's over-masking on Ai4Privacy.
+- **Status:** shipped (LAB-1098, LAB-1148, LAB-1150). The image comparison against Presidio
+  Image Redactor and Eka is in [section 9](#9-images-faces-signatures-machine-readable-zones)
+  (LAB-1164).
 
 ## 6. The LLM can only point, never write; red-teamed
 
@@ -203,22 +252,38 @@ Scans and photos carry personal data too. pii-guard finds faces, ID photos and s
 SAM 3.1, finds machine-readable zones (MRZ) on ID documents by their OCR layout, fills the
 regions and strips metadata before the image goes anywhere.
 
-| Set | Portrait | Signature | MRZ | Source |
-|---|---:|---:|---:|---|
-| 65 official specimen ID documents, 24 countries | **90.8 %** | 83.8 % | 0 % → **76.7 %** | [specimens.md](../eval/results/visual/specimens.md); MRZ: [journey.md, milestone 18](journey.md#18-machine-readable-zones-masked-by-their-layout-2026-10-27) (report not committed), [tests/visual/test_mrz.py](../tests/visual/test_mrz.py) |
-| 24 fictional specimens painted with Muse Image | **100 %** | **100 %** | 0 % → **100 %** | [fictional.md](../eval/results/visual/fictional.md), same MRZ note |
+| Set | Portrait | Signature | MRZ | Printed text values | Source |
+|---|---:|---:|---:|---:|---|
+| 65 official specimen ID documents, 24 countries | **90.8 %** | 83.8 % | 0 % → **76.7 %** (80.0 % with the LLM detector) | 1.5 % → **15.0 %** (29.2 % with the LLM detector) | [specimens.md](../eval/results/visual/specimens.md), [captions](../eval/results/visual/specimens-captions.md), [benchmarks.md](benchmarks.md#image-masking) |
+| 24 fictional specimens painted with Muse Image | **100 %** | **100 %** | 0 % → **100 %** | 34.5 % → **87.3 %** (99.1 % with the LLM detector) | [fictional.md](../eval/results/visual/fictional.md), [captions](../eval/results/visual/fictional-captions.md), same page |
 
-Recall is the share of labelled regions masked with IoU ≥ 0.5.
+Recall is the share of labelled regions masked with IoU ≥ 0.5. MRZ: [tests/visual/test_mrz.py](../tests/visual/test_mrz.py),
+[journey.md, milestone 18](journey.md#18-machine-readable-zones-masked-by-their-layout-2026-10-27).
 
-- **Caveats:** printed text values on ID cards (names, numbers) are barely masked without the
-  LLM detector (0.4 % on specimens, 34.5 % on the fictional set). Fixing that is **in
-  progress** (LAB-1125).
-- **Planned (LAB-1156):** placeholder-labelled image masking. Each masked region carries the
-  session's own placeholder (`PHOTO · [[PERSON_a1b2]]`) and the image comes back with a masked
-  transcript that shares the text vault, so an assistant can answer "which parties have an ID
-  on file?" without seeing a real value. As far as we found in a survey on 2026-10-27, no
-  open-source tool shares placeholders between images and the text session.
-- **Status:** shipped (LAB-1089, LAB-1110, LAB-1120, LAB-1121, LAB-1124).
+- **Text on IDs (LAB-1125, shipped):** a value next to a known caption (`Családi név /
+  Surname`) is masked too, per language pack. This raised the printed-text recall, but it
+  stays low on the official specimens: Tesseract returns no word at all for 108 of the 274
+  specimen text values (guilloche backgrounds, holograms, thin strokes on small scans), so no
+  text method reaches them. A reader for security-printed cards is the next step
+  ([journey.md, milestone 22](journey.md#22-values-next-to-field-captions-on-id-cards-2026-10-27)).
+- **Against other tools (LAB-1164, shipped):** on the 65 specimens, portraits 90.8 % vs Eka
+  PII Redaction 55–57 %, signatures 83.8 % vs 46–49 %, MRZ 80.0 % vs at most 10 %; Presidio
+  Image Redactor is text-only and masks none of these. On printed text Eka is ahead of
+  pii-guard (32.5 % vs 30.3 % with the LLM detector, 15.0 % with rules alone), at 2.5 times
+  the over-masking. All systems, with run conditions:
+  [image baselines](../eval/results/2026-10-27-image-baselines/README.md),
+  [journey.md, milestone 26](journey.md#26-image-masking-against-presidio-image-redactor-and-eka-2026-10-27).
+- **Labelled images (LAB-1156, shipped):** each masked region carries the session's own
+  placeholder (`PHOTO · [[PERSON_a1b2]]`) and the image comes back with a masked transcript
+  that shares the text vault, so an assistant can answer "which parties have an ID on file?"
+  without seeing a real value. The demo question was answered right for 3 of 3 parties with
+  labelled images and 1 of 3 with black boxes; fuzzy matching puts the text's placeholder on
+  50 of 51 printed values with clean OCR (96.1 % with simulated OCR noise;
+  [journey.md, milestone 27](journey.md#27-images-that-say-whose-data-they-hid-2026-10-27)).
+  As far as we found in a survey on 2026-10-27, no open-source tool shares placeholders
+  between images and the text session.
+- **Status:** shipped (LAB-1089, LAB-1110, LAB-1120, LAB-1121, LAB-1124, LAB-1125, LAB-1156,
+  LAB-1164).
 
 ## 10. Hungarian depth as a showcase for hard languages
 
@@ -276,19 +341,30 @@ the index are generated from them, and CI fails if they are out of date. The lea
 F1, is the headline number. Generated sets are reported, but the headline uses the
 hand-written ones because the generated ones flatter a Muse-based detector.
 
-- **Evidence:** 61 run records in [eval/results/runs/](../eval/results/runs/) against
+- **Evidence:** 499 run records in [eval/results/runs/](../eval/results/runs/) on
+  `develop@5581013` (the [run log](benchmarks.md#run-log) lists them), against
   [run.schema.json](../eval/results/schema/run.schema.json);
   [benchmarks.md](benchmarks.md) generated by `pii-guard eval report`; `pii-guard eval report
   --check` runs on every pull request ([ci.yml](../.github/workflows/ci.yml)). How the numbers
-  moved, milestone by milestone, with what each step cost (about $12 of compute in total):
-  [journey.md](journey.md).
+  moved, milestone by milestone, with what each step cost:
+  [journey.md](journey.md). Its [spend table](journey.md#spend-so-far) itemises about $22 of
+  compute as of 2026-10-27, not counting the $2.92 of the NER v2.1 retrain (LAB-1306) or
+  early unmetered calls.
 - **Status:** shipped (LAB-1129, LAB-1141).
 
 ## What is not here yet
 
-- Published distilled NER weights, so fast mode works without training a model first.
-- Written confirmation of Baseten's data-retention terms for the shared Model APIs (LAB-1139).
-  Until then only fictional or masked data goes there; for real data, run the same open
-  weights on hardware you control ([models.md](models.md#baseten-model-apis-the-audit-mode-detector)).
-- English names on Muse-generated English text: 2.5 % leak on `en-synth-sample` (LAB-1138).
+- Written confirmation of Baseten's data-retention terms for the shared Model APIs (LAB-1139,
+  triage). Until then only fictional or masked data goes there; for real data, run the same
+  open weights on hardware you control
+  ([models.md](models.md#baseten-model-apis-the-audit-mode-detector)).
+- English names on Muse-generated English text: 2.5 % leak on `en-synth-sample` (LAB-1138,
+  triage).
+- Fast mode on unfamiliar text: 19.1 % leak on finance text, 13.8 % on Ai4Privacy-style text
+  the NER has not seen, and 39.4 % over-masking on CEE-PII
+  ([model card](../training/ner/model-card.md#limitations)).
+- A reader for security-printed ID cards: Tesseract returns no word for 108 of 274 specimen
+  text values (LAB-1125, [section 9](#9-images-faces-signatures-machine-readable-zones)).
+- Reducing re-identification from residual context (LAB-1152, triage).
+- The Glimmer LoRA fine-tune (LAB-1109) is blocked.
 - It is a hackathon build, not production-hardened.
