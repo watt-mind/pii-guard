@@ -295,7 +295,7 @@ mixed; documents: de 200 + en 200 + hu 200.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 600 | 98.5% | 36.3% | 53.1% | 63.1% | 1.6% | 0.1% | 100.0% | 0.40 ms | 2026-10-27 | `18b15fa` |
+| **pii-guard rules** | 600 | 98.5% | 36.5% | 53.2% | 62.9% | 1.6% | 0.1% | 100.0% | 0.59 ms | 2026-10-28 | `26975e8` |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 600 | 92.8% | 71.7% | 80.9% | 27.6% | 1.9% | 2.4% | 100.0% | 28 ms | 2026-10-27 | `752ff9a` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 600 | 95.9% | 95.6% | 95.7% | 0.5% | 0.1% | 0.2% | 100.0% | 72 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 600 | 90.0% | 82.8% | 86.2% | 11.7% | 5.1% | 1.9% | 100.0% | 131 ms | 2026-10-28 | `36a78e3` |
@@ -345,7 +345,7 @@ By language:
 
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard rules** | 59.0% | 49.8% | 51.4% | 57.5% | 65.2% | 65.4% |
+| **pii-guard rules** | 59.2% | 50.1% | 51.4% | 57.3% | 65.0% | 65.4% |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 84.5% | 81.8% | 76.7% | 23.4% | 25.3% | 33.6% |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 99.8% | 99.3% | 88.5% | 0.5% | 0.6% | 0.5% |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 87.7% | 87.1% | 84.2% | 13.2% | 14.5% | 7.3% |
@@ -395,7 +395,7 @@ By language:
 
 | System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard rules** | 63.1% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 71.1% (907/1276) |
+| **pii-guard rules** | 62.9% | 100.0% (166/166) | 0.0% (0/166) | 35.5% (264/743) | 63.0% (468/743) | 71.1% (907/1276) |
 | pii-guard rules + ner (xlmr-large-distilled-glimmer) | 27.6% | 100.0% (166/166) | 0.0% (0/166) | 35.1% (261/743) | 63.4% (471/743) | 10.4% (133/1276) |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 0.5% | 96.4% (160/166) | 0.6% (1/166) | 89.4% (664/743) | 0.0% (0/743) | 0.9% (11/1276) |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 11.7% | 91.0% (151/166) | 6.0% (10/166) | 72.5% (539/743) | 12.9% (96/743) | 11.7% (149/1276) |
@@ -464,7 +464,7 @@ mixed; documents: en 200 + hu 251.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 451 | 96.3% | 57.3% | 71.9% | 40.9% | 14.1% | 1.0% | 100.0% | 0.28 ms | 2026-10-27 | `18b15fa` |
+| **pii-guard rules** | 451 | 97.3% | 56.9% | 71.8% | 41.3% | 14.1% | 0.0% | 100.0% | 0.32 ms | 2026-10-28 | `26975e8` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 451 | 48.7% | 44.8% | 46.7% | 24.8% | 0.0% | 18.2% | 100.0% | 51 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 451 | 67.8% | 85.7% | 75.7% | 8.7% | 3.0% | 26.5% | 100.0% | 118 ms | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 451 | 39.0% | 44.4% | 41.5% | 19.6% | 0.8% | 30.3% | 100.0% | 58 ms | 2026-10-28 | `97ee284` |
@@ -494,7 +494,7 @@ By language:
 
 | System | en F1 | hu F1 | en leak | hu leak |
 |---|---:|---:|---:|---:|
-| **pii-guard rules** | 67.7% | 74.5% | 41.8% | 40.3% |
+| **pii-guard rules** | 68.0% | 74.3% | 41.8% | 40.9% |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 76.2% | 28.8% | 27.6% | 23.1% |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 66.2% | 81.3% | 15.8% | 4.2% |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 75.9% | 23.5% | 24.5% | 16.6% |
@@ -526,7 +526,7 @@ By language:
 
 | System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard rules** | 40.9% | 100.0% (219/219) | 0.0% (0/219) | 0.0% (0/40) | 80.0% (32/40) | 71.0% (174/245) |
+| **pii-guard rules** | 41.3% | 99.1% (217/219) | 0.9% (2/219) | 0.0% (0/40) | 80.0% (32/40) | 71.0% (174/245) |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 24.8% | 7.8% (17/219) | 23.7% (52/219) | 92.5% (37/40) | 0.0% (0/40) | 29.8% (73/245) |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 8.7% | 80.8% (177/219) | 14.2% (31/219) | 35.0% (14/40) | 25.0% (10/40) | 1.2% (3/245) |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 19.6% | 8.7% (19/219) | 9.6% (21/219) | 97.5% (39/40) | 0.0% (0/40) | 31.8% (78/245) |
@@ -683,7 +683,7 @@ mixed; documents: de 200 + en 200.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 400 | 75.2% | 12.2% | 21.0% | 80.7% | 5.6% | 23.8% | 100.0% | 2.2 ms | 2026-10-27 | `18b15fa` |
+| **pii-guard rules** | 400 | 77.2% | 12.1% | 20.9% | 80.8% | 5.6% | 21.7% | 100.0% | 2.6 ms | 2026-10-28 | `26975e8` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 400 | 83.6% | 60.8% | 70.4% | 27.8% | 4.9% | 15.1% | 100.0% | 132 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 400 | 74.3% | 41.7% | 53.4% | 35.1% | 14.3% | 25.7% | 99.5% | 286 ms | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 400 | 81.8% | 61.8% | 70.4% | 27.7% | 7.0% | 17.9% | 100.0% | 146 ms | 2026-10-28 | `97ee284` |
@@ -713,7 +713,7 @@ By language:
 
 | System | de F1 | en F1 | de leak | en leak |
 |---|---:|---:|---:|---:|
-| **pii-guard rules** | 20.0% | 22.3% | 82.7% | 78.0% |
+| **pii-guard rules** | 20.0% | 22.0% | 82.7% | 78.2% |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 71.9% | 68.5% | 34.4% | 18.5% |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 50.6% | 56.6% | 43.7% | 23.0% |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 66.4% | 75.0% | 35.1% | 17.2% |
@@ -745,7 +745,7 @@ By language:
 
 | System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard rules** | 80.7% | 98.0% (50/51) | 2.3% (1/44) | 57.6% (38/66) | 37.7% (23/61) | 88.0% (738/839) |
+| **pii-guard rules** | 80.8% | 98.0% (50/51) | 2.3% (1/44) | 54.5% (36/66) | 39.3% (24/61) | 88.0% (738/839) |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 27.8% | 82.4% (42/51) | 15.9% (7/44) | 59.1% (39/66) | 41.0% (25/61) | 27.4% (230/839) |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 35.1% | 74.5% (38/51) | 11.4% (5/44) | 69.7% (46/66) | 21.3% (13/61) | 37.3% (313/839) |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 27.7% | 80.4% (41/51) | 13.6% (6/44) | 40.9% (27/66) | 54.1% (33/61) | 26.5% (222/839) |
@@ -1430,6 +1430,12 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-28 | `2026-10-28-lab-1433-cee-pii-rules-after` | pii-guard rules | cee-pii | en, hu | recorded | `26975e8` | — | — |
+| 2026-10-28 | `2026-10-28-lab-1433-gretel-finance-rules-after` | pii-guard rules | gretel-finance | de, en | recorded | `26975e8` | — | — |
+| 2026-10-28 | `2026-10-28-lab-1433-ai4privacy-rules-after` | pii-guard rules | ai4privacy | de, en, hu | recorded | `26975e8` | — | — |
+| 2026-10-28 | `2026-10-28-lab-1433-cee-pii-rules-before` | pii-guard rules | cee-pii | en, hu | recorded | `6254fd1` | — | — |
+| 2026-10-28 | `2026-10-28-lab-1433-gretel-finance-rules-before` | pii-guard rules | gretel-finance | de, en | recorded | `6254fd1` | — | — |
+| 2026-10-28 | `2026-10-28-lab-1433-ai4privacy-rules-before` | pii-guard rules | ai4privacy | de, en, hu | recorded | `6254fd1` | — | — |
 | 2026-10-28 | `2026-10-28-lab-1400-pl-pii-bench-rules` | pii-guard rules | pl-pii-bench | pl | recorded | `793ddf9` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-lab-1400-pl-pii-bench-after` | pii-guard fast, NER v2.0 (published hdkiller/pii-guard-ner-xlmr-base, LAB-1306) | pl-pii-bench | pl | recorded | `793ddf9` (dirty) | — | — |
 | 2026-10-28 | `2026-10-28-lab-1400-pl-pii-bench-before` | pii-guard fast, NER v2.0 (published hdkiller/pii-guard-ner-xlmr-base, LAB-1306) | pl-pii-bench | pl | recorded | `793ddf9` | — | — |

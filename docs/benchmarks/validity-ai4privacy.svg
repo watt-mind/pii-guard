@@ -24,12 +24,12 @@
 <text x="1460" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">100%</text>
 <circle cx="66" cy="216.2" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
 <text x="84" y="224.2" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
-<rect x="1035.3" y="218" width="267.8" height="-3.9" fill="#4A4A52"/>
-<text x="1311.2" y="210.1" font-size="19" fill="#1B1B1F">63.1</text>
+<rect x="1035.3" y="218" width="267.2" height="-3.9" fill="#4A4A52"/>
+<text x="1310.6" y="210.1" font-size="19" fill="#1B1B1F">62.9</text>
 <rect x="1035.3" y="218.1" width="2" height="-3.9" fill="#117733"/>
 <text x="1045.3" y="210.2" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="218.2" width="269.2" height="-3.9" fill="#CC6677"/>
-<text x="1312.5" y="210.3" font-size="19" fill="#1B1B1F">63.4</text>
+<rect x="1035.3" y="218.2" width="267.5" height="-3.9" fill="#CC6677"/>
+<text x="1310.8" y="210.3" font-size="19" fill="#1B1B1F">63.0</text>
 <rect x="1035.3" y="218.3" width="301.8" height="-3.9" fill="#332288"/>
 <text x="1345.2" y="210.4" font-size="19" fill="#1B1B1F">71.1</text>
 <circle cx="66" cy="228.6" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>

@@ -1454,8 +1454,7 @@ As of 2026-10-28, `develop` at `5581013`.
   LAB-1138, triage).
 - **Re-identification from residual context** (39.2 % re-identified with a five-name candidate list,
   chance 20 %; LAB-1152, triage).
-- **Polish.** With the `pl` pack (LAB-1400) fast mode leaks 3.5 % on pl-pii-bench, all of it
-  identifiers whose check digit fails and that have no cue; its `negative` lane over-masks
-  117 spans, mostly labelled numbers with a bad check digit (LAB-1433).
+- **Polish.** Fast mode leaks 17.5 % on the public pl-pii-bench set, nearly all national ID
+  numbers; a `pl` language pack with checksum validators is in progress (LAB-1400).
 - **Confirm Baseten's data terms** (LAB-1139, triage) before recommending the hosted endpoint
   for real data.
