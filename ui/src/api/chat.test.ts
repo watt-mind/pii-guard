@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createHttpChat, createMockChat } from "./chat";
+import { DEFAULT_MAX_TOKENS, FALLBACK_CHAT_MODEL, createHttpChat, createMockChat, isChatModel, pickDefaultModel } from "./chat";
 import { createMockClient } from "./mock";
 
 function sse(events: unknown[]): string {
@@ -64,5 +64,79 @@ describe("simulated chat", () => {
     expect(r.maskedAnswer).toMatch(/\[\[PERSON_[0-9a-f]{4,}\]\]/);
     expect(r.answer).toContain("Teszt Elek");
     expect(r.answer).not.toMatch(/\[\[/);
+  });
+});
+
+describe("Playground model defaulting (LAB-1335)", () => {
+  const META = [
+    "muse-image-1.0",
+    "muse-voice-transcribe-1.0",
+    "sam-3.1",
+    "muse-spark-1.2",
+    "muse-wonder-1.0",
+    "muse-spark-1.3",
+    "muse-spark-1.3-contributor",
+  ];
+
+  it("prefers the last-used model while the upstream still lists it", () => {
+    expect(pickDefaultModel(META, "muse-spark-1.2")).toBe("muse-spark-1.2");
+    expect(pickDefaultModel(META, "meta-models/muse-spark-open-1026")).toBe("muse-spark-1.3");
+  });
+
+  it("then muse-spark-1.3, then muse-wonder-1.0", () => {
+    expect(pickDefaultModel(META, null)).toBe("muse-spark-1.3");
+    expect(pickDefaultModel(META.filter((m) => m !== "muse-spark-1.3"), null)).toBe("muse-wonder-1.0");
+  });
+
+  it("otherwise the first chat-capable id, skipping transcribe, image and SAM ids", () => {
+    expect(pickDefaultModel(["sam-3.1", "muse-image-1.0", "muse-voice-transcribe-1.0", "gpt-x", "other"], null)).toBe("gpt-x");
+    expect(isChatModel("sam-3.1")).toBe(false);
+    expect(isChatModel("meta/sam-3.1")).toBe(false);
+    expect(isChatModel("muse-image-1.0")).toBe(false);
+    expect(isChatModel("muse-voice-transcribe-1.0")).toBe(false);
+    expect(isChatModel("text-embedding-3-small")).toBe(false);
+    expect(isChatModel("samba-chat")).toBe(true);
+    expect(isChatModel("muse-spark-1.3-contributor")).toBe(true);
+  });
+
+  it("never falls back to a Baseten id when nothing is listed", () => {
+    expect(FALLBACK_CHAT_MODEL).not.toMatch(/meta-models\//);
+    expect(pickDefaultModel([], null)).toBe(FALLBACK_CHAT_MODEL);
+  });
+
+  it("lists the gateway's models, de-duplicated, and fails on a contract error", async () => {
+    let url = "";
+    const ok = (async (u: string) => {
+      url = u;
+      return new Response(JSON.stringify({ object: "list", data: [{ id: "muse-spark-1.3" }, { id: "sam-3.1" }, { id: "muse-spark-1.3" }, { nope: 1 }] }));
+    }) as unknown as typeof globalThis.fetch;
+    expect(await createHttpChat({ fetch: ok, baseUrl: "http://g/" }).listModels!()).toEqual(["muse-spark-1.3", "sam-3.1"]);
+    expect(url).toBe("http://g/v1/models");
+    const bad = (async () =>
+      new Response(JSON.stringify({ error: { code: "upstream_unavailable", message: "x" } }), { status: 502 })) as unknown as typeof globalThis.fetch;
+    await expect(createHttpChat({ fetch: bad }).listModels!()).rejects.toMatchObject({ code: "upstream_unavailable" });
+  });
+
+  it("asks for enough tokens for a reasoning model and reports finish_reason", async () => {
+    let body: Record<string, unknown> = {};
+    const fetch = (async (_u: string, init: RequestInit) => {
+      body = JSON.parse(init.body as string) as Record<string, unknown>;
+      return new Response(sse([{ choices: [{ index: 0, delta: { reasoning_content: "hmm" } }] }, { choices: [{ index: 0, delta: {}, finish_reason: "length" }] }, "[DONE]"]), {
+        headers: { "content-type": "text/event-stream", "x-pii-guard-session": "s_1" },
+      });
+    }) as unknown as typeof globalThis.fetch;
+    const r = await createHttpChat({ fetch }).send({ messages: [{ role: "user", content: "hi" }], model: "muse-spark-1.3", mode: "fast", language: "en", sessionId: null });
+    expect(body.max_tokens).toBeGreaterThanOrEqual(2048);
+    expect(body.max_tokens).toBe(DEFAULT_MAX_TOKENS);
+    expect(r.answer).toBe("");
+    expect(r.finishReason).toBe("length");
+  });
+
+  it("keeps upstream_error's status for the error copy", async () => {
+    const fetch = (async () =>
+      new Response(JSON.stringify({ error: { code: "upstream_error", message: "upstream returned HTTP 404", type: "upstream_error" } }), { status: 404 })) as unknown as typeof globalThis.fetch;
+    await expect(
+      createHttpChat({ fetch }).send({ messages: [{ role: "user", content: "hi" }], model: "x", mode: "fast", language: "en", sessionId: null }),
+    ).rejects.toMatchObject({ code: "upstream_error", status: 404 });
   });
 });

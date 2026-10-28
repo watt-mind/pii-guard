@@ -30,6 +30,8 @@ export interface RunResult {
 export interface RunError {
   code: string;
   message: string;
+  /** The HTTP status of a contract error (for `upstream_error`, the upstream's own status). */
+  status?: number;
   /** For `invalid_known_value`: the panel row the API refused. */
   knownIndex?: number;
 }
@@ -55,7 +57,8 @@ export const knownSignatureOf = (values: readonly KnownValue[]) =>
 export function toRunError(err: unknown): RunError {
   if (err instanceof ApiError) {
     const knownIndex = (err as ApiError & { knownIndex?: number }).knownIndex;
-    return knownIndex === undefined ? { code: err.code, message: err.message } : { code: err.code, message: err.message, knownIndex };
+    const base = { code: err.code, message: err.message, status: err.status };
+    return knownIndex === undefined ? base : { ...base, knownIndex };
   }
   if (err instanceof UnreachableError) return { code: "unreachable", message: err.message };
   return { code: "internal_error", message: "Something went wrong in the UI." };

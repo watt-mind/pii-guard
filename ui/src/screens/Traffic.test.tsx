@@ -305,3 +305,31 @@ describe("Live traffic", () => {
     expect(screen.queryByText(/Nothing to restore/)).toBeNull();
   });
 });
+
+describe("Upstream refusals in the drawer (LAB-1335)", () => {
+  it("says the masked request reached the upstream, with its status and a hint", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    const rejected: TrafficEvent = {
+      ...asMasked(huChat),
+      outcome: "upstream_error",
+      error: { code: "upstream_error", status: 404 },
+      upstream: { status: 404, model: null, unresolved_placeholders: 0 },
+      response: null,
+    };
+    f.push([rejected]);
+    const note = await screen.findByText("The upstream refused the masked request (HTTP 404).");
+    const box = note.closest("[role=note]")!;
+    expect(box).toHaveTextContent("model not found on the upstream? Pick another model");
+    expect(box).toHaveTextContent("Nothing unmasked left pii-guard.");
+    expect(box).not.toHaveTextContent("Nothing was sent to the model");
+  });
+
+  it("keeps the refusal text when pii-guard stopped the request", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([refused]);
+    expect(await screen.findByText(/Refused\. Nothing was sent to the model\./)).toBeInTheDocument();
+    expect(screen.queryByText(/The upstream refused/)).toBeNull();
+  });
+});

@@ -6,6 +6,7 @@ import type { EntityType } from "../api/types";
 import { MaskedText } from "../components/MaskedText";
 import { RestoredText } from "../components/RestoredText";
 import { Button } from "../components/ui";
+import { errorCopy } from "../lib/errorCopy";
 import { useTraffic, type TrafficHandle, type TrafficSource } from "../hooks/useTraffic";
 import { ENTITY_META, metaFor } from "../lib/entities";
 import { tokenize } from "../lib/placeholders";
@@ -567,6 +568,10 @@ function CallDetail({
   const maskedBody = e.request?.masked;
   const forwarded = maskedBody !== undefined && maskedBody !== null;
   const labelled = labelledScenarioFor(e);
+  // An upstream refusal reached the model's provider (masked); everything else here stopped in pii-guard (LAB-1335).
+  const failCode = e.error?.code ?? (e.outcome === "upstream_error" ? "upstream_error" : e.outcome === "stream_error" ? "stream_failed" : undefined);
+  const upstreamCopy = errorCopy(failCode, e.error?.status ?? e.upstream?.status ?? null);
+  const upstreamSide = upstreamCopy.kind === "upstream" || upstreamCopy.kind === "stream";
   return (
     <>
       <section aria-labelledby="detail-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
@@ -614,16 +619,18 @@ function CallDetail({
         {labelled && <LabelledNote match={labelled} />}
       </section>
 
-      {!forwarded && e.outcome !== "ok" && (
-        <div role="note" className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
-          <p className="font-medium text-warn">{e.outcome === "blocked" ? "Blocked by policy." : "Refused."} Nothing was sent to the model.</p>
+      {e.outcome !== "ok" && (!forwarded || upstreamSide) && (
+        <div role="note" data-error-kind={upstreamSide ? upstreamCopy.kind : e.outcome === "blocked" ? "policy" : "fail_closed"} className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
+          <p className="font-medium text-warn">
+            {upstreamSide ? upstreamCopy.title : `${e.outcome === "blocked" ? "Blocked by policy." : "Refused."} Nothing was sent to the model.`}
+          </p>
           <p className="mt-1 text-ink">
             <code className="font-mono text-xs">{e.error?.code ?? e.outcome}</code>
             {e.error?.status ? ` · HTTP ${e.error.status}` : ""}
             {e.error?.entity_types ? ` · ${Object.entries(e.error.entity_types).map(([k, n]) => `${metaFor(k as EntityType).label} ×${n}`).join(", ")}` : ""}
           </p>
           <p className="mt-2 text-muted">
-            {refusalReason(e.error?.code, Boolean(e.entities?.images))}
+            {upstreamSide ? upstreamCopy.body : refusalReason(e.error?.code, Boolean(e.entities?.images))}
           </p>
         </div>
       )}

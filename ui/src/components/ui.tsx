@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { errorCopy, statusFromMessage } from "../lib/errorCopy";
 import type { RunError } from "../lib/run";
 
 type Variant = "primary" | "secondary" | "ghost";
@@ -47,27 +48,27 @@ export function EmptyState({ title, body, children }: { title: string; body: str
 }
 
 /**
- * Fail closed, made visible. Outbound: the request was blocked and nothing
- * left. Inbound: the answer could not be restored, so nothing is shown.
+ * Fail closed, made visible. Outbound: why the request stopped, by error code (an upstream
+ * refusal says the masked request did reach the upstream). Inbound: the answer could not be
+ * restored, so nothing is shown.
  */
 export function BlockedNotice({ error, phase = "outbound" }: { error: RunError; phase?: "outbound" | "inbound" }) {
-  const unreachable = error.code === "unreachable";
+  // Outbound copy depends on the code: an upstream refusal is not pii-guard failing closed (LAB-1335).
+  const copy = errorCopy(error.code, error.status ?? statusFromMessage(error.message));
   const title =
     phase === "inbound"
       ? error.code === "not_found"
         ? "This session is no longer known to the guard."
         : "The answer could not be restored."
-      : unreachable
-        ? "The guard is not reachable. Nothing was sent."
-        : "Blocked. Nothing was sent to the model.";
+      : copy.title;
   const body =
     phase === "inbound"
       ? error.code === "not_found"
         ? "Mappings live only in the guard's memory and expire. Mask the document again to start a new session."
         : "pii-guard shows nothing rather than a half-restored answer."
-      : "pii-guard fails closed: if detection or masking fails, the request is stopped rather than forwarded unmasked.";
+      : copy.body;
   return (
-    <div role="alert" className="rounded-lg border border-blocked/40 bg-blocked-soft p-4 text-sm">
+    <div role="alert" data-error-kind={phase === "inbound" ? "inbound" : copy.kind} className="rounded-lg border border-blocked/40 bg-blocked-soft p-4 text-sm">
       <p className="flex items-center gap-2 font-medium text-blocked">
         <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
           <circle cx="8" cy="8" r="6" />
