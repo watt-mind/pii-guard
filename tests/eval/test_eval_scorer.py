@@ -139,6 +139,38 @@ def test_partial_ignores_tokens_found_outside_gold_spans() -> None:
     assert not report.partial  # "Budapest" also occurs outside the label; "utca" is generic
 
 
+@pytest.mark.parametrize(
+    ("value", "masked", "partial"),
+    [
+        ("8461269322", "8461269", True),  # "[[X]]322": the edge cuts the digit run
+        ("8461269322", "461269322", True),  # "8[[X]]"
+        ("812.754.113.91", "812.754.113", True),  # "[[X]].91": joined by a dot
+        ("812.754.113.91", "812.754.113.91", False),  # whole value
+        ("06 30 123 4567", "06 30 123", False),  # a space is not a joiner, "4567" is a token
+        ("Minta utca 12.", "Minta utca", False),  # house number after a space
+    ],
+)
+def test_partial_counts_digits_left_at_the_placeholder_edge(
+    value: str, masked: str, partial: bool
+) -> None:
+    """LAB-1367: a few digits of an identifier left next to its placeholder."""
+    doc = _doc(f"Az azonosító: {label('ID_DOCUMENT', value)}.")
+    (span,) = doc.spans
+    start = span.start + value.index(masked)
+    reps = [(start, start + len(masked), "[[ID_DOCUMENT_aaaa]]")]
+    masked_text = doc.text[:start] + "[[ID_DOCUMENT_aaaa]]" + doc.text[start + len(masked) :]
+    (report,) = leak_report(doc, masked_text, replacements=reps)
+    assert not report.leaked
+    expected = partial or value == "06 30 123 4567"  # the 4-digit token rule still applies
+    assert report.partial is expected
+    # Without the replacements only the token rule runs: short digit runs aren't seen.
+    (old,) = leak_report(doc, masked_text)
+    assert old.partial is (value == "06 30 123 4567")
+    # Consistency reads the same gap as not covered.
+    (entity,) = consistency_report(doc, reps)
+    assert entity.consistent is (not expected)
+
+
 def test_leak_report_repr_has_no_value() -> None:
     doc = _doc(f"{label('PERSON', 'Teszt Elek')}")
     assert "Teszt" not in repr(leak_report(doc, doc.text))
@@ -338,6 +370,7 @@ def test_consistency_accepts_a_suffix_outside_the_placeholder(
         ("de", "PERSON", "Erika Beispiel", "Erika", False),  # the surname stays readable
         ("hu", "PERSON", "Próba Piroska", "Piroska", False),
         ("en", "ID_DOCUMENT", "AB1234010", "AB1234", False),  # digits left after it
+        ("de", "ID_DOCUMENT", "812.754.113.91", "812.754.113", False),  # ".91" (LAB-1367)
         ("hu", "ADDRESS", "1051 Budapest, Minta utca 12.", "1051", False),
     ],
 )

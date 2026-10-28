@@ -28,10 +28,14 @@ Rule = Callable[[str], Iterator[_Hit]]
 # a sha256 or git hash ("…885d392771036a9d…"), a base64 digest or a code name, and one digit
 # run in ten passes a mod-10 check by chance (LAB-1282). Cued numbers refuse the same ("Nr123",
 # ``languages/cues.py``).
+#
+# A comma between digits is a thousands or decimal mark only when 1-3 digits follow it
+# ("1,234,567", "27358,76"). Otherwise it separates CSV fields ("…6714,8461269322,ORD-…": a phone
+# field, then a tax number), and the number on either side is found as on its own (LAB-1367).
 NOT_IN_WORD_BEFORE = r"(?<![^\W\d])"
 NOT_IN_WORD_AFTER = r"(?![^\W\d])"
-NUM_START = r"(?<!\d)(?<!\d[-./,])" + NOT_IN_WORD_BEFORE
-NUM_END = r"(?!\d)(?![-./,]\d)" + NOT_IN_WORD_AFTER
+NUM_START = r"(?<!\d)(?<!\d[-./])(?:(?<!\d,)|(?=\d{4}))" + NOT_IN_WORD_BEFORE
+NUM_END = r"(?!\d)(?![-./]\d)(?!,\d{1,3}(?!\d))" + NOT_IN_WORD_AFTER
 NOT_AMOUNT = r"(?!\s?(?:,-\s?)?(?:Ft|HUF|forint|EUR|€)(?!\w))"
 # Space-grouped numbers must not be part of a longer space-grouped number ("1 234 567 890").
 NO_GROUP_BEFORE = r"(?<!\d )"

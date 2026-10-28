@@ -53,7 +53,7 @@ from typing import Any, Protocol
 from pii_guard.detect import ner_resolve
 from pii_guard.detect.ner_numbers import check_numbers
 from pii_guard.detect.ner_orgs import relabel_brands
-from pii_guard.detect.ner_words import snap_to_words
+from pii_guard.detect.ner_words import snap_to_tokens, snap_to_words
 from pii_guard.types import DetectionError, EntityType, Span
 
 __all__ = [
@@ -833,6 +833,8 @@ class NerDetector:
             spans.add(Span(start, end, entity_type, text[start:end], score, self.name))
         # Names, organisations and addresses start and end on word boundaries (LAB-1338).
         found = snap_to_words(text, list(spans), language)
+        # Numbers and phones cover whole tokens, so no digits stay next to the mask (LAB-1367).
+        found = snap_to_tokens(text, found)
         if self.number_checks:
             # Format, checksum and cue checks for the numbers the model proposes (LAB-1293).
             found = sorted(
