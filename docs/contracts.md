@@ -835,9 +835,25 @@ Treatments:
 - **mask**: free text. Detected values are replaced by placeholders and restored in the
   answer.
 - **mask JSON**: every string in the value, object keys included, is masked as its own text.
+  Every number with at least six digits is detected too (`{"tax_id": 8123456786}`; an
+  integral float in its integer form): a number with detected personal data is replaced by
+  the placeholder **string** (`"[[NATIONAL_ID_HU_TAX_ab12cd]]"`), because a JSON number can't
+  carry a placeholder; any other number is forwarded as the same number. A restored value
+  comes back as a string: the answer's tool-call arguments hold the original digits as a JSON
+  string, not a number (LAB-1348).
 - **check**: an identifier or enum-like setting that can't carry a placeholder. Detected
   personal data rejects the request (`400 unsupported_content`); otherwise it is forwarded
   unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.
+  Numbers with at least six digits in a checked value, and JSON-Schema keyword numbers
+  (`maximum`, `minLength`, ...), are checked the same way.
+
+**Declared tool names.** A tool or namespace name the request declares (`tools[].name`,
+`tools[].function.name`, `functions[].name`, ...) is the client's vocabulary: a `PERSON`,
+`ORGANIZATION` or `ADDRESS` detection whose whole value is a declared name is dropped, in the
+texts and in identifiers ("Muse" read as a person, LAB-1299/LAB-1317/LAB-1324). No other type
+is exempt: a value found by format or checksum (a tax ID, an IBAN, ...) is masked wherever it
+appears, and a tool named after one is `400 unsupported_content` (LAB-1348). Values the operator
+pre-loaded (`known`) are never exempt.
 - **pass**: numbers, booleans and null only (strings are `400 invalid_request`), or an opaque
   provider-issued blob forwarded untouched.
 

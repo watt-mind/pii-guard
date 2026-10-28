@@ -2,9 +2,14 @@
 
 Shared by ``/v1/chat/completions`` (:class:`~pii_guard.gateway.service.Gateway`) and
 ``/v1/responses`` (:class:`~pii_guard.gateway.responses.ResponsesGateway`): after detection and
-before masking, both drop the detections whose whole value is a declared tool name; when the
-masked texts are written back, an identifier whose only rewrites are declared tool names is
-written as the client sent it (:func:`identifier_keeps_tool_names`).
+before masking, both drop the word-like detections (:data:`EXEMPT_TYPES`) whose whole value is a
+declared tool name; when the masked texts are written back, an identifier whose only rewrites are
+declared tool names is written as the client sent it (:func:`identifier_keeps_tool_names`).
+
+The exemption covers only the types a statistical detector can misread a tool word as. A
+format- or checksum-validated value (a tax ID, an IBAN, ...) is personal data whatever the
+client named its tools: it is masked in the texts, and a tool name that is one fails closed
+(LAB-1348).
 """
 
 from __future__ import annotations
@@ -14,10 +19,18 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from pii_guard.detect.known import KNOWN_DETECTOR
-from pii_guard.types import Span
+from pii_guard.types import EntityType, Span
 from pii_guard.vault.placeholders import PLACEHOLDER_RE, normalize_value
 
-__all__ = ["identifier_keeps_tool_names", "tool_names", "without_tool_names"]
+__all__ = ["EXEMPT_TYPES", "identifier_keeps_tool_names", "tool_names", "without_tool_names"]
+
+#: The entity types a declared tool name is exempt from: the word-like types the NER (or the
+#: LLM) can misread a tool vocabulary word as ("Muse" as a PERSON, LAB-1299). Every other type
+#: is found by format or checksum and is personal data even when a tool is named after it: a
+#: tool named after a valid tax ID used to keep that ID unmasked everywhere (LAB-1348).
+EXEMPT_TYPES: frozenset[EntityType] = frozenset(
+    {EntityType.PERSON, EntityType.ORGANIZATION, EntityType.ADDRESS}
+)
 
 #: What a tool or namespace name looks like (OpenAI: ``^[a-zA-Z0-9_-]{1,64}$``; namespaced
 #: calls add ``.``). A "name" with whitespace is not a real identifier and gets no exemption: a
@@ -66,7 +79,8 @@ def without_tool_names(
     prompts; the NER read it as a PERSON, and the vault then masked the ``muse`` namespace (an
     identifier) as another occurrence of that value, so the request was refused (LAB-1299).
     Chat Completions had the same gap for ``tools[].function.name`` (LAB-1317). Values the
-    operator pre-loaded (``known``) are kept.
+    operator pre-loaded (``known``) are kept, and so is every detection of a type outside
+    :data:`EXEMPT_TYPES` (LAB-1348).
     """
     if not names:
         return spans
@@ -74,7 +88,9 @@ def without_tool_names(
         [
             s
             for s in found
-            if s.detector == KNOWN_DETECTOR or normalize_value(text[s.start : s.end]) not in names
+            if s.detector == KNOWN_DETECTOR
+            or s.entity_type not in EXEMPT_TYPES
+            or normalize_value(text[s.start : s.end]) not in names
         ]
         for text, found in zip(texts, spans, strict=True)
     ]
@@ -96,13 +112,17 @@ def identifier_keeps_tool_names(
     upstream as written in the tool definitions anyway, so keeping them in an identifier
     reveals nothing more. A placeholder counts only when both the text it replaced and its
     session value (``original``, ``None`` for a placeholder the session did not issue) are
-    declared names; anything else, a real name glued to a tool name included, fails closed.
+    declared names and its type is one of :data:`EXEMPT_TYPES`; anything else, a real name
+    glued to a tool name or a tool named after a tax ID included, fails closed (LAB-1348).
     The caller leaves the operator's pre-loaded ``known`` values out of ``names``.
     """
     if not names:
         return False
     literals = PLACEHOLDER_RE.split(masked)[:: PLACEHOLDER_RE.groups + 1]
-    placeholders = [m.group(0) for m in PLACEHOLDER_RE.finditer(masked)]
+    found = list(PLACEHOLDER_RE.finditer(masked))
+    if any(m.group(1) not in EXEMPT_TYPES for m in found):
+        return False
+    placeholders = [m.group(0) for m in found]
     if not placeholders:
         return masked == text
     match = re.fullmatch("(.+?)".join(re.escape(part) for part in literals), text, re.DOTALL)

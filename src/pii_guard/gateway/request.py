@@ -16,6 +16,9 @@ placeholder, so they are only checked: personal data in one rejects the request
 Tool-call arguments are JSON: they are parsed and every string (keys included) is masked as
 its own text, so escaped characters can't hide a value from the detectors and the result is
 re-serialised as valid JSON. Arguments that are not valid JSON are masked as plain text.
+Number leaves (6+ digits) are detected too: a masked number is written back as the placeholder
+string, an unchanged one stays the same number (LAB-1348). In a JSON Schema, keyword numbers
+(``maximum``, ...) are checked like identifiers instead.
 
 A message ``name`` that contains detected personal data can't carry a placeholder (providers
 restrict it to ``[A-Za-z0-9_-]``), so it is removed instead.
@@ -393,10 +396,13 @@ def _require_scalars(value: object, where: str) -> None:
 def _check_json(
     container: dict[str, Any] | list[Any], key: Any, where: str, out: CollectedTexts
 ) -> None:
-    """A structural value: every string in it (object keys too) is checked as an identifier."""
+    """A structural value: every string in it (object keys too) and every long number is
+    checked as an identifier."""
     value = container[key]
     if isinstance(value, str):
         _check_name(value, where, out)
+    elif (number := _number_text(value)) is not None:
+        _check_text(number, where, out)
     elif isinstance(value, list):
         for i in range(len(value)):
             _check_json(value, i, f"{where}.{i}", out)
@@ -718,12 +724,46 @@ def _collect_arguments(function: dict[str, Any], where: str, out: CollectedTexts
     out.finalizers.append(reserialize)
 
 
+#: A bare number with fewer digits than this is never personal data on its own (the shortest
+#: numeric types, TAJ and tax IDs, have 9 and 10 digits; phone and account numbers more).
+_MIN_NUMBER_DIGITS = 6
+
+
+def _number_text(value: object) -> str | None:
+    """The text a JSON number leaf is detected as (``None``: not a number, or too short).
+
+    ``bool`` is an ``int`` in Python but not a number in JSON. An integral float
+    (``8123456786.0``) is detected in its integer form, as the detectors read digits."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    if isinstance(value, float) and value.is_integer() and abs(value) < 1e16:
+        text = str(int(value))
+    else:
+        text = json.dumps(value)
+    return text if sum(ch.isdigit() for ch in text) >= _MIN_NUMBER_DIGITS else None
+
+
+def _number_setter(container: dict[str, Any] | list[Any], key: Any) -> Callable[[str], None]:
+    """Write a masked number back: unchanged, it stays the original number; masked, it
+    becomes the placeholder string (a JSON number can't carry one, LAB-1348)."""
+    text = _number_text(container[key])
+
+    def write(masked: str) -> None:
+        if masked != text:
+            container[key] = masked
+
+    return write
+
+
 def _collect_json(
     container: dict[str, Any] | list[Any], key: Any, out: CollectedTexts, kind: str = "arguments"
 ) -> None:
     value = container[key]
     if isinstance(value, str):
         out.slots.append(TextSlot(value, _setter(container, key), kind))
+    elif (number := _number_text(value)) is not None:
+        # Numbers carry values too ({"tax_id": 8123456786}); a masked one becomes a string.
+        out.slots.append(TextSlot(number, _number_setter(container, key), kind))
     elif isinstance(value, list):
         for i in range(len(value)):
             _collect_json(value, i, out, kind)
@@ -820,6 +860,9 @@ def _collect_schema(
     value = container[key]
     if isinstance(value, str):
         out.slots.append(TextSlot(value, _setter(container, key), "tools"))
+    elif (number := _number_text(value)) is not None:
+        # A keyword number (maximum, minLength, ...) is structure: checked, never rewritten.
+        _check_text(number, where, out)
     elif isinstance(value, list):
         for i in range(len(value)):
             _collect_schema(value, i, f"{where}.{i}", out)
