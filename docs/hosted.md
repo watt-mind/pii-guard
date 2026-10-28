@@ -140,7 +140,7 @@ startup characteristics and is not subject to the self-hosted image's 375 MB OCR
 ## Dedicated Azure deployment
 
 Use an explicit subscription and a **new dedicated** resource group beginning with
-`rg-pii-guard-prod` (or `rg-pii-guard-staging`). The deployment script refuses shared groups and requires matching
+`rg-pii-guard-prod` (or `rg-pii-guard-dev`). The deployment script refuses shared groups and requires matching
 `project=pii-guard` and `environment` tags for updates. The selected public origin is **https://guard.watt-mind.com**, with Google callback
 `https://guard.watt-mind.com/.auth/login/google/callback`. The planned dedicated resource group
 is `rg-pii-guard-prod`, region `swedencentral`, project prefix `piiguard`, environment `prod`. Names derive from both, for example
@@ -153,7 +153,7 @@ Microsoft.ManagedIdentity, Microsoft.KeyVault, Microsoft.Storage and Microsoft.I
 the selected subscription first if not already registered.
 
 1. Set `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_LOCATION` and optionally
-   `AZURE_PROJECT_PREFIX` (default `piiguard`) and `AZURE_ENVIRONMENT` (`prod`, or `staging`). Check the active `az account` matches. Run
+   `AZURE_PROJECT_PREFIX` (default `piiguard`) and `AZURE_ENVIRONMENT` (`prod`, or `dev`). Check the active `az account` matches. Run
    `deploy/azure/deploy.sh validate`, then `deploy/azure/deploy.sh bootstrap`. Bootstrap creates
    dedicated foundation resources: registry, vault, runtime identity, environment, allocation
    share and monthly budget. Set `AZURE_MONTHLY_BUDGET_AMOUNT=25` for the owner-approved **EUR
@@ -206,6 +206,42 @@ public. This is **not** API authorization. Protected routes must reject anonymou
 spoofed identity headers, cross-owner sessions/API keys and cross-origin cookie writes. Verify
 that the platform discards caller-supplied `X-MS-CLIENT-PRINCIPAL` headers on **all** ingress
 hostnames, including anonymous requests. If this cannot be established, keep ingress internal.
+
+## Dev/prod deployment plan — private dev networking pending
+
+The deployment environments are **dev** and **prod**. The intended branch mapping is
+`develop` → dev and the repository's actual production branch (`main`, or `master` where that
+is the actual branch) → prod. The branch deployment workflow is not implemented by this PR.
+Both environments should use the same reviewed application image/template with separate
+identities, vault credentials, OAuth client, owner state, allocation ledger and billing budget.
+Real input is allowed in the authorized running service; repository fixtures, screenshots,
+logs and committed evidence must still be synthetic.
+
+**Dev cloud operations are deliberately refused by the current script, and the Bicep app
+resource is disabled for dev until the private network design is implemented.** Recognizing
+the `dev` parameter does not mean a private dev service exists. Do not deploy an ad hoc public
+dev app or use Tailscale Funnel to bypass this gate.
+
+The proposed dev path is a dedicated VNet, an internal Container Apps environment with public
+network access disabled, private DNS for its ingress, and a dedicated always-on Tailscale
+subnet router/reverse proxy with narrow tailnet routes/ACLs. App HTTP ingress must be reachable
+from that proxy within the private environment. A request from the active proxy may trigger
+Container Apps HTTP scaling from zero; a Tailscale sidecar inside a sleeping app is not a
+wake path. Validate the full private request path and model cold start before promising it.
+Do not reuse unrelated existing tailnet nodes. The proxy's ongoing cost needs its own reviewed
+budget allowance; the prod EUR 25 budget does not authorize another environment's spend.
+
+Use an owned private HTTPS hostname and separately validated Google OAuth callback/client for
+dev. The user's browser must reach the private callback over the tailnet; no public application
+origin may bypass that path. DNS/TLS issuance, Google audience/redirect acceptance and tailnet
+route approval remain design/verification work. Production remains at the approved public
+origin, with all existing launch gates.
+
+The product intent is finite sponsored access by default once provider permission and
+LAB-1372 Done are established. This PR does not replenish allocations automatically: idle
+scale-to-zero/restart forfeits a previously claimed allocation. Before automatic dev releases,
+review a finite allocation issuance/reconciliation policy and any required durable spend state;
+never mint new credit on every restart or treat an alert budget as a hard spend ceiling.
 
 ## Foundation migration and deletion
 

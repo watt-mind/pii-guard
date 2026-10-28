@@ -4,7 +4,7 @@ targetScope = 'resourceGroup'
 @minLength(3)
 @maxLength(10)
 param projectPrefix string = 'piiguard'
-@allowed(['prod', 'staging'])
+@allowed(['prod', 'dev'])
 param environmentName string = 'prod'
 param location string = resourceGroup().location
 param deployApp bool = false
@@ -39,6 +39,8 @@ param googleSecretUri string = ''
 var suffix = uniqueString(resourceGroup().id)
 var namePrefix = '${projectPrefix}-${environmentName}'
 var appName = '${namePrefix}-app'
+// Dev apps stay disabled until the dedicated tailnet-only network is implemented/reviewed.
+var appDeploymentEnabled = deployApp && environmentName == 'prod'
 var tags = { project: 'pii-guard', environment: environmentName, state: 'ephemeral-single-process' }
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
@@ -132,7 +134,7 @@ resource allocationMount 'Microsoft.App/managedEnvironments/storages@2025-01-01'
     }
   }
 }
-resource app 'Microsoft.App/containerApps@2025-01-01' = if (deployApp) {
+resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled) {
   name: appName
   location: location
   tags: tags
@@ -193,7 +195,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (deployApp) {
   }
   dependsOn: [vaultReader, pull]
 }
-resource auth 'Microsoft.App/containerApps/authConfigs@2025-01-01' = if (deployApp) {
+resource auth 'Microsoft.App/containerApps/authConfigs@2025-01-01' = if (appDeploymentEnabled) {
   parent: app
   name: 'current'
   properties: {
@@ -221,7 +223,7 @@ output registryServer string = registry.properties.loginServer
 output vaultUri string = vault.properties.vaultUri
 output environmentDomain string = environment.properties.defaultDomain
 output appName string = appName
-output appFqdn string = deployApp ? app!.properties.configuration.ingress.fqdn : ''
+output appFqdn string = appDeploymentEnabled ? app!.properties.configuration.ingress.fqdn : ''
 
 // Platform metrics contain counts/resource usage, never request bodies or credentials.
 var alerts = [
@@ -229,7 +231,7 @@ var alerts = [
   { name: 'cpu', metric: 'UsageNanoCores', aggregation: 'Average', operator: 'GreaterThan', threshold: 1800000000 }
   { name: 'memory', metric: 'WorkingSetBytes', aggregation: 'Average', operator: 'GreaterThan', threshold: 3600000000 }
 ]
-resource metricAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for item in alerts: if (deployApp) {
+resource metricAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for item in alerts: if (appDeploymentEnabled) {
   name: '${namePrefix}-${item.name}'
   location: 'global'
   tags: tags
