@@ -217,6 +217,8 @@ http {{
       set $aca_origin {aca_fqdn};
       proxy_pass https://$aca_origin;
       proxy_ssl_verify on;
+      # Default depth 1 rejects ACA's leaf -> intermediate -> root chain (LAB-1422).
+      proxy_ssl_verify_depth 3;
       proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
       proxy_ssl_server_name on;
       proxy_ssl_name {aca_fqdn};
