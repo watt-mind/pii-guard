@@ -82,3 +82,10 @@ html:has(.hosted), body:has(.hosted) { overflow-x: clip; }
   .hosted .mode-comparison th:first-child { width: 100%; }
   .hosted .mode-comparison td::before { content: attr(data-label); display: block; font-size: var(--text-small); font-weight: 500; color: var(--color-muted); margin-bottom: var(--space-xs); }
 }
+
+/* Hosted panels inside the console follow the console's tokens, light and dark. */
+.hosted.hosted-embed { --color-paper: var(--surface); --color-wash: var(--surface-2); --color-ink: var(--ink); --color-muted: var(--muted); --color-line: var(--line); --color-field: var(--field); --color-primary: var(--primary); --color-primary-hover: var(--primary-hover); --color-on-primary: var(--on-primary); --color-accent: var(--accent); --color-accent-soft: var(--accent-soft); --color-guard: var(--guard); --color-guard-soft: var(--guard-soft); --color-error: var(--danger); --color-error-soft: var(--danger-soft); --color-focus: var(--focus); min-height: 0; background: transparent; font-size: var(--text-small); }
+.hosted.hosted-embed .settings { border-top: 0; padding-top: 0; }
+.hosted.hosted-embed .account-columns { margin-top: 0; grid-template-columns: minmax(0,1fr); }
+.hosted.hosted-embed summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+@media (min-width: 64rem) { .hosted.hosted-embed summary { min-height: 0; } }

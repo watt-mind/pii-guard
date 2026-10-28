@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { ServerStatus } from "../api/status";
+import { isFullStatus, type FullServerStatus } from "../api/status";
 import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type EntityType } from "../api/types";
 import { NerHint } from "../components/NerHint";
 import type { ServerStatusState } from "../hooks/useServerStatus";
@@ -25,7 +25,7 @@ const POLICY_CLASS: Record<EntityPolicy, string> = {
 const mono = (s: string) => <code className="font-mono text-xs">{s}</code>;
 
 export function Policy({ status }: PolicyProps) {
-  const server = status.state === "ok" ? status.status : null;
+  const server = status.state === "ok" && isFullStatus(status.status) ? status.status : null;
   return (
     <div className="space-y-6">
       <div className="max-w-3xl">
@@ -114,12 +114,12 @@ export function Policy({ status }: PolicyProps) {
   );
 }
 
-function imageGaps(server: ServerStatus): string {
+function imageGaps(server: FullServerStatus): string {
   const needs: Record<string, string> = { ocr: "no OCR (the ocr extra)", tesseract: "no Tesseract", segmenter: "no face detector (the local-vision extra, or SAM 3.1 with META_API_KEY)" };
   return server.images.gaps.map((g) => needs[g] ?? g).join(", ");
 }
 
-function PolicyTable({ title, types, server }: { title: string; types: readonly EntityType[]; server: ServerStatus | null }) {
+function PolicyTable({ title, types, server }: { title: string; types: readonly EntityType[]; server: FullServerStatus | null }) {
   return (
     <table className="w-full self-start text-sm">
       <caption className="mb-1 text-left text-xs font-medium text-muted">{title}</caption>

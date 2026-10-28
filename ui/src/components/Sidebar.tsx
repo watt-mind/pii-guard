@@ -3,6 +3,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 import { SECTIONS, hashOf, type Route, type Section } from "../lib/routes";
+import { offersSection, type Capabilities } from "../lib/capabilities";
+import { useHostedSession } from "../hosted/session";
 
 interface Props {
   route: Route;
@@ -16,6 +18,8 @@ interface Props {
   onTheme: (t: ThemePref) => void;
   /** What the connected server runs, for the status tooltip ("fast mode · rules+ner"). */
   statusDetail?: string | null;
+  /** What the server offers: sections it doesn't are left out of the menu. */
+  caps: Capabilities;
 }
 
 /**
@@ -23,7 +27,7 @@ interface Props {
  * Sections are plain hash links, so they open in a new tab, can be copied, and keep working
  * with the back button.
  */
-export function Sidebar({ route, onSection, engineState, engine, onPreference, onRecheck, theme, onTheme, statusDetail }: Props) {
+export function Sidebar({ route, onSection, engineState, engine, onPreference, onRecheck, theme, onTheme, statusDetail, caps }: Props) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -41,6 +45,9 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
   }, [open]);
 
   const current = SECTIONS.find((s) => s.id === route.section)!;
+  const session = useHostedSession();
+  // 44 px targets at phone width for the hosted console, whose visitors are often on a phone.
+  const touch = caps.accounts;
 
   return (
     // The column carries the border, so it runs the full page height; the sticky panel inside
@@ -66,7 +73,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
             aria-expanded={open}
             aria-controls={menuId}
             onClick={() => setOpen((o) => !o)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink lg:hidden"
+            className={`inline-flex ${touch ? "h-11" : "h-9"} items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink lg:hidden`}
           >
             <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               {open ? <path d="M4 4l8 8M12 4l-8 8" /> : <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />}
@@ -86,7 +93,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                   </p>
                 )}
                 <ul className="space-y-0.5" aria-labelledby={group.label ? `${menuId}-group-${gi}` : undefined}>
-                  {SECTIONS.filter((s) => group.ids.includes(s.id)).map((s) => {
+                  {SECTIONS.filter((s) => group.ids.includes(s.id) && offersSection(caps, s.id)).map((s) => {
                     const active = s.id === route.section;
                     return (
                       <li key={s.id}>
@@ -102,14 +109,15 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                             onSection(s.id);
                           }}
                           className={[
-                            "flex min-h-10 items-center gap-3 rounded-sm px-3 py-2 text-sm text-ink transition-colors lg:min-h-9 lg:py-1.5",
+                            touch ? "flex min-h-11 items-center" : "flex min-h-10 items-center",
+                            "gap-3 rounded-sm px-3 py-2 text-sm text-ink transition-colors lg:min-h-9 lg:py-1.5",
                             active ? "bg-surface-2 font-medium" : "hover:bg-surface-2",
                           ].join(" ")}
                         >
                           <SectionIcon id={s.id} active={active} />
                           <span className="min-w-0">
                             <span className="block">{s.label}</span>
-                            <span className="block text-2xs text-faint lg:hidden">{s.hint}</span>
+                            <span className="block text-2xs text-faint lg:hidden">{s.id === "playground" && !caps.images ? "Try text and chat" : s.hint}</span>
                           </span>
                         </a>
                       </li>
@@ -121,24 +129,36 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
           </nav>
 
           <div className="space-y-2.5 border-t border-line px-5 py-3">
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-muted" htmlFor="engine-mode">
-                Engine
-              </label>
-              <select
-                id="engine-mode"
-                value={engineState.preference}
-                onChange={(e) => onPreference(e.target.value as ModePreference)}
-                className="h-8 min-w-0 flex-1 rounded-lg border border-field bg-surface px-2 text-xs text-ink"
-              >
-                <option value="auto">Auto</option>
-                <option value="api">Live API</option>
-                <option value="mock">Demo engine</option>
-              </select>
-            </div>
+            {session && (
+              <div className="flex flex-wrap items-center gap-x-4 text-sm">
+                <a href="#site" className="inline-flex min-h-11 items-center text-muted hover:text-ink lg:min-h-8">
+                  View site
+                </a>
+                <a href={session.account.logout_url || "/.auth/logout?post_logout_redirect_uri=%2F"} className="inline-flex min-h-11 items-center text-muted hover:text-ink lg:min-h-8">
+                  Sign out
+                </a>
+              </div>
+            )}
+            {!caps.accounts && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted" htmlFor="engine-mode">
+                  Engine
+                </label>
+                <select
+                  id="engine-mode"
+                  value={engineState.preference}
+                  onChange={(e) => onPreference(e.target.value as ModePreference)}
+                  className="h-8 min-w-0 flex-1 rounded-lg border border-field bg-surface px-2 text-xs text-ink"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="api">Live API</option>
+                  <option value="mock">Demo engine</option>
+                </select>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <EngineStatus state={engineState} engine={engine} detail={statusDetail} onRecheck={onRecheck} />
-              <ThemeToggle theme={theme} onTheme={onTheme} />
+              <ThemeToggle theme={theme} onTheme={onTheme} touch={touch} />
             </div>
           </div>
         </div>
@@ -220,7 +240,7 @@ export function EngineStatus({ state, engine, detail, onRecheck }: { state: Engi
   );
 }
 
-function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) => void }) {
+function ThemeToggle({ theme, onTheme, touch }: { theme: ThemePref; onTheme: (t: ThemePref) => void; touch: boolean }) {
   const options: { id: ThemePref; label: string; icon: string }[] = [
     { id: "light", label: "Light theme", icon: "M8 3.5V2m0 12v-1.5M3.5 8H2m12 0h-1.5M4.8 4.8 3.8 3.8m8.4 8.4-1-1m0-6.4 1-1M3.8 12.2l1-1M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z" },
     { id: "system", label: "System theme", icon: "M2.5 3.5h11v7h-11zM6 13.5h4M8 10.5v3" },
@@ -236,7 +256,7 @@ function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemeP
           aria-label={o.label}
           title={o.label}
           onClick={() => onTheme(o.id)}
-          className={["grid size-7 place-items-center rounded-md transition-colors", theme === o.id ? "bg-primary text-on-primary" : "text-muted hover:text-ink"].join(" ")}
+          className={["grid place-items-center", touch ? "size-11 lg:size-7" : "size-7", "rounded-md transition-colors", theme === o.id ? "bg-primary text-on-primary" : "text-muted hover:text-ink"].join(" ")}
         >
           <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d={o.icon} />

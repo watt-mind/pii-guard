@@ -96,11 +96,11 @@ def test_account_hides_guest_identity_and_secrets(route_app: tuple[FastAPI, list
     assert account["state"] == {"persistence": "ephemeral", "restart_loses_sessions": True}
 
 
-def test_account_links_return_to_the_workspace(route_app: tuple[FastAPI, list[Any]]) -> None:
+def test_account_links_return_to_the_dashboard(route_app: tuple[FastAPI, list[Any]]) -> None:
     app, _ = route_app
     with TestClient(app) as client:
         account = client.get("/v1/account").json()
-    assert account["login_url"] == "/.auth/login/google?post_login_redirect_uri=%2F%23account"
+    assert account["login_url"] == "/.auth/login/google?post_login_redirect_uri=%2F%23overview"
     assert account["logout_url"] == "/.auth/logout?post_logout_redirect_uri=%2F"
     assert account["limits"]["sponsored_enabled"] is False
 

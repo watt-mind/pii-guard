@@ -42,6 +42,15 @@ remembered per browser.
 A contract error from a live endpoint (for example `503 detection_failed`) is **not** a reason
 to fall back: the guard failed closed, and the UI says that nothing was sent.
 
+## Hosted build
+
+`VITE_PII_GUARD_HOSTED=true` builds the hosted page. Anonymous visitors get the public landing
+page; a signed-in owner gets this same console, scoped to their own projects, activity and
+sessions. Sections are shown or hidden only by the server's capabilities
+(`ui/src/lib/capabilities.ts`): `GET /v1/status` `capabilities` when the server reports them,
+otherwise the defaults for the mode (hosted: text only, no server Policy, plus the account).
+Sign-in returns to `#overview`.
+
 ## Screens
 
 A console with a sidebar (a **Menu** button below 1024 px). Every section has its own hash, so

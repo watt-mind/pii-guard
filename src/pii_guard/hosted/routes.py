@@ -79,8 +79,9 @@ class _NotFoundError(PiiGuardError):
     status_code = 404
 
 
-# Easy Auth shows its own bare "signed in" page without a return address (LAB-1425).
-LOGIN_URL = "/.auth/login/google?post_login_redirect_uri=%2F%23account"
+# Easy Auth shows its own bare "signed in" page without a return address (LAB-1425);
+# sign-in returns to the dashboard (LAB-1430).
+LOGIN_URL = "/.auth/login/google?post_login_redirect_uri=%2F%23overview"
 LOGOUT_URL = "/.auth/logout?post_logout_redirect_uri=%2F"
 
 

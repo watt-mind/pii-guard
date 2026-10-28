@@ -19,20 +19,28 @@ export interface ServerStatus {
     /** This server's gateway base URL, as the browser reached it (`…/v1`). */
     url: string;
     default_mode: string;
-    modes: { fast: ModeStatus; audit: ModeStatus };
+    /** A hosted owner's projection lists fast mode only. */
+    modes: { fast: ModeStatus; audit?: ModeStatus };
   };
-  rest: { detectors: string[] };
+  /** Left out of a hosted owner's projection, like `upstream`, `images`, `auth` and `metrics`. */
+  rest?: { detectors: string[] };
   ner: { available: boolean; model: string | null };
-  upstream: { configured: boolean; mock: boolean; origin: string | null };
-  images: { segmenter: string; sam: boolean; ocr_required: boolean; gaps: string[]; available: boolean };
+  upstream?: { configured: boolean; mock: boolean; origin: string | null };
+  images?: { segmenter: string; sam: boolean; ocr_required: boolean; gaps: string[]; available: boolean };
   policies: Partial<Record<EntityType, Policy>>;
-  auth: { token_required: boolean };
+  /** What this server offers the console (LAB-1431); older servers leave it out. */
+  capabilities?: Partial<Record<string, boolean>>;
+  auth?: { token_required: boolean };
   default_language: string;
   traffic_log: "off" | "masked" | "full" | string;
   /** `PII_GUARD_VAULT_INSPECT`; absent on servers that predate the vault inspector. */
   vault_inspect?: "off" | "masked" | "full";
-  metrics: boolean;
+  metrics?: boolean;
 }
+
+/** The local server's whole status, as the Policy screen reads it. */
+export type FullServerStatus = ServerStatus & Required<Pick<ServerStatus, "rest" | "upstream" | "images" | "auth">> & { gateway: { modes: { audit: ModeStatus } } };
+export const isFullStatus = (s: ServerStatus): s is FullServerStatus => Boolean(s.rest && s.upstream && s.images && s.auth && s.gateway.modes.audit);
 
 export type StatusResult =
   | { state: "ok"; status: ServerStatus }
@@ -46,8 +54,10 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 export function parseStatus(raw: unknown): ServerStatus | null {
   if (!isRecord(raw) || !isRecord(raw.gateway) || !isRecord(raw.gateway.modes) || typeof raw.gateway.url !== "string") return null;
   const modes = raw.gateway.modes;
-  if (!isRecord(modes.fast) || !isRecord(modes.audit) || !Array.isArray(modes.fast.detectors)) return null;
-  if (!isRecord(raw.ner) || !isRecord(raw.upstream) || !isRecord(raw.images) || !isRecord(raw.policies)) return null;
+  if (!isRecord(modes.fast) || !Array.isArray(modes.fast.detectors)) return null;
+  if (!isRecord(raw.ner) || !isRecord(raw.policies)) return null;
+  // A hosted owner's projection leaves these out; when present they must be whole.
+  if (["upstream", "images", "rest", "auth"].some((k) => raw[k] !== undefined && !isRecord(raw[k])) || (modes.audit !== undefined && !isRecord(modes.audit))) return null;
   return raw as unknown as ServerStatus;
 }
 
