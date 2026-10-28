@@ -36,7 +36,10 @@ services:
     environment:
       PII_GUARD_HOST: 0.0.0.0
       PII_GUARD_PORT: "8787"
+      PII_GUARD_PROJECT_STATE_PATH: /var/lib/pii-guard/projects/state.sqlite3
     read_only: true
+    volumes:
+      - pii-guard-projects:/var/lib/pii-guard/projects
     # pytesseract hands Tesseract the image through a temp file: OCR needs a writable /tmp.
     tmpfs:
       - /tmp
@@ -63,6 +66,8 @@ services:
       PII_GUARD_HOST: 0.0.0.0
       PII_GUARD_PORT: "8787"
       PII_GUARD_GATEWAY_MODE: fast
+      # The demo's generated tenant key changes per container, so its configuration does too.
+      PII_GUARD_PROJECT_STATE_PATH: /tmp/pii-guard-projects/state.sqlite3
       # The UI's Vite proxy reaches this service as demo-api:8787 (Host header guard).
       PII_GUARD_ALLOWED_HOSTS: demo-api
       # masked only: `full` is refused on a non-loopback bind, and a container binds 0.0.0.0.
@@ -145,6 +150,9 @@ services:
         condition: service_healthy
 
 volumes:
+  # Private configuration and locally generated encryption key. Keep this volume together
+  # with a stable PII_GUARD_TENANT_KEY when one is explicitly configured. down -v deletes it.
+  pii-guard-projects:
   # Downloaded models (the NER fallback), kept across `docker compose down`; `down -v` drops it.
   pii-guard-models:
   # The demo UI's prebuilt benchmark index (rebuilt by benchmarks-index on every start).

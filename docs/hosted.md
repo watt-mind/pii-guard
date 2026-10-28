@@ -130,7 +130,7 @@ scripts/ci/lychee.sh --offline
 
 Use an immutable image digest for deployment. Azure Container Apps uses Linux amd64; building
 on an ARM workstation may use emulation and take longer. The NER image has its own size and
-startup characteristics and is not subject to the self-hosted image's 375 MB OCR image budget.
+startup characteristics and is not subject to the self-hosted image's 550 MB OCR/vision image budget.
 
 | Setting | Hosted deployment |
 |---|---|
