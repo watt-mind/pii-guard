@@ -20,6 +20,29 @@ _HU_LENGTHENED_SUFFIXES = (
     "tól", "től", "ra", "re", "ról", "ről", "n", "ig", "ért", "ként", "t", "val", "vel", "vá",
     "vé", "é", "ék", "éi", "i", "k",
 )  # fmt: skip
+# The family / possessive suffix chain after a lengthened stem: ``-é`` ("Hajna's"), ``-ék``
+# ("the Hajna family"), ``-éi`` ("Hajna's things"), each with an optional case ending:
+# ``Hajnáéknál``, ``Kendééknek``, ``Hubáéval``, ``Hajnáéit``. Written out from the grammar,
+# not taken from the vault's matcher (ADR 0008). ``-ék`` takes a linking vowel before ``-t``
+# and assimilates ``-val``/``-vá`` (``Hajnáékat``, ``Hajnáékkal``); ``-é``/``-éi`` take the
+# endings as they are (``Hajnáét``, ``Hajnáéval``, ``Hajnáéinak``).
+_HU_CHAIN_CASES = (
+    "nak", "nek", "ban", "ben", "ba", "be", "ból", "ből", "hoz", "hez", "höz", "nál", "nél",
+    "tól", "től", "ra", "re", "ról", "ről", "n", "ig", "ért", "ként", "é",
+)  # fmt: skip
+_HU_AFTER_EK = (*_HU_CHAIN_CASES, "at", "et", "kal", "kel", "ká", "ké")
+_HU_AFTER_E = (*_HU_CHAIN_CASES, "t", "val", "vel", "vá", "vé")
+
+
+def _alternation(options: tuple[str, ...]) -> str:
+    return "|".join(sorted(set(options), key=lambda s: (-len(s), s)))
+
+
+_HU_CHAIN = (
+    f"é(?:k(?:{_alternation(_HU_AFTER_EK)})?"
+    f"|i(?:{_alternation(_HU_AFTER_E)})?"
+    f"|(?:{_alternation(_HU_AFTER_E)}))?"
+)
 _HU_DIGRAPHS = ("cs", "dz", "gy", "ly", "ny", "sz", "ty", "zs")
 STOPWORDS = frozenset(
     [
@@ -88,7 +111,8 @@ def _words(value: str) -> str:
 class HungarianSurfaceForms(SurfaceForms):
     """Hungarian: the vault's case suffixes plus stem-changing forms.
 
-    - final ``a``/``e`` lengthens before most suffixes: ``Anna`` -> ``Annának``;
+    - final ``a``/``e`` lengthens before most suffixes: ``Anna`` -> ``Annának``, also before
+      the family / possessive chain: ``Hajna`` -> ``Hajnáéknál``, ``Kende`` -> ``Kendééknek``;
     - a final digraph doubles before ``-val``/``-vá``: ``Kovács`` -> ``Kováccsal``.
     """
 
@@ -100,10 +124,10 @@ class HungarianSurfaceForms(SurfaceForms):
             return []
         variants: list[str] = []
         last = value[-1].casefold()
-        suffixes = "|".join(sorted(_HU_LENGTHENED_SUFFIXES, key=len, reverse=True))
+        suffixes = _alternation(_HU_LENGTHENED_SUFFIXES)
         if last in {"a", "e"}:
             long_vowel = "á" if last == "a" else "é"
-            variants.append(_words(value[:-1]) + long_vowel + f"(?:{suffixes})")
+            variants.append(_words(value[:-1]) + long_vowel + f"(?:{_HU_CHAIN}|{suffixes})")
         for digraph in _HU_DIGRAPHS:
             if value.casefold().endswith(digraph):
                 doubled = value[:-2] + digraph[0] + value[-2:]
