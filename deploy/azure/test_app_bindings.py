@@ -26,6 +26,21 @@ class BindingReadTests(unittest.TestCase):
             [],
         )
 
+    def test_successful_empty_output_is_unbound(self) -> None:
+        for stdout in ("", "\n", "  \n"):
+            result = subprocess.CompletedProcess([], 0, stdout, "")
+            self.assertEqual(
+                existing_bindings(
+                    "app", "group", "enable", run=lambda *a, result=result, **k: result
+                ),
+                [],
+            )
+
+    def test_malformed_output_still_refuses(self) -> None:
+        result = subprocess.CompletedProcess([], 0, "{not json", "")
+        with self.assertRaises(ValueError):
+            existing_bindings("app", "group", "stage", run=lambda *a, result=result, **k: result)
+
     def test_proven_missing_app_allows_first_stage_only(self) -> None:
         result = subprocess.CompletedProcess(
             [], 3, "", "ERROR: (ContainerAppNotFound) synthetic app not found"
