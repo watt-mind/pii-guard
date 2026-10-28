@@ -289,7 +289,7 @@ class Gateway:
         self.vault = vault
         self.config = config or GatewayConfig()
         self._detectors = dict(detectors) if detectors is not None else None
-        self.cache = cache or DetectionCache(self.config.cache_size)
+        self.cache = cache if cache is not None else DetectionCache(self.config.cache_size)
         self._transport = transport
         # One upstream client per gateway, created on first use (LAB-1176): building one is
         # ~4.5 ms of blocking TLS and proxy setup on the event loop, and only a shared pool
@@ -330,6 +330,8 @@ class Gateway:
             client = httpx.AsyncClient(
                 timeout=self.upstream_timeout(),
                 transport=self._transport,
+                trust_env=not self.settings.hosted,
+                follow_redirects=False,
                 limits=httpx.Limits(
                     max_connections=config.upstream_max_connections,
                     max_keepalive_connections=config.upstream_max_keepalive,
@@ -344,6 +346,26 @@ class Gateway:
         client, self._client, self._client_loop = self._client, None, None
         if client is not None:
             await client.aclose()
+
+    async def bound_upstream_response(self, response: httpx.Response) -> None:
+        """Bound untrusted hosted upstream bytes before buffering or SSE parsing.
+
+        The transport applies the same policy; this boundary also covers injected
+        transports and keeps size enforcement adjacent to every gateway consumer.
+        """
+        if not self.settings.hosted:
+            return
+        from pii_guard.hosted.egress import MAX_RESPONSE_BYTES, BoundedResponseStream
+
+        if response.headers.get("content-encoding", "identity").strip().lower() != "identity":
+            await response.aclose()
+            raise UpstreamError("Compressed upstream responses are unavailable in hosted mode")
+        if response.is_stream_consumed:
+            if len(response.content) > MAX_RESPONSE_BYTES:
+                await response.aclose()
+                raise UpstreamError("Upstream response exceeds hosted size limit")
+        else:
+            response.stream = BoundedResponseStream(response.stream)
 
     @property
     def detectors(self) -> dict[Mode, ModeDetector]:
@@ -472,6 +494,8 @@ class Gateway:
 
     def _upstream_headers(self, headers: Mapping[str, str]) -> dict[str, str]:
         out = {"Content-Type": "application/json", "Accept": "application/json"}
+        if self.settings.hosted:
+            out["Accept-Encoding"] = "identity"
         key = self.settings.upstream_api_key
         if key is not None:
             out["Authorization"] = f"Bearer {key.get_secret_value()}"
@@ -823,6 +847,7 @@ class Gateway:
         timer.upstream_sent = started
         try:
             response = await client.send(request, stream=True)
+            await self.bound_upstream_response(response)
         except httpx.HTTPError as exc:
             timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")

@@ -43,6 +43,9 @@ router = v1_router(GatewayRoute)
 
 def get_gateway(request: Request) -> Gateway:
     state = request.app.state
+    hosted = getattr(state, "hosted", None)
+    if hosted is not None:
+        return hosted.gateway(request)
     gateway = getattr(state, "gateway", None)
     if gateway is None:
         vault = get_vault(request)  # fails closed without a tenant key

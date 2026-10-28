@@ -42,6 +42,29 @@ class Settings(BaseSettings):
     # Bearer token required on every route but /healthz; unset: no authentication.
     api_token: SecretStr | None = None
 
+    # Hosted mode requires the Azure Easy Auth sidecar to own the only ingress path.
+    # Defaults deliberately retain the local/self-hosted behavior.
+    hosted: bool = False
+    hosted_public_origin: str | None = None
+    hosted_trust_easy_auth: bool = False
+    hosted_single_process: bool = False
+    # Enable only after verifying direct ACA ingress and access-log privacy.
+    hosted_client_ip_source: Literal["off", "aca_xff_rightmost"] = "off"
+    hosted_max_principals: int = Field(default=256, ge=1, le=10000)
+    hosted_runtime_ttl: int = Field(default=3600, ge=300, le=86400)
+    hosted_max_sessions: int = Field(default=20, ge=1, le=100)
+    hosted_max_body_bytes: int = Field(default=32768, ge=1024, le=262144)
+    hosted_max_output_tokens: int = Field(default=8192, ge=1024, le=32768)
+    hosted_request_timeout: float = Field(default=180, gt=0, le=240)
+    hosted_models: Annotated[tuple[str, ...], NoDecode] = ("muse-spark-1.3",)
+    hosted_sponsored_microdollars: int = Field(default=0, ge=0)
+    hosted_sponsored_allocation_id: str | None = None
+    hosted_allocation_directory: str | None = None
+    hosted_allocation_expires_at: float | None = None
+    # Conservative ceilings, including reasoning tokens. Operator verifies against prices.
+    hosted_input_microdollars_per_token: int = Field(default=100, ge=1)
+    hosted_output_microdollars_per_token: int = Field(default=100, ge=1)
+
     # Detection and policies for the REST API (/v1/analyze, /v1/mask).
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
     # the gateway fast-mode stack, rules + ner when available (pii_guard.detect.stack).
@@ -166,7 +189,7 @@ class Settings(BaseSettings):
             return frozenset(part.strip().upper() for part in value.split(",") if part.strip())
         return value
 
-    @field_validator("allowed_hosts", mode="before")
+    @field_validator("allowed_hosts", "hosted_models", mode="before")
     @classmethod
     def _split_hosts(cls, value: object) -> object:
         if isinstance(value, str):

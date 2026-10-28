@@ -70,6 +70,8 @@ DEFAULT_MUSE_METADATA: dict[str, Any] = {
 def get_responses_gateway(request: Request) -> ResponsesGateway:
     state = request.app.state
     gateway = get_gateway(request)
+    if getattr(state, "hosted", None) is not None:
+        return ResponsesGateway(gateway)
     responses = getattr(state, "responses_gateway", None)
     if responses is None or responses.gateway is not gateway:
         with _lock:
@@ -146,6 +148,9 @@ async def _from_models_route(request: Request) -> JSONResponse:
 @router.get("/muse-code/models", tags=["gateway"])
 async def muse_code_models(request: Request) -> JSONResponse:
     state = request.app.state
+    if getattr(state, "hosted", None) is not None:
+        # One catalog implementation applies the same connection ownership and egress policy.
+        return await _from_models_route(request)
     config = getattr(state, "models_config", None) or ModelsConfig()
     settings = state.settings
     if config.upstream_models or not settings.upstream_base_url:
