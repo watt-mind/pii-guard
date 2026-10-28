@@ -1638,14 +1638,27 @@ Reservations are sized from the request before work. The input charge is the ups
 payload bound `2 × body bytes + 4096` (in tokens: a byte-level tokenizer never emits more
 tokens than bytes), and the gateway refuses with `413 payload_too_large`, before any upstream
 call, a masked payload larger than that bound. The output charge is the request's own output
-token limit (at most 8192; the default when it sets none), and 512 for the curated demo. With
-the defaults a guest gets its five demos (about 4,700 reserved tokens and $0.04 each) and a
-fresh signed-in user can send a chat close to the 32 KiB body limit. Completion, cancellation, invalid provider responses and client retries never refund
+token limit (at most 8192; the default when it sets none), and 4096 for the curated demo.
+`muse-spark-1.3` reasons before it answers and reasoning counts against that limit: measured
+on 2026-10-28 (`eval/results/2026-10-28-lab-1372-meta-reasoning`), every demo-sized call at 512
+tokens or fewer came back with empty content, and at 4096 every call answered (at most 2,994
+completion tokens used). `PII_GUARD_HOSTED_MAX_OUTPUT_TOKENS` therefore cannot be set below
+4096. A client may still ask for less and then gets an empty answer it is charged for. With
+the defaults a guest gets its five demos (about 8,250 reserved tokens and $0.14 each) and a
+fresh signed-in user can send a chat close to the 32 KiB body limit. Sponsored requests may not
+ask for provider-side tools (`web_search_options`, or a `tools` entry other than `function` or
+`custom`): Meta bills web search grounding per query, outside the token usage a reservation
+bounds, so they are refused with `403 hosted_request_denied` before any work. Completion, cancellation, invalid provider responses and client retries never refund
 requests, tokens or money. Concurrency releases only after the response stream and cleanup.
 There are no automatic upstream retries. Monetary units are integer microdollars, and configured
 per-token rates must upper-bound every permitted model and all reasoning charges. The rate
 defaults have one source (`hosted/quotas.py`): 5 input and 30 output microdollars per token
-(`HOSTED_INPUT_MICRODOLLARS_PER_TOKEN`, `HOSTED_OUTPUT_MICRODOLLARS_PER_TOKEN`). The global
+(`HOSTED_INPUT_MICRODOLLARS_PER_TOKEN`, `HOSTED_OUTPUT_MICRODOLLARS_PER_TOKEN`). Reconciled on
+2026-10-28 with Meta's published Standard price for `muse-spark-1.3` (USD 1.25 input and 4.25
+output per million tokens, <https://dev.meta.ai/docs/pricing-rate-limits>; reasoning tokens are
+reported inside `completion_tokens`, so they are charged at the output rate): the defaults are
+4× and about 7× that, and also cover Muse Wonder (4.00 / 20.00). Re-check the page before
+raising an allocation or adding a model to the allowlist. The global
 daily ceiling is $10 and a finite allocation adds a stricter process-lifetime cap.
 
 Sponsored calls default to disabled. Enabling them requires a positive reconciled allocation,

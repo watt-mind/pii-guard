@@ -312,9 +312,13 @@ def test_guest_gets_the_documented_five_demos_with_default_limits(make_client: A
         for _ in range(limits.guest_requests + 1)
     ]
     assert statuses == [200] * limits.guest_requests + [429]
-    # One demo reserves a small, request-sized amount (it used to be 4,505,600 microdollars).
+    # One demo reserves a request-sized amount (it used to be 4,505,600 microdollars): the
+    # payload bound plus DEMO_MAX_OUTPUT_TOKENS, sized so the reasoning model can answer.
     per_demo = service.quotas._spent_today // limits.guest_requests
-    assert per_demo < 50_000
+    assert per_demo < 150_000
+    assert service.quotas.usage(next(iter(service.quotas._users)))["tokens_today"] <= (
+        limits.guest_tokens
+    )
     assert client.get("/v1/account").json()["limits"]["requests_per_day"] == 5
 
 
@@ -490,3 +494,69 @@ def test_deeply_nested_chat_json_is_refused_not_a_500(make_client: Any) -> None:
     )
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "hosted_request_denied"
+
+
+# --- LAB-1372: measured reasoning budget and provider-billed tools ------------------------
+
+
+def test_demo_output_budget_leaves_room_for_reasoning() -> None:
+    # muse-spark-1.3 answered nothing at 512 and at most 2,994 completion tokens were used
+    # by an answered call (eval/results/2026-10-28-lab-1372-meta-reasoning).
+    assert DEMO_MAX_OUTPUT_TOKENS >= 4096
+    with pytest.raises(ValueError):
+        Settings(_env_file=None, hosted_max_output_tokens=DEMO_MAX_OUTPUT_TOKENS - 1)
+    # Five demos stay inside the guest token budget.
+    per_demo = upstream_payload_bound(64) + DEMO_MAX_OUTPUT_TOKENS
+    limits = QuotaLimits()
+    assert per_demo * limits.guest_requests <= limits.guest_tokens
+
+
+@pytest.mark.parametrize(
+    ("path", "extra"),
+    [
+        ("/v1/chat/completions", {"web_search_options": {}}),
+        ("/v1/chat/completions", {"tools": [{"type": "web_search"}]}),
+        ("/v1/chat/completions", {"tools": "web_search"}),
+        ("/v1/responses", {"tools": [{"type": "web_search_preview"}]}),
+        ("/v1/responses", {"tools": [{"type": "function", "name": "f"}, {"type": "mcp"}]}),
+    ],
+)
+def test_sponsored_requests_cannot_ask_for_provider_billed_tools(
+    make_client: Any, path: str, extra: dict[str, Any]
+) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return echo(request)
+
+    client = make_client(handler)
+    body: dict[str, Any] = {"model": "muse-spark-1.3", **extra}
+    if path == "/v1/responses":
+        body["input"] = "Hello"
+    else:
+        body["messages"] = [{"role": "user", "content": "Hello"}]
+    response = client.post(path, json=body, headers=auth())
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "hosted_request_denied"
+    assert calls == []
+    assert client.app.state.hosted.quotas._spent_today == 0
+
+
+def test_sponsored_requests_keep_client_side_function_tools(make_client: Any) -> None:
+    client = make_client()
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "muse-spark-1.3",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {"name": "lookup", "parameters": {"type": "object"}},
+                }
+            ],
+        },
+        headers=auth(),
+    )
+    assert response.status_code == 200, response.text

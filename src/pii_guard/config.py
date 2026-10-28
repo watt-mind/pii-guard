@@ -67,7 +67,9 @@ class Settings(BaseSettings):
     hosted_runtime_ttl: int = Field(default=3600, ge=300, le=86400)
     hosted_max_sessions: int = Field(default=20, ge=1, le=100)
     hosted_max_body_bytes: int = Field(default=32768, ge=1024, le=262144)
-    hosted_max_output_tokens: int = Field(default=8192, ge=1024, le=32768)
+    # At least the demo's reservation (DEMO_MAX_OUTPUT_TOKENS): smaller budgets leave a
+    # reasoning model no room to answer (LAB-1372, LAB-1334).
+    hosted_max_output_tokens: int = Field(default=8192, ge=4096, le=32768)
     hosted_request_timeout: float = Field(default=180, gt=0, le=240)
     hosted_models: Annotated[tuple[str, ...], NoDecode] = ("muse-spark-1.3",)
     hosted_sponsored_microdollars: int = Field(default=0, ge=0)

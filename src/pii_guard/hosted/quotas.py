@@ -29,10 +29,19 @@ from pii_guard.types import PiiGuardError
 DAY_SECONDS = 86_400
 # The one source of the sponsored token rates (integer microdollars per token): QuotaLimits
 # and the PII_GUARD_HOSTED_*_MICRODOLLARS_PER_TOKEN settings both default to these.
+# Reconciled 2026-10-28 against https://dev.meta.ai/docs/pricing-rate-limits, Standard
+# muse-spark-1.3: USD 1.25 input / 4.25 output per million tokens (1.25 / 4.25 µ$ per token);
+# reasoning tokens are reported inside completion_tokens, so they are charged as output.
+# The defaults stay 4x (input) and about 7x (output) above that, and above Muse Wonder
+# (4.00 / 20.00), so a price rise or a second allowlisted model stays covered.
 DEFAULT_INPUT_MICRODOLLARS_PER_TOKEN = 5
 DEFAULT_OUTPUT_MICRODOLLARS_PER_TOKEN = 30
 # The curated demo asks for a short reply; its output reservation is this, not the hosted max.
-DEMO_MAX_OUTPUT_TOKENS = 512
+# muse-spark-1.3 reasons before it answers: on the demo prompts every call at 512 and below
+# came back empty, 1024 answered 1 of 4, and 4096 answered all, using at most 2,994 tokens
+# (eval/results/2026-10-28-lab-1372-meta-reasoning). A budget too small to answer is still
+# charged in full, so the demo reserves enough to answer.
+DEMO_MAX_OUTPUT_TOKENS = 4096
 # Masking may lengthen a request (a placeholder can be longer than the value it replaces).
 # The upstream payload may be at most twice the admitted body plus a fixed allowance; the
 # gateway refuses a larger masked payload, so this bound is also the input token charge
