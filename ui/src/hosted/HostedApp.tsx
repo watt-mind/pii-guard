@@ -382,11 +382,24 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </Card>
       </section>
 
-      <section id="account" aria-labelledby="account-heading" className="scroll-mt-20">
-        <Card as="div" title="Try it now. Connect your app when you’re ready." titleId="account-heading" actions={account && (signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account.logout_url || LOGOUT}>Sign out</ButtonLink></> : <ButtonLink variant="primary" href={loginUrl}>Sign in with Google</ButtonLink>)}>
+      <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-20 space-y-6">
+        <SectionHead id="privacy-heading" eyebrow="Limits" title="What PII Guard doesn’t promise." />
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2">
+          <Card title="Detection can miss" headingLevel={3}><p className="text-muted">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</p></Card>
+          <Card title="Context can identify" headingLevel={3}><p className="text-muted">Even with names removed, surrounding detail can point to a person.</p></Card>
+          <Card title="It pseudonymises; it doesn’t anonymise" headingLevel={3}><p className="text-muted">The data is still personal data, and PII Guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</p></Card>
+          <Card title="Remote detectors join your trust boundary" headingLevel={3}><p className="text-muted">If you enable one, it sees originals. Don’t submit highly sensitive data, or content you aren’t authorised to process.</p></Card>
+        </div>
+        <p className="text-xs text-muted"><a className={link} href={`${DOCS}/privacy-model.md`}>Read the privacy model ↗</a></p>
+      </section>
+
+      <section id="account" aria-labelledby="account-heading" className="scroll-mt-20 space-y-6">
+        <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live example. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."} />
+        <div className="flex flex-wrap items-center gap-3">
+          {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <><ButtonLink variant="primary" href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
+        </div>
+        <Card as="div" aria-label="Your runs and the server limits">
           <div className="space-y-4">
-            {!signedIn && <p className="max-w-3xl text-muted">{sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live example. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."}</p>}
-            {signedIn && <p className="max-w-3xl text-muted">You’re signed in. Your projects, endpoints, model connections and activity are in the console.</p>}
             {accountError ? <Notice tone="danger" live action={<Button size="sm" onClick={() => void refresh()}>Reconnect to API</Button>}>{accountError}</Notice> : !account ? <p className="text-muted">Checking live availability…</p> : <>
               {(!sponsoredOff || signedIn) && <dl className="grid max-w-md grid-cols-2 gap-4">
                 {typeof account.limits.requests_per_day === "number"
@@ -399,17 +412,6 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             </>}
           </div>
         </Card>
-      </section>
-
-      <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="privacy-heading" eyebrow="Limits" title="What PII Guard doesn’t promise." />
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2">
-          <Card title="Detection can miss" headingLevel={3}><p className="text-muted">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</p></Card>
-          <Card title="Context can identify" headingLevel={3}><p className="text-muted">Even with names removed, surrounding detail can point to a person.</p></Card>
-          <Card title="It pseudonymises; it doesn’t anonymise" headingLevel={3}><p className="text-muted">The data is still personal data, and PII Guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</p></Card>
-          <Card title="Remote detectors join your trust boundary" headingLevel={3}><p className="text-muted">If you enable one, it sees originals. Don’t submit highly sensitive data, or content you aren’t authorised to process.</p></Card>
-        </div>
-        <p className="text-xs text-muted"><a className={link} href={`${DOCS}/privacy-model.md`}>Read the privacy model ↗</a></p>
       </section>
     </main>
     <footer className="border-t border-line">
