@@ -5,6 +5,7 @@
 <p align="center"><b>Mask personal data before it reaches the LLM, and put it back in the answer. Built on Meta's open models; runs on your machine.</b></p>
 
 <p align="center">
+  <a href="https://guard.watt-mind.com"><img alt="Try it live: guard.watt-mind.com" src="https://img.shields.io/badge/try%20it%20live-guard.watt--mind.com-b6f36b"></a>
   <a href="https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml/badge.svg?branch=develop"></a>
   <a href="https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base"><img alt="Model on Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20model-watt--mind%2Fpii--guard--ner--xlmr--base-yellow"></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
@@ -18,6 +19,8 @@ folder. Under GDPR, sending it to a third-party model is a legal risk; not sendi
 agent can't do the job. PII Guard is a drop-in proxy in between: change one base URL, and every
 name, address, ID and face is swapped for a reversible placeholder before the request leaves
 your network, then restored in the answer, even mid-stream and inside tool calls.
+
+**Try it live: https://guard.watt-mind.com**. Run the guest demo with no sign-up and no key, or sign in with Google for your own gateway endpoint. Use fictional data only; it is a hackathon demo with a capped sponsored allowance.
 
 **Why it matters in the EU.** The GDPR requires data minimization (Art. 5) and lists
 pseudonymization among example by-design and security measures (Art. 25, 32). Placeholders
