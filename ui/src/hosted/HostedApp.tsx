@@ -155,9 +155,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />pii-guard</a>
         <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
           <a className="hidden text-muted hover:text-ink md:inline" href="#demo">Demo</a>
-          <a className="hidden text-muted hover:text-ink md:inline" href="#how">How it works</a>
+          <a className="hidden text-muted hover:text-ink md:inline" href="#images">Images</a>
           <a className="hidden text-muted hover:text-ink md:inline" href="#results">Results</a>
-          <a className="hidden text-muted hover:text-ink md:inline" href="#data">Your data</a>
+          <a className="hidden text-muted hover:text-ink md:inline" href="#how">How it works</a>
+          <a className="hidden text-muted hover:text-ink lg:inline" href="#data">Your data</a>
           <a className="hidden text-muted hover:text-ink md:inline" href={SELF_HOST}>Self-host</a>
           {signedIn ? <ButtonLink href={hasConsole ? "#overview" : "#account"}>{hasConsole ? "Open console" : "Your account"}</ButtonLink> : <ButtonLink href={loginUrl}>Sign in with Google</ButtonLink>}
         </nav>
@@ -234,56 +235,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
 
-      <section id="for" aria-labelledby="for-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="for-heading" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. pii-guard lets the agent use the model without handing over the person." />
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
-          <Card title="Legal" headingLevel={3}><p className="text-muted">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</p></Card>
-          <Card title="HR" headingLevel={3}><p className="text-muted">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</p></Card>
-          <Card title="Finance and back office" headingLevel={3}><p className="text-muted">Work through invoices and account correspondence. Bank accounts and tax IDs are caught by validated rules.</p></Card>
-        </div>
-      </section>
-
-      <section id="how" aria-labelledby="how-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="how-heading" title="Change one base URL. The model gets placeholders." lead="pii-guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
-        <ol className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
-          <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted">Validated rules for identifiers, plus an open multilingual NER for names, addresses and dates, run inside pii-guard with no API call.</p></Card></li>
-          <li><Card as="div" title="2 · Swap" headingLevel={3} className="h-full"><p className="text-muted">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in pii-guard.</p></Card></li>
-          <li><Card as="div" title="3 · Restore" headingLevel={3} className="h-full"><p className="text-muted">The answer comes back with the real values, chunk by chunk as it streams.</p></Card></li>
-        </ol>
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-          <Card title="One line in your client" headingLevel={3} subtitle="Works with the OpenAI SDK, Codex, Muse Code and pi.">
-            <pre tabIndex={0} aria-label="Python client example" className="overflow-x-auto rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-ui text-ink"><code>{"from openai import OpenAI\n\nclient = OpenAI(\n    base_url=\"https://<your-pii-guard>/v1\",\n    api_key=\"…\",\n)"}</code></pre>
-            <p className="mt-3 text-xs text-muted"><a className={link} href={`${DOCS}/integrations/README.md`}>Integration guides ↗</a></p>
-          </Card>
-          <Card title="Made for agents" headingLevel={3}>
-            <ul className="space-y-3">
-              <Point title="Tool calls too.">Tool definitions, arguments and results are masked, not just the prompt.</Point>
-              <Point title="Streaming.">Placeholders are restored mid-stream, even when one is split across chunks.</Point>
-              <Point title="Grammar-aware.">In Hungarian a name changes with every case. The ending stays outside the placeholder, so the model still writes correct sentences.</Point>
-              <Point title="Images.">Faces, ID photos and printed personal data are covered before an image goes anywhere (see below).</Point>
-              <Point title="Fails closed.">If anything can’t be masked, the request isn’t sent.</Point>
-            </ul>
-          </Card>
-        </div>
-      </section>
-
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-6 space-y-6">
         <SectionHead id="images-heading" title="Images too: faces are covered before they leave." lead="A gateway that only reads text passes images on untouched. pii-guard reads the image itself: faces and ID photos are found by a segmenter, printed names and numbers by OCR and the same detectors as text, and all of it is covered before the image goes to the model." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
         <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card; the regions were recorded on 27 Oct 2026 from a run with SAM 3.1 and OCR. In the hosted preview, signatures and stamps stay visible, as shown here. A self-hosted install can mask them too, with SAM 3.1. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
-      </section>
-
-      <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="meta-heading" title="Built on Meta models, each where it fits." lead="Anything that sees real personal data is an open-weight model you can run yourself. Hosted models only see fictional or masked text." />
-        <Card>
-          <KeyValues className="sm:grid-cols-[12rem_minmax(0,1fr)]" items={[
-            { key: "xlmr", label: <span className="font-medium text-ink">XLM-RoBERTa</span>, value: <>Open, MIT. Our fine-tuned NER runs inside pii-guard on every request. <a className={link} href={NER_MODEL}>On Hugging Face ↗</a></> },
-            { key: "glimmer", label: <span className="font-medium text-ink">Muse Glimmer 30B</span>, value: "Open weights. The teacher: it labelled 4,964 fictional documents to train the NER." },
-            { key: "spark", label: <span className="font-medium text-ink">{modelOr("Muse Spark")}</span>, value: "Answers in this demo, seeing placeholders only." },
-            { key: "sam", label: <span className="font-medium text-ink">SAM 3.1</span>, value: "Finds signatures so a self-hosted install can mask them too." },
-            { key: "open", label: <span className="font-medium text-ink">Muse Spark Open</span>, value: "The optional audit mode and the red team." },
-          ]} />
-        </Card>
       </section>
 
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-6 space-y-6">
@@ -314,6 +269,52 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <Point title="Other EU languages.">Trained on Hungarian, German and English. On EU legal text in 21 languages it leaks 8.5 % (MAPA EUR-Lex, 42 docs).</Point>
           </ul>
           <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{signedIn && hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
+        </Card>
+      </section>
+
+      <section id="how" aria-labelledby="how-heading" className="scroll-mt-6 space-y-6">
+        <SectionHead id="how-heading" title="Change one base URL. The model gets placeholders." lead="pii-guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
+        <ol className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
+          <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted">Validated rules for identifiers, plus an open multilingual NER for names, addresses and dates, run inside pii-guard with no API call.</p></Card></li>
+          <li><Card as="div" title="2 · Swap" headingLevel={3} className="h-full"><p className="text-muted">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in pii-guard.</p></Card></li>
+          <li><Card as="div" title="3 · Restore" headingLevel={3} className="h-full"><p className="text-muted">The answer comes back with the real values, chunk by chunk as it streams.</p></Card></li>
+        </ol>
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <Card title="One line in your client" headingLevel={3} subtitle="Works with the OpenAI SDK, Codex, Muse Code and pi.">
+            <pre tabIndex={0} aria-label="Python client example" className="overflow-x-auto rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-ui text-ink"><code>{"from openai import OpenAI\n\nclient = OpenAI(\n    base_url=\"https://<your-pii-guard>/v1\",\n    api_key=\"…\",\n)"}</code></pre>
+            <p className="mt-3 text-xs text-muted"><a className={link} href={`${DOCS}/integrations/README.md`}>Integration guides ↗</a></p>
+          </Card>
+          <Card title="Made for agents" headingLevel={3}>
+            <ul className="space-y-3">
+              <Point title="Tool calls too.">Tool definitions, arguments and results are masked, not just the prompt.</Point>
+              <Point title="Streaming.">Placeholders are restored mid-stream, even when one is split across chunks.</Point>
+              <Point title="Grammar-aware.">In Hungarian a name changes with every case. The ending stays outside the placeholder, so the model still writes correct sentences.</Point>
+              <Point title="Images.">Faces, ID photos and printed personal data are covered before an image goes anywhere (see above).</Point>
+              <Point title="Fails closed.">If anything can’t be masked, the request isn’t sent.</Point>
+            </ul>
+          </Card>
+        </div>
+      </section>
+
+      <section id="for" aria-labelledby="for-heading" className="scroll-mt-6 space-y-6">
+        <SectionHead id="for-heading" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. pii-guard lets the agent use the model without handing over the person." />
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
+          <Card title="Legal" headingLevel={3}><p className="text-muted">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</p></Card>
+          <Card title="HR" headingLevel={3}><p className="text-muted">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</p></Card>
+          <Card title="Finance and back office" headingLevel={3}><p className="text-muted">Work through invoices and account correspondence. Bank accounts and tax IDs are caught by validated rules.</p></Card>
+        </div>
+      </section>
+
+      <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-6 space-y-6">
+        <SectionHead id="meta-heading" title="Built on Meta models, each where it fits." lead="Anything that sees real personal data is an open-weight model you can run yourself. Hosted models only see fictional or masked text." />
+        <Card>
+          <KeyValues className="sm:grid-cols-[12rem_minmax(0,1fr)]" items={[
+            { key: "xlmr", label: <span className="font-medium text-ink">XLM-RoBERTa</span>, value: <>Open, MIT. Our fine-tuned NER runs inside pii-guard on every request. <a className={link} href={NER_MODEL}>On Hugging Face ↗</a></> },
+            { key: "glimmer", label: <span className="font-medium text-ink">Muse Glimmer 30B</span>, value: "Open weights. The teacher: it labelled 4,964 fictional documents to train the NER." },
+            { key: "spark", label: <span className="font-medium text-ink">{modelOr("Muse Spark")}</span>, value: "Answers in this demo, seeing placeholders only." },
+            { key: "sam", label: <span className="font-medium text-ink">SAM 3.1</span>, value: "Finds signatures so a self-hosted install can mask them too." },
+            { key: "open", label: <span className="font-medium text-ink">Muse Spark Open</span>, value: "The optional audit mode and the red team." },
+          ]} />
         </Card>
       </section>
 
