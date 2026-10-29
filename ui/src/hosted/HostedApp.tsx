@@ -199,7 +199,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-20 space-y-4">
-        <SectionHead id="demo-heading" focusable title="See exactly what the model sees." lead={`Your text, what PII Guard sends to ${modelOr("the model")}, its answer, and the answer with the real values put back.`} />
+        <SectionHead id="demo-heading" eyebrow="Demo" focusable title="See exactly what the model sees." lead={`Your text, what PII Guard sends to ${modelOr("the model")}, its answer, and the answer with the real values put back.`} />
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-end gap-3">
             <div className="basis-full sm:order-last sm:ml-auto sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
@@ -248,7 +248,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="images-heading" title="Images too: faces blocked, ID details tokenized." lead="A gateway that only reads text passes screenshots and scans on untouched. PII Guard reads the image itself: faces and ID photos are covered, and each printed name and number is covered by a box with its placeholder. The same person gets the same placeholder in your text and in the image, so the model can still answer, and the answer comes back to you with the real values." />
+        <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="A gateway that only reads text passes screenshots and scans on untouched. PII Guard reads the image itself: faces and ID photos are covered, and each printed name and number is covered by a box with its placeholder. The same person gets the same placeholder in your text and in the image, so the model can still answer, and the answer comes back to you with the real values." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
         <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway, the masked image goes to the model in place of the original, followed by its masked transcript and summary. On 24 fictional documents, 98&nbsp;% of the values on an image got the same placeholder as in the text, with no false merges (<a className={link} href={`${DOCS}/benchmarks.md#visual-placeholders`}>benchmark</a>).</p>
         <p className="max-w-3xl text-xs text-muted">In the hosted preview, masking runs on the service and the masked image comes back to you; it isn’t sent to a model. It doesn’t look for signatures or stamps (on this card the photo cover happens to take the signature too); a self-hosted install masks them. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
@@ -259,7 +259,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="results-heading" title="Among the best at keeping personal data out." lead="The lowest leak rate of the tools we compared on every set in the table below. It is not the lowest everywhere: on Gretel finance, Presidio leaks slightly less (18.8 % against 19.0 %). Fictional data only, from committed run records of 27–28 October 2026. The sets are small: a few points’ difference is noise." />
+        <SectionHead id="results-heading" eyebrow="Results" title="Among the best at keeping personal data out." lead="The lowest leak rate of the tools we compared on every set in the table below. It is not the lowest everywhere: on Gretel finance, Presidio leaks slightly less (18.8 % against 19.0 %). Fictional data only, from committed run records of 27–28 October 2026. The sets are small: a few points’ difference is noise." />
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
             <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better; each tool’s time was measured where it ran.">
@@ -295,7 +295,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="how" aria-labelledby="how-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="how-heading" title="Change one base URL. The model gets placeholders." lead="PII Guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
+        <SectionHead id="how-heading" eyebrow="How it works" title="Change one base URL. The model gets placeholders." lead="PII Guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
         <ol className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
           <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted"><span className="font-medium text-ink">No LLM in the masking path.</span> Validated rules for identifiers, plus our open multilingual NER, a small encoder model, for names, addresses and dates. Both run inside PII Guard, with no API call. An LLM detector is an opt-in audit mode, off by default.</p></Card></li>
           <li><Card as="div" title="2 · Swap" headingLevel={3} className="h-full"><p className="text-muted">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in PII Guard.</p></Card></li>
@@ -320,7 +320,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="for" aria-labelledby="for-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="for-heading" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. PII Guard lets the agent use the model without handing over the person." />
+        <SectionHead id="for-heading" eyebrow="Who it’s for" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. PII Guard lets the agent use the model without handing over the person." />
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
           <Card title="Legal" headingLevel={3}><p className="text-muted">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</p></Card>
           <Card title="HR" headingLevel={3}><p className="text-muted">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</p></Card>
@@ -329,7 +329,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="meta-heading" title="Built on Meta models, each where it fits." lead="Anything that sees real personal data is an open-weight model you can run yourself. Hosted models only see fictional or masked text." />
+        <SectionHead id="meta-heading" eyebrow="Models" title="Built on Meta models, each where it fits." lead="Anything that sees real personal data is an open-weight model you can run yourself. Hosted models only see fictional or masked text." />
         <Card>
           <KeyValues className="sm:grid-cols-[12rem_minmax(0,1fr)]" items={[
             { key: "xlmr", label: <span className="font-medium text-ink">XLM-RoBERTa</span>, value: <>Open, MIT. Our fine-tuned NER runs inside PII Guard on every request. <a className={link} href={NER_MODEL}>On Hugging Face ↗</a></> },
@@ -342,7 +342,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="run" aria-labelledby="run-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="run-heading" title="Two ways to run it." />
+        <SectionHead id="run-heading" eyebrow="Self-host or hosted" title="Two ways to run it." />
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
           <Card title="Self-hosted" subtitle="Open source" headingLevel={3} className="flex flex-col">
             <KeyValues items={[
@@ -364,7 +364,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="data" aria-labelledby="data-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="data-heading" title="What happens to your data here." lead="This covers the hosted preview. If you self-host, all of it stays on your own servers." />
+        <SectionHead id="data-heading" eyebrow="Your data" title="What happens to your data here." lead="This covers the hosted preview. If you self-host, all of it stays on your own servers." />
         <Card>
           <KeyValues items={[
             { label: "Where", value: "Microsoft Azure, Sweden Central (EU). Processed in memory. No content archive, and no backup of the mappings. Azure operators can access process memory." },
@@ -398,7 +398,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="privacy-heading" title="What PII Guard doesn’t promise." />
+        <SectionHead id="privacy-heading" eyebrow="Limits" title="What PII Guard doesn’t promise." />
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2">
           <Card title="Detection can miss" headingLevel={3}><p className="text-muted">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</p></Card>
           <Card title="Context can identify" headingLevel={3}><p className="text-muted">Even with names removed, surrounding detail can point to a person.</p></Card>
@@ -431,9 +431,17 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   </div>;
 }
 
-/** A landing section's heading: the console's 24/500 section title and a muted lead. */
-function SectionHead({ id, title, lead, focusable }: { id: string; title: string; lead?: string; focusable?: boolean }) {
-  return <div className="max-w-3xl"><h2 id={id} tabIndex={focusable ? -1 : undefined} className="text-2xl font-medium text-balance text-ink focus:outline-none">{title}</h2>{lead && <p className="mt-2 text-sm text-pretty text-muted sm:text-base">{lead}</p>}</div>;
+/**
+ * A landing section's heading: a mono eyebrow that names the section in the nav's words, the
+ * landing's 24→30/500 section title (one step above the console's page title, so a section never
+ * reads at card-title weight) and a muted lead.
+ */
+function SectionHead({ id, eyebrow, title, lead, focusable }: { id: string; eyebrow: string; title: string; lead?: string; focusable?: boolean }) {
+  return <div className="max-w-3xl">
+    <p className="font-mono text-xs text-guard">{eyebrow}</p>
+    <h2 id={id} tabIndex={focusable ? -1 : undefined} className="mt-2 text-2xl font-medium text-balance text-ink focus:outline-none sm:text-3xl">{title}</h2>
+    {lead && <p className="mt-3 text-sm text-pretty text-muted sm:text-base">{lead}</p>}
+  </div>;
 }
 
 /** One of the hero's three differences: a short lead that links to the section that shows it. */
