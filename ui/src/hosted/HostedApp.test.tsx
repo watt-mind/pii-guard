@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import * as chatApi from "../api/chat";
 import { ApiError } from "../api/http";
 import { HostedApp } from "./HostedApp";
 import { recovery, type Account, type DemoResult, type Requester } from "./api";
@@ -41,6 +42,23 @@ describe("public hosted workflow", () => {
     expect(document.querySelector("#demo [data-flow] [data-restored]")).toHaveTextContent("Synthetic Person");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByText("Vault")).not.toBeInTheDocument();
+  });
+  it("keeps pending feedback honest until the server returns the whole result", async () => {
+    let finish!: (value: DemoResult) => void;
+    const pending = new Promise<DemoResult>((resolve) => { finish = resolve; });
+    const call = requester((path) => path === "/v1/account" ? account : pending);
+    const user = userEvent.setup();
+    render(<HostedApp call={call} />);
+    await user.click(await screen.findByRole("button", { name: "Run the live demo" }));
+    expect(screen.getByText("Waiting for the live result")).toBeInTheDocument();
+    expect(screen.getByText(/Individual stage progress isn’t available/)).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Live run progress" })).not.toBeInTheDocument();
+    expect(document.querySelector("#demo")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("radio", { name: "Hungarian" })).toBeDisabled();
+    await act(async () => { finish(result); });
+    expect(screen.queryByText("Waiting for the live result")).not.toBeInTheDocument();
+    expect(document.querySelector("#demo")).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByText("Live result · answered by test-model")).toBeInTheDocument();
   });
   it("clears previous success on quota failure and makes static recovery explicit", async () => {
     let runs = 0;
@@ -134,12 +152,94 @@ describe("hero CTA (LAB-1479)", () => {
     expect(scroll).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
     vi.unstubAllGlobals(); scroll.mockRestore();
   });
-  it("stays a plain anchor when runs are paused or the visitor is signed in", async () => {
+  it("opens the custom-text editor from the signed-in hero without sending a request", async () => {
+    const call = requester((path) => path === "/v1/account" ? { ...account, authenticated: true } : result);
+    const scroll = spyScroll();
+    try {
+      const user = userEvent.setup(); render(<HostedApp call={call} />);
+      await user.click(await screen.findByRole("link", { name: "Run your own text" }));
+      expect(screen.getByRole("combobox", { name: "Input" })).toHaveValue("custom");
+      expect(screen.getByRole("textbox", { name: "Your text" })).toBeInTheDocument();
+      expect(screen.getByText("Your text · ready for a live run")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "See exactly what the model sees." })).toHaveFocus();
+      expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
+    } finally { scroll.mockRestore(); }
+  });
+  it("explains why an empty or whitespace-only custom draft cannot run", async () => {
+    const call = requester(() => ({ ...account, authenticated: true }));
+    const user = userEvent.setup(); render(<HostedApp call={call} />);
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Input" }), "custom");
+    const editor = screen.getByRole("textbox", { name: "Your text" });
+    await user.clear(editor);
+    expect(screen.getByText("Your text · add text to run")).toBeInTheDocument();
+    await user.type(editor, "   ");
+    expect(screen.getByText("Your text · add text to run")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run your text" })).toBeDisabled();
+    await user.type(editor, "Synthetic draft.");
+    expect(screen.getByText("Your text · ready for a live run")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run your text" })).toBeEnabled();
+  });
+  it("clears a shown custom result and reopens the editor from the signed-in hero", async () => {
+    const send = vi.fn(async () => ({ sessionId: "synthetic", answer: "Synthetic answer", maskedAnswer: "Synthetic answer", maskedMessages: [{ role: "user" as const, content: "Synthetic draft." }], masked: 0, mode: "fast" as const, ms: 1 }));
+    const chat = vi.spyOn(chatApi, "createHttpChat").mockReturnValue({ kind: "api", listModels: async () => ["test-model"], send });
+    const scroll = spyScroll();
+    try {
+      const call = requester(() => ({ ...account, authenticated: true }));
+      const user = userEvent.setup(); render(<HostedApp call={call} />);
+      await user.selectOptions(await screen.findByRole("combobox", { name: "Input" }), "custom");
+      await user.type(screen.getByRole("textbox", { name: "Your text" }), "Synthetic draft.");
+      await user.click(screen.getByRole("button", { name: "Run your text" }));
+      await screen.findByRole("button", { name: "Edit your text" });
+      await user.click(screen.getByRole("link", { name: "Run your own text" }));
+      expect(screen.queryByRole("button", { name: "Edit your text" })).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Your text" })).toBeInTheDocument();
+    } finally { chat.mockRestore(); scroll.mockRestore(); }
+  });
+  it("lets a custom result be edited with the draft and focus preserved, or return to the recording", async () => {
+    const draft = "Synthetic draft. ".repeat(25);
+    const send = vi.fn(async () => ({ sessionId: "synthetic", answer: "Synthetic answer", maskedAnswer: "Synthetic answer", maskedMessages: [{ role: "user" as const, content: draft }], masked: 0, mode: "fast" as const, ms: 1 }));
+    const chat = vi.spyOn(chatApi, "createHttpChat").mockReturnValue({ kind: "api", listModels: async () => ["test-model"], send });
+    try {
+      const call = requester(() => ({ ...account, authenticated: true }));
+      const user = userEvent.setup(); render(<HostedApp call={call} />);
+      await user.selectOptions(await screen.findByRole("combobox", { name: "Input" }), "custom");
+      await user.clear(screen.getByRole("textbox", { name: "Your text" }));
+      await user.paste(draft);
+      await user.click(screen.getByRole("button", { name: "Run your text" }));
+      await user.click(await screen.findByRole("button", { name: "Edit your text" }));
+      expect(screen.getByRole("textbox", { name: "Your text" })).toHaveValue(draft);
+      expect(screen.getByRole("textbox", { name: "Your text" })).toHaveFocus();
+      expect(send).toHaveBeenCalledTimes(1);
+      await user.click(screen.getByRole("button", { name: "Run your text" }));
+      await user.click(await screen.findByRole("button", { name: "Back to the recorded run" }));
+      expect(screen.getByRole("combobox", { name: "Input" })).toHaveValue("curated");
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
+    } finally { chat.mockRestore(); }
+  });
+  it("preserves a custom draft when the hero CTA is activated again", async () => {
+    const call = requester((path) => path === "/v1/account" ? { ...account, authenticated: true } : result);
+    const scroll = spyScroll();
+    try {
+      const user = userEvent.setup(); render(<HostedApp call={call} />);
+      const cta = await screen.findByRole("link", { name: "Run your own text" });
+      await user.click(cta);
+      const editor = screen.getByRole("textbox", { name: "Your text" });
+      await user.clear(editor);
+      await user.type(editor, "Synthetic draft for testing.");
+      await user.click(cta);
+      expect(editor).toHaveValue("Synthetic draft for testing.");
+      expect(screen.getByRole("combobox", { name: "Input" })).toHaveValue("custom");
+      expect(screen.getByRole("heading", { name: "See exactly what the model sees." })).toHaveFocus();
+      expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
+    } finally { scroll.mockRestore(); }
+  });
+  it("stays a plain anchor when guest runs are paused or a signed-in visitor needs a key", async () => {
     const off: Account = { ...account, limits: { requests_per_day: 5, sponsored_enabled: false } };
-    for (const acct of [off, { ...account, authenticated: true }]) {
+    for (const acct of [off, { ...off, authenticated: true }]) {
       const call = requester((path) => path === "/v1/account" ? acct : path === "/v1/demo" ? result : []);
       const user = userEvent.setup(); const { unmount } = render(<HostedApp call={call} />);
-      const cta = await screen.findByRole("link", { name: acct === off ? "See the demo" : "Run your own text" });
+      const cta = await screen.findByRole("link", { name: "See the demo" });
       let prevented: boolean | null = null;
       const listener = (e: Event) => { prevented = e.defaultPrevented; e.preventDefault(); };
       document.addEventListener("click", listener);
@@ -299,6 +399,45 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
     await user.click(screen.getByText("Sections"));
     await user.click(screen.getByRole("heading", { level: 1 }));
     expect(menu).not.toHaveAttribute("open");
+  });
+});
+
+describe("landing recovery and keyboard navigation (LAB-1540)", () => {
+  it("retries beside the recorded demo, prevents duplicate retries and recovers live actions", async () => {
+    let finish!: (value: Account) => void;
+    const call = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockImplementationOnce(() => new Promise<Account>((resolve) => { finish = resolve; }));
+    const user = userEvent.setup(); render(<HostedApp call={call as Requester} />);
+    await user.click(await screen.findByRole("button", { name: "Retry live service" }));
+    for (const button of screen.getAllByRole("button", { name: "Retrying…" })) expect(button).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getAllByRole("button", { name: "Retrying…" })[0]!);
+    expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
+    finish(account);
+    expect(await screen.findByRole("button", { name: "Run the live demo" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry live service" })).not.toBeInTheDocument();
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+
+  it("can retry again after another outage without losing the recording", async () => {
+    const call = vi.fn().mockRejectedValue(new Error("offline"));
+    const user = userEvent.setup(); render(<HostedApp call={call as Requester} />);
+    await user.click(await screen.findByRole("button", { name: "Retry live service" }));
+    expect(await screen.findByRole("button", { name: "Retry live service" })).toBeEnabled();
+    expect(document.querySelector("#demo [data-flow] [data-restored]")).toHaveTextContent("Jane Placeholder");
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes when keyboard focus leaves and focuses the destination after following a section", async () => {
+    const user = userEvent.setup(); render(<HostedApp call={requester(() => account)} />);
+    const toggle = screen.getByText("Sections").closest("summary")!;
+    const menu = toggle.closest("details")!;
+    await user.click(toggle);
+    await user.tab({ shift: true });
+    expect(menu).not.toHaveAttribute("open");
+    await user.click(toggle);
+    await user.click(screen.getAllByRole("link", { name: "Why Europe" })[0]!);
+    expect(menu).not.toHaveAttribute("open");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "What EU rules ask, and what PII Guard does." })).toHaveFocus());
   });
 });
 

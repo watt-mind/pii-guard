@@ -83,7 +83,7 @@ export function ClientSetup({ call }: { call: Requester }) {
           Preparing your endpoint…
         </p>
       ) : loaded.state === "failed" ? (
-        <Notice tone="danger" live action={<Button size="sm" onClick={() => setRevision((n) => n + 1)}>Retry</Button>}>
+        <Notice tone="danger" live action={<Button size="sm" onClick={() => { setLoaded({ state: "loading" }); setRevision((n) => n + 1); }}>Retry</Button>}>
           Your endpoints could not be loaded. Retry, or open <a className="underline underline-offset-4" href="#projects">Projects</a>.
         </Notice>
       ) : !current || !ok ? (

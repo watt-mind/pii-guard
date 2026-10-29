@@ -5,6 +5,8 @@ The gateway is an OpenAI-compatible endpoint: `POST /v1/chat/completions`,
 client that lets you set a base URL for either API works through it. The client sends real data, the model gets placeholders, and the
 answer (tool-call arguments included) comes back restored.
 
+For a plain OpenAI-compatible client (cURL, Python SDK), see [integrations.md](../integrations.md).
+
 | Tool | API it uses | Setup | Tested version | End-to-end test |
 |---|---|---|---|---|
 | [Muse Code](muse-code.md) (Meta's coding agent) | Responses (`/v1/responses`) | `pii-guard connect muse-code` (writes `settings.json`) | 1.4.14-R7309.1 | [`test_muse_e2e.py`](../../tests/integrations/test_muse_e2e.py) |
