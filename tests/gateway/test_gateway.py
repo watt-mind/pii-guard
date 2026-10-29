@@ -248,13 +248,14 @@ def test_second_turn_detects_only_the_new_message(stream: bool) -> None:
         )
         session = raw.headers["x-pii-guard-session"]
         assert raw.headers["x-pii-guard-cache-hits"] == "0"
-        assert raw.headers["x-pii-guard-cache-misses"] == "2"
+        # Two messages plus the identifier-checked ``model`` (LAB-1563).
+        assert raw.headers["x-pii-guard-cache-misses"] == "3"
         parsed = raw.parse()
         if stream:
             answer = "".join(c.choices[0].delta.content or "" for c in parsed if c.choices)
         else:
             answer = parsed.choices[0].message.content
-        assert llm.calls == 2
+        assert llm.calls == 3
 
         turn_two = [
             *turn_one,
@@ -266,9 +267,9 @@ def test_second_turn_detects_only_the_new_message(stream: bool) -> None:
         )
         raw2.parse()
     assert raw2.headers["x-pii-guard-session"] == session
-    assert raw2.headers["x-pii-guard-cache-hits"] == "3"  # system, user 1, the answer
+    assert raw2.headers["x-pii-guard-cache-hits"] == "4"  # system, user 1, the answer, model
     assert raw2.headers["x-pii-guard-cache-misses"] == "1"  # only the new message
-    assert llm.calls == 3
+    assert llm.calls == 4
     first, second = upstream.bodies[0], upstream.bodies[1]
     # Re-sent history masks identically (deterministic per session).
     assert second["messages"][:2] == first["messages"][:2]
@@ -313,7 +314,7 @@ def test_audit_mode_calls_the_llm_detector() -> None:
         openai_client(http, **{"X-PII-Guard-Mode": "audit"}).chat.completions.create(
             model="m", messages=conversation_turn_one()
         )
-    assert llm.calls == 2
+    assert llm.calls == 3  # two messages plus the identifier-checked ``model`` (LAB-1563)
 
 
 def test_default_mode_comes_from_the_config() -> None:
@@ -568,6 +569,8 @@ def test_upstream_stream_error_event_is_sanitized() -> None:
         )
     assert "PERSON" not in response.text
     assert "upstream_error" in response.text
+    assert response.text.endswith("data: [DONE]\n\n")
+    assert response.headers["cache-control"] == "no-cache"
 
 
 def test_unresolved_placeholders_are_left_and_counted() -> None:
@@ -885,3 +888,34 @@ def test_request_with_no_new_value_runs_no_remask_pass() -> None:
     assert session.entries_scanned == second
     assert upstream.bodies[0]["messages"] == upstream.bodies[1]["messages"]
     assert upstream.bodies[1]["messages"] == upstream.bodies[2]["messages"]
+
+
+@pytest.mark.parametrize("failure", ["transport", "content_parts"])
+def test_chat_stream_failure_ends_with_done(failure: str) -> None:
+    class FailingStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            yield b'data: {"choices":[{"index":0,"delta":{"content":"ok "}}]}\n\n'
+            if failure == "transport":
+                raise RuntimeError("private upstream detail")
+            yield b'data: {"choices":[{"index":0,"delta":{"content":[{"type":"image"}]}}]}\n\n'
+
+    app = make_app(MockUpstream())
+    app.state.gateway_transport = httpx.MockTransport(
+        lambda r: httpx.Response(
+            200, stream=FailingStream(), headers={"content-type": "text/event-stream"}
+        )
+    )
+    with TestClient(app) as http:
+        response = http.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": conversation_turn_one(), "stream": True},
+        )
+    events = response.text.split("\n\n")
+    assert json.loads(events[-3][6:])["error"] == {
+        "code": "stream_failed",
+        "message": "the response stream failed",
+        "type": "stream_failed",
+    }
+    assert events[-2] == "data: [DONE]"
+    assert "private upstream detail" not in response.text
+    assert response.headers["cache-control"] == "no-cache"

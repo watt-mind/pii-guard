@@ -5,7 +5,7 @@ import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
 import { NerHint } from "../components/NerHint";
 import { BlockedNotice, Button, ConfirmAction, Input, SegmentedControl, Select, Textarea } from "../components/ui";
-import { CHAT_SAMPLES } from "../content/chatSamples";
+import { CHAT_SAMPLES, DEFAULT_CHAT_SAMPLE } from "../content/chatSamples";
 import { metaFor } from "../lib/entities";
 import { SESSION_SOURCE_LABEL } from "../lib/traffic";
 import { alignLoose, alignRestored, tokenize, type RestoredSegment } from "../lib/placeholders";
@@ -79,7 +79,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
   const [chosenMode, setMode] = useState<ChatMode>("fast");
   // A mode the server stops offering (or never offered) is never sent.
   const mode = modes.includes(chosenMode) ? chosenMode : (modes[0] ?? "fast");
-  const [language, setLanguage] = useState<"hu" | "en">(CHAT_SAMPLES[0]!.language);
+  const [language, setLanguage] = useState<"hu" | "en">(DEFAULT_CHAT_SAMPLE.language);
   const [model, setModel] = useState(FALLBACK_CHAT_MODEL);
   /** The last `/v1/models` answer, and which client it came from (null ids: it failed). */
   const [listed, setListed] = useState<{ client: ChatClient; ids: string[] | null } | null>(null);
@@ -87,7 +87,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
     listed?.client === client
       ? { status: listed.ids ? "ok" : "failed", ids: listed.ids ?? [] }
       : { status: client.kind === "api" && client.listModels ? "loading" : "idle", ids: [] };
-  const [text, setText] = useState(CHAT_SAMPLES[0]!.text);
+  const [text, setText] = useState(DEFAULT_CHAT_SAMPLE.text);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionSource, setSessionSource] = useState<string | null>(null);

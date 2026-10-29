@@ -285,3 +285,168 @@ def test_gateway_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.keep_types == frozenset({EntityType.ORGANIZATION})
     assert config.llm_reasoning_effort == "minimal"
     assert GatewayConfig(keep_types="").keep_types == frozenset()
+
+
+@pytest.mark.parametrize("index", ["0", 0.5, None, True, [], {}])
+@pytest.mark.parametrize("finish", [False, True])
+def test_sse_invalid_choice_index_uses_enumeration(index: object, finish: bool) -> None:
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    choice = {"index": index, "delta": {"content": "[["}}
+    restorer.process(json.dumps({"choices": [{}, choice]}))
+    if finish:
+        out = restorer.process(
+            json.dumps({"choices": [{}, {"index": index, "finish_reason": "stop"}]})
+        )
+        assert json.loads(out[0])["choices"][1]["delta"]["content"] == "[["
+        assert restorer.finish() == []
+    else:
+        assert json.loads(restorer.finish()[0])["choices"] == [
+            {"index": 1, "delta": {"content": "[["}, "finish_reason": None}
+        ]
+
+
+def test_sse_absent_choice_index_flushes_by_position() -> None:
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    restorer.process(json.dumps({"choices": [{}, {"delta": {"content": "[["}}]}))
+    assert json.loads(restorer.finish()[0])["choices"][0]["index"] == 1
+
+
+@pytest.mark.parametrize("finish", [False, True])
+def test_sse_content_parts_share_string_unmasker(finish: bool) -> None:
+    session, ph = make_session()
+    restorer = SseRestorer(session)
+    restorer.process(json.dumps(chunk({"content": ph["PERSON"][:5]})))
+    payload = chunk(
+        {"content": [{"type": "text", "text": ph["PERSON"][5:]}, {"type": "text", "text": " [["}]},
+        finish="stop" if finish else None,
+    )
+    out = json.loads(restorer.process(json.dumps(payload))[0])
+    parts = out["choices"][0]["delta"]["content"]
+    text = "".join(p["text"] for p in parts)
+    tails = restorer.finish()
+    if tails:
+        text += json.loads(tails[0])["choices"][0]["delta"]["content"]
+    assert text == "Teszt Elek [["
+    assert restorer.masked_content() == {0: ph["PERSON"] + " [["}
+
+
+@pytest.mark.parametrize("kind,field", [("function", "arguments"), ("custom", "input")])
+def test_sse_indexless_tool_tail_stays_in_original_call(kind: str, field: str) -> None:
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    delta = {"tool_calls": [{kind: {field: "first [["}}, {kind: {field: "second [["}}]}
+    out = json.loads(restorer.process(json.dumps(chunk(delta, finish="tool_calls")))[0])
+    assert out["choices"][0]["delta"] == delta
+
+
+def test_sse_multiline_non_json_round_trips() -> None:
+    from pii_guard.gateway.stream import sse_event
+
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    payload = "first\nsecond\n"
+    assert sse_event(restorer.process(payload)[0]) == b"data: first\ndata: second\ndata: \n\n"
+
+    async def collect():
+        async def lines():
+            for line in sse_event(payload).decode().splitlines():
+                yield line
+
+        return [data async for data in iter_sse_data(lines())]
+
+    assert asyncio.run(collect()) == [payload]
+
+
+def test_sse_flushes_before_upstream_error_and_ignores_after_done() -> None:
+    session, ph = make_session()
+    restorer = SseRestorer(session)
+    restorer.process(json.dumps(chunk({"content": ph["PERSON"]})))
+    tail, error, done = restorer.process(json.dumps({"error": {"message": "private detail"}}))
+    assert json.loads(tail)["choices"][0]["delta"]["content"] == "Teszt Elek"
+    assert json.loads(error)["error"]["code"] == "upstream_error"
+    assert "private detail" not in error
+    assert done == "[DONE]"
+    assert restorer.process(json.dumps(chunk({"content": "ignored [["}))) == []
+    assert restorer.process("[DONE]") == []
+    assert restorer.finish() == []
+
+
+def test_sse_ignores_all_payloads_after_done() -> None:
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    assert restorer.process("[DONE]") == ["[DONE]"]
+    for payload in ["not JSON", json.dumps(chunk({"content": "[["})), '{"error": "bad"}']:
+        assert restorer.process(payload) == []
+    assert restorer.masked_content() == {}
+    assert restorer.finish() == []
+
+
+@pytest.mark.parametrize("nested", [False, True], ids=["top-level", "nested"])
+@pytest.mark.parametrize("serialized", [False, True], ids=["object", "json-string"])
+def test_json_key_collision_does_not_replace_object(nested: bool, serialized: bool) -> None:
+    original = {"Teszt Elek": 1, "TESZT ELEK": 2}
+    args = {"outer": [{"inner": original}]} if nested else original
+    function = {"arguments": json.dumps(args) if serialized else args}
+    body = {"model": "m", "messages": [{"role": "assistant", "function_call": function}]}
+    collected = collect_texts(body)
+    for slot in collected.slots:
+        slot.write("[[PERSON_aaaa]]" if slot.text.casefold() == "teszt elek" else slot.text)
+    with pytest.raises(
+        InvalidChatRequestError, match="masking JSON object keys produced a collision"
+    ) as exc:
+        collected.finalize()
+    assert "Teszt" not in str(exc.value)
+    assert "TESZT" not in str(exc.value)
+    # Reject before clearing the colliding object or serializing a lossy replacement.
+    assert original == {"Teszt Elek": 1, "TESZT ELEK": 2}
+    assert function["arguments"] == (json.dumps(args) if serialized else args)
+
+
+@pytest.mark.parametrize("role", ["system", "developer", "user", "assistant", "tool", "function"])
+@pytest.mark.parametrize(
+    "field", ["content", "refusal", "reasoning_content", "reasoning", "text_part", "refusal_part"]
+)
+def test_chat_gutters_preserve_offsets_and_mask_whole_names(role: str, field: str) -> None:
+    original = "Header\n12|Jane Placeholder\n \t3|Jane Placeholder\nplain\n"
+    message = {"role": role, "content": None}
+    if field.endswith("_part"):
+        kind = field.removesuffix("_part")
+        key = "text" if kind == "text" else "refusal"
+        holder = {"type": kind, key: original}
+        message["content"] = [holder]
+    else:
+        key = field
+        holder = message
+        holder[key] = original
+    body = {"model": "m", "messages": [message]}
+    slot = next(s for s in collect_texts(body).slots if "Jane Placeholder" in s.text)
+    assert slot.text == "Header\n   Jane Placeholder\n    Jane Placeholder\nplain\n"
+    assert len(slot.text) == len(original)
+    session, _ = make_session()
+    spans = [
+        Span(i, i + len("Jane Placeholder"), EntityType.PERSON, "Jane Placeholder", 1, "test")
+        for i in range(len(original))
+        if original.startswith("Jane Placeholder", i)
+    ]
+    masked = session.mask(slot.text, spans)
+    slot.write(masked)
+    placeholder = masked.split("\n")[1].strip()
+    assert holder[key] == f"Header\n12|{placeholder}\n \t3|{placeholder}\nplain\n"
+    assert "Jane" not in holder[key] and "Placeholder" not in holder[key]
+
+
+def test_chat_gutter_multiline_mask_never_restores_original_text() -> None:
+    message = {"role": "tool", "content": "12|Jane\n13|Placeholder\n14|safe"}
+    slot = next(
+        s for s in collect_texts({"model": "m", "messages": [message]}).slots if s.kind == "content"
+    )
+    session, _ = make_session()
+    value = slot.text[3:22]
+    span = Span(3, 22, EntityType.PERSON, value, 1, "test")
+    slot.write(session.mask(slot.text, [span]))
+    assert message["content"].startswith("   [[PERSON_")
+    assert message["content"].endswith("\n   safe")
+    assert "|" not in message["content"]
+    assert "Jane" not in message["content"] and "Placeholder" not in message["content"]

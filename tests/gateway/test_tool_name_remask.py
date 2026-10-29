@@ -177,6 +177,9 @@ def test_responses_value_from_an_earlier_toolless_turn_does_not_refuse() -> None
     upstream = ResponsesUpstream()
     with TestClient(make_app(upstream)) as http:
         first_body = responses_body(tools=False)
+        # ``model`` is identifier-checked (LAB-1563): with no tool declared, a model name
+        # containing the detected word would refuse this setup turn itself.
+        first_body["model"] = "m"
         first_body["input"][0]["content"] = "Hi Muse."
         first = http.post("/s/c_lab1324_resp_0001/v1/responses", json=first_body)
         assert first.status_code == 200, first.text
@@ -326,6 +329,54 @@ def test_a_structured_value_in_text_is_masked_when_a_tool_is_named_after_it(valu
     names = tool_names(structured_chat(value, value))
     assert names  # identifier-shaped, so declared
     assert without_tool_names(texts, found, names) == found
-    # A word-like type of the same name is still dropped (LAB-1299).
+    # A word-like type of the same name is dropped in an identifier slot only; in prose it
+    # is kept and masked (LAB-1299 as restricted by LAB-1563).
     person = [[Span(start, start + len(value), EntityType.PERSON, value, 0.9, "ner")]]
-    assert without_tool_names(texts, person, names) == [[]]
+    assert without_tool_names(texts, person, names, ["identifier"]) == [[]]
+    assert without_tool_names(texts, person, names, ["content"]) == person
+    assert without_tool_names(texts, person, names) == person
+
+
+# --- a tool named after a person does not unmask prose (LAB-1563) ---------------------------
+
+
+def test_chat_prose_matching_a_tool_name_is_masked_identifiers_kept() -> None:
+    """A client could unmask a real name in every text by naming a tool after it: the
+    exemption now covers the tool-name identifiers only, prose is masked as usual."""
+    from gateway_helpers import make_app as shared_make_app
+
+    upstream = MockUpstream()
+    app = shared_make_app(upstream, llm=FakeLlm((*NAMES, "Kovacs")))
+    body: dict[str, Any] = {
+        "model": "m",
+        "messages": [{"role": "user", "content": "Kovacs called yesterday."}],
+        "tools": [chat_tool("Kovacs")],
+    }
+    with TestClient(app) as http:
+        response = http.post("/v1/chat/completions", json=body)
+    assert response.status_code == 200, response.text
+    forwarded = upstream.bodies[-1]
+    assert forwarded["tools"][0]["function"]["name"] == "Kovacs"
+    content = forwarded["messages"][-1]["content"]
+    assert content.startswith("[[PERSON_") and "called yesterday." in content
+    assert "Kovacs called" not in upstream.requests[-1].content.decode()
+
+
+def test_responses_prose_matching_a_tool_name_is_masked_identifiers_kept() -> None:
+    from gateway_helpers import make_app as shared_make_app
+
+    upstream = ResponsesUpstream()
+    app = shared_make_app(upstream, llm=FakeLlm((*NAMES, "Kovacs")))
+    body: dict[str, Any] = {
+        "model": "m",
+        "input": [{"role": "user", "content": "Kovacs called yesterday."}],
+        "tools": [{"type": "function", "name": "Kovacs", "parameters": {}}],
+    }
+    with TestClient(app) as http:
+        response = http.post("/v1/responses", json=body)
+    assert response.status_code == 200, response.text
+    forwarded = json.loads(upstream.requests[-1].content)
+    assert forwarded["tools"][0]["name"] == "Kovacs"
+    content = forwarded["input"][-1]["content"]
+    assert content.startswith("[[PERSON_") and "called yesterday." in content
+    assert "Kovacs called" not in upstream.requests[-1].content.decode()

@@ -1,0 +1,28 @@
+{
+  "teacher": {
+    "model": "accounts/fireworks/models/muse-glimmer-30b#accounts/hdkiller/deployments/pii-guard-label-v41b",
+    "reasoning_strength": "low"
+  },
+  "counts": {
+    "adopted_organization": 158,
+    "adopted_person": 702,
+    "agree": 58811,
+    "disagree": 1170,
+    "documents": 3816,
+    "documents_without_teacher": 2,
+    "gold_found_by_teacher": 51844,
+    "gold_missed_by_teacher": 18936,
+    "new_address_ignored": 1,
+    "teacher_overlap_ignored": 22
+  },
+  "usage": {
+    "requests": 51,
+    "prompt_tokens": 112606,
+    "cached_tokens": 56256,
+    "completion_tokens": 143579,
+    "reasoning_tokens": 138758,
+    "invalid_outputs": 14,
+    "refusals": 0,
+    "empty_challenged": 0
+  }
+}

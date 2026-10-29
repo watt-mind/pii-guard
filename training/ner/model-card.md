@@ -1,13 +1,14 @@
-# pii-guard NER: multilingual PII detection for AI agent traffic
+<p align="center"><a href="https://huggingface.co/watt-mind"><img src="https://cdn-avatars.huggingface.co/v1/production/uploads/63ccddedf488db9bb3cece6b/51Lvp86UyUDIWL-vA0x_Q.png" alt="Watt Mind" width="72" /></a></p>
 
-A token-classification model that finds personal data (names, addresses, birth dates, contact
-details, ID and account numbers) in Hungarian, English and German text. It is the detector
-behind the **fast mode** of [pii-guard](https://github.com/watt-mind/pii-guard), an open-source
-privacy firewall that masks personal data before a prompt reaches an LLM and restores it in the
-answer.
+# PII Guard NER
 
-It is small enough to run in-process on a CPU next to every LLM call (about 50 ms per message),
-so no text has to leave the machine to be checked.
+**Multilingual PII detection for AI agents.**
+
+[Quickstart](#usage) · [Source code](https://github.com/watt-mind/pii-guard) · [Try the demo](https://guard.watt-mind.com) · [Evaluations](https://github.com/watt-mind/pii-guard/blob/develop/docs/benchmarks.md) · [Watt Mind](https://huggingface.co/watt-mind)
+
+A text token-classification model that finds personal data in **Hungarian, English and German**: names, addresses, birth dates, contact details, ID and account numbers. Built by [Watt Mind](https://watt-mind.com), it powers the NER detector in [PII Guard](https://github.com/watt-mind/pii-guard)'s fast mode and runs locally on CPU.
+
+**This model returns detected text spans.** PII Guard adds rule-based detection, boundary and Hungarian suffix handling, reversible masking and restoration, and the gateway workflows for prompts, tool calls and images. The model alone does not redact text, process images or guarantee that all personal data is found.
 
 | | |
 |---|---|
@@ -15,6 +16,84 @@ so no text has to leave the machine to be checked.
 | Languages | Hungarian, English, German |
 | Release | `v2.0` |
 | Licence | Apache-2.0 (training data attribution below) |
+
+## Usage
+
+### With PII Guard (recommended for masking)
+
+PII Guard downloads this model, verifies its checksum and combines it with rule-based
+detectors. The rules have the final say on structured identifiers (checksums, formats).
+The gateway replaces detected values with reversible placeholders and restores the originals
+in the upstream model's answer.
+
+With [uv](https://docs.astral.sh/uv/) installed:
+
+```bash
+git clone https://github.com/watt-mind/pii-guard.git
+cd pii-guard
+uv sync --extra ner
+uv run --no-sync pii-guard up
+```
+
+For gateway configuration and client examples, see the
+[integration guide](https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations.md).
+To explore the [hosted demo](https://guard.watt-mind.com), use fictional data only.
+
+### With Transformers (text spans on CPU)
+
+Install the dependencies in a Python environment. These versions were used to check the
+examples below:
+
+```bash
+python -m pip install "transformers==5.21.0" "torch==2.14.1" "sentencepiece==0.2.2" "protobuf==7.36.2"
+```
+
+Load the published `v2.0` release and inspect a short fictional example:
+
+```python
+from transformers import pipeline
+
+ner = pipeline(
+    "token-classification",
+    model="watt-mind/pii-guard-ner-xlmr-base",
+    revision="v2.0",
+    aggregation_strategy="simple",
+    device=-1,  # CPU
+)
+
+text = "Fictional example: email Jane Placeholder at jane.placeholder@example.com."
+for span in ner(text):
+    print(
+        span["entity_group"],
+        text[span["start"] : span["end"]],
+        span["start"],
+        span["end"],
+        round(float(span["score"]), 3),
+    )
+```
+
+Each result contains `entity_group`, `score`, `word`, `start` and `end`. Use the character
+offsets to recover the exact span from your original string; a confidence score is not a
+guarantee that a value is personal data.
+
+The same pipeline accepts a batch of texts:
+
+```python
+texts = [
+    "Fictional example: email Jane Placeholder at jane.placeholder@example.com.",
+    "Fiktív példa: Kovács Anna e-mail-címe anna.kovacs@example.com.",
+    "Fiktives Beispiel: Anna Beispiel ist unter anna.beispiel@example.com erreichbar.",
+]
+results = ner(texts, batch_size=3)
+for text, spans in zip(texts, results):
+    print([(span["entity_group"], text[span["start"] : span["end"]]) for span in spans])
+```
+
+These examples use short inputs. For long documents, split the text into overlapping token
+windows and merge the results; do not assume a plain pipeline call covers the full document.
+PII Guard handles windowing, word-boundary snapping, Hungarian suffix handling and the rule
+layer on top. The evaluation scores below were measured with those steps applied, not with
+this plain Transformers snippet.
 
 ## Labels
 
@@ -32,38 +111,6 @@ BIO tags over ten entity types:
 | `NATIONAL_ID_HU_TAX` | Hungarian tax ID (adóazonosító jel) |
 | `NATIONAL_ID_HU_TAJ` | Hungarian social security number (TAJ) |
 | `BANK_ACCOUNT` | Bank account numbers and IBANs |
-
-## Usage
-
-### With pii-guard (recommended)
-
-pii-guard downloads this model, verifies its checksum and runs it together with rule-based
-detectors. The rules have the final say on structured identifiers (checksums, formats).
-Detected values are replaced with reversible placeholders, and the originals are restored in
-the model's answer:
-
-```bash
-git clone https://github.com/watt-mind/pii-guard && cd pii-guard
-uv sync --extra ner
-uv run pii-guard up   # an OpenAI-compatible gateway with rules + this model
-```
-
-### With transformers
-
-```python
-from transformers import pipeline
-
-ner = pipeline(
-    "token-classification",
-    model="watt-mind/pii-guard-ner-xlmr-base",
-    revision="v2.0",
-    aggregation_strategy="simple",
-)
-ner("Kovács Annának küldd el a számlát: anna.kovacs@example.com, +36 30 123 4567")
-```
-
-Used this way you get raw spans. pii-guard adds word-boundary snapping, Hungarian suffix
-handling and the rule layer on top. The scores below are measured with those steps applied.
 
 ## Evaluation
 

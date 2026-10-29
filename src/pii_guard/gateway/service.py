@@ -7,8 +7,9 @@ Order of operations (fail closed at every step, ADR 0006):
 2. detect every text (cache first; misses run concurrently, under one per-request timeout),
    then add the session's pre-loaded known values (:mod:`pii_guard.detect.known`), which win
    their conflicts and are masked even for a ``keep`` type (a ``block`` type still refuses),
-   and drop the detections that are exactly a tool name the request declares
-   (:func:`~pii_guard.gateway.tool_names.without_tool_names`, LAB-1317); an identifier whose
+   and drop the detections in identifier slots that are exactly a tool name the request
+   declares (:func:`~pii_guard.gateway.tool_names.without_tool_names`, LAB-1317/LAB-1563);
+   an identifier whose
    only rewrites are those names is written back as sent, whatever the session holds
    (:func:`~pii_guard.gateway.tool_names.identifier_keeps_tool_names`, LAB-1324);
 3. widen a name detected only in part to a full name known from this request or the session
@@ -41,8 +42,10 @@ import logging
 import re
 import threading
 import time
-from collections import Counter
-from collections.abc import AsyncIterator, Callable, Mapping
+import weakref
+from collections import Counter, OrderedDict
+from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
+from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -299,6 +302,29 @@ class _SessionHold:
     refused_creator: bool = False
 
 
+_LEASED_CLASSES: dict[type[StreamingResponse], type[StreamingResponse]] = {}
+
+
+def _leased_class(cls: type[StreamingResponse]) -> type[StreamingResponse]:
+    """``cls`` with an ASGI call that always releases the request's vault leases (LAB-1573)."""
+    if getattr(cls, "_pii_guard_leased", False):
+        return cls
+    leased = _LEASED_CLASSES.get(cls)
+    if leased is None:
+
+        async def __call__(self: Any, scope: Any, receive: Any, send: Any) -> None:
+            try:
+                await super(leased, self).__call__(scope, receive, send)  # type: ignore[arg-type]
+            finally:
+                self._pii_guard_release()
+
+        leased = type(
+            f"Leased{cls.__name__}", (cls,), {"__call__": __call__, "_pii_guard_leased": True}
+        )
+        _LEASED_CLASSES[cls] = leased
+    return leased
+
+
 class Gateway:
     """One per app. Everything is injectable for tests: detectors, cache, upstream transport."""
 
@@ -342,6 +368,9 @@ class Gateway:
         # Session id -> the requests masking into it now (LAB-1316): a refused request drops
         # the session it created only once no other request holds it and none succeeded.
         self._session_holds: dict[str, _SessionHold] = {}
+        self._request_sessions: ContextVar[list[VaultSession] | None] = ContextVar(
+            "request_sessions", default=None
+        )
         self._holds_lock = threading.Lock()
         # Fixed headers added to every upstream call of this gateway (the hosted sponsored
         # route's attribution, LAB-1461); they never override content type or credentials.
@@ -349,6 +378,10 @@ class Gateway:
         # Ids the upstream issued per session (LAB-1469): sent back as identifiers, they are
         # forwarded without detection (the NER reads some random call ids as phone numbers).
         self.issued_ids = IssuedIds()
+        # Session id -> the VaultSession object last seen for it (LAB-1565): a different
+        # object under the same id is a new incarnation (dropped/expired/rotated and
+        # re-created), so its detection-cache entries and issued-id exemptions are dropped.
+        self._session_incarnations: OrderedDict[str, weakref.ref[VaultSession]] = OrderedDict()
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
@@ -492,13 +525,73 @@ class Gateway:
         The request holds the session until :meth:`_release_session`, which every caller
         must call once masking finished or failed."""
         with self._holds_lock:
-            session, created, source = resolve_session(self.vault, headers, body, path_session)
+            session, created, source = self.vault.acquire_session(
+                lambda: resolve_session(self.vault, headers, body, path_session)
+            )
+            sessions = self._request_sessions.get()
+            if sessions is None:
+                self.vault.release_session(session)
+                raise RuntimeError("session resolution requires a request lease scope")
+            sessions.append(session)
+            previous = self._session_incarnations.get(session.session_id)
+            if previous is not None and previous() is not session:
+                # New incarnation of this id: start clean (LAB-1565).
+                self.cache.drop_session(session.session_id)
+                self.issued_ids.drop(session.session_id)
+            self._session_incarnations[session.session_id] = weakref.ref(session)
+            self._session_incarnations.move_to_end(session.session_id)
+            while len(self._session_incarnations) > 16384:
+                self._session_incarnations.popitem(last=False)
             hold = self._session_holds.setdefault(session.session_id, _SessionHold())
             hold.in_flight += 1
         stats.session_source = source
         trace.session_id, trace.session_new = session.session_id, created
         trace.session_source = source.value
         return session, created
+
+    async def _with_session_lease(
+        self, work: Coroutine[Any, Any, tuple[Response, RequestStats]]
+    ) -> tuple[Response, RequestStats]:
+        """Keep request pins through upstream work and the stream's final cleanup."""
+        sessions: list[VaultSession] = []
+        token = self._request_sessions.set(sessions)
+
+        def release() -> None:
+            while sessions:
+                self.vault.release_session(sessions.pop())
+
+        try:
+            response, stats = await work
+            if isinstance(response, StreamingResponse):
+                source = response.body_iterator
+
+                async def leased_stream() -> AsyncIterator[Any]:
+                    try:
+                        async for chunk in source:
+                            yield chunk
+                    finally:
+                        try:
+                            if hasattr(source, "aclose"):
+                                await source.aclose()
+                        finally:
+                            release()
+
+                response.body_iterator = leased_stream()
+                # The generator's ``finally`` never runs when Starlette never starts it
+                # (client gone before ``http.response.start``), so release around the ASGI
+                # call too, and on garbage collection for a response nobody calls. Release
+                # is idempotent: it pops what is still held.
+                response.__class__ = _leased_class(type(response))
+                response._pii_guard_release = release  # type: ignore[attr-defined]
+                weakref.finalize(response, release)
+            else:
+                release()
+            return response, stats
+        except BaseException:
+            release()
+            raise
+        finally:
+            self._request_sessions.reset(token)
 
     def _release_session(self, session: VaultSession, created: bool, *, masked: bool) -> None:
         """End the hold :meth:`_session` took, once masking finished (``masked``) or failed.
@@ -525,6 +618,8 @@ class Gateway:
                 return
             self.vault.drop(session_id)
             self.cache.drop_session(session_id)
+            self.issued_ids.drop(session_id)
+            self._session_incarnations.pop(session_id, None)
 
     def _forwarded(
         self,
@@ -836,13 +931,15 @@ class Gateway:
         timer = RequestTimer(received_at)
         trace = CallTrace(self.observability, timer, body)
         try:
-            response, stats = await self._chat_completions(
-                body,
-                headers,
-                max_text_chars=max_text_chars,
-                timer=timer,
-                trace=trace,
-                path_session=path_session,
+            response, stats = await self._with_session_lease(
+                self._chat_completions(
+                    body,
+                    headers,
+                    max_text_chars=max_text_chars,
+                    timer=timer,
+                    trace=trace,
+                    path_session=path_session,
+                )
             )
         except BaseException as exc:
             trace.fail(exc)
@@ -897,7 +994,12 @@ class Gateway:
             with timer.span("detect"):
                 spans = await self._detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
-                spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
+                spans = without_tool_names(
+                    [slot.text for slot in collected.slots],
+                    spans,
+                    names,
+                    [slot.kind for slot in collected.slots],
+                )
                 issued = self.issued_ids.of(session.session_id)
                 spans = without_opaque_ids(collected.slots, spans, issued)
             # Every older entry has scanned every text by the end of _mask: an image's remask
@@ -969,6 +1071,9 @@ class Gateway:
         if response.status_code >= 400:
             try:
                 raw = await _read_limited(response)
+            except httpx.HTTPError as exc:
+                stats.log("upstream_unreachable")
+                raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
             finally:
                 await response.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
@@ -977,9 +1082,22 @@ class Gateway:
             return _upstream_error(response.status_code, raw, out_headers), stats
 
         is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
-        if not stream or not is_sse:
+        if stream and not is_sse:
+            # The client requested SSE: never pass through or buffer a whole JSON answer.
+            # Closing must not replace the protocol error with transport exception text.
+            with suppress(httpx.HTTPError):
+                await response.aclose()
+            stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+            stats.log("upstream_did_not_stream")
+            raise UpstreamError(
+                "upstream did not return an event stream; retry without stream",
+                code="upstream_did_not_stream",
+            ) from None
+
+        if not stream:
             try:
-                raw = await response.aread()
+                raw = await _read_bounded(response, self.config.upstream_max_response_bytes)
             except httpx.HTTPError as exc:
                 raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
             finally:
@@ -1024,12 +1142,20 @@ class Gateway:
         trace.streaming = True
 
         async def timed_lines() -> AsyncIterator[str]:
-            """The upstream's lines; time spent waiting on them counts as upstream time."""
+            """The upstream's lines; time spent waiting on them counts as upstream time.
+
+            The whole stream has a total deadline (LAB-1566), separate from the per-read
+            httpx timeout: past it the stream ends with the generic stream error.
+            """
             lines = response.aiter_lines().__aiter__()
+            deadline = time.perf_counter() + self.config.upstream_stream_timeout
             while True:
                 waiting = time.perf_counter()
+                remaining = deadline - waiting
+                if remaining <= 0:
+                    raise TimeoutError("upstream stream deadline exceeded")
                 try:
-                    line = await lines.__anext__()
+                    line = await asyncio.wait_for(lines.__anext__(), remaining)
                 except StopAsyncIteration:
                     timer.add("upstream", time.perf_counter() - waiting)
                     return
@@ -1077,6 +1203,8 @@ class Gateway:
                         echoed_answer = True
                         yield answer_event()
                     yield sse_event(out)
+                    if out == DONE:
+                        return
             unmasking = time.perf_counter()
             outs = restorer.finish()
             timer.add("unmask", time.perf_counter() - unmasking)
@@ -1109,6 +1237,7 @@ class Gateway:
                         else:
                             failed = error_event("stream_failed", "the response stream failed")
                         yield sse_event(failed)
+                        yield sse_event(DONE)
                     finally:
                         timer.add("client", time.perf_counter() - sending)
             except (GeneratorExit, asyncio.CancelledError):
@@ -1141,6 +1270,7 @@ class Gateway:
                 else:
                     trace.finish(outcome="stream_error", error={"code": "stream_failed"})
 
+        out_headers["Cache-Control"] = "no-cache"
         return (
             StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),
             stats,
@@ -1195,6 +1325,20 @@ async def _read_limited(response: httpx.Response) -> bytes:
         data.extend(chunk)
         if len(data) > _MAX_ERROR_BODY:
             break
+    return bytes(data)
+
+
+async def _read_bounded(response: httpx.Response, limit: int) -> bytes:
+    """A whole upstream success body, byte-bounded in every mode (LAB-1566).
+
+    Raises :class:`UpstreamError` (sanitised, no body text) once the body passes ``limit``,
+    without buffering more than the limit plus one chunk.
+    """
+    data = bytearray()
+    async for chunk in response.aiter_bytes():
+        data.extend(chunk)
+        if len(data) > limit:
+            raise UpstreamError("upstream response is too large")
     return bytes(data)
 
 

@@ -15,6 +15,21 @@ function requester(handler: (path: string, body?: unknown, method?: string) => u
 }
 
 describe("public hosted workflow", () => {
+  it("defaults to English even with a Hungarian browser locale and honors the sample switch", async () => {
+    const locale = vi.spyOn(navigator, "language", "get").mockReturnValue("hu-HU");
+    try {
+      const call = requester((path) => path === "/v1/account" ? account : result);
+      const user = userEvent.setup();
+      render(<HostedApp call={call} />);
+      expect(screen.getByRole("radio", { name: "English" })).toBeChecked();
+      await user.click(screen.getByRole("radio", { name: "Hungarian" }));
+      await user.click(await screen.findByRole("button", { name: "Run the live demo" }));
+      await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/demo", { sample_id: "hu-support", language: "hu" }));
+    } finally {
+      locale.mockRestore();
+    }
+  });
+
   it("sends sign-in back to the console instead of the provider's bare page", async () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);

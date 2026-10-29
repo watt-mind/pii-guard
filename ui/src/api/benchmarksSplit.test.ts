@@ -88,3 +88,24 @@ describe("split benchmark index (LAB-1454)", () => {
     expect(gz).toBeLessThan(500 * 1024);
   });
 });
+
+it("retries rejected summary, dataset and run-log parts while retaining successful reads", async () => {
+  const files = served();
+  const failed = new Set<string>();
+  const calls: string[] = [];
+  const src = fetchedBenchmarks(manifest, async (url) => {
+    calls.push(url);
+    if (!failed.has(url)) { failed.add(url); throw new Error("offline"); }
+    return JSON.parse(files.get(url.slice(1))!) as Record<string, unknown>;
+  }, "/");
+  await expect(src.summary()).rejects.toThrow("offline");
+  await expect(src.summary()).resolves.toHaveProperty("schema_version", 1);
+  const other = manifest.sets.find((s) => s !== manifest.headline_set)!;
+  await expect(src.set(other)).rejects.toThrow("offline");
+  await expect(src.set(other)).resolves.toHaveProperty("snapshots");
+  await expect(src.runs!()).rejects.toThrow("offline");
+  await expect(src.runs!()).resolves.toHaveProperty("runs");
+  const count = calls.length;
+  await src.summary(); await src.set(other); await src.runs!();
+  expect(calls).toHaveLength(count);
+});

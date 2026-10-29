@@ -150,7 +150,7 @@ describe("hosted console for a signed-in owner", () => {
     const tabs = await screen.findByRole("tablist", { name: "Playground" });
     expect(within(tabs).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Text", "Chat"]);
     await waitFor(() => expect(location.hash).toBe("#playground/text"));
-    await user.click(screen.getByRole("button", { name: /mask document/i }));
+    await user.click(await screen.findByRole("button", { name: /mask document/i }));
     const masked = await within(screen.getByRole("tabpanel", { name: "Text" })).findByTestId("masked-text");
     expect(masked).toHaveTextContent(/\[\[PERSON_[0-9a-f]{4,}\]\]/);
   });
@@ -300,9 +300,12 @@ describe("hosted console for a signed-in owner", () => {
   it("asks for one endpoint's snippets on Connect when an endpoint is picked", async () => {
     setSelectedProject("project-one");
     setSelectedEndpoint("ep-one");
-    history.replaceState(null, "", "#connect");
+    history.replaceState(null, "", "#overview");
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { code: "unavailable" } }), { status: 503 }));
-    renderHosted(requester(true, withEndpoints), withStatus);
+    renderHosted(requester(true, withEndpoints), withStatus, liveEmptyLog);
+    await screen.findByText("Mode and detectors");
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/v1/connect/snippets"))).toBe(false);
+    await userEvent.setup().click(within(menu()).getByRole("link", { name: /^Connect/ }));
     await waitFor(() => expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/v1/connect/snippets?endpoint=ep-one"))).toBe(true));
     expect(fetchSpy.mock.calls.some(([url]) => /snippets\?.*session=/.test(String(url)))).toBe(false);
     expect(screen.queryByTestId("gateway-url")).not.toBeInTheDocument();
@@ -387,4 +390,17 @@ describe("hosted console for a signed-in owner", () => {
     expect((await fetchSnippets({ endpoint: "ep-one" }, doFetch as unknown as typeof fetch)).state).toBe("ok");
     expect(String((doFetch.mock.calls[0] as unknown[])[0])).toMatch(/\/v1\/connect\/snippets\?endpoint=ep-one$/);
   });
+});
+
+it("discards an unsaved provider credential when leaving Projects", async () => {
+  history.replaceState(null, "", "#projects");
+  renderHosted(requester(true, withPolicies), withStatus);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Create endpoint" }));
+  await user.type(screen.getByLabelText(/^Provider API key/), "synthetic-unsaved-key");
+  await user.click(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /^Overview/ }));
+  expect(screen.queryByLabelText(/^Provider API key/)).not.toBeInTheDocument();
+  await user.click(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /^Projects/ }));
+  await user.click(await screen.findByRole("button", { name: "Create endpoint" }));
+  expect(screen.getByLabelText(/^Provider API key/)).toHaveValue("");
 });

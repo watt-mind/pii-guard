@@ -144,6 +144,7 @@ export interface OwnerPolicyProps {
 
 type OwnerState =
   | { state: "loading" }
+  | { state: "empty" }
   | { state: "error"; message: string }
   | { state: "ok"; project: Project; policy: PolicyVersion | null };
 
@@ -167,12 +168,12 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
       const list = await call<ProjectList>("/v1/projects");
       if (!Array.isArray(list.projects)) throw new Error("Invalid projects");
       const project = list.projects.find((p) => p.id === projectId) ?? list.projects.find((p) => p.id === list.default_project_id) ?? list.projects[0];
-      if (!project) throw new Error("No project");
+      if (!project) return null;
       const data = await call<{ policies: PolicyVersion[] }>(`${projectPath(project.id)}/policies`);
       if (!Array.isArray(data.policies)) throw new Error("Invalid policies");
       return { project, policy: defaultPolicyOf(project, data.policies) };
     })().then(
-      (ok) => active && setState({ state: "ok", ...ok }),
+      (ok) => active && setState(ok ? { state: "ok", ...ok } : { state: "empty" }),
       (e: unknown) => active && setState({ state: "error", message: recovery(e) }),
     );
     return () => {
@@ -188,6 +189,7 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
         lead="What happens to each kind of personal data in your project. Policies belong to projects and are versioned: each endpoint applies the version it is pinned to. Read-only here; create policies and new versions under Projects."
       />
 
+      {state.state === "empty" && <Notice live action={<ButtonLink href="#projects">Create a project</ButtonLink>}>No projects yet. Create a project to configure its policies.</Notice>}
       {state.state === "loading" && <Notice live>Loading your project's policy…</Notice>}
       {state.state === "error" && (
         <Notice

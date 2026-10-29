@@ -37,7 +37,6 @@ vault session; send the whole ``input`` with ``store: false``, as Muse Code does
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from pii_guard.gateway.request import (
@@ -56,6 +55,7 @@ from pii_guard.gateway.request import (
     _reject_unknown,
     _require_scalars,
     _setter,
+    _text_slot,
 )
 
 __all__ = ["collect_response_texts"]
@@ -112,16 +112,6 @@ _REASONING_PARTS = {"summary": "summary_text", "content": "reasoning_text"}
 _TOOL_TYPES = frozenset({"function", "namespace", "custom"})
 _NAMESPACE_KEYS = frozenset({"type", "name", "description", "tools"})
 _TEXT_KEYS = frozenset({"format", "verbosity"})
-#: A line-number gutter, as Muse Code's ``read_file`` prints file lines (``12|Jane ...``),
-#: after the line's leading spaces/tabs (stripped first: no backtracking over them).
-_GUTTER_RE = re.compile(r"\d{1,7}\|")
-
-
-def _gutter(line: str) -> str:
-    """The line's gutter (indentation, number and ``|``), or ``""``."""
-    indent = len(line) - len(line.lstrip(" \t"))
-    match = _GUTTER_RE.match(line, indent)
-    return line[: match.end()] if match else ""
 
 
 def collect_response_texts(body: object) -> CollectedTexts:
@@ -167,6 +157,8 @@ def collect_response_texts(body: object) -> CollectedTexts:
             if not isinstance(metadata, dict):
                 raise InvalidChatRequestError(f"{key} must be an object")
             _collect_metadata(metadata, out)
+    # ``model`` goes upstream verbatim and can't carry a placeholder: checked (LAB-1563).
+    _check_text(body["model"], "model", out)
     return out
 
 
@@ -291,38 +283,6 @@ def _collect_output(item: dict[str, Any], where: str, out: CollectedTexts) -> No
             _collect_part(part, f"{where}.output.{i}", out, output)
     else:
         raise InvalidChatRequestError(f"{where}.output must be a string or an array")
-
-
-def _text_slot(holder: dict[str, Any], key: str, kind: str) -> TextSlot:
-    """A message text or tool output; a line-number gutter (``12|``) is hidden from detection.
-
-    Muse Code's ``read_file`` prints each file line after its number (``12|Jane Placeholder``),
-    in tool outputs and again in the conversation its reminder observers get as a message.
-    Glued to the first word, the gutter makes a name detector see ``12|Jane`` as one token and
-    mask only the surname. The detectors get each gutter as spaces of the same length (offsets
-    don't move); the masked text gets the gutters back.
-    """
-    text: str = holder[key]
-    lines = text.split("\n")
-    gutters = {i: g for i, line in enumerate(lines) if (g := _gutter(line))}
-    if not gutters:
-        return TextSlot(text, _setter(holder, key), kind)
-    hidden = "\n".join(
-        " " * len(gutters[i]) + line[len(gutters[i]) :] if i in gutters else line
-        for i, line in enumerate(lines)
-    )
-
-    def write(masked: str) -> None:
-        out = masked.split("\n")
-        if len(out) == len(lines):
-            for i, gutter in gutters.items():
-                if out[i].startswith(" " * len(gutter)):
-                    out[i] = gutter + out[i][len(gutter) :]
-        # A masked value that spanned lines changes the line count: the gutters are dropped
-        # (line numbers only; nothing unmasked is written back).
-        holder[key] = "\n".join(out)
-
-    return TextSlot(hidden, write, kind)
 
 
 def _collect_reasoning(item: dict[str, Any], where: str, out: CollectedTexts) -> None:

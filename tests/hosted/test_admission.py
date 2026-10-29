@@ -787,6 +787,10 @@ def test_separate_request_gateways_share_session_holds(monkeypatch, refuse_secon
             name = "synthetic-gated-rules"
 
             def detect(self, text, language):
+                if text == "muse-spark-1.3":
+                    # The identifier-checked ``model`` (LAB-1563) is detected too; the
+                    # barrier below pairs the two requests' message detections only.
+                    return []
                 barrier.wait()
                 if text.startswith("Refuse"):
                     raise DetectionError("synthetic refusal")

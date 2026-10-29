@@ -235,7 +235,13 @@ export const loadBenchmarks = (): Promise<BenchmarkIndex> => served.full();
 export function sourceOf(load: BenchmarkLoader): BenchmarkSource {
   if (typeof load !== "function") return load;
   let index: Promise<BenchmarkIndex> | undefined;
-  const all = () => (index ??= load());
+  const all = () => {
+    if (!index) {
+      index = load();
+      index.catch(() => { index = undefined; });
+    }
+    return index;
+  };
   return {
     summary: all,
     set: (fixtureSet) =>

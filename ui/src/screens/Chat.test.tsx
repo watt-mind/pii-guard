@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockChat, type ChatClient, type ChatTurnRequest, type ChatTurnResult } from "../api/chat";
 import { ApiError } from "../api/http";
 import { createMockClient } from "../api/mock";
+import { CHAT_SAMPLES } from "../content/chatSamples";
 import { Chat, MODEL_PREF } from "./Chat";
 
 const META = ["muse-image-1.0", "sam-3.1", "muse-voice-transcribe-1.0", "muse-spark-1.2", "muse-wonder-1.0", "muse-spark-1.3"];
@@ -35,6 +36,37 @@ beforeEach(() => {
 });
 
 describe("Chat model picker (LAB-1335)", () => {
+  it("preserves a Hungarian draft handed over from Text", async () => {
+    const { client, calls } = liveChat();
+    const text = CHAT_SAMPLES.find((s) => s.id === "hu-letter")!.text;
+    const { rerender } = render(<Chat client={client} live draft={null} />);
+    await screen.findByRole("combobox", { name: "Model" });
+    rerender(<Chat client={client} live draft={{ text, language: "hu", sessionId: "s_existing", nonce: 1 }} />);
+    await waitFor(() => expect(calls[0]).toMatchObject({ language: "hu", sessionId: "s_existing", messages: expect.arrayContaining([expect.objectContaining({ role: "user", content: text })]) }));
+    expect(screen.getByRole("combobox", { name: "Language" })).toHaveValue("hu");
+  });
+
+  it("starts in English and sends explicit language and sample choices unchanged", async () => {
+    const user = userEvent.setup();
+    const { client, calls } = liveChat();
+    render(<Chat client={client} live draft={null} />);
+    const language = screen.getByRole("combobox", { name: "Language" });
+    expect(language).toHaveValue("en");
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue(CHAT_SAMPLES.find((s) => s.id === "en-refund")!.text);
+    await screen.findByRole("combobox", { name: "Model" });
+    await user.click(screen.getByRole("button", { name: /send through/i }));
+    await waitFor(() => expect(calls[0]?.language).toBe("en"));
+    await user.click(screen.getByRole("button", { name: "Letter (Hungarian)" }));
+    expect(language).toHaveValue("hu");
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue(CHAT_SAMPLES.find((s) => s.id === "hu-letter")!.text);
+    await user.click(screen.getByRole("button", { name: /send through/i }));
+    await waitFor(() => expect(calls[1]?.language).toBe("hu"));
+    await user.click(screen.getByRole("button", { name: "Refund (English)" }));
+    await user.selectOptions(language, "hu");
+    await user.click(screen.getByRole("button", { name: /send through/i }));
+    await waitFor(() => expect(calls[2]?.language).toBe("hu"));
+  });
+
   it("defaults to muse-spark-1.3 from /v1/models and lists only chat-capable ids", async () => {
     const { client } = liveChat();
     render(<Chat client={client} live draft={null} />);
