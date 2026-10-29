@@ -677,7 +677,8 @@ def demo_mock_answer(body: dict[str, Any]) -> str:
     """A deterministic stand-in for the upstream model: reads only what the guard forwarded
     (the masked contract and the image summaries) and answers per party, with placeholders.
     Proves the forwarded request carries enough to answer; the live run uses a real model."""
-    parts = body["messages"][0]["content"]
+    # The user turn, not a system note the guard may have put in front of it (LAB-1471).
+    parts = next(m["content"] for m in body["messages"] if m.get("role") == "user")
     contract = parts[0]["text"]
     parties = list(dict.fromkeys(m.group(0) for m in PLACEHOLDER_RE.finditer(contract)))
     parties = [p for p in parties if p.startswith("[[PERSON_")]
