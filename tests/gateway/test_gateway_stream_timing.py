@@ -220,3 +220,31 @@ def test_disconnect_while_waiting_on_the_upstream_is_recorded_and_not_seeded() -
     stream = _Stream(1000, delay=0.2)
     app = _run_disconnect(stream, spec_version="2.3", after=2)
     _assert_disconnected(app, stream)
+
+
+def test_trickling_stream_hits_the_total_deadline() -> None:
+    """LAB-1566: per-read timeouts still pass chunk by chunk, but the whole stream
+    has a total deadline; past it the client gets the generic stream error."""
+    import time
+
+    stream = _Stream(1000, delay=0.05)  # ~50 s of trickle if unbounded
+    app = _app(_Transport(stream))
+    app.state.gateway_config = GatewayConfig(mode=Mode.AUDIT, upstream_stream_timeout=0.2)
+
+    async def main() -> bytes:
+        transport = httpx.ASGITransport(app=app)
+        async with (
+            httpx.AsyncClient(
+                transport=transport, base_url="http://localhost", timeout=10
+            ) as client,
+            client.stream("POST", "/v1/chat/completions", content=_body()) as response,
+        ):
+            assert response.status_code == 200
+            return b"".join([part async for part in response.aiter_bytes()])
+
+    started = time.perf_counter()
+    body = asyncio.run(main())
+    elapsed = time.perf_counter() - started
+    assert b"stream_failed" in body
+    assert elapsed < 5  # ended by the 0.2 s deadline, not by reading the whole trickle
+    assert stream.pulled < stream.count

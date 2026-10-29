@@ -35,8 +35,8 @@ from starlette.responses import Response
 
 from pii_guard.api.deps import get_max_text_chars
 from pii_guard.api.errors import error_responses
-from pii_guard.api.routes._common import log_extra, v1_router
-from pii_guard.api.routes.chat import get_gateway
+from pii_guard.api.routes._common import ensure_connected, log_extra, v1_router
+from pii_guard.api.routes.chat import GatewayRoute, get_gateway
 from pii_guard.api.routes.models import ModelsConfig, list_models
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses import ResponsesGateway
@@ -45,7 +45,9 @@ from pii_guard.gateway.sessions import path_session
 
 __all__ = ["DEFAULT_MUSE_METADATA", "get_responses_gateway", "muse_catalog_url", "router"]
 
-router = v1_router()
+# Same route class as chat (LAB-1566): inline image bodies get the gateway allowance,
+# not just the text limit, so Responses image requests reach image validation.
+router = v1_router(GatewayRoute)
 _lock = threading.Lock()
 
 _TIMEOUT = httpx.Timeout(15.0, connect=5.0)
@@ -90,6 +92,7 @@ def get_responses_gateway(request: Request) -> ResponsesGateway:
     responses=error_responses("detection_profile_denied", "outbound_check_failed"),
 )
 async def responses(request: Request) -> Response:
+    await ensure_connected(request)
     gateway = get_responses_gateway(request)
     raw = await request.body()
     received_at = time.perf_counter()

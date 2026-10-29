@@ -58,6 +58,7 @@ from pii_guard.gateway.service import (
     _count_masked,
     _counts,
     _counts_of,
+    _read_bounded,
     _read_limited,
     _upstream_error,
     check_upstream_payload,
@@ -357,7 +358,7 @@ class ResponsesGateway:
         masked_input: list[dict[str, str]] | None,
     ) -> tuple[Response, RequestStats]:
         try:
-            raw = await response.aread()
+            raw = await _read_bounded(response, self.gateway.config.upstream_max_response_bytes)
         except httpx.HTTPError as exc:
             raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
         finally:
@@ -410,11 +411,16 @@ class ResponsesGateway:
         trace.streaming = True
 
         async def timed_lines() -> AsyncIterator[str]:
+            # Whole-stream deadline (LAB-1566), like the chat stream's timed lines.
             lines = response.aiter_lines().__aiter__()
+            deadline = time.perf_counter() + self.gateway.config.upstream_stream_timeout
             while True:
                 waiting = time.perf_counter()
+                remaining = deadline - waiting
+                if remaining <= 0:
+                    raise TimeoutError("upstream stream deadline exceeded")
                 try:
-                    line = await lines.__anext__()
+                    line = await asyncio.wait_for(lines.__anext__(), remaining)
                 except StopAsyncIteration:
                     timer.add("upstream", time.perf_counter() - waiting)
                     return
