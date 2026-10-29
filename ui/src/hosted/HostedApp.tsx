@@ -22,6 +22,7 @@ import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 import { useCurrentSection } from "./useCurrentSection";
 import { consoleSectionOf } from "./consoleLink";
+import { PublicEvaluation } from "./PublicEvaluation";
 import { SignedOutConsole } from "./SignedOut";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -84,6 +85,9 @@ export function HostedApp({ call = request, console: renderConsole }: { call?: R
   if (renderConsole && account?.authenticated && !SITE_HASHES.has(hash)) return renderConsole({ account, error, refresh, call });
   // A console deep link without a session: say what the screen is and how to get there (LAB-1519).
   const section = renderConsole && account && !account.authenticated ? consoleSectionOf(hash) : null;
+  // Evaluation shows only the published benchmarks bundled with the page, so it needs no sign-in
+  // (LAB-1533), and it still opens when the account can't be read.
+  if (renderConsole && !account?.authenticated && (account || error) && consoleSectionOf(hash) === "evaluation") return <PublicEvaluation loginUrl={account?.login_url || LOGIN} hash="#evaluation" />;
   if (section && account) return <SignedOutConsole section={section} hash={hash} loginUrl={account.login_url || LOGIN} expired={wasSignedIn} />;
   // Back from sign-in: wait for the account rather than flash the public page.
   if (renderConsole && !account && !error && hash !== "" && !SITE_HASHES.has(hash) && hash !== "#account") return <p role="status" className="p-6 text-sm text-muted">Opening your console…</p>;
@@ -350,7 +354,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <p className="mt-3 text-xs text-muted">PII Guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits PII Guard was not trained on.</p>
             <div className="mt-auto border-t border-line pt-4">
               <p className="text-muted"><span className="font-medium text-ink">Against {COMPARED.openModels} other open PII models</span>, with the same rules around each: ours leaks {OPEN_MODELS[0].leak}&nbsp;%. The closest, {OPEN_MODELS[1].model}, leaks {OPEN_MODELS[1].leak}&nbsp;% and masks about nine times as much text that isn’t personal data ({OPEN_MODELS[1].over}&nbsp;% against {OPEN_MODELS[0].over}&nbsp;%).</p>
-              <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{signedIn && hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
+              <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
             </div>
           </Card>
         </div>
