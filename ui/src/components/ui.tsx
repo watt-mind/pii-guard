@@ -522,11 +522,15 @@ export function SecretReveal({
 /* ---------- Data display ---------- */
 
 /** One number with its label: value 18/500 tabular, label 12 px muted. Use inside a `<dl>`. */
-export function Metric({ label, value, suffix, hint, className = "" }: { label: ReactNode; value: ReactNode; suffix?: ReactNode; hint?: ReactNode; className?: string }) {
+/**
+ * A labelled number. `size="hero"` is the landing hero's proof strip only (24→30 px value, the one
+ * place a number leads a screen); everywhere else a metric is the 18 px card value.
+ */
+export function Metric({ label, value, suffix, hint, size = "md", className = "" }: { label: ReactNode; value: ReactNode; suffix?: ReactNode; hint?: ReactNode; size?: "md" | "hero"; className?: string }) {
   return (
     <div className={["min-w-0", className].join(" ")}>
       <dt className="text-xs text-muted">{label}</dt>
-      <dd className="mt-0.5 text-lg font-medium text-ink tabular-nums">
+      <dd className={["mt-0.5 font-medium text-ink tabular-nums", size === "hero" ? "text-2xl sm:text-3xl" : "text-lg"].join(" ")}>
         {value}
         {suffix && <span className="ml-1 text-sm font-normal text-muted">{suffix}</span>}
       </dd>

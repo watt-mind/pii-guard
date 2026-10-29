@@ -13,11 +13,6 @@ import { createMockClient } from "./api/mock";
 import { HostedApp } from "./hosted/HostedApp";
 import type { Account, Requester } from "./hosted/api";
 
-// LAB-1484 is rewriting the landing's image showcase and hero image in parallel; their copy joins
-// this check when that lands (the mocks go then).
-vi.mock("./hosted/ImageShowcase", () => ({ default: () => null }));
-vi.mock("./hosted/HeroImage", () => ({ default: () => null }));
-
 const CODE = "code, pre, kbd, samp, textarea, script, style";
 const WRONG = /pii-guard|PIIGuard|Pii Guard|PII-Guard/;
 const ATTRS = ["title", "aria-label", "alt", "placeholder", "aria-description"];

@@ -40,10 +40,10 @@ function restore(text: string): string {
 const restored = restore(answer.masked);
 const day = new Date(`${recorded}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
-function Figure({ alt, children }: { alt: string; children?: ReactNode }) {
+function Figure({ alt, compact = false, children }: { alt: string; compact?: boolean; children?: ReactNode }) {
   return (
     <div className="flex justify-center rounded-lg bg-surface-2 p-2 ring-1 ring-line">
-      <div className="@container relative w-full max-w-[44rem]">
+      <div className={["@container relative w-full max-w-[44rem]", compact ? "max-sm:max-w-[15rem]" : ""].join(" ")}>
         <img src={sample.src} alt={alt} width={image.width} height={image.height} loading="lazy" decoding="async" className="block h-auto w-full rounded-sm" />
         {children}
       </div>
@@ -51,8 +51,11 @@ function Figure({ alt, children }: { alt: string; children?: ReactNode }) {
   );
 }
 
-/** The text covers' column, enlarged, so the placeholders printed on the card can be read. */
-function Zoom() {
+/**
+ * The text column, enlarged: as printed on your side, and with the covers the model reads on its
+ * side, so the two panes line up and the placeholders on the card can be read.
+ */
+function Zoom({ masked: covered, className = "" }: { masked: boolean; className?: string }) {
   const text = masked.filter((r) => r.source === "ocr" && r.cover_box);
   if (!text.length) return null;
   const pad = 14;
@@ -63,12 +66,12 @@ function Zoom() {
   const w = x2 - x1;
   const h = y2 - y1;
   return (
-    <figure className="space-y-1.5">
-      <figcaption><Caption>Enlarged: the details as the model reads them</Caption></figcaption>
+    <figure className={["space-y-1.5", className].join(" ")}>
+      <figcaption><Caption>{covered ? "Enlarged: the details as the model reads them" : "Enlarged: the details as printed"}</Caption></figcaption>
       <div aria-hidden="true" className="relative mx-auto w-full max-w-[13rem] overflow-hidden rounded-md ring-1 ring-line" style={{ aspectRatio: `${w} / ${h}` }}>
         <div className="@container absolute" style={{ width: `${(image.width / w) * 100}%`, left: `${(-x1 / w) * 100}%`, top: `${(-y1 / h) * 100}%` }}>
           <img src={sample.src} alt="" width={image.width} height={image.height} loading="lazy" decoding="async" className="block h-auto w-full" />
-          <LabelledCovers regions={regions} width={image.width} height={image.height} />
+          {covered && <LabelledCovers regions={regions} width={image.width} height={image.height} />}
         </div>
       </div>
     </figure>
@@ -86,14 +89,18 @@ export default function ImageShowcase() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane id="image-original" side="you" eyebrow="Stays with pii-guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the on-device face detector. Dashed: text found by OCR and the rules.">
+        <Pane id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the on-device face detector. Dashed: text found by OCR and the rules.">
           <div className="space-y-3">
             <YourText text={IMAGE_LABELS_MESSAGE} masked={message.masked} />
-            <Figure alt={sample.alt}>
+            <Figure alt={sample.alt} compact>
               {regions.map((r, i) => (
                 <span key={i} aria-hidden="true" className="absolute rounded-sm" style={{ ...box(r), border: r.source === "ocr" ? `1px dashed ${regionColor(r)}` : `2px solid ${regionColor(r)}`, backgroundColor: r.policy === "mask" && r.source !== "ocr" ? tint(regionColor(r), 8) : "transparent" }} />
               ))}
             </Figure>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
+            <Zoom masked={false} className="max-sm:hidden" />
+            <div className="min-w-0 space-y-1.5">
+            <Caption>Found on the card</Caption>
             <ul aria-label="Region legend" className="flex flex-wrap gap-1.5">
               {rows.map((row) => (
                 <li key={row.type} className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs text-muted">
@@ -104,9 +111,11 @@ export default function ImageShowcase() {
                 </li>
               ))}
             </ul>
+            </div>
+            </div>
           </div>
         </Pane>
-        <Boundary direction="outbound" label="pii-guard boundary: only placeholders cross it">
+        <Boundary direction="outbound" label="PII Guard boundary: only placeholders cross it">
           <dl className="space-y-1 text-center">
             <Metric label="regions covered" value={masked.length} className="min-w-12" />
             <Metric label="as placeholders" value={tokenized.length} className="min-w-12" />
@@ -119,7 +128,7 @@ export default function ImageShowcase() {
               <LabelledCovers regions={regions} width={image.width} height={image.height} />
             </Figure>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
-            <Zoom />
+            <Zoom masked />
             <div className="min-w-0 space-y-1.5">
               <Caption>With the image: its document summary</Caption>
               <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
@@ -145,7 +154,7 @@ export default function ImageShowcase() {
         <Pane id="image-answer" side="model" eyebrow="Still placeholders" title="The model’s answer about the card" className="lg:flex-1" footer="A stand-in model, reading only the masked summary.">
           <MaskedText text={answer.masked} />
         </Pane>
-        <Boundary direction="inbound" label="pii-guard boundary: placeholders are restored on the way back" />
+        <Boundary direction="inbound" label="PII Guard boundary: placeholders are restored on the way back" />
         <Pane id="image-restored" side="you" eyebrow="Real values put back" title="The answer, with the name back" className="lg:flex-1">
           <RestoredText segments={restoredSegments({ answer: answer.masked, restored, masked: message.masked, original: IMAGE_LABELS_MESSAGE })} />
         </Pane>
