@@ -137,6 +137,18 @@
       "color": "#D55E00",
       "shape": "circle"
     },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s30": {
+      "color": "#332288",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s50": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s70": {
+      "color": "#882255",
+      "shape": "circle"
+    },
     "rules+ner:wismut-nym@decoder=word": {
       "color": "#117733",
       "shape": "circle"
@@ -171,6 +183,10 @@
     },
     "rules+ner:xlmr-base-v2-hn@PII_GUARD_NER_AGENT_TEXT=false": {
       "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn@rescore=lab-1494": {
+      "color": "#117733",
       "shape": "circle"
     },
     "rules+ner:xlmr-base-v2-no-ai4privacy": {
