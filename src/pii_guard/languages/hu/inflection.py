@@ -353,7 +353,7 @@ class HungarianSuffixMatcher:
         if not suffix or suffix.startswith("-") or not lemma or not lemma[-1].isalpha():
             return lemma + suffix
         # Stem changes belong to names, as in variant_stems/splits: an e-mail address or an
-        # ID keeps its spelling (anna@firma.de + re -> anna@firma.dere, not ...dére).
+        # ID keeps its spelling (anna@example.de + re -> anna@example.dere, not ...dére).
         if entity_type not in _STEM_CHANGE_TYPES or not _word_like(lemma):
             return lemma + suffix
         folded = suffix.casefold()
