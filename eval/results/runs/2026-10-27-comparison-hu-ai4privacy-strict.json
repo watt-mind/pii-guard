@@ -14,11 +14,14 @@
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold spans), so masking them counts as over-masking. Most card, tax and TAJ numbers in the set fail their checksums, which pii-guard's rules require."
   ],
   "rescored": {
-    "by": "LAB-1213",
+    "by": "LAB-1223",
     "method": "unscored-types",
-    "note": "89 DATE_OF_BIRTH prediction(s) taken out of precision and over-masking (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "note": "33 ORGANIZATION/VEHICLE_PLATE/PARCEL_NUMBER_HU/COMPANY_ID_HU prediction(s) taken out of precision and over-masking (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
     "unscored_types": [
-      "DATE_OF_BIRTH"
+      "ORGANIZATION",
+      "VEHICLE_PLATE",
+      "PARCEL_NUMBER_HU",
+      "COMPANY_ID_HU"
     ]
   },
   "code": {
@@ -104,26 +107,26 @@
       "documents": 200,
       "gold_spans": 752,
       "predicted_spans": 864,
-      "unscored_predictions": 89,
+      "unscored_predictions": 122,
       "exact": {
         "gold": 752,
-        "pred": 775,
+        "pred": 742,
         "tp_pred": 657,
         "tp_gold": 657,
-        "precision": 0.847742,
+        "precision": 0.885445,
         "recall": 0.87367,
-        "f1": 0.860511
+        "f1": 0.879518
       },
       "overlap": {
         "gold": 752,
-        "pred": 775,
+        "pred": 742,
         "tp_pred": 709,
         "tp_gold": 716,
-        "precision": 0.914839,
+        "precision": 0.955526,
         "recall": 0.952128,
-        "f1": 0.933111
+        "f1": 0.953824
       },
-      "macro_f1_overlap": 0.635434,
+      "macro_f1_overlap": 0.953151,
       "leak": {
         "values": 752,
         "leaked": 28,
@@ -132,9 +135,9 @@
         "partial_rate": 0.00133
       },
       "over_masking": {
-        "masked": 746,
+        "masked": 742,
         "over_masked": 29,
-        "rate": 0.038874
+        "rate": 0.039084
       },
       "roundtrip": {
         "documents": 200,
@@ -295,52 +298,6 @@
             "masked": 51,
             "over_masked": 0
           }
-        },
-        "COMPANY_ID_HU": {
-          "gold": 0,
-          "pred": 2,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": null
-        },
-        "ORGANIZATION": {
-          "gold": 0,
-          "pred": 27,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": null
-        },
-        "PARCEL_NUMBER_HU": {
-          "gold": 0,
-          "pred": 1,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": {
-            "masked": 1,
-            "over_masked": 0
-          }
-        },
-        "VEHICLE_PLATE": {
-          "gold": 0,
-          "pred": 3,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": {
-            "masked": 3,
-            "over_masked": 0
-          }
         }
       },
       "validity": {
@@ -455,26 +412,26 @@
         "documents": 200,
         "gold_spans": 752,
         "predicted_spans": 864,
-        "unscored_predictions": 89,
+        "unscored_predictions": 122,
         "exact": {
           "gold": 752,
-          "pred": 775,
+          "pred": 742,
           "tp_pred": 657,
           "tp_gold": 657,
-          "precision": 0.847742,
+          "precision": 0.885445,
           "recall": 0.87367,
-          "f1": 0.860511
+          "f1": 0.879518
         },
         "overlap": {
           "gold": 752,
-          "pred": 775,
+          "pred": 742,
           "tp_pred": 709,
           "tp_gold": 716,
-          "precision": 0.914839,
+          "precision": 0.955526,
           "recall": 0.952128,
-          "f1": 0.933111
+          "f1": 0.953824
         },
-        "macro_f1_overlap": 0.635434,
+        "macro_f1_overlap": 0.953151,
         "leak": {
           "values": 752,
           "leaked": 28,
@@ -483,9 +440,9 @@
           "partial_rate": 0.00133
         },
         "over_masking": {
-          "masked": 746,
+          "masked": 742,
           "over_masked": 29,
-          "rate": 0.038874
+          "rate": 0.039084
         },
         "roundtrip": {
           "documents": 200,
@@ -644,52 +601,6 @@
             },
             "over_masking": {
               "masked": 51,
-              "over_masked": 0
-            }
-          },
-          "COMPANY_ID_HU": {
-            "gold": 0,
-            "pred": 2,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": null
-          },
-          "ORGANIZATION": {
-            "gold": 0,
-            "pred": 27,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": null
-          },
-          "PARCEL_NUMBER_HU": {
-            "gold": 0,
-            "pred": 1,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": {
-              "masked": 1,
-              "over_masked": 0
-            }
-          },
-          "VEHICLE_PLATE": {
-            "gold": 0,
-            "pred": 3,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": {
-              "masked": 3,
               "over_masked": 0
             }
           }

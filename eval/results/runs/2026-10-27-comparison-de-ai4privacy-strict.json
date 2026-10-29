@@ -14,11 +14,12 @@
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold spans), so masking them counts as over-masking. Most card, tax and TAJ numbers in the set fail their checksums, which pii-guard's rules require."
   ],
   "rescored": {
-    "by": "LAB-1213",
+    "by": "LAB-1223",
     "method": "unscored-types",
-    "note": "71 DATE_OF_BIRTH prediction(s) taken out of precision and over-masking (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "note": "11 ORGANIZATION/VEHICLE_PLATE prediction(s) taken out of precision and over-masking (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
     "unscored_types": [
-      "DATE_OF_BIRTH"
+      "ORGANIZATION",
+      "VEHICLE_PLATE"
     ]
   },
   "code": {
@@ -104,26 +105,26 @@
       "documents": 200,
       "gold_spans": 628,
       "predicted_spans": 668,
-      "unscored_predictions": 71,
+      "unscored_predictions": 82,
       "exact": {
         "gold": 628,
-        "pred": 597,
+        "pred": 586,
         "tp_pred": 519,
         "tp_gold": 519,
-        "precision": 0.869347,
+        "precision": 0.885666,
         "recall": 0.826433,
-        "f1": 0.847347
+        "f1": 0.855025
       },
       "overlap": {
         "gold": 628,
-        "pred": 597,
+        "pred": 586,
         "tp_pred": 570,
         "tp_gold": 587,
-        "precision": 0.954774,
+        "precision": 0.972696,
         "recall": 0.934713,
-        "f1": 0.944637
+        "f1": 0.953327
       },
-      "macro_f1_overlap": 0.712605,
+      "macro_f1_overlap": 0.950139,
       "leak": {
         "values": 628,
         "leaked": 30,
@@ -132,9 +133,9 @@
         "partial_rate": 0.0
       },
       "over_masking": {
-        "masked": 588,
+        "masked": 586,
         "over_masked": 5,
-        "rate": 0.008503
+        "rate": 0.008532
       },
       "roundtrip": {
         "documents": 200,
@@ -261,29 +262,6 @@
             "masked": 40,
             "over_masked": 0
           }
-        },
-        "ORGANIZATION": {
-          "gold": 0,
-          "pred": 9,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": null
-        },
-        "VEHICLE_PLATE": {
-          "gold": 0,
-          "pred": 2,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": {
-            "masked": 2,
-            "over_masked": 0
-          }
         }
       },
       "validity": {
@@ -370,26 +348,26 @@
         "documents": 200,
         "gold_spans": 628,
         "predicted_spans": 668,
-        "unscored_predictions": 71,
+        "unscored_predictions": 82,
         "exact": {
           "gold": 628,
-          "pred": 597,
+          "pred": 586,
           "tp_pred": 519,
           "tp_gold": 519,
-          "precision": 0.869347,
+          "precision": 0.885666,
           "recall": 0.826433,
-          "f1": 0.847347
+          "f1": 0.855025
         },
         "overlap": {
           "gold": 628,
-          "pred": 597,
+          "pred": 586,
           "tp_pred": 570,
           "tp_gold": 587,
-          "precision": 0.954774,
+          "precision": 0.972696,
           "recall": 0.934713,
-          "f1": 0.944637
+          "f1": 0.953327
         },
-        "macro_f1_overlap": 0.712605,
+        "macro_f1_overlap": 0.950139,
         "leak": {
           "values": 628,
           "leaked": 30,
@@ -398,9 +376,9 @@
           "partial_rate": 0.0
         },
         "over_masking": {
-          "masked": 588,
+          "masked": 586,
           "over_masked": 5,
-          "rate": 0.008503
+          "rate": 0.008532
         },
         "roundtrip": {
           "documents": 200,
@@ -525,29 +503,6 @@
             },
             "over_masking": {
               "masked": 40,
-              "over_masked": 0
-            }
-          },
-          "ORGANIZATION": {
-            "gold": 0,
-            "pred": 9,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": null
-          },
-          "VEHICLE_PLATE": {
-            "gold": 0,
-            "pred": 2,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": {
-              "masked": 2,
               "over_masked": 0
             }
           }

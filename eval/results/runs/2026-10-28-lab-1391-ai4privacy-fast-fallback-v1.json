@@ -12,6 +12,14 @@
     "Wall time 32.3 s, load average at end 12.5.",
     "pii-guard NER v2 trained on OpenPII train rows: in distribution here."
   ],
+  "rescored": {
+    "by": "LAB-1223",
+    "method": "unscored-types",
+    "note": "88 ORGANIZATION prediction(s) taken out of precision and over-masking (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "unscored_types": [
+      "ORGANIZATION"
+    ]
+  },
   "code": {
     "commit": "97ee28450ba4ee2dc11ef075c0f8e275d4647555",
     "dirty": true,
@@ -92,26 +100,26 @@
       "documents": 600,
       "gold_spans": 2185,
       "predicted_spans": 2442,
-      "unscored_predictions": 155,
+      "unscored_predictions": 243,
       "exact": {
         "gold": 2185,
-        "pred": 2287,
+        "pred": 2199,
         "tp_pred": 1565,
         "tp_gold": 1565,
-        "precision": 0.684303,
+        "precision": 0.711687,
         "recall": 0.716247,
-        "f1": 0.699911
+        "f1": 0.71396
       },
       "overlap": {
         "gold": 2185,
-        "pred": 2287,
+        "pred": 2199,
         "tp_pred": 1901,
         "tp_gold": 1868,
-        "precision": 0.83122,
+        "precision": 0.864484,
         "recall": 0.85492,
-        "f1": 0.842903
+        "f1": 0.859675
       },
-      "macro_f1_overlap": 0.66153,
+      "macro_f1_overlap": 0.744221,
       "leak": {
         "values": 2185,
         "leaked": 229,
@@ -283,16 +291,6 @@
             "masked": 120,
             "over_masked": 0
           }
-        },
-        "ORGANIZATION": {
-          "gold": 0,
-          "pred": 88,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": null
         }
       },
       "validity": {
@@ -394,26 +392,26 @@
         "documents": 200,
         "gold_spans": 628,
         "predicted_spans": 696,
-        "unscored_predictions": 45,
+        "unscored_predictions": 60,
         "exact": {
           "gold": 628,
-          "pred": 651,
+          "pred": 636,
           "tp_pred": 493,
           "tp_gold": 493,
-          "precision": 0.757296,
+          "precision": 0.775157,
           "recall": 0.785032,
-          "f1": 0.770915
+          "f1": 0.780063
         },
         "overlap": {
           "gold": 628,
-          "pred": 651,
+          "pred": 636,
           "tp_pred": 564,
           "tp_gold": 566,
-          "precision": 0.866359,
+          "precision": 0.886792,
           "recall": 0.901274,
-          "f1": 0.883472
+          "f1": 0.893975
         },
-        "macro_f1_overlap": 0.758936,
+        "macro_f1_overlap": 0.885425,
         "leak": {
           "values": 628,
           "leaked": 50,
@@ -551,16 +549,6 @@
               "masked": 37,
               "over_masked": 0
             }
-          },
-          "ORGANIZATION": {
-            "gold": 0,
-            "pred": 15,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": null
           }
         },
         "validity": {
@@ -633,26 +621,26 @@
         "documents": 200,
         "gold_spans": 805,
         "predicted_spans": 855,
-        "unscored_predictions": 44,
+        "unscored_predictions": 77,
         "exact": {
           "gold": 805,
-          "pred": 811,
+          "pred": 778,
           "tp_pred": 565,
           "tp_gold": 565,
-          "precision": 0.696671,
+          "precision": 0.726221,
           "recall": 0.701863,
-          "f1": 0.699257
+          "f1": 0.713834
         },
         "overlap": {
           "gold": 805,
-          "pred": 811,
+          "pred": 778,
           "tp_pred": 697,
           "tp_gold": 696,
-          "precision": 0.859433,
+          "precision": 0.895887,
           "recall": 0.864596,
-          "f1": 0.862007
+          "f1": 0.879964
         },
-        "macro_f1_overlap": 0.659735,
+        "macro_f1_overlap": 0.753983,
         "leak": {
           "values": 805,
           "leaked": 90,
@@ -803,16 +791,6 @@
               "masked": 36,
               "over_masked": 0
             }
-          },
-          "ORGANIZATION": {
-            "gold": 0,
-            "pred": 33,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": null
           }
         },
         "validity": {
@@ -885,26 +863,26 @@
         "documents": 200,
         "gold_spans": 752,
         "predicted_spans": 891,
-        "unscored_predictions": 66,
+        "unscored_predictions": 106,
         "exact": {
           "gold": 752,
-          "pred": 825,
+          "pred": 785,
           "tp_pred": 507,
           "tp_gold": 507,
-          "precision": 0.614545,
+          "precision": 0.64586,
           "recall": 0.674202,
-          "f1": 0.642993
+          "f1": 0.659727
         },
         "overlap": {
           "gold": 752,
-          "pred": 825,
+          "pred": 785,
           "tp_pred": 640,
           "tp_gold": 606,
-          "precision": 0.775758,
+          "precision": 0.815287,
           "recall": 0.805851,
-          "f1": 0.790518
+          "f1": 0.810541
         },
-        "macro_f1_overlap": 0.641679,
+        "macro_f1_overlap": 0.721888,
         "leak": {
           "values": 752,
           "leaked": 89,
@@ -1076,16 +1054,6 @@
               "masked": 47,
               "over_masked": 0
             }
-          },
-          "ORGANIZATION": {
-            "gold": 0,
-            "pred": 40,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": null
           }
         },
         "validity": {

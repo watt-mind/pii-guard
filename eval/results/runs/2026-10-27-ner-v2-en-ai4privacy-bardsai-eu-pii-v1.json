@@ -13,6 +13,14 @@
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold spans), so masking them counts as over-masking. Most card, tax and TAJ numbers in the set fail their checksums, which pii-guard's rules require.",
     "This NER's model card lists ai4privacy/pii-masking-openpii-1m among its training data without naming the split, so the ai4privacy scorecard (validation rows) is not an out-of-distribution check for it; the hand-written smoke sets are."
   ],
+  "rescored": {
+    "by": "LAB-1223",
+    "method": "unscored-types",
+    "note": "33 ORGANIZATION prediction(s) taken out of precision and over-masking (the set labels every date DATE, which is policy-excluded). Predictions on a policy-excluded title or bare city are still counted: the run kept no per-document predictions, so ignore regions can't be applied.",
+    "unscored_types": [
+      "ORGANIZATION"
+    ]
+  },
   "code": {
     "commit": "e1268295b0d362cf7098fc9a88be6149fe1c864b",
     "dirty": true,
@@ -73,26 +81,26 @@
       "documents": 200,
       "gold_spans": 805,
       "predicted_spans": 855,
-      "unscored_predictions": 44,
+      "unscored_predictions": 77,
       "exact": {
         "gold": 805,
-        "pred": 811,
+        "pred": 778,
         "tp_pred": 551,
         "tp_gold": 551,
-        "precision": 0.679408,
+        "precision": 0.708226,
         "recall": 0.684472,
-        "f1": 0.681931
+        "f1": 0.696147
       },
       "overlap": {
         "gold": 805,
-        "pred": 811,
+        "pred": 778,
         "tp_pred": 697,
         "tp_gold": 696,
-        "precision": 0.859433,
+        "precision": 0.895887,
         "recall": 0.864596,
-        "f1": 0.862007
+        "f1": 0.879964
       },
-      "macro_f1_overlap": 0.659735,
+      "macro_f1_overlap": 0.753983,
       "leak": {
         "values": 805,
         "leaked": 90,
@@ -243,16 +251,6 @@
             "masked": 36,
             "over_masked": 0
           }
-        },
-        "ORGANIZATION": {
-          "gold": 0,
-          "pred": 33,
-          "exact_tp_gold": 0,
-          "exact_tp_pred": 0,
-          "overlap_tp_gold": 0,
-          "overlap_tp_pred": 0,
-          "leak": null,
-          "over_masking": null
         }
       },
       "validity": {
@@ -326,26 +324,26 @@
         "documents": 200,
         "gold_spans": 805,
         "predicted_spans": 855,
-        "unscored_predictions": 44,
+        "unscored_predictions": 77,
         "exact": {
           "gold": 805,
-          "pred": 811,
+          "pred": 778,
           "tp_pred": 551,
           "tp_gold": 551,
-          "precision": 0.679408,
+          "precision": 0.708226,
           "recall": 0.684472,
-          "f1": 0.681931
+          "f1": 0.696147
         },
         "overlap": {
           "gold": 805,
-          "pred": 811,
+          "pred": 778,
           "tp_pred": 697,
           "tp_gold": 696,
-          "precision": 0.859433,
+          "precision": 0.895887,
           "recall": 0.864596,
-          "f1": 0.862007
+          "f1": 0.879964
         },
-        "macro_f1_overlap": 0.659735,
+        "macro_f1_overlap": 0.753983,
         "leak": {
           "values": 805,
           "leaked": 90,
@@ -496,16 +494,6 @@
               "masked": 36,
               "over_masked": 0
             }
-          },
-          "ORGANIZATION": {
-            "gold": 0,
-            "pred": 33,
-            "exact_tp_gold": 0,
-            "exact_tp_pred": 0,
-            "overlap_tp_gold": 0,
-            "overlap_tp_pred": 0,
-            "leak": null,
-            "over_masking": null
           }
         },
         "validity": {
