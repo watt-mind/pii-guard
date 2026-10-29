@@ -185,13 +185,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">A privacy gateway for AI agents. Personal data in text and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
           <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 sm:grid-cols-3">
             <Differentiator href="#images" title="Images too">Faces are blocked and printed ID details become placeholders before an image is sent.</Differentiator>
-            <Differentiator href="#how" title="No LLM in the masking path">Rules and our open encoder NER, fine-tuned from Meta’s XLM-RoBERTa, run on the gateway.</Differentiator>
+            <Differentiator href="#how" title="No LLM in the masking path">Rules and an open NER fine-tuned from Meta’s XLM-RoBERTa, run on the gateway.</Differentiator>
             <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
           </ul>
           <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
           <div className="max-w-2xl space-y-3 border-t border-line pt-5">
             <dl aria-label="Measured results" className="grid grid-cols-3 gap-3 sm:gap-6">{PROOF.map((p) => <Metric key={p.label} size="hero" label={p.label} value={p.value} hint={p.hint} />)}</dl>
-            <p className="text-xs text-muted">{MEASURED} · <a className={link} href={`${DOCS}/benchmarks.md`}>All results ↗</a> · <a className={link} href={NER_MODEL}>Open NER on Hugging Face ↗</a></p>
+            <p className="text-xs text-muted">{MEASURED} · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a> · <a className={[link, "whitespace-nowrap"].join(" ")} href={NER_MODEL}>Our NER on Hugging Face ↗</a></p>
           </div>
         </div>
         <MiniFlow model={model} name={language === "hu" ? "Minta Réka" : "Robin Example"} />
