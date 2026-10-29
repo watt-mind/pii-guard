@@ -64,9 +64,9 @@ describe("Benchmarks screen", () => {
     await user.click(screen.getByRole("link", { name: /evaluation/i }));
     expect(screen.getByRole("link", { name: /evaluation/i })).toHaveAttribute("aria-current", "page");
     expect(location.hash).toBe("#evaluation");
-    expect(load).toHaveBeenCalledTimes(1);
     const panel = screen.getByRole("region", { name: "Evaluation" });
     expect(await within(panel).findByRole("region", { name: "Results" })).toBeInTheDocument();
+    expect(load).toHaveBeenCalledTimes(1);
   });
 
   it("works in demo mode without the API and says the data is bundled", async () => {

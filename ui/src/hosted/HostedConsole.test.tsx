@@ -391,3 +391,16 @@ describe("hosted console for a signed-in owner", () => {
     expect(String((doFetch.mock.calls[0] as unknown[])[0])).toMatch(/\/v1\/connect\/snippets\?endpoint=ep-one$/);
   });
 });
+
+it("discards an unsaved provider credential when leaving Projects", async () => {
+  history.replaceState(null, "", "#projects");
+  renderHosted(requester(true, withPolicies), withStatus);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Create endpoint" }));
+  await user.type(screen.getByLabelText(/^Provider API key/), "synthetic-unsaved-key");
+  await user.click(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /^Overview/ }));
+  expect(screen.queryByLabelText(/^Provider API key/)).not.toBeInTheDocument();
+  await user.click(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /^Projects/ }));
+  await user.click(await screen.findByRole("button", { name: "Create endpoint" }));
+  expect(screen.getByLabelText(/^Provider API key/)).toHaveValue("");
+});

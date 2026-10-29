@@ -17,6 +17,7 @@ import { createHttpClient, type HttpGuardClient } from "./api/http";
 import { MOCK_SESSION_PREFIX, createMockClient } from "./api/mock";
 import type { GuardClient } from "./api/types";
 import type { ServerStatus } from "./api/status";
+import { PageLoadBoundary } from "./components/PageLoadBoundary";
 import { Sidebar } from "./components/Sidebar";
 import { PageHeader, SegmentedControl } from "./components/ui";
 import { ProfileMenu } from "./components/ProfileMenu";
@@ -325,7 +326,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
 
         <main id="main" tabIndex={-1} className="mx-auto min-h-dvh max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
           <section id="section-overview" aria-label="Overview" hidden={section !== "overview"}>
-            {sectionOpened("overview") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading overview…</p>}>
+            {sectionOpened("overview") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading overview…</p>}>
             {trafficOpened && (
               <Overview
                 t={trafficHandle}
@@ -341,11 +342,11 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 }}
               />
             )}
-            </Suspense>}
+            </Suspense></PageLoadBoundary>}
           </section>
 
           <section id="section-playground" aria-label="Playground" hidden={section !== "playground"} className="space-y-6">
-            {sectionOpened("playground") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading playground…</p>}>
+            {sectionOpened("playground") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading playground…</p>}>
             <PageHeader
               title="Playground"
               lead={
@@ -366,7 +367,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 ]}
               />
               <div hidden={textView !== "mask"}>
-                <Suspense fallback={<p role="status">Loading text…</p>}>{opened("playground/text") && <Playground
+                <PageLoadBoundary><Suspense fallback={<p role="status">Loading text…</p>}>{opened("playground/text") && <Playground
                   text={text}
                   onText={editText}
                   sampleId={sampleId}
@@ -397,10 +398,10 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                     openTab("chat");
                     window.scrollTo?.({ top: 0 });
                   }}
-                />}</Suspense>
+                />}</Suspense></PageLoadBoundary>
               </div>
               {textView === "roundtrip" && (
-                <Suspense fallback={<p role="status">Loading round trip…</p>}><RoundTrip
+                <PageLoadBoundary><Suspense fallback={<p role="status">Loading round trip…</p>}><RoundTrip
                   key={result?.mask.session_id ?? "none"}
                   client={engine.client}
                   result={result}
@@ -408,23 +409,23 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                   onAnswer={setAnswer}
                   running={running}
                   onRun={() => void run()}
-                /></Suspense>
+                /></Suspense></PageLoadBoundary>
               )}
             </div>
             <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" hidden={tab !== "chat"}>
-              <Suspense fallback={<p role="status">Loading chat…</p>}>{opened("playground/chat") && <Chat
+              <PageLoadBoundary><Suspense fallback={<p role="status">Loading chat…</p>}>{opened("playground/chat") && <Chat
                 client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={server?.upstream?.mock ?? false}
                 modes={chatModesOf(server, caps)}
-              />}</Suspense>
+              />}</Suspense></PageLoadBoundary>
             </div>
             <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={tab !== "images"}>
-              <Suspense fallback={<p role="status">Loading images…</p>}>{caps.images && opened("playground/images") && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}</Suspense>
+              <PageLoadBoundary><Suspense fallback={<p role="status">Loading images…</p>}>{caps.images && opened("playground/images") && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}</Suspense></PageLoadBoundary>
             </div>
-            </Suspense>}
+            </Suspense></PageLoadBoundary>}
           </section>
 
           <section id="section-logs" aria-label="Logs" hidden={section !== "logs"}>
-            {sectionOpened("logs") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading logs…</p>}>
+            {sectionOpened("logs") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading logs…</p>}>
             {trafficOpened && (
               <Logs
                 t={trafficHandle}
@@ -440,15 +441,15 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 }}
               />
             )}
-            </Suspense>}
+            </Suspense></PageLoadBoundary>}
           </section>
           <section id="section-vault" aria-label="Vault" hidden={section !== "vault"}>
-            {sectionOpened("vault") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading vault…</p>}>
+            {sectionOpened("vault") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading vault…</p>}>
             <Vault status={status} live={engine.engine === "api"} active={section === "vault"} client={vault} focus={vaultFocus} />
-            </Suspense>}
+            </Suspense></PageLoadBoundary>}
           </section>
           <section id="section-connect" aria-label="Connect" hidden={section !== "connect"}>
-            {sectionOpened("connect") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading connect…</p>}>
+            {sectionOpened("connect") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading connect…</p>}>
             <Connect
               status={status}
               serverSnippets={!caps.accounts || (server !== null && hostedSnippets !== undefined)}
@@ -466,22 +467,23 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 openSection("vault");
               }}
             />
-            </Suspense>}
+            </Suspense></PageLoadBoundary>}
           </section>
           <section id="section-projects" aria-label="Projects" hidden={section !== "projects"}>
-            {sectionOpened("projects") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading projects…</p>}>
-            {opened("projects") && <Workspace call={hosted?.call} hosted={caps.accounts} onProject={selectProject} projectId={getCurrentProject()} />}
-            </Suspense>}
+            {sectionOpened("projects") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading projects…</p>}>
+            {/* Unlike ordinary drafts, provider credentials and key reveals must clear on departure. */}
+            {section === "projects" && <Workspace call={hosted?.call} hosted={caps.accounts} onProject={selectProject} projectId={getCurrentProject()} />}
+            </Suspense></PageLoadBoundary>}
           </section>
           <section id="section-policy" aria-label="Policy" hidden={section !== "policy"}>
-            {sectionOpened("policy") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading policy…</p>}>
+            {sectionOpened("policy") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading policy…</p>}>
             {caps.server_policy ? <Policy status={status} /> : section === "policy" && <OwnerPolicy call={hosted?.call} projectId={getCurrentProject()} />}
-            </Suspense>}
+            </Suspense></PageLoadBoundary>}
           </section>
           <section id="section-evaluation" aria-label="Evaluation" hidden={section !== "evaluation"}>
-            {sectionOpened("evaluation") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading evaluation…</p>}>
+            {sectionOpened("evaluation") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading evaluation…</p>}>
             {opened("evaluation") && <Benchmarks load={loadBenchmarks} />}
-            </Suspense>}
+            </Suspense></PageLoadBoundary>}
           </section>
         </main>
 

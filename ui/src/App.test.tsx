@@ -149,7 +149,7 @@ describe("App against a live API", () => {
     expect(screen.queryByTestId("entity-popover")).toBeNull();
 
     await user.click(screen.getByRole("radio", { name: "Round trip" }));
-    expect(screen.getByRole("heading", { level: 2, name: /masked values restored/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: /masked values restored/ })).toBeInTheDocument();
   });
 });
 
