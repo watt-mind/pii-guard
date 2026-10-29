@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from pii_guard.api.app import create_app
-from pii_guard.api.routes.models import ModelsConfig, models_url
+from pii_guard.api.routes.models import _MAX_BODY, ModelsConfig, models_url
 from pii_guard.config import Settings
 
 UPSTREAM = "https://upstream.test/v1"
@@ -111,13 +113,77 @@ def test_upstream_error_status_without_its_message(status: int, expected: int) -
     assert "PERSON" not in response.text
 
 
-def test_upstream_unreachable() -> None:
+@pytest.mark.parametrize("error", [httpx.ConnectError, httpx.ConnectTimeout])
+def test_upstream_unreachable(error: type[httpx.HTTPError]) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("refused")
+        raise error("synthetic-private-upstream-detail")
 
     response = _client(handler).get("/v1/models")
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "upstream_unavailable"
+    assert response.json()["error"]["message"] == (f"upstream model list failed ({error.__name__})")
+
+
+class _TrackedStream(httpx.AsyncByteStream):
+    def __init__(self, chunks: list[bytes], error: type[httpx.HTTPError] | None = None):
+        self.chunks = chunks
+        self.error = error
+        self.consumed = 0
+        self.closed = False
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for chunk in self.chunks:
+            self.consumed += 1
+            yield chunk
+        if self.error is not None:
+            raise self.error("synthetic-private-upstream-detail")
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+def test_upstream_body_cap_stops_reading_and_closes_response() -> None:
+    stream = _TrackedStream([b" " * _MAX_BODY, b"x", b"must not be consumed"])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.extensions["timeout"] == {
+            "connect": 5.0,
+            "read": 15.0,
+            "write": 15.0,
+            "pool": 15.0,
+        }
+        return httpx.Response(200, stream=stream)
+
+    response = _client(handler).get("/v1/models")
+    assert response.status_code == 502
+    assert response.json()["error"] == {
+        "code": "upstream_unavailable",
+        "message": "upstream model list is too large",
+    }
+    assert stream.consumed == 2
+    assert stream.closed
+
+
+def test_upstream_body_at_cap_is_accepted() -> None:
+    body = b'{"data": [{"id": "synthetic-model"}]}'
+    stream = _TrackedStream([body, b" " * (_MAX_BODY - len(body))])
+    response = _client(lambda request: httpx.Response(200, stream=stream)).get("/v1/models")
+    assert response.status_code == 200
+    assert response.json()["data"][0]["id"] == "synthetic-model"
+    assert stream.consumed == 2
+    assert stream.closed
+
+
+@pytest.mark.parametrize("error", [httpx.ReadTimeout, httpx.ReadError])
+def test_upstream_stream_error_is_sanitized_and_closed(error: type[httpx.HTTPError]) -> None:
+    stream = _TrackedStream([b'{"data": ['], error=error)
+    response = _client(lambda request: httpx.Response(200, stream=stream)).get("/v1/models")
+    assert response.status_code == 502
+    assert response.json()["error"] == {
+        "code": "upstream_unavailable",
+        "message": f"upstream model list failed ({error.__name__})",
+    }
+    assert stream.closed
 
 
 @pytest.mark.parametrize("body", [b"not json", b"[]", b'{"data": 3}'])
