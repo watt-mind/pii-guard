@@ -16,8 +16,13 @@
   the escape is JSON-encoded too (``\\\\[\\\\[``). Only tool-call fields get this; message
   text keeps an escaped placeholder as written.
 - In a shell command in JSON arguments (a top-level ``command``/``cmd``), a value restored in a
-  single-quoted string or a ``sed`` ``s`` replacement is escaped for it (LAB-1483,
-  :mod:`~pii_guard.gateway.shell_context`). Everywhere else a value is byte-exact.
+  single-quoted, double-quoted or unquoted part, or a ``sed`` ``s`` replacement, is escaped
+  for it (LAB-1483, LAB-1564, :mod:`~pii_guard.gateway.shell_context`), so it cannot act as
+  shell syntax. Custom tool input gets the same treatment inside quotes only (see
+  :class:`ToolInputSession`). Everywhere else a value is byte-exact.
+- Both adapters also restore a placeholder whose brackets are ``\\uXXXX``-escaped or
+  ``%XX``-encoded (``\\u005b\\u005bEMAIL_x\\u005d\\u005d``, ``%5B%5BEMAIL_x%5D%5D``) to the
+  plain value; an unknown one stays as written and counts unresolved (LAB-1564).
 
 Unknown placeholders are left as is and counted (``unresolved``). Every restored value is
 charged to one :class:`~pii_guard.vault.RestoreBudget` per response, so a response restores at
@@ -32,10 +37,16 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from pii_guard.gateway.shell_context import ArgumentsContext, shell_escape
+from pii_guard.gateway.shell_context import (
+    BYTE_EXACT,
+    ArgumentsContext,
+    ShellContext,
+    ShellText,
+    shell_escape,
+)
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, RestoreBudget, UnmaskResult, VaultSession
-from pii_guard.vault.inflection import following_suffix
+from pii_guard.vault.inflection import MAX_SUFFIX_LENGTH, following_suffix
 from pii_guard.vault.placeholders import MAX_PLACEHOLDER_LENGTH
 
 __all__ = [
@@ -70,19 +81,28 @@ class _Restored:
     suffix: str
 
 
-def _restorations(session: VaultSession, text: str, budget: RestoreBudget) -> Iterator[_Restored]:
+def _restorations(
+    session: VaultSession,
+    text: str,
+    budget: RestoreBudget,
+    pattern: re.Pattern[str] = PLACEHOLDER_RE,
+) -> Iterator[_Restored]:
     """Each placeholder in ``text`` restored by the vault, together with its suffix.
 
     The suffix after a placeholder can change the restored stem (Hungarian
     ``[[PERSON_x]]nak`` -> ``Minta Máriának``), so the vault gets placeholder + suffix:
     the same restore and inflection path :meth:`VaultSession.unmask_with_report` takes for
     a whole text (``/v1/unmask``) and that the streaming unmasker uses.
+
+    ``pattern`` may also match encoded bracket forms (LAB-1564); the vault always sees the
+    canonical ``[[TYPE_id]]`` built from the match's body groups, which for a plain match is
+    the match itself.
     """
     cursor = 0
-    for match in PLACEHOLDER_RE.finditer(text):
+    for match in pattern.finditer(text):
         if match.start() < cursor:  # pragma: no cover - a suffix never holds "[["
             continue
-        placeholder = match.group(0)
+        placeholder = f"[[{match.group(1)}_{match.group(2)}]]"
         suffix = following_suffix(text, match.end())
         result = session.unmask_with_report(placeholder + suffix, budget=budget)
         if result.unresolved:
@@ -211,6 +231,76 @@ _RAW_ESCAPE = _EscapeForm("\\")
 #: In JSON arguments, the same escape JSON-encoded: ``\\\\[\\\\[`` (decodes to ``\\[\\[``).
 _JSON_ESCAPE = _EscapeForm("\\\\")
 
+# --- encoded placeholder brackets in tool input (LAB-1564) ----------------------------------
+#
+# A model may also write a placeholder with its brackets encoded for the layer it is writing:
+# ``\u005b\u005bEMAIL_x\u005d\u005d`` in JSON arguments, ``%5B%5BEMAIL_x%5D%5D`` in a URL or
+# form field. Each bracket may be written literally or in either encoding. These are not regex
+# escapes: they decode to the plain placeholder, so they restore to the plain value (through
+# the same shell/JSON escaping as a plain placeholder), and an unknown one is left as written
+# and counted unresolved under its canonical form.
+
+_OPEN_TOKENS = ("[", "%5B", "%5b", "\\u005b", "\\u005B")
+_CLOSE_TOKENS = ("]", "%5D", "%5d", "\\u005d", "\\u005D")
+_ENCODED_RE = re.compile(rf"(?:\[|%5[bB]|\\u005[bB]){{2}}{_BODY}(?:\]|%5[dD]|\\u005[dD]){{2}}")
+#: Longest encoded placeholder (every bracket as ``\uXXXX``), plus a suffix that may still grow.
+_ENCODED_LONGEST = MAX_PLACEHOLDER_LENGTH + 4 * 5 + MAX_SUFFIX_LENGTH
+_OPEN_SUFFIX_RE = re.compile(r"-?\w*")
+
+
+def _take_token(text: str, pos: int, tokens: tuple[str, ...]) -> int | None:
+    """End of the token at ``pos``, ``len(text)`` if only a partial token remains, else None."""
+    for token in tokens:
+        if text.startswith(token, pos):
+            return pos + len(token)
+    return len(text) if any(token.startswith(text[pos:]) for token in tokens) else None
+
+
+def _encoded_prefix(text: str) -> bool:
+    """True if ``text`` may still grow into an encoded placeholder (plus a growing suffix)."""
+    if len(text) > _ENCODED_LONGEST:
+        return False
+    match = _ENCODED_RE.match(text)
+    if match is not None:
+        tail = text[match.end() :]
+        return len(tail) <= MAX_SUFFIX_LENGTH and _OPEN_SUFFIX_RE.fullmatch(tail) is not None
+    pos = 0
+    for _ in range(2):
+        taken = _take_token(text, pos, _OPEN_TOKENS)
+        if taken is None:
+            return False
+        pos = taken
+        if pos == len(text):
+            return True
+    body = _BODY_PREFIX_RE.match(text, pos)
+    if body is None:
+        return pos == len(text)
+    pos = body.end()
+    for _ in range(2):
+        if pos == len(text):
+            return True
+        taken = _take_token(text, pos, _CLOSE_TOKENS)
+        if taken is None:
+            return False
+        pos = taken
+    return pos == len(text)
+
+
+def _encoded_hold_from(buffer: str) -> int:
+    """Index of a trailing possible encoded placeholder (``len(buffer)`` if there is none).
+
+    A ``\\`` right after another ``\\`` is an escaped backslash, not a new ``\\u`` escape:
+    holding from the second one alone would lose that pairing and make a split ``\\\\[``
+    look like ``\\[``, so a run of backslashes is held from its first one."""
+    for index in range(max(0, len(buffer) - _ENCODED_LONGEST), len(buffer)):
+        if buffer[index] in "[%\\" and _encoded_prefix(buffer[index:]):
+            start = index
+            if buffer[index] == "\\":
+                while start > 0 and buffer[start - 1] == "\\":
+                    start -= 1
+            return start
+    return len(buffer)
+
 
 def _restore_escaped(
     session: VaultSession,
@@ -255,14 +345,28 @@ def _json_string(value: str) -> str:
 class ToolInputSession:
     """Restores freeform tool input (custom tool ``input``): plain placeholders as the session
     does, and regex-escaped ones as regex literals. Duck-type compatible with
-    :class:`~pii_guard.vault.StreamUnmasker` (``hold_from`` holds back a split escape)."""
+    :class:`~pii_guard.vault.StreamUnmasker` (``hold_from`` holds back a split escape).
+
+    Shell boundary (LAB-1564): freeform input may be a patch or program text, not a command,
+    so shell escaping is applied only where the shell lexer knows the quoting — a placeholder
+    inside a single- or double-quoted string (including a single-quoted ``sed`` script) is
+    escaped for that quoting, exactly as in a JSON ``command`` argument, so a restored value
+    cannot break out of the quotes or run a substitution. An unquoted placeholder, and
+    anything the lexer does not model, stays byte-exact: with no quotes in the text there is
+    no evidence it is a shell command at all. The instance reads one input in order, so use
+    one per text (or per streamed input)."""
 
     def __init__(self, session: VaultSession, budget: RestoreBudget | None = None) -> None:
         self._session = session
         self._budget = budget
+        self._shell = ShellText()
 
     def restore_budget(self) -> RestoreBudget:
         return self._budget or self._session.restore_budget()
+
+    def _quoted_context(self) -> ShellContext:
+        context = self._shell.context()
+        return context if context.single_quoted or context.double_quoted else BYTE_EXACT
 
     def unmask_with_report(self, text: str, *, budget: RestoreBudget | None = None) -> UnmaskResult:
         budget = budget or self.restore_budget()
@@ -271,22 +375,42 @@ class ToolInputSession:
             text,
             budget,
             _RAW_ESCAPE,
-            lambda literal: literal,
-            lambda part: self._session.unmask_with_report(part, budget=budget),
+            lambda literal: shell_escape(literal, self._quoted_context(), regex=True),
+            lambda part: self._plain(part, budget),
+            self._shell.feed,
         )
 
     @staticmethod
     def hold_from(buffer: str) -> int:
-        return _RAW_ESCAPE.hold_from(buffer)
+        return min(_RAW_ESCAPE.hold_from(buffer), _encoded_hold_from(buffer))
+
+    def _plain(self, text: str, budget: RestoreBudget) -> UnmaskResult:
+        unresolved: dict[str, None] = {}
+        parts: list[str] = []
+        cursor = 0
+        for item in _restorations(self._session, text, budget, _ENCODED_RE):
+            self._shell.feed(text[cursor : item.start])
+            parts.append(text[cursor : item.start])
+            cursor = item.end
+            if item.value is None:
+                unresolved[item.placeholder] = None
+                parts.append(text[item.start : item.end])
+            else:
+                parts.append(shell_escape(item.value + item.suffix, self._quoted_context()))
+            self._shell.feed(text[item.start : item.end])
+        self._shell.feed(text[cursor:])
+        parts.append(text[cursor:])
+        return UnmaskResult("".join(parts), tuple(unresolved))
 
 
 class JsonEscapingSession:
     """Restores placeholders as JSON-string-escaped values (for tool-call ``arguments``).
 
     Inside a shell command string of the arguments (a top-level ``command``/``cmd``), a value
-    in a single-quoted string or a ``sed`` ``s`` replacement is escaped for it first
-    (:mod:`~pii_guard.gateway.shell_context`, LAB-1483). The instance reads one arguments text
-    in order, so use one per text (or per streamed arguments)."""
+    in a single-quoted, double-quoted or unquoted part or a ``sed`` ``s`` replacement is
+    escaped for it first (:mod:`~pii_guard.gateway.shell_context`, LAB-1483, LAB-1564). The
+    instance reads one arguments text in order, so use one per text (or per streamed
+    arguments)."""
 
     def __init__(self, session: VaultSession, budget: RestoreBudget | None = None) -> None:
         self._session = session
@@ -312,19 +436,19 @@ class JsonEscapingSession:
 
     @staticmethod
     def hold_from(buffer: str) -> int:
-        return _JSON_ESCAPE.hold_from(buffer)
+        return min(_JSON_ESCAPE.hold_from(buffer), _encoded_hold_from(buffer))
 
     def _plain(self, text: str, budget: RestoreBudget) -> UnmaskResult:
         unresolved: dict[str, None] = {}
         parts: list[str] = []
         cursor = 0
-        for item in _restorations(self._session, text, budget):
+        for item in _restorations(self._session, text, budget, _ENCODED_RE):
             self._context.feed(text[cursor : item.start])
             parts.append(text[cursor : item.start])
             cursor = item.end
             if item.value is None:
                 unresolved[item.placeholder] = None
-                parts.append(item.placeholder)
+                parts.append(text[item.start : item.end])
             else:
                 value = shell_escape(item.value + item.suffix, self._context.context())
                 parts.append(_json_string(value))
