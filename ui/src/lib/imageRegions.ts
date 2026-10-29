@@ -245,3 +245,19 @@ export function tagPlacements(
     return pick[0];
   });
 }
+
+/**
+ * The landing's enlarged crop of a card's text column (x1, y1, x2, y2 in image pixels): the text
+ * covers plus a margin, starting right of a photo cover that ends before the text (L2 carryover 2).
+ */
+export function zoomBox(regions: readonly LabelledRegion[], width: number, height: number, pad = 14): [number, number, number, number] | null {
+  const text = regions.filter((r) => r.policy === "mask" && r.source === "ocr" && r.cover_box);
+  if (!text.length) return null;
+  const left = Math.min(...text.map((r) => r.cover_box![0]));
+  const visualEdge = Math.max(0, ...regions.filter((r) => r.policy === "mask" && r.source !== "ocr" && r.cover_box && r.cover_box[2] < left).map((r) => r.cover_box![2] + 1));
+  const x1 = Math.max(0, visualEdge, left - pad);
+  const y1 = Math.max(0, Math.min(...text.map((r) => r.cover_box![1])) - pad);
+  const x2 = Math.min(width, Math.max(...text.map((r) => r.cover_box![2])) + pad);
+  const y2 = Math.min(height, Math.max(...text.map((r) => r.cover_box![3])) + pad);
+  return [x1, y1, x2, y2];
+}
