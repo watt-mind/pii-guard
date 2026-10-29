@@ -206,11 +206,25 @@ def create_app(
             **error_responses("traffic_log_not_local", common=False),
         },
     )
-    def healthz() -> dict[str, str]:
-        """``{"status": "ok", "version": ..., "ner": ...}`` while the server is up, also while
-        the NER model loads (``ner``: ``loading``). Needs no token, and touches no detector,
-        vault or upstream."""
-        return {"status": "ok", "version": __version__, "ner": warmup.state}
+    def healthz() -> dict[str, object]:
+        """``{"status": "ok", "version": ..., "ner": ..., "ocr": ...}`` while the server
+        is up, also while the NER model loads (``ner``: ``loading``). ``ocr`` is ``"on"``
+        when Tesseract is installed and ``"off"`` otherwise; ``image_require_ocr`` says
+        whether image requests are refused without it (503 ``ocr_unavailable``). Needs no
+        token, and touches no detector, vault or upstream."""
+        try:
+            from pii_guard.visual.ocr import tesseract_available
+
+            ocr = "on" if tesseract_available() else "off"
+        except Exception:  # the ocr extra is not installed: OCR is off, not an error
+            ocr = "off"
+        return {
+            "status": "ok",
+            "version": __version__,
+            "ner": warmup.state,
+            "ocr": ocr,
+            "image_require_ocr": settings.image_require_ocr,
+        }
 
     from pii_guard.projects.runtime import ProjectService
 

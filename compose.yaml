@@ -103,8 +103,9 @@ services:
       # The first start downloads the NER model before the server listens: allow for it.
       start_period: 900s
       # Healthy = /healthz answers and OCR is available (the image ships Tesseract); prints
-      # "ocr on|off". Images are refused (503 ocr_unavailable) without it (ADR 0006).
-      test: ["CMD", "python", "-c", "import os, sys, urllib.request; from pii_guard.visual.ocr import tesseract_available as t; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2); ok = t(); print('ocr', 'on' if ok else 'off'); sys.exit(0 if ok or os.environ.get('PII_GUARD_IMAGE_REQUIRE_OCR', 'true').lower() in ('false', '0', 'no', 'off') else 1)"]
+      # "ocr on|off" from /healthz itself ("ocr" + "image_require_ocr"). Images are
+      # refused (503 ocr_unavailable) without it (ADR 0006).
+      test: ["CMD", "python", "-c", "import json, urllib.request; r = json.load(urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2)); print('ocr', r.get('ocr')); sys.exit(0 if r.get('ocr') == 'on' or not r.get('image_require_ocr', True) else 1)"]
 
   # The Benchmarks view's index, built once per start from the committed run records (the Node
   # image has no Python): the UI's Vite plugin reads it from the shared volume (LAB-1356).

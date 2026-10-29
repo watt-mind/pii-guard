@@ -151,11 +151,9 @@ def test_a_failed_load_fails_closed_with_detection_unavailable(load: FakeLoad) -
             "ner model unavailable: ner model download failed (ConnectionError)"
         )
         assert "Retry-After" not in r.headers
-        assert client.get("/healthz").json() == {
-            "status": "ok",
-            "version": client.get("/healthz").json()["version"],
-            "ner": "failed",
-        }
+        health = client.get("/healthz").json()
+        assert health["status"] == "ok" and health["ner"] == "failed"
+        assert health["ocr"] in ("on", "off") and "image_require_ocr" in health
         status = client.get("/v1/status").json()["ner"]
         assert status["state"] == "failed"
         assert status["error"] == "ner model download failed (ConnectionError)"
