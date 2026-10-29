@@ -134,7 +134,8 @@ def collect_response_texts(body: object) -> CollectedTexts:
     _collect_input(body, out)
     instructions = body.get("instructions")
     if isinstance(instructions, str):
-        out.slots.append(TextSlot(instructions, _setter(body, "instructions"), "instructions"))
+        # Muse Code's instructions can quote numbered file lines: same gutters as chat system.
+        out.slots.append(_text_slot(body, "instructions", "instructions"))
     elif instructions is not None:
         raise InvalidChatRequestError("instructions must be a string or null")
     for key in _TOP_SCALAR:
@@ -297,7 +298,11 @@ def _collect_reasoning(item: dict[str, Any], where: str, out: CollectedTexts) ->
             if not isinstance(part, dict) or part.get("type") != part_type:
                 raise UnsupportedContentError(f"{at}: only {part_type!r} parts are supported")
             _reject_unknown(part, frozenset({"type", "text"}), at, "reasoning part")
-            _collect_string(part, "text", at, out, "reasoning")
+            text = part.get("text")
+            if isinstance(text, str):  # gutters as for chat reasoning (LAB-1583)
+                out.slots.append(_text_slot(part, "text", "reasoning"))
+            elif text is not None:
+                raise InvalidChatRequestError(f"{at}.text must be a string")
     blob = item.get("encrypted_content")
     if blob is not None and not isinstance(blob, str):  # opaque, forwarded untouched
         raise InvalidChatRequestError(f"{where}.encrypted_content must be a string or null")
