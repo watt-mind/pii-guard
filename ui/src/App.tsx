@@ -458,7 +458,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           {caps.accounts ? (
             <>
               All sample data is fictional. This page talks only to pii-guard, never to a model provider: pii-guard masks what you send and forwards it to the model your
-              endpoint or connection names. The round trip uses a simulated answer.
+              endpoint or connection names. The Playground round trip uses a simulated answer; the test request on Connect goes to your endpoint’s real model.
             </>
           ) : (
             <>
