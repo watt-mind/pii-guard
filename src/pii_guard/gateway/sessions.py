@@ -45,6 +45,7 @@ derive distinct sessions.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 import threading
@@ -177,7 +178,10 @@ def _owner_refuses(owner: str | None, identity: str) -> bool:
     ``anonymous`` presenting a credentialed owner: leaving ``Authorization`` out is the
     caller's choice and must not bypass the binding.
     """
-    return owner is not None and owner != "anonymous" and owner != identity
+    if owner is None or owner == "anonymous":
+        return False
+    # Constant time: ``identity`` is derived from the caller's ``Authorization`` value.
+    return not hmac.compare_digest(owner.encode(), identity.encode())
 
 
 def check_and_bind(session: VaultSession, identity: str) -> None:

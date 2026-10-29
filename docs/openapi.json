@@ -1426,7 +1426,7 @@
           "Masking"
         ],
         "summary": "Restore the original values behind placeholders",
-        "description": "Replace every placeholder the session issued with its original value.\n\nTokens shaped like a placeholder but unknown to the session are reported in\n``unresolved`` and left in place. Unknown or expired session: 404 ``not_found``.\nRestoring more than ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of original values:\n413 ``unmask_output_too_large``, nothing returned (LAB-1350).",
+        "description": "Replace every placeholder the session issued with its original value.\n\nTokens shaped like a placeholder but unknown to the session are reported in\n``unresolved`` and left in place. Unknown or expired session: 404 ``not_found``.\nRestoring more than ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of original values:\n413 ``unmask_output_too_large``, nothing returned (LAB-1350).\n\nA session a gateway request bound to a client identity (LAB-1565) restores only for that\nidentity (LAB-1580): a different ``Authorization`` value, or none for a credentialed\nowner, gets the same 404 as a missing session. Unbound sessions (``/v1/mask``) and\nanonymous-owned ones restore as before; unmasking never binds.",
         "operationId": "unmask_v1_unmask_post",
         "requestBody": {
           "content": {

@@ -738,7 +738,10 @@ class VaultSession:
         with self._lock:
             # Copy all mutable mask state together: entries, variants, memo references and
             # generation indexes must continue to refer to the same copied objects.
-            excluded = {"_lock", "_clock", "_known", "_parent", "_journal"}
+            # ``owner`` and ``incarnation`` are identity, not mask state: a concurrent
+            # ``check_and_bind`` (which does not take this lock) must not be reverted to the
+            # value the session had when the commit started (LAB-1580).
+            excluded = {"_lock", "_clock", "_known", "_parent", "_journal", "owner", "incarnation"}
             state = copy.deepcopy({k: v for k, v in vars(self).items() if k not in excluded})
             staged = copy.copy(self)
             staged.__dict__.update(state)

@@ -502,6 +502,34 @@ def test_recreated_session_starts_unowned() -> None:
         resolve_session(vault, BEARER_1, {}, "reborn-box")
 
 
+def test_owner_bound_during_an_image_fork_commit_survives(monkeypatch: pytest.MonkeyPatch) -> None:
+    # ``check_and_bind`` does not take the session lock, so it can land while ``commit``
+    # replays a fork's journal on its staged copy. The commit must not copy the owner the
+    # session had when it started back over the new binding.
+    from pii_guard.vault.vault import VaultSession
+
+    vault = Vault(KEY_A)
+    session, _, _ = resolve_session(vault, {}, {}, "fork-box")
+    assert session.owner == "anonymous"
+    fork = session.fork()
+    fork.mask("Teszt Elek írt.", [])
+    replay = VaultSession.mask_with_report
+
+    def bind_mid_commit(self: VaultSession, *args: Any, **kwargs: Any) -> Any:
+        if self is not session and self is not fork:  # the staged copy inside commit()
+            sessions.check_and_bind(session, client_identity(BEARER_1))
+        return replay(self, *args, **kwargs)
+
+    monkeypatch.setattr(VaultSession, "mask_with_report", bind_mid_commit)
+    incarnation = session.incarnation
+    session.commit(fork)
+
+    assert session.owner == client_identity(BEARER_1)
+    assert session.incarnation == incarnation
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, BEARER_2, {}, "fork-box")
+
+
 def _shared_gateway(vault: Vault, cache: Any, upstream: MockUpstream) -> Any:
     """A per-request gateway on a shared vault and cache, as the hosted and project runtimes
     build them (``hosted/runtime.py``, ``projects/runtime.py``)."""
