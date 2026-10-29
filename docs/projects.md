@@ -43,6 +43,16 @@ new keys. Deleting an endpoint permanently removes its configuration and key rec
 applies to new admissions; a request that already captured its endpoint configuration may
 finish with that snapshot.
 
+With `PII_GUARD_API_TOKEN` set, `/e/{endpoint_id}/v1` routes are admitted only by an endpoint
+key sent as `Authorization: Bearer <key>` (any letter case, ASCII space padding). Calling one
+with only the API token, as either header, returns 403; earlier releases could fall through to
+local owner access. An endpoint key sent together with `X-PII-Guard-Token` is also 403, and an
+endpoint key on a route outside `/e/` is 401. The gateway removes an `Authorization` header
+when one of its whitespace-separated fields (or the whole value) equals the API token, so the
+token is not forwarded to the provider as a bring-your-own key. Other encodings are not
+detected: an HTTP Basic credential that contains the token, or the token joined to other text
+by punctuation (such as `key:<token>`), is forwarded unchanged.
+
 ## Isolation and lifetime
 
 The hosted owner remains the account identity. Hosted management operations require that
