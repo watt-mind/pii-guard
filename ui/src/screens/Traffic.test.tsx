@@ -369,7 +369,7 @@ describe("Upstream refusals in the drawer (LAB-1335)", () => {
     const note = await screen.findByText("The upstream refused the masked request (HTTP 404).");
     const box = note.closest("[role=note]")!;
     expect(box).toHaveTextContent("model not found on the upstream? Pick another model");
-    expect(box).toHaveTextContent("Nothing unmasked left pii-guard.");
+    expect(box).toHaveTextContent("Nothing unmasked left PII Guard.");
     expect(box).not.toHaveTextContent("Nothing was sent to the model");
   });
 

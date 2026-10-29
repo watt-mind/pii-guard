@@ -1,8 +1,8 @@
 # Evaluation datasets
 
-pii-guard is scored on more than its own hand-written fixtures. This page lists every
+PII Guard is scored on more than its own hand-written fixtures. This page lists every
 registered dataset: where it comes from, its licence, what is committed, how its labels map to
-pii-guard types, and which split it belongs to. The registry lives in
+PII Guard types, and which split it belongs to. The registry lives in
 [`src/pii_guard/eval/datasets/`](../src/pii_guard/eval/datasets/), one module per dataset.
 Results, with bootstrap confidence intervals, are in
 [benchmarks.md](benchmarks.md#results-per-dataset).
@@ -46,7 +46,7 @@ set here and every `dev` set, which NER candidates are selected on, by text wher
 | `pl-pii-bench` | [pl-pii-bench/pl-pii-bench](https://huggingface.co/datasets/pl-pii-bench/pl-pii-bench) v1.0.0 @ `bef947d` | CC-BY-4.0 | pl | 346 | test | yes (synthetic) |
 | `mapa-eur-lex` | [piimb/mapa-eur-lex-pii](https://huggingface.co/datasets/piimb/mapa-eur-lex-pii), `test.jsonl` @ `a44958f` | CC-BY-4.0 | 21 EU languages | 42 | test | **no**: real EU court documents |
 | `tab-echr` | [TAB](https://github.com/NorskRegnesentral/text-anonymization-benchmark), `echr_test.json` @ `558e09e` | MIT (annotations) | en | 40 | test | **no**: real court documents |
-| `agent-traffic` | pii-guard's seeded generator ([below](#synthetic-agent-traffic)) | Apache-2.0 | hu, en, de | 990 | test | yes (generated) |
+| `agent-traffic` | PII Guard's seeded generator ([below](#synthetic-agent-traffic)) | Apache-2.0 | hu, en, de | 990 | test | yes (generated) |
 | `agent-traffic-dev` | the same generator, another seed | Apache-2.0 | hu, en, de | 300 | dev | yes (generated) |
 
 Attribution, as the licences require:
@@ -92,7 +92,7 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
 - **`cee-pii`**: the only public set we found with Hungarian identifiers (checksum-valid TAJ
   numbers). It adds deliberate noise (stripped diacritics, OCR confusions) and unlabelled
   order and tracking numbers. Another detector's authors wrote it as their benchmark, so it
-  is a fair third-party set for pii-guard.
+  is a fair third-party set for PII Guard.
 - **`pl-pii-bench`**: the first Polish set. It was scored before the `pl` language pack existed
   (LAB-1392) and again with it (LAB-1400, report-only: the pack was tuned on other sets). It has complete, exhaustively annotated synthetic administrative documents, so precision is
   meaningful. Its identifiers are checksum-valid, and a separate negative lane holds
@@ -100,7 +100,7 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
   Polish cases. Five of its seven public lanes are used; the `robustness` and `pdf` lanes
   are re-renderings of `core` and are left out. Its card asks that nobody train on it. PESEL,
   ID card, passport, driving licence and NIP are `ID_DOCUMENT`; REGON (a business number)
-  and VIN have no pii-guard type. Its maintainer also maintains one of the systems it
+  and VIN have no PII Guard type. Its maintainer also maintains one of the systems it
   scores.
 - **`mapa-eur-lex`**: two long Advocate General opinions in 21 EU languages, including
   Hungarian, Czech, Slovak and Romanian. It is the only set with most EU languages, and the
@@ -124,10 +124,10 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
 
 ## Label mapping
 
-Each dataset's labels map to [pii-guard types](entities.md). The rules match the Ai4Privacy
+Each dataset's labels map to [PII Guard types](entities.md). The rules match the Ai4Privacy
 conversion:
 
-- **Policy-excluded labels become ignore regions.** These are labels pii-guard has no type
+- **Policy-excluded labels become ignore regions.** These are labels PII Guard has no type
   for: any date, IP and MAC addresses, customer and employee ids, PINs, passwords, API keys,
   user names, health and demographic attributes, routing and SWIFT codes, and contract or
   policy references. An ignore region (`meta.ignore`: offsets and label, no value) is left
@@ -137,7 +137,7 @@ conversion:
   street and a building number, separated only by spaces or a comma (≤ 3 characters), become
   one span.
 - **Address parts count only inside an address.** A city, state, county or postcode merged
-  into an address is `ADDRESS`. On its own it is an ignore region, because pii-guard keeps a
+  into an address is `ADDRESS`. On its own it is an ignore region, because PII Guard keeps a
   town on its own.
 - **Company names are `ORGANIZATION`**, a `keep` type. They count for recall but are never a
   leak.
@@ -206,7 +206,7 @@ UV_PROJECT_ENVIRONMENT=.venv-baselines uv run --no-sync \
 
 - **Downloads** go to `data/datasets/raw/` (git-ignored) and are checked against the pinned
   SHA-256 before use.
-- **Parquet** sources need `pyarrow`, which pii-guard doesn't depend on. Only `fetch` reads
+- **Parquet** sources need `pyarrow`, which PII Guard doesn't depend on. Only `fetch` reads
   Parquet; the committed samples are JSONL.
 - **`run --record`** writes a run record per system to `eval/results/runs/` (the usual
   format) and the per-document counts to `eval/datasets/results/<run_id>.json`. The counts

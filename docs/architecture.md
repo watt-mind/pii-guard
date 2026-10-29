@@ -86,7 +86,7 @@ matcher, prompt notes, stopwords; the worked example of [languages.md](languages
   same person gets the same placeholder within a session, and placeholders are neither
   guessable nor linkable across tenants. See [ADR 0007](decisions/0007-keyed-pseudonyms.md).
 - The **mapping** (placeholder → original value, plus its inflected surface forms) is held in
-  memory or an encrypted store with a TTL. It never leaves pii-guard.
+  memory or an encrypted store with a TTL. It never leaves PII Guard.
 - **Re-identification** replaces placeholders in the response with the original value,
   re-applying the inflection the model used where the language needs it.
 
@@ -135,14 +135,14 @@ Moved here from the README.
   timeout, a model error or a malformed answer blocks the request; nothing is sent unmasked.
 - **Keyed, reversible pseudonyms** ([ADR 0007](decisions/0007-keyed-pseudonyms.md)).
   HMAC-derived placeholders, the same within a conversation, unlinkable across sessions and
-  tenants. The mapping lives only in pii-guard's session vault, with a TTL.
+  tenants. The mapping lives only in PII Guard's session vault, with a TTL.
 - **Streaming-safe restore.** Placeholders split across chunks (`[[PERS` + `ON_7f3a]]`) are
   held back until complete, in content and in tool-call arguments.
 - **Layered detection with one resolver:** rules with checksums (Hungarian tax and TAJ
   numbers, IBAN, giro accounts, company IDs, US SSN, UK NINO, payment cards…), the NER model
   (fast mode, the default), the LLM detector (audit mode, opt-in), merged by one
   deterministic resolver.
-- **The LLM never rewrites your text.** It only names spans; pii-guard finds them in the
+- **The LLM never rewrites your text.** It only names spans; PII Guard finds them in the
   original, drops anything the model invented, and lets checksum-validated rules win on
   structured IDs. A hallucination can't add text, and a disagreement can't unmask anything.
 - **Grammar-aware placeholders.** Hungarian case endings stay outside the placeholder

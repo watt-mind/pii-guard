@@ -2,13 +2,13 @@
 
 | Doc | What it covers |
 |---|---|
-| [why-pii-guard.md](why-pii-guard.md) | What is different about pii-guard, each claim with its evidence and status |
+| [why-pii-guard.md](why-pii-guard.md) | What is different about PII Guard, each claim with its evidence and status |
 | [vision.md](vision.md) | The problem, who it is for, goals and non-goals |
 | [architecture.md](architecture.md) | Components, data flow, APIs, the gateway and streaming re-identification |
 | [private-dev.md](private-dev.md) | Tailnet-only dev networking, proxy credentials, app-only releases and live activation gates |
 | [hosted.md](hosted.md) | Hosted deployment, trust boundary, actual retention, release gates and rollback |
 | [projects.md](projects.md) | Projects, immutable policy versions, endpoint configuration and persistence boundaries |
-| [privacy-model.md](privacy-model.md) | Threat model, what pii-guard guarantees and what it does not |
+| [privacy-model.md](privacy-model.md) | Threat model, what PII Guard guarantees and what it does not |
 | [entities.md](entities.md) | The entity taxonomy: what counts as personal data, per language |
 | [evaluation.md](evaluation.md) | Synthetic benchmark, metrics, baselines, how results are reported |
 | [languages.md](languages.md) | Adding a language: the language pack, the conformance suite, what "done" means |

@@ -1,4 +1,4 @@
-# Design: pii-guard console
+# Design: PII Guard console
 
 The locked design system for `ui/`. Every screen follows it; extend this file when the system
 needs to grow instead of styling one screen on its own. Tokens live in `src/index.css`.
@@ -12,7 +12,7 @@ family, not an inversion. "System" stays available in the theme toggle.
 The look and feel follows the account console of a hosted inference provider
 (reference: https://app.fireworks.ai/account/home, measured 2026-10-28): a warm off-white canvas
 under white cards, warm neutrals, a plum primary, a magenta-plum accent family and a light neo-grotesk. Only
-the feel is shared. The name, logo, copy and fonts are pii-guard's own; no marks, logos or
+the feel is shared. The name, logo, copy and fonts are PII Guard's own; no marks, logos or
 proprietary fonts of the reference are used.
 
 ## Colour carries meaning
@@ -223,8 +223,11 @@ merged.
   Groups (Inspect, Set up, Measure) keep the sections in their order; Overview stands alone at
   the top. Hints under each label show only in the phone menu.
 - **Brand row:** 48 px from 1024 px, the height of the page header bar, in the nav items'
-  gutter so the mark sits over their icons: a 24 px shield glyph (no tile) and "pii-guard" in
-  Geist 16/500. The product is always written "pii-guard": console, landing and copy.
+  gutter so the mark sits over their icons: a 24 px shield glyph (no tile) and "PII Guard" in
+  Geist 16/500. The product is written "PII Guard" wherever a person reads it: the wordmark,
+  headings, copy, the page title and share tags. `pii-guard`, in code font, is only for what is
+  typed or read by a machine: the CLI, the package, the repo, env vars, headers, file and image
+  names. Never "PIIGuard" or "Pii Guard" (LAB-1486; `src/wordmark.test.tsx` checks it).
 - **Sidebar footer:** the Engine select, then the connection as a quiet line beside the theme
   control: a 6 px dot and the API version in muted 12 px, with "API connected · fast mode ·
   rules" in the tooltip (a click checks again). The label only appears when something differs:
@@ -235,8 +238,8 @@ merged.
   1024 px. Below that width the menu's top bar names the section and the hairline sits under it.
 - **Hosted landing:** composed from the console's own components, so it can't drift from the
   dashboard: `Logo` and the 56/48 px header over the `header-hairline`, `Card`, `Pane` and
-  `Boundary` for the demo (your text → pii-guard → sent to the model, then the model's answer →
-  pii-guard → restored), `MaskedText`, `RestoredText`, `Placeholder` and `Legend` for values,
+  `Boundary` for the demo (your text → PII Guard → sent to the model, then the model's answer →
+  PII Guard → restored), `MaskedText`, `RestoredText`, `Placeholder` and `Legend` for values,
   `Notice`, `Metric`, `KeyValues`, `Badge`, `Field`, `SegmentedControl` and `ThemeToggle`.
   Values are marked exactly as in the Playground: a value in your text and its placeholder are
   masked blue (`meta.mark`, `<Placeholder>`), a value put back is restored green. The image

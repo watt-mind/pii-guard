@@ -104,7 +104,7 @@ function GatewayLine({ status, server, gateway }: { status: ServerStatusState; s
           "Asking the server…"
         ) : (
           <>
-            The default address: {status.state === "missing" ? "this server doesn't report its own" : "the pii-guard API isn't reachable"}. Start it with {mono("pii-guard up")}{" "}
+            The default address: {status.state === "missing" ? "this server doesn't report its own" : "the PII Guard API isn't reachable"}. Start it with {mono("pii-guard up")}{" "}
             and the blocks above use the URL it serves.
           </>
         )}

@@ -91,7 +91,8 @@ def test_python_dash_m() -> None:
         check=False,
     )
     assert result.returncode == 0
-    assert "pii-guard" in result.stdout
+    assert "usage: pii-guard" in result.stdout
+    assert "PII Guard, a privacy firewall" in result.stdout  # the wordmark (LAB-1486)
 
 
 # --- API --------------------------------------------------------------------

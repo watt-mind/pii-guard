@@ -8,7 +8,7 @@ describe("error copy per code (LAB-1335)", () => {
     expect(c.title).toBe("The upstream refused the masked request (HTTP 404).");
     expect(c.body).toContain("The masked request reached the upstream, which answered 404");
     expect(c.body).toContain("model not found on the upstream? Pick another model");
-    expect(c.body).toContain("Nothing unmasked left pii-guard.");
+    expect(c.body).toContain("Nothing unmasked left PII Guard.");
     expect(`${c.title} ${c.body}`).not.toMatch(/Nothing was sent|fails closed/);
   });
 
@@ -38,7 +38,7 @@ describe("error copy per code (LAB-1335)", () => {
   it("separates an unreachable guard, a missing upstream and a broken stream", () => {
     expect(errorCopy("unreachable").title).toBe("The guard is not reachable. Nothing was sent.");
     expect(errorCopy("upstream_not_configured").kind).toBe("not_configured");
-    expect(errorCopy("upstream_unavailable").body).toContain("Nothing unmasked left pii-guard.");
+    expect(errorCopy("upstream_unavailable").body).toContain("Nothing unmasked left PII Guard.");
     expect(errorCopy("stream_failed").kind).toBe("stream");
   });
 

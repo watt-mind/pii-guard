@@ -1,6 +1,6 @@
-# Why pii-guard
+# Why PII Guard
 
-What pii-guard does that we did not find elsewhere, and the evidence for each claim. Every
+What PII Guard does that we did not find elsewhere, and the evidence for each claim. Every
 number links to a committed file on `develop`: a run record, a scorecard, a test or a decision
 record. Where the only source is a write-up of a run whose scorecard is not committed, the
 link goes to that write-up and says so. All data behind these numbers is fictional
@@ -15,7 +15,7 @@ As of 2026-10-28, `develop` at `5581013`. Fast mode below means the published NE
 [benchmarks.md](benchmarks.md): the hand-written set from [results by fixture
 set](benchmarks.md#smoke), the public and agent-traffic test splits from [results per
 dataset](benchmarks.md#results-per-dataset). When a number changes, update it here, in the
-README's "Why pii-guard" section, in [submission.md](submission.md) and in
+README's "Why PII Guard" section, in [submission.md](submission.md) and in
 [journey.md](journey.md) together.
 
 | # | Differentiator | Headline evidence | Status |
@@ -37,11 +37,11 @@ README's "Why pii-guard" section, in [submission.md](submission.md) and in
 ## 1. Reversible placeholders, consistent for a whole session
 
 Most redaction tools replace a value with `[REDACTED]` or `<PERSON>`, so the model's answer
-can't name the person you asked about. pii-guard swaps each value for a keyed placeholder
+can't name the person you asked about. PII Guard swaps each value for a keyed placeholder
 (`[[PERSON_525263]]`), the same one every time that value appears in the conversation, and
 puts the real value back in the answer, also while it streams, also inside tool-call
 arguments. Placeholders are HMAC-derived, so they are unlinkable across sessions and tenants,
-and the mapping never leaves pii-guard's vault.
+and the mapping never leaves PII Guard's vault.
 
 - **Evidence:** round trip 100 % (every document unmasks back to the original exactly) on the
   hand-written set, in fast mode ([benchmarks.md](benchmarks.md#smoke)). Placeholder
@@ -63,7 +63,7 @@ and the mapping never leaves pii-guard's vault.
 ## 2. Grammar-aware: Hungarian inflection in and out
 
 In Hungarian a name changes with every case: `Próba Zsuzsanna`, `Próba Zsuzsannának`,
-`Próba Zsuzsannával`. pii-guard keys every form on its lemma, so all of them get the same
+`Próba Zsuzsannával`. PII Guard keys every form on its lemma, so all of them get the same
 placeholder, keeps the case ending outside it (`[[PERSON_x]]nak`) so the model still writes
 grammatical sentences, and re-inflects the stem on unmask. Grammar lives in the language pack,
 so every detector benefits.
@@ -155,8 +155,8 @@ scorer, on our hand-written set and on public and generated test sets.
 | Presidio | 64.9 | 24.3 | 27.5 |
 | LLM Guard | 53.2 | 45.1 | 36.7 |
 | PrivAiTe | 55.2 | 12.7 | 25.8 |
-| **pii-guard fast (rules + NER `v2.0`)** | **94.3** | **0.0** | **1.1** |
-| pii-guard audit (rules + NER + Muse Spark Open) | 98.2 | 0.6 | 1.1 |
+| **PII Guard fast (rules + NER `v2.0`)** | **94.3** | **0.0** | **1.1** |
+| PII Guard audit (rules + NER + Muse Spark Open) | 98.2 | 0.6 | 1.1 |
 
 Leak on the test splits of the public and generated datasets, in %:
 
@@ -165,7 +165,7 @@ Leak on the test splits of the public and generated datasets, in %:
 | Presidio | 12.8 | 36.5 | 12.4 | **18.8** | 29.6 |
 | LLM Guard | 28.8 | 75.8 | 20.2 | 59.3 | 43.8 |
 | PrivAiTe | 4.0 | 4.4 | **2.4** | 27.6 | 9.5 |
-| **pii-guard fast** | **0.7** | **0.4** | 2.6 | 19.1 | 0.4 † |
+| **PII Guard fast** | **0.7** | **0.4** | 2.6 | 19.1 | 0.4 † |
 
 † In-distribution: the NER trained on rows of this dataset's train split. The same recipe
 trained without any of them leaks 13.8 %, behind PrivAiTe's 9.5 %
@@ -177,7 +177,7 @@ trained without any of them leaks 13.8 %, behind PrivAiTe's 9.5 %
   tools' configurations and the label mapping:
   [eval/results/2026-10-26-baselines/comparison.md](../eval/results/2026-10-26-baselines/comparison.md);
   the fresh one: [eval/results/2026-10-27-comparison/README.md](../eval/results/2026-10-27-comparison/README.md).
-- **Where pii-guard is not ahead:** on finance text it is level with Presidio (19.1 vs 18.8 %)
+- **Where PII Guard is not ahead:** on finance text it is level with Presidio (19.1 vs 18.8 %)
   and on agent traffic within 0.2 points of PrivAiTe (2.6 vs 2.4 %). Fast mode also
   over-masks more than the leak numbers show on CEE-PII (39.4 %) and agent traffic (14.0 %);
   Presidio and PrivAiTe over-mask more still on most sets (Presidio 52.5 % on CEE-PII).
@@ -192,7 +192,7 @@ trained without any of them leaks 13.8 %, behind PrivAiTe's 9.5 %
 
 ## 6. The LLM can only point, never write; red-teamed
 
-The LLM detector returns the strings it thinks are personal data. pii-guard finds each one in
+The LLM detector returns the strings it thinks are personal data. PII Guard finds each one in
 the original text itself, drops anything the model invented, and lets checksum-validated rules
 keep their spans. A hallucination can't add text and a disagreement can't unmask anything: the
 model can only add spans. Then we attacked it: 62 fictional messages in 15 attack classes
@@ -227,14 +227,14 @@ value and four decoys), on 81 fictional documents in Hungarian, English and Germ
 - **Evidence:** [eval/results/2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md).
 - **What we conclude:** placeholders hold against reconstruction from the text alone, but
   someone who already holds a short candidate list links a document to the right person about
-  twice as often as chance. pii-guard is **pseudonymisation, not anonymisation**, and the docs
+  twice as often as chance. PII Guard is **pseudonymisation, not anonymisation**, and the docs
   say so ([privacy-model.md](privacy-model.md)). Generalising the remaining context is filed
   (LAB-1152, triage).
 - **Status:** shipped (LAB-1088).
 
 ## 8. A drop-in gateway that fails closed
 
-Adopting pii-guard is a change of API base URL: it is an OpenAI-compatible
+Adopting PII Guard is a change of API base URL: it is an OpenAI-compatible
 `/v1/chat/completions` proxy with streaming, tool calls and per-message detection caching
 (chat clients resend the whole history; only new messages are detected). It masks the places
 agents actually leak data: tool definitions, `response_format` JSON schemas and request
@@ -254,7 +254,7 @@ metadata, not just message text.
 
 ## 9. Images: faces, signatures, machine-readable zones
 
-Scans and photos carry personal data too. pii-guard finds faces, ID photos and signatures with
+Scans and photos carry personal data too. PII Guard finds faces, ID photos and signatures with
 SAM 3.1, finds machine-readable zones (MRZ) on ID documents by their OCR layout, fills the
 regions and strips metadata before the image goes anywhere.
 
@@ -275,7 +275,7 @@ Recall is the share of labelled regions masked with IoU ≥ 0.5. MRZ: [tests/vis
 - **Against other tools (LAB-1164, shipped):** on the 65 specimens, portraits 90.8 % vs Eka
   PII Redaction 55–57 %, signatures 83.8 % vs 46–49 %, MRZ 80.0 % vs at most 10 %; Presidio
   Image Redactor is text-only and masks none of these. On printed text Eka is ahead of
-  pii-guard (32.5 % vs 30.3 % with the LLM detector, 15.0 % with rules alone), at 2.5 times
+  PII Guard (32.5 % vs 30.3 % with the LLM detector, 15.0 % with rules alone), at 2.5 times
   the over-masking. All systems, with run conditions:
   [image baselines](../eval/results/2026-10-27-image-baselines/README.md),
   [journey.md, milestone 26](journey.md#26-image-masking-against-presidio-image-redactor-and-eka-2026-10-27).

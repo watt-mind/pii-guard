@@ -1,7 +1,7 @@
 # Using the gateway
 
-pii-guard's gateway is a drop-in for any OpenAI-compatible client: point the client at
-pii-guard instead of the provider. Every message is masked when it arrives, the masked request
+PII Guard's gateway is a drop-in for any OpenAI-compatible client: point the client at
+PII Guard instead of the provider. Every message is masked when it arrives, the masked request
 is forwarded, and the answer (streamed or not) comes back with the real values restored. How it
 is built: [architecture.md](architecture.md#gateway-the-proxy). Running and exposing it:
 [operations.md](operations.md).

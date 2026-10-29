@@ -1,6 +1,6 @@
-# Muse Code behind pii-guard
+# Muse Code behind PII Guard
 
-[Muse Code](https://dev.meta.ai) is Meta's terminal coding agent. With pii-guard in between,
+[Muse Code](https://dev.meta.ai) is Meta's terminal coding agent. With PII Guard in between,
 Muse reads your files, runs tools and writes code as usual. The model only ever sees
 placeholders, and Muse's tool calls come back with the real values, so the files it writes are
 correct.

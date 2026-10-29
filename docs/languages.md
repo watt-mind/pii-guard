@@ -1,6 +1,6 @@
 # Adding a language
 
-pii-guard ships Hungarian (`hu`), English (`en`), German (`de`) and Polish (`pl`). Everything a language
+PII Guard ships Hungarian (`hu`), English (`en`), German (`de`) and Polish (`pl`). Everything a language
 contributes is one **language pack**: a Python package with one `LanguagePack` object
 ([ADR 0010](decisions/0010-language-pack-plugins.md)). The components (rule detector, vault,
 LLM detector, evaluation) ask the pack registry for the text's language and fall back to
@@ -65,7 +65,7 @@ pl = "pii_guard_polish.pl:pack"
 
 The entry point names a `LanguagePack` or, as in the skeleton, a function returning one
 (packs load lazily, on first use). An installed entry point with the code of a built-in pack
-replaces it. A pack that fails to load raises `LanguagePackError`: pii-guard fails closed
+replaces it. A pack that fails to load raises `LanguagePackError`: PII Guard fails closed
 rather than silently running without the language.
 
 ### 2. Write the smoke fixtures first

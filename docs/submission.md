@@ -69,7 +69,7 @@ One rule decides where each model runs: anything that sees real personal data is
 | Field | Link |
 |---|---|
 | Repository | https://github.com/watt-mind/pii-guard |
-| Why pii-guard (evidence for every claim) | https://github.com/watt-mind/pii-guard/blob/develop/docs/why-pii-guard.md |
+| Why PII Guard (evidence for every claim) | https://github.com/watt-mind/pii-guard/blob/develop/docs/why-pii-guard.md |
 | Benchmarks (every run, with charts) | https://github.com/watt-mind/pii-guard/blob/develop/docs/benchmarks.md |
 | Journey (milestones, before/after numbers, spend) | https://github.com/watt-mind/pii-guard/blob/develop/docs/journey.md |
 | Models (which Meta model does what) | https://github.com/watt-mind/pii-guard/blob/develop/docs/models.md |

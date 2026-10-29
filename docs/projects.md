@@ -81,7 +81,7 @@ matching tenant key through approved secret management. Rotating the tenant key 
 re-encrypting the database makes stored provider credentials unavailable. Do not log database
 rows, credential envelopes, key material or raw endpoint keys.
 
-For local self-hosting, when no tenant key is configured, pii-guard creates a random
+For local self-hosting, when no tenant key is configured, PII Guard creates a random
 `project-storage.key` beside the database with owner-only permissions. Back up that key with
 the database; losing either or restoring them from different points makes stored credentials
 unavailable. Existing environment-based upstream configuration remains available for the local

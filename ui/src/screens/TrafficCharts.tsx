@@ -58,7 +58,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
   return (
     <div className="@container">
       <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-3 @xl:grid-cols-4">
-        <Figure label="pii-guard added" value={formatMsShort(w.overhead)} strong testId="wf-overhead" />
+        <Figure label="PII Guard added" value={formatMsShort(w.overhead)} strong testId="wf-overhead" />
         <Figure label="Model (upstream)" value={w.upstream > 0 ? formatMsShort(w.upstream) : "not called"} testId="wf-upstream" />
         <Figure label="Total" value={formatMsShort(w.total)} testId="wf-total" />
         {w.addedTtft !== null ? (
@@ -102,7 +102,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
               {formatMsShort(r.ms)}
               <span className="sr-only">
                 {" "}
-                {r.kind === "upstream" ? "waiting on the model" : r.kind === "other" ? "not in any stage" : "pii-guard"}
+                {r.kind === "upstream" ? "waiting on the model" : r.kind === "other" ? "not in any stage" : "PII Guard"}
                 {r.ttfbMs ? `, headers after ${formatMsShort(r.ttfbMs)}` : ""}
               </span>
             </span>
@@ -111,11 +111,11 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
       </ol>
       <p className="mt-3 text-xs text-muted">
         <span className="tabular-nums">
-          {formatMsShort(w.total)} total = {formatMsShort(w.upstream)} model + {formatMsShort(w.overhead)} pii-guard ({formatMsShort(w.own)} in stages
+          {formatMsShort(w.total)} total = {formatMsShort(w.upstream)} model + {formatMsShort(w.overhead)} PII Guard ({formatMsShort(w.own)} in stages
           {w.other > 0 ? ` + ${formatMsShort(w.other)} other` : ""}).
         </span>{" "}
         {w.rows.find((r) => r.key === "forward" && r.ms >= w.own / 2)
-          ? "Forward (most of pii-guard's time here) is serialising the masked body and opening the HTTP connection to the model. "
+          ? "Forward (most of PII Guard's time here) is serialising the masked body and opening the HTTP connection to the model. "
           : ""}
         {event.stream
           ? `Streamed: unmasking runs between upstream reads and is shown summed after it${w.ttft !== null ? `; first token to the client after ${formatMsShort(w.ttft)}` : ""}.`
@@ -178,7 +178,7 @@ export function OverheadChart({ events }: { events: TrafficEvent[] }) {
         width={width}
         height={height}
         role="img"
-        aria-label={`pii-guard overhead per call, last ${pts.length} calls: now p50 ${formatMsShort(last.p50)}, p95 ${formatMsShort(last.p95)} over the last 20 calls.`}
+        aria-label={`PII Guard overhead per call, last ${pts.length} calls: now p50 ${formatMsShort(last.p50)}, p95 ${formatMsShort(last.p95)} over the last 20 calls.`}
         className="block touch-none overflow-visible font-sans"
         onPointerMove={(e) => pick(e.clientX, e.currentTarget.getBoundingClientRect())}
         onPointerLeave={() => setHover(null)}
@@ -262,7 +262,7 @@ export function ModeChart({ events }: { events: TrafficEvent[] }) {
   const max = niceCeil(Math.max(...rows.map((r) => r.p95)) * 1.1);
   return (
     <div>
-      <ul className="space-y-3" aria-label="pii-guard overhead by gateway mode">
+      <ul className="space-y-3" aria-label="PII Guard overhead by gateway mode">
         {rows.map((r) => (
           <li key={r.mode}>
             <p className="mb-1 flex items-baseline justify-between gap-2 text-sm">
@@ -313,7 +313,7 @@ export function StageChart({ events, onSelect }: { events: TrafficEvent[]; onSel
           <span>{formatMsShort(max)}</span>
           <span>0</span>
         </div>
-        <ol aria-label={`pii-guard's own stages per call, last ${recent.length} calls`} className="flex h-40 flex-1 items-end gap-[2px] border-b border-line">
+        <ol aria-label={`PII Guard's own stages per call, last ${recent.length} calls`} className="flex h-40 flex-1 items-end gap-[2px] border-b border-line">
           {recent.map((e) => {
             const parts = OWN_STAGES.map((k) => [k, e.timing.stages_ms[k] ?? 0] as const).filter(([, v]) => v > 0);
             const label = parts.map(([k, v]) => `${STAGE_LABEL[k]} ${formatMsShort(v)}`).join(", ");

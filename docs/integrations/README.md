@@ -1,4 +1,4 @@
-# Integrations: putting a client behind pii-guard
+# Integrations: putting a client behind PII Guard
 
 The gateway is an OpenAI-compatible endpoint: `POST /v1/chat/completions`,
 `POST /v1/responses` (the Responses API) and `GET /v1/models` at `http://127.0.0.1:8787/v1`. A

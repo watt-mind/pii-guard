@@ -250,7 +250,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
           )}
         </Pane>
 
-        <Boundary direction="inbound" label="pii-guard boundary: placeholders are restored on the way back">
+        <Boundary direction="inbound" label="PII Guard boundary: placeholders are restored on the way back">
           <div className="flex flex-row items-center gap-2 lg:flex-col">
             <Button variant="primary" onClick={() => void stream()} busy={streaming} disabled={!streaming && answer.trim() === ""} className="lg:w-full">
               <span aria-hidden="true">▶</span> Stream
@@ -317,7 +317,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
                         <code className="font-mono text-ink">{u}</code>
                       </span>
                     ))}
-                    , which this session never issued. pii-guard doesn't guess: it leaves the token visible so a person can check it.
+                    , which this session never issued. PII Guard doesn't guess: it leaves the token visible so a person can check it.
                   </p>
                 </Notice>
               )}
@@ -358,7 +358,7 @@ function RoundTripIntro({ live = false }: { live?: boolean }) {
         {live ? "The answer comes back with the masked values restored." : "The answer comes back with the real names in it."}
       </h2>
       <p className="mt-0.5 text-sm text-pretty text-muted">
-        A replay of the document from Mask a document with a simulated, editable model answer. The model writes about placeholders; on the way back, pii-guard swaps them
+        A replay of the document from Mask a document with a simulated, editable model answer. The model writes about placeholders; on the way back, PII Guard swaps them
         for the original values, even mid-stream, when a placeholder is split across two chunks.
       </p>
     </div>

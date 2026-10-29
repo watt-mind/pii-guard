@@ -72,6 +72,11 @@ def _contracts_error_table() -> dict[str, int]:
     }
 
 
+def test_the_docs_name_the_product(spec: dict[str, Any]) -> None:
+    """The /docs page title is the wordmark; the command stays ``pii-guard`` (LAB-1486)."""
+    assert spec["info"]["title"] == "PII Guard"
+
+
 def test_every_schema_has_a_description(spec: dict[str, Any]) -> None:
     missing = [
         name

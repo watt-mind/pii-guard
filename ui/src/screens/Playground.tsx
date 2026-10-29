@@ -194,7 +194,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           )}
         </Pane>
 
-        <Boundary direction="outbound" label="pii-guard boundary: only masked text crosses it">
+        <Boundary direction="outbound" label="PII Guard boundary: only masked text crosses it">
           {summary && fresh && (
             <dl className="flex gap-3 text-center lg:flex-col lg:gap-2">
               <Metric label="found" value={summary.detected} className="min-w-12" />
@@ -275,7 +275,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                     </span>
                   ),
                 },
-                { label: "Engine", value: result.engine === "api" ? "pii-guard API" : "Demo engine (in browser)" },
+                { label: "Engine", value: result.engine === "api" ? "PII Guard API" : "Demo engine (in browser)" },
                 { label: "Round trip", value: <span className="tabular-nums">{result.ms} ms</span> },
               ]}
             />

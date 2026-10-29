@@ -181,7 +181,7 @@ describe("Overview", () => {
     const overview = region("Overview");
     expect(await within(overview).findByText(title)).toBeInTheDocument();
     expect(within(overview).getByText(body)).toBeInTheDocument();
-    expect(within(overview).queryByText("The pii-guard API isn't reachable.")).toBeNull();
+    expect(within(overview).queryByText("The PII Guard API isn't reachable.")).toBeNull();
   });
 
   it("counts real calls: requests, values masked, blocked, top types and stage latency", async () => {
@@ -224,7 +224,7 @@ describe("Overview", () => {
   it("says what it can't know in demo mode instead of guessing", async () => {
     render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: vi.fn(() => ({ close() {} })), fixtureIntervalMs: 60_000 }} />);
     const overview = region("Overview");
-    expect((await within(overview).findAllByText(/Unknown: the pii-guard API isn't reachable/)).length).toBe(2);
+    expect((await within(overview).findAllByText(/Unknown: the PII Guard API isn't reachable/)).length).toBe(2);
   });
 });
 
@@ -243,7 +243,7 @@ describe("Connect", () => {
     history.replaceState(null, "", "#connect");
     render(<App api={offlineApi()} mock={createMockClient()} />);
     const connect = region("Connect");
-    expect(await within(connect).findByText(/the pii-guard API isn't reachable/)).toBeInTheDocument();
+    expect(await within(connect).findByText(/the PII Guard API isn't reachable/)).toBeInTheDocument();
     expect(within(connect).getByTestId("gateway-url")).toHaveTextContent("http://127.0.0.1:8787/v1");
   });
 });

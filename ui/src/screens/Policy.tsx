@@ -42,8 +42,8 @@ export function Policy({ status }: PolicyProps) {
           {status.state === "loading"
             ? "Asking the server…"
             : status.state === "missing"
-              ? "This pii-guard server doesn't report its configuration (it predates /v1/status). The entity table shows the documented defaults."
-              : "The pii-guard API isn't reachable, so its configuration is unknown. The entity table shows the documented defaults (docs/entities.md)."}
+              ? "This PII Guard server doesn't report its configuration (it predates /v1/status). The entity table shows the documented defaults."
+              : "The PII Guard API isn't reachable, so its configuration is unknown. The entity table shows the documented defaults (docs/entities.md)."}
         </Notice>
       )}
 
@@ -127,7 +127,7 @@ export function Policy({ status }: PolicyProps) {
           <PolicyTable title="Image regions" types={VISUAL_ENTITY_TYPES} policies={server?.policies ?? null} />
         </div>
         <p className="mt-4 text-xs text-muted">
-          <span className="font-medium text-ink">Allow-list:</span> none. pii-guard has no per-value allow-list; a detected value stays in place only when its type's policy is keep.
+          <span className="font-medium text-ink">Allow-list:</span> none. PII Guard has no per-value allow-list; a detected value stays in place only when its type's policy is keep.
           Values the application already knows are sensitive can be pre-loaded per session ({mono("POST /v1/sessions")}).
         </p>
       </Card>

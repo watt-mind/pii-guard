@@ -355,9 +355,12 @@ export function headline(index: BenchmarkIndex, set: string, lang: LanguageFilte
  */
 export const FAST_MODE_SYSTEM = "rules+ner:xlmr-large-distilled-glimmer";
 
-/** One spelling for detector names in labels: the index has both "ner" and "NER". */
+/**
+ * One spelling for detector names in labels: the index has both "ner" and "NER". The run records
+ * name the product "pii-guard"; the screen shows the wordmark, PII Guard (LAB-1486).
+ */
 export function tidyLabels(index: BenchmarkIndex): BenchmarkIndex {
-  const tidy = (l: string) => l.replace(/\bner\b/g, "NER");
+  const tidy = (l: string) => l.replace(/\bner\b/g, "NER").replace(/(?<![\w/-])pii-guard(?![\w-])/g, "PII Guard");
   const systems = Object.fromEntries(
     Object.entries(index.systems).map(([k, v]) => [k, { ...v, label: tidy(v.label), short_label: v.short_label && tidy(v.short_label) }]),
   );
@@ -398,11 +401,11 @@ function visualPart(p: string): string {
   return `${VISUAL_PART[base] ?? base}${tuned ? " (tuned)" : ""}`;
 }
 
-/** "visual:sam-3.1+tesseract+rules" -> "pii-guard: SAM 3.1 + Tesseract + rules" (LAB-1266). */
+/** "visual:sam-3.1+tesseract+rules" -> "PII Guard: SAM 3.1 + Tesseract + rules" (LAB-1266). */
 export function visualRunLabel(system: string): string {
   const [kind, rest = ""] = system.includes(":") ? [system.slice(0, system.indexOf(":")), system.slice(system.indexOf(":") + 1)] : ["visual", system];
   const parts = rest.split("+").filter(Boolean).map(visualPart);
   const joined = parts.join(" + ");
   if (kind === "visual-segment") return `Segmenter: ${joined}`;
-  return rest.startsWith("sam-") ? `pii-guard: ${joined}` : joined;
+  return rest.startsWith("sam-") ? `PII Guard: ${joined}` : joined;
 }

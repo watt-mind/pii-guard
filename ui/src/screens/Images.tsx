@@ -194,7 +194,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
             ? serverImages.sam
               ? "SAM 3.1 segments signatures and stamps, an on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
               : "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image. Signatures and stamps need SAM 3.1 (META_API_KEY on the server)."
-            : "Faces, ID photos, signatures and stamps are segmented on the pii-guard server; OCR plus the text detectors find identifiers printed in the image."}{" "}
+            : "Faces, ID photos, signatures and stamps are segmented on the PII Guard server; OCR plus the text detectors find identifiers printed in the image."}{" "}
           Every masked region is filled solid, and the image is rebuilt from pixels, so no metadata leaves either.
       </p>
 
@@ -202,7 +202,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
         <p role="note" aria-label="How hosted images are processed" className="rounded-lg border border-line bg-surface px-4 py-3 text-sm text-ink">
           <strong className="font-medium">Your image is processed in memory on our Azure server and is not stored.</strong> Its text is read with Tesseract and faces are found on that
           server's CPU; the image is not sent to any other service or model. Only the masked image and your session's placeholders are kept, in memory, until you delete the session or
-          the server restarts. Signatures and stamps are not detected here and stay visible: cover them before uploading, or self-host pii-guard with SAM 3.1.
+          the server restarts. Signatures and stamps are not detected here and stay visible: cover them before uploading, or self-host PII Guard with SAM 3.1.
         </p>
       )}
 
@@ -340,7 +340,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
           </Figure>
         </Pane>
 
-        <Boundary direction="outbound" label="pii-guard boundary: only the masked image crosses it">
+        <Boundary direction="outbound" label="PII Guard boundary: only the masked image crosses it">
           {summary && (
             <dl className="flex gap-3 text-center lg:flex-col lg:gap-2">
               <Metric label="found" value={summary.found} className="min-w-12" />
@@ -420,7 +420,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
             <ImageLegend regions={data.regions} activeType={active !== null ? (data.regions[active]?.entity_type ?? null) : null} />
             <KeyValues
               items={[
-                { label: "Engine", value: result.engine === "api" ? "pii-guard API" : "Demo engine (recorded regions)" },
+                { label: "Engine", value: result.engine === "api" ? "PII Guard API" : "Demo engine (recorded regions)" },
                 { label: "Segmentation", value: `${data.analysis.sam.model} · ${plural(summary?.sam ?? 0, "region")}` },
                 { label: "Text (OCR)", value: data.analysis.ocr.ran ? `${data.analysis.ocr.engine} · ${plural(summary?.ocr ?? 0, "region")}` : "off" },
                 { label: "Image", value: <span className="tabular-nums">{data.width} × {data.height} px</span> },
@@ -622,7 +622,7 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
           {ocr.ran && ocr.models?.llm ? (
             <>
               {" "}
-              The OCR text also went to <span className="font-medium">{modelLabel(ocr.models.llm)}</span>, an LLM detector that the pii-guard server calls.
+              The OCR text also went to <span className="font-medium">{modelLabel(ocr.models.llm)}</span>, an LLM detector that the PII Guard server calls.
             </>
           ) : null}
         </p>
@@ -646,7 +646,7 @@ function DemoUploadNotice({ switchEngine }: { switchEngine: boolean }) {
   return (
     <div role="alert" className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4">
       <p className="font-medium text-warn">Uploads need the live API.</p>
-      <p className="mt-1 text-ink">Image masking runs on the pii-guard server, not in your browser. Your image was not sent anywhere.</p>
+      <p className="mt-1 text-ink">Image masking runs on the PII Guard server, not in your browser. Your image was not sent anywhere.</p>
       <p className="mt-2 text-muted">
         {switchEngine ? (
           <>The API is up: switch <strong className="font-medium text-ink">Engine</strong> in the sidebar to <strong className="font-medium text-ink">Live API</strong>, then mask the image again.</>
@@ -682,9 +682,9 @@ function Running() {
 /** What the server's image pipeline is missing, phrased for a checkout and for `uvx` alike. */
 function imageNeeds(gaps: readonly string[]): string {
   const parts: string[] = [];
-  if (gaps.includes("ocr")) parts.push("pii-guard's OCR add-on (the ocr extra)");
+  if (gaps.includes("ocr")) parts.push("PII Guard's OCR add-on (the ocr extra)");
   if (gaps.includes("tesseract")) parts.push("the Tesseract OCR program (brew install tesseract, or apt install tesseract-ocr)");
   if (gaps.includes("segmenter")) parts.push("a face detector (the local-vision extra, or a META_API_KEY for SAM 3.1)");
   if (!parts.length) return "";
-  return `To read images, the server needs ${parts.join(", ")}. Install what is missing and restart pii-guard: when it starts, pii-guard up prints the exact install command.`;
+  return `To read images, the server needs ${parts.join(", ")}. Install what is missing and restart PII Guard: when it starts, pii-guard up prints the exact install command.`;
 }

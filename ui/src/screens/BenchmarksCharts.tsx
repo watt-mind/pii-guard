@@ -284,7 +284,7 @@ export function ProgressChart({
   const points = history
     .map((h) => ({ h, m: pick(h, lang) }))
     .filter((p): p is { h: HistoryPoint; m: Metrics } => p.m !== null && p.m.leak !== null);
-  if (!points.length) return <ChartEmpty>No pii-guard runs on this set and language yet.</ChartEmpty>;
+  if (!points.length) return <ChartEmpty>No PII Guard runs on this set and language yet.</ChartEmpty>;
   const cats: string[] = [];
   for (const { h } of points) {
     const c = `${h.date} ${h.commit.slice(0, 7)}`;
@@ -323,7 +323,7 @@ export function ProgressChart({
         width={width}
         height={height}
         role="img"
-        aria-label={`Leak rate of each pii-guard configuration over time: ${[...bySystem.entries()]
+        aria-label={`Leak rate of each PII Guard configuration over time: ${[...bySystem.entries()]
           .map(([k, list]) => `${systems[k]?.label ?? k} latest ${formatPct(list[list.length - 1]!.m.leak)}`)
           .join("; ")}.`}
         className="block overflow-visible font-sans"
