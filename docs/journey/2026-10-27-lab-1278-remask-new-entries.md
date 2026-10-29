@@ -20,7 +20,7 @@ created after that point can find anything new.
   LAB-1284 widening cases) also gives byte-identical bodies and answers.
 
 Measured on an M1 Max under heavy load, `develop` and the fix alternated three times, medians.
-The session is the LAB-1268 bench: each turn adds a new e-mail and phone, the restored answer
+The session is the LAB-1268 bench: each turn adds a new email and phone, the restored answer
 goes back as history, fast mode with rules only, and a 0 ms mock upstream.
 
 | | turn 20 | turn 60 | turn 120 |

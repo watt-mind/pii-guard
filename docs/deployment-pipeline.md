@@ -65,7 +65,7 @@ An operator configures the following after review, outside this workflow:
    candidate into its own ACR. Runtime managed identities remain separate. Do not grant
    workflow identities access to raw provider secrets, budget funding, allowance creation
    or subscription-wide administration. Bootstrap/RBAC provisioning stays an operator step.
-4. Provide a dedicated Linux self-hosted runner labelled `pii-guard-dev` with access to the
+4. Provide a dedicated Linux self-hosted runner labeled `pii-guard-dev` with access to the
    reviewed private dev route and GitHub/Azure control plane. There is no public runner
    fallback for dev deployment/smoke. Place it in an organization runner group restricted
    to the canonical trusted workflow/ref, with ephemeral or rebuilt-per-job isolation.

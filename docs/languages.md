@@ -4,7 +4,7 @@ PII Guard ships Hungarian (`hu`), English (`en`), German (`de`) and Polish (`pl`
 contributes is one **language pack**: a Python package with one `LanguagePack` object
 ([ADR 0010](decisions/0010-language-pack-plugins.md)). The components (rule detector, vault,
 LLM detector, evaluation) ask the pack registry for the text's language and fall back to
-language-independent behaviour when there is none, so a pack can start small and grow.
+language-independent behavior when there is none, so a pack can start small and grow.
 
 A **conformance suite** checks a pack: which parts are present, that they are well-formed,
 that masking round-trips on the pack's fixtures, that no allowed inflected form leaks a
@@ -29,7 +29,7 @@ LAB-1400) was built the same way, from the skeleton below.
 | Country-specific entity types | `country_entity_types` | the LLM prompt asks for them | generic types only |
 | Eval surface forms | `surface_forms` (`SurfaceForms`) | leak rate, corpus spans | exact matching, no stopwords |
 | Lexicons | `lexicons` (`LexiconSpec`) | `pii_guard.lang`, the corpus generator, rules | `LexiconUnavailable` |
-| Document field captions | `captions` (`captions.tsv`) | `visual/captions.py`: the value next to `Név` / `Date of birth` on an ID card is masked | captions in this language not recognised in images |
+| Document field captions | `captions` (`captions.tsv`) | `visual/captions.py`: the value next to `Név` / `Date of birth` on an ID card is masked | captions in this language not recognized in images |
 | Cue words for numbers | `cues` (`cues.tsv`) | `RuleDetector` via `languages/cues.py`: a number right after `TAJ` or `passport` is masked even when its checksum fails | only the other packs' cues |
 | Brand names | `brands` (`brands.tsv`) | `NerDetector` via `detect/ner_orgs.py`: an NER `PERSON` span that is only a company or product name (`OTP Bank`, `Deutsche Bahn`) becomes `ORGANIZATION`, which policy keeps | the shared list (`languages/brands.tsv`) and the other packs' names |
 
@@ -71,7 +71,7 @@ rather than silently running without the language.
 ### 2. Write the smoke fixtures first
 
 About ten hand-written documents in `eval/fixtures/<code>-smoke.jsonl`, in the format of
-[contracts.md](contracts.md#evaluation-fixtures-and-harness-implemented): e-mails, a contract,
+[contracts.md](contracts.md#evaluation-fixtures-and-harness-implemented): emails, a contract,
 a letter, a chat message, a form, and at least one **hard negative** (no personal data, but
 numbers, dates and amounts that look like it). Every value is fictional
 ([ADR 0005](decisions/0005-synthetic-data-only.md)): `example.com` addresses, numbers from
@@ -90,7 +90,7 @@ eval/fixtures/pl-smoke.jsonl` before any rule exists, and every later step shows
 
 - `EVERYWHERE`: identifiers with a checksum or a distinctive format (a German
   Sozialversicherungsnummer: date, letter, check digit). They run for every language, because
-  a German ID in an English e-mail is still personal data. Keep them precise: they run on
+  a German ID in an English email is still personal data. Keep them precise: they run on
   every other language's text too.
 - `RULES`: formats that are only unambiguous in this language's texts (postcodes, national
   phone numbers, an 11-digit number without its label). They run only for this language.
@@ -100,7 +100,7 @@ handles compact values, groups joined by hyphens, spaces or dots, and four-group
 matching also accepts lowercase text and variable spaces between its groups. When a grouping
 is also common for something that is not personal data, require a label instead of dropping
 the form: dotted or slashed numeric groups can be thousands-grouped amounts, so those TAJ
-variants require a TAJ cue. An unlabelled TAJ (format and checksum only) runs for Hungarian
+variants require a TAJ cue. An unlabeled TAJ (format and checksum only) runs for Hungarian
 text only: a one-in-ten check is too weak for another language's nine-digit numbers, such as
 a Polish phone number (LAB-1433).
 
@@ -111,7 +111,7 @@ label). Before adding an `EVERYWHERE` rule, check what it does to the other lang
 hu/en scorecards must not change (`--language hu,en`). That is why the German Steuer-ID runs
 everywhere only next to its label: Hungarian personal ID numbers are 11 digits too.
 
-Every German noun is capitalised, so "five digits before a capitalised word" is not a
+Every German noun is capitalized, so "five digits before a capitalized word" is not a
 postcode ("20000 Teilnehmer"); the German postcode rule only fires where an address line
 starts. Hard negatives in the smoke set catch this kind of rule.
 
@@ -204,8 +204,8 @@ generator and for validating addresses, from sources whose terms allow redistrib
 
 `captions=files(__name__).joinpath("captions.tsv")`: the field captions printed on the
 language's ID documents and forms, one `caption<TAB>ENTITY_TYPE` per line (`-` for a caption
-whose value is not personal data, such as `Sex` or `Expiry`: it is still recognised, so it
-bounds the neighbouring fields). Image masking pairs each caption with the value on its right
+whose value is not personal data, such as `Sex` or `Expiry`: it is still recognized, so it
+bounds the neighboring fields). Image masking pairs each caption with the value on its right
 or under it and masks that value ([visual/captions.py](../src/pii_guard/visual/captions.py)).
 Write captions as printed, with accents; matching ignores case, accents and punctuation and
 tolerates small OCR errors. The conformance suite checks that the file parses (and
@@ -215,11 +215,11 @@ tolerates small OCR errors. The conformance suite checks that the file parses (a
 names, one per line as written (`OTP Bank`, `Deutsche Bahn`). The NER model sometimes calls a
 bare brand a person (`Write a haiku about Meta` came out as `[[PERSON_x]]`, LAB-1336); a
 `PERSON` span that is exactly a listed name, plus a suffix your inflection matcher allows for
-an organisation (`Google-nek`, `Metáról`, `Metas`), becomes `ORGANIZATION`, which policy
+an organization (`Google-nek`, `Metáról`, `Metas`), becomes `ORGANIZATION`, which policy
 keeps. Global names (Meta, Llama, Google, OpenAI ...) are already in the shared
 `languages/brands.tsv`, and every pack's names count for every text. Leave out names that are
 also given names or surnames (Ford, Dell, Siemens, Otto): a missed brand is an over-mask, a
-missed person a leak. A name your pack's name lexicons list is never relabelled, and neither
+missed person a leak. A name your pack's name lexicons list is never relabeled, and neither
 is one next to an honorific (`Ms. Apple`) or another part of a name (`Meta Kovács`). Add a
 few prompts with your brands to `eval/fixtures/negative/<code>-brand-names.jsonl`.
 
@@ -260,9 +260,9 @@ with 40 labels, 2 of them hard negatives without any):
 |---|---:|---:|---:|---:|---:|
 | `rules` | 100.0 | 52.5 | 50.0 | 43.2 | 100.0 |
 
-Every structured identifier is found (addresses, e-mails, phones, Steuer-IDs,
+Every structured identifier is found (addresses, emails, phones, Steuer-IDs,
 Sozialversicherungsnummern, IBANs: 100 % overlap recall); the misses are the names, dates of
-birth and organisations that the rules don't cover by design. Adding the German pack left the
+birth and organizations that the rules don't cover by design. Adding the German pack left the
 `hu` and `en` scorecards unchanged.
 
 ## Polish smoke results
@@ -275,7 +275,7 @@ with 47 labels, 2 of them hard negatives without any):
 | `rules` | 100.0 | 55.3 | 55.3 | 39.5 | 100.0 |
 
 Every structured identifier is found (PESEL, NIP, REGON, ID-card, passport and driving-licence
-numbers, IBANs, phones, addresses); the misses are names, dates of birth and organisations. In
+numbers, IBANs, phones, addresses); the misses are names, dates of birth and organizations. In
 fast mode (rules + NER v2.0) the smoke set leaks 0.0 %, and pl-pii-bench (report-only) goes
 from 17.5 to 3.5 % ([results](../eval/results/2026-10-28-lab-1400-pl-pack/README.md)). Adding
 the Polish pack left the `hu`, `en` and `de` scorecards unchanged.

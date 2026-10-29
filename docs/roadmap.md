@@ -19,14 +19,14 @@ Submission deadline: **November 4, 21:00 ET** (03:00 Budapest time on November 5
 
 **If time runs short, cut in this order:** fine-tuning (keep the prompted detector, still
 measured) → visual masking for non-text regions (keep OCR-based text masking) → demo UI polish.
-Never cut: the evaluation set, fail-closed behaviour, streaming re-identification.
+Never cut: the evaluation set, fail-closed behavior, streaming re-identification.
 
 ## Day-1 checks
 
 - [ ] Meta Model API access works; which Muse models and tiers are available; quality of
       Hungarian document generation on a few samples.
 - [ ] Which small Llama models Fireworks can fine-tune, and the data format it expects.
-- [ ] SAM 3.1 weights and licence; can it be served on Modal within the credits.
+- [ ] SAM 3.1 weights and license; can it be served on Modal within the credits.
 - [ ] Partner credits activated (Baseten, Modal, Fireworks).
 - [ ] Official hackathon rules: open-source requirements, use of third-party libraries,
       submission format.

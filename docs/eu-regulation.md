@@ -31,10 +31,10 @@ All from the GDPR, [Regulation (EU) 2016/679][gdpr]:
 | Rule | What it says (paraphrased; quoted terms are the Regulation's own) | Why it is relevant |
 |---|---|---|
 | **Art. 5(1)(c)**, data minimization | Personal data shall be "adequate, relevant and limited to what is necessary" for the purposes. | A model drafting a letter rarely needs the real name, IBAN or ID number to do it. |
-| **Art. 25(1)**, data protection by design | The controller implements appropriate technical and organizational measures, "such as pseudonymisation", designed to implement principles "such as data minimisation". | Pseudonymization is given as an example of an appropriate measure, not required as such; what is appropriate depends on the risk. |
+| **Art. 25(1)**, data protection by design | The controller implements appropriate technical and organizational measures, "such as pseudonymization", designed to implement principles "such as data minimization". | Pseudonymization is given as an example of an appropriate measure, not required as such; what is appropriate depends on the risk. |
 | **Art. 25(2)**, by default | By default, only personal data necessary for each specific purpose are processed, including as to their "accessibility". | Masking by default limits who can read the values: the model provider gets placeholders. |
-| **Art. 32(1)(a)**, security of processing | Appropriate measures include "the pseudonymisation and encryption of personal data". | Pseudonymization is listed among example security measures, again subject to the risk. |
-| **Recital 78** | By-design measures could consist of "pseudonymising personal data as soon as possible". | PII Guard pseudonymizes at the point the request leaves your application. |
+| **Art. 32(1)(a)**, security of processing | Appropriate measures include "the pseudonymization and encryption of personal data". | Pseudonymization is listed among example security measures, again subject to the risk. |
+| **Recital 78** | By-design measures could consist of "pseudonymizing personal data as soon as possible". | PII Guard pseudonymizes at the point the request leaves your application. |
 | **Art. 4(5)**, definition | Pseudonymization: data "can no longer be attributed to a specific data subject without the use of additional information", provided that information "is kept separately" under technical and organizational measures. | The placeholder mapping is that additional information, and it is kept apart from what the model receives (see [below](#what-pii-guard-does-as-a-technical-measure)). |
 | **Recital 26** | Pseudonymized data that could be attributed to a person with additional information "should be considered to be information on an identifiable natural person"; the GDPR does not apply to anonymous information. | **Pseudonymized is not anonymous.** For whoever holds the mapping, the data stay personal data. |
 
@@ -68,9 +68,9 @@ What this means for PII Guard, stated carefully:
   assessment, not a property PII Guard can guarantee. A value detection misses, or context such
   as "the only female judge at the regional court", can identify someone without a name
   ([privacy model](privacy-model.md#explicit-non-guarantees)).
-- The EDPB's [Guidelines 01/2025 on Pseudonymisation][edpb] (adopted 16 January 2025, version
+- The EDPB's [Guidelines 01/2025 on Pseudonymization][edpb] (adopted 16 January 2025, version
   for public consultation) predate the judgment and take a broader view: pseudonymized data
-  remain personal "if pseudonymised data and additional information are not in the hands of the
+  remain personal "if pseudonymized data and additional information are not in the hands of the
   same person". Read both.
 
 ## International transfers
@@ -177,7 +177,7 @@ Office, which serves the same documents as EUR-Lex).
   44–46, 88, 90; Recitals 26, 78.
 - [Judgment of 4 September 2025, *EDPS v SRB*, C‑413/23 P][srb], paras. 52, 85, 86, 96, 111;
   [curia case file][srb-curia].
-- [EDPB, Guidelines 01/2025 on Pseudonymisation][edpb], version for public consultation.
+- [EDPB, Guidelines 01/2025 on Pseudonymization][edpb], version for public consultation.
 - [Commission Implementing Decision (EU) 2023/1795][dpf] (EU–US Data Privacy Framework).
 - [DORA, Regulation (EU) 2022/2554][dora]: Art. 28, 30, 64.
 - [AI Act, Regulation (EU) 2024/1689][aiact]: Art. 10, 113, Annex III.

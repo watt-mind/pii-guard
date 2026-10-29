@@ -144,7 +144,7 @@ rule_packs() -> dict[str, RulePack]          # the language packs' rules, with o
 - **Scopes.** The language-independent rules (`pii_guard.detect.rules.common` and
   `pii_guard.detect.rules.secrets`) run for every text. A language pack ([ADR 0008](decisions/0008-language-packs.md), `languages/<lang>/rules.py`)
   contributes `everywhere` rules (identifiers with a checksum or a distinctive validated format,
-  run whatever the text's language: a Hungarian tax ID in an English e-mail is still personal
+  run whatever the text's language: a Hungarian tax ID in an English email is still personal
   data) and `rules` (formats that are only unambiguous in that language, such as postcodes,
   plates and national phone formats, run only when `language` matches, `en-GB` counting as
   `en`). A language without a pack gets the language-independent rules and every pack's
@@ -162,14 +162,14 @@ label, a consistent postcode and settlement, or valid check digits:
 |---|---|---|
 | all | `BANK_ACCOUNT` (IBAN, mod 97; payment card, issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
 | all | `SECRET` (provider key shapes, PEM private keys, `scheme://user:password@host`, values assigned to a secret-ish key, `Authorization: Bearer/Basic`; [entities.md](entities.md#language-independent)) | provider shape 0.9-0.97, private key 0.99, URL password 0.9 / user 0.85, bearer 0.9, assignment 0.85 |
-| `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labelled ID card / passport / licence / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
+| `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labeled ID card / passport / license / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
 | `hu`, language | `ADDRESS` (postcode, address with settlement and street), `VEHICLE_PLATE`, bare `ID_DOCUMENT` card number, `PERSON` inside a company name with a legal form | postcode 0.75-0.9, address 0.75 / 0.85 / 0.97 (postcode and settlement agree), plate 0.85 / 0.8, bare ID card 0.7, company-name person 0.7-0.9 (`languages/hu/companies.py`) |
 | `en`, everywhere | `ID_DOCUMENT` (US SSN, UK NINO) | SSN 0.95 / 0.85, NINO 0.95 / 0.9 |
-| `en`, language | `PHONE` (UK, US/NANP), `ADDRESS` (UK postcode, US ZIP), `VEHICLE_PLATE` (UK), `ID_DOCUMENT` (labelled passport / licence, SSN after a label) | phone 0.8-0.85, postcode 0.75-0.85, ZIP 0.8 / 0.85, plate 0.8, labelled ID 0.85, SSN after a label 0.9 |
-| `de`, everywhere | `ID_DOCUMENT` (Sozialversicherungsnummer, labelled Steuer-ID) | 0.9 / 0.97 |
+| `en`, language | `PHONE` (UK, US/NANP), `ADDRESS` (UK postcode, US ZIP), `VEHICLE_PLATE` (UK), `ID_DOCUMENT` (labeled passport / license, SSN after a label) | phone 0.8-0.85, postcode 0.75-0.85, ZIP 0.8 / 0.85, plate 0.8, labeled ID 0.85, SSN after a label 0.9 |
+| `de`, everywhere | `ID_DOCUMENT` (Sozialversicherungsnummer, labeled Steuer-ID) | 0.9 / 0.97 |
 | `de`, language | `ID_DOCUMENT` (Steuer-ID without a label), `PHONE`, `ADDRESS` (street + house number, postcode line) | Steuer-ID 0.85, phone 0.8, address 0.75 / 0.85, postcode line 0.7 |
 
-Names, organisations, prose addresses and dates of birth are not rule territory; they come
+Names, organizations, prose addresses and dates of birth are not rule territory; they come
 from the NER and LLM detectors. Scores are heuristics for the resolver, not probabilities;
 the code is the source of truth for the exact values.
 
@@ -250,7 +250,7 @@ REST API. `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
 settings load: an unknown type or policy stops startup. `LlmDetector` resolves its model,
 reasoning effort, max tokens and timeout as the constructor argument, then the setting
 (environment or `.env`), then its built-in default, so the registry and `pii-guard eval`
-honour them too (Muse Spark Open on Baseten needs `REASONING_EFFORT=low`; contract-length
+honor them too (Muse Spark Open on Baseten needs `REASONING_EFFORT=low`; contract-length
 documents need a larger `MAX_TOKENS` and `TIMEOUT`). Folding the text size limit and the
 gateway settings into `Settings` is LAB-1095.
 
@@ -614,7 +614,7 @@ With `render: "labels"` (the default) the response also carries:
   letter↔digit confusions only (`XJXK89KU4` is not `XJXK89KV4`, `HU-ABE-123` is not
   `HU-ABC-123`).
 - Session values printed where no detector found them (a visitor badge's name) are also
-  covered and labelled (`detector: "vault"`), for accepted matches only.
+  covered and labeled (`detector: "vault"`), for accepted matches only.
 - `cover_box` is the area actually painted: the box grown by 2 px and, when the label would
   not fit legibly, extended to the right into free space (never over visible words or another
   box). `box` stays the detected area in both render modes, so coverage is identical.
@@ -637,7 +637,7 @@ With `render: "labels"` (the default) the response also carries:
 - Regions never carry the covered text or pixels. Overlapping regions of the same type and
   source are merged into their union (SAM's `signature` and `squiggly line` prompts).
 - Policies apply per region: `mask` regions are covered (plus 2 px; solid black with `opaque`,
-  a neutral labelled box with `labels`), `keep` regions
+  a neutral labeled box with `labels`), `keep` regions
   (`STAMP` by default) are reported and left visible (`STAMP` is only segmented with
   `sam-api`, or when its policy is not `keep`), any `block` region is
   `422 blocked_entity` with no image.
@@ -1310,7 +1310,7 @@ built on it.
   occurrence in another case is not masked with the confirmed secret's placeholder (the
   detector decides about it on its own). Every other type is case-insensitive as below:
   names and other natural-language values (with their inflection), and IBANs, plates, ID
-  numbers and e-mail addresses, which are case-insensitive by their own rules.
+  numbers and email addresses, which are case-insensitive by their own rules.
 - **Casing:** occurrences match case-insensitively, so `TESZT ELEK` and `teszt elek` are
   masked along with a `Teszt Elek` span. By default they share its placeholder and `unmask`
   restores the value as first written (`TESZT ELEK és Teszt Elek.` → `Teszt Elek és Teszt
@@ -1372,7 +1372,7 @@ MAX_SUFFIX_LENGTH = 12   # a longer run is never a suffix; it bounds what the st
   follow them (occurrence expansion in the vault and `LlmDetector.align`).
 - `splits` reads a detected surface form as `lemma + suffix` (`Próba Zsuzsannának` → `Próba
   Zsuzsanna` + `nak`), so the placeholder covers the stem. `restore` re-inflects on unmask.
-- A matcher that only has `suffix_pattern` keeps exact-stem behaviour; call the module
+- A matcher that only has `suffix_pattern` keeps exact-stem behavior; call the module
   functions, which provide the fallbacks. A hook registered with `register_inflection` applies
   to new masking calls of that primary language.
 
@@ -1406,7 +1406,7 @@ Lines, one document per line, UTF-8, **one file per language and set**:
 
 Gold spans don't overlap, aren't blank and don't start or end with whitespace. A Hungarian
 suffix that leaves the value intact stays outside the span (`Teszt Elek|nek`); a
-stem-changing form is labelled as the whole word (`Minta Annának`). Every value is fictional
+stem-changing form is labeled as the whole word (`Minta Annának`). Every value is fictional
 ([ADR 0005](decisions/0005-synthetic-data-only.md)). `load_fixtures` rejects anything else with
 file, line and field, never the value.
 
@@ -1443,7 +1443,7 @@ The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag, version,
 skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
 (one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
 `leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
-contains document text or labelled values.
+contains document text or labeled values.
 
 ## Hosted boundary (implemented, opt-in)
 

@@ -16,7 +16,7 @@ As on 2026-10-28 ([setup](harness-matrix-2026-10-28.md#setup)), with these diffe
 | Gateway | `pii-guard up --upstream-url <recorder> --traffic-log masked`, `develop` at `944effc` (#215 and #216 in), then this branch for the runs after the fix below |
 | Detection | fast mode: rules + NER `watt-mind/pii-guard-ner-xlmr-base@95f612a9ad65`; the placeholder note on (the default) |
 | Harnesses | pi 1.3.0, OpenCode 1.18.26, Codex 0.163.0 ¹, Muse Code 1.4.14. Claude Code is still not testable (LAB-1313); aider was not run |
-| Task | turn 1 `contacts.json` with name, email, iban and tax_id of two fictional customers, `cat` it, reply with the German e-mail; turn 2 insert `"verified": true` after the first e-mail with the edit tool. The original file name: on 2026-10-28 OpenCode only finished after a rename to `records.json` |
+| Task | turn 1 `contacts.json` with name, email, iban and tax_id of two fictional customers, `cat` it, reply with the German email; turn 2 insert `"verified": true` after the first email with the edit tool. The original file name: on 2026-10-28 OpenCode only finished after a rename to `records.json` |
 | Upstream calls | 123 in total (budget about 100): 115 agent requests through the gateway, 8 for the A/B below. 67 of the 115 went to one OpenCode turn that looped on the bug fixed here. No `--check` canaries this time: the `connect` code is unchanged since 2026-10-28 |
 | Isolation | as before: scratch `HOME`, `XDG_*`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`, `--muse-dir`; pi and OpenCode under the `sandbox-exec` profile, Codex and Muse in their own workspace sandboxes |
 
@@ -68,7 +68,7 @@ never leaked: both placeholders stood for it.
 The fix ([`vault/vault.py`](../../src/pii_guard/vault/vault.py), `IDENTIFIER_TYPES`): within a
 session, a number-like identifier value (phone, date of birth, national IDs, ID documents,
 bank accounts, company IDs, parcel numbers, plates) keeps the placeholder it got first when a
-detector reads it as another of these types. Names, addresses, e-mails and organisations keep
+detector reads it as another of these types. Names, addresses, emails and organizations keep
 their own keys. Tests:
 [`tests/vault/test_vault_identifier_types.py`](../../tests/vault/test_vault_identifier_types.py).
 After it, OpenCode finished both turns in 9 requests and Codex its first turn in 3.

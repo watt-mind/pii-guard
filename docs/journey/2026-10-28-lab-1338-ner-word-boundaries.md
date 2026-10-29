@@ -39,7 +39,7 @@ end.
 | cee-pii (test) | 1 -> 0 | 12 -> 0 | 0.40 -> 0.40 % | 27.86 -> 27.75 % | 97.22 -> 97.22 % |
 | ai4privacy (test) | 1 -> 0 | 5 -> 0 | 0.37 -> 0.37 % | 1.41 -> 1.41 % | 98.95 -> 98.95 % |
 
-"Values cut" counts the gold names, organisations and addresses with a word that a mask
+"Values cut" counts the gold names, organizations and addresses with a word that a mask
 edge splits, a case ending after a stem excepted. Leak counts values that survive whole, so
 it doesn't see a fragment: `Te` is not the name. That is why it doesn't move.
 

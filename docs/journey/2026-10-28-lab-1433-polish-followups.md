@@ -16,12 +16,12 @@ and a cue date guard that needs a real month and day, so a driving-licence numbe
 | gretel-finance, rules: over-masked spans | 65 | **59** |
 
 - **pl-pii-bench did not move.** None of its lanes holds these cases. Its 117 over-masked
-  `negative` spans are mostly NER bank accounts (59) and the cue rule masking labelled numbers
+  `negative` spans are mostly NER bank accounts (59) and the cue rule masking labeled numbers
   with a bad check digit (34), which is policy (LAB-1400).
 - **The dev split is in-sample.** Its 80 documents were written for these fixes
   ([generator](../../eval/results/2026-10-28-lab-1433-pl-followups/pl_dev_split.py)): it shows
-  that they work, not how far they generalise.
-- **Other languages only gained.** The unlabelled TAJ no longer fires on English and German
+  that they work, not how far they generalize.
+- **Other languages only gained.** The unlabeled TAJ no longer fires on English and German
   numbers (6 over-masks fewer on gretel-finance), and with the new date guard 3 more cued phone
   numbers are masked on ai4privacy. Every hu/en/de smoke, synth-sample and negative
   set gives the same counts; `make gate` passes
