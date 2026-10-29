@@ -1,0 +1,736 @@
+{
+  "method": {
+    "shingles": "word 5-grams of NFKC case-folded text",
+    "minhash": "128 hashes, LSH 32 bands x 4 rows",
+    "threshold": "exact Jaccard >= 0.8",
+    "exact": "SHA-256 of the whitespace-folded text"
+  },
+  "documents": 4340,
+  "dropped": 0,
+  "dropped_exact": 0,
+  "dropped_near": 0,
+  "by_eval_set": {},
+  "files": {
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/bg-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/bg-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/cs-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/cs-distill-train.jsonl": {
+      "documents": 140,
+      "kept": 140,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/da-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/da-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/de-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/de-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/el-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/el-distill-train.jsonl": {
+      "documents": 143,
+      "kept": 143,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/en-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/en-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/es-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/es-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/et-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/et-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/fi-distill-dev.jsonl": {
+      "documents": 15,
+      "kept": 15,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/fi-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/fr-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/fr-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/ga-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/ga-distill-train.jsonl": {
+      "documents": 143,
+      "kept": 143,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/hr-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/hr-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/hu-distill-dev.jsonl": {
+      "documents": 15,
+      "kept": 15,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/hu-distill-train.jsonl": {
+      "documents": 138,
+      "kept": 138,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/it-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/it-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/lt-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/lt-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/lv-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/lv-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/mt-distill-dev.jsonl": {
+      "documents": 15,
+      "kept": 15,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/mt-distill-train.jsonl": {
+      "documents": 143,
+      "kept": 143,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/nl-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/nl-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/pl-distill-dev.jsonl": {
+      "documents": 15,
+      "kept": 15,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/pl-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/pt-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/pt-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/ro-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/ro-distill-train.jsonl": {
+      "documents": 143,
+      "kept": 143,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/sk-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/sk-distill-train.jsonl": {
+      "documents": 142,
+      "kept": 142,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/sl-distill-dev.jsonl": {
+      "documents": 16,
+      "kept": 16,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/sl-distill-train.jsonl": {
+      "documents": 143,
+      "kept": 143,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/sv-distill-dev.jsonl": {
+      "documents": 15,
+      "kept": 15,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/court/sv-distill-train.jsonl": {
+      "documents": 144,
+      "kept": 144,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/bg-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/bg-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/cs-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/cs-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/da-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/da-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/de-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/de-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/el-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/el-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/en-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/en-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/es-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/es-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/et-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/et-distill-train.jsonl": {
+      "documents": 19,
+      "kept": 19,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/fi-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/fi-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/fr-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/fr-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/ga-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/ga-distill-train.jsonl": {
+      "documents": 19,
+      "kept": 19,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/hr-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/hr-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/hu-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/hu-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/it-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/it-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/lt-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/lt-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/lv-distill-dev.jsonl": {
+      "documents": 1,
+      "kept": 1,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/lv-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/mt-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/mt-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/nl-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/nl-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/pl-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/pl-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/pt-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/pt-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/ro-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/ro-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/sk-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/sk-distill-train.jsonl": {
+      "documents": 19,
+      "kept": 19,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/sl-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/sl-distill-train.jsonl": {
+      "documents": 18,
+      "kept": 18,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/sv-distill-dev.jsonl": {
+      "documents": 2,
+      "kept": 2,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "/Users/hdkiller/Develop/.worktrees/pii-guard/data-eu/v41/variants/sv-distill-train.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    }
+  },
+  "examples": [],
+  "eval_index": {
+    "documents_by_set": {
+      "agent-traffic": 990,
+      "agent-traffic-dev": 300,
+      "ai4privacy": 600,
+      "cee-pii": 451,
+      "fixtures/agent-text": 69,
+      "fixtures/brand-names": 30,
+      "fixtures/company-names": 44,
+      "fixtures/court-smoke": 6,
+      "fixtures/inflection": 60,
+      "fixtures/injection": 62,
+      "fixtures/known-values": 5,
+      "fixtures/secrets": 21,
+      "fixtures/smoke": 117,
+      "fixtures/synth-sample": 30,
+      "fixtures/uncued-numbers": 49,
+      "gretel-finance": 400,
+      "nemotron-pii": 300,
+      "pl-pii-bench": 346
+    },
+    "hashes": 3819,
+    "missing": [
+      "data/datasets/fixtures/tab-echr/en-tab-echr.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/en-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/es-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/bg-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/cs-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/da-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/de-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/el-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/ga-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/et-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/fi-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/fr-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/hu-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/it-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/lt-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/lv-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/mt-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/nl-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/pt-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/ro-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/sk-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/sv-mapa-eur-lex.jsonl"
+    ]
+  },
+  "absent_inputs": []
+}

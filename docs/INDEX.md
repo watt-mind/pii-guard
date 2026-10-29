@@ -16,6 +16,7 @@
 | [languages.md](languages.md) | Adding a language: the language pack, the conformance suite, what "done" means |
 | [data-sources-eu24.md](data-sources-eu24.md) | Research: license and coverage audit of NER/PII data and national identifiers for the 24 EU languages |
 | [training-data-eu-phase1.md](training-data-eu-phase1.md) | Multilingual NER phase 1 (LAB-1525): training sources, licenses, per-language counts and the fictional gate sets |
+| [training-data-v41.md](training-data-v41.md) | NER v4.1 data (LAB-1539): fictional court-style documents in 24 languages, mined v2.0 error patterns and their variants, HF sets, teacher agreement |
 | [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [journey.md](journey.md) | The project's story so far: dated milestones with before/after metrics, cost and the decisions made |

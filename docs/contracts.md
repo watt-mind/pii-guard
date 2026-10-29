@@ -1218,6 +1218,12 @@ class Vault:
     # "d_" + 32 hex of HMAC-SHA256(tenant key, material): stable per deployment, keyed.
     def derive_session_id(self, material: str) -> str: ...
 
+    # Resolve (session, created, metadata) and acquire an LRU pin in one vault transaction.
+    def acquire_session(
+        self, resolve: Callable[[], tuple[VaultSession, bool, T]]
+    ) -> tuple[VaultSession, bool, T]: ...
+    def release_session(self, session: VaultSession) -> None: ...  # one per acquire
+
     def drop(self, session_id: str) -> None: ...  # close and forget now; no error if gone
     def purge_expired(self) -> int: ...  # drop every expired session, return how many
     def __len__(self) -> int: ...  # live sessions
@@ -1298,6 +1304,7 @@ doesn't inflate them).
 | `SessionNotFoundError` (`PiiGuardError`) | `not_found` | 404 | The session id is unknown, expired or closed. Raised by `Vault.session` and by every `VaultSession` method (and so by `StreamUnmasker`) once the session is gone; the gateway fails the request instead of forwarding unrestored text. |
 | `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
 | `MaskingError` | `vault_not_configured` | 500 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
+| `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased. |
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
 | `SessionEntryLimitError` (`MaskingError`) | `session_entry_limit_reached` | 409 | An explicit session already holds its `max_entries` placeholders; it is never rotated. |
 
@@ -1320,6 +1327,20 @@ built on it.
 - `Vault.drop(id)` and `VaultSession.close()` forget the mapping and the known values at once;
   later calls raise `SessionNotFoundError`. The mapping never leaves the process, is never
   logged and has no persistence.
+
+- Capacity eviction chooses only sessions without leases. `acquire_session(resolve)` holds
+  the vault lock across lookup/creation and pin acquisition, closing the lookup-to-eviction
+  race. Each successful acquire needs one `release_session(session)`, even if the session
+  expired or was explicitly dropped in the meantime. Leases are counted per session object.
+  The gateway holds its lease through detection, masking, upstream work, restoration and
+  stream cleanup, releasing it on failures and cancellation as well as success.
+- If every capacity slot is leased, creating another session fails closed with HTTP 503
+  `vault_capacity_exhausted`; it neither exceeds the cap nor evicts an active session.
+  Leases do not suspend sliding TTL or explicit deletion/purge semantics.
+- `VaultSession.commit(fork)` consumes the fork once and validates its entire journal against
+  a private snapshot under the parent lock before publishing the state. A replay mismatch
+  raises `MaskingError` and leaves all parent mapping, memo, count and generation state
+  unchanged. The caller must discard the fork output on any commit failure.
 
 ### Placeholders
 

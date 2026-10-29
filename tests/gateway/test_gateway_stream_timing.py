@@ -269,10 +269,11 @@ def test_a_chunk_with_error_null_streams_normally() -> None:
     (out,) = restorer.process(json.dumps(chunk))
     assert json.loads(out)["choices"][0]["delta"]["content"] == "tok "
 
-    (failed,) = restorer.process(json.dumps({"error": {"message": "quota for Teszt Elek"}}))
+    failed, done = restorer.process(json.dumps({"error": {"message": "quota for Teszt Elek"}}))
     assert json.loads(failed)["error"] == {
         "code": "upstream_error",
         "message": "upstream stream error",
         "type": "upstream_error",
     }
     assert "Teszt" not in failed
+    assert done == "[DONE]"
