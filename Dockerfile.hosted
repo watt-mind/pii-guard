@@ -53,7 +53,7 @@ RUN --mount=type=bind,from=ner-model,source=/app/models/ner,target=/tmp/ner-pinn
 FROM node:24-trixie-slim@sha256:89c5244bc22a9bc3287d89ebc7e49b9cb5bb84cd40e6175ac3421d5a9f68b95a AS ui-build
 WORKDIR /ui
 RUN npm install --global pnpm@12.10.1
-COPY ui/package.json ui/pnpm-lock.yaml ./
+COPY ui/package.json ui/pnpm-lock.yaml ui/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY ui ./
 COPY --from=python-build /app/benchmarks-index.json /app/benchmarks-index.json
