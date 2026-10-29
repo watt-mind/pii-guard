@@ -1,0 +1,41 @@
+{
+  "audit": "mapa-eur-lex: what the leaked PERSON values are, by shape only",
+  "ticket": "LAB-1511",
+  "system": "fast",
+  "ner_model": "watt-mind/pii-guard-ner-xlmr-base@95f612a9 (v2.0)",
+  "code": {
+    "commit": "e6e2fc1413d0fd70d1acb113ada3d83145fc714d",
+    "dirty": false
+  },
+  "documents": 42,
+  "person_values": 740,
+  "person_values_leaked": 63,
+  "leaked_by_languages_with_the_same_gold_string": {
+    "1": 13,
+    "2-5": 9,
+    "6+": 41
+  },
+  "leaked_by_language": {
+    "bg": 1,
+    "cs": 2,
+    "de": 2,
+    "el": 2,
+    "en": 9,
+    "es": 2,
+    "et": 1,
+    "fi": 3,
+    "ga": 9,
+    "hu": 1,
+    "it": 1,
+    "lt": 6,
+    "lv": 8,
+    "mt": 9,
+    "nl": 2,
+    "pt": 2,
+    "ro": 1,
+    "sv": 2
+  },
+  "role_word_list_size": 79,
+  "distinct_gold_person_strings_that_are_role_words": 0,
+  "leaked_values_that_are_role_words": 0
+}
