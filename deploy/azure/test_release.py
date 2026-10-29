@@ -138,12 +138,13 @@ class ReleaseTemplateTests(unittest.TestCase):
             "PII_GUARD_DETECTORS": "rules,ner",
             "PII_GUARD_HOSTED_IMAGES": "true",
             "PII_GUARD_SEGMENTER": "local",
-            "PII_GUARD_POLICY_OVERRIDES": "SIGNATURE=keep",
             "PII_GUARD_HOSTED_MODELS": "muse-spark-1.3",
             "PII_GUARD_TRAFFIC_LOG": "off",
             "PII_GUARD_METRICS": "false",
         }.items():
             self.assertEqual(env[key]["value"], value)
+        # Signatures are masked on-device by the owner's policy: no server override (LAB-1444).
+        self.assertNotIn("PII_GUARD_POLICY_OVERRIDES", env)
         hosts = env["PII_GUARD_ALLOWED_HOSTS"]["value"]
         self.assertIn("publicOrigin", hosts)
         self.assertIn("defaultDomain", hosts)

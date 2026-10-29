@@ -189,10 +189,10 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
     <div className="space-y-6">
       <p className="max-w-3xl text-sm text-pretty text-muted">
           {hosted && !demo
-            ? "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
+            ? "On-device detectors find faces, ID photos and signatures; OCR plus the text detectors find identifiers printed in the image."
             : serverImages && !demo
             ? serverImages.sam
-              ? "SAM 3.1 segments signatures and stamps, an on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
+              ? "SAM 3.1 segments signatures and stamps (the original image is sent to Meta's API for that), an on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
               : "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image. Signatures and stamps need SAM 3.1 (META_API_KEY on the server)."
             : "Faces, ID photos, signatures and stamps are segmented on the PII Guard server; OCR plus the text detectors find identifiers printed in the image."}{" "}
           Every masked region is filled solid, and the image is rebuilt from pixels, so no metadata leaves either.
@@ -200,9 +200,10 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
 
       {hosted && (
         <p role="note" aria-label="How hosted images are processed" className="rounded-lg border border-line bg-surface px-4 py-3 text-sm text-ink">
-          <strong className="font-medium">Your image is processed in memory on our Azure server and is not stored.</strong> Its text is read with Tesseract and faces are found on that
-          server's CPU; the image is not sent to any other service or model. Only the masked image and your session's placeholders are kept, in memory, until you delete the session or
-          the server restarts. Signatures and stamps are not detected here and stay visible: cover them before uploading, or self-host PII Guard with SAM 3.1.
+          <strong className="font-medium">Your image is processed in memory on our Azure server and is not stored.</strong> Its text is read with Tesseract, and faces, ID photos and
+          signatures are found on that server's CPU; the image is not sent to any other service or model. Your project policy decides which of them are masked. Only the masked image and
+          your session's placeholders are kept, in memory, until you delete the session or the server restarts. Stamps are not detected here and stay visible: cover them before
+          uploading if they matter.
         </p>
       )}
 

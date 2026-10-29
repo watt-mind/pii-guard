@@ -5,6 +5,7 @@
 - **Amends:** [ADR 0011](0011-hosted-saas.md) (hosted images were disabled),
   [ADR 0013](0013-one-console-owner-scoped-api.md) (hosted `images` capability)
 - **Builds on:** [ADR 0006](0006-fail-closed.md)
+- **Amended:** 2026-10-29 (LAB-1444): on-device signatures; visual actions in project policies
 
 ## Context
 
@@ -24,7 +25,8 @@ owner's runtime vault, so another owner's session id is `404`, and text and imag
 are shared within the owner's session.
 
 **Where.** On the replica only: the built-in Tesseract (`eng`, `hun`, `deu`, `pol`, `osd` in
-`Dockerfile.hosted`) and the on-device segmenter (YuNet, `local-vision`). Hosted mode builds
+`Dockerfile.hosted`), the on-device segmenter (YuNet, `local-vision`) and, since LAB-1444, the
+pinned YOLOS-tiny signature detector (see *Amendment* below). Hosted mode builds
 the segmenter as `local` regardless of `PII_GUARD_SEGMENTER`, and refuses to start when that
 setting names anything else or `PII_GUARD_IMAGE_REQUIRE_OCR=false`. Any other segmenter or OCR
 object found on the app is refused (`detection_profile_denied`). Hosted detectors were already
@@ -75,3 +77,28 @@ covered on hosted; owners who need them covered use self-hosting with SAM. OCR m
 larger and a cold start slower; the container size (2 vCPU, 4 GiB) is unchanged since only one
 image is processed at a time. A deployment smoke of OCR and readiness is still required before
 public enablement.
+
+## Amendment (2026-10-29, LAB-1444): signatures on-device, visual actions per project policy
+
+The segmentation benchmarks (LAB-1229, `docs/models.md`) measured YuNet plus a YOLOS-tiny
+signature detector at 0.7 s p50, free and with no egress, against SAM 3.1 hybrid at 2.5 s p50 and
+about $0.005 per image with the original image sent to Meta. The owner decided that visual
+detection is configured per project policy and that SAM is opt-in.
+
+- **Signatures are masked on the replica.** `Dockerfile.hosted` ships
+  `mdefrance/yolos-tiny-signature-detection` (Apache-2.0, 26 MB, safetensors only) at a pinned
+  revision, each file checked against its pinned SHA-256 and loaded once at build time; the
+  runtime loads it offline. Readiness loads it while the server's own policies mask signatures.
+  The release no longer sets `PII_GUARD_POLICY_OVERRIDES=SIGNATURE=keep`.
+- **Project policies hold visual actions.** `FACE`, `ID_PHOTO`, `SIGNATURE` and `STAMP` are
+  `mask` or `keep` in `entity_policies`, versioned like text types. The operator's explicit
+  overrides still win when stricter. Versions saved before this amendment take the server's
+  visual actions. Stamps cannot be found on the replica, so a policy that masks them refuses
+  images before work.
+- **`visual_detection`** is `local` (default) or `sam`. Hosted accepts `local` only for now:
+  `sam` on hosted needs a per-image SAM spend reservation inside the daily image cap, the Meta
+  key from Key Vault and a pre-upload disclosure that the original goes to Meta. That is a
+  separately reviewed follow-up; until then no hosted image leaves the process.
+
+This replaces the *Signatures* paragraph above: hosted owners now get signatures masked without
+any remote processor.
