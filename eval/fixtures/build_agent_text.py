@@ -205,7 +205,7 @@ def _positives(lang: str) -> list[str]:
     )
     command_with_name = (
         f'$ cd repo && python3 send_invoice.py --to "{P(hu_name)}" --phone '
-        f"{PH('+36 30 123 4567')} && git commit --author \"{P(de_name)} <{E(de_mail)}>\""
+        f'{PH("+36 30 123 4567")} && git commit --author "{P(de_name)} <{E(de_mail)}>"'
     )
     path_with_name = (
         f"{P(hu_name)} reported a crash in /opt/homebrew/lib/node_modules/@quillstone-works/"

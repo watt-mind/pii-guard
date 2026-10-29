@@ -228,3 +228,94 @@ def test_ner_detector_applies_the_guards() -> None:
     detector = NerDetector(backend=Backend(), entity_types=["EMAIL", "PERSON"])
     text = "Kovács Réka adatait mentsd a contacts.json fájlba."
     assert [s.text for s in detector.detect(text, "hu")] == ["Kovács Réka"]
+
+
+class TestMachineTokens:
+    """LAB-1482: request metadata and commands from the LAB-1475 re-run
+    (docs/integrations/harness-matrix-2026-10-29.md). The spans are what the NER proposed."""
+
+    CODEX_UUID = "019a3f2e-7b1c-7d40-abc6-3e9f1a2b4c5d"
+    TURN = (
+        '{"turn_id":"01934872-6621-7c2e-9a5f-4b6d8c0e2f3a",'
+        '"turn_started_at_unix_ms":1793228461234,"analytics_enabled":false,"x":null}'
+    )
+
+    def test_leading_segment_of_a_bare_uuid_is_not_a_phone(self) -> None:
+        text = f"prompt_cache_key: {self.CODEX_UUID}"
+        assert kept(text, hit(text, "019a3f2e", E.PHONE)) == []
+        assert kept(self.TURN, hit(self.TURN, "01934872-6621-7c2e", E.PHONE)) == []
+
+    def test_uuid_in_escaped_json_and_prose(self) -> None:
+        text = '{"m": "{\\"turn_id\\":\\"01934872-6621-7c2e-9a5f-4b6d8c0e2f3a\\"}"}'
+        assert kept(text, hit(text, "01934872", E.BANK_ACCOUNT)) == []
+        text = f"Ticket {self.CODEX_UUID} is closed."
+        assert kept(text, hit(text, "019a3f2e-7b1c", E.PERSON)) == []
+
+    def test_phone_next_to_a_uuid_is_kept(self) -> None:
+        text = f"Ticket {self.CODEX_UUID}: call +36 30 123 4567 or 06301234567."
+        spans = (hit(text, "+36 30 123 4567", E.PHONE), hit(text, "06301234567", E.PHONE))
+        assert kept(text, *spans) == ["+36 30 123 4567", "06301234567"]
+
+    def test_hit_spilling_out_of_a_uuid_is_kept(self) -> None:
+        text = f"id {self.CODEX_UUID} Teszt Elek"
+        assert kept(text, hit(text, "4c5d Teszt Elek", E.PERSON)) == ["4c5d Teszt Elek"]
+
+    def test_json_literals_are_not_names(self) -> None:
+        assert kept(self.TURN, hit(self.TURN, "false", E.PERSON)) == []
+        assert kept(self.TURN, hit(self.TURN, "null", E.PERSON)) == []
+        text = "analytics_enabled=false, telemetry: true"
+        assert kept(text, hit(text, "false", E.PERSON), hit(text, "true", E.PERSON)) == []
+
+    def test_word_false_in_prose_needs_value_position(self) -> None:
+        text = "Ask False about it."  # capitalised, no value position: not this guard's call
+        assert kept(text, hit(text, "False", E.PERSON)) == ["False"]
+
+    def test_epoch_milliseconds_in_a_time_field_are_not_an_account(self) -> None:
+        assert kept(self.TURN, hit(self.TURN, "1793228461234", E.BANK_ACCOUNT)) == []
+        text = "created_at=1793228461 elapsed"
+        assert kept(text, hit(text, "1793228461", E.PHONE)) == []
+
+    def test_long_numbers_elsewhere_are_kept(self) -> None:
+        text = '{"account":1793228461234,"phone":"3630123456"}'
+        spans = (hit(text, "1793228461234", E.BANK_ACCOUNT), hit(text, "3630123456", E.PHONE))
+        assert kept(text, *spans) == ["1793228461234", "3630123456"]
+        text = "Account 1793228461234 at the bank, call 3630123456."
+        spans = (hit(text, "1793228461234", E.BANK_ACCOUNT), hit(text, "3630123456", E.PHONE))
+        assert kept(text, *spans) == ["1793228461234", "3630123456"]
+
+    def test_time_field_with_a_phone_shaped_value_is_kept(self) -> None:
+        text = '"callback_at": "+36301234567"'
+        assert kept(text, hit(text, "+36301234567", E.PHONE)) == ["+36301234567"]
+
+    def test_executable_at_command_position_is_not_a_name(self) -> None:
+        text = '{"command": "cd /work/repo && python3 -c \\"print(1)\\" | jq ."}'
+        spans = (hit(text, "python3", E.PERSON), hit(text, "jq", E.PERSON))
+        assert kept(text, *spans) == []
+        text = '{"command": "python3 scripts/check.py"}'
+        assert kept(text, hit(text, "python3", E.PERSON)) == []
+        text = "$ python3 scripts/check.py --verbose"
+        assert kept(text, hit(text, "python3", E.PERSON)) == []
+
+    def test_name_next_to_a_command_is_kept(self) -> None:
+        text = '$ cd repo && python3 send.py --to "Kovács Réka" && echo Teszt Elek'
+        spans = (hit(text, "Kovács Réka", E.PERSON), hit(text, "Teszt Elek", E.PERSON))
+        assert kept(text, *spans) == ["Kovács Réka", "Teszt Elek"]
+        text = "cd repo && Elek ran it"  # written as a name: not an executable
+        assert kept(text, hit(text, "Elek", E.PERSON)) == ["Elek"]
+
+    def test_lowercase_word_in_prose_is_kept(self) -> None:
+        text = "I met elek yesterday."
+        assert kept(text, hit(text, "elek", E.PERSON)) == ["elek"]
+
+    def test_letterless_person_is_dropped(self) -> None:
+        text = "rows len 89\nchecked 89 of 89"
+        assert kept(text, hit(text, "89", E.PERSON), hit(text, "89", E.PERSON, 1)) == []
+
+    def test_npm_scope_under_node_modules_is_not_a_name(self) -> None:
+        text = "Read /opt/homebrew/lib/node_modules/@quillstone-works/pi-coding-agent/README.md"
+        spans = (hit(text, "quillstone", E.PERSON), hit(text, "pi-coding-agent", E.PERSON))
+        assert kept(text, *spans) == []
+
+    def test_home_directory_beside_node_modules_is_kept(self) -> None:
+        text = "/Users/anna.kovacs/project/node_modules/@scope-works/pkg/index.js"
+        assert kept(text, hit(text, "anna.kovacs", E.PERSON)) == ["anna.kovacs"]

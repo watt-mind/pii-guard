@@ -262,3 +262,40 @@ def test_schema_bounds_are_not_read_as_bank_accounts() -> None:
     sent = upstream.bodies[0]
     assert sent["tools"] == [OPENCODE_READ_TOOL]
     assert PERSON not in json.dumps(sent["messages"], ensure_ascii=False)
+
+
+#: Codex 0.163.0's prompt_cache_key and window id: bare UUIDs (LAB-1482).
+CODEX_UUID = "019a3f2e-7b1c-7d40-abc6-3e9f1a2b4c5d"
+
+
+def test_codex_cache_key_and_metadata_ids_are_forwarded_as_sent() -> None:
+    upstream = ResponsesUpstream()
+    phone_digits, card_digits = "36301234567", "4111111111111111"
+    body = muse_body(stream=True)
+    body["prompt_cache_key"] = CODEX_UUID
+    body["client_metadata"] = {
+        "x-codex-window-id": CODEX_UUID,
+        "callback": phone_digits,
+        "card": card_digits,
+        "owner": PERSON,
+    }
+    flagged = (PERSON, CODEX_UUID, phone_digits, card_digits)
+    with TestClient(fast_app(upstream, flagged)) as client:
+        response = client.post("/v1/responses", json=body)
+    assert response.status_code == 200, response.text
+    sent = upstream.bodies[0]
+    assert sent["prompt_cache_key"] == CODEX_UUID
+    meta = sent["client_metadata"]
+    assert meta["x-codex-window-id"] == CODEX_UUID
+    # Not ids: a bare digit run (a phone, a card) and a name stay masked (fail closed).
+    for key in ("callback", "card", "owner"):
+        assert meta[key].startswith("[["), key
+
+
+def test_id_values() -> None:
+    from pii_guard.gateway.opaque_ids import is_id_value
+
+    for value in (CODEX_UUID, MESSAGE_ID, "c_5f0c3a9e1b7d4f2a8c6e0b9d3a1f7e2c"):
+        assert is_id_value(value), value
+    for value in ("36301234567", "4111111111111111", "id_4111111111111111", PERSON, "1.5"):
+        assert not is_id_value(value), value
