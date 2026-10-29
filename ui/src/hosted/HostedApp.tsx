@@ -236,9 +236,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="images-heading" title="Images too: faces are covered before they leave." lead="A gateway that only reads text passes images on untouched. pii-guard reads the image itself: faces and ID photos are found by a segmenter, printed names and numbers by OCR and the same detectors as text, and all of it is covered before the image goes to the model." />
+        <SectionHead id="images-heading" title="Images too: faces are covered before they leave." lead="A gateway that only reads text passes screenshots and scans on untouched. pii-guard reads the image itself: a segmenter finds faces and ID photos, OCR and the text detectors find printed names and numbers, and all of it is covered before the image goes on." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
-        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card; the regions were recorded on 27 Oct 2026 from a run with SAM 3.1 and OCR. In the hosted preview, signatures and stamps stay visible, as shown here. A self-hosted install can mask them too, with SAM 3.1. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway, the masked image goes to the model in place of the original. In the hosted preview, masking runs on the service and the masked image comes back to you; it isn’t sent to a model, and signatures and stamps stay visible, as here. A self-hosted install masks them too. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <Card title="Measured on 65 official specimen ID documents from 24 countries" headingLevel={3} subtitle="Self-hosted run with SAM 3.1, Tesseract OCR and the rules, 27 Oct 2026. A region counts as covered when the mask overlaps it at IoU ≥ 0.5.">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
+          <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/benchmarks.md#image-masking`}>Image benchmark details ↗</a></p>
+        </Card>
       </section>
 
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-6 space-y-6">
