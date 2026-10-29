@@ -115,7 +115,7 @@ export interface RunOptions {
 /** Analyze and mask the same text; both go through the same engine. */
 export async function runGuard(client: RoutingClient, text: string, sampleId: string | null, options: RunOptions = {}): Promise<RunResult> {
   const started = performance.now();
-  const language = options.language ?? "hu";
+  const language = options.language ?? "en";
   let sessionId: string | null = null;
   let known: KnownValuesResponse | null = null;
   if (options.known?.length) {

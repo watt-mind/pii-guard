@@ -22,3 +22,5 @@ export const CHAT_SAMPLES: ChatSample[] = [
     text: "Hi, I'm Jane Placeholder (jane.placeholder@example.net, +44 20 7946 0958). Please draft a two-sentence email to Sam Example asking him to refund the deposit to GB33 BUKB 2020 1555 5555 55.",
   },
 ];
+
+export const DEFAULT_CHAT_SAMPLE = CHAT_SAMPLES.find((sample) => sample.id === "en-refund")!;

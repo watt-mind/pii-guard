@@ -8,8 +8,10 @@ history, tool results), ``content`` strings and text parts, refusals, assistant
 Request metadata is masked too: tool definitions (``tools[]``, legacy ``functions[]``),
 ``response_format.json_schema`` and ``metadata`` values. In a JSON Schema every free-text
 string (``description``, ``title``, ``enum``/``const``/``default``/``examples`` values, ...) is
-masked; structural strings (``type``, ``$ref``, ``format``, ...) are left alone. Identifiers
-(function names, ``properties`` keys, ``required`` entries, ``metadata`` keys) can't carry a
+masked; structural strings (``type``, ``$ref``, ``format``, ...) are checked like identifiers
+(personal data in one rejects the request, LAB-1563). A custom tool's
+``format.grammar.definition`` is free text: it is masked. Identifiers (function names,
+``properties`` keys, ``required`` entries, ``metadata`` keys, ``model``) can't carry a
 placeholder, so they are only checked: personal data in one rejects the request
 (:class:`UnsupportedContentError`, naming the location, never the value).
 
@@ -65,7 +67,8 @@ _TEXT_FIELDS = ("refusal", "reasoning_content", "reasoning")
 _TEXT_PART_TYPES = {"text": "text", "refusal": "refusal"}
 _IMAGE_SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
 _DATA_URL_RE = re.compile(r"^data:(image/(?:png|jpeg|jpg));base64,", re.IGNORECASE)
-#: JSON-Schema keywords whose string values are structure, not text: never masked.
+#: JSON-Schema keywords whose string values are structure, not text: checked as identifiers,
+#: never masked (a custom tool's ``format.grammar.definition`` is handled before this set).
 _SCHEMA_STRUCTURAL = frozenset({"type", "$ref", "$schema", "$id", "$anchor", "format"})
 #: JSON-Schema keywords whose values are data (any JSON): every string in them is masked.
 _SCHEMA_DATA = frozenset({"enum", "const", "default", "examples"})
@@ -197,6 +200,8 @@ def collect_texts(body: object) -> CollectedTexts:
             raise InvalidChatRequestError(f"messages.{index} must be an object")
         _collect_message(message, index, out)
     _collect_top_level(body, out)
+    # ``model`` goes upstream verbatim and can't carry a placeholder: checked (LAB-1563).
+    _check_text(body["model"], "model", out)
     return out
 
 
@@ -806,7 +811,8 @@ def _collect_request_metadata(body: dict[str, Any], out: CollectedTexts) -> None
                     _check_json(tool, key, at, out)
                 elif isinstance(value, dict):
                     _collect_function(value, at, out)
-                elif isinstance(value, str | list):
+                elif isinstance(value, str | list) or _number_text(value) is not None:
+                    # A direct numeric leaf is a number slot, as in _collect_json (LAB-1563).
                     _collect_json(tool, key, out, "tools")
     functions = body.get("functions")
     if functions is not None:
@@ -842,16 +848,48 @@ def _collect_response_format(response_format: object, out: CollectedTexts) -> No
 
 def _collect_function(function: dict[str, Any], where: str, out: CollectedTexts) -> None:
     """A function (or json_schema) definition: ``name`` checked, schemas walked, text masked."""
-    for position, (key, value) in enumerate(list(function.items())):
+    for position, key in enumerate(list(function)):
+        if key == "format":
+            # A custom tool's format: its grammar definition is free text (LAB-1563).
+            _collect_tool_format(function, key, f"{where}.format", out)
+            continue
         if key in _SCHEMA_STRUCTURAL:
+            # Structural values are checked like identifiers, never skipped (LAB-1563).
+            _check_json(function, key, _field(where, key, position), out)
             continue
         _check_name(key, _field(where, key, position), out)
         if key == "name":
             _check_identifier(function, key, f"{where}.name", out)
         elif key in ("parameters", "schema"):
             _collect_schema(function, key, f"{where}.{key}", out)
-        elif isinstance(value, str | list | dict):
+        else:
+            # _collect_json also makes number slots for direct numeric leaves (LAB-1563);
+            # booleans and null collect nothing there.
             _collect_json(function, key, out, "tools")
+
+
+def _collect_tool_format(
+    container: dict[str, Any] | list[Any], key: Any, where: str, out: CollectedTexts
+) -> None:
+    """A custom tool's ``format``: a ``grammar.definition`` string at any depth is free text
+    and masked; every other leaf (``type``, ``syntax``, numbers) is checked like an
+    identifier. A plain-string format (a schema ``format`` at this level) is checked too."""
+    value = container[key]
+    if isinstance(value, dict):
+        for position, (name, sub) in enumerate(list(value.items())):
+            at = _field(where, name, position)
+            _check_name(name, at, out)
+            if name == "definition" and isinstance(sub, str):
+                out.slots.append(TextSlot(sub, _setter(value, name), "tools"))
+            elif isinstance(sub, dict | list):
+                _collect_tool_format(value, name, at, out)
+            else:
+                _check_json(value, name, at, out)
+    elif isinstance(value, list):
+        for i in range(len(value)):
+            _collect_tool_format(value, i, f"{where}.{i}", out)
+    else:
+        _check_json(container, key, where, out)
 
 
 def _collect_schema(
@@ -874,6 +912,8 @@ def _collect_schema(
                 at = f"{where}.{position}"
                 _check_text(name, at, out)
             if name in _SCHEMA_STRUCTURAL:
+                # Checked like identifiers, never skipped unchecked (LAB-1563).
+                _check_json(value, name, at, out)
                 continue
             if name in _SCHEMA_DATA:
                 _collect_json(value, name, out, "tools")
