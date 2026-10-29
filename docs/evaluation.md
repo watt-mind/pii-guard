@@ -675,8 +675,8 @@ fetched once into `$PII_GUARD_MODELS_DIR/ner/` (outside the repository) and chec
 
 ```bash
 uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py score --record
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py latency
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score --record
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency
 ```
 
 **Label mapping** (`LABEL_MAP` in that module; every one of the 42 labels has an entry):
