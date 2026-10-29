@@ -22,6 +22,13 @@ your network, then restored in the answer, even mid-stream and inside tool calls
 
 **Try it live: https://guard.watt-mind.com**. Run the guest demo with no sign-up and no key, or sign in with Google for your own gateway endpoint. Use fictional data only; it is a hackathon demo with a capped sponsored allowance.
 
+**Why it matters in the EU.** The GDPR requires data minimization (Art. 5) and lists
+pseudonymization among example by-design and security measures (Art. 25, 32). Placeholders
+reduce the personal data that reaches a model provider outside the EU, though they don't by
+themselves settle Chapter V transfer obligations. Pseudonymized data stay personal data for
+whoever holds the mapping: a technical measure, not a compliance certificate. Sources, the 2025
+CJEU ruling, DORA and the AI Act: [docs/eu-regulation.md](docs/eu-regulation.md).
+
 **Try it offline** (no key; needs [uv](https://docs.astral.sh/uv/) and
 [pnpm](https://pnpm.io/)): `git clone https://github.com/watt-mind/pii-guard.git && cd pii-guard && make demo`,
 then open http://localhost:5173. Once the package is on PyPI (it is not yet), one command
@@ -98,7 +105,8 @@ Ai4Privacy data too ([configurations](eval/results/2026-10-27-comparison/README.
 
 The gateway speaks the OpenAI chat API, so an agent framework only changes its base URL. It
 masks every message, **tool definitions, tool-call arguments and tool results**, restores
-placeholders in streamed answers chunk by chunk (also when one is split across chunks), keeps
+placeholders in streamed answers chunk by chunk (when a chunk ends in what could be the start of
+a placeholder, only that tail is held back until the next chunk completes or rules it out), keeps
 the same placeholder for the same person across a whole session, masks inline images, and
 fails closed on anything it can't mask ([field table](docs/contracts.md#gateway-request-fields-implemented)).
 Clients that can't send a session header still get one sticky session: from the URL path
@@ -120,10 +128,16 @@ stream = client.chat.completions.create(
 )  # the model sees [[PERSON_…]] and [[EMAIL_…]]; your code gets the real values back
 ```
 
-It also serves the Responses API, so coding agents run behind it: with **Muse Code 1.4.14**
-on the Meta Model API, 0 of 16 fictional values reached the upstream and no request was
-refused ([LAB-1299](docs/journey/2026-10-27-lab-1299-muse-1-4-14.md),
-[guide](docs/integrations/muse-code.md)). Sessions, headers, modes and settings:
+It also serves the Responses API, so coding agents run behind it unmodified. **Four real
+harnesses, pi, OpenCode, Codex and Muse Code**, did a two-turn task on a fictional customer file
+(`cat` it, reply with an e-mail, then edit the file) through the gateway on Muse Spark: across
+**115 agent requests, none of the 9 fictional values reached the model**, refused turns went from
+7 of 15 to **0 of 10** after the placeholder note, and 8 of 10 turns finished, with real values
+restored in the answers and on disk. Streaming, multi-turn sessions and tool calls (`read`,
+`write`, `bash`, `edit`) passed in all four; the one Codex failure was a regex-escaped placeholder,
+since fixed ([#221](https://github.com/watt-mind/pii-guard/pull/221)). Ten turns is a small sample, not a benchmark
+([matrix and setup](docs/integrations/harness-matrix-2026-10-29.md),
+[Muse Code guide](docs/integrations/muse-code.md)). Sessions, headers, modes and settings:
 [docs/architecture-gateway.md](docs/architecture-gateway.md).
 
 ## Why PII Guard

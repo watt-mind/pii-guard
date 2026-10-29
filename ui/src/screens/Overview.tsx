@@ -6,6 +6,7 @@ import type { EntityType } from "../api/types";
 import { NerHint } from "../components/NerHint";
 import { Button, ButtonLink, Card, KeyValues, Metric, PageHeader } from "../components/ui";
 import { useNow } from "../hooks/useNow";
+import { useHostedSession } from "../hosted/session";
 import type { ServerStatusState } from "../hooks/useServerStatus";
 import type { TrafficHandle } from "../hooks/useTraffic";
 import { metaFor } from "../lib/entities";
@@ -180,6 +181,7 @@ function ScopeNote({ t, forced, since }: { t: TrafficHandle; forced: boolean; si
 
 /** `setup`: a hosted owner's setup list (above) holds the next step, so this card adds no primary action. */
 function EmptyOverview({ t, server, sendDemo, setup = false }: { t: TrafficHandle; server: ServerStatus | null; sendDemo: typeof sendDemoTraffic | null; setup?: boolean }) {
+  const hosted = useHostedSession() !== null;
   const status = t.status;
   const gateway = server?.gateway.url ?? "/v1";
   const title =
@@ -193,7 +195,9 @@ function EmptyOverview({ t, server, sendDemo, setup = false }: { t: TrafficHandl
             ? "Too many requests just now, so the traffic log is paused."
             : status.state === "denied"
               ? status.reason === "signed_out"
-                ? "You're signed out, so the traffic log can't be read."
+                ? hosted
+                  ? "Your session ended, so the traffic log can't be read."
+                  : "You're signed out, so the traffic log can't be read."
                 : "This account can't read this traffic log."
               : "Nothing has gone through the gateway yet.";
   return (
@@ -215,7 +219,7 @@ function EmptyOverview({ t, server, sendDemo, setup = false }: { t: TrafficHandl
           <>The API is up but asked this page to slow down. It retries by itself{status.retryAfterMs ? ` in about ${Math.ceil(status.retryAfterMs / 1000)} s` : ""}; nothing is lost.</>
         ) : status.state === "denied" ? (
           <>
-            The API is up but answered {status.reason === "signed_out" ? "401" : "403"}.{" "}
+            {hosted && status.reason === "signed_out" ? "" : `The API is up but answered ${status.reason === "signed_out" ? "401" : "403"}. `}
             {status.reason === "signed_out" ? "Sign in again; this page reconnects by itself." : "Check the selected project, or sign in with the account that owns it."}
           </>
         ) : (

@@ -41,12 +41,20 @@
       "color": "#E69F00",
       "shape": "circle"
     },
+    "ner:bardsai-v1-fallback@baseline=lab-1516": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
     "ner:bardsai-v3@decoder=word": {
       "color": "#E69F00",
       "shape": "circle"
     },
     "ner:eu-pii-safeguard": {
       "color": "#999933",
+      "shape": "circle"
+    },
+    "ner:eu-pii-safeguard@decoder=first@baseline=lab-1516": {
+      "color": "#E69F00",
       "shape": "circle"
     },
     "ner:horizon-base@decoder=word": {
@@ -63,6 +71,10 @@
     },
     "ner:xlmr-base-v2-hn": {
       "color": "#117733",
+      "shape": "circle"
+    },
+    "ner:xlmr-base-v2-hn@baseline=lab-1516": {
+      "color": "#0072B2",
       "shape": "circle"
     },
     "presidio": {
@@ -95,6 +107,10 @@
     },
     "rules+ner:bardsai-v1-fallback": {
       "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "rules+ner:bardsai-v1-fallback@baseline=lab-1516": {
+      "color": "#009E73",
       "shape": "circle"
     },
     "rules+ner:bardsai-v3@decoder=word": {
@@ -185,6 +201,10 @@
       "color": "#CC79A7",
       "shape": "circle"
     },
+    "rules+ner:xlmr-base-v2-hn@baseline=lab-1516": {
+      "color": "#D55E00",
+      "shape": "circle"
+    },
     "rules+ner:xlmr-base-v2-hn@rescore=lab-1494": {
       "color": "#117733",
       "shape": "circle"
@@ -251,6 +271,10 @@
     },
     "rules+ner_gliner:gliner-multi-v2.1@labels=pii_guard.detect.ner_gliner.GLINER_LABELS": {
       "color": "#D55E00",
+      "shape": "circle"
+    },
+    "rules@baseline=lab-1516": {
+      "color": "#CC79A7",
       "shape": "circle"
     },
     "visual-labels:exact": {

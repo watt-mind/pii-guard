@@ -39,6 +39,7 @@ from pii_guard.detect import ner_resolve
 from pii_guard.eval.baselines import eu_pii_safeguard as eu
 from pii_guard.eval.baselines import new_encoders as ne
 from pii_guard.eval.baselines.encoders import ComparisonDetector, EncoderSpec
+from pii_guard.eval.datasets import mapa
 from pii_guard.eval.fixtures import load_fixtures
 from pii_guard.eval.record import build_records, host_info, write_records
 from pii_guard.eval.report import build_scorecard
@@ -60,6 +61,11 @@ SETS: dict[str, list[str]] = {
     "cee-pii": [f"eval/datasets/cee-pii/{lang}-cee-pii.jsonl" for lang in ("hu", "en")],
     "gretel-finance": [
         f"eval/datasets/gretel-finance/{lang}-gretel-finance.jsonl" for lang in ("de", "en")
+    ],
+    # Fetch-only (court text, never committed): `python -m pii_guard.eval.datasets fetch
+    # mapa-eur-lex` rebuilds these. Every language of its test split (LAB-1516).
+    "mapa-eur-lex": [
+        f"data/datasets/fixtures/mapa-eur-lex/{lang}-mapa-eur-lex.jsonl" for lang in mapa.LANGUAGES
     ],
 }
 
@@ -113,6 +119,7 @@ def _theirs(spec: EncoderSpec) -> dict[str, Any]:
 
 #: config -> (registry names, detectors for the record, label, model name or None)
 CONFIGS: dict[str, tuple[list[str], list[dict[str, Any]], str, str | None]] = {
+    "rules": (["rules"], [_RULES], "pii-guard rules alone (no NER)", None),
     "ner-v20": (["ner"], [_OURS_DETECTOR], "pii-guard NER v2.0 alone (no rules)", None),
     "fast-v20": (
         ["rules", "ner"],
@@ -126,7 +133,14 @@ CONFIGS: dict[str, tuple[list[str], list[dict[str, Any]], str, str | None]] = {
         "rules + the public fallback bardsai/eu-pii-anonimization-multilang v1 (reference)",
         None,
     ),
+    "ner-fallback-v1": (
+        ["ner"],
+        [_FALLBACK_DETECTOR],
+        "bardsai/eu-pii-anonimization-multilang v1 alone (comparison)",
+        None,
+    ),
 }
+_FALLBACK_CONFIGS = ("fast-fallback-v1", "ner-fallback-v1")
 for _name, (_spec, _) in MODELS.items():
     CONFIGS[_name] = (
         [_name],
@@ -156,7 +170,7 @@ def _score(args: argparse.Namespace) -> int:
     unmapped: dict[str, dict[str, int]] = {}
     for config in args.configs:
         names, detectors, label, model = CONFIGS[config]
-        if config == "fast-fallback-v1":  # the product's own fallback path, from the cache
+        if config in _FALLBACK_CONFIGS:  # the product's own fallback path, from the cache
             os.environ[ner_resolve.MODEL_ENV_VAR] = str(_FALLBACK.local_dir())
         else:
             os.environ.pop(ner_resolve.MODEL_ENV_VAR, None)
@@ -201,6 +215,8 @@ def _score(args: argparse.Namespace) -> int:
                 extra={"system": {"label": label}},
                 notes=notes,
             )[:1]
+            if args.key_tag:  # a distinct system key: never supersedes another run's snapshot
+                records[0]["system"]["key"] += f"@{args.key_tag}"
             overall = records[0]["metrics"]["overall"]
             print(
                 f"{config:24s} {name:18s} docs={overall['documents']:4d} "
@@ -328,6 +344,10 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument("--sets", nargs="+", choices=list(SETS), default=list(SETS))
     score.add_argument("--slug", default="lab-1391", help="run record slug prefix")
     score.add_argument("--record", action="store_true", help="write run records")
+    score.add_argument(
+        "--key-tag",
+        help="append '@<tag>' to each record's system key, so the runs form their own rows",
+    )
     score.add_argument("--runs-dir", type=Path, default=Path("eval/results/runs"))
     score.add_argument("--scorecards", type=Path, help="also write each scorecard here")
     score.add_argument("--summary", type=Path, help="dropped comparison-model labels (JSON)")

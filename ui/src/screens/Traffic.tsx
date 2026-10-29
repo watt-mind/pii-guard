@@ -273,6 +273,7 @@ function SourceBanner({
   replayDone: boolean;
   onReplay: () => void;
 }) {
+  const hosted = useHostedSession() !== null;
   const code = (s: string) => <code className="rounded bg-surface px-1 font-mono text-xs">{s}</code>;
   if (source === "fixture") {
     return (
@@ -354,7 +355,16 @@ function SourceBanner({
       <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4 text-ink">
         {status.reason === "signed_out" ? (
           <>
-            <strong className="font-medium text-danger">You're signed out.</strong> The API is up but answered 401. Sign in again; this page reconnects by itself.
+            {hosted ? (
+              // Hosted: the console only opens signed in, so a 401 means the session ended (LAB-1519).
+              <>
+                <strong className="font-medium text-danger">Your session ended.</strong> Sign in again; this page reconnects by itself.
+              </>
+            ) : (
+              <>
+                <strong className="font-medium text-danger">You're signed out.</strong> The API is up but answered 401. Sign in again; this page reconnects by itself.
+              </>
+            )}
           </>
         ) : (
           <>
