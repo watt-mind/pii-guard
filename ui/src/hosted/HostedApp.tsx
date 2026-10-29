@@ -72,7 +72,6 @@ const NAV: readonly { href: string; label: string; wide?: boolean }[] = [
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
 const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
 
-const initialLanguage = (): Language => (globalThis.navigator?.language ?? "").toLowerCase().startsWith("hu") ? "hu" : "en";
 const link = "underline underline-offset-4 hover:text-ink";
 
 /** Anonymous visitors get the public page; a signed-in owner gets the console (`console`). */
@@ -96,7 +95,7 @@ export function HostedApp({ call = request, console: renderConsole }: { call?: R
 
 function HostedContent({ call, account, accountError, refresh, console: hasConsole }: { call: Requester; account: Account | null; accountError: string; refresh: () => Promise<void>; console: boolean }) {
   const [theme, setTheme] = useTheme();
-  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const [language, setLanguage] = useState<Language>("en");
   const [result, setResult] = useState<DemoResult | null>(null);
   const [running, setRunning] = useState(false);
   const [failed, setFailed] = useState(false);

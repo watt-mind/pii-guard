@@ -1,13 +1,16 @@
 """A restored value fits the shell quoting it lands in, inside a command argument (LAB-1483).
 
 A plain placeholder in the ``command``/``cmd`` of JSON tool-call arguments, inside a
-single-quoted shell string or a ``sed`` ``s`` replacement, is restored escaped for that context
-(``'`` -> ``'\\''``; ``\\``, ``&``, the delimiter and newline backslashed in a replacement).
-Everywhere else (other keys, double quotes, heredocs, custom tool input, message text) the value
-stays byte-exact. Whole and streamed restores agree (chat and Responses).
+single-quoted, double-quoted or unquoted part of the command or a ``sed`` ``s`` replacement, is
+restored escaped for that context (``'`` -> ``'\\''``; ``\\``, ``&``, the delimiter and newline
+backslashed in a replacement; ``$``, backtick, ``"`` and ``\\`` backslashed in double quotes;
+metacharacters and whitespace backslashed unquoted — LAB-1564, so a value can never act as
+shell syntax). Custom tool input gets the same escaping inside quotes. Everywhere else (other
+keys, heredocs, message text) the value stays byte-exact. Whole and streamed restores agree
+(chat and Responses).
 
-Commands that run are executed with ``bash`` and ``sed`` to prove the value comes out intact.
-Every value is fictional (ADR 0005).
+Commands that run are executed with ``bash`` and ``sed`` to prove the value comes out intact
+and nothing in it executes. Every value is fictional (ADR 0005).
 """
 
 from __future__ import annotations
@@ -143,12 +146,10 @@ def test_script_after_dash_c_in_a_command_array() -> None:
     ("key", "template"),
     [
         ("content", "name = '{ph}'"),  # file content, not a command
-        ("command", 'echo "{ph}"'),  # double quotes: not modeled
         ("command", "cat <<'EOF'\n'{ph}'\nEOF"),  # heredoc body
         ("command", "echo $'{ph}'"),  # ANSI-C quoting
         ("command", "# '{ph}'"),  # a comment
         ("command", "echo \"$(echo '{ph}')\""),  # command substitution in double quotes
-        ("command", "echo {ph}"),  # unquoted
     ],
 )
 def test_value_stays_byte_exact_where_the_context_is_not_known(key: str, template: str) -> None:
@@ -190,7 +191,8 @@ def test_nested_command_keys_and_argv_arrays_stay_byte_exact() -> None:
     assert restored["note"]["cmd"] == f"echo '{value}'"
 
 
-def test_custom_tool_input_and_message_text_stay_byte_exact() -> None:
+def test_message_text_stays_byte_exact_but_custom_input_escapes_inside_quotes() -> None:
+    """LAB-1564: prose is never shell-escaped; custom tool input is, inside its quotes."""
     session = _session()
     value = VALUES[0]
     ph = _placeholder(session, value)
@@ -200,9 +202,8 @@ def test_custom_tool_input_and_message_text_stay_byte_exact() -> None:
     )
     restore_completion(session, body)
     message = body["choices"][0]["message"]
-    expected = text.replace(ph, value)
-    assert message["content"] == expected
-    assert message["tool_calls"][0]["custom"]["input"] == expected
+    assert message["content"] == text.replace(ph, value)
+    assert message["tool_calls"][0]["custom"]["input"] == text.replace(ph, "O'\\''Brien Teszt")
 
 
 def test_a_later_key_after_the_command_is_byte_exact() -> None:
@@ -224,11 +225,11 @@ def test_a_later_key_after_the_command_is_byte_exact() -> None:
         ('{"command": "sed \'s/a', ShellContext(True, sed_pattern="/")),
         ("{\"command\": \"sed -e 'p' -e 's|a|", ShellContext(True, sed_replacement="|")),
         ("{\"command\": \"sed 's/a/b/' '", ShellContext(True)),  # a file name, not a script
-        ('{"command": "sed \'s/a/\\u0027', ShellContext()),  # \\u0027 closed the quote
-        ('{"command": "echo \\"it\'s \'', ShellContext()),  # ' inside double quotes
+        ('{"command": "sed \'s/a/\\u0027', ShellContext(unquoted=True)),  # \\u0027 closed it
+        ('{"command": "echo \\"it\'s \'', ShellContext(double_quoted=True)),  # ' in double quotes
         ("{\"command\": \"echo 'a' '", ShellContext(True)),
         ('{"command": "x", "other": "\'', ShellContext()),
-        ('{"command": "echo \'a\'', ShellContext()),
+        ('{"command": "echo \'a\'', ShellContext(unquoted=True)),
         ("not json '", ShellContext()),
     ],
 )
@@ -279,7 +280,7 @@ def _streamed_chat(session: VaultSession, pieces: list[str]) -> str:
 
 
 def _command_with_all_contexts(ph: str) -> str:
-    return f"echo '{ph}' \"{ph}\" && printf x | sed 's/{_escaped(ph)}/{ph}/'"
+    return f"echo '{ph}' \"{ph}\" {ph} && printf x | sed 's/{_escaped(ph)}/{ph}/'"
 
 
 def test_streamed_chat_arguments_split_anywhere_equal_the_whole_restore() -> None:
@@ -350,3 +351,73 @@ def test_responses_whole_and_streamed_function_call_arguments() -> None:
         events = [json.loads(data) for _, data in out]
         deltas = "".join(e["delta"] for e in events if e["type"].endswith(".delta"))
         assert deltas == events[-1]["arguments"] == whole, cut
+
+
+# --- security: double-quoted and unquoted command parts (LAB-1564) ---------------------------
+
+#: Fictional values that would run a command or break the word if restored byte-exact.
+ACTIVE_VALUES = [
+    "x$(echo INJECTED)y",
+    "a`echo INJECTED`b",
+    'say "INJECTED" \\ $HOME',
+    "a;echo INJECTED",
+    "one two|echo INJECTED",
+    "first\nsecond;echo INJECTED",
+    "* ? [a] ~ <>&()",
+]
+
+
+@needs_shell
+@pytest.mark.parametrize("value", ACTIVE_VALUES + VALUES)
+def test_security_value_in_double_quotes_arrives_literal_and_runs_nothing(value: str) -> None:
+    session = _session()
+    ph = _placeholder(session, value)
+    command = _restored_command(session, f'printf "%s" "{ph}"')
+    assert _bash(command) == value
+
+
+@needs_shell
+@pytest.mark.parametrize("value", ACTIVE_VALUES + VALUES)
+def test_security_value_unquoted_arrives_literal_and_runs_nothing(value: str) -> None:
+    session = _session()
+    ph = _placeholder(session, value)
+    command = _restored_command(session, f"printf '%s' {ph}")
+    assert _bash(command) == value
+
+
+def _restored_input(session: VaultSession, text: str) -> str:
+    body = completion("", tool_calls=[{"type": "custom", "custom": {"name": "sh", "input": text}}])
+    restore_completion(session, body)
+    return body["choices"][0]["message"]["tool_calls"][0]["custom"]["input"]
+
+
+@needs_shell
+@pytest.mark.parametrize(
+    ("value", "template"),
+    [
+        ("x';echo INJECTED;echo 'y", "printf '%s' '{ph}'"),  # single-quote breakout
+        ("x$(echo INJECTED)y", 'printf "%s" "{ph}"'),  # substitution in double quotes
+        ("a`echo INJECTED`b", 'printf "%s" "{ph}"'),
+    ],
+)
+def test_security_custom_tool_input_inside_quotes_runs_nothing(value: str, template: str) -> None:
+    session = _session()
+    ph = _placeholder(session, value)
+    assert _bash(_restored_input(session, template.format(ph=ph))) == value
+
+
+@needs_shell
+def test_security_custom_tool_input_in_a_sed_replacement() -> None:
+    session = _session()
+    value = VALUES[3]
+    ph = _placeholder(session, value)
+    assert _bash(_restored_input(session, f"printf 'x\\n' | sed 's/x/{ph}/'")) == value + "\n"
+
+
+def test_custom_tool_input_outside_quotes_stays_byte_exact() -> None:
+    """The LAB-1564 boundary: unquoted freeform input may be a patch, not a command."""
+    session = _session()
+    value = 'Minta $HOME `id` "Kft" \\ & társa'
+    ph = _placeholder(session, value)
+    text = f"name = {ph}\ncall({ph})"
+    assert _restored_input(session, text) == text.replace(ph, value)

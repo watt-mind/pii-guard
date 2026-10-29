@@ -167,6 +167,8 @@ def collect_response_texts(body: object) -> CollectedTexts:
             if not isinstance(metadata, dict):
                 raise InvalidChatRequestError(f"{key} must be an object")
             _collect_metadata(metadata, out)
+    # ``model`` goes upstream verbatim and can't carry a placeholder: checked (LAB-1563).
+    _check_text(body["model"], "model", out)
     return out
 
 

@@ -104,6 +104,34 @@ def test_scrub_removes_credentials_known_secrets_and_images() -> None:
     assert value["api_key"] == "sk-other"  # a copy: the input is untouched
 
 
+def test_scrub_redacts_credential_synonyms_and_short_secrets() -> None:
+    # LAB-1565: keys are matched by meaning (case/separator/camelCase-insensitive),
+    # and short known secrets / bearer values are still cut out.
+    value = {
+        "token": "value-1",
+        "auth_token": "value-2",
+        "accessToken": "value-3",
+        "private_key": "value-4",
+        "passwd": "value-5",
+        "clientSecret": "value-6",
+        "X-Session-Key": "value-7",
+        "refreshToken": "value-8",
+        "long_form_credential_field": "value-9",
+        "prompt_cache_key": "conv-1",
+        "max_tokens": 10,
+        "author": "Teszt Elek",
+        "messages": [{"content": "Bearer xy and k9z here"}],
+    }
+    out = scrub(value, ["k9z"])
+    dumped = json.dumps(out)
+    for marker in (f"value-{i}" for i in range(1, 10)):
+        assert marker not in dumped
+    assert "xy" not in out["messages"][0]["content"].replace("Bearer [redacted]", "")
+    assert "k9z" not in dumped  # a 3-char known secret is still scrubbed
+    assert out["prompt_cache_key"] == "conv-1"  # not a credential
+    assert out["max_tokens"] == 10 and out["author"] == "Teszt Elek"
+
+
 def test_scrub_truncates_long_strings() -> None:
     out = scrub({"text": "x" * 50}, max_string=10)
     assert out["text"].startswith("x" * 10) and "truncated, 50 chars" in out["text"]

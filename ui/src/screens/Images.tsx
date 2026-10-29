@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { effectiveEngine, type EngineKind, type EngineState, type RoutingClient } from "../api/engine";
-import { DemoImageUnavailableError, IMAGE_RECORDINGS } from "../api/imageMock";
+import { DemoImageUnavailableError, imageRecordedOn } from "../api/imageMock";
 import type { ServerStatus } from "../api/status";
 import type { ImageMaskRequest, ImageMaskResponse, ImageRegion } from "../api/types";
 import { Boundary } from "../components/Boundary";
@@ -362,7 +362,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
               result.engine === "api" ? (
                 <span>The masked PNG exactly as the API returned it, re-encoded from pixels with no metadata. {result.ms} ms.</span>
               ) : (
-                <span>Demo mode: regions recorded from a real SAM 3.1 + OCR run on this sample; the black boxes are drawn in your browser.</span>
+                <span>Demo mode: regions recorded from a real {segmenterLabel(data.analysis.sam.model)} + OCR run on this sample; the black boxes are drawn in your browser.</span>
               )
             ) : undefined
           }
@@ -401,7 +401,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
                   {active !== null && data.regions[active] && <Highlight region={data.regions[active]} width={data.width} height={data.height} />}
                 </Figure>
               )}
-              <WhatRan data={data} engine={result.engine} />
+              <WhatRan recordedOn={imageRecordedOn(selection.kind === "sample" ? selection.sample.id : null)} data={data} engine={result.engine} />
             </div>
           ) : (
             <EmptyState title="Nothing has been sent yet" body={hosted ? "Mask the image to see exactly what the model would get." : "Mask the image to see exactly what would leave your network."} />
@@ -606,7 +606,7 @@ function RegionTable({
 }
 
 /** Say exactly what ran, and what did not, so gaps read as known scope. */
-function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind }) {
+function WhatRan({ data, engine, recordedOn }: { data: ImageMaskResponse; engine: EngineKind; recordedOn: string }) {
   const gaps = coverageGaps(data.analysis);
   const ocr = data.analysis.ocr;
   return (
@@ -629,7 +629,7 @@ function WhatRan({ data, engine }: { data: ImageMaskResponse; engine: EngineKind
         </p>
         {engine === "mock" && (
           <p className="mt-0.5 text-muted">
-            Recorded {IMAGE_RECORDINGS.recorded} from the live pipeline on this fictional sample. Nothing was sent anywhere just now.
+            Recorded {recordedOn} from the live pipeline on this fictional sample. Nothing was sent anywhere just now.
           </p>
         )}
       </div>

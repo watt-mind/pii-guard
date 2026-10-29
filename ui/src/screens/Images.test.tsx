@@ -51,6 +51,29 @@ beforeEach(() => {
 });
 
 describe("Images screen", () => {
+  it("sends the English default image and honors a manual language override", async () => {
+    const maskImage = vi.fn().mockResolvedValue(recorded("id-card-en"));
+    const { user, panel } = await openImages(liveApi(maskImage));
+    await screen.findByText("API up", { selector: "span" });
+    await user.click(within(panel).getByRole("button", { name: "Mask image" }));
+    await within(panel).findByTestId("masked-image");
+    expect(maskImage).toHaveBeenLastCalledWith(expect.objectContaining({ sampleId: "id-card-en", language: "en" }));
+    expect(loadImage).toHaveBeenCalledWith("/samples/id-card-en.png");
+    await user.selectOptions(within(panel).getByRole("combobox", { name: "Language of the text in the image" }), "hu");
+    await user.click(within(panel).getByRole("button", { name: "Run again" }));
+    await waitFor(() => expect(maskImage).toHaveBeenLastCalledWith(expect.objectContaining({ sampleId: "id-card-en", language: "hu" })));
+  });
+
+  it("starts on the English specimen with an honest local-detector demo replay", async () => {
+    const { user, panel } = await openImages(offlineApi());
+    expect(within(panel).getByRole("combobox", { name: "Language of the text in the image" })).toHaveValue("en");
+    expect(within(panel).getByRole("button", { name: /ID card \(English\)/ })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(panel).getByRole("button", { name: "Mask image" }));
+    expect(await within(panel).findByTestId("demo-masked-image")).toBeInTheDocument();
+    expect(within(panel).getByTestId("image-scope-note")).toHaveTextContent("Nothing was sent anywhere just now");
+    expect(within(panel).getByText(/black boxes are drawn/)).not.toHaveTextContent("SAM 3.1");
+  });
+
   it("is the third tab and reachable with the arrow keys", async () => {
     const user = userEvent.setup();
     render(<App api={offlineApi()} mock={createMockClient()} loadImage={loadImage} />);
@@ -141,7 +164,7 @@ describe("Images screen", () => {
     const maskImage = vi.fn().mockResolvedValue(recorded("id-card"));
     const { user, panel } = await openImages(liveApi(maskImage));
     expect(await screen.findByText("API up", { selector: "span" })).toBeInTheDocument();
-    await user.click(within(panel).getByRole("button", { name: "Mask image" }));
+    await user.click(within(panel).getByRole("button", { name: /^ID cardFace/i }));
 
     const figure = await within(panel).findByTestId("masked-image");
     expect(figure.querySelector("img")!.getAttribute("src")).toBe("data:image/png;base64,iVBORw0KGgo=");
