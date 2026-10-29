@@ -979,6 +979,15 @@ a request refused by the re-check gets `422 outbound_check_failed` with
 walker's texts, the re-check scans the serialized masked body as one text, so a field no
 walker slot covers can't carry a session value out either (LAB-1563).
 
+## Gateway chat streaming (implemented)
+
+For Chat Completions, `stream: true` requires an upstream `text/event-stream` response.
+A successful non-SSE response is closed without reading or forwarding its body and returns
+sanitized HTTP `502` with error code `upstream_did_not_stream`; the client can retry without
+`stream`. The gateway does not synthesize SSE from a JSON answer. Non-streaming JSON success
+and upstream HTTP error status/sanitization remain unchanged. The traffic record marks the
+call as failed with this code and retains the upstream status, without the rejected body.
+
 ## Gateway request fields (implemented)
 
 `POST /v1/chat/completions` walks the whole body against an allow-list
