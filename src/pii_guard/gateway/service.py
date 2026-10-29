@@ -41,7 +41,8 @@ import logging
 import re
 import threading
 import time
-from collections import Counter
+import weakref
+from collections import Counter, OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -349,6 +350,10 @@ class Gateway:
         # Ids the upstream issued per session (LAB-1469): sent back as identifiers, they are
         # forwarded without detection (the NER reads some random call ids as phone numbers).
         self.issued_ids = IssuedIds()
+        # Session id -> the VaultSession object last seen for it (LAB-1565): a different
+        # object under the same id is a new incarnation (dropped/expired/rotated and
+        # re-created), so its detection-cache entries and issued-id exemptions are dropped.
+        self._session_incarnations: OrderedDict[str, weakref.ref[VaultSession]] = OrderedDict()
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
@@ -493,6 +498,15 @@ class Gateway:
         must call once masking finished or failed."""
         with self._holds_lock:
             session, created, source = resolve_session(self.vault, headers, body, path_session)
+            previous = self._session_incarnations.get(session.session_id)
+            if previous is not None and previous() is not session:
+                # New incarnation of this id: start clean (LAB-1565).
+                self.cache.drop_session(session.session_id)
+                self.issued_ids.drop(session.session_id)
+            self._session_incarnations[session.session_id] = weakref.ref(session)
+            self._session_incarnations.move_to_end(session.session_id)
+            while len(self._session_incarnations) > 16384:
+                self._session_incarnations.popitem(last=False)
             hold = self._session_holds.setdefault(session.session_id, _SessionHold())
             hold.in_flight += 1
         stats.session_source = source
@@ -525,6 +539,8 @@ class Gateway:
                 return
             self.vault.drop(session_id)
             self.cache.drop_session(session_id)
+            self.issued_ids.drop(session_id)
+            self._session_incarnations.pop(session_id, None)
 
     def _forwarded(
         self,

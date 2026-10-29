@@ -949,10 +949,17 @@ this order (`pii_guard.gateway.sessions`, LAB-1286; details in
 | 3 | `prompt_cache_key` | `HMAC(tenant key, "pck:" + identity + ":" + prompt_cache_key)` | created |
 | 4 | `default` | `HMAC(tenant key, "default:" + identity)` | created |
 
-`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous`. Every
+`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous` (a single
+local principal by construction: see `gateway/sessions.py`). Every
 response carries `X-PII-Guard-Session` (the id used, including a derived `d_…` one) and
 `X-PII-Guard-Session-Source`; the traffic record has `session_source` next to `session_ref`.
 Steps 2-4 go through `Vault.session_or_create` and its `PII_GUARD_VAULT_MAX_ENTRIES` cap.
+An explicit session (steps 1-2) is bound to the credentialed identity that first presents
+it to the gateway (LAB-1565): another credentialed identity presenting the same id gets
+`404 not_found` (the credential-less local principal is never refused by a binding), and
+session ids are 3-128 characters. A dropped, expired or rotated session id re-created as a
+new incarnation starts clean: no detection-cache entries and no issued-id exemptions carry
+over.
 
 Lifetime of a session a refused call created (LAB-1316): a call holds its session from
 resolving it until masking finished or failed. When the call that created the session is
