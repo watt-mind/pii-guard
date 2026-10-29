@@ -123,7 +123,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                     return (
                       <li key={s.id}>
                         <a
-                          href={hashOf({ section: s.id, tab: route.tab })}
+                          href={hashOf(s.id === route.section ? route : { section: s.id, tab: route.tab })}
                           aria-current={active ? "page" : undefined}
                           onClick={(e) => {
                             // A plain click navigates here, without a history entry per section;

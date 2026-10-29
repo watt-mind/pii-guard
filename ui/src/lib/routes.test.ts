@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ROUTE, hashOf, parseHash } from "./routes";
+import { DEFAULT_ROUTE, evaluationQuery, hashOf, parseEvaluationQuery, parseHash } from "./routes";
 
 describe("console routes (LAB-1287)", () => {
   it.each([
@@ -52,5 +52,39 @@ describe("console routes (LAB-1287)", () => {
 
   it("opens on the Overview", () => {
     expect(hashOf(DEFAULT_ROUTE)).toBe("#overview");
+  });
+});
+
+describe("evaluation deep links (LAB-1133)", () => {
+  it("round-trips filters, including system ids that contain commas", () => {
+    const route = {
+      section: "evaluation" as const,
+      tab: "text" as const,
+      evaluation: { set: "smoke", lang: "hu", systems: ["rules", "sys,with,commas", "rules+ner:x"], sort: "f1:desc" },
+    };
+    const hash = hashOf(route);
+    expect(hash).toBe(
+      "#evaluation?set=smoke&lang=hu&systems=rules&systems=sys%2Cwith%2Ccommas&systems=rules%2Bner%3Ax&sort=f1%3Adesc",
+    );
+    const parsed = parseHash(hash)!;
+    expect(parsed.redirect).toBe(false);
+    expect(parsed.route).toEqual(route);
+  });
+
+  it("drops unknown query keys and empty values", () => {
+    expect(parseEvaluationQuery("?set=smoke&bogus=1&lang=&systems=a&systems=")).toEqual({ set: "smoke", systems: ["a"] });
+    expect(parseEvaluationQuery("")).toEqual({});
+  });
+
+  it("reads a bare #evaluation with no filters", () => {
+    const parsed = parseHash("#evaluation")!;
+    expect(parsed).toEqual({ route: { section: "evaluation", tab: "text" }, redirect: false });
+    expect(hashOf(parsed.route)).toBe("#evaluation");
+    expect(evaluationQuery(undefined)).toBe("");
+  });
+
+  it("treats an evaluation sub-path, or a query on another section, as a redirect", () => {
+    expect(parseHash("#evaluation/smoke")).toEqual({ route: { section: "evaluation", tab: "text" }, redirect: true });
+    expect(parseHash("#overview?set=smoke")!.redirect).toBe(true);
   });
 });
