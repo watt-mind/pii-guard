@@ -441,10 +441,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <a className="text-ink hover:underline" href="#data">Your data</a>
           <a className="text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks</a>
           {PRIVACY_NOTICE_URL && <a className="text-ink hover:underline" href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
-          {CONTACT_URL && <a className="text-ink hover:underline" href={CONTACT_URL}>Contact</a>}
+          <a className="text-ink hover:underline" href={CONTACT_URL ?? `${SOURCE}/issues`}>{CONTACT_URL ? "Contact" : "Questions and issues"}</a>
         </nav>
         <p className="text-xs text-muted">Apache-2.0 · Built for the Meta Global AI Developer Hackathon 2026</p>
-        <p className="text-xs text-muted">{OPERATOR ? `Operated by ${OPERATOR}.` : "Operator details, privacy notice and contact are being finalised."}</p>
+        {OPERATOR && <p className="text-xs text-muted">Operated by {OPERATOR}.</p>}
       </div>
     </footer>
   </div>;
