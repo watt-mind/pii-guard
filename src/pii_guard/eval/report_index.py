@@ -469,6 +469,61 @@ def compact(block: Mapping[str, Any]) -> dict[str, Any]:
 # --- Index --------------------------------------------------------------------------------
 
 
+def display_note(note: str) -> str:
+    """A run-record note as a reader reads it (LAB-1266): drop ticket ids and
+    internal machine-sharing phrasing. The record keeps the raw note; the index
+    carries this public text alongside it."""
+    s = re.sub(
+        r"machine shared with parallel agent runs",
+        "machine shared with other jobs",
+        note,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(r"\s*\(LAB-\d+\)", "", s)
+    s = re.sub(r"^LAB-\d+:?\s+", "", s)
+    s = s.strip()
+    return (s[:1].upper() + s[1:]) if s else s
+
+
+_VISUAL_PART = {
+    "tesseract": "Tesseract",
+    "rules": "rules",
+    "captions": "captions",
+    "eka": "EKA",
+    "presidio-image": "Presidio Image Redactor",
+    "efficientsam-vitt": "EfficientSAM",
+    "yolos-tiny-signature": "YOLOS-tiny (signatures)",
+}
+
+
+def visual_short_label(system: str) -> str:
+    """``visual:sam-3.1+tesseract+rules`` -> ``PII Guard: SAM 3.1 + Tesseract + rules``.
+
+    Reader-facing short labels for image-masking runs (LAB-1266); keys stay slugs."""
+    kind, _, rest = system.partition(":")
+    if not rest:
+        kind, rest = "visual", kind
+    parts: list[str] = []
+    for part in rest.split("+"):
+        if not part:
+            continue
+        if part.startswith("sam-"):
+            parts.append(f"SAM {part[4:]}")
+        elif part.startswith("yunet"):
+            parts.append("YuNet")
+        elif part.startswith("llm:"):
+            name = " ".join(w.capitalize() for w in part[4:].split("-"))
+            parts.append(f"LLM ({name})")
+        else:
+            tuned = part.endswith("-tuned")
+            base = part[:-6] if tuned else part
+            parts.append(f"{_VISUAL_PART.get(base, base)}{' (tuned)' if tuned else ''}")
+    joined = " + ".join(parts)
+    if kind == "visual-segment":
+        return f"Segmenter: {joined}"
+    return f"PII Guard: {joined}" if rest.startswith("sam-") else joined
+
+
 def _short_label(label: str) -> str:
     return label.removeprefix("pii-guard ").strip() or label
 
@@ -568,6 +623,7 @@ def build_index(
                     for k in ("usd", "estimated", "gpu_minutes", "note", "shared_with")
                 },
                 "notes": list(rec["notes"]),
+                "display_note": display_note("; ".join(rec["notes"])),
                 "rescored": None
                 if not rec.get("rescored")
                 else {k: rec["rescored"][k] for k in ("by", "method", "note")},
@@ -686,6 +742,8 @@ def build_index(
                 "date": rec["date"],
                 "commit": rec["code"]["commit"],
                 "system": rec["system"]["key"],
+                "display_label": visual_short_label(str(rec["system"]["key"])),
+                "display_note": display_note("; ".join(rec["notes"])),
                 "notes": list(rec["notes"]),
                 "fixture_set": rec["fixtures"][0]["set"] if rec["fixtures"] else None,
                 "specimens": m["specimens"],
