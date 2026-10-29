@@ -20,7 +20,7 @@ export const MEASURED = "Fictional German, English and Hungarian data · measure
 export const SETS = ["Hand-written de + en + hu (51)", "CEE-PII (451)", "Nemotron-PII (300)"] as const;
 type Row = { system: string; leak: readonly string[]; f1: readonly string[]; ours?: boolean };
 export const COMPARISON: readonly Row[] = [
-  { system: "pii-guard fast", leak: ["0.0", "0.4", "0.7"], f1: ["94.3", "82.6", "89.4"], ours: true },
+  { system: "pii-guard", leak: ["0.0", "0.4", "0.7"], f1: ["94.3", "82.6", "89.4"], ours: true },
   { system: "PrivAiTe", leak: ["12.7", "4.4", "4.0"], f1: ["55.2", "34.2", "80.8"] },
   { system: "Presidio", leak: ["24.3", "36.5", "12.8"], f1: ["64.9", "41.4", "66.4"] },
   { system: "LLM Guard", leak: ["45.1", "75.8", "28.8"], f1: ["53.2", "24.7", "72.9"] },
@@ -39,9 +39,9 @@ export function nextBest(metric: "leak" | "f1", set: number) {
 const ours = COMPARISON[0]!;
 /** The hero's three numbers, each with the best of the other tools on the same set. */
 export const PROOF = [
+  { value: `${ours.leak[1]} %`, label: "Leak, CEE-PII public test set", hint: `Next best: ${nextBest("leak", 1)}` },
   { value: `${ours.leak[0]} %`, label: "Leak, 51 hand-written docs", hint: `Next best: ${nextBest("leak", 0)}` },
   { value: `${ours.f1[0]} %`, label: "F1, same docs", hint: `Next best: ${nextBest("f1", 0)}` },
-  { value: `${ours.leak[1]} %`, label: "Leak, CEE-PII public set", hint: `Next best: ${nextBest("leak", 1)}` },
 ] as const;
 
 export const LATENCY = { value: "~34 ms", label: "Gateway overhead per request", hint: "p50 on CPU, rules + NER, one request at a time" } as const;

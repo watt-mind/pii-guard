@@ -6,7 +6,7 @@ describe("landing proof (LAB-1478)", () => {
     expect(nextBest("leak", 0)).toBe("PrivAiTe 12.7 %");
     expect(nextBest("f1", 0)).toBe("Presidio 64.9 %");
     expect(nextBest("leak", 1)).toBe("PrivAiTe 4.4 %");
-    expect(PROOF.map((p) => p.value)).toEqual([`${COMPARISON[0]!.leak[0]} %`, `${COMPARISON[0]!.f1[0]} %`, `${COMPARISON[0]!.leak[1]} %`]);
+    expect(PROOF.map((p) => p.value)).toEqual([`${COMPARISON[0]!.leak[1]} %`, `${COMPARISON[0]!.leak[0]} %`, `${COMPARISON[0]!.f1[0]} %`]);
   });
   it("lists the open models by leak, ours first, with the closest one included", () => {
     const leaks = OPEN_MODELS.map((m) => Number(m.leak));

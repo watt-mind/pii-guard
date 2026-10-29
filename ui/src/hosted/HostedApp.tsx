@@ -31,6 +31,7 @@ const MODEL_CARD = `${NER_MODEL}#model-card`;
 // stays small (Lighthouse, LAB-1466).
 const ImageShowcase = lazy(() => import("./ImageShowcase"));
 const ResultsChart = lazy(() => import("./ResultsChart"));
+const HeroImage = lazy(() => import("./HeroImage"));
 
 // TODO(owner): operator name, privacy notice URL and contact address. Until they are set the
 // footer says they are being finalised; never invent a legal entity here.
@@ -446,13 +447,15 @@ function Point({ title, children }: { title: string; children: ReactNode }) {
 function MiniFlow({ model, name }: { model: string | null; name: string }) {
   const masked = metaFor("PERSON");
   return <figure className="hidden min-w-0 space-y-2 lg:block" aria-labelledby="mini-flow-caption">
-    <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back.</figcaption>
+    <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back. Below it, a fictional ID card before and after masking: the face and ID details are covered in black.</figcaption>
     <div aria-hidden="true" className="space-y-2">
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You send</p><p className="doc mt-1">Name: <mark className={["rounded-md px-0.5 -mx-0.5 ring-1 ring-inset", masked.mark].join(" ")}>{name}</mark></p></div>
       <p className="text-center font-mono text-2xs text-guard">↓ pii-guard masks</p>
       <div className="rounded-xl border border-model/25 bg-model-soft/60 px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-model">{model ?? "The model"} sees</p><p className="doc mt-1">Name: <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" /></p></div>
       <p className="text-center font-mono text-2xs text-guard">↓ pii-guard restores</p>
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You get back</p><p className="doc mt-1">Dear <mark className="rounded-md bg-restored-soft px-0.5 -mx-0.5 text-ink ring-1 ring-restored/45 ring-inset">{name}</mark>, …</p></div>
+      <p className="text-center font-mono text-2xs text-guard">↓ and in images</p>
+      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">Faces and ID details covered</p><div className="mt-2"><Suspense fallback={<div className="aspect-[3/1] rounded-md bg-surface-2" />}><HeroImage /></Suspense></div></div>
     </div>
   </figure>;
 }
