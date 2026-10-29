@@ -51,17 +51,23 @@ SETS: dict[str, list[str]] = {
     "mapa-eur-lex": ["data/datasets/fixtures/mapa-eur-lex/*-mapa-eur-lex.jsonl"],
 }
 LABELS = {
-    "v20": "pii-guard fast, NER v2.0 (published hdkiller/pii-guard-ner-xlmr-base, LAB-1306)",
+    "v20": "pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)",
     "xlmr-v3": "pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)",
     "mmbert-v3": "pii-guard fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)",
     "v31-a": "pii-guard fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410)",
     "v31-b": "pii-guard fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)",
     "v31-c": "pii-guard fast, NER v3.1 candidate C: B without Wismut (LAB-1410)",
+    "v32-s30": "pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494)",
+    "v32-s50": "pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494)",
+    "v32-s70": "pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494)",
+    "v32-d": "pii-guard fast, NER v3.2 candidate D: v2.0 warm start + error-mined data (LAB-1494)",
+    "v32-e": "pii-guard fast, NER v3.2 candidate E: v2.0 recipe + error-mined data (LAB-1494)",
 }
 #: Per ticket: the record slug prefix and what the run notes say. ``--ticket`` picks one.
 TICKETS = {
     "LAB-1393": "NER v3 candidates vs v2.0",
     "LAB-1410": "NER v3.1 candidates vs v2.0 (clean selection set: agent-traffic-dev)",
+    "LAB-1494": "NER v3.2 candidates (soups, error-mined data) vs v2.0, v3.1 protocol",
 }
 
 
@@ -81,7 +87,7 @@ def _detector(candidate: str, model: str | None) -> dict[str, Any]:
         return {
             "name": "ner",
             "model": "xlmr-base-v2-hn",
-            "model_ref": f"hdkiller/pii-guard-ner-xlmr-base v2.0, revision {pub.revision[:12]}",
+            "model_ref": f"{pub.repo_id} v2.0, revision {pub.revision[:12]}",
             "revision": f"sha256:{pub.weights_sha256}",
             "settings": {},
             "serving": "local PyTorch, CPU",
@@ -134,10 +140,10 @@ def _score(args: argparse.Namespace) -> int:
                 "(seed 1393, near-copies removed by decontam.py): closer to distribution than "
                 "for v2.0."
             )
-        if name == "agent-traffic-dev" and args.ticket == "LAB-1410":
+        if name == "agent-traffic-dev" and args.ticket in ("LAB-1410", "LAB-1494"):
             notes.append(
-                "Selection set. No v3.1 mix holds any agent-traffic generator document, so it "
-                "is unseen by every candidate, as it was for v2.0."
+                "Selection set. No v3.1 or v3.2 mix holds any agent-traffic generator "
+                "document, so it is unseen by every candidate, as it was for v2.0."
             )
         records = build_records(
             card,
