@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SAMPLES } from "./content/samples";
 import { App } from "./App";
 import type { HttpGuardClient } from "./api/http";
 import { ApiError, UnreachableError } from "./api/http";
@@ -19,6 +20,22 @@ beforeEach(() => {
 });
 
 describe("App in demo mode", () => {
+  it("starts with the English support example and preserves explicit language and sample choices", async () => {
+    const user = userEvent.setup();
+    render(<App api={offlineApi()} mock={createMockClient()} />);
+    const language = await screen.findByRole("combobox", { name: "Document language" });
+    expect(language).toHaveValue("en");
+    expect(screen.getByLabelText("Document text")).toHaveValue(SAMPLES.find((s) => s.id === "support")!.text);
+    await user.selectOptions(language, "hu");
+    await user.type(screen.getByLabelText("Document text"), " ");
+    expect(language).toHaveValue("hu");
+    await user.click(screen.getByRole("radio", { name: /Property sale contract/i }));
+    expect(language).toHaveValue("hu");
+    expect(screen.getByLabelText("Document text")).toHaveValue(SAMPLES.find((s) => s.id === "contract")!.text);
+    await user.click(screen.getByRole("radio", { name: /Support ticket/i }));
+    expect(language).toHaveValue("en");
+  });
+
   it("shows the demo badge when the API is unreachable", async () => {
     render(<App api={offlineApi()} mock={createMockClient()} />);
     await screen.findByRole("button", { name: /mask document/i });
@@ -35,6 +52,7 @@ describe("App in demo mode", () => {
     render(<App api={offlineApi()} mock={createMockClient()} />);
     await screen.findByRole("button", { name: /mask document/i });
 
+    await user.click(screen.getByRole("radio", { name: /Property sale contract/i }));
     await user.click(screen.getByRole("button", { name: /mask document/i }));
     const playground = screen.getByRole("tabpanel", { name: "Text" });
     const masked = await within(playground).findByTestId("masked-text");
@@ -62,6 +80,7 @@ describe("App in demo mode", () => {
     const user = userEvent.setup();
     render(<App api={offlineApi()} mock={createMockClient()} />);
     await screen.findByRole("button", { name: /mask document/i });
+    await user.click(screen.getByRole("radio", { name: /Property sale contract/i }));
     await user.click(screen.getByRole("button", { name: /mask document/i }));
     await within(screen.getByRole("tabpanel", { name: "Text" })).findByTestId("masked-text");
     await user.click(screen.getByRole("radio", { name: "Round trip" }));
@@ -198,7 +217,7 @@ describe("Known values and Chat in demo mode", () => {
     await waitFor(() => expect(received).toHaveTextContent(/\[\[PERSON_[0-9a-f]{4,}\]\]/));
     const back = within(panel).getByRole("region", { name: "What you got back" });
     await waitFor(() => expect(back.querySelector("mark[data-restored]")).not.toBeNull());
-    expect(back).toHaveTextContent("Teszt Elek");
+    expect(back).toHaveTextContent("Jane Placeholder");
     const draft = within(panel).getByPlaceholderText(/Write a message/);
     await user.type(draft, "Synthetic follow-up draft");
     await user.click(screen.getByRole("link", { name: /^Overview/ }));
@@ -217,7 +236,7 @@ describe("Known values example", () => {
     await screen.findByRole("button", { name: /mask document/i });
     await user.click(screen.getByText("Known values"));
     await user.click(screen.getByRole("button", { name: "Try a fictional example" }));
-    expect((screen.getByLabelText("Document text") as HTMLTextAreaElement).value).toContain("Gyakorló Tihamérnak");
+    expect((screen.getByLabelText("Document text") as HTMLTextAreaElement).value).toContain("Please hand the keys to Gyakorló Tihamér's assistant.");
     await user.click(screen.getByRole("button", { name: /mask document/i }));
     const panel = screen.getByRole("tabpanel", { name: "Text" });
     await within(panel).findByTestId("masked-text");

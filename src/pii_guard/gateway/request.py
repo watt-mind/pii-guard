@@ -8,8 +8,10 @@ history, tool results), ``content`` strings and text parts, refusals, assistant
 Request metadata is masked too: tool definitions (``tools[]``, legacy ``functions[]``),
 ``response_format.json_schema`` and ``metadata`` values. In a JSON Schema every free-text
 string (``description``, ``title``, ``enum``/``const``/``default``/``examples`` values, ...) is
-masked; structural strings (``type``, ``$ref``, ``format``, ...) are left alone. Identifiers
-(function names, ``properties`` keys, ``required`` entries, ``metadata`` keys) can't carry a
+masked; structural strings (``type``, ``$ref``, ``format``, ...) are checked like identifiers
+(personal data in one rejects the request, LAB-1563). A custom tool's
+``format.grammar.definition`` is free text: it is masked. Identifiers (function names,
+``properties`` keys, ``required`` entries, ``metadata`` keys, ``model``) can't carry a
 placeholder, so they are only checked: personal data in one rejects the request
 (:class:`UnsupportedContentError`, naming the location, never the value).
 
@@ -65,7 +67,8 @@ _TEXT_FIELDS = ("refusal", "reasoning_content", "reasoning")
 _TEXT_PART_TYPES = {"text": "text", "refusal": "refusal"}
 _IMAGE_SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
 _DATA_URL_RE = re.compile(r"^data:(image/(?:png|jpeg|jpg));base64,", re.IGNORECASE)
-#: JSON-Schema keywords whose string values are structure, not text: never masked.
+#: JSON-Schema keywords whose string values are structure, not text: checked as identifiers,
+#: never masked (a custom tool's ``format.grammar.definition`` is handled before this set).
 _SCHEMA_STRUCTURAL = frozenset({"type", "$ref", "$schema", "$id", "$anchor", "format"})
 #: JSON-Schema keywords whose values are data (any JSON): every string in them is masked.
 _SCHEMA_DATA = frozenset({"enum", "const", "default", "examples"})
@@ -149,6 +152,50 @@ class TextSlot:
         return f"TextSlot(kind={self.kind!r}, length={len(self.text)})"
 
 
+#: A line-number gutter, as Muse Code's ``read_file`` prints file lines (``12|Jane ...``),
+#: after the line's leading spaces/tabs (stripped first: no backtracking over them).
+_GUTTER_RE = re.compile(r"\d{1,7}\|")
+
+
+def _gutter(line: str) -> str:
+    """The line's gutter (indentation, number and ``|``), or ``""``."""
+    indent = len(line) - len(line.lstrip(" \t"))
+    match = _GUTTER_RE.match(line, indent)
+    return line[: match.end()] if match else ""
+
+
+def _text_slot(holder: dict[str, Any], key: str, kind: str) -> TextSlot:
+    """A message text or tool output; a line-number gutter (``12|``) is hidden from detection.
+
+    Muse Code's ``read_file`` prints each file line after its number (``12|Jane Placeholder``),
+    in tool outputs and again in the conversation its reminder observers get as a message.
+    Glued to the first word, the gutter makes a name detector see ``12|Jane`` as one token and
+    mask only the surname. The detectors get each gutter as spaces of the same length (offsets
+    don't move); the masked text gets the gutters back.
+    """
+    text: str = holder[key]
+    lines = text.split("\n")
+    gutters = {i: g for i, line in enumerate(lines) if (g := _gutter(line))}
+    if not gutters:
+        return TextSlot(text, _setter(holder, key), kind)
+    hidden = "\n".join(
+        " " * len(gutters[i]) + line[len(gutters[i]) :] if i in gutters else line
+        for i, line in enumerate(lines)
+    )
+
+    def write(masked: str) -> None:
+        out = masked.split("\n")
+        if len(out) == len(lines):
+            for i, gutter in gutters.items():
+                if out[i].startswith(" " * len(gutter)):
+                    out[i] = gutter + out[i][len(gutter) :]
+        # A masked value that spanned lines changes the line count: the gutters are dropped
+        # (line numbers only; nothing unmasked is written back).
+        holder[key] = "\n".join(out)
+
+    return TextSlot(hidden, write, kind)
+
+
 @dataclass(slots=True)
 class ImageSlot:
     """One inline image to mask, and how to write the masked PNG back as a data URL."""
@@ -197,6 +244,8 @@ def collect_texts(body: object) -> CollectedTexts:
             raise InvalidChatRequestError(f"messages.{index} must be an object")
         _collect_message(message, index, out)
     _collect_top_level(body, out)
+    # ``model`` goes upstream verbatim and can't carry a placeholder: checked (LAB-1563).
+    _check_text(body["model"], "model", out)
     return out
 
 
@@ -489,7 +538,7 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
         raise InvalidChatRequestError(f"{where}.role must be one of {', '.join(sorted(_ROLES))}")
     content = message.get("content")
     if isinstance(content, str):
-        out.slots.append(TextSlot(content, _setter(message, "content")))
+        out.slots.append(_text_slot(message, "content", "content"))
     elif isinstance(content, list):
         for part_index, part in enumerate(content):
             _collect_part(part, f"{where}.content.{part_index}", out, content)
@@ -499,7 +548,7 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
     for name in _TEXT_FIELDS:
         value = message.get(name)
         if isinstance(value, str):
-            out.slots.append(TextSlot(value, _setter(message, name), name))
+            out.slots.append(_text_slot(message, name, name))
         elif value is not None:
             _collect_json(message, name, out, name)
     for name in _REASONING_LISTS:
@@ -639,7 +688,7 @@ def _collect_part(
     value = part.get(key)
     if not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
-    out.slots.append(TextSlot(value, _setter(part, key)))
+    out.slots.append(_text_slot(part, key, "content"))
 
 
 def _collect_image(
@@ -775,8 +824,16 @@ def _collect_json(
             _collect_json(item, 1, out, kind)
 
         def rebuild(value: dict[str, Any] = value, items: list[list[Any]] = items) -> None:
+            # Distinct spellings can share a vault placeholder (case/Unicode folding).
+            # Fail closed before replacing the object: merging loses arguments, while
+            # inventing placeholders would break reversible vault mappings (LAB-1568).
+            rebuilt = dict(items)
+            if len(rebuilt) != len(items):
+                raise InvalidChatRequestError(
+                    "masking JSON object keys produced a collision; request not forwarded"
+                )
             value.clear()
-            value.update((k, v) for k, v in items)
+            value.update(rebuilt)
 
         # Inner dicts must be rebuilt before outer ones re-serialise: prepend.
         out.finalizers.insert(0, rebuild)
@@ -806,7 +863,8 @@ def _collect_request_metadata(body: dict[str, Any], out: CollectedTexts) -> None
                     _check_json(tool, key, at, out)
                 elif isinstance(value, dict):
                     _collect_function(value, at, out)
-                elif isinstance(value, str | list):
+                elif isinstance(value, str | list) or _number_text(value) is not None:
+                    # A direct numeric leaf is a number slot, as in _collect_json (LAB-1563).
                     _collect_json(tool, key, out, "tools")
     functions = body.get("functions")
     if functions is not None:
@@ -842,16 +900,48 @@ def _collect_response_format(response_format: object, out: CollectedTexts) -> No
 
 def _collect_function(function: dict[str, Any], where: str, out: CollectedTexts) -> None:
     """A function (or json_schema) definition: ``name`` checked, schemas walked, text masked."""
-    for position, (key, value) in enumerate(list(function.items())):
+    for position, key in enumerate(list(function)):
+        if key == "format":
+            # A custom tool's format: its grammar definition is free text (LAB-1563).
+            _collect_tool_format(function, key, f"{where}.format", out)
+            continue
         if key in _SCHEMA_STRUCTURAL:
+            # Structural values are checked like identifiers, never skipped (LAB-1563).
+            _check_json(function, key, _field(where, key, position), out)
             continue
         _check_name(key, _field(where, key, position), out)
         if key == "name":
             _check_identifier(function, key, f"{where}.name", out)
         elif key in ("parameters", "schema"):
             _collect_schema(function, key, f"{where}.{key}", out)
-        elif isinstance(value, str | list | dict):
+        else:
+            # _collect_json also makes number slots for direct numeric leaves (LAB-1563);
+            # booleans and null collect nothing there.
             _collect_json(function, key, out, "tools")
+
+
+def _collect_tool_format(
+    container: dict[str, Any] | list[Any], key: Any, where: str, out: CollectedTexts
+) -> None:
+    """A custom tool's ``format``: a ``grammar.definition`` string at any depth is free text
+    and masked; every other leaf (``type``, ``syntax``, numbers) is checked like an
+    identifier. A plain-string format (a schema ``format`` at this level) is checked too."""
+    value = container[key]
+    if isinstance(value, dict):
+        for position, (name, sub) in enumerate(list(value.items())):
+            at = _field(where, name, position)
+            _check_name(name, at, out)
+            if name == "definition" and isinstance(sub, str):
+                out.slots.append(TextSlot(sub, _setter(value, name), "tools"))
+            elif isinstance(sub, dict | list):
+                _collect_tool_format(value, name, at, out)
+            else:
+                _check_json(value, name, at, out)
+    elif isinstance(value, list):
+        for i in range(len(value)):
+            _collect_tool_format(value, i, f"{where}.{i}", out)
+    else:
+        _check_json(container, key, where, out)
 
 
 def _collect_schema(
@@ -874,6 +964,8 @@ def _collect_schema(
                 at = f"{where}.{position}"
                 _check_text(name, at, out)
             if name in _SCHEMA_STRUCTURAL:
+                # Checked like identifiers, never skipped unchecked (LAB-1563).
+                _check_json(value, name, at, out)
                 continue
             if name in _SCHEMA_DATA:
                 _collect_json(value, name, out, "tools")

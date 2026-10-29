@@ -285,3 +285,72 @@ def test_gateway_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.keep_types == frozenset({EntityType.ORGANIZATION})
     assert config.llm_reasoning_effort == "minimal"
     assert GatewayConfig(keep_types="").keep_types == frozenset()
+
+
+@pytest.mark.parametrize("nested", [False, True], ids=["top-level", "nested"])
+@pytest.mark.parametrize("serialized", [False, True], ids=["object", "json-string"])
+def test_json_key_collision_does_not_replace_object(nested: bool, serialized: bool) -> None:
+    original = {"Teszt Elek": 1, "TESZT ELEK": 2}
+    args = {"outer": [{"inner": original}]} if nested else original
+    function = {"arguments": json.dumps(args) if serialized else args}
+    body = {"model": "m", "messages": [{"role": "assistant", "function_call": function}]}
+    collected = collect_texts(body)
+    for slot in collected.slots:
+        slot.write("[[PERSON_aaaa]]" if slot.text.casefold() == "teszt elek" else slot.text)
+    with pytest.raises(
+        InvalidChatRequestError, match="masking JSON object keys produced a collision"
+    ) as exc:
+        collected.finalize()
+    assert "Teszt" not in str(exc.value)
+    assert "TESZT" not in str(exc.value)
+    # Reject before clearing the colliding object or serializing a lossy replacement.
+    assert original == {"Teszt Elek": 1, "TESZT ELEK": 2}
+    assert function["arguments"] == (json.dumps(args) if serialized else args)
+
+
+@pytest.mark.parametrize("role", ["system", "developer", "user", "assistant", "tool", "function"])
+@pytest.mark.parametrize(
+    "field", ["content", "refusal", "reasoning_content", "reasoning", "text_part", "refusal_part"]
+)
+def test_chat_gutters_preserve_offsets_and_mask_whole_names(role: str, field: str) -> None:
+    original = "Header\n12|Jane Placeholder\n \t3|Jane Placeholder\nplain\n"
+    message = {"role": role, "content": None}
+    if field.endswith("_part"):
+        kind = field.removesuffix("_part")
+        key = "text" if kind == "text" else "refusal"
+        holder = {"type": kind, key: original}
+        message["content"] = [holder]
+    else:
+        key = field
+        holder = message
+        holder[key] = original
+    body = {"model": "m", "messages": [message]}
+    slot = next(s for s in collect_texts(body).slots if "Jane Placeholder" in s.text)
+    assert slot.text == "Header\n   Jane Placeholder\n    Jane Placeholder\nplain\n"
+    assert len(slot.text) == len(original)
+    session, _ = make_session()
+    spans = [
+        Span(i, i + len("Jane Placeholder"), EntityType.PERSON, "Jane Placeholder", 1, "test")
+        for i in range(len(original))
+        if original.startswith("Jane Placeholder", i)
+    ]
+    masked = session.mask(slot.text, spans)
+    slot.write(masked)
+    placeholder = masked.split("\n")[1].strip()
+    assert holder[key] == f"Header\n12|{placeholder}\n \t3|{placeholder}\nplain\n"
+    assert "Jane" not in holder[key] and "Placeholder" not in holder[key]
+
+
+def test_chat_gutter_multiline_mask_never_restores_original_text() -> None:
+    message = {"role": "tool", "content": "12|Jane\n13|Placeholder\n14|safe"}
+    slot = next(
+        s for s in collect_texts({"model": "m", "messages": [message]}).slots if s.kind == "content"
+    )
+    session, _ = make_session()
+    value = slot.text[3:22]
+    span = Span(3, 22, EntityType.PERSON, value, 1, "test")
+    slot.write(session.mask(slot.text, [span]))
+    assert message["content"].startswith("   [[PERSON_")
+    assert message["content"].endswith("\n   safe")
+    assert "|" not in message["content"]
+    assert "Jane" not in message["content"] and "Placeholder" not in message["content"]

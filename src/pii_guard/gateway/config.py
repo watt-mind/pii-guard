@@ -6,7 +6,9 @@ These live here, not in ``pii_guard.config``, until the settings work (LAB-1095)
 |---|---|---|
 | ``PII_GUARD_GATEWAY_MODE`` | ``mode`` (``fast`` or ``audit``) | ``fast`` |
 | ``PII_GUARD_GATEWAY_DETECTION_TIMEOUT`` | ``detection_timeout`` (s) | ``30`` |
-| ``PII_GUARD_GATEWAY_UPSTREAM_TIMEOUT`` | ``upstream_timeout`` (s) | ``120`` |
+| ``PII_GUARD_GATEWAY_UPSTREAM_TIMEOUT`` | ``upstream_timeout`` (s, per read) | ``120`` |
+| ``PII_GUARD_GATEWAY_UPSTREAM_STREAM_TIMEOUT`` | ``upstream_stream_timeout`` (s) | ``600`` |
+| ``PII_GUARD_GATEWAY_UPSTREAM_MAX_RESPONSE_BYTES`` | ``upstream_max_response_bytes`` | 16 MiB |
 | ``PII_GUARD_GATEWAY_UPSTREAM_MAX_CONNECTIONS`` | ``upstream_max_connections`` | ``100`` |
 | ``PII_GUARD_GATEWAY_UPSTREAM_MAX_KEEPALIVE`` | ``upstream_max_keepalive`` (idle kept) | ``20`` |
 | ``PII_GUARD_GATEWAY_UPSTREAM_KEEPALIVE_EXPIRY`` | ``upstream_keepalive_expiry`` (s) | ``30`` |
@@ -123,6 +125,17 @@ class GatewayConfig(BaseSettings):
     )
     upstream_timeout: float = Field(
         default=120.0, gt=0, validation_alias="PII_GUARD_GATEWAY_UPSTREAM_TIMEOUT"
+    )
+    # Whole-stream deadline (LAB-1566): upstream_timeout is per read, so a trickling
+    # upstream could otherwise hold a stream (and its session) forever.
+    upstream_stream_timeout: float = Field(
+        default=600.0, gt=0, validation_alias="PII_GUARD_GATEWAY_UPSTREAM_STREAM_TIMEOUT"
+    )
+    # Largest non-streamed upstream success body buffered in any mode (LAB-1566).
+    upstream_max_response_bytes: int = Field(
+        default=16 * 1024 * 1024,
+        ge=1,
+        validation_alias="PII_GUARD_GATEWAY_UPSTREAM_MAX_RESPONSE_BYTES",
     )
     # The one shared upstream client's pool (LAB-1176): connections are kept alive between calls.
     upstream_max_connections: int = Field(

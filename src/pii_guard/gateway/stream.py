@@ -29,19 +29,37 @@ __all__ = ["SseRestorer", "iter_sse_data", "sse_event"]
 
 DONE = "[DONE]"
 
+#: Caps on what one stream retains (LAB-1566), in every mode: one buffered SSE event, the
+#: retained masked content per choice (it only feeds detection-cache seeding, so overflow
+#: drops the retained copy instead of failing), and the open unmaskers (per choice/field/
+#: tool index). Past the event or unmasker cap the stream ends with the generic error.
+MAX_SSE_EVENT_CHARS = 4 * 1024 * 1024
+MAX_MASKED_CONTENT_CHARS = 1_000_000
+MAX_UNMASKERS = 1024
+
+
+class StreamTooLargeError(RuntimeError):
+    """A stream retention cap was passed; the caller ends the stream with a generic error."""
+
 
 async def iter_sse_data(lines: AsyncIterator[str]) -> AsyncIterator[str]:
     """The ``data`` payload of each server-sent event (multi-line data joined by ``\\n``)."""
     data: list[str] = []
+    buffered = 0
     async for line in lines:
         if line == "":
             if data:
                 yield "\n".join(data)
                 data = []
+                buffered = 0
             continue
         if line.startswith("data:"):
             value = line[5:]
-            data.append(value[1:] if value.startswith(" ") else value)
+            value = value[1:] if value.startswith(" ") else value
+            buffered += len(value) + 1
+            if buffered > MAX_SSE_EVENT_CHARS:
+                raise StreamTooLargeError("upstream SSE event is too large")
+            data.append(value)
         # Comments (":"), "event:", "id:" and "retry:" lines are not used by chat completions.
     if data:
         yield "\n".join(data)
@@ -66,11 +84,12 @@ class SseRestorer:
         self._on_ids = on_ids
         # One budget for the whole response: every choice, field and tool call (LAB-1350).
         self._budget = session.restore_budget()
-        self._tool_session = ToolInputSession(session, self._budget)
         # (choice, field) or (choice, "tool", tool index) -> unmasker
         self._unmaskers: dict[tuple[Any, ...], StreamUnmasker] = {}
         self._retired_unresolved: dict[str, None] = {}
         self._masked_content: dict[int, list[str]] = {}
+        self._masked_overflow: set[int] = set()  # choices past the retention cap (LAB-1566)
+        self._masked_len: dict[int, int] = {}
         self._template: dict[str, Any] | None = None
         self._done = False
         self.chunks = 0
@@ -86,17 +105,36 @@ class SseRestorer:
         return tuple(seen)
 
     def masked_content(self) -> dict[int, str]:
-        """Per choice, the upstream (masked) ``content`` seen so far -- for cache seeding."""
+        """Per choice, the upstream (masked) ``content`` seen so far -- for cache seeding.
+
+        A choice that passed the retention cap is absent: seeding is an optimisation, and a
+        partial copy would only seed a text the client never sends back (LAB-1566).
+        """
         return {index: "".join(parts) for index, parts in self._masked_content.items()}
+
+    def _retain_masked(self, index: int, value: str) -> None:
+        if index in self._masked_overflow:
+            return
+        parts = self._masked_content.setdefault(index, [])
+        if self._masked_len.get(index, 0) + len(value) > MAX_MASKED_CONTENT_CHARS:
+            del self._masked_content[index]
+            self._masked_len.pop(index, None)
+            self._masked_overflow.add(index)
+            return
+        parts.append(value)
+        self._masked_len[index] = self._masked_len.get(index, 0) + len(value)
 
     def _unmasker(self, key: tuple[Any, ...], kind: str = "text") -> StreamUnmasker:
         unmasker = self._unmaskers.get(key)
+        if unmasker is None and len(self._unmaskers) >= MAX_UNMASKERS:
+            raise StreamTooLargeError("upstream stream has too many open fields")
         if unmasker is None:
             # StreamUnmasker calls unmask_with_report() (and hold_from()); the adapters have them.
             # A JSON adapter tracks where it is in the arguments, so one per stream (LAB-1483).
+            # A tool adapter tracks the shell quoting it has read, so one per stream too.
             session: Any = {
                 "json": JsonEscapingSession(self._session, self._budget),
-                "tool": self._tool_session,
+                "tool": ToolInputSession(self._session, self._budget),
             }.get(kind, self._session)
             unmasker = StreamUnmasker(session, self._budget)
             self._unmaskers[key] = unmasker
@@ -114,7 +152,7 @@ class SseRestorer:
             return [data]  # not ours to interpret; holds masked text only
         if not isinstance(chunk, dict):
             return [data]
-        if "error" in chunk:
+        if chunk.get("error"):  # ``error: null`` is a normal chunk, not a failure (LAB-1564)
             return [error_event("upstream_error", "upstream stream error")]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(chunk))
@@ -141,7 +179,7 @@ class SseRestorer:
             value = delta.get(name)
             if isinstance(value, str):
                 if name == "content" and isinstance(index, int):
-                    self._masked_content.setdefault(index, []).append(value)
+                    self._retain_masked(index, value)
                 delta[name] = self._unmasker((index, name)).feed(value)
         for position_in_delta, call in enumerate(delta.get("tool_calls") or []):
             if not isinstance(call, dict):

@@ -388,6 +388,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `upstream_destination_not_allowed` | Hosted endpoint destination does not satisfy the public HTTPS/port policy. |
 | 422 | `outbound_check_failed` | Gateway: after masking, the request still held a value its vault session knows (the [outbound re-check](architecture-gateway.md#outbound-re-check), LAB-1500); nothing was sent. The message lists entity types and counts only; the response has `X-PII-Guard-Outbound-Check: blocked`. |
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
+| 409 | `session_entry_limit_reached` | An explicit vault session (`X-PII-Guard-Session`, or a path or `prompt_cache_key` id) already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders. Explicit sessions are never rotated, so nothing is masked or sent; start a new session (LAB-1565). |
 | 502 | `upstream_credential_rejected` | Listing a provider's models (`POST /v1/projects/{project_id}/endpoints/models`, a pass-through `/e/{endpoint_id}/v1/models`): the provider answered 401 or 403, so the API key is wrong or lacks access. The message is fixed; the provider's own status text and body are never passed on. |
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
@@ -949,10 +950,17 @@ this order (`pii_guard.gateway.sessions`, LAB-1286; details in
 | 3 | `prompt_cache_key` | `HMAC(tenant key, "pck:" + identity + ":" + prompt_cache_key)` | created |
 | 4 | `default` | `HMAC(tenant key, "default:" + identity)` | created |
 
-`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous`. Every
+`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous` (a single
+local principal by construction: see `gateway/sessions.py`). Every
 response carries `X-PII-Guard-Session` (the id used, including a derived `d_…` one) and
 `X-PII-Guard-Session-Source`; the traffic record has `session_source` next to `session_ref`.
 Steps 2-4 go through `Vault.session_or_create` and its `PII_GUARD_VAULT_MAX_ENTRIES` cap.
+An explicit session (steps 1-2) is bound to the credentialed identity that first presents
+it to the gateway (LAB-1565): another credentialed identity presenting the same id gets
+`404 not_found` (the credential-less local principal is never refused by a binding), and
+session ids are 3-128 characters. A dropped, expired or rotated session id re-created as a
+new incarnation starts clean: no detection-cache entries and no issued-id exemptions carry
+over.
 
 Lifetime of a session a refused call created (LAB-1316): a call holds its session from
 resolving it until masking finished or failed. When the call that created the session is
@@ -967,7 +975,18 @@ the entries the refused call added. A refused call never drops a session it did 
 Every gateway response that reached the upstream carries `X-PII-Guard-Outbound-Check: passed`;
 a request refused by the re-check gets `422 outbound_check_failed` with
 `X-PII-Guard-Outbound-Check: blocked` (policy and short-value rules:
-[architecture-gateway.md](architecture-gateway.md#outbound-re-check)).
+[architecture-gateway.md](architecture-gateway.md#outbound-re-check)). Besides re-reading the
+walker's texts, the re-check scans the serialized masked body as one text, so a field no
+walker slot covers can't carry a session value out either (LAB-1563).
+
+## Gateway chat streaming (implemented)
+
+For Chat Completions, `stream: true` requires an upstream `text/event-stream` response.
+A successful non-SSE response is closed without reading or forwarding its body and returns
+sanitized HTTP `502` with error code `upstream_did_not_stream`; the client can retry without
+`stream`. The gateway does not synthesize SSE from a JSON answer. Non-streaming JSON success
+and upstream HTTP error status/sanitization remain unchanged. The traffic record marks the
+call as failed with this code and retains the upstream status, without the rejected body.
 
 ## Gateway request fields (implemented)
 
@@ -991,17 +1010,29 @@ Treatments:
   the placeholder **string** (`"[[NATIONAL_ID_HU_TAX]]"`), because a JSON number can't
   carry a placeholder; any other number is forwarded as the same number. A restored value
   comes back as a string: the answer's tool-call arguments hold the original digits as a JSON
-  string, not a number (LAB-1348).
+  string, not a number (LAB-1348). If distinct object keys mask to the same key (including
+  case or Unicode variants), the request fails closed with `400 invalid_request`, at any
+  nesting depth. No values are merged or silently dropped, and nothing is forwarded
+  (LAB-1568).
 - **check**: an identifier or enum-like setting that can't carry a placeholder. Detected
   personal data rejects the request (`400 unsupported_content`); otherwise it is forwarded
   unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.
   Numbers with at least six digits in a checked value, and JSON-Schema keyword numbers
   (`maximum`, `minLength`, ...), are checked the same way.
 
+**Chat line-number gutters.** Message content, text/refusal content parts and the string
+fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter handling:
+a leading line number and pipe (e.g. `12|`, including indentation) become same-length spaces
+for detection, preserving offsets. Gutters are restored in masked text when line counts
+match and the replacement spaces survive; when masking spans lines and changes the line
+count, gutters are dropped rather than writing any original text back.
+
 **Declared tool names.** A tool or namespace name the request declares (`tools[].name`,
 `tools[].function.name`, `functions[].name`, ...) is the client's vocabulary: a `PERSON`,
-`ORGANIZATION` or `ADDRESS` detection whose whole value is a declared name is dropped, in the
-texts and in identifiers ("Muse" read as a person, LAB-1299/LAB-1317/LAB-1324). No other type
+`ORGANIZATION` or `ADDRESS` detection whose whole value is a declared name is dropped **in
+identifiers only** ("Muse" read as a person, LAB-1299/LAB-1317/LAB-1324). The same value in
+message prose or any other masked text is masked as usual (LAB-1563: a declared name is
+client-controlled and must not suppress prose detections). No other type
 is exempt: a value found by format or checksum (a tax ID, an IBAN, ...) is masked wherever it
 appears, and a tool named after one is `400 unsupported_content` (LAB-1348). Values the operator
 pre-loaded (`known`) are never exempt.
@@ -1010,7 +1041,7 @@ pre-loaded (`known`) are never exempt.
 
 | Where | Key | Treatment |
 | --- | --- | --- |
-| body | `model` | pass (non-empty string, required) |
+| body | `model` | check (non-empty string, required; LAB-1563) |
 | body | `messages` | per message, below (non-empty array, required) |
 | body | `temperature`, `top_p`, `n`, `max_tokens`, `max_completion_tokens`, `presence_penalty`, `frequency_penalty`, `seed`, `logprobs`, `top_logprobs`, `stream`, `parallel_tool_calls`, `store`, and the extension knobs `top_k`, `min_p`, `repetition_penalty` | pass |
 | body | `reasoning_effort`, `service_tier`, `verbosity`, `modalities`, `stream_options`, `audio`, `tool_choice`, `function_call` | check (every string and key) |
@@ -1020,11 +1051,11 @@ pre-loaded (`known`) are never exempt.
 | body | `web_search_options` | `search_context_size` check; `user_location` mask JSON |
 | body | `logit_bias` | keys must be token ids, values numbers |
 | body | `metadata` | keys check; values mask JSON |
-| body | `tools`, `functions` | definitions: `name` and other keys check; `parameters`/`schema` walked as JSON Schema (free text masked, `properties` keys and `required` entries checked, `type`/`$ref`/`format`/... passed); every other string or array mask JSON (e.g. an MCP tool's `server_description`); entries must be objects |
+| body | `tools`, `functions` | definitions: `name` and other keys check; `parameters`/`schema` walked as JSON Schema (free text masked, `properties` keys and `required` entries checked, `type`/`$ref`/`format`/... **values** checked, LAB-1563); a custom tool's `format.grammar.definition` mask, its other `format` leaves check; every other string, array or direct numeric leaf mask JSON (e.g. an MCP tool's `server_description`); entries must be objects |
 | body | `response_format` | `type` check; `json_schema` as a definition |
 | message | `role` | one of `system`, `developer`, `user`, `assistant`, `tool`, `function` |
-| message | `content` | string mask; array of content parts, below |
-| message | `refusal`, `reasoning_content`, `reasoning` | mask (a non-string value: mask JSON) |
+| message | `content` | string mask (line-number gutters hidden during detection, restored when forwarding); array of content parts, below; applies to every role, including tool/function output |
+| message | `refusal`, `reasoning_content`, `reasoning` | mask (strings use the same gutter treatment; a non-string value: mask JSON) |
 | message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass (opaque, provider-signed) |
 | message | `audio` | `transcript` mask; `id` check; `expires_at` pass |
 | message | `annotations` | mask JSON |
@@ -1055,7 +1086,7 @@ with the treatments of the table above. Any other key, item type or part type is
 
 | Where | Key | Treatment |
 | --- | --- | --- |
-| body | `model` | pass (non-empty string, required) |
+| body | `model` | check (non-empty string, required; LAB-1563) |
 | body | `input` | a string (mask), or a non-empty array of items, below (required) |
 | body | `instructions` | mask |
 | body | `temperature`, `top_p`, `top_logprobs`, `max_output_tokens`, `max_tool_calls`, `parallel_tool_calls`, `store`, `stream`, `background` | pass |
@@ -1063,7 +1094,7 @@ with the treatments of the table above. Any other key, item type or part type is
 | body | `user`, `safety_identifier`, `prompt_cache_key` | mask |
 | body | `metadata`, `client_metadata` (Codex's per-turn ids) | keys check; values mask JSON |
 | body | `text` | `verbosity` check; `format` (`type`, `name`, `schema`, `description`, `strict`) as a definition |
-| body | `tools` | `function` and `custom` tools as definitions (as for chat); `namespace` tools: `name` check, `description` mask, `tools` (function/custom only) walked; hosted tools (`web_search`, `file_search`, `mcp`, ...) `400` |
+| body | `tools` | `function` and `custom` tools as definitions (as for chat, including a custom tool's `format.grammar.definition` mask); `namespace` tools: `name` check, `description` mask, `tools` (function/custom only) walked; hosted tools (`web_search`, `file_search`, `mcp`, ...) `400` |
 | body | `previous_response_id`, `conversation`, `prompt` | `400`: server-side state would hold another vault session's placeholders; send the whole `input` with `store: false` |
 | every item | `type`, `id`, `call_id`, `status`, `phase` | check |
 | `message` item (or `{role, content}` without `type`) | `role` | one of `system`, `developer`, `user`, `assistant` |
@@ -1096,29 +1127,47 @@ placeholder as written; other escape depths (`\\[\\[` in freeform input, an esca
 backslash) are left; an unknown or other session's placeholder stays as written and is counted as
 unresolved; the restored value is charged to the response's restore budget.
 
-**Shell quoting in command arguments** (both APIs, whole and streamed; LAB-1483). A restored value
-is byte-exact, except in one context the gateway reads for sure: the string value of a top-level
+**Shell quoting in command arguments** (both APIs, whole and streamed; LAB-1483, LAB-1564). A restored
+value is byte-exact, except in one context the gateway reads for sure: the string value of a top-level
 `command` or `cmd` key in JSON `arguments` (or the script after `-c`/`-lc` in a `command` array),
 read by a small shell lexer. There a value restored inside a single-quoted string gets `'` written
 as `'\''`; inside the single-quoted script word of a `sed` command, in an `s` replacement, `\`, `&`,
 the delimiter and a newline also get a backslash (an escaped placeholder in an `s` pattern also gets a
-delimiter backslashed that the regex literal leaves as is). Then it is JSON-escaped as usual. So
-`echo '[[PERSON_x]]'` with `O'Brien Teszt` and `sed 's/x/[[ADDRESS_x]]/'` with `Fő utca 1/A` run
-as meant. **Limitation:** everywhere else the value stays byte-exact, so a `$`, backtick, `"` or `\`
-in a double-quoted string, an unquoted value, a heredoc, `$'...'`, a comment, a nested or argv-array
-command, another `sed` command or a bracket expression, and custom tool `input` (it may be a patch,
-not a command) are not escaped. Other keys, message text and file content are never touched.
+delimiter backslashed that the regex literal leaves as is); inside a double-quoted string, `$`,
+backtick, `"` and `\` get a backslash (a newline is already literal there); unquoted, every shell
+metacharacter and whitespace gets a backslash (a newline goes in as a single-quoted segment). So a
+restored value can never act as shell syntax — no command or parameter substitution, word splitting
+or extra commands. Then it is JSON-escaped as usual. So `echo '[[PERSON_x]]'` with `O'Brien Teszt`
+and `sed 's/x/[[ADDRESS_x]]/'` with `Fő utca 1/A` run as meant. Custom tool `input` gets the same
+escaping **inside quotes only**: freeform input may be a patch or program text, so an unquoted
+placeholder there stays byte-exact, while one inside single or double quotes (or a single-quoted
+`sed` script) is escaped for that quoting. **Limitation:** everywhere else the value stays byte-exact:
+a heredoc, `$'...'`, a comment, command substitution inside double quotes, a nested or argv-array
+command, another `sed` command or a bracket expression are not modelled by the lexer. Other keys,
+message text and file content are never touched.
+
+**Encoded placeholder brackets in tool input** (both APIs, whole and streamed; LAB-1564). In
+`arguments` and custom tool `input` a placeholder whose brackets are `\uXXXX`-escaped
+(`\u005b\u005bEMAIL_x\u005d\u005d`) or `%XX`-encoded (`%5B%5BEMAIL_x%5D%5D`), with each bracket in
+either form or literal, is also restored to the plain value (through the same shell/JSON escaping
+as a plain placeholder); an unknown one stays as written and counts as unresolved. Message text
+keeps encoded forms as written.
 
 **Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
 stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
 `summary_index`: `response.output_text.delta`, `response.refusal.delta`,
 `response.function_call_arguments.delta` (JSON-escaped), `response.reasoning_summary_text.delta`,
-`response.reasoning_text.delta` and `response.custom_tool_call_input.delta`. A placeholder split
-across deltas is held back until it is complete. When the stream's `.done` event arrives (or the
-stream ends), what is held back goes out as one more delta event just before it, so the joined
-deltas equal the restored `.done` text. Every other event (`response.created`,
-`response.output_item.added`/`.done`, `response.content_part.*`, `response.completed`, ...) is
-restored whole. `sequence_number` is renumbered so it stays strictly increasing. An upstream
+`response.reasoning_text.delta` and `response.custom_tool_call_input.delta`; an unmodelled event
+type ending in `.delta` with a string `delta` gets the same treatment, keyed by its own type and
+indexes (LAB-1564). A placeholder split across deltas is held back until it is complete. When the
+stream's `.done` event arrives (or the stream ends), what is held back goes out as one more delta
+event just before it, so the joined deltas equal the restored `.done` text. Every other event
+(`response.created`, `response.output_item.added`/`.done`, `response.content_part.*`,
+`response.completed`, ...) is restored whole. The shared restore budget is charged once per logical
+text: a whole copy of text already charged as deltas (the `.done`, item-done and
+`response.completed` repetitions) does not charge again, while any new text charges normally
+(LAB-1564). A chat chunk with `error: null` streams normally; only a truthy `error` is fatal.
+`sequence_number` is renumbered so it stays strictly increasing. An upstream
 `error` event becomes `{"type": "error", "code": "upstream_error", ...}`, and
 `response.failed` keeps its status with a generic `error`. `data: [DONE]` is passed on.
 
@@ -1250,6 +1299,7 @@ doesn't inflate them).
 | `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
 | `MaskingError` | `vault_not_configured` | 500 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
+| `SessionEntryLimitError` (`MaskingError`) | `session_entry_limit_reached` | 409 | An explicit session already holds its `max_entries` placeholders; it is never rotated. |
 
 Messages and `repr()`s carry types, counts and placeholder ids, never an original value.
 

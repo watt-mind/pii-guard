@@ -432,3 +432,113 @@ def test_a_tail_that_cannot_become_an_escaped_placeholder_is_not_held(tail: str)
 def test_a_tail_that_may_become_an_escaped_placeholder_is_held(tail: str) -> None:
     assert ToolInputSession.hold_from("go " + tail) == 3
     assert JsonEscapingSession.hold_from("go " + json.dumps(tail)[1:-1]) == 3
+
+
+# --- encoded placeholder brackets (LAB-1564) ------------------------------------------------
+
+
+def _encoded(placeholder: str, form: str) -> str:
+    """The placeholder with its brackets in one encoded form (``unicode`` or ``percent``)."""
+    if form == "unicode":
+        return placeholder.replace("[", "\\u005b").replace("]", "\\u005d")
+    return placeholder.replace("[", "%5B").replace("]", "%5D")
+
+
+@pytest.mark.parametrize("form", ["unicode", "percent"])
+def test_encoded_placeholder_in_json_arguments_is_restored(form: str) -> None:
+    session = _session()
+    ph = _placeholder(session, EMAIL, EntityType.EMAIL)
+    arguments = '{"url": "https://x.test/?to=' + _encoded(ph, form) + '"}'
+    body = completion(
+        "", tool_calls=[{"type": "function", "function": {"name": "f", "arguments": arguments}}]
+    )
+    report = restore_completion(session, body)
+    restored = body["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    assert json.loads(restored) == {"url": f"https://x.test/?to={EMAIL}"}
+    assert report.unresolved == {}
+
+
+@pytest.mark.parametrize("form", ["unicode", "percent"])
+def test_encoded_placeholder_in_custom_tool_input_is_restored(form: str) -> None:
+    session = _session()
+    ph = _placeholder(session, EMAIL, EntityType.EMAIL)
+    text = f"to={_encoded(ph, form)}"
+    body = completion("", tool_calls=[{"type": "custom", "custom": {"name": "t", "input": text}}])
+    report = restore_completion(session, body)
+    assert body["choices"][0]["message"]["tool_calls"][0]["custom"]["input"] == f"to={EMAIL}"
+    assert report.unresolved == {}
+
+
+def test_encoded_placeholder_with_mixed_brackets_is_restored() -> None:
+    session = _session()
+    ph = _placeholder(session, EMAIL, EntityType.EMAIL)
+    written = "%5b\\u005B" + ph[2:-2] + "]%5d"
+    body = completion(
+        "", tool_calls=[{"type": "custom", "custom": {"name": "t", "input": written}}]
+    )
+    restore_completion(session, body)
+    assert body["choices"][0]["message"]["tool_calls"][0]["custom"]["input"] == EMAIL
+
+
+@pytest.mark.parametrize("form", ["unicode", "percent"])
+def test_unknown_encoded_placeholder_is_left_as_written_and_counted(form: str) -> None:
+    session = _session()
+    written = _encoded("[[EMAIL_000000]]", form)
+    arguments = '{"url": "' + written + '"}'
+    body = completion(
+        "", tool_calls=[{"type": "function", "function": {"name": "f", "arguments": arguments}}]
+    )
+    report = restore_completion(session, body)
+    restored = body["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    assert restored == arguments
+    assert list(report.unresolved) == ["[[EMAIL_000000]]"]
+
+
+@pytest.mark.parametrize("form", ["unicode", "percent"])
+def test_streamed_arguments_restore_an_encoded_placeholder_split_anywhere(form: str) -> None:
+    session = _session()
+    ph = _placeholder(session, EMAIL, EntityType.EMAIL)
+    arguments = '{"url": "https://x.test/?to=' + _encoded(ph, form) + '"}'
+    whole = completion(
+        "", tool_calls=[{"type": "function", "function": {"name": "f", "arguments": arguments}}]
+    )
+    restore_completion(session, whole)
+    expected = whole["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    for cut in _cuts(arguments, _encoded(ph, form)):
+        streamed = _streamed_arguments(session, [arguments[:cut], arguments[cut:]], True)
+        assert streamed == expected, cut
+
+
+@pytest.mark.parametrize("form", ["unicode", "percent"])
+def test_streamed_custom_input_restores_an_encoded_placeholder_split_anywhere(form: str) -> None:
+    session = _session()
+    ph = _placeholder(session, EMAIL, EntityType.EMAIL)
+    text = f"to={_encoded(ph, form)} end"
+    for cut in _cuts(text, _encoded(ph, form)):
+        payloads = [
+            chunk(
+                {
+                    "tool_calls": [
+                        {"index": 0, "type": "custom", "custom": {"name": "t", "input": p}}
+                    ]
+                }
+            )
+            for p in (text[:cut], text[cut:])
+        ]
+        payloads.append(chunk({}, finish="tool_calls"))
+        events = _run(SseRestorer(session), payloads)
+        restored = "".join(
+            call.get("custom", {}).get("input", "")
+            for event in events
+            for choice in event.get("choices", [])
+            for call in choice["delta"].get("tool_calls", [])
+        )
+        assert restored == f"to={EMAIL} end", cut
+
+
+@pytest.mark.parametrize(
+    "tail", ["%", "%5", "%5B%5BEMAIL_ab", "\\u005", "\\u005b\\u005bEMAIL_ab12%5"]
+)
+def test_a_tail_that_may_become_an_encoded_placeholder_is_held(tail: str) -> None:
+    assert ToolInputSession.hold_from("go " + tail) == 3
+    assert JsonEscapingSession.hold_from("go " + tail) == 3
