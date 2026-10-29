@@ -345,6 +345,14 @@ is still the published model.
   - Mining found no real error family to generate data for, so nothing was trained
     ([v3.2 results](../eval/results/2026-10-29-ner-v32/README.md)).
 
+### NER v2.0 in every MAPA language
+
+v2.0 is gated on en, de and hu. It is also measured, zero-shot, in all 21 languages of MAPA
+EUR-Lex. Pooled, 8.5 % of person names leak, against 21.9 % and 29.5 % for two public
+EU-multilingual models. Weakest: Maltese, Latvian, Lithuanian, Irish. Per-language table and
+the add-a-language roadmap:
+[MAPA 21-language baseline](../eval/results/2026-10-29-lab-1516-mapa-24/README.md) (LAB-1516).
+
 ## LLM detector
 
 `pii_guard.detect.llm.LlmDetector` (registry name `llm`) talks to any OpenAI-compatible Chat
