@@ -76,9 +76,8 @@ An operator configures the following after review, outside this workflow:
    plan cannot enforce selected-workflow/ref restrictions, do not enroll a private runner.
    Set repository variable `HOSTED_PRIVATE_RUNNER_READY=true` only after these controls
    are independently verified; preparation refuses before runner allocation otherwise.
-5. Finish the private network and durable spend-accounting prerequisites. The side-effect-free `deploy.sh ci-preflight <dev|prod>` must prove the reviewed
-   app-only release contract before Azure login. The current foundation rejects this
-   unsupported mode before cloud commands; both targets remain refused until the companion
+5. Finish the private network and durable spend-accounting prerequisites. The side-effect-free `deploy.sh ci-preflight <dev|prod>` proves the reviewed
+   app-only release contract before Azure login (see "App-only release contract" below). Both targets remain refused until the companion
    Azure changes land. Internal ACA ingress by itself does not establish a Tailscale route.
 6. Configure the variables below, prove live OAuth/hostname/network/release gates, then
    explicitly enable the repository switch. No credentials or switches are set by this PR.
@@ -123,9 +122,8 @@ The workflow invokes `deploy.sh ci-preflight <dev|prod>` before Azure login. Thi
 use local source/configuration checks only and return exactly the reviewed capability
 version: `version:1`, `app_only:true`, `no_storage_keys:true`,
 `no_role_assignments:true`, `durable_budget:true`, and `private_dev:true` for dev. It must
-not return ready capabilities before those properties are implemented. The foundation
-currently refuses the unsupported mode, so setting readiness variables early cannot bypass
-the missing contract.
+not return ready capabilities before those properties are implemented. Setting readiness variables early cannot bypass
+the missing contract: `ci-preflight` fails closed with `reviewed_app_release_contract_unavailable` unless the reviewed template satisfies it.
 
 CI must use the app-only release template provided by the Azure lane. Reapplying a
 foundation template that lists storage account keys or writes role assignments is not
