@@ -390,10 +390,10 @@ def _check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
             out.append(span)
             continue
         fields = _fields(text, span.start, span.end)
-        if span.entity_type in NUMBER_TYPES or len(fields) > 1:
-            kept = [f for f in fields if number_verdict(text, f[0], f[1])]
-        else:
-            kept = fields  # one field: no separator ran through it, leave it alone
+        if span.entity_type not in NUMBER_TYPES and len(fields) <= 1:
+            out.append(span)  # one field: no separator ran through it, leave it alone
+            continue
+        kept = [f for f in fields if number_verdict(text, f[0], f[1])]
         if kept == [(span.start, span.end)]:
             out.append(span)
             continue
