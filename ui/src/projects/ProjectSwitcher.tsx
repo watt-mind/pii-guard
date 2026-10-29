@@ -101,7 +101,7 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
               <MenuSeparator />
               <div role="group" aria-labelledby={endpointsHeading}>
                 <MenuHeading id={endpointsHeading}>Inspect activity &amp; vault</MenuHeading>
-                {[{ id: null, name: "Project playground" }, ...endpoints].map((item) => (
+                {[{ id: null, name: "All endpoints" }, ...endpoints].map((item) => (
                   <button
                     key={item.id ?? ""}
                     type="button"
@@ -111,7 +111,11 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
                     onClick={() => pick(() => setSelectedEndpoint(item.id), item.id !== (endpoint ?? null))}
                     className={MENU_ITEM}
                   >
-                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {item.name}
+                      {/* Logs merge every endpoint here (LAB-1492); the Vault stays on the project's own playground. */}
+                      {item.id === null && <span className="block text-xs text-muted">Logs of every endpoint · playground vault</span>}
+                    </span>
                     <Check on={item.id === (endpoint ?? null)} />
                   </button>
                 ))}

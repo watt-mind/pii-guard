@@ -8,6 +8,10 @@
 
 The traffic routes answer 404 ``traffic_log_disabled`` while ``PII_GUARD_TRAFFIC_LOG=off``
 (the default). Events live in memory only (:class:`~pii_guard.observability.TrafficLog`).
+
+Hosted mode: with no endpoint selected, a project's Logs merge its own runtime and every one
+of its endpoint runtimes (one owner-wide ``seq``, each endpoint event tagged ``endpoint``);
+``X-PII-Guard-Endpoint`` narrows the view to one endpoint (LAB-1492).
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from starlette.responses import PlainTextResponse, StreamingResponse
 from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import v1_router
 from pii_guard.observability import Observability, TrafficLog
+from pii_guard.observability.traffic import TrafficFeedView
 from pii_guard.types import PiiGuardError
 
 __all__ = ["router"]
@@ -54,8 +59,11 @@ def _observability(request: Request) -> Observability:
     return obs
 
 
-def _traffic(request: Request) -> TrafficLog:
-    traffic = _observability(request).traffic
+def _traffic(request: Request) -> TrafficLog | TrafficFeedView:
+    # Hosted project Logs with no endpoint selected: the project's runtime and its endpoint
+    # runtimes, merged under the owner's one sequence (LAB-1492).
+    view = getattr(getattr(request, "state", None), "hosted_traffic", None)
+    traffic = view if view is not None else _observability(request).traffic
     if not traffic.enabled:
         raise TrafficLogDisabledError(
             "the traffic log is off; set PII_GUARD_TRAFFIC_LOG=masked (or full, on localhost)"

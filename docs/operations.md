@@ -505,6 +505,14 @@ Both answer `404 traffic_log_disabled` while the log is off.
 startup: a poller that sees it change knows the server restarted and its `after` cursor is
 stale, and starts again from `after=0`. The Logs screen does this.
 
+Hosted mode keeps one log per owner runtime (the project's own, one per endpoint) but numbers
+all of an owner's events from one sequence. With no endpoint selected, `/v1/traffic` and the
+stream merge the project's runtime and every one of its endpoint runtimes by `seq`, so a call
+through `/e/<endpoint>/v1/...` shows up in the project's Logs; `X-PII-Guard-Endpoint` narrows
+the view to that endpoint. Both views share one `boot` and one `seq` space, so `after` is a
+plain cursor in either. Another owner's runtimes are never read, and the Vault stays per
+runtime.
+
 ### Privacy model
 
 - **Nothing is persisted.** Events live in a bounded ring buffer in the API process; they are
@@ -539,6 +547,7 @@ stale, and starts again from `after=0`. The Logs screen does this.
 |---|---|
 | `id` | Request id, also sent back as `X-PII-Guard-Request-Id` on successful responses |
 | `seq`, `time` | Order in this process; UTC timestamp |
+| `endpoint` | Hosted only: `{"id", "name"}` of the endpoint the call went through; absent for calls on the project itself |
 | `level` | `masked` or `full` |
 | `outcome` | `ok`, `blocked` (a `block` policy), `refused` (any other error before or at the upstream), `upstream_error` (upstream HTTP >= 400), `stream_error`, `client_disconnected` (the client went away mid-stream; the partial answer does not seed the detection cache), `error` |
 | `error` | `{"code", "status"}` and, for `blocked`, `entity_types` (counts) |

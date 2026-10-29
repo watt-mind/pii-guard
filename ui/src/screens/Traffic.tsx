@@ -32,6 +32,7 @@ import {
 } from "../lib/traffic";
 import { NerHint } from "../components/NerHint";
 import { useHostedSession } from "../hosted/session";
+import { setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 import { TimingWaterfall } from "./TrafficCharts";
 
 export interface TrafficProps {
@@ -61,7 +62,7 @@ export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureInterv
 type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 
 /** The Logs screen with its own traffic connection (tests, and embedding on its own). */
-export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic">) {
+export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession">) {
   const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
   return <Logs t={t} forceFixture={forceFixture} {...rest} />;
 }
@@ -71,6 +72,9 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cleared, setCleared] = useState(0);
   const detailRef = useRef<HTMLDivElement>(null);
+  // No endpoint picked in the header: the server merges the project's endpoints (LAB-1492),
+  // so each call names the endpoint it went through.
+  const endpointSelected = useSelectedEndpoint() !== null;
   const lastTime = t.events.length ? Date.parse(t.events[t.events.length - 1]!.time) : 0;
 
   const filtered = useMemo(
@@ -212,13 +216,13 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
           </header>
           {filtered.length === 0 ? (
             <div className="p-4 sm:p-5">
-              <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} demoTraffic={demoTraffic} />
+              <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} demoTraffic={demoTraffic} endpointSelected={endpointSelected} />
             </div>
           ) : (
             <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[calc(100dvh-10rem)]" data-testid="call-list">
               {[...filtered].reverse().map((e) => (
                 <li key={e.id}>
-                  <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} />
+                  <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} showEndpoint={!endpointSelected} />
                 </li>
               ))}
             </ul>
@@ -230,6 +234,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
             <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)}
               mockUpstream={mockUpstream}
               onOpenSession={t.source === "api" ? onOpenSession : undefined}
+              aggregated={!endpointSelected}
             />
           ) : (
             <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-xl border border-line px-6 py-10 text-center">
@@ -389,7 +394,21 @@ function SourceBanner({
   );
 }
 
-function EmptyCalls({ hasAny, source, status, replayDone, demoTraffic }: { hasAny: boolean; source: TrafficSource; status: TrafficStatus; replayDone: boolean; demoTraffic: boolean }) {
+function EmptyCalls({
+  hasAny,
+  source,
+  status,
+  replayDone,
+  demoTraffic,
+  endpointSelected = false,
+}: {
+  hasAny: boolean;
+  source: TrafficSource;
+  status: TrafficStatus;
+  replayDone: boolean;
+  demoTraffic: boolean;
+  endpointSelected?: boolean;
+}) {
   if (hasAny) return <p className="py-6 text-center text-sm text-muted">No call matches these filters.</p>;
   if (source === "fixture" && replayDone)
     return (
@@ -401,7 +420,13 @@ function EmptyCalls({ hasAny, source, status, replayDone, demoTraffic }: { hasAn
   return (
     <div className="py-6 text-center text-sm text-muted">
       <p className="font-medium text-ink">{status.state === "connecting" ? "Connecting…" : "Waiting for the first call"}</p>
-      {source === "api" && status.state === "live" && !demoTraffic && <p className="mt-1">Connect a client to one of your endpoints (Connect), or mask a text in the Playground.</p>}
+      {source === "api" && status.state === "live" && !demoTraffic && (
+        <p className="mt-1">
+          {endpointSelected
+            ? "Only calls through the endpoint picked in the header show here. Pick All endpoints in the header menu to see the whole project."
+            : "Calls through any of this project's endpoints show here, each tagged with its endpoint. Connect a client to one (Connect), or mask a text in the Playground."}
+        </p>
+      )}
       {source === "api" && status.state === "live" && demoTraffic && (
         <p className="mt-1">
           Press <strong className="text-ink">Send demo traffic</strong>, run <code className="font-mono text-xs">make demo-traffic</code>, or point an OpenAI client at{" "}
@@ -538,7 +563,19 @@ function modelOf(e: TrafficEvent, mockUpstream: boolean): string {
   return e.upstream?.model ?? e.model ?? "–";
 }
 
-function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: TrafficEvent; selected: boolean; onSelect: () => void; mockUpstream: boolean }) {
+function CallRow({
+  event: e,
+  selected,
+  onSelect,
+  mockUpstream,
+  showEndpoint = false,
+}: {
+  event: TrafficEvent;
+  selected: boolean;
+  onSelect: () => void;
+  mockUpstream: boolean;
+  showEndpoint?: boolean;
+}) {
   const hasTools = requestTools(e.request?.masked ?? e.request?.original).length > 0;
   const hasImage = (e.entities?.images?.count ?? 0) > 0;
   const labelled = labelledScenarioFor(e);
@@ -555,6 +592,12 @@ function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: Traffi
       <span className="flex w-full items-start gap-2 text-xs">
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-mono whitespace-nowrap text-muted tabular-nums">{clock(e.time)}</span>
+        {showEndpoint && e.endpoint && (
+          <span className="max-w-[10rem] truncate rounded bg-surface-2 px-1.5 py-0.5 text-2xs font-medium text-ink ring-1 ring-line-strong ring-inset" title={`Endpoint: ${e.endpoint.name}`}>
+            <span className="sr-only">Endpoint </span>
+            {e.endpoint.name}
+          </span>
+        )}
         {e.mode && <Tag>{e.mode}</Tag>}
         {e.stream && <Tag>stream</Tag>}
         {hasTools && <Tag>tools</Tag>}
@@ -590,6 +633,7 @@ function CallDetail({
   onFollow,
   mockUpstream,
   onOpenSession,
+  aggregated = false,
 }: {
   event: TrafficEvent;
   following: boolean;
@@ -598,6 +642,8 @@ function CallDetail({
   onFollow: () => void;
   mockUpstream: boolean;
   onOpenSession?: (ref: string) => void;
+  /** The project's merged view: an endpoint call's vault session lives on that endpoint. */
+  aggregated?: boolean;
 }) {
   const showOriginals = canShowOriginals(e, pageHost, source);
   const hosted = useHostedSession() !== null;
@@ -627,6 +673,7 @@ function CallDetail({
           )}
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs @xl:grid-cols-3 @3xl:grid-cols-4">
+          {e.endpoint && <Meta label="Endpoint" value={e.endpoint.name} />}
           <Meta label="Mode" value={e.mode ?? "–"} />
           <Meta label="Model" value={modelOf(e, mockUpstream)} />
           <Meta label="Language" value={e.language ?? "auto"} />
@@ -637,7 +684,12 @@ function CallDetail({
           <Meta label="Tokens" value={e.usage?.total_tokens !== undefined ? `${e.usage.prompt_tokens ?? "?"} in · ${e.usage.completion_tokens ?? "?"} out` : "–"} />
           <Meta label="Detection cache" value={e.cache ? `${e.cache.hits} hit · ${e.cache.misses} miss` : "–"} />
         </dl>
-        {e.session_ref && onOpenSession && (
+        {e.session_ref && onOpenSession && aggregated && e.endpoint ? (
+          // The Vault is per endpoint: switch the console to this one, where the session lives.
+          <Button size="sm" className="mt-3" onClick={() => setSelectedEndpoint(e.endpoint!.id)}>
+            Switch to endpoint {e.endpoint.name} to open its session
+          </Button>
+        ) : e.session_ref && onOpenSession && (
           <Button size="sm" className="mt-3" onClick={() => onOpenSession(e.session_ref!)}>
             Open session <span className="font-mono">{e.session_ref}</span> in Vault
           </Button>
