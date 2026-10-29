@@ -36,8 +36,9 @@ uv run --no-sync pii-guard up
 ```
 
 For gateway configuration and client examples, see the
-[integration guide](https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations.md).
-To explore the [hosted demo](https://guard.watt-mind.com), use fictional data only.
+[integration guide](https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations.md)
+and the [API guide](https://github.com/watt-mind/pii-guard/blob/develop/docs/api.md) (reference:
+[guard.watt-mind.com/#api](https://guard.watt-mind.com/#api)). To explore the [hosted demo](https://guard.watt-mind.com), use fictional data only.
 
 ### With Transformers (text spans on CPU)
 

@@ -155,6 +155,12 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
           </nav>
 
           <div className="space-y-2.5 border-t border-line px-5 py-3">
+            {caps.accounts && (
+              // The public API reference (LAB-1586): a page of its own, outside the console.
+              <a href="#api" className="inline-flex min-h-8 items-center text-xs text-muted hover:text-ink pointer-coarse:min-h-11">
+                API reference
+              </a>
+            )}
             {!caps.accounts && (
               <div className="flex items-center gap-2">
                 <label className="text-xs text-muted" htmlFor="engine-mode">
