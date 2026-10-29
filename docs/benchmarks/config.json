@@ -9,5 +9,67 @@
     "presidio",
     "llm-guard",
     "privaite"
-  ]
+  ],
+  "readme": {
+    "about": "The README results table (pii-guard eval report rewrites the block between <!-- results:start --> and <!-- results:end -->). Columns read a fixture set's latest snapshot or a dataset's latest counts; marks are caveats explained under the table in the README, and a column whose best cell is marked gets no bold.",
+    "columns": [
+      {
+        "title": "Hand-written",
+        "fixture_set": "smoke"
+      },
+      {
+        "title": "Agent traffic",
+        "dataset": "agent-traffic"
+      },
+      {
+        "title": "Nemotron-PII",
+        "dataset": "nemotron-pii"
+      },
+      {
+        "title": "CEE-PII",
+        "dataset": "cee-pii"
+      },
+      {
+        "title": "Gretel finance",
+        "dataset": "gretel-finance"
+      },
+      {
+        "title": "Ai4Privacy",
+        "dataset": "ai4privacy"
+      }
+    ],
+    "rows": [
+      {
+        "system": "rules+ner:xlmr-base-v2-hn",
+        "label": "**PII Guard fast** (rules + NER, on-device, $0)",
+        "short": "fast",
+        "marks": {
+          "ai4privacy": "†"
+        }
+      },
+      {
+        "system": "privaite",
+        "label": "PrivAiTe",
+        "short": "PrivAiTe"
+      },
+      {
+        "system": "presidio",
+        "label": "Presidio",
+        "short": "Presidio"
+      },
+      {
+        "system": "llm-guard",
+        "label": "LLM Guard",
+        "short": "LLM Guard",
+        "marks": {
+          "ai4privacy": "‡"
+        }
+      },
+      {
+        "system": "rules",
+        "label": "PII Guard rules only (no name detection)",
+        "p50": false
+      }
+    ]
+  }
 }
