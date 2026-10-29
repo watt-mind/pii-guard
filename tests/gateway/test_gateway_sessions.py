@@ -403,9 +403,23 @@ def test_header_session_is_bound_to_its_first_gateway_identity() -> None:
     assert resolve_session(vault, headers, {}, None)[0] is known  # same identity: fine
     with pytest.raises(SessionNotFoundError):
         resolve_session(vault, {"X-PII-Guard-Session": known.session_id, **BEARER_2}, {}, None)
-    # The credential-less local principal is not a different identity (LAB-1565 item 2):
-    # a server-generated id sent back without Authorization still resolves.
-    assert resolve_session(vault, {"X-PII-Guard-Session": known.session_id}, {}, None)[0] is known
+    # Dropping Authorization is not a way around the binding: a credential-less caller
+    # can't use a credentialed session.
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, {"X-PII-Guard-Session": known.session_id}, {}, None)
+
+
+def test_anonymous_sessions_stay_shared_and_a_credential_takes_them_over() -> None:
+    vault = Vault(KEY_A)
+    known = vault.session()
+    header = {"X-PII-Guard-Session": known.session_id}
+    assert resolve_session(vault, header, {}, None)[0] is known
+    assert resolve_session(vault, header, {}, None)[0] is known  # the one local principal
+    assert resolve_session(vault, {**header, **BEARER_1}, {}, None)[0] is known  # takes over
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, header, {}, None)
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, {**header, **BEARER_2}, {}, None)
 
 
 def test_one_and_two_character_session_ids_are_refused() -> None:

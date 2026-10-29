@@ -186,11 +186,15 @@ def test_tools_without_personal_data_are_forwarded_unchanged() -> None:
     assert json.dumps(forwarded["tools"]) == json.dumps(fields["tools"])  # key order too
 
 
-def test_structural_strings_are_never_slots() -> None:
+def test_structural_strings_are_never_masked_slots() -> None:
+    """Structural values are identifier-checked, never masked (LAB-1563: they used to be
+    skipped unchecked). The API's own words (``function``) get no slot at all."""
     body = {"model": "m", "messages": MESSAGES, "tools": [tool()]}
-    texts = {slot.text for slot in collect_texts(body).slots}
-    for structural in ("string", "object", "integer", "email", "#/$defs/address", "function"):
-        assert structural not in texts
+    slots = collect_texts(body).slots
+    for structural in ("string", "object", "integer", "email", "#/$defs/address"):
+        found = [s for s in slots if s.text == structural]
+        assert found and all(s.kind == "identifier" for s in found)
+    assert all(s.text != "function" for s in slots)
 
 
 # --- identifiers are checked, not masked --------------------------------------------------
@@ -337,9 +341,12 @@ def muse_chat(content: str) -> dict[str, Any]:
 
 
 def test_a_tool_name_read_as_a_name_does_not_refuse_the_chat_request() -> None:
-    """The NER reads "Muse" in the system prompt as a PERSON; without the filter the vault
-    masks ``muse`` in ``tools[].function.name`` and ``tool_calls[].function.name`` as another
-    occurrence and the request is refused (parity with LAB-1299). Real names stay masked."""
+    """The NER reads "Muse" in the system prompt as a PERSON; without the identifier
+    write-back the vault masks ``muse`` in ``tools[].function.name`` and
+    ``tool_calls[].function.name`` as another occurrence and the request is refused (parity
+    with LAB-1299, LAB-1324). Since LAB-1563 the prose occurrence itself is masked — the
+    tool name only exempts identifiers — so the identifiers stay as written while the
+    system prompt carries a placeholder. Real names stay masked."""
     upstream = MockUpstream()
     app = make_app(upstream, llm=FakeLlm((*NAMES, "Muse", "Write_File")))
     with TestClient(app) as http:
@@ -350,7 +357,7 @@ def test_a_tool_name_read_as_a_name_does_not_refuse_the_chat_request() -> None:
     forwarded = upstream.bodies[0]
     assert [t["function"]["name"] for t in forwarded["tools"]] == ["muse", "write_file"]
     assert forwarded["messages"][2]["tool_calls"][0]["function"]["name"] == "muse"
-    assert forwarded["messages"][0]["content"] == "You are Muse, a coding agent."
+    assert forwarded["messages"][0]["content"].startswith("You are [[PERSON_")
     assert PLACEHOLDER_RE.search(forwarded["messages"][1]["content"])
     assert_no_values(upstream.requests[0].content)
 
@@ -387,3 +394,49 @@ def test_chat_tool_names() -> None:
     }
     assert tool_names(body) == frozenset({"send_letter", "flat_tool", "grep", "legacy_fn"})
     assert tool_names({"functions": "not a list"}) == frozenset()
+
+
+# --- schema structural values are checked, not skipped (LAB-1563) ---------------------------
+
+
+@pytest.mark.parametrize(
+    "parameters",
+    [
+        {"type": "object", "properties": {"x": {"type": "string", "format": EMAIL}}},
+        {"type": "object", "properties": {"x": {"$id": f"https://example.invalid/{PERSON}"}}},
+        {"type": "object", "$defs": {"y": {"$ref": f"#/$defs/{PERSON}"}}},
+        {EMAIL: {}},  # a structural key at the function level takes the same path
+    ],
+)
+def test_personal_data_in_a_structural_value_is_refused(parameters: dict[str, Any]) -> None:
+    """``format``/``$id``/``$ref`` values used to be skipped unchecked at any nesting, so
+    PII there went upstream verbatim. They are identifier-checked now: refused, not masked."""
+    upstream = MockUpstream()
+    if "type" not in parameters and "$defs" not in parameters and "properties" not in parameters:
+        fields: dict[str, Any] = {
+            "tools": [{"type": "function", "function": {"name": "f", "type": EMAIL}}]
+        }
+    else:
+        fields = {"tools": [tool(parameters=parameters)]}
+    response = post(upstream, **fields)
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "unsupported_content"
+    assert_no_values(response.content)
+    assert upstream.requests == []
+
+
+def test_valid_structural_values_still_pass() -> None:
+    """The check refuses personal data only: ordinary structural vocabulary still forwards
+    byte-for-byte (also covered by ``assert_masked_schema`` above)."""
+    upstream = MockUpstream()
+    parameters = {
+        "type": ["string", "null"],
+        "$id": "https://example.invalid/schemas/letter.json",
+        "properties": {"when": {"type": "string", "format": "date-time"}},
+    }
+    response = post(upstream, tools=[tool(parameters=parameters)])
+    assert response.status_code == 200, response.text
+    sent = upstream.bodies[0]["tools"][0]["function"]["parameters"]
+    assert sent["type"] == ["string", "null"]
+    assert sent["$id"] == parameters["$id"]
+    assert sent["properties"]["when"] == {"type": "string", "format": "date-time"}

@@ -3,8 +3,10 @@
 Shared by ``/v1/chat/completions`` (:class:`~pii_guard.gateway.service.Gateway`) and
 ``/v1/responses`` (:class:`~pii_guard.gateway.responses.ResponsesGateway`): after detection and
 before masking, both drop the word-like detections (:data:`EXEMPT_TYPES`) whose whole value is a
-declared tool name; when the masked texts are written back, an identifier whose only rewrites are
-declared tool names is written as the client sent it (:func:`identifier_keeps_tool_names`).
+declared tool name **in identifier slots only** (LAB-1563: the same value in message prose or
+any other slot is masked as usual — a declared name must not suppress prose detections); when
+the masked texts are written back, an identifier whose only rewrites are declared tool names is
+written as the client sent it (:func:`identifier_keeps_tool_names`).
 
 The exemption covers only the types a statistical detector can misread a tool word as. A
 format- or checksum-validated value (a tax ID, an IBAN, ...) is personal data whatever the
@@ -69,30 +71,41 @@ def tool_names(body: Mapping[str, Any]) -> frozenset[str]:
 
 
 def without_tool_names(
-    texts: list[str], spans: list[list[Span]], names: frozenset[str]
+    texts: list[str],
+    spans: list[list[Span]],
+    names: frozenset[str],
+    kinds: list[str | None] | None = None,
 ) -> list[list[Span]]:
-    """``spans`` without the detections whose whole value is one of the declared tool ``names``.
+    """``spans`` without the tool-name detections in **identifier slots**.
 
     A client's tool vocabulary is not personal data, and it goes upstream as written anyway:
-    tool and namespace names are identifiers, sent unmasked or the request is refused. Masking
-    the same word elsewhere does harm only. Muse Code 1.4.14 says "Muse" alone in its reminder
-    prompts; the NER read it as a PERSON, and the vault then masked the ``muse`` namespace (an
-    identifier) as another occurrence of that value, so the request was refused (LAB-1299).
-    Chat Completions had the same gap for ``tools[].function.name`` (LAB-1317). Values the
-    operator pre-loaded (``known``) are kept, and so is every detection of a type outside
-    :data:`EXEMPT_TYPES` (LAB-1348).
+    tool and namespace names are identifiers, sent unmasked or the request is refused. Muse
+    Code 1.4.14 says "Muse" alone in its reminder prompts; the NER read it as a PERSON, and the
+    vault then masked the ``muse`` namespace (an identifier) as another occurrence of that
+    value, so the request was refused (LAB-1299). Chat Completions had the same gap for
+    ``tools[].function.name`` (LAB-1317).
+
+    The exemption is restricted to identifier slots (``kinds``, one slot kind per text; a
+    missing kind counts as non-identifier): a tool name is client-controlled, so exempting the
+    same value in message prose let a client unmask a real name by naming a tool after it
+    (LAB-1563). Prose occurrences are masked as usual; the identifier rewrite that masking
+    then causes is still undone at write-back (:func:`identifier_keeps_tool_names`, LAB-1324),
+    so tool-name identifiers keep working. Values the operator pre-loaded (``known``) are
+    kept, and so is every detection of a type outside :data:`EXEMPT_TYPES` (LAB-1348).
     """
     if not names:
         return spans
+    slot_kinds: list[str | None] = kinds if kinds is not None else [None] * len(texts)
     return [
         [
             s
             for s in found
-            if s.detector == KNOWN_DETECTOR
+            if kind != "identifier"
+            or s.detector == KNOWN_DETECTOR
             or s.entity_type not in EXEMPT_TYPES
             or normalize_value(text[s.start : s.end]) not in names
         ]
-        for text, found in zip(texts, spans, strict=True)
+        for text, found, kind in zip(texts, spans, slot_kinds, strict=True)
     ]
 
 

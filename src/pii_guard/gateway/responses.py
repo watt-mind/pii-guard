@@ -7,9 +7,9 @@ cache and vault:
 1. upstream configured? mode, language, session and echo headers valid? body well-formed and
    nothing in it the gateway can't mask (:func:`~pii_guard.gateway.responses_request.
    collect_response_texts`)?
-2. detect every text, add the session's known values, drop detections that are exactly one of
-   the tool names the request declares (:func:`~pii_guard.gateway.tool_names.
-   without_tool_names`), mask with one vault
+2. detect every text, add the session's known values, drop detections in identifier slots
+   that are exactly one of the tool names the request declares
+   (:func:`~pii_guard.gateway.tool_names.without_tool_names`), mask with one vault
    session;
 3. forward the masked body to ``{upstream base}/responses``, natively (no translation to Chat
    Completions). An upstream without a Responses API (404/405 on that path) gets a clear 501
@@ -244,7 +244,12 @@ class ResponsesGateway:
             with timer.span("detect"):
                 spans = await gw._detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
-                spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
+                spans = without_tool_names(
+                    [slot.text for slot in collected.slots],
+                    spans,
+                    names,
+                    [slot.kind for slot in collected.slots],
+                )
                 issued = gw.issued_ids.of(session.session_id)
                 spans = without_opaque_ids(collected.slots, spans, issued)
             # Inline images go through the chat path (LAB-1285): mask the texts, then the

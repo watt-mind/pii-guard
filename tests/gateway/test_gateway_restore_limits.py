@@ -127,3 +127,66 @@ def test_responses_stream_shares_one_budget_across_its_deltas() -> None:
     with pytest.raises(UnmaskOutputTooLargeError):
         for index in range(10):  # a new stream per output index, one shared budget
             restorer.process("response.output_text.delta", delta(index))
+
+
+def _placeholder_for(session: Any, value: str) -> str:
+    text = f"k {value}"
+    span = Span(2, len(text), EntityType.SECRET, value, 1.0, "test")
+    return session.mask(text, [span])[2:]
+
+
+def _logical_text_events(placeholder: str) -> list[dict[str, Any]]:
+    """One logical text as a Responses stream repeats it: deltas, .done, item, completed."""
+    text = f"hi {placeholder} !"
+    item = {
+        "type": "message",
+        "content": [{"type": "output_text", "text": text}],
+    }
+    return [
+        {
+            "type": "response.output_text.delta",
+            "output_index": 0,
+            "content_index": 0,
+            "delta": text[:6],
+        },
+        {
+            "type": "response.output_text.delta",
+            "output_index": 0,
+            "content_index": 0,
+            "delta": text[6:],
+        },
+        {"type": "response.output_text.done", "output_index": 0, "content_index": 0, "text": text},
+        {"type": "response.output_item.done", "output_index": 0, "item": item},
+        {"type": "response.completed", "response": {"output": [item]}},
+    ]
+
+
+def test_responses_stream_charges_one_logical_text_once() -> None:
+    """Delta + .done + output_item.done + response.completed is one text, charged once:
+    it completes within ``2 * len(value) + 5`` (LAB-1564; was charged 3-4x and died)."""
+    value = TOKEN_A
+    session = Vault(bytes.fromhex(TEST_TENANT_KEY), max_restored_chars=2 * len(value) + 5).session()
+    placeholder = _placeholder_for(session, value)
+    restorer = ResponsesSseRestorer(session)
+    for event in _logical_text_events(placeholder):
+        out = restorer.process(event["type"], json.dumps(event))
+        assert TOKEN_A in out[-1][1] or "delta" in event["type"]
+
+
+def test_responses_stream_still_charges_a_new_text_in_a_whole_event() -> None:
+    """The dedupe is per logical text, not a hole in the cap: a *different* value first
+    seen in ``response.completed`` charges normally and still hits the limit (LAB-1564)."""
+    session = Vault(bytes.fromhex(TEST_TENANT_KEY), max_restored_chars=len(TOKEN_A) + 5).session()
+    first = _placeholder_for(session, TOKEN_A)
+    second = _placeholder_for(session, TOKEN_B)
+    restorer = ResponsesSseRestorer(session)
+    for event in _logical_text_events(first):
+        restorer.process(event["type"], json.dumps(event))
+    other = {
+        "type": "response.completed",
+        "response": {
+            "output": [{"type": "message", "content": [{"type": "output_text", "text": second}]}]
+        },
+    }
+    with pytest.raises(UnmaskOutputTooLargeError):
+        restorer.process(other["type"], json.dumps(other))

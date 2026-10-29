@@ -35,9 +35,11 @@ an existing explicit id gets ``session_not_found`` (fail closed, no distinction 
 missing session), never the mapping. The credential-less ``anonymous`` identity is a
 *single* principal by construction: in the documented local (loopback) deployment every
 local client without ``Authorization`` is the same user, so they share the anonymous derived
-session (multi-turn restore needs that), an anonymous presenter is never refused by a
-binding, and a credentialed identity takes an anonymous binding over. Distinct
-``Authorization`` values always derive distinct sessions.
+session (multi-turn restore needs that) and anonymous presenters never refuse each other;
+a credentialed identity takes an anonymous binding over. An anonymous presenter is refused
+by a *credentialed* binding: dropping ``Authorization`` is the caller's choice, so it must
+not unlock a session another credential owns. Distinct ``Authorization`` values always
+derive distinct sessions.
 """
 
 from __future__ import annotations
@@ -180,19 +182,17 @@ class _Bindings:
         """Record ``identity`` for ``session``; refuse a different credentialed identity.
 
         The credential-less ``anonymous`` identity is the one local principal (see the
-        module docstring): it never refuses and never overwrites a recorded identity, and
-        a credentialed identity presenting an anonymous-bound session takes the binding
-        over. Distinct credentialed identities are refused. This keeps server-generated
-        ids usable as the bearer credential they are (a client may send the returned id
-        back without the same ``Authorization``) while a *different* credential cannot
-        take a session over.
+        module docstring): it matches an anonymous binding, and a credentialed identity
+        presenting an anonymous-bound session takes the binding over. Any other mismatch
+        is refused, including ``anonymous`` presenting a credentialed binding: leaving
+        ``Authorization`` out is the caller's choice and must not bypass the binding.
         """
         with self._lock:
             found = self._by_id.get(session.session_id)
             if found is not None:
                 recorded, ref = found
                 if ref() is session:
-                    if recorded == identity or identity == "anonymous":
+                    if recorded == identity:
                         self._by_id.move_to_end(session.session_id)
                         return
                     if recorded != "anonymous":

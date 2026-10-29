@@ -119,8 +119,10 @@ def test_explicit_session_entry_limit_fails_closed_at_mask_time(clock: FakeClock
     for email in EMAILS[:2]:
         session.mask(email, [span_of(email, email, EntityType.EMAIL)])
     assert session.entry_count == 2
-    with pytest.raises(MaskingError, match="entry limit"):
+    with pytest.raises(MaskingError, match="entry limit") as raised:
         session.mask(EMAILS[2], [span_of(EMAILS[2], EMAILS[2], EntityType.EMAIL)])
+    # Client-recoverable (start a new session), so not a 500.
+    assert (raised.value.code, raised.value.status_code) == ("session_entry_limit_reached", 409)
 
 
 def test_reserved_foreign_tokens_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:

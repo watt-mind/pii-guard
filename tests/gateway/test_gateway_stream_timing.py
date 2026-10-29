@@ -197,7 +197,9 @@ def _assert_disconnected(app: FastAPI, stream: _Stream) -> None:
     # The partial answer is not what the client will send back as history: no seeding.
     assert event["cache"]["seeded"] == 0
     gateway = app.state.gateway
-    assert len(gateway.cache) == 1  # only the request's own message, detected before forwarding
+    # The request's own message and its identifier-checked ``model`` (LAB-1563), detected
+    # before forwarding; nothing seeded from the partial answer.
+    assert len(gateway.cache) == 2
     assert stream.closed and stream.pulled < stream.count
     # The disconnect closed the upstream *response*; the shared client stays open (LAB-1176).
     assert gateway._client is not None and not gateway._client.is_closed
@@ -248,3 +250,29 @@ def test_trickling_stream_hits_the_total_deadline() -> None:
     assert b"stream_failed" in body
     assert elapsed < 5  # ended by the 0.2 s deadline, not by reading the whole trickle
     assert stream.pulled < stream.count
+
+
+def test_a_chunk_with_error_null_streams_normally() -> None:
+    """``error: null`` is a normal chunk; only a truthy ``error`` is the sanitised fatal
+    upstream error, and it never carries the upstream's message (LAB-1564)."""
+    from pii_guard.gateway.stream import SseRestorer
+    from pii_guard.vault import Vault
+
+    session = Vault(bytes.fromhex(TEST_TENANT_KEY)).session()
+    restorer = SseRestorer(session)
+    chunk = {
+        "id": "c",
+        "object": "chat.completion.chunk",
+        "error": None,
+        "choices": [{"index": 0, "delta": {"content": "tok "}, "finish_reason": None}],
+    }
+    (out,) = restorer.process(json.dumps(chunk))
+    assert json.loads(out)["choices"][0]["delta"]["content"] == "tok "
+
+    (failed,) = restorer.process(json.dumps({"error": {"message": "quota for Teszt Elek"}}))
+    assert json.loads(failed)["error"] == {
+        "code": "upstream_error",
+        "message": "upstream stream error",
+        "type": "upstream_error",
+    }
+    assert "Teszt" not in failed

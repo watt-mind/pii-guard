@@ -435,7 +435,8 @@ def test_a_tool_name_read_as_a_name_does_not_refuse_the_request() -> None:
     """Muse 1.4.14 says "Muse" alone in its prompts and the NER can read it as a PERSON. The
     vault then masked the ``muse`` namespace as another occurrence of that value, and the
     request was refused as personal data in an identifier (LAB-1299). The tool vocabulary is
-    left as written; real names around it are still masked."""
+    left as written in identifiers; since LAB-1563 the prose occurrence itself is masked,
+    and real names around it are still masked too."""
     body = muse_body()
     body["input"][0]["content"] = "You are Muse, a coding agent. Support line +36 30 123 4567."
     upstream = ResponsesUpstream()
@@ -447,7 +448,7 @@ def test_a_tool_name_read_as_a_name_does_not_refuse_the_request() -> None:
     assert forwarded["tools"][0]["name"] == "muse"
     assert forwarded["tools"][0]["tools"][0]["name"] == "write_file"
     assert forwarded["input"][4]["name"] == "muse.read_file"
-    assert forwarded["input"][0]["content"].startswith("You are Muse, a coding agent.")
+    assert forwarded["input"][0]["content"].startswith("You are [[PERSON_")
     assert leaked_values(upstream.requests[0].content) == []
 
 
@@ -463,8 +464,12 @@ def test_tool_names_and_the_spans_they_drop() -> None:
         Span(14, 30, EntityType.PERSON, "Jane Placeholder", 0.9, "ner"),
         Span(35, 39, EntityType.PERSON, "MUSE", 1.0, "known"),  # pre-loaded: kept
     ]
-    kept = without_tool_names([text], [found], names)[0]
+    # In an identifier slot the tool word is dropped; the pre-loaded one is kept. In prose
+    # (any other kind, or none) nothing is dropped since LAB-1563.
+    kept = without_tool_names([text], [found], names, ["identifier"])[0]
     assert [s.text for s in kept] == ["Jane Placeholder", "MUSE"]
+    assert without_tool_names([text], [found], names, ["content"]) == [found]
+    assert without_tool_names([text], [found], names) == [found]
     assert without_tool_names([text], [found], frozenset()) == [found]
 
 
@@ -631,3 +636,97 @@ def test_codex_client_metadata_is_masked_like_metadata() -> None:
     assert {"01a1", '{"turn_id":"t1"}'} <= {s.text for s in slots}
     with pytest.raises(InvalidChatRequestError, match="client_metadata must be an object"):
         collect_response_texts({"model": "m", "input": "hi", "client_metadata": "x"})
+
+
+# --- custom-tool grammar definitions and ``model`` (LAB-1563) --------------------------------
+
+
+def test_custom_tool_grammar_definition_is_masked() -> None:
+    """``format.grammar.definition`` was skipped as schema-structural, so personal data in a
+    custom tool's grammar went upstream verbatim. It is free text: masked."""
+    email = "teszt.elek@example.com"
+    body: dict[str, Any] = {
+        "model": "m",
+        "input": "hello",
+        "tools": [
+            {
+                "type": "custom",
+                "name": "grep",
+                "description": "Search text.",
+                "format": {
+                    "type": "grammar",
+                    "grammar": {"syntax": "lark", "definition": f'start: "mail {email}"'},
+                },
+            }
+        ],
+    }
+    upstream = ResponsesUpstream()
+    with TestClient(make_app(upstream)) as http:
+        response = http.post("/v1/responses", json=body)
+    assert response.status_code == 200, response.text
+    forwarded = json.loads(upstream.requests[0].content)
+    definition = forwarded["tools"][0]["format"]["grammar"]["definition"]
+    assert "[[EMAIL_" in definition
+    assert email not in upstream.requests[0].content.decode()
+
+
+def test_a_pii_shaped_model_is_refused_on_responses() -> None:
+    email = "teszt.elek@example.com"
+    upstream = ResponsesUpstream()
+    with TestClient(make_app(upstream)) as http:
+        response = http.post("/v1/responses", json={"model": email, "input": "hello"})
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "unsupported_content"
+    assert email not in response.text
+    assert upstream.requests == []
+
+
+def test_unknown_delta_types_hold_back_a_split_placeholder() -> None:
+    """An unmodelled ``*.delta`` event type with a string ``delta`` streams through the same
+    holdback as a known one, so a split placeholder is never emitted in fragments, and its
+    ``.done`` flushes it before the whole text (LAB-1564)."""
+
+    class Session:
+        def restore_budget(self) -> Any:
+            from pii_guard.vault import RestoreBudget
+
+            return RestoreBudget(1000)
+
+        def unmask_with_report(self, text: str, *, budget: Any = None) -> Any:
+            from pii_guard.vault import UnmaskResult
+
+            return UnmaskResult(text.replace("[[EMAIL_abcd12]]", "a@example.com"), ())
+
+    restorer = ResponsesSseRestorer(Session())  # type: ignore[arg-type]
+    kind = "response.future_text"
+    out: list[tuple[str | None, str]] = []
+    for piece in ("to [[EM", "AIL_abcd12]] !"):
+        event = {"type": f"{kind}.delta", "output_index": 1, "delta": piece}
+        out += restorer.process(event["type"], json.dumps(event))
+        assert "[[EM" not in out[-1][1]
+    done = {"type": f"{kind}.done", "output_index": 1, "text": "to [[EMAIL_abcd12]] !"}
+    out += restorer.process(done["type"], json.dumps(done))
+    events = [json.loads(data) for _, data in out]
+    deltas = "".join(e["delta"] for e in events if e["type"].endswith(".delta"))
+    assert deltas == events[-1]["text"] == "to a@example.com !"
+
+
+def test_unknown_delta_without_a_string_delta_is_restored_whole() -> None:
+    """Other unmodelled events keep the existing whole-event restore (LAB-1564)."""
+
+    class Session:
+        def restore_budget(self) -> Any:
+            from pii_guard.vault import RestoreBudget
+
+            return RestoreBudget(1000)
+
+        def unmask_with_report(self, text: str, *, budget: Any = None) -> Any:
+            from pii_guard.vault import UnmaskResult
+
+            return UnmaskResult(text.replace("[[EMAIL_abcd12]]", "a@example.com"), ())
+
+    restorer = ResponsesSseRestorer(Session())  # type: ignore[arg-type]
+    event = {"type": "response.future.delta", "delta": {"text": "to [[EMAIL_abcd12]]"}}
+    [(name, data)] = restorer.process(event["type"], json.dumps(event))
+    assert name == "response.future.delta"
+    assert json.loads(data)["delta"] == {"text": "to a@example.com"}

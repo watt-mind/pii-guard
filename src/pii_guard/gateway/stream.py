@@ -84,7 +84,6 @@ class SseRestorer:
         self._on_ids = on_ids
         # One budget for the whole response: every choice, field and tool call (LAB-1350).
         self._budget = session.restore_budget()
-        self._tool_session = ToolInputSession(session, self._budget)
         # (choice, field) or (choice, "tool", tool index) -> unmasker
         self._unmaskers: dict[tuple[Any, ...], StreamUnmasker] = {}
         self._retired_unresolved: dict[str, None] = {}
@@ -132,9 +131,10 @@ class SseRestorer:
         if unmasker is None:
             # StreamUnmasker calls unmask_with_report() (and hold_from()); the adapters have them.
             # A JSON adapter tracks where it is in the arguments, so one per stream (LAB-1483).
+            # A tool adapter tracks the shell quoting it has read, so one per stream too.
             session: Any = {
                 "json": JsonEscapingSession(self._session, self._budget),
-                "tool": self._tool_session,
+                "tool": ToolInputSession(self._session, self._budget),
             }.get(kind, self._session)
             unmasker = StreamUnmasker(session, self._budget)
             self._unmaskers[key] = unmasker
@@ -152,7 +152,7 @@ class SseRestorer:
             return [data]  # not ours to interpret; holds masked text only
         if not isinstance(chunk, dict):
             return [data]
-        if "error" in chunk:
+        if chunk.get("error"):  # ``error: null`` is a normal chunk, not a failure (LAB-1564)
             return [error_event("upstream_error", "upstream stream error")]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(chunk))

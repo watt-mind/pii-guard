@@ -62,6 +62,7 @@ __all__ = [
     "MaskResult",
     "PlaceholderInInputError",
     "RestoreBudget",
+    "SessionEntryLimitError",
     "SessionNotFoundError",
     "UnmaskOutputTooLargeError",
     "UnmaskResult",
@@ -82,6 +83,17 @@ class PlaceholderInInputError(MaskingError):
 
     code = "placeholder_in_input"
     status_code = 422
+
+
+class SessionEntryLimitError(MaskingError):
+    """An explicit session holds ``max_entries`` placeholders (409, LAB-1565).
+
+    Nobody can rotate an explicit session for the client, so it fails closed; the client
+    recovers by starting a new session.
+    """
+
+    code = "session_entry_limit_reached"
+    status_code = 409
 
 
 DEFAULT_TTL_SECONDS = 3600.0
@@ -785,9 +797,8 @@ class VaultSession:
             if self._entry_limit is not None and len(self._by_placeholder) >= self._entry_limit:
                 # An explicit session has nobody to rotate it for (LAB-1565): fail closed
                 # rather than grow without bound; the client starts a new session.
-                raise MaskingError(
-                    "vault session entry limit reached; start a new session",
-                    code="session_entry_limit_reached",
+                raise SessionEntryLimitError(
+                    "vault session entry limit reached; start a new session"
                 )
             if since is not None and not self._edges_unchanged(text, since, language):
                 since = None
