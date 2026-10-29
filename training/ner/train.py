@@ -55,6 +55,7 @@ from pii_guard.detect.ner import RawEntity, TransformersBackend, decode_tokens
 from pii_guard.eval.fixtures import Document
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import data_sync
 import decontam
 
 #: The v1 label set (LAB-1106, LAB-1128): what the NER found before LAB-1150.
@@ -371,8 +372,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     random.seed(cfg["seed"])
     torch.manual_seed(cfg["seed"])
     device = pick_device(cfg["device"])
-    train_paths = [Path(p) for p in cfg["train"]]
-    dev_paths = [Path(p) for p in cfg["dev"]]
+    # ``data:<corpus>/<file>`` is read from the data root (PII_GUARD_DATA_DIR, LAB-1542).
+    train_paths = [data_sync.resolve(p) for p in cfg["train"]]
+    dev_paths = [data_sync.resolve(p) for p in cfg["dev"]]
     index = decontam.eval_corpus() if cfg["decontam"] else None
     gate_report = decontam.Report()
     train_docs = decontam.load_training_docs(train_paths, index, gate_report)
