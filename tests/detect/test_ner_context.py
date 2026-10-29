@@ -167,6 +167,18 @@ class TestSoftwareNames:
         text = "Claude sent the invoice yesterday."
         assert kept(text, hit(text, "Claude", E.PERSON)) == ["Claude"]
 
+    def test_short_harness_name_completed_to_a_product(self) -> None:
+        # LAB-1485: "pi" is a surname on its own, so only the software context unmasks it.
+        text = "Read the pi coding agent docs, then run pi-coding-agent."
+        spans = (hit(text, "pi", E.PERSON), hit(text, "pi-coding-agent", E.PERSON))
+        assert kept(text, *spans) == []
+
+    def test_short_harness_name_alone_is_kept(self) -> None:
+        # Bare "pi" (as in "pi's documentation") cannot be told from the surname Pi:
+        # the over-mask is accepted, as for a bare "Claude".
+        text = "pi's documentation: run pi --help"
+        assert kept(text, hit(text, "pi", E.PERSON)) == ["pi"]
+
     def test_lexicon_name_listed_with_software_is_kept(self) -> None:
         text = "Ask Anna or Codex for a review."
         assert kept(text, hit(text, "Anna", E.PERSON), hit(text, "Codex", E.PERSON)) == ["Anna"]
