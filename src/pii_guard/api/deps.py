@@ -42,7 +42,13 @@ from pii_guard.detect.stack import (
     unavailable_reason,
 )
 from pii_guard.policy import PolicySet
-from pii_guard.types import Analyzer, Detector, PayloadTooLargeError, PiiGuardError, Span
+from pii_guard.types import (
+    Analyzer,
+    Detector,
+    PayloadTooLargeError,
+    Span,
+    VaultNotConfiguredError,
+)
 from pii_guard.vault import Vault
 
 __all__ = [
@@ -170,9 +176,8 @@ def get_vault(request: Request) -> Vault:
                     vault = Vault.from_settings(state.settings)
                 except ValueError:
                     # Invalid hex or too short; never echo the key.
-                    raise PiiGuardError(
+                    raise VaultNotConfiguredError(
                         "PII_GUARD_TENANT_KEY is invalid: expected at least 16 bytes of hex",
-                        code="vault_not_configured",
                     ) from None
                 state.vault = vault
     return vault
@@ -187,4 +192,11 @@ def get_language(request: Request, language: str | None) -> str:
 
 
 def get_max_text_chars(request: Request) -> int:
-    return int(getattr(request.app.state, "max_text_chars", DEFAULT_MAX_TEXT_CHARS))
+    state = request.app.state
+    configured = getattr(state, "max_text_chars", None)
+    if configured is not None:
+        return int(configured)
+    settings = getattr(state, "settings", None)
+    if settings is not None and getattr(settings, "max_text_chars", None) is not None:
+        return int(settings.max_text_chars)
+    return DEFAULT_MAX_TEXT_CHARS

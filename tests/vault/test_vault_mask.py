@@ -11,7 +11,7 @@ from hypothesis import strategies as st
 from vault_helpers import OTHER_TEST_KEY, TEST_KEY, FakeClock, span_of
 
 from pii_guard.config import Settings
-from pii_guard.types import EntityType, MaskingError, Span
+from pii_guard.types import EntityType, MaskingError, Span, VaultNotConfiguredError
 from pii_guard.vault import (
     PLACEHOLDER_RE,
     ExactMatcher,
@@ -415,9 +415,10 @@ def test_vault_validates_arguments() -> None:
 def test_from_settings() -> None:
     vault = Vault.from_settings(Settings(tenant_key="0f" * 32), ttl_seconds=5)
     assert mask_one(vault.session(), NAME, NAME).startswith("[[PERSON_")
-    with pytest.raises(MaskingError) as exc:
+    with pytest.raises(VaultNotConfiguredError) as exc:
         Vault.from_settings(Settings())
     assert exc.value.code == "vault_not_configured"
+    assert exc.value.status_code == 503
 
 
 # --- no leaks ------------------------------------------------------------------------------

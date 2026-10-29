@@ -169,6 +169,7 @@ def create_app(
         resolve_detector(name)
     app.state.settings = settings
     app.state.detector_names = list(detector_names)
+    app.state.max_text_chars = settings.max_text_chars
     app.state.policies = PolicySet.from_settings(settings)
     warmup = NerWarmup(settings)
     app.state.ner_warmup = warmup

@@ -112,6 +112,9 @@ class Settings(BaseSettings):
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
     # the gateway fast-mode stack, rules + ner when available (pii_guard.detect.stack).
     detectors: Annotated[tuple[str, ...] | None, NoDecode] = None
+    # Upper bound on the analysed text, in code points (LAB-1095). Override per-app via
+    # app.state.max_text_chars (set by create_app from here).
+    max_text_chars: int = Field(default=200_000, ge=1)
     # A processing constraint, independent of the masked downstream LLM destination.
     detection_profile: Literal["standard", "local-only"] = "standard"
     # "TYPE=mask|keep|block,..." on top of the defaults in docs/entities.md.
