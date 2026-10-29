@@ -68,6 +68,23 @@ describe("public header navigation", () => {
     expect(menu()).not.toHaveAttribute("open");
     scrollY.mockRestore();
   });
+  it("changes appearance from the header and restores trigger focus on Escape", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<PublicHeader accountHref="#overview" />);
+    const appearance = screen.getByLabelText("Appearance");
+    await user.click(appearance);
+    await user.click(screen.getByRole("radio", { name: "Dark theme" }));
+    expect(document.documentElement).toHaveClass("dark");
+    await user.keyboard("{Escape}");
+    expect(appearance).toHaveFocus();
+    expect(appearance.closest("details")).not.toHaveAttribute("open");
+    unmount();
+    render(<PublicHeader accountHref="#overview" />);
+    await user.click(screen.getByLabelText("Appearance"));
+    expect(screen.getByRole("radio", { name: "Dark theme" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Light theme" }));
+    expect(document.documentElement).not.toHaveClass("dark");
+  });
   it("preserves modified-click navigation without closing or moving focus", async () => {
     const user = userEvent.setup(); render(<PublicHeader accountHref="#overview" />);
     await user.click(trigger());

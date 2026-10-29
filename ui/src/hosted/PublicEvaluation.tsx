@@ -1,6 +1,4 @@
 import { lazy, Suspense, useEffect, type MouseEvent } from "react";
-import { ThemeToggle } from "../components/ui";
-import { useTheme } from "../hooks/useTheme";
 import { PublicHeader } from "./PublicHeader";
 import { loginFor } from "./consoleLink";
 
@@ -13,7 +11,6 @@ const Benchmarks = lazy(() => import("../screens/Benchmarks").then((m) => ({ def
  * calls no API and shows nothing of any account. "Sign in" returns to Evaluation after authentication.
  */
 export function PublicEvaluation({ loginUrl, hash }: { loginUrl: string; hash: string }) {
-  const [theme, setTheme] = useTheme();
   // Opened from a link on the public page: start at the top, not at that page's scroll position.
   useEffect(() => {
     globalThis.scrollTo?.(0, 0);
@@ -25,7 +22,7 @@ export function PublicEvaluation({ loginUrl, hash }: { loginUrl: string; hash: s
   }
 
   return (
-    <div className="min-h-dvh bg-canvas text-sm text-ink">
+    <div className="public-teal-theme min-h-dvh bg-canvas text-sm text-ink">
       <a href="#main" onClick={skip} className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">
         Skip to content
       </a>
@@ -38,7 +35,6 @@ export function PublicEvaluation({ loginUrl, hash }: { loginUrl: string; hash: s
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 lg:px-10">
           <p className="text-xs text-muted">Published benchmark results, the same for every visitor. No account data is shown here.</p>
-          <ThemeToggle theme={theme} onTheme={setTheme} />
         </div>
       </footer>
     </div>

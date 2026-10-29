@@ -8,8 +8,7 @@ import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
 import { Placeholder } from "../components/Placeholder";
 import { RestoredText } from "../components/RestoredText";
-import { Announcer, Badge, Button, ButtonLink, Card, Field, KeyValues, Logo, Metric, Notice, SegmentedControl, Select, Textarea, ThemeToggle, type BadgeTone } from "../components/ui";
-import { useTheme } from "../hooks/useTheme";
+import { Announcer, Badge, Button, ButtonLink, Card, Field, KeyValues, Logo, Metric, Notice, SegmentedControl, Select, Textarea, type BadgeTone } from "../components/ui";
 import { metaFor } from "../lib/entities";
 import { ApiError } from "../api/http";
 import { request, recovery, type Account, type DemoResult, type Requester } from "./api";
@@ -86,7 +85,6 @@ export function HostedApp({ call = request, console: renderConsole }: { call?: R
 }
 
 function HostedContent({ call, account, accountError, refresh, console: hasConsole }: { call: Requester; account: Account | null; accountError: string; refresh: () => Promise<void>; console: boolean }) {
-  const [theme, setTheme] = useTheme();
   const [language, setLanguage] = useState<Language>("en");
   const [result, setResult] = useState<DemoResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -188,7 +186,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
   const current = useCurrentSection(SECTIONS);
 
-  return <div className="min-h-dvh bg-canvas text-sm text-ink">
+  return <div className="public-teal-theme min-h-dvh bg-canvas text-sm text-ink">
     <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
     <PublicHeader current={current} signedIn={signedIn} accountHref={signedIn ? (hasConsole ? "#overview" : "#account") : loginUrl} />
     <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-20 lg:px-10">
@@ -433,22 +431,30 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <div className="mx-auto grid max-w-[1280px] gap-4 px-4 py-8 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <a href="#" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
-          <ThemeToggle theme={theme} onTheme={setTheme} />
         </div>
-        <p className="text-muted">Open-source privacy gateway for AI agents. Every example on this page is fictional.</p>
-        <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-          <a className="text-ink hover:underline" href={SELF_HOST}>Self-hosting guide <span aria-hidden="true">↗</span></a>
-          <a className="text-ink hover:underline" href={`${DOCS}/integrations/README.md`}>Integration guide <span aria-hidden="true">↗</span></a>
-          <a className="text-ink hover:underline" href="#data">Privacy</a>
-          <a className="text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks <span aria-hidden="true">↗</span></a>
-          {PRIVACY_NOTICE_URL && <a className="text-ink hover:underline" href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
-          <a className="text-ink hover:underline" href={CONTACT_URL ?? `${SOURCE}/issues`}>{CONTACT_URL ? "Contact" : "Questions and issues"} <span aria-hidden="true">↗</span></a>
+        <p className="text-muted">Open-source privacy gateway for AI agents.</p>
+        <nav aria-label="Footer" className="public-footer-columns">
+          <div><h2>Build</h2>
+            <a href={SELF_HOST}>Self-hosting <span aria-hidden="true">↗</span></a>
+            <a href={`${DOCS}/integrations/README.md`}>Integration guide <span aria-hidden="true">↗</span></a>
+            <a href="#demo">Try the demo</a>
+          </div>
+          <div><h2>Learn</h2>
+            <a href="#how">How it works</a>
+            <a href={`${DOCS}/benchmarks.md`}>Benchmarks <span aria-hidden="true">↗</span></a>
+            <a href="#data">Privacy</a>
+            {PRIVACY_NOTICE_URL && <a href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
+          </div>
+          <div className="public-footer-project"><h2>Project</h2>
+            <a href={SOURCE}><img className="github-mark" src="/brands/github.svg" alt="" width="20" height="20" />Source on GitHub <span aria-hidden="true">↗</span></a>
+            <a href={CONTACT_URL ?? `${SOURCE}/issues`}>{CONTACT_URL ? "Contact" : "Report an issue"} <span aria-hidden="true">↗</span></a>
+          </div>
         </nav>
-        <div className="public-footer-brands">
-          <a href="https://watt-mind.com/"><img className="watt-mind-mark" src="/brands/watt-mind.svg" alt="" width="24" height="24" />Watt Mind <span aria-hidden="true">↗</span></a>
-          <a href={SOURCE}><img className="github-mark" src="/brands/github.svg" alt="" width="24" height="24" />GitHub <span aria-hidden="true">↗</span></a>
+        <div className="public-footer-meta">
+          <a className="public-footer-attribution" href="https://watt-mind.com/"><img className="watt-mind-mark" src="/brands/watt-mind.svg" alt="" width="20" height="20" />Built by Watt Mind <span aria-hidden="true">↗</span></a>
+          <p className="text-xs text-muted"><a href={`${SOURCE}/blob/develop/LICENSE`}>Apache-2.0 <span aria-hidden="true">↗</span></a><span aria-hidden="true"> · </span>Built for the Meta Global AI Developer Hackathon 2026</p>
         </div>
-        <p className="text-xs text-muted">Apache-2.0 · Built for the Meta Global AI Developer Hackathon 2026</p>
+        <p className="text-xs text-muted">Every example on this page is fictional.</p>
         {OPERATOR && <p className="text-xs text-muted">Operated by {OPERATOR}.</p>}
       </div>
     </footer>

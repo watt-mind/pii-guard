@@ -251,11 +251,11 @@ merged.
   eyebrow that names the section in the nav's words; and the hero's proof numbers,
   `Metric size="hero"` (24→30 / 500). The header is sticky (sections use `scroll-mt-20`), and the
   containers widen their gutter to 40 px from 1024 px (`lg:px-10`). One primary button per card
-  or hero; the header's sign-in is secondary. The page ends on the "Get started" call to action,
+  or hero; the public header has a compact primary sign-in action. The page ends on the "Get started" call to action,
   after the data and limits sections. Below 1024 px
   the hero's mini flow is hidden (the demo follows). Below-the-fold modules that weigh more (the
   image showcase, the comparison chart) are lazy-loaded. The hosted build follows the system
-  theme until a visitor picks one in the footer (the local console starts light).
+  theme until a visitor picks one in the header (the local console starts light).
 
 ## Motion
 
@@ -279,7 +279,7 @@ in English. Say what ran ("4 values masked by Rules + checksum"), never what mig
 
 The landing, public Evaluation and signed-out headers share `hosted/PublicHeader.tsx`.
 Their scoped `publicNavigation.css` keeps the existing Geist typography, shield and warm
-surfaces. The 64px bar has 44px targets, centered desktop primary links, a Resources
+surfaces. The 64px bar has 44px navigation targets and a lean 36px account action, centered desktop primary links, a Resources
 disclosure, and a separate account action. Below 1024px the disclosure becomes a wide Menu
 panel, bounded by the viewport height; native Tab navigation is preserved.
 
@@ -293,3 +293,18 @@ Footer brand links use the official assets in `public/brands/`, with adjacent vi
 names, decorative image alt text, and same-tab external navigation. The Watt Mind mark
 retains its original colors on a small white mat in both themes; GitHub uses its mono mark.
 See that directory's README and license for provenance.
+
+The public pages scope their action palette with `public-teal-theme`: deep teal
+`#006b64` with white text in light mode, mint `#4fdbc8` with dark teal text in dark
+mode. The console retains its plum actions. Status colors for masked/restored values,
+warnings and errors remain shared. Public footer hover states use the teal accent.
+
+The header contains a compact Appearance disclosure with the existing Light / System /
+Dark radio control, 44px option targets, and persisted preference. Escape restores the
+trigger; pointer/focus departure closes disclosures. Desktop also exposes the GitHub mark.
+Sign-in is labelled “Sign in to console” on wide screens and “Sign in” in compact layouts;
+signed-in access becomes “Open console” / “Console”.
+
+The footer groups Build, Learn and Project links. Build and Learn sit side by side on
+phones, with Project below; all three become columns from 640px. “Built by Watt Mind”
+sits beside the license and project attribution, with the fictional-data note below.

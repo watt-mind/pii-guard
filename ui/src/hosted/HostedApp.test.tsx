@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import * as chatApi from "../api/chat";
@@ -363,12 +363,12 @@ describe("positioning and copy (LAB-1466)", () => {
     await screen.findByText(/Runs on Meta’s model · no key needed/);
     expect(document.body.textContent).not.toMatch(/Muse Spark 1\.3/);
   });
-  it("keeps one primary action in the header area: sign-in is secondary", async () => {
+  it("keeps sign-in clearly named in the header", async () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);
     await screen.findAllByText(/free runs/);
     const nav = screen.getByRole("navigation", { name: "Main navigation" }).closest("header")!;
-    expect(nav.querySelector("a[href^='/.auth/login']")?.className).not.toMatch(/bg-primary/);
+    expect(within(nav).getByRole("link", { name: "Sign in to console" })).toHaveAttribute("href", account.login_url);
   });
 });
 
@@ -483,7 +483,7 @@ describe("public footer", () => {
     render(<HostedApp call={requester(() => account)} />);
     const footer = screen.getByRole("navigation", { name: "Footer" }).closest("footer")!;
     const links = [...footer.querySelectorAll("a")];
-    for (const [name, href, src] of [["Watt Mind", "https://watt-mind.com/", "/brands/watt-mind.svg"], ["GitHub", "https://github.com/watt-mind/pii-guard", "/brands/github.svg"]] as const) {
+    for (const [name, href, src] of [["Built by Watt Mind", "https://watt-mind.com/", "/brands/watt-mind.svg"], ["Source on GitHub", "https://github.com/watt-mind/pii-guard", "/brands/github.svg"]] as const) {
       const a = links.find((el) => el.textContent?.includes(name))!;
       expect(a).toHaveAccessibleName(name);
       expect(a).toHaveAttribute("href", href);
