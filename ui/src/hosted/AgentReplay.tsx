@@ -121,13 +121,13 @@ export default function AgentReplay() {
   return <figure ref={root} aria-labelledby="replay-title" className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="font-mono text-2xs text-guard">Real gateway · stand-in model · fictional data</p>
+        <p className="font-mono text-2xs text-guard">Real gateway · scripted model · fictional data</p>
         <p id="replay-title" className="mt-0.5 text-sm font-medium text-ink">Tool calls masked, answers restored mid-stream</p>
       </div>
       {!reduce && <Button size="sm" onClick={onControl} aria-label={`${control} the replay`}>{control}</Button>}
     </div>
     <figcaption className="sr-only">
-      {`A recorded agent turn through the PII Guard gateway, with a scripted stand-in model and fictional data. The agent is asked: ${recording.task} The model calls read_file on crm.json. The file holds a fictional customer's name, e-mail and IBAN; the model receives placeholders instead. The model streams a send_email tool call addressed to placeholders, and PII Guard restores the real e-mail and name in the arguments before the agent runs the tool. The model's closing message streams back with placeholders split across chunks; PII Guard holds each split placeholder back until it is complete, then restores it. ${recording.upstream_requests} model requests, no fictional value reached the model.`}
+      {`A recorded agent turn through the PII Guard gateway, with a scripted model and fictional data. The agent is asked: ${recording.task} The model calls read_file on crm.json. The file holds a fictional customer's name, e-mail and IBAN; the model receives placeholders instead. The model streams a send_email tool call addressed to placeholders, and PII Guard restores the real e-mail and name in the arguments before the agent runs the tool. The model's closing message streams back with placeholders split across chunks; PII Guard holds each split placeholder back until it is complete, then restores it. ${recording.upstream_requests} model requests, no fictional value reached the model.`}
     </figcaption>
     <ol aria-hidden="true" className="mt-4 space-y-1">
       <Line side="you" label="task" shown={step >= 1}><Sized final={recording.task}>{recording.task}</Sized></Line>

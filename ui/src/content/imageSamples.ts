@@ -51,6 +51,23 @@ export const IMAGE_SAMPLES: ImageSample[] = [
 
 export const DEFAULT_IMAGE_SAMPLE = IMAGE_SAMPLES[0]!;
 
+/**
+ * The English specimen ID card (LAB-1509): eval/fixtures/visual/images/en-id_card-front.png,
+ * the same pipeline and layout as the Hungarian one. The landing's showcase only: the console's
+ * Images screen replays SAM 3.1 recordings (imageRecordings.json) that exist for the four above.
+ */
+export const ENGLISH_ID_CARD: ImageSample = {
+  id: "id-card-en",
+  title: "ID card (English)",
+  subtitle: "Face, signature, document no., date of birth",
+  language: "en",
+  src: "/samples/id-card-en.png",
+  alt: "Fictional specimen identity card overprinted MINTA / SPECIMEN: an AI-generated portrait, the name Jane Placeholder, a birth date, a document number and a signature.",
+};
+
+/** The landing's image showcase: the English specimen first (the default), then the Hungarian one. */
+export const LANDING_IMAGE_SAMPLES: readonly ImageSample[] = [ENGLISH_ID_CARD, DEFAULT_IMAGE_SAMPLE];
+
 /** Same limit as the API's default (`DEFAULT_MAX_IMAGE_BYTES`). */
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const UPLOAD_TYPES = ["image/png", "image/jpeg"] as const;

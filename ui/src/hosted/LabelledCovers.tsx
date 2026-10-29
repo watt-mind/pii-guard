@@ -11,7 +11,7 @@ const BROWSER_FONT_SCALE = 0.9;
  * Needs an `@container` parent the width of the image (font sizes are in `cqw`). Decorative:
  * the figure's alt text says what is covered.
  */
-export function LabelledCovers({ regions, width, height }: { regions: readonly LabelledRegion[]; width: number; height: number }) {
+export function LabelledCovers({ regions, width, height, textLabelsOnly = false }: { regions: readonly LabelledRegion[]; width: number; height: number; /** A crop of the text column: the photo's label would show only as a stray tail. */ textLabelsOnly?: boolean }) {
   const covers = labelCovers(regions, width, height);
   return (
     <>
@@ -19,7 +19,7 @@ export function LabelledCovers({ regions, width, height }: { regions: readonly L
         <span key={i} aria-hidden="true" data-cover={c.visual ? "visual" : "text"} data-label={c.lines.join(" ") || undefined} className="absolute" style={{ ...c.box, backgroundColor: LABEL_FILL, border: `1px solid ${LABEL_INK}` }} />
       ))}
       {covers.map((c, i) =>
-        c.lines.length ? (
+        c.lines.length && !(textLabelsOnly && c.visual) ? (
           <span
             key={`l${i}`}
             aria-hidden="true"

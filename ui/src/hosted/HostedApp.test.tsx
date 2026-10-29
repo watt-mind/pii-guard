@@ -21,15 +21,15 @@ describe("public hosted workflow", () => {
     expect(screen.getByText(/Runs on Muse Spark 1.3 · no key needed/)).toHaveTextContent("3 of 3 free runs left today");
     expect(document.body.textContent).not.toMatch(/sponsor/i);
     const links = [...screen.getAllByRole("link", { name: "Sign in with Google" }), ...screen.getAllByRole("link", { name: "Console" })];
-    expect(links.length).toBeGreaterThanOrEqual(3);
+    expect(links.length).toBeGreaterThanOrEqual(2);
     for (const link of links) expect(link).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23overview");
   });
   it("labels the static mechanism, requests only a server sample, and shows all live stages", async () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     const user = userEvent.setup();
     render(<HostedApp call={call} />);
-    expect(screen.getByText("Worked example")).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "Run live example" }));
+    expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Run the live demo" }));
     await screen.findByText("Live result · answered by test-model");
     expect(call).toHaveBeenCalledWith("/v1/demo", { sample_id: "en-support", language: "en" });
     const stages = ["demo-input", "demo-sent", "demo-answer", "demo-restored"].map((id) => document.querySelector(`[aria-labelledby="${id}-title"] .doc`)?.textContent?.replace(/ \([^)]*\)/g, ""));
@@ -46,17 +46,17 @@ describe("public hosted workflow", () => {
     let runs = 0;
     const call = requester((path) => { if (path === "/v1/account") return account; if (++runs === 1) return result; throw new ApiError(429, "quota_exceeded", "sensitive server text must never render"); });
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await user.click(await screen.findByRole("button", { name: "Run live example" }));
+    await user.click(await screen.findByRole("button", { name: "Run the live demo" }));
     await screen.findByText("Live result · answered by test-model");
-    await user.click(screen.getByRole("button", { name: "Run live example" }));
+    await user.click(screen.getByRole("button", { name: "Run the live demo" }));
     await screen.findByRole("alert");
     expect(screen.queryByText(result.restored)).not.toBeInTheDocument();
     expect(screen.queryByText(/sensitive server text/)).not.toBeInTheDocument();
-    // A live failure never blanks the worked example.
-    expect(document.querySelector("#demo [data-flow] [data-restored]")).toHaveTextContent("Robin Example");
-    expect(screen.getByText("Live run didn’t finish · showing the worked example")).toBeInTheDocument();
-    // The worked example is already on screen: no way back to it. Used up: no retry, sign in instead.
-    expect(screen.queryByRole("button", { name: "Back to the worked example" })).not.toBeInTheDocument();
+    // A live failure never blanks the recorded run.
+    expect(document.querySelector("#demo [data-flow] [data-restored]")).toHaveTextContent("Jane Placeholder");
+    expect(screen.getByText("Live run didn’t finish · showing the recorded run")).toBeInTheDocument();
+    // The recorded run is already on screen: no way back to it. Used up: no retry, sign in instead.
+    expect(screen.queryByRole("button", { name: "Back to the recorded run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sign in for more runs" })).toBeInTheDocument();
     expect(screen.queryByText(/free runs left today/)).not.toBeInTheDocument();
@@ -64,31 +64,31 @@ describe("public hosted workflow", () => {
   it("offers Try again after a provider failure (LAB-1466)", async () => {
     const call = requester((path) => { if (path === "/v1/account") return account; throw new ApiError(502, "upstream_error", "x"); });
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await user.click(await screen.findByRole("button", { name: "Run live example" }));
+    await user.click(await screen.findByRole("button", { name: "Run the live demo" }));
     await screen.findByRole("alert");
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
   it("rejects incomplete live results rather than showing a successful model run", async () => {
     const call = requester((path) => path === "/v1/account" ? account : { ...result, restored: "" });
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await user.click(await screen.findByRole("button", { name: "Run live example" }));
+    await user.click(await screen.findByRole("button", { name: "Run the live demo" }));
     await screen.findByRole("alert"); expect(screen.queryByText("Live result · answered by test-model")).not.toBeInTheDocument();
   });
   it.each([null, {}, { start: 0.5, end: 2, type: "PERSON" }, { start: 3, end: 2, type: "PERSON" }, { start: 0, end: 2, type: null }])("rejects malformed entity metadata without rendering a live success: %j", async (entity) => {
     const call = requester((path) => path === "/v1/account" ? account : { ...result, entities: [entity] });
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await user.click(await screen.findByRole("button", { name: "Run live example" }));
+    await user.click(await screen.findByRole("button", { name: "Run the live demo" }));
     await screen.findByRole("alert");
     expect(screen.queryByText("Live result · answered by test-model")).not.toBeInTheDocument();
     expect(screen.queryByText(result.restored)).not.toBeInTheDocument();
-    expect(screen.getByText("Live run didn’t finish · showing the worked example")).toBeInTheDocument();
+    expect(screen.getByText("Live run didn’t finish · showing the recorded run")).toBeInTheDocument();
   });
   it("offers honest unavailable state with reconnect and keeps the static walkthrough", async () => {
     const call = requester(() => { throw new Error("offline"); });
     render(<HostedApp call={call} />);
     await screen.findByRole("alert");
-    expect(screen.getByRole("button", { name: "Run live example" })).toBeDisabled();
-    expect(screen.getByText("Worked example")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run the live demo" })).toBeDisabled();
+    expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
     expect(screen.getByText("The live service isn’t reachable")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reconnect to API" })).toBeInTheDocument();
   });
@@ -110,7 +110,7 @@ describe("hero CTA (LAB-1479)", () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     const scroll = spyScroll();
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await screen.findByRole("button", { name: "Run live example" });
+    await screen.findByRole("button", { name: "Run the live demo" });
     const cta = screen.getByRole("link", { name: "Run the live demo" });
     expect(cta).toHaveAttribute("href", "#demo");
     await user.click(cta);
@@ -128,7 +128,7 @@ describe("hero CTA (LAB-1479)", () => {
     const scroll = spyScroll();
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false }) as MediaQueryList);
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await screen.findByRole("button", { name: "Run live example" });
+    await screen.findByRole("button", { name: "Run the live demo" });
     await user.click(screen.getByRole("link", { name: "Run the live demo" }));
     await screen.findByText("Live result · answered by test-model");
     expect(scroll).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
@@ -139,7 +139,7 @@ describe("hero CTA (LAB-1479)", () => {
     for (const acct of [off, { ...account, authenticated: true }]) {
       const call = requester((path) => path === "/v1/account" ? acct : path === "/v1/demo" ? result : []);
       const user = userEvent.setup(); const { unmount } = render(<HostedApp call={call} />);
-      const cta = await screen.findByRole("link", { name: acct === off ? "See how it works" : "Run your own text" });
+      const cta = await screen.findByRole("link", { name: acct === off ? "See the demo" : "Run your own text" });
       let prevented: boolean | null = null;
       const listener = (e: Event) => { prevented = e.defaultPrevented; e.preventDefault(); };
       document.addEventListener("click", listener);
@@ -154,18 +154,18 @@ describe("hero CTA (LAB-1479)", () => {
 
 describe("sponsorship off (zero budget until the provider authorises it)", () => {
   const off: Account = { ...account, limits: { requests_per_day: 5, images_per_day: 0, max_image_bytes: 0, sponsored_enabled: false } };
-  it("offers no live run to guests, keeps the worked example and points to sign-in", async () => {
+  it("offers no live run to guests, keeps the recorded run and points to sign-in", async () => {
     const call = requester((path) => path === "/v1/account" ? off : result);
     render(<HostedApp call={call} />);
     expect(await screen.findByRole("link", { name: "Sign in to run your own text" })).toHaveAttribute("href", account.login_url);
-    expect(screen.queryByRole("button", { name: "Run live example" })).not.toBeInTheDocument();
-    expect(screen.getByText("Worked example")).toBeInTheDocument();
-    expect(document.querySelector("#demo [data-flow] [data-placeholder]")).toHaveTextContent("[[PERSON_3f9a1c]]");
+    expect(screen.queryByRole("button", { name: "Run the live demo" })).not.toBeInTheDocument();
+    expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
+    expect(document.querySelector("#demo [data-flow] [data-placeholder]")).toHaveTextContent(/\[\[PERSON_[0-9a-f]{6}\]\]/);
     expect(screen.queryByText(/No login needed/)).not.toBeInTheDocument();
     expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
     expect(screen.getByText("Free runs are paused right now")).toBeInTheDocument();
-    expect(screen.getByText("The worked example below shows the same flow, step by step.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "See how it works" })).toHaveAttribute("href", "#demo");
+    expect(screen.getByText("The recorded run below shows the same flow, answered by a real model.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See the demo" })).toHaveAttribute("href", "#demo");
     expect(document.body.textContent).not.toMatch(/sponsor/i);
   });
   it("hides limits that are off", async () => {
@@ -189,7 +189,7 @@ describe("signed-in example runs without a model picker", () => {
   it("uses sponsored Meta when it's on, with no connection dropdown", async () => {
     const call = requester((path) => path === "/v1/account" ? { ...signed, limits: { requests_per_day: 5, sponsored_enabled: true }, connections: [conn] } : result);
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await user.click(await screen.findByRole("button", { name: "Run live example" }));
+    await user.click(await screen.findByRole("button", { name: "Run the live demo" }));
     await screen.findByText("Live result · answered by test-model");
     expect(call).toHaveBeenCalledWith("/v1/demo", { sample_id: "en-support", language: "en" });
     expect(screen.queryByLabelText("Model connection")).not.toBeInTheDocument();
@@ -203,11 +203,11 @@ describe("signed-in example runs without a model picker", () => {
       const user = userEvent.setup(); render(<HostedApp call={call} />);
       expect(await screen.findByText(/Runs through your Meta connection/)).toBeInTheDocument();
       expect(screen.queryByLabelText("Model connection")).not.toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Run live example" }));
+      await user.click(screen.getByRole("button", { name: "Run the live demo" }));
       await screen.findByRole("alert");
       expect(new Headers(fetchSpy.mock.calls[0]![1]!.headers).get("X-PII-Guard-Connection")).toBe("conn-one");
       expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
-      expect(document.querySelector("#demo [data-flow] [data-restored]")).toHaveTextContent("Robin Example");
+      expect(document.querySelector("#demo [data-flow] [data-restored]")).toHaveTextContent("Jane Placeholder");
     } finally { fetchSpy.mockRestore(); }
   });
   it("asks for a key instead of a failing run when there is neither", async () => {
@@ -217,7 +217,7 @@ describe("signed-in example runs without a model picker", () => {
     expect(screen.queryByRole("button", { name: /^Run/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Input")).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/sponsor/i);
-    expect(document.querySelector("#demo [data-flow] [data-placeholder]")).toHaveTextContent("[[PERSON_3f9a1c]]");
+    expect(document.querySelector("#demo [data-flow] [data-placeholder]")).toHaveTextContent(/\[\[PERSON_[0-9a-f]{6}\]\]/);
   });
 });
 
@@ -230,11 +230,11 @@ describe("positioning and copy (LAB-1466)", () => {
     expect(screen.getAllByText(/measured 27–28 Oct 2026/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Run the live demo" })).toHaveAttribute("href", "#demo");
     const text = document.body.textContent ?? "";
-    expect(text).not.toMatch(/sponsor|Llama|GDPR|privacy firewall|Hungarian first|coming soon/i);
+    expect(text).not.toMatch(/sponsor|Llama|GDPR[- ]compliant|compliant with GDPR|anonymi[sz]ed data|privacy firewall|Hungarian first|coming soon/i);
     // The differentiators come right after the hero, and only tools the integration docs test (LAB-1478, LAB-1499).
     expect(screen.getByRole("list", { name: "What makes it different" })).toHaveTextContent(/Agents, not just chat.*the coding agents Codex, OpenCode, Muse Code and pi: 115 requests, 0 values leaked, 0 of 10 turns refused.*No LLM, no GPU to mask.*EU languages, grammar-aware.*One person, one placeholder.*Measured in the open/);
     // The problem in one line, and the proof signals under the call to action (LAB-1499).
-    expect(text).toMatch(/Legal, HR and finance teams in the EU can’t send case files to a hosted model/);
+    expect(text).toMatch(/Legal, HR and finance teams in the EU often can’t send case files to a hosted model/);
     expect(screen.getByRole("list", { name: "Proof" })).toHaveTextContent(/Tested with 4 real coding agents.*700\+ committed benchmark runs.*Published open NER model.*Apache-2\.0.*CI and tests/);
     // The Meta strip says what each model does, and Glimmer was the teacher, not a fine-tune.
     expect(screen.getByRole("list", { name: "Meta models and what each does" })).toHaveTextContent(/XLM-RoBERTa.*Muse Glimmer 30B.*served on Modal.*The teacher.*Muse Spark Open.*on Baseten.*SAM 3\.1.*Muse Spark 1\.3/);
@@ -257,6 +257,48 @@ describe("positioning and copy (LAB-1466)", () => {
   });
 });
 
+describe("landing round L3 (LAB-1515, LAB-1503)", () => {
+  it("opens the demo on the recorded real-model run of the server's own sample, panes under the section h2", async () => {
+    const call = requester((path) => path === "/v1/account" ? account : result);
+    render(<HostedApp call={call} />);
+    await screen.findByText(/Runs on Muse Spark 1.3/);
+    expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
+    expect(screen.getByText(/^Recorded \d+ \w{3} 2026 on this hosted preview: the real gateway masked the server’s fictional sample and Muse Spark 1\.3 answered\./)).toBeInTheDocument();
+    const stages = ["demo-input", "demo-sent", "demo-answer", "demo-restored"].map((id) => document.querySelector(`[aria-labelledby="${id}-title"] .doc`)?.textContent ?? "");
+    expect(stages[0]).toContain("I am Jane Placeholder");
+    expect(stages[1]).not.toContain("Jane Placeholder");
+    expect(stages[2]).toMatch(/\[\[PERSON_[0-9a-f]{6}\]\]/);
+    expect(stages[3]).toContain("Jane Placeholder");
+    for (const id of ["demo-input", "demo-sent", "demo-answer", "demo-restored"]) expect(document.getElementById(`${id}-title`)?.tagName).toBe("H3");
+    expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
+  });
+  it("has the Why Europe cards with the disclaimer and the three steps, with no compliance claim", async () => {
+    render(<HostedApp call={requester((path) => path === "/v1/account" ? account : result)} />);
+    await screen.findByText(/Runs on Muse Spark 1.3/);
+    expect(screen.getByRole("list", { name: "EU rules and what PII Guard does" })).toHaveTextContent(/Minimize before you send.*Less personal data crossing borders.*Built for regulated work/);
+    expect(screen.getByText(/^A technical measure, not legal advice/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "What we don’t claim ↗" })).toHaveAttribute("href", expect.stringMatching(/docs\/eu-regulation\.md#what-we-dont-claim$/));
+    expect(screen.getByRole("list", { name: "Live in three steps" })).toHaveTextContent(/Change one base URL\..*Masking and restoring happen automatically: streaming, tool calls, images\..*See every request in Logs, with its outbound check result\./);
+    expect(document.body.textContent).not.toMatch(/GDPR[- ]compliant|special categor|anonymised data/i);
+  });
+  it("offers a section menu where the nav links don't fit, closed after a link is followed", async () => {
+    const user = userEvent.setup();
+    render(<HostedApp call={requester((path) => path === "/v1/account" ? account : result)} />);
+    const menu = screen.getByText("Sections").closest("details")!;
+    await user.click(screen.getByText("Sections"));
+    expect(menu).toHaveAttribute("open");
+    await user.click(screen.getAllByRole("link", { name: "Why Europe" })[0]!);
+    expect(menu).not.toHaveAttribute("open");
+    await user.click(screen.getByText("Sections"));
+    await user.keyboard("{Escape}");
+    expect(menu).not.toHaveAttribute("open");
+    expect(screen.getByText("Sections").closest("summary")).toHaveFocus();
+    await user.click(screen.getByText("Sections"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
+    expect(menu).not.toHaveAttribute("open");
+  });
+});
+
 describe("usage line", () => {
   it("says how many free runs are left and when they reset", () => {
     const now = Date.parse("2026-10-28T18:00:00Z");
@@ -271,8 +313,8 @@ describe("usage line", () => {
 describe("hosted recovery copy", () => {
   it("mentions the static example only on the public page, and never says reconnect for a 404", () => {
     for (const error of [new ApiError(404, "not_found", "x"), new ApiError(429, "rate_limited", "x"), new ApiError(503, "unavailable", "x"), new Error("offline")]) {
-      expect(recovery(error)).not.toMatch(/worked example/);
-      expect(recovery(error, "site")).toMatch(/worked example/);
+      expect(recovery(error)).not.toMatch(/recorded run/);
+      expect(recovery(error, "site")).toMatch(/recorded run/);
     }
     expect(recovery(new ApiError(404, "not_found", "x"))).not.toMatch(/Reconnect/);
     expect(recovery(new ApiError(404, "not_found", "x"), "site")).not.toMatch(/Reconnect/);
