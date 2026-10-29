@@ -52,11 +52,31 @@ function stripTickets(text: string): string {
  */
 const DISPLAY_LABEL: Record<string, string> = { [FAST_MODE_SYSTEM]: "rules + NER v2.0" };
 
+/** "rules + X in place of PII Guard NER": the "rules +" already says it, and the label wraps. */
+const shortLabel = (text: string) => stripTickets(text).replace(/ in place of PII Guard NER\b/, "");
+
+/**
+ * Green belongs to the production system: other systems the palette gave a green are drawn in
+ * the palette's other colors, in a stable order (LAB-1533). The stored colors don't change.
+ */
+const GREENS = new Set(["#009E73", "#117733"]);
+const NOT_GREEN = ["#0072B2", "#E69F00", "#CC79A7", "#D55E00", "#AA4499", "#999933", "#882255", "#332288"];
+
+function displayColors(systems: BenchmarkIndex["systems"]): Record<string, string> {
+  const production = systems[FAST_MODE_SYSTEM]?.color.toUpperCase();
+  const greens = production && GREENS.has(production) ? GREENS : new Set(production ? [production] : []);
+  const moved = Object.keys(systems)
+    .filter((k) => k !== FAST_MODE_SYSTEM && greens.has(systems[k]!.color.toUpperCase()))
+    .sort();
+  return Object.fromEntries(moved.map((k, i) => [k, NOT_GREEN[i % NOT_GREEN.length]!]));
+}
+
 function withoutTickets(index: BenchmarkIndex): BenchmarkIndex {
+  const recolored = displayColors(index.systems);
   const systems = Object.fromEntries(
     Object.entries(index.systems).map(([k, v]) => [
       k,
-      { ...v, label: stripTickets(v.label), short_label: DISPLAY_LABEL[k] ?? (v.short_label && stripTickets(v.short_label)) },
+      { ...v, color: recolored[k] ?? v.color, label: stripTickets(v.label), short_label: DISPLAY_LABEL[k] ?? (v.short_label && shortLabel(v.short_label)) },
     ]),
   );
   return { ...index, systems };

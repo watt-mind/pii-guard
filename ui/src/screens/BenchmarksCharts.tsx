@@ -238,7 +238,7 @@ export function LeakLatencyChart({ points, highlight }: { points: ScatterPoint[]
                 </g>
               )}
               {p.key === highlight && <circle cx={x} cy={y} r={13} fill={colorOf(p.info)} fillOpacity={0.18} stroke={colorOf(p.info)} strokeOpacity={0.6} strokeWidth={1.5} />}
-              <Marker info={p.info} x={x} y={y} r={p.key === highlight ? 8 : 7} />
+              <Marker info={p.info} x={x} y={y} r={p.key === highlight ? 8 : dense && !p.info?.featured && !p.info?.default ? 5 : 7} />
             </g>
           );
         })}
