@@ -54,7 +54,7 @@ export function SignedOutConsole({ section, hash, loginUrl, expired }: { section
         </div>
         <div aria-hidden="true" className="header-hairline" />
       </header>
-      <main id="main" className="mx-auto flex w-full max-w-[1280px] flex-1 items-start px-4 py-12 sm:px-6 sm:py-20 lg:px-10">
+      <main id="main" className="mx-auto flex w-full max-w-[1280px] flex-1 items-start justify-center px-4 py-12 sm:px-6 sm:py-20 lg:px-10">
         <section aria-labelledby="signed-out-heading" className="w-full max-w-xl rounded-xl border border-line bg-surface p-6 sm:p-8">
           <p className="font-mono text-xs text-guard">Console · {label}</p>
           <h1 id="signed-out-heading" ref={heading} tabIndex={-1} className="mt-2 text-2xl font-medium text-balance text-ink focus:outline-none">
@@ -62,7 +62,7 @@ export function SignedOutConsole({ section, hash, loginUrl, expired }: { section
           </h1>
           <p className="mt-3 text-pretty text-muted">
             {expired ? `Sign in again to get back to ${label}. ` : ""}
-            <span className="text-ink">{label}:</span> {screen.what}
+            {screen.what}
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <ButtonLink variant="primary" href={loginFor(loginUrl, hash)}>
