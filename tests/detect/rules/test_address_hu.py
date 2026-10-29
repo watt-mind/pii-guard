@@ -114,7 +114,21 @@ def test_look_alikes(detector: RuleDetector, text: str) -> None:
 def test_bare_postcode_still_found_and_consistency_boosts_it(detector: RuleDetector) -> None:
     assert addresses(detector, "3300 Eger") == [("3300", 0.85)]
     assert addresses(detector, "3300 Szeged") == [("3300", 0.75)]
-    assert addresses(detector, "3300 Kitaláltfalva") == [("3300", 0.75)]
+    # An unknown word after the number is not a settlement, so there is no postcode (LAB-1476).
+    assert addresses(detector, "3300 Kitaláltfalva") == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "-rw-r--r--  1 dev  staff  1203 Oct 28 22:40 customers.md",
+        "-rw-r--r--  1 dev  staff  2048 Jan 12 10:00 notes.md",
+        "drwxr-xr-x  5 dev  staff   160 Szept 3 09:11 docs",
+    ],
+)
+def test_tool_output_sizes_are_not_postcodes(detector: RuleDetector, text: str) -> None:
+    """A file size before a month abbreviation in `ls -la` output is not an ADDRESS."""
+    assert addresses(detector, text) == []
 
 
 def test_only_for_hungarian_text(detector: RuleDetector) -> None:

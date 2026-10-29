@@ -332,6 +332,14 @@ _NOT_PLACES = frozenset({
     "Euro", "Euró", "Forint", "Darab", "Január", "Február", "Március", "Április",
     "Május", "Június", "Július", "Augusztus", "Szeptember", "Október", "November", "December",
     "Ezer", "Millió",
+    # English month names and abbreviations: `ls -la` and other tool output puts one
+    # after a bare size or count ("1203 Oct 28"), which is not a settlement (LAB-1476).
+    "January", "February", "March", "April", "May", "June", "July", "August",
+    "September", "October", "November", "December",
+    "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct",
+    "Nov", "Dec",
+    # Hungarian month abbreviations, as typed with a capital ("Okt", not "okt.").
+    "Febr", "Márc", "Ápr", "Máj", "Jún", "Júl", "Szept", "Okt",
 })  # fmt: skip
 
 
@@ -351,9 +359,13 @@ def _find_postcode(text: str) -> Iterator[_Hit]:
             # neither number is a postcode (LAB-1227). A cued postcode always counts.
             if legal_form_after(text, place.end()) or reference_or_amount_before(text, m.start()):
                 continue
-            # The postcode check works like a checksum: only a consistent pair is boosted.
+            # A bare pair needs a gazetteer-known settlement: a month abbreviation from
+            # tool output ("1203 Oct 28") or any other unknown word is not one (LAB-1476).
             settlement = _settlement(place.group(1))
-            consistent = settlement is not None and _postcodes_agree(m.group("code"), settlement)
+            if settlement is None:
+                continue
+            # The postcode check works like a checksum: only a consistent pair is boosted.
+            consistent = _postcodes_agree(m.group("code"), settlement)
             score = 0.85 if consistent else 0.75
         else:
             continue
