@@ -67,6 +67,11 @@ SETS: dict[str, list[str]] = {
     "mapa-eur-lex": [
         f"data/datasets/fixtures/mapa-eur-lex/{lang}-mapa-eur-lex.jsonl" for lang in mapa.LANGUAGES
     ],
+    # The same documents with corrected gold (LAB-1497); `datasets fetch gretel-finance-corrected`.
+    "gretel-finance-corrected": [
+        f"data/datasets/fixtures/gretel-finance-corrected/{lang}-gretel-finance-corrected.jsonl"
+        for lang in ("de", "en")
+    ],
 }
 
 _OURS = ner_resolve.PUBLISHED

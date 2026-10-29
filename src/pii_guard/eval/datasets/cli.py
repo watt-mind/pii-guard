@@ -16,6 +16,10 @@ __all__ = ["main"]
 
 
 def _fetch_one(ds: Dataset) -> list[Path]:
+    if ds.derived_from is not None:
+        from pii_guard.eval.datasets import corrections
+
+        return corrections.fetch(ds)
     if ds.builder is not None:
         written = []
         for path, (_, docs) in zip(
@@ -77,6 +81,10 @@ def _builder_manifest(ds: Dataset) -> dict[str, object]:
 
 
 def _check_one(ds: Dataset) -> list[str]:
+    if ds.derived_from is not None:
+        from pii_guard.eval.datasets import corrections
+
+        return corrections.check(ds)
     if ds.builder is not None:
         import tempfile
 
@@ -132,7 +140,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             for ds in REGISTRY.values():
                 langs = ",".join(ds.languages)
                 rows = "rows committed" if ds.commit_rows else "manifest only"
-                print(f"{ds.name:18} {ds.split:4} {ds.license[:28]:28} {langs:9} {rows}")
+                print(f"{ds.name:24} {ds.split:4} {ds.license[:28]:28} {langs:9} {rows}")
             return 0
         if args.command == "paths":
             for path in get(args.name).fixture_paths():

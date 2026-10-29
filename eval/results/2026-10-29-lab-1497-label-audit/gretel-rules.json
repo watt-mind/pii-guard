@@ -1,0 +1,147 @@
+{
+  "audit": "gretel-finance: the same predictions on upstream and corrected labels",
+  "ticket": "LAB-1497",
+  "system": "rules",
+  "ner_model": null,
+  "code": {
+    "commit": "e6e2fc1413d0fd70d1acb113ada3d83145fc714d",
+    "dirty": false
+  },
+  "corrections": "eval/datasets/gretel-finance/corrections.json",
+  "upstream": {
+    "documents": 400,
+    "gold_spans": 1710,
+    "leak": {
+      "values": 944,
+      "leaked": 763,
+      "partial": 53,
+      "rate": 0.808263,
+      "partial_rate": 0.056144
+    },
+    "overlap_f1": 0.20929,
+    "over_masking": {
+      "masked": 272,
+      "over_masked": 59,
+      "rate": 0.216912
+    },
+    "per_type_leak": {
+      "ADDRESS": {
+        "gold": 296,
+        "leaked": 200,
+        "values": 251
+      },
+      "BANK_ACCOUNT": {
+        "gold": 33,
+        "leaked": 6,
+        "values": 29
+      },
+      "DATE_OF_BIRTH": {
+        "gold": 23,
+        "leaked": 22,
+        "values": 22
+      },
+      "EMAIL": {
+        "gold": 68,
+        "leaked": 2,
+        "values": 50
+      },
+      "ID_DOCUMENT": {
+        "gold": 33,
+        "leaked": 11,
+        "values": 28
+      },
+      "PERSON": {
+        "gold": 694,
+        "leaked": 514,
+        "values": 516
+      },
+      "PHONE": {
+        "gold": 51,
+        "leaked": 8,
+        "values": 48
+      }
+    },
+    "languages": {
+      "de": {
+        "leak": 0.826958,
+        "values": 549
+      },
+      "en": {
+        "leak": 0.782278,
+        "values": 395
+      }
+    }
+  },
+  "corrected": {
+    "documents": 400,
+    "gold_spans": 1532,
+    "leak": {
+      "values": 778,
+      "leaked": 600,
+      "partial": 52,
+      "rate": 0.771208,
+      "partial_rate": 0.066838
+    },
+    "overlap_f1": 0.230111,
+    "over_masking": {
+      "masked": 271,
+      "over_masked": 59,
+      "rate": 0.217712
+    },
+    "per_type_leak": {
+      "ADDRESS": {
+        "gold": 292,
+        "leaked": 197,
+        "values": 248
+      },
+      "BANK_ACCOUNT": {
+        "gold": 33,
+        "leaked": 6,
+        "values": 29
+      },
+      "DATE_OF_BIRTH": {
+        "gold": 23,
+        "leaked": 22,
+        "values": 22
+      },
+      "EMAIL": {
+        "gold": 65,
+        "leaked": 0,
+        "values": 47
+      },
+      "ID_DOCUMENT": {
+        "gold": 33,
+        "leaked": 11,
+        "values": 28
+      },
+      "PERSON": {
+        "gold": 524,
+        "leaked": 357,
+        "values": 357
+      },
+      "PHONE": {
+        "gold": 50,
+        "leaked": 7,
+        "values": 47
+      }
+    },
+    "languages": {
+      "de": {
+        "leak": 0.762025,
+        "values": 395
+      },
+      "en": {
+        "leak": 0.780679,
+        "values": 383
+      }
+    }
+  },
+  "upstream_leaks_that_are_corrected_values": {
+    "code-not-a-name": 2,
+    "common-noun": 44,
+    "greeting-or-phrase": 70,
+    "possessive-noun-phrase": 25,
+    "role-word": 7,
+    "template-slot": 15
+  }
+}
