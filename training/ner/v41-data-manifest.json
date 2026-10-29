@@ -1,0 +1,2495 @@
+{
+  "ticket": "LAB-1539",
+  "synthetic": true,
+  "rows_committed": false,
+  "data_dir": "~/Develop/.worktrees/pii-guard/data-eu/v41 (outside every worktree)",
+  "policy": "ADR 0005: synthetic or fictional only; no MAPA/TAB or other real text (LAB-1419); no GDPR special categories",
+  "sources": {
+    "court-v41": {
+      "what": "fictional judgment and opinion-style documents, 24 languages, planted gold with standalone and declined surnames (court_eu.py court, seed 1539)",
+      "license": "Apache-2.0 (pii-guard generator; writer Muse Spark, Meta Model API contributor tier)",
+      "synthetic": true,
+      "path": "data-eu/v41/court",
+      "files": {
+        "bg-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 23,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 26,
+            "PERSON": 191
+          },
+          "sha256": "567d9f6c3d631d77548e12e9144f88dc7fcaddd436df853ba297a887cf8714ee"
+        },
+        "bg-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 239,
+            "DATE_OF_BIRTH": 81,
+            "ORGANIZATION": 183,
+            "PERSON": 2019
+          },
+          "sha256": "777346c97a74597545eee80136d131665b95a20f91ef170a8efd71411a3e0958"
+        },
+        "cs-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 17,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 22,
+            "PERSON": 261
+          },
+          "sha256": "490ff3c25c1e5695a73260f4f9c7828e4fac8ec4bb4c5f5da38e0c44edbf8e94"
+        },
+        "cs-distill-train.jsonl": {
+          "documents": 140,
+          "gold_spans": {
+            "ADDRESS": 225,
+            "DATE_OF_BIRTH": 84,
+            "ORGANIZATION": 146,
+            "PERSON": 2015
+          },
+          "sha256": "e88057b102c2428559112cb0582e053b12662595c7de69516bcff22d44878c66"
+        },
+        "da-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 28,
+            "DATE_OF_BIRTH": 13,
+            "ORGANIZATION": 26,
+            "PERSON": 338
+          },
+          "sha256": "6085370d890322a7d542b10dbb239a96ea59fbb3c2e5b566ee23fafad166fa9c"
+        },
+        "da-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 200,
+            "DATE_OF_BIRTH": 76,
+            "ORGANIZATION": 214,
+            "PERSON": 2728
+          },
+          "sha256": "55a211e93b859c5ca43574bf4c40298807100a4d9f5dc5e000cb55c364aae50f"
+        },
+        "de-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 19,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 23,
+            "PERSON": 249
+          },
+          "sha256": "07e23d42ffd3bb29e1cacd9a18fbe73fb0e2169f4f166930186c41260a9582de"
+        },
+        "de-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 195,
+            "DATE_OF_BIRTH": 79,
+            "ORGANIZATION": 187,
+            "PERSON": 2377
+          },
+          "sha256": "a97d8f434e725789a29790dc2112aa936844c9ad7d77e8b5e3f1b16caef0a033"
+        },
+        "el-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 20,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 14,
+            "PERSON": 180
+          },
+          "sha256": "0bb8e94826c166038de62827672aa9a40c9b5b1e1c538eb6710642f7b9897ada"
+        },
+        "el-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 207,
+            "DATE_OF_BIRTH": 85,
+            "ORGANIZATION": 110,
+            "PERSON": 1605
+          },
+          "sha256": "99c04f98d7125932b77204f9f7fc48d6757982b5fb51e926cc793edf71817a14"
+        },
+        "en-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 21,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 33,
+            "PERSON": 271
+          },
+          "sha256": "31d1f8d4f23135da6621e04648021e365387c31964ec64b444adbddf516aa429"
+        },
+        "en-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 218,
+            "DATE_OF_BIRTH": 80,
+            "ORGANIZATION": 245,
+            "PERSON": 2773
+          },
+          "sha256": "e84bcbaaefa311bce51c4bad4a299c2573e1519dfbbc416d629a8a6bb7f7c478"
+        },
+        "es-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 21,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 31,
+            "PERSON": 185
+          },
+          "sha256": "766321216a53df42b2d988c3a0867d11a1313fd87288f47288d22f624c9cf92c"
+        },
+        "es-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 219,
+            "DATE_OF_BIRTH": 97,
+            "ORGANIZATION": 176,
+            "PERSON": 1631
+          },
+          "sha256": "4fb6f6a384624e4c31c6ec6b99221db183df797267fd8d98cd801c5dd386c526"
+        },
+        "et-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 29,
+            "DATE_OF_BIRTH": 10,
+            "ORGANIZATION": 14,
+            "PERSON": 248
+          },
+          "sha256": "d8ec162d58bf7cc649cfde0fb3d4ddf99a7843de03221fe03779c8e3fe936d8c"
+        },
+        "et-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 229,
+            "DATE_OF_BIRTH": 85,
+            "ORGANIZATION": 291,
+            "PERSON": 2129
+          },
+          "sha256": "15f1a9158418f74b14d0a9051715324a068dc71f882304d6fb63b42c0cf7190f"
+        },
+        "fi-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 24,
+            "DATE_OF_BIRTH": 12,
+            "ORGANIZATION": 20,
+            "PERSON": 341
+          },
+          "sha256": "3e6176a99a2da11b74ff87cd9b931124ec2cd601bd3ea87820465cb6f08c458b"
+        },
+        "fi-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 219,
+            "DATE_OF_BIRTH": 75,
+            "ORGANIZATION": 217,
+            "PERSON": 3107
+          },
+          "sha256": "bfae6bdc09a41c38618417102e0dbc4def40b9d66b048fcaa78fa52d7b8e22e3"
+        },
+        "fr-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 20,
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 36,
+            "PERSON": 234
+          },
+          "sha256": "dab538c1cf104a3604754a6fb52844167020f04d6f467faf66ac87c65b32b531"
+        },
+        "fr-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 215,
+            "DATE_OF_BIRTH": 75,
+            "ORGANIZATION": 265,
+            "PERSON": 2402
+          },
+          "sha256": "ef0b2769517d072dacbc1e0d3fc0aa95ab2f5a25479cb406b56f295f7a29e080"
+        },
+        "ga-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 18,
+            "PERSON": 208
+          },
+          "sha256": "6d79781078c0bff81a4f202433f224a99cc604362875cecdb6d7ae8259916bad"
+        },
+        "ga-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 203,
+            "DATE_OF_BIRTH": 86,
+            "ORGANIZATION": 152,
+            "PERSON": 1843
+          },
+          "sha256": "856f7e31775460e378a4aaff59d501ffff0804026b67fae34e48517877280d5e"
+        },
+        "hr-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 21,
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 21,
+            "PERSON": 227
+          },
+          "sha256": "c9c1944e90b35de99c2d76258409e243c43cedb0f4f09a11484b50609f46e3cf"
+        },
+        "hr-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 215,
+            "DATE_OF_BIRTH": 89,
+            "ORGANIZATION": 168,
+            "PERSON": 2063
+          },
+          "sha256": "b07ca4c817da7411c37d146dca31412d85a69e588b57eed84a95617f56e7624a"
+        },
+        "hu-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 21,
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 13,
+            "PERSON": 137
+          },
+          "sha256": "f01f28ada3fb89d27046e552273da1e10b94df809ba2689f6dd6fdb49b4c8077"
+        },
+        "hu-distill-train.jsonl": {
+          "documents": 138,
+          "gold_spans": {
+            "ADDRESS": 202,
+            "DATE_OF_BIRTH": 66,
+            "ORGANIZATION": 166,
+            "PERSON": 1757
+          },
+          "sha256": "0763885568ebb7e923d1b1f622613af7370ae2aa7b0b4e64bc99053dbf8aac54"
+        },
+        "it-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 25,
+            "PERSON": 191
+          },
+          "sha256": "735949e3b67874f52e2c6833ccff1ed202f78dd6a7633bdea32fb706958b26c5"
+        },
+        "it-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 223,
+            "DATE_OF_BIRTH": 82,
+            "ORGANIZATION": 209,
+            "PERSON": 1683
+          },
+          "sha256": "a5110aebdee259e83ce73dc81cecee756d7a12fa448daa0b990bed05feb41a57"
+        },
+        "lt-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 26,
+            "DATE_OF_BIRTH": 13,
+            "ORGANIZATION": 16,
+            "PERSON": 279
+          },
+          "sha256": "7bb16e1801512599079c3ecc6d923477aed73c7f65f137e79b884f921ac846ef"
+        },
+        "lt-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 247,
+            "DATE_OF_BIRTH": 84,
+            "ORGANIZATION": 265,
+            "PERSON": 2324
+          },
+          "sha256": "a299c584c4986056cae704b924efa56407bc829c323371efbe8996d004750aae"
+        },
+        "lv-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 23,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 34,
+            "PERSON": 286
+          },
+          "sha256": "ae65bba7026116167d78cebc0ae1a4e65dbf3675aef443cf3fbd5271e442d2b8"
+        },
+        "lv-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 229,
+            "DATE_OF_BIRTH": 83,
+            "ORGANIZATION": 250,
+            "PERSON": 2499
+          },
+          "sha256": "6cf4ccfb7276c62bd1ebefc2d5438ebd224e96c9ce19a53e0e152e65aea90124"
+        },
+        "mt-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 24,
+            "DATE_OF_BIRTH": 10,
+            "ORGANIZATION": 16,
+            "PERSON": 241
+          },
+          "sha256": "073939068a938a5b3bea170a45cb1d0f00adc98c55a5e2aa4f9ec7c2d688d912"
+        },
+        "mt-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 197,
+            "DATE_OF_BIRTH": 79,
+            "ORGANIZATION": 149,
+            "PERSON": 1939
+          },
+          "sha256": "55765c977e7ec802c2deeedf4a8561ad533c6e85d645fc4f8e296464e1f5c59a"
+        },
+        "nl-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 26,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 30,
+            "PERSON": 234
+          },
+          "sha256": "0e50a7459a6626f4179bc4f22c7dff7bedeb5970a0966398c2bfa901fb8dc737"
+        },
+        "nl-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 224,
+            "DATE_OF_BIRTH": 81,
+            "ORGANIZATION": 259,
+            "PERSON": 2271
+          },
+          "sha256": "1ac46e746e9b4480045423736b94c28591399393c9ff709b77fc37e8037bb376"
+        },
+        "pl-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 24,
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 20,
+            "PERSON": 191
+          },
+          "sha256": "b044a2182cb318459fb44d01c4fca0f5bc486dbb0f44a4601a263259c6abc3d3"
+        },
+        "pl-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 229,
+            "DATE_OF_BIRTH": 79,
+            "ORGANIZATION": 180,
+            "PERSON": 1647
+          },
+          "sha256": "65aae95d2e6bb4f4c53ce4360bab145140d712e5b5438acb970f75d4c64b6267"
+        },
+        "pt-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 24,
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 27,
+            "PERSON": 218
+          },
+          "sha256": "8c6cee797ebbe2a0d598b02e838d0d8a1828ac8e15ea406d83caebe4d97a3224"
+        },
+        "pt-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 194,
+            "DATE_OF_BIRTH": 75,
+            "ORGANIZATION": 231,
+            "PERSON": 1926
+          },
+          "sha256": "c21b080d7904cf84d77cb4832f7d371a60b8bb0a07f9e2686b59edc0666da46e"
+        },
+        "ro-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 24,
+            "PERSON": 192
+          },
+          "sha256": "94e273e9bab16c0454819a51ceaf6d2da1cadf20f58739505dca1c1403e0183c"
+        },
+        "ro-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 211,
+            "DATE_OF_BIRTH": 74,
+            "ORGANIZATION": 202,
+            "PERSON": 1821
+          },
+          "sha256": "4181bc1d4e3fa5f47508d0d36dbc7e53c853c0cae387f37666679d3e7319b156"
+        },
+        "sk-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 10,
+            "ORGANIZATION": 16,
+            "PERSON": 192
+          },
+          "sha256": "c9c07e17505148486b1aa47500777346e23e6099440ada304fa51b7306d846fe"
+        },
+        "sk-distill-train.jsonl": {
+          "documents": 142,
+          "gold_spans": {
+            "ADDRESS": 214,
+            "DATE_OF_BIRTH": 74,
+            "ORGANIZATION": 178,
+            "PERSON": 2070
+          },
+          "sha256": "62360a370df7e3f3a714ac26f68b36a0058ce10b55f605e2e519f857cb6692a9"
+        },
+        "sl-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 26,
+            "PERSON": 189
+          },
+          "sha256": "c3a20e20a1f0c8c3b31de0764cfe732eb72caa6a308850c70fce047a19af3d48"
+        },
+        "sl-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 214,
+            "DATE_OF_BIRTH": 80,
+            "ORGANIZATION": 149,
+            "PERSON": 1876
+          },
+          "sha256": "3fa72b0fcf49aa6c8a68755b165296ae0e3ac2a66dd3c7aa1b2a15d09c2ceb41"
+        },
+        "sv-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 17,
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 41,
+            "PERSON": 444
+          },
+          "sha256": "6cbbd2efedc9b6a0f4fad8085fb8047ca60d886d35fc70ad220b93c35491ce80"
+        },
+        "sv-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 191,
+            "DATE_OF_BIRTH": 75,
+            "ORGANIZATION": 190,
+            "PERSON": 3408
+          },
+          "sha256": "020cf51af164a2513d25e5e9c8b11e4def6ff2dcd0ec9d06b307d6bc4354eff9"
+        }
+      },
+      "documents": 3818
+    },
+    "court-v41-labelled": {
+      "what": "court-v41 after the Muse Glimmer teacher pass (fireworks_label.py)",
+      "license": "Apache-2.0 (teacher: Muse Glimmer 30B, open weights)",
+      "synthetic": true,
+      "path": "data-eu/v41/court/labelled",
+      "files": {
+        "bg-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 23,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 26,
+            "PERSON": 191
+          },
+          "sha256": "29c4c1f198385ee619294fed051058391f2f85be9869fa90e6da6cdc7afb31ff"
+        },
+        "bg-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 239,
+            "DATE_OF_BIRTH": 81,
+            "ORGANIZATION": 183,
+            "PERSON": 2019
+          },
+          "sha256": "58dad47ed732a4e03e1086066057ea6f1df1eccf1af522086e138675f9c33415"
+        },
+        "cs-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 17,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 22,
+            "PERSON": 261
+          },
+          "sha256": "00eff299db45196741a6c942d45f0ad13835adf8b593bcdaba86e75652076041"
+        },
+        "cs-distill-train.jsonl": {
+          "documents": 140,
+          "gold_spans": {
+            "ADDRESS": 225,
+            "DATE_OF_BIRTH": 84,
+            "ORGANIZATION": 147,
+            "PERSON": 2015
+          },
+          "sha256": "9ac65c5a61d546666f6cc705a1cd7dc756147b1d4cde36cbbc56425107c2b381"
+        },
+        "da-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 28,
+            "DATE_OF_BIRTH": 13,
+            "ORGANIZATION": 27,
+            "PERSON": 338
+          },
+          "sha256": "4d590cd656a14269c329442d22c899e6f99cd3bd12bdfa3e3173392bfbfc3dc0"
+        },
+        "da-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 199,
+            "DATE_OF_BIRTH": 76,
+            "ORGANIZATION": 212,
+            "PERSON": 2712
+          },
+          "sha256": "ff3311d02a7bbe25aa31e61d4cec1075cf9f494d3ba547e0e0772710d6380b15"
+        },
+        "de-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 19,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 23,
+            "PERSON": 249
+          },
+          "sha256": "351d239918e0f7614e2c13c98f6db7219f46d1c50f28b7a3cda07588849b9279"
+        },
+        "de-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 195,
+            "DATE_OF_BIRTH": 79,
+            "ORGANIZATION": 189,
+            "PERSON": 2377
+          },
+          "sha256": "9556611437d69df2c24e837c9d34fcada693c37f5dd223c208cab97a572ca4d9"
+        },
+        "el-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 20,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 15,
+            "PERSON": 180
+          },
+          "sha256": "61e8db2100233609ef137e4db5192ecdd1f611aa4cbd454a4a3e030d3178574a"
+        },
+        "el-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 207,
+            "DATE_OF_BIRTH": 85,
+            "ORGANIZATION": 120,
+            "PERSON": 1608
+          },
+          "sha256": "2cb76747486cfe3f7b4397264653147a059cd5f78bb8140d2f6add893ac58cf4"
+        },
+        "en-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 21,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 35,
+            "PERSON": 271
+          },
+          "sha256": "3cd23dbaf9b177f141397e306606ed9e1af322003b48bd6f08c87a5574ddbccd"
+        },
+        "en-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 218,
+            "DATE_OF_BIRTH": 80,
+            "ORGANIZATION": 246,
+            "PERSON": 2773
+          },
+          "sha256": "d7c11535aada498f2e8a704797f7649749b57a44f3e2897ab98aef986dbdc713"
+        },
+        "es-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 21,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 31,
+            "PERSON": 185
+          },
+          "sha256": "e9f0718eafd93f97d185d26a2f37d5e8ce09238b453d55cc8893b91a2c02eccb"
+        },
+        "es-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 219,
+            "DATE_OF_BIRTH": 97,
+            "ORGANIZATION": 185,
+            "PERSON": 1631
+          },
+          "sha256": "8b46727fce5f9f001696060836a8e200a8df1ffd211105128bc91d00623dd722"
+        },
+        "et-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 29,
+            "DATE_OF_BIRTH": 10,
+            "ORGANIZATION": 14,
+            "PERSON": 263
+          },
+          "sha256": "5ed2b49dda00b45ccad6e9a887b262cd7bdbf0e7fbf843541a53f63a2fabe749"
+        },
+        "et-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 229,
+            "DATE_OF_BIRTH": 85,
+            "ORGANIZATION": 294,
+            "PERSON": 2317
+          },
+          "sha256": "636e5e1e88f3a093909708bb26a337d4492d04ec2b0f423f16f771982ad6787f"
+        },
+        "fi-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 24,
+            "DATE_OF_BIRTH": 12,
+            "ORGANIZATION": 21,
+            "PERSON": 341
+          },
+          "sha256": "768c7d39b46df048ca89e33a4272ab270d5e5c33d5bc2dbfdca1b10c51bf5018"
+        },
+        "fi-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 219,
+            "DATE_OF_BIRTH": 75,
+            "ORGANIZATION": 242,
+            "PERSON": 3108
+          },
+          "sha256": "1ad7793394705f3181f2d748bcdc89b74188f5c28078094f3da84e773b6c04fd"
+        },
+        "fr-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 20,
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 38,
+            "PERSON": 234
+          },
+          "sha256": "dc9cd77e9c6005fb448caf18ebbb934dc05ac3b0008032c90f1538699a711e3b"
+        },
+        "fr-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 215,
+            "DATE_OF_BIRTH": 75,
+            "ORGANIZATION": 271,
+            "PERSON": 2402
+          },
+          "sha256": "6105e83f2faf0385b39b27e26e64a19495bcca36a668a47db5b70ce34bca0519"
+        },
+        "ga-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 18,
+            "PERSON": 211
+          },
+          "sha256": "5c843ed7e2bf2121bc291549d04b148171bc41c6e1e1293948a746422e2665d7"
+        },
+        "ga-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 203,
+            "DATE_OF_BIRTH": 86,
+            "ORGANIZATION": 159,
+            "PERSON": 1910
+          },
+          "sha256": "5b4c32b8dfa12820f8a84b934e0714ecece1b8e483c56ef4471cd1184e49c3a2"
+        },
+        "hr-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 21,
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 21,
+            "PERSON": 227
+          },
+          "sha256": "81adca04195695180e886153380a8f4baed3ed957411b4c342af29103a6cb6df"
+        },
+        "hr-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 215,
+            "DATE_OF_BIRTH": 89,
+            "ORGANIZATION": 168,
+            "PERSON": 2064
+          },
+          "sha256": "1b68b57c02fd42c12bf2d86a50ea1d0b859ed7bffd08d75e2295e984250744a1"
+        },
+        "hu-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 21,
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 13,
+            "PERSON": 137
+          },
+          "sha256": "7651c42c876c76812636b229564d67c53112ce0236357f697537e63306515175"
+        },
+        "hu-distill-train.jsonl": {
+          "documents": 138,
+          "gold_spans": {
+            "ADDRESS": 202,
+            "DATE_OF_BIRTH": 66,
+            "ORGANIZATION": 166,
+            "PERSON": 1760
+          },
+          "sha256": "61983405c05f1391c55c1bc3f44ee43d2670f6342507a9854ec7314cccd61cc2"
+        },
+        "it-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 25,
+            "PERSON": 191
+          },
+          "sha256": "0b0993de7f8b579a8f923aa2ba3379ad0ba91cc9326f8260b1ca1d2d4f826688"
+        },
+        "it-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 223,
+            "DATE_OF_BIRTH": 82,
+            "ORGANIZATION": 217,
+            "PERSON": 1683
+          },
+          "sha256": "1570125e75d82708ed75bd103ee0ab7b69f63940332ac6dbc37297e0b8b73ac0"
+        },
+        "lt-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 26,
+            "DATE_OF_BIRTH": 13,
+            "ORGANIZATION": 16,
+            "PERSON": 279
+          },
+          "sha256": "55a9e9f087f5d97f6c803b552bceb20e34a078b8a183571662ea862e2dd964d9"
+        },
+        "lt-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 247,
+            "DATE_OF_BIRTH": 84,
+            "ORGANIZATION": 266,
+            "PERSON": 2326
+          },
+          "sha256": "04c1f85d2688cc51cacaa3aed7afff801c2afe73ebeebc8ff476f4f37cba76cb"
+        },
+        "lv-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 23,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 35,
+            "PERSON": 288
+          },
+          "sha256": "a91ed6bc4ba6f58b8d89d03c4a39ec177170a7cb39cfd0aadb21a672518463f3"
+        },
+        "lv-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 229,
+            "DATE_OF_BIRTH": 83,
+            "ORGANIZATION": 253,
+            "PERSON": 2502
+          },
+          "sha256": "698c2c5ee45d7147f9ab636e87e384ff72c8d387de44f346ca394e43cfce9d7c"
+        },
+        "mt-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 24,
+            "DATE_OF_BIRTH": 10,
+            "ORGANIZATION": 16,
+            "PERSON": 241
+          },
+          "sha256": "34a5997f6548842d82d3ab99f5162d8ac3bfecf29883a3edf50e898294645104"
+        },
+        "mt-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 197,
+            "DATE_OF_BIRTH": 79,
+            "ORGANIZATION": 153,
+            "PERSON": 1939
+          },
+          "sha256": "9454e42b5f01b9b091a8b952ba5fa8b24d65a89ff241bffdeb058af1b1ce3498"
+        },
+        "nl-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 26,
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 30,
+            "PERSON": 289
+          },
+          "sha256": "5395141846a6c3d28e4a9fa9ee3c7c393547243d1e3c51a9a835dd845713872b"
+        },
+        "nl-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 224,
+            "DATE_OF_BIRTH": 81,
+            "ORGANIZATION": 259,
+            "PERSON": 2621
+          },
+          "sha256": "379b0e65c9c83aaed8097760cd1ea94c3052b9087a3003f1dcfc16e75c06576a"
+        },
+        "pl-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 24,
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 21,
+            "PERSON": 191
+          },
+          "sha256": "cc0154c2ee5ea151586bef2b57e81dd5d3a4d1ccf4089be70e3fc2f720e3ddfb"
+        },
+        "pl-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 229,
+            "DATE_OF_BIRTH": 79,
+            "ORGANIZATION": 196,
+            "PERSON": 1634
+          },
+          "sha256": "256f03b34521e926b52ad01f287acc52e8ec3f28578cd61e3e2efe2c118cf78d"
+        },
+        "pt-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 24,
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 28,
+            "PERSON": 218
+          },
+          "sha256": "205c8f29e848305a8881299f63fd486682c422c4b97e37ca8d904a190f224477"
+        },
+        "pt-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 194,
+            "DATE_OF_BIRTH": 75,
+            "ORGANIZATION": 236,
+            "PERSON": 1926
+          },
+          "sha256": "c6c7139a9491477c52985dadb31745b21a4dbaaaf9f821fefcac278f615ebdd4"
+        },
+        "ro-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 24,
+            "PERSON": 192
+          },
+          "sha256": "903a4673e9367f5c3274b7d75fc26112bb945aef50bf29a3f8f6d464da73fdee"
+        },
+        "ro-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 211,
+            "DATE_OF_BIRTH": 74,
+            "ORGANIZATION": 206,
+            "PERSON": 1822
+          },
+          "sha256": "b055cfb39a62c4b0f919cca41ac50c24171d672e234aebf6aa625e9bf6e1cf55"
+        },
+        "sk-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 10,
+            "ORGANIZATION": 18,
+            "PERSON": 192
+          },
+          "sha256": "6150691c4be4cfe1dab7fde06101bd7c427471083c90733219f0d5044761268e"
+        },
+        "sk-distill-train.jsonl": {
+          "documents": 142,
+          "gold_spans": {
+            "ADDRESS": 214,
+            "DATE_OF_BIRTH": 74,
+            "ORGANIZATION": 179,
+            "PERSON": 2070
+          },
+          "sha256": "f1eac5c17d3c601460b5b3759acf21942fcf75173e276c2e0df0a8f6b0590379"
+        },
+        "sl-distill-dev.jsonl": {
+          "documents": 16,
+          "gold_spans": {
+            "ADDRESS": 22,
+            "DATE_OF_BIRTH": 9,
+            "ORGANIZATION": 26,
+            "PERSON": 189
+          },
+          "sha256": "91dac40b0b1394b9906e3265eb126ce5cb55e40a68f7109ae96ee421b58607a3"
+        },
+        "sl-distill-train.jsonl": {
+          "documents": 143,
+          "gold_spans": {
+            "ADDRESS": 214,
+            "DATE_OF_BIRTH": 80,
+            "ORGANIZATION": 150,
+            "PERSON": 1880
+          },
+          "sha256": "f375fccf439700b124fea45ff0cb5f96997aec68033210e289567f3ca7a160db"
+        },
+        "sv-distill-dev.jsonl": {
+          "documents": 15,
+          "gold_spans": {
+            "ADDRESS": 17,
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 41,
+            "PERSON": 444
+          },
+          "sha256": "b511244de07862bf198801ecf7a0a96d7172e5c0e336f04abf1e367695186343"
+        },
+        "sv-distill-train.jsonl": {
+          "documents": 144,
+          "gold_spans": {
+            "ADDRESS": 191,
+            "DATE_OF_BIRTH": 75,
+            "ORGANIZATION": 226,
+            "PERSON": 3408
+          },
+          "sha256": "3d9b9bce338332014e7067e79ae3c97d28497e3289c9af9d262dc8133e316d8b"
+        }
+      },
+      "documents": 3816
+    },
+    "variants-v41": {
+      "what": "fictional variants per mined v2.0 error pattern (court_eu.py variants, seed 1539; patterns in eval/results/2026-10-29-lab-1539-v41-data/patterns.json)",
+      "license": "Apache-2.0 (pii-guard generator; writer Muse Spark, Meta Model API contributor tier)",
+      "synthetic": true,
+      "path": "data-eu/v41/variants",
+      "files": {
+        "bg-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 4,
+            "PERSON": 24
+          },
+          "sha256": "6f5831059639f02c85d1bebb04ee1b63b4978b3e6fe5b53a84998722c4a5cd45"
+        },
+        "bg-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 6,
+            "ORGANIZATION": 18,
+            "PERSON": 142
+          },
+          "sha256": "2aa856bccd4fab20b9fd3ffadd746f2320eb929da0b6de309f1046d1f1fa8464"
+        },
+        "cs-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 10,
+            "PERSON": 5
+          },
+          "sha256": "9b66a652eff57f280f3745de184cf9137565b8e40a2b46149f98fb9cdf64990b"
+        },
+        "cs-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 4,
+            "PERSON": 111
+          },
+          "sha256": "de43b2195c229859c66d42740eeb256e3824fd7a9e07dc24d950ef73dfe9b630"
+        },
+        "da-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 2
+          },
+          "sha256": "4772cd65a52aa4b1663a6eea2afff5b76435c0159b4a1ed2adae2b2ac4a1fa12"
+        },
+        "da-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 6,
+            "PERSON": 123
+          },
+          "sha256": "ae46cf951f7badc412543c60884eca58a48fd3ac3b01890f6bc72f49ec9b3bc3"
+        },
+        "de-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 27
+          },
+          "sha256": "908586881ad2d626db7ae1a98bdea942e3f93d26a7db75dd57943d44e3b43a1f"
+        },
+        "de-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 18,
+            "PERSON": 168
+          },
+          "sha256": "209eeabdfdd2037264489ca4135d6ff95a4d5d4f249fefcb55d6c59d318257f0"
+        },
+        "el-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 2
+          },
+          "sha256": "b6bfebdcf328d4ee95a297588199b0a11d284741c4977e4931138e031c676347"
+        },
+        "el-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 23,
+            "PERSON": 113
+          },
+          "sha256": "8a94bbc6bab35a82621455f85836ce7b100c343ae19b52af4a7c62e8ca7a690b"
+        },
+        "en-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 10,
+            "PERSON": 4
+          },
+          "sha256": "ab910265c0147a7037a3399194a2c2351125be93c49427e74fa88480b94189c1"
+        },
+        "en-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 15,
+            "PERSON": 109
+          },
+          "sha256": "2d6ec9e18cdc7e454aa39f4bec2cbaa8e27d60024ff5cba5f6832fd2b1776917"
+        },
+        "es-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 5,
+            "PERSON": 3
+          },
+          "sha256": "1e50f80f393c9f1e866f4975f88bffc12635b135d3610095b76e0a94b34b21c5"
+        },
+        "es-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 6,
+            "PERSON": 104
+          },
+          "sha256": "6d213887cd71ce61a03d03e388d8e6349ee36aabb29e82b8b12068eea7c838ef"
+        },
+        "et-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 8,
+            "PERSON": 6
+          },
+          "sha256": "e08cf8a79c08117f267618b38bdf3a69c94e66127d5aaae2742a7c6eac07bdae"
+        },
+        "et-distill-train.jsonl": {
+          "documents": 19,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 17,
+            "PERSON": 76
+          },
+          "sha256": "594ef39b30aee71e6404ce8e500389bb1a98fb68a509faf136f33b9ecc398bfd"
+        },
+        "fi-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 22
+          },
+          "sha256": "a0f99270f56423b3ea751706a9d2524a0ff99a6f70227a3d749a01524e1ae528"
+        },
+        "fi-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 18,
+            "PERSON": 131
+          },
+          "sha256": "e78865b37c01020d598a6d0db294c9e36296c69d921aac833bfd69ca61334a2d"
+        },
+        "fr-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 6
+          },
+          "sha256": "657f7fec668c8eed48229f7da8bc5936ea3b580d99f9d1a4ce7d5c8c37d69afd"
+        },
+        "fr-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 9,
+            "PERSON": 65
+          },
+          "sha256": "6f7b5c28926c38f81e99fd904e7b1a7d7571939389ae5d32741c9db146e06463"
+        },
+        "ga-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 3
+          },
+          "sha256": "fdd44d8216056a504581fe146866e87efe419686fa543135646c9a18e7f9c9ca"
+        },
+        "ga-distill-train.jsonl": {
+          "documents": 19,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 7,
+            "PERSON": 118
+          },
+          "sha256": "ed1203430274328c97cded8acccea1f092cc0f0f103fd06f085ea6e32de4fbda"
+        },
+        "hr-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 2,
+            "PERSON": 4
+          },
+          "sha256": "f0735d73025d0e62a544f02711fed84b70aaecc8ae9508a72fc4f3206c1ea420"
+        },
+        "hr-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 15,
+            "PERSON": 83
+          },
+          "sha256": "306e00d6e4ca3d803e345250ef9b7de2a4980c3a1e89e07654b17449f7c84599"
+        },
+        "hu-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 4
+          },
+          "sha256": "becaa9289f260dbaa346dd804dc8eaf3f333e9d889f028292e36b76e8a884e15"
+        },
+        "hu-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 5,
+            "PERSON": 156
+          },
+          "sha256": "6413af3bac524e92504a3187f1aee0b1177b443216a389386fd10dbf07710443"
+        },
+        "it-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 21
+          },
+          "sha256": "936c555590e6557c403094e12a98935f17fd0a0a1d7729f21f2098e1340ae832"
+        },
+        "it-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 15,
+            "PERSON": 115
+          },
+          "sha256": "a133a18bdd52066d0444ec0767d97f6734a0eba0bd669794a96e9de226476313"
+        },
+        "lt-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 5,
+            "PERSON": 19
+          },
+          "sha256": "5bd214f374ee0ceab787c65772802c477779a370399f20f454e79cf53d734598"
+        },
+        "lt-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 2,
+            "PERSON": 113
+          },
+          "sha256": "78ca8f30f5c1b600c9888fc4758801af34a80f9e827da0bf3fc25b81e79f74ce"
+        },
+        "lv-distill-dev.jsonl": {
+          "documents": 1,
+          "gold_spans": {},
+          "sha256": "7ad55250244d3b3c6985893be16cf97cdce862e111f0929a4e352f3f76648dbf"
+        },
+        "lv-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 17,
+            "PERSON": 96
+          },
+          "sha256": "26e4dc513e8978c72bf1addb1b699f0f2bca442200c15d93e667be419fca666c"
+        },
+        "mt-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {},
+          "sha256": "89f05920c21d93dab8b142d6c4b7566c67c568e7117e3899ee7950f7ba85c84f"
+        },
+        "mt-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 12,
+            "PERSON": 140
+          },
+          "sha256": "32f2c6c6dfd5a2a502c1f068a850f8d5b69ec95e5a942fee60aa9063d7d2e4d7"
+        },
+        "nl-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 2
+          },
+          "sha256": "bf92cf88a4c43f2ac98c196cad0d16b86ea6ad5b069baba793a9b8923b51c641"
+        },
+        "nl-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 28,
+            "PERSON": 119
+          },
+          "sha256": "647ddce3de4c5208049bba0ac12095476f9e00110c186607078474a17b6563a8"
+        },
+        "pl-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 13
+          },
+          "sha256": "1f35d799c00492974337361cf5991d5815df3d1d8f631ff62d51c0b269879147"
+        },
+        "pl-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 8,
+            "PERSON": 103
+          },
+          "sha256": "05cc6754413ccc5f812a3074af7e1ed61e5a16abbcb13e3e6edb4d5812133bef"
+        },
+        "pt-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 18
+          },
+          "sha256": "c503c6ff80f26ebe14ec69fdd9e0965b6c74425346bf93b1f06fe005eac498ff"
+        },
+        "pt-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 6,
+            "PERSON": 157
+          },
+          "sha256": "a8238a8be82307dc88364b622188bc5aa6f6152c8fc5c455fd5ead54e73872e8"
+        },
+        "ro-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 17
+          },
+          "sha256": "f2034fd13c64e6197a95607118880d5f04a6ede1131ee2af68564a6426455327"
+        },
+        "ro-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 4,
+            "PERSON": 88
+          },
+          "sha256": "74970e7f8e4650bd5e0ab2527b582a04aa990833d8248dbe1b0c55694b3feb75"
+        },
+        "sk-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 29
+          },
+          "sha256": "a70e61cc21011eb898f7593bed526da3b0c05c8c6a0c77264e08adf2c2f92470"
+        },
+        "sk-distill-train.jsonl": {
+          "documents": 19,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 5,
+            "PERSON": 135
+          },
+          "sha256": "e8261c269e5dda6f2f971a170e5b4ef218b3701b22e5b55b94559dd0a6e33454"
+        },
+        "sl-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 25
+          },
+          "sha256": "915f1fdd5f22eaf0184e9fab59cc99ca65e355dcf7f8a9c2b2ae689aace87a41"
+        },
+        "sl-distill-train.jsonl": {
+          "documents": 18,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 16,
+            "PERSON": 53
+          },
+          "sha256": "b126ef2a49b0f44f1150eba818d93e2f01b1f9532363c1fe2fcd3ee06f5eaee1"
+        },
+        "sv-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 3
+          },
+          "sha256": "4b0cd657afbfd260d1e65372b4c96da9c83e636c03957c3d2662ec4a92050df2"
+        },
+        "sv-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 6,
+            "ORGANIZATION": 4,
+            "PERSON": 81
+          },
+          "sha256": "14c66abdab5fcbd301117d269c115961131763d2c81894a3c1c7424df9ed59ac"
+        }
+      },
+      "documents": 522
+    },
+    "variants-v41-labelled": {
+      "what": "variants-v41 after the Muse Glimmer teacher pass",
+      "license": "Apache-2.0 (teacher: Muse Glimmer 30B, open weights)",
+      "synthetic": true,
+      "path": "data-eu/v41/variants/labelled",
+      "files": {
+        "bg-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 4,
+            "PERSON": 24
+          },
+          "sha256": "3f74310cc9fff2647289571b255b6d11c577de5d25b87468a3bf937fefaf50a3"
+        },
+        "bg-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 6,
+            "ORGANIZATION": 18,
+            "PERSON": 142
+          },
+          "sha256": "3e41acaff1e77e9414395414bb087bf93722fe2635b5dba31c7f20e51852e37b"
+        },
+        "cs-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 10,
+            "PERSON": 5
+          },
+          "sha256": "06a05e237f3bf514bc71a0c92e1aead05c0e56de7cdc0ad08fe7b93aa6778505"
+        },
+        "cs-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 4,
+            "PERSON": 112
+          },
+          "sha256": "823d97202f97ecf8070f82331108b80175ff3c0e3247725e947683a73bdc8f8b"
+        },
+        "da-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 2
+          },
+          "sha256": "1c5e1a98aa883ce5f32baca0dfe0415c1d240ecde3b90976c1505e380cf401f4"
+        },
+        "da-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 6,
+            "PERSON": 123
+          },
+          "sha256": "571fa543f4e31701ad52ac30e85d0ee6e7725ef6b37bfec76d3eb74574957945"
+        },
+        "de-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 27
+          },
+          "sha256": "401a84927919ac564c55593ebfd7f8a9796f74ebcec9fd282fca587d551f6e7e"
+        },
+        "de-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 7,
+            "ORGANIZATION": 18,
+            "PERSON": 168
+          },
+          "sha256": "09b1e32ce048a1e56395c055edf2adae56b2a1813a6e443aa0a1cff4e364222a"
+        },
+        "el-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 2
+          },
+          "sha256": "9530943e85624ea6ae65867a493888a26b333e365901d38532428a114f7b9492"
+        },
+        "el-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 23,
+            "PERSON": 113
+          },
+          "sha256": "436e169a2ce22676a1a4bc8993bfc708eaf58f793029bfe932542c8578ea831c"
+        },
+        "en-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 10,
+            "PERSON": 4
+          },
+          "sha256": "5ec3923cc788df0e0659723825cbb0484a971f2f4ec8fbd2f9a001c49d3bed03"
+        },
+        "en-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 15,
+            "PERSON": 109
+          },
+          "sha256": "8776362195bb0bb668f70c5e3484c11a607658e3703046e59b87c48198671178"
+        },
+        "es-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 5,
+            "PERSON": 3
+          },
+          "sha256": "e00fee9044d37d4ffeec20169233c00c7b8f5d0b700db332aa00dddd6659189d"
+        },
+        "es-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 6,
+            "PERSON": 104
+          },
+          "sha256": "b3311a61d2e00aa0fca5852f2f4d0103dc6808c0bf04e902aec968f0dfc78052"
+        },
+        "et-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 8,
+            "PERSON": 7
+          },
+          "sha256": "61fbe86dc831e0a6a372f2e4cd420feeed125700fd67f9671aec1eb85fe18fa9"
+        },
+        "et-distill-train.jsonl": {
+          "documents": 19,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 17,
+            "PERSON": 114
+          },
+          "sha256": "7197e767d548090233b45850964ca5bfe95df2b25e56267879f510acf4ab14fe"
+        },
+        "fi-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 22
+          },
+          "sha256": "e5e3a21ed63f43cf295300cf3dd77b0a6bec606ca28242ca9e8c0078ee52e7a6"
+        },
+        "fi-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 18,
+            "PERSON": 131
+          },
+          "sha256": "13aa4140c80235d3e1b01906c3d1ac5831ebdd3476e1d07e4c28b862222a7928"
+        },
+        "fr-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 6
+          },
+          "sha256": "21a36cb539974a1bccb309ef3eb6d89d22cd3096c12122046d8881a836933691"
+        },
+        "fr-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 9,
+            "PERSON": 65
+          },
+          "sha256": "a58dc56de78650169da57eeda32923472b4f7f9fae491524ca2370e8df224e99"
+        },
+        "ga-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 4
+          },
+          "sha256": "cc012fa159d61fdd765ee6140ef85c90138eea941cce59a079b7b252db4e8fb7"
+        },
+        "ga-distill-train.jsonl": {
+          "documents": 19,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 7,
+            "PERSON": 136
+          },
+          "sha256": "136d9a006b5d34ebcdd50b0db2a5e9d37b836b747550fc1cdc8be768ef1a5fc1"
+        },
+        "hr-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 2,
+            "PERSON": 4
+          },
+          "sha256": "a4356c50d784baec868364cb8c53612a11d7fc0bb6440ae499c60cb43dbfce5a"
+        },
+        "hr-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 15,
+            "PERSON": 85
+          },
+          "sha256": "f6e69e2b340b162efe7462b552558c1be2fa343c5e23aa7635b4884a0a699851"
+        },
+        "hu-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 4
+          },
+          "sha256": "7fdb2ab70403086fe44299148ee6106ec98d6f8187d0b90f748d01ceb60ddf8b"
+        },
+        "hu-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 5,
+            "PERSON": 160
+          },
+          "sha256": "abb96d4f96eb28d1ca47b77633d4a7c98ace075255c041c6cfd69f1d2f3085f8"
+        },
+        "it-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 21
+          },
+          "sha256": "ad0ce7413ee20ec602652e7b2057f377293cc369f438d661adba2f3d2f97e1f7"
+        },
+        "it-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 3,
+            "ORGANIZATION": 15,
+            "PERSON": 115
+          },
+          "sha256": "99a6bfeab9b0731c04536279b2a23be80c3a13151ff237a31cb61bfa4d118d5b"
+        },
+        "lt-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "ORGANIZATION": 5,
+            "PERSON": 19
+          },
+          "sha256": "69ebc4eec062fb27cbc4ac51315a171004fb54fa3910934c639ea39111952d47"
+        },
+        "lt-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 2,
+            "PERSON": 113
+          },
+          "sha256": "82c9dc141af10b7b1f1bc1f8d4fd3daa28980ee7d15c67eeacc5025b4fb01035"
+        },
+        "lv-distill-dev.jsonl": {
+          "documents": 1,
+          "gold_spans": {},
+          "sha256": "d8201e899a905f2997eb2fcbb9c794eabfcf4ee79e76871537090e66572c94ad"
+        },
+        "lv-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 8,
+            "ORGANIZATION": 18,
+            "PERSON": 96
+          },
+          "sha256": "e036bbefb2af773975b5e5568895f3d23d880185a94fda2e9e8e12a8b65b709b"
+        },
+        "mt-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {},
+          "sha256": "0466f6ce1c8015e5514ab6d5ece7d4688a22e3fabbad5494dde7a826658a884f"
+        },
+        "mt-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 12,
+            "PERSON": 140
+          },
+          "sha256": "4a241bf13ab24166ef0fa368aa42ff3f97481fe23760e56105a2afdb60baa5e0"
+        },
+        "nl-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 2
+          },
+          "sha256": "18d5f2fcd784af954f00d933f2d68a2312007630609b48c65de526e61b0888a0"
+        },
+        "nl-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 28,
+            "PERSON": 119
+          },
+          "sha256": "c343602607c55b7a9f0927aa5682b805072281325459236305830fec64d1757c"
+        },
+        "pl-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 13
+          },
+          "sha256": "8c0dccd64e67bec9447024a05b5eddf662bfab3b727520574cb696f6e2af456f"
+        },
+        "pl-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 5,
+            "ORGANIZATION": 8,
+            "PERSON": 110
+          },
+          "sha256": "760b67e592356dc954d5cf0182679150f2a7994457fc9c9850a32af1ba690427"
+        },
+        "pt-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 18
+          },
+          "sha256": "cf3f1c6aaca13ee68db686f2adae45a8af268eeca0e0d159d33926caf535d2c8"
+        },
+        "pt-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 6,
+            "PERSON": 157
+          },
+          "sha256": "330663078abfa775d811a0e3022071fb508999b5f7336c5d33a94b3a64fed4a0"
+        },
+        "ro-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 1,
+            "PERSON": 17
+          },
+          "sha256": "46cfb8abc3434d0e1dbf24311556b97f5b0755fde91262a905a69773d6b5daf4"
+        },
+        "ro-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 4,
+            "PERSON": 88
+          },
+          "sha256": "c47c7961a8c7a35d92ef78d929e4f16f9b0760071a77d6095c8c46cf5ded0b6a"
+        },
+        "sk-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 29
+          },
+          "sha256": "ed04eca80132c4147e0bd6ccccc45d274353448658dbc5dacdf6824642cfdfb5"
+        },
+        "sk-distill-train.jsonl": {
+          "documents": 19,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 5,
+            "PERSON": 135
+          },
+          "sha256": "9bd7ae0863c9f7fe372f3884791afe7a00dd83be2633492a8c0da790465f9e78"
+        },
+        "sl-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 26
+          },
+          "sha256": "470061ff17f64b68587c109e7feb9f86edb96cd998cec0bc5242b44518f35494"
+        },
+        "sl-distill-train.jsonl": {
+          "documents": 18,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 4,
+            "ORGANIZATION": 16,
+            "PERSON": 53
+          },
+          "sha256": "65468bad987f84d88c481534dfbebfe86c125df93b9c344e76fdd8fb87c49a52"
+        },
+        "sv-distill-dev.jsonl": {
+          "documents": 2,
+          "gold_spans": {
+            "PERSON": 3
+          },
+          "sha256": "5a1c3970d27ce0b468fd7f2f3cc4f412d2251148d66bccb86ddc007d0cbe5536"
+        },
+        "sv-distill-train.jsonl": {
+          "documents": 20,
+          "gold_spans": {
+            "DATE_OF_BIRTH": 6,
+            "ORGANIZATION": 4,
+            "PERSON": 81
+          },
+          "sha256": "cb06ef2b41c8e1d21423304c48d9bd355d12ea2b2d2fe456d605bf73dce067f3"
+        }
+      },
+      "documents": 522
+    },
+    "kiji": {
+      "what": "DataikuNLP/kiji-pii-training-data train, mapped (hf_v41.py)",
+      "license": "Apache-2.0",
+      "manifest": "training/ner/v41-hf-manifest.json",
+      "synthetic": true,
+      "path": "data-eu/v41/hf-mapped/kiji",
+      "files": {
+        "da-kiji-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1874,
+            "BANK_ACCOUNT": 511,
+            "DATE_OF_BIRTH": 343,
+            "EMAIL": 364,
+            "ID_DOCUMENT": 1909,
+            "ORGANIZATION": 477,
+            "PERSON": 4721,
+            "PHONE": 370,
+            "SECRET": 539,
+            "VEHICLE_PLATE": 328
+          },
+          "sha256": "72da7bc7d07c236437de8c44c2c3e13e77768fa9175a51428ec3bbfbe2d9a7e1"
+        },
+        "de-kiji-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1811,
+            "BANK_ACCOUNT": 465,
+            "DATE_OF_BIRTH": 420,
+            "EMAIL": 368,
+            "ID_DOCUMENT": 1891,
+            "ORGANIZATION": 506,
+            "PERSON": 4860,
+            "PHONE": 325,
+            "SECRET": 578,
+            "VEHICLE_PLATE": 344
+          },
+          "sha256": "24ce5030581a70816280e9f80ac5f114e2adae63d4ba38c89fd8e28e8a4f615b"
+        },
+        "en-kiji-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1775,
+            "BANK_ACCOUNT": 443,
+            "DATE_OF_BIRTH": 311,
+            "EMAIL": 622,
+            "ID_DOCUMENT": 1573,
+            "ORGANIZATION": 743,
+            "PERSON": 4578,
+            "PHONE": 587,
+            "SECRET": 399,
+            "VEHICLE_PLATE": 307
+          },
+          "sha256": "0daef2bae2063a429e8643835ff6839684d0c1bd97b116b0467e3ba733fa5c1c"
+        },
+        "es-kiji-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1802,
+            "BANK_ACCOUNT": 475,
+            "DATE_OF_BIRTH": 350,
+            "EMAIL": 332,
+            "ID_DOCUMENT": 2047,
+            "ORGANIZATION": 455,
+            "PERSON": 4625,
+            "PHONE": 346,
+            "SECRET": 491,
+            "VEHICLE_PLATE": 357
+          },
+          "sha256": "bb4ffb9899fdc96f01a185f422dba155c3616ceb3053f9fcc562467da8eab0ba"
+        },
+        "fr-kiji-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1792,
+            "BANK_ACCOUNT": 490,
+            "DATE_OF_BIRTH": 372,
+            "EMAIL": 349,
+            "ID_DOCUMENT": 1958,
+            "ORGANIZATION": 464,
+            "PERSON": 4722,
+            "PHONE": 348,
+            "SECRET": 536,
+            "VEHICLE_PLATE": 319
+          },
+          "sha256": "953e1cda418a997ed12f4083a1ecc40d589b9074da7cabe2a0478ea150b52298"
+        },
+        "nl-kiji-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1831,
+            "BANK_ACCOUNT": 498,
+            "DATE_OF_BIRTH": 394,
+            "EMAIL": 350,
+            "ID_DOCUMENT": 1887,
+            "ORGANIZATION": 523,
+            "PERSON": 5276,
+            "PHONE": 353,
+            "SECRET": 517,
+            "VEHICLE_PLATE": 319
+          },
+          "sha256": "28cc9f99495ce8774a09d3524be76e42cdba12b318e7823035d98adf172d6e47"
+        }
+      },
+      "documents": 15000
+    },
+    "nym": {
+      "what": "Wismut/nym-pii-multilingual-data train, language-identified and mapped",
+      "license": "MIT",
+      "manifest": "training/ner/v41-hf-manifest.json",
+      "synthetic": true,
+      "path": "data-eu/v41/hf-mapped/nym",
+      "files": {
+        "cs-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 518,
+            "BANK_ACCOUNT": 1003,
+            "DATE_OF_BIRTH": 517,
+            "EMAIL": 711,
+            "ID_DOCUMENT": 1361,
+            "ORGANIZATION": 821,
+            "PERSON": 1780,
+            "PHONE": 818,
+            "SECRET": 245,
+            "VEHICLE_PLATE": 139
+          },
+          "sha256": "d6bafc3657a18c606fbe9884e58be5fe6ba5041c5105133103eadbefc27ced85"
+        },
+        "da-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 689,
+            "BANK_ACCOUNT": 707,
+            "DATE_OF_BIRTH": 508,
+            "EMAIL": 626,
+            "ID_DOCUMENT": 1233,
+            "ORGANIZATION": 472,
+            "PERSON": 1623,
+            "PHONE": 757,
+            "SECRET": 247,
+            "VEHICLE_PLATE": 98
+          },
+          "sha256": "71300262aadac6bdb8c19d72b4ecf5d11734bde381993910368c307cdab71d6c"
+        },
+        "de-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 474,
+            "BANK_ACCOUNT": 555,
+            "DATE_OF_BIRTH": 549,
+            "EMAIL": 642,
+            "ID_DOCUMENT": 906,
+            "ORGANIZATION": 345,
+            "PERSON": 1556,
+            "PHONE": 612,
+            "SECRET": 212,
+            "VEHICLE_PLATE": 90
+          },
+          "sha256": "8efd4778305bb542fdefa4fffcb43f305af2a3aa24c77613e623be6f1cf68118"
+        },
+        "el-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 646,
+            "BANK_ACCOUNT": 1351,
+            "DATE_OF_BIRTH": 518,
+            "EMAIL": 446,
+            "ID_DOCUMENT": 1491,
+            "ORGANIZATION": 303,
+            "PERSON": 2130,
+            "PHONE": 471,
+            "SECRET": 142,
+            "VEHICLE_PLATE": 135
+          },
+          "sha256": "d71e0bae4f52bddb5b7687e84333fbb69db2ce97480be72d24d2bb78a2ba1478"
+        },
+        "en-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 225,
+            "BANK_ACCOUNT": 319,
+            "DATE_OF_BIRTH": 228,
+            "EMAIL": 237,
+            "ID_DOCUMENT": 408,
+            "ORGANIZATION": 227,
+            "PERSON": 695,
+            "PHONE": 358,
+            "SECRET": 58,
+            "VEHICLE_PLATE": 37
+          },
+          "sha256": "bd5cc57ae04d2b8a9c12a6da3c0267fc732ea14ad40bbaf71af36db52755c694"
+        },
+        "es-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 529,
+            "BANK_ACCOUNT": 926,
+            "DATE_OF_BIRTH": 419,
+            "EMAIL": 612,
+            "ID_DOCUMENT": 1362,
+            "ORGANIZATION": 567,
+            "PERSON": 1321,
+            "PHONE": 722,
+            "SECRET": 273,
+            "VEHICLE_PLATE": 112
+          },
+          "sha256": "9bf6d0a30c9bbe32422aa867131a9e2cbbf1be9d8c44e576d9108c5d4e37144c"
+        },
+        "fi-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 625,
+            "BANK_ACCOUNT": 532,
+            "DATE_OF_BIRTH": 728,
+            "EMAIL": 864,
+            "ID_DOCUMENT": 999,
+            "ORGANIZATION": 576,
+            "PERSON": 1763,
+            "PHONE": 876,
+            "SECRET": 204,
+            "VEHICLE_PLATE": 85
+          },
+          "sha256": "824d356ad5a63d2d883e58d511a484a258e1be52932bd496dd2c9f788944634b"
+        },
+        "fr-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 472,
+            "BANK_ACCOUNT": 738,
+            "DATE_OF_BIRTH": 413,
+            "EMAIL": 436,
+            "ID_DOCUMENT": 1295,
+            "ORGANIZATION": 390,
+            "PERSON": 1354,
+            "PHONE": 725,
+            "SECRET": 195,
+            "VEHICLE_PLATE": 110
+          },
+          "sha256": "4e21195c36088eb3c3b7b270e3910cd2476ae5a55461a0a92d4dab25cd28ce93"
+        },
+        "it-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 514,
+            "BANK_ACCOUNT": 730,
+            "DATE_OF_BIRTH": 552,
+            "EMAIL": 871,
+            "ID_DOCUMENT": 1615,
+            "ORGANIZATION": 597,
+            "PERSON": 2165,
+            "PHONE": 1038,
+            "SECRET": 186,
+            "VEHICLE_PLATE": 176
+          },
+          "sha256": "982215990d4d1221d96f33d6942eb59adf8b0bd0b73de292e96539047c0db116"
+        },
+        "nl-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 421,
+            "BANK_ACCOUNT": 826,
+            "DATE_OF_BIRTH": 737,
+            "EMAIL": 638,
+            "ID_DOCUMENT": 1241,
+            "ORGANIZATION": 419,
+            "PERSON": 1619,
+            "PHONE": 819,
+            "SECRET": 228,
+            "VEHICLE_PLATE": 123
+          },
+          "sha256": "58efc042bab9ec6cb46dd3559e72441557ad6072e8a95a0b3ee00ab1f4a1668d"
+        },
+        "pl-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 653,
+            "BANK_ACCOUNT": 1245,
+            "DATE_OF_BIRTH": 370,
+            "EMAIL": 610,
+            "ID_DOCUMENT": 1233,
+            "ORGANIZATION": 268,
+            "PERSON": 2325,
+            "PHONE": 951,
+            "SECRET": 204,
+            "VEHICLE_PLATE": 145
+          },
+          "sha256": "a6179d0c824e9002026192e6d346fddcd8f3851746101092ffd2527855ca8323"
+        },
+        "pt-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 556,
+            "BANK_ACCOUNT": 859,
+            "DATE_OF_BIRTH": 483,
+            "EMAIL": 633,
+            "ID_DOCUMENT": 1647,
+            "ORGANIZATION": 830,
+            "PERSON": 1873,
+            "PHONE": 863,
+            "SECRET": 220,
+            "VEHICLE_PLATE": 142
+          },
+          "sha256": "5500804f5e326900067368cb3aaf0155f9a80c935c73a5257b291bc58839f75b"
+        },
+        "ro-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 430,
+            "BANK_ACCOUNT": 969,
+            "DATE_OF_BIRTH": 523,
+            "EMAIL": 585,
+            "ID_DOCUMENT": 1323,
+            "ORGANIZATION": 410,
+            "PERSON": 1658,
+            "PHONE": 790,
+            "SECRET": 275,
+            "VEHICLE_PLATE": 127
+          },
+          "sha256": "a55050176b9a9623d7ddb10ff86677f3c0d2384f3450d685a2d5b728ed38f061"
+        },
+        "sv-nym-train.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 850,
+            "BANK_ACCOUNT": 673,
+            "DATE_OF_BIRTH": 269,
+            "EMAIL": 637,
+            "ID_DOCUMENT": 985,
+            "ORGANIZATION": 225,
+            "PERSON": 1626,
+            "PHONE": 979,
+            "SECRET": 190,
+            "VEHICLE_PLATE": 153
+          },
+          "sha256": "d897292e4f20930480986bc1e9962f3ccc7bef51c20f5ea076128a1ee60f305e"
+        }
+      },
+      "documents": 35000
+    },
+    "e3": {
+      "what": "E3-JSI/synthetic-multi-pii-ner-v1, non-health rows, mapped",
+      "license": "MIT",
+      "manifest": "training/ner/v41-hf-manifest.json",
+      "synthetic": true,
+      "path": "data-eu/v41/hf-mapped/e3",
+      "files": {
+        "de-e3-train.jsonl": {
+          "documents": 308,
+          "gold_spans": {
+            "ADDRESS": 98,
+            "BANK_ACCOUNT": 103,
+            "DATE_OF_BIRTH": 46,
+            "EMAIL": 23,
+            "ID_DOCUMENT": 49,
+            "ORGANIZATION": 206,
+            "PERSON": 342,
+            "PHONE": 56,
+            "VEHICLE_PLATE": 11
+          },
+          "sha256": "51f5877b3fa62ce3c83afd72059c5e6822dd2da64868d508d021861a93077fc0"
+        },
+        "el-e3-train.jsonl": {
+          "documents": 300,
+          "gold_spans": {
+            "ADDRESS": 36,
+            "BANK_ACCOUNT": 67,
+            "DATE_OF_BIRTH": 32,
+            "EMAIL": 14,
+            "ID_DOCUMENT": 55,
+            "ORGANIZATION": 181,
+            "PERSON": 320,
+            "PHONE": 24,
+            "VEHICLE_PLATE": 7
+          },
+          "sha256": "36988ee5ff505ea0cd5ac79a90c22920b919930942b0d5e05de02cc0a0ffacce"
+        },
+        "en-e3-train.jsonl": {
+          "documents": 315,
+          "gold_spans": {
+            "ADDRESS": 72,
+            "BANK_ACCOUNT": 38,
+            "DATE_OF_BIRTH": 24,
+            "EMAIL": 37,
+            "ID_DOCUMENT": 70,
+            "ORGANIZATION": 271,
+            "PERSON": 377,
+            "PHONE": 61,
+            "VEHICLE_PLATE": 11
+          },
+          "sha256": "858c2c629793aa24cbf4ec122fed3b767d6db7ba2836f1b53478254942040169"
+        },
+        "fr-e3-train.jsonl": {
+          "documents": 311,
+          "gold_spans": {
+            "ADDRESS": 84,
+            "BANK_ACCOUNT": 86,
+            "DATE_OF_BIRTH": 81,
+            "EMAIL": 31,
+            "ID_DOCUMENT": 78,
+            "ORGANIZATION": 229,
+            "PERSON": 354,
+            "PHONE": 48,
+            "VEHICLE_PLATE": 10
+          },
+          "sha256": "73543077df435c3a5be7bffc3ba4dc563e8313cba2ca55cc1a2d08472cb67158"
+        },
+        "it-e3-train.jsonl": {
+          "documents": 305,
+          "gold_spans": {
+            "ADDRESS": 74,
+            "BANK_ACCOUNT": 84,
+            "DATE_OF_BIRTH": 79,
+            "EMAIL": 32,
+            "ID_DOCUMENT": 67,
+            "ORGANIZATION": 190,
+            "PERSON": 379,
+            "PHONE": 63,
+            "VEHICLE_PLATE": 12
+          },
+          "sha256": "10a00da21731f0e7cbbdb79dcef84fbe623434a0f43e3eaba6e94fe051b31caa"
+        },
+        "nl-e3-train.jsonl": {
+          "documents": 341,
+          "gold_spans": {
+            "ADDRESS": 75,
+            "BANK_ACCOUNT": 73,
+            "DATE_OF_BIRTH": 53,
+            "EMAIL": 37,
+            "ID_DOCUMENT": 55,
+            "ORGANIZATION": 264,
+            "PERSON": 399,
+            "PHONE": 76,
+            "VEHICLE_PLATE": 10
+          },
+          "sha256": "abf9b9cb175bc28b2b302ec00b8e51ba415081e49b731e1ef7a9373089612e8c"
+        },
+        "sl-e3-train.jsonl": {
+          "documents": 284,
+          "gold_spans": {
+            "ADDRESS": 87,
+            "BANK_ACCOUNT": 72,
+            "DATE_OF_BIRTH": 38,
+            "EMAIL": 19,
+            "ID_DOCUMENT": 47,
+            "ORGANIZATION": 143,
+            "PERSON": 323,
+            "PHONE": 45,
+            "VEHICLE_PLATE": 13
+          },
+          "sha256": "42566b38b217e13c6105d11e0311a4c0de132443e166f16b884c39ee09bcf380"
+        }
+      },
+      "documents": 2164
+    },
+    "pii-anon": {
+      "what": "subhash-holla/pii-anon train, synthetic rows with an ID only, <= 5 % of the mix",
+      "license": "CC0-1.0",
+      "manifest": "training/ner/v41-hf-manifest.json",
+      "synthetic": true,
+      "path": "data-eu/v41/hf-mapped/pii-anon",
+      "files": {
+        "bg-pii-anon-train.jsonl": {
+          "documents": 7,
+          "gold_spans": {
+            "ADDRESS": 3,
+            "EMAIL": 7,
+            "ID_DOCUMENT": 7,
+            "PERSON": 7,
+            "PHONE": 7
+          },
+          "sha256": "6b54a481306c31916c6b02698925ce8c1a8e87c9789ea54e9593c79d1a2d4274"
+        },
+        "cs-pii-anon-train.jsonl": {
+          "documents": 10,
+          "gold_spans": {
+            "ADDRESS": 1,
+            "BANK_ACCOUNT": 1,
+            "EMAIL": 10,
+            "ID_DOCUMENT": 9,
+            "ORGANIZATION": 2,
+            "PERSON": 10,
+            "PHONE": 10
+          },
+          "sha256": "74998cdf7f09c5b6ac6bc57c1aff039f1fd3401a19bd23157e5dedfc1a771eac"
+        },
+        "da-pii-anon-train.jsonl": {
+          "documents": 10,
+          "gold_spans": {
+            "ADDRESS": 4,
+            "BANK_ACCOUNT": 1,
+            "DATE_OF_BIRTH": 1,
+            "EMAIL": 9,
+            "ID_DOCUMENT": 10,
+            "ORGANIZATION": 1,
+            "PERSON": 12,
+            "PHONE": 10
+          },
+          "sha256": "754844c8b8cf02b2711545153bb238d91a8a113f714b18cbfeb25a9d2f38f166"
+        },
+        "de-pii-anon-train.jsonl": {
+          "documents": 357,
+          "gold_spans": {
+            "ADDRESS": 95,
+            "BANK_ACCOUNT": 102,
+            "DATE_OF_BIRTH": 10,
+            "EMAIL": 359,
+            "ID_DOCUMENT": 293,
+            "ORGANIZATION": 87,
+            "PERSON": 505,
+            "PHONE": 110,
+            "VEHICLE_PLATE": 19
+          },
+          "sha256": "7db2123d4a41526d8b6135ade08d00b0b52405b4389b165475b4deb06bc7fd79"
+        },
+        "el-pii-anon-train.jsonl": {
+          "documents": 382,
+          "gold_spans": {
+            "ADDRESS": 1,
+            "BANK_ACCOUNT": 110,
+            "EMAIL": 382,
+            "ID_DOCUMENT": 255,
+            "PERSON": 382,
+            "PHONE": 2,
+            "VEHICLE_PLATE": 17
+          },
+          "sha256": "dadf9d5a4e75042139a31b0e658a5c7a058c79a08391dc1e5cafa258265aade2"
+        },
+        "en-pii-anon-train.jsonl": {
+          "documents": 385,
+          "gold_spans": {
+            "ADDRESS": 184,
+            "BANK_ACCOUNT": 186,
+            "DATE_OF_BIRTH": 103,
+            "EMAIL": 386,
+            "ID_DOCUMENT": 392,
+            "ORGANIZATION": 150,
+            "PERSON": 767,
+            "PHONE": 258,
+            "VEHICLE_PLATE": 7
+          },
+          "sha256": "fa9d13184e19a85c2f684cbd64ec1f152b478bf06ddbba1184771cde79e1370f"
+        },
+        "es-pii-anon-train.jsonl": {
+          "documents": 361,
+          "gold_spans": {
+            "ADDRESS": 111,
+            "BANK_ACCOUNT": 75,
+            "DATE_OF_BIRTH": 7,
+            "EMAIL": 365,
+            "ID_DOCUMENT": 298,
+            "ORGANIZATION": 96,
+            "PERSON": 509,
+            "PHONE": 118,
+            "VEHICLE_PLATE": 14
+          },
+          "sha256": "df8a1c9f10d4d0332f37e088ac58bd62b878c7f7d3bfffe42000fa494c2a59d4"
+        },
+        "et-pii-anon-train.jsonl": {
+          "documents": 8,
+          "gold_spans": {
+            "ADDRESS": 4,
+            "BANK_ACCOUNT": 3,
+            "EMAIL": 8,
+            "ID_DOCUMENT": 5,
+            "ORGANIZATION": 1,
+            "PERSON": 12,
+            "PHONE": 8
+          },
+          "sha256": "9531ab7e58955666a9f6ece72340d67d38d1a61bc7b21e265f53911290475f84"
+        },
+        "fi-pii-anon-train.jsonl": {
+          "documents": 5,
+          "gold_spans": {
+            "ADDRESS": 1,
+            "BANK_ACCOUNT": 1,
+            "DATE_OF_BIRTH": 2,
+            "EMAIL": 3,
+            "ID_DOCUMENT": 6,
+            "ORGANIZATION": 1,
+            "PERSON": 5,
+            "PHONE": 5
+          },
+          "sha256": "a2f864675bd62466b4fbac70977ef971aa61f9dd542f0af766fb1bba79c38308"
+        },
+        "fr-pii-anon-train.jsonl": {
+          "documents": 360,
+          "gold_spans": {
+            "ADDRESS": 111,
+            "BANK_ACCOUNT": 91,
+            "DATE_OF_BIRTH": 10,
+            "EMAIL": 341,
+            "ID_DOCUMENT": 300,
+            "ORGANIZATION": 105,
+            "PERSON": 462,
+            "PHONE": 116,
+            "VEHICLE_PLATE": 24
+          },
+          "sha256": "4087437f62f21fe4355ef53fb29778691ff94a2ef1d69e539dd9431dc7f58852"
+        },
+        "hu-pii-anon-train.jsonl": {
+          "documents": 10,
+          "gold_spans": {
+            "ADDRESS": 4,
+            "BANK_ACCOUNT": 1,
+            "EMAIL": 10,
+            "ID_DOCUMENT": 9,
+            "ORGANIZATION": 2,
+            "PERSON": 10,
+            "PHONE": 10
+          },
+          "sha256": "8c8279955fbe3457c55ebc4e599e163bdd6107924cf10f9ffb7b066a0fc4851d"
+        },
+        "it-pii-anon-train.jsonl": {
+          "documents": 344,
+          "gold_spans": {
+            "ADDRESS": 33,
+            "BANK_ACCOUNT": 99,
+            "DATE_OF_BIRTH": 4,
+            "EMAIL": 344,
+            "ID_DOCUMENT": 238,
+            "ORGANIZATION": 28,
+            "PERSON": 346,
+            "PHONE": 38,
+            "VEHICLE_PLATE": 20
+          },
+          "sha256": "11d93ae1c560a50197b9fe09a6d4039e388a06d1b17d741c0600bc3e8d19c4d1"
+        },
+        "lv-pii-anon-train.jsonl": {
+          "documents": 4,
+          "gold_spans": {
+            "ADDRESS": 1,
+            "BANK_ACCOUNT": 1,
+            "EMAIL": 4,
+            "ID_DOCUMENT": 3,
+            "ORGANIZATION": 1,
+            "PERSON": 6,
+            "PHONE": 4
+          },
+          "sha256": "ff0b4692f5ddc963631b221f362c06db8181d5d97f3102d4dab24a51f22a95c2"
+        },
+        "nl-pii-anon-train.jsonl": {
+          "documents": 362,
+          "gold_spans": {
+            "ADDRESS": 10,
+            "BANK_ACCOUNT": 98,
+            "EMAIL": 362,
+            "ID_DOCUMENT": 239,
+            "ORGANIZATION": 10,
+            "PERSON": 362,
+            "PHONE": 12,
+            "VEHICLE_PLATE": 25
+          },
+          "sha256": "77733cab8a65ac90dfaaee5a7ff2a64cb0afdecdf9d3d15fac71135df8816e88"
+        },
+        "pl-pii-anon-train.jsonl": {
+          "documents": 5,
+          "gold_spans": {
+            "ADDRESS": 1,
+            "BANK_ACCOUNT": 1,
+            "EMAIL": 5,
+            "ID_DOCUMENT": 4,
+            "ORGANIZATION": 2,
+            "PERSON": 7,
+            "PHONE": 5
+          },
+          "sha256": "c923dc86c0b2473ebeea6371305d36b3fe351a602d28b07258c8aef9950c2fa6"
+        },
+        "pt-pii-anon-train.jsonl": {
+          "documents": 341,
+          "gold_spans": {
+            "ADDRESS": 31,
+            "BANK_ACCOUNT": 106,
+            "DATE_OF_BIRTH": 2,
+            "EMAIL": 341,
+            "ID_DOCUMENT": 220,
+            "ORGANIZATION": 23,
+            "PERSON": 341,
+            "PHONE": 38,
+            "VEHICLE_PLATE": 21
+          },
+          "sha256": "864f3fc5598a5a4f6fed8bb70949994074ae7f884a6eaeda8e074e28c46cb99a"
+        },
+        "ro-pii-anon-train.jsonl": {
+          "documents": 11,
+          "gold_spans": {
+            "ADDRESS": 4,
+            "BANK_ACCOUNT": 2,
+            "EMAIL": 11,
+            "ID_DOCUMENT": 9,
+            "ORGANIZATION": 3,
+            "PERSON": 11,
+            "PHONE": 11
+          },
+          "sha256": "0d3b4122f7a0cb9986be30a0a9b26736efa2c8c778a255bdb0f068034e43e383"
+        },
+        "sv-pii-anon-train.jsonl": {
+          "documents": 11,
+          "gold_spans": {
+            "ADDRESS": 1,
+            "EMAIL": 11,
+            "ID_DOCUMENT": 11,
+            "PERSON": 11,
+            "PHONE": 11
+          },
+          "sha256": "1110fad0c46b5f3c70547409801e7d758368e39a58eef2460cf35e6a793b6beb"
+        }
+      },
+      "documents": 2973
+    }
+  }
+}

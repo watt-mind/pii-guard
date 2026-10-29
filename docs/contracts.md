@@ -979,6 +979,15 @@ a request refused by the re-check gets `422 outbound_check_failed` with
 walker's texts, the re-check scans the serialized masked body as one text, so a field no
 walker slot covers can't carry a session value out either (LAB-1563).
 
+## Gateway chat streaming (implemented)
+
+For Chat Completions, `stream: true` requires an upstream `text/event-stream` response.
+A successful non-SSE response is closed without reading or forwarding its body and returns
+sanitized HTTP `502` with error code `upstream_did_not_stream`; the client can retry without
+`stream`. The gateway does not synthesize SSE from a JSON answer. Non-streaming JSON success
+and upstream HTTP error status/sanitization remain unchanged. The traffic record marks the
+call as failed with this code and retains the upstream status, without the rejected body.
+
 ## Gateway request fields (implemented)
 
 `POST /v1/chat/completions` walks the whole body against an allow-list
@@ -1001,12 +1010,22 @@ Treatments:
   the placeholder **string** (`"[[NATIONAL_ID_HU_TAX]]"`), because a JSON number can't
   carry a placeholder; any other number is forwarded as the same number. A restored value
   comes back as a string: the answer's tool-call arguments hold the original digits as a JSON
-  string, not a number (LAB-1348).
+  string, not a number (LAB-1348). If distinct object keys mask to the same key (including
+  case or Unicode variants), the request fails closed with `400 invalid_request`, at any
+  nesting depth. No values are merged or silently dropped, and nothing is forwarded
+  (LAB-1568).
 - **check**: an identifier or enum-like setting that can't carry a placeholder. Detected
   personal data rejects the request (`400 unsupported_content`); otherwise it is forwarded
   unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.
   Numbers with at least six digits in a checked value, and JSON-Schema keyword numbers
   (`maximum`, `minLength`, ...), are checked the same way.
+
+**Chat line-number gutters.** Message content, text/refusal content parts and the string
+fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter handling:
+a leading line number and pipe (e.g. `12|`, including indentation) become same-length spaces
+for detection, preserving offsets. Gutters are restored in masked text when line counts
+match and the replacement spaces survive; when masking spans lines and changes the line
+count, gutters are dropped rather than writing any original text back.
 
 **Declared tool names.** A tool or namespace name the request declares (`tools[].name`,
 `tools[].function.name`, `functions[].name`, ...) is the client's vocabulary: a `PERSON`,
@@ -1035,8 +1054,8 @@ pre-loaded (`known`) are never exempt.
 | body | `tools`, `functions` | definitions: `name` and other keys check; `parameters`/`schema` walked as JSON Schema (free text masked, `properties` keys and `required` entries checked, `type`/`$ref`/`format`/... **values** checked, LAB-1563); a custom tool's `format.grammar.definition` mask, its other `format` leaves check; every other string, array or direct numeric leaf mask JSON (e.g. an MCP tool's `server_description`); entries must be objects |
 | body | `response_format` | `type` check; `json_schema` as a definition |
 | message | `role` | one of `system`, `developer`, `user`, `assistant`, `tool`, `function` |
-| message | `content` | string mask; array of content parts, below |
-| message | `refusal`, `reasoning_content`, `reasoning` | mask (a non-string value: mask JSON) |
+| message | `content` | string mask (line-number gutters hidden during detection, restored when forwarding); array of content parts, below; applies to every role, including tool/function output |
+| message | `refusal`, `reasoning_content`, `reasoning` | mask (strings use the same gutter treatment; a non-string value: mask JSON) |
 | message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass (opaque, provider-signed) |
 | message | `audio` | `transcript` mask; `id` check; `expires_at` pass |
 | message | `annotations` | mask JSON |
@@ -1199,6 +1218,12 @@ class Vault:
     # "d_" + 32 hex of HMAC-SHA256(tenant key, material): stable per deployment, keyed.
     def derive_session_id(self, material: str) -> str: ...
 
+    # Resolve (session, created, metadata) and acquire an LRU pin in one vault transaction.
+    def acquire_session(
+        self, resolve: Callable[[], tuple[VaultSession, bool, T]]
+    ) -> tuple[VaultSession, bool, T]: ...
+    def release_session(self, session: VaultSession) -> None: ...  # one per acquire
+
     def drop(self, session_id: str) -> None: ...  # close and forget now; no error if gone
     def purge_expired(self) -> int: ...  # drop every expired session, return how many
     def __len__(self) -> int: ...  # live sessions
@@ -1279,6 +1304,7 @@ doesn't inflate them).
 | `SessionNotFoundError` (`PiiGuardError`) | `not_found` | 404 | The session id is unknown, expired or closed. Raised by `Vault.session` and by every `VaultSession` method (and so by `StreamUnmasker`) once the session is gone; the gateway fails the request instead of forwarding unrestored text. |
 | `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
 | `MaskingError` | `vault_not_configured` | 500 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
+| `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased. |
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
 | `SessionEntryLimitError` (`MaskingError`) | `session_entry_limit_reached` | 409 | An explicit session already holds its `max_entries` placeholders; it is never rotated. |
 
@@ -1301,6 +1327,20 @@ built on it.
 - `Vault.drop(id)` and `VaultSession.close()` forget the mapping and the known values at once;
   later calls raise `SessionNotFoundError`. The mapping never leaves the process, is never
   logged and has no persistence.
+
+- Capacity eviction chooses only sessions without leases. `acquire_session(resolve)` holds
+  the vault lock across lookup/creation and pin acquisition, closing the lookup-to-eviction
+  race. Each successful acquire needs one `release_session(session)`, even if the session
+  expired or was explicitly dropped in the meantime. Leases are counted per session object.
+  The gateway holds its lease through detection, masking, upstream work, restoration and
+  stream cleanup, releasing it on failures and cancellation as well as success.
+- If every capacity slot is leased, creating another session fails closed with HTTP 503
+  `vault_capacity_exhausted`; it neither exceeds the cap nor evicts an active session.
+  Leases do not suspend sliding TTL or explicit deletion/purge semantics.
+- `VaultSession.commit(fork)` consumes the fork once and validates its entire journal against
+  a private snapshot under the parent lock before publishing the state. A replay mismatch
+  raises `MaskingError` and leaves all parent mapping, memo, count and generation state
+  unchanged. The caller must discard the fork output on any commit failure.
 
 ### Placeholders
 
