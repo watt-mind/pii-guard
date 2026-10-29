@@ -35,6 +35,7 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
       wheel: ${{ steps.filter.outputs.wheel }}
       hosted: ${{ steps.filter.outputs.hosted }}
+      hosted-image: ${{ steps.filter.outputs.hosted-image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -223,14 +224,14 @@ jobs:
       - name: Size budget, healthcheck, one masked request on the mock upstream
         run: scripts/ci/docker_smoke.sh pii-guard:ci
 
-  # Secret-free validation of Azure source and the opt-in production image. The packaging
-  # smoke deliberately does not claim deployed auth, readiness or sponsored-provider access.
+  # Secret-free validation of Azure deployment source. The hosted image build is the
+  # separate hosted-image job below, so these fast checks do not wait for it serially.
   hosted-infra:
     name: hosted-infra
     needs: changes
     if: needs.changes.outputs.hosted == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -254,6 +255,19 @@ jobs:
           done
       - name: Deployment, app binding and Linux TLS proxy regression tests (no cloud calls)
         run: python3 -m unittest discover -s deploy/azure -p 'test_*.py' -v
+
+  # The opt-in production image, in parallel with hosted-infra. The packaging smoke
+  # deliberately does not claim deployed auth, readiness or sponsored-provider access.
+  hosted-image:
+    name: hosted-image
+    needs: changes
+    if: needs.changes.outputs.hosted-image == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build hosted UI and pinned CPU NER image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -271,14 +285,14 @@ jobs:
       - name: Bundled UI and offline CPU NER packaging smoke (no network)
         run: docker run --rm --interactive --network none --entrypoint python pii-guard:hosted-ci - < deploy/azure/ci_hosted_smoke.py
 
-  # Build once (LAB-1446): on a develop push, push the image hosted-infra just built and tested
+  # Build once (LAB-1446): on a develop push, push the image hosted-image just built and tested
   # to the dev registry, so the operator deploys that digest instead of rebuilding it. The
   # dev-image Environment (develop only) holds an OIDC identity with AcrPush on that registry
   # and nothing else. A delivery job: not in ci-ok, so a registry hiccup does not turn CI red.
   # Deploy its digest only after ci-ok is green (docs/private-dev.md).
   hosted-image-push:
     name: hosted-image-push
-    needs: hosted-infra
+    needs: [hosted-infra, hosted-image]
     if: >-
       github.repository == 'watt-mind/pii-guard' && github.event_name == 'push' &&
       github.ref == 'refs/heads/develop'
@@ -308,9 +322,9 @@ jobs:
       - name: Authenticate to the dev registry (AcrPush only)
         run: az acr login --name "$AZURE_ACR_NAME" --output none
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      # Same inputs as hosted-infra's build, which just wrote this cache: every layer is a hit.
+      # Same inputs as hosted-image's build, which just wrote this cache: every layer is a hit.
       - id: image
-        name: Push the hosted image hosted-infra built
+        name: Push the hosted image hosted-image built
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           DOCKER_BUILD_RECORD_UPLOAD: "false"
@@ -526,6 +540,7 @@ jobs:
         eval-gate,
         docker,
         hosted-infra,
+        hosted-image,
         audit,
         ui,
         wheel,

@@ -13,7 +13,7 @@ SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "ci" / "changes.py"
 MODULE = runpy.run_path(str(SCRIPT))
 classify = MODULE["classify"]
 changed_paths = MODULE["changed_paths"]
-ALL = {"ui": True, "docker": True, "wheel": True, "hosted": True}
+ALL = {"ui": True, "docker": True, "wheel": True, "hosted": True, "hosted-image": True}
 NONE = dict.fromkeys(ALL, False)
 
 
@@ -31,17 +31,23 @@ NONE = dict.fromkeys(ALL, False)
         ("docs/architecture.md", NONE),
         ("tests/vault/test_vault_mask.py", NONE),
         ("Dockerfile", {**NONE, "docker": True}),
-        (".dockerignore", {**NONE, "docker": True, "hosted": True}),
-        ("Dockerfile.hosted", {**NONE, "hosted": True}),
+        (".dockerignore", {**NONE, "docker": True, "hosted": True, "hosted-image": True}),
+        ("Dockerfile.hosted", {**NONE, "hosted": True, "hosted-image": True}),
+        ("deploy/azure/entrypoint.py", {**NONE, "hosted": True, "hosted-image": True}),
+        ("deploy/azure/venv_layer.py", {**NONE, "hosted": True, "hosted-image": True}),
+        ("deploy/azure/ci_hosted_smoke.py", {**NONE, "hosted": True, "hosted-image": True}),
+        ("deploy/azure/modules/app.bicep", {**NONE, "hosted": True}),
+        ("deploy/azure/dev_router/router.sh", {**NONE, "hosted": True}),
+        ("deploy/azure/app_bindings.py", {**NONE, "hosted": True}),
         ("deploy/azure/main.bicep", {**NONE, "hosted": True}),
         ("deploy/azure/deploy.sh", {**NONE, "hosted": True}),
         ("scripts/ci/docker_smoke.sh", {**NONE, "docker": True}),
         ("scripts/ci/wheel_smoke.sh", {**NONE, "wheel": True}),
         (".github/workflows/release.yml", {**NONE, "wheel": True}),
-        ("ui/src/App.tsx", {**NONE, "ui": True, "wheel": True, "hosted": True}),
-        ("eval/results/runs/run.json", {**NONE, "ui": True, "wheel": True, "hosted": True}),
+        ("ui/src/App.tsx", {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True}),
+        ("eval/results/runs/run.json", {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True}),
         ("eval/datasets/results/counts.json", {**NONE, "ui": True, "wheel": True, "hosted": True}),
-        ("docs/benchmarks/config.json", {**NONE, "ui": True, "wheel": True, "hosted": True}),
+        ("docs/benchmarks/config.json", {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True}),
         ("docs/benchmarks/colours.json", {**NONE, "ui": True, "wheel": True, "hosted": True}),
     ],
 )
@@ -52,6 +58,21 @@ def test_packaging_inputs(path: str, jobs: dict[str, bool]) -> None:
 def test_multiple_changes_combine_jobs() -> None:
     assert classify(["Dockerfile", "ui/src/App.tsx"]) == ALL
     assert classify([]) == NONE
+    assert classify(["deploy/azure/main.bicep"])["hosted-image"] is False
+    assert classify(["deploy/azure/main.bicep", "Dockerfile.hosted"])["hosted-image"] is True
+
+
+def test_hosted_image_always_implies_hosted() -> None:
+    for path in (
+        "src/pii_guard/config.py",
+        "ui/src/App.tsx",
+        "eval/results/runs/run.json",
+        "docs/benchmarks/config.json",
+        "Dockerfile.hosted",
+        "deploy/azure/entrypoint.py",
+    ):
+        selected = classify([path])
+        assert not selected["hosted-image"] or selected["hosted"], path
 
 
 def _git(*args: str) -> str:
@@ -99,4 +120,4 @@ def test_non_pr_events_always_run_every_package(
     # Not a git repository: non-PR selection must not need a diff or a base revision.
     result = subprocess.run([sys.executable, str(SCRIPT)], capture_output=True, text=True)  # noqa: S603
     assert result.returncode == 0
-    assert result.stdout == "ui=true\ndocker=true\nwheel=true\nhosted=true\n"
+    assert result.stdout == "ui=true\ndocker=true\nwheel=true\nhosted=true\nhosted-image=true\n"
