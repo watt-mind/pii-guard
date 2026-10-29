@@ -1532,8 +1532,8 @@ sponsorship is unavailable) or `disabled`. `issue_key: true` issues one endpoint
 raw only in that response, while the endpoint has no active key. `meta_api_key` converts a
 `needs_key` sponsored default endpoint, in place, to an own-key `meta` endpoint on
 `https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The
-operation is one atomic store update (a single conditional write on the Blob store, retried
-once after a conflict), so repeat sign-ins and concurrent first requests never create a second
+operation is one atomic store update (a single conditional write on the Blob store, re-read and
+retried up to three times after a conflict), so repeat sign-ins and concurrent first requests never create a second
 endpoint. It spends no daily request or token budget and takes no runtime.
 
 ### Projects, policies and endpoints

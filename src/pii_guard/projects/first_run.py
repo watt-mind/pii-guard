@@ -13,13 +13,13 @@ client snippets straight after sign-in:
 
 Provisioning is owner-scoped and idempotent: it creates the endpoint only when the default
 project has none, and it runs as one atomic store operation (one snapshot read and conditional
-write for the Blob store, the store's lock for the local one), so repeat sign-ins and concurrent
-first requests never create a second one. No schema change: an existing snapshot loads as is.
+write for the Blob store, retried after a conflict; the store's lock for the local one), so
+repeat sign-ins and concurrent first requests never create a second one. No schema change: an
+existing snapshot loads as is.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from pydantic import SecretStr
@@ -31,6 +31,8 @@ from pii_guard.upstreams import PRESETS
 DEFAULT_ENDPOINT_NAME = "Default endpoint"
 FIRST_RUN_KEY_NAME = "First-run key"
 META_BASE_URL = PRESETS["meta"].base_url
+# Conditional-write attempts on the Blob store before a conflict is reported.
+BLOB_ATTEMPTS = 3
 
 
 def endpoint_state(endpoint: dict[str, Any], *, sponsored_enabled: bool) -> str:
@@ -135,12 +137,14 @@ def ensure_first_run(
         )
 
     if isinstance(store, BlobProjectStore):
-        run: Callable[[], dict[str, Any]] = lambda: store._run(operation)  # noqa: E731
-        try:
-            return run()
-        except ProjectStorageError:
-            # A concurrent writer won the conditional write: read again and decide again, so
-            # the loser sees the winner's endpoint instead of creating its own.
-            return run()
+        # A concurrent writer that wins the conditional write makes ours fail: read again and
+        # decide again, so the loser sees the winner's endpoint (and key) instead of creating
+        # its own. Bounded, so a store that keeps failing still surfaces as an error.
+        for _ in range(BLOB_ATTEMPTS - 1):
+            try:
+                return store._run(operation)
+            except ProjectStorageError:
+                continue
+        return store._run(operation)
     with store._lock:
         return operation(store)

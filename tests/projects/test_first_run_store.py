@@ -15,13 +15,14 @@ from pydantic import SecretStr
 from pii_guard.policy import PolicySet
 from pii_guard.projects.blob import BlobProjectStore
 from pii_guard.projects.first_run import (
+    BLOB_ATTEMPTS,
     DEFAULT_ENDPOINT_NAME,
     FIRST_RUN_KEY_NAME,
     META_BASE_URL,
     endpoint_state,
     ensure_first_run,
 )
-from pii_guard.projects.store import InvalidProjectConfigError, ProjectStore
+from pii_guard.projects.store import InvalidProjectConfigError, ProjectStorageError, ProjectStore
 
 MASTER_KEY = b"synthetic-project-key".ljust(32, b"!")
 OWNER = "synthetic-owner"
@@ -262,6 +263,42 @@ def test_concurrent_replicas_create_one_endpoint_in_the_blob() -> None:
     assert len(ids) == 1 and [e["id"] for e in fresh.list_endpoints(OWNER, project)] == list(ids)
     # Exactly one conflict, resolved by one fresh read.
     assert blob.version == 2
+
+
+class ConflictingBlob(SharedBlob):
+    """Loses the conditional write ``conflicts`` times, as if other replicas kept winning."""
+
+    def __init__(self, conflicts: int) -> None:
+        super().__init__()
+        self.conflicts = conflicts
+
+    def compare_and_swap(self, value: bytes, etag: str) -> None:
+        with self.lock:
+            lose, self.conflicts = self.conflicts > 0, self.conflicts - 1
+        if lose:
+            with self.lock:
+                self.writes += 1
+            raise RuntimeError("synthetic HTTP 412")
+        super().compare_and_swap(value, etag)
+
+
+def test_repeated_conflicts_are_retried_then_reported() -> None:
+    # Two lost writes in a row (three racing replicas) still provision exactly one endpoint.
+    blob = ConflictingBlob(conflicts=0)
+    blob_store(blob).initialize_empty()
+    blob.conflicts = BLOB_ATTEMPTS - 1
+    result = ensure_first_run(blob_store(blob), OWNER, model=MODEL, sponsored_enabled=True)
+    project = blob_store(blob).default_project(OWNER)["id"]
+    assert [e["id"] for e in blob_store(blob).list_endpoints(OWNER, project)] == [
+        result["endpoint"]["id"]
+    ]
+    # A store that never accepts the write surfaces as a storage error, not a loop.
+    stuck = ConflictingBlob(conflicts=0)
+    blob_store(stuck).initialize_empty()
+    stuck.conflicts = BLOB_ATTEMPTS
+    with pytest.raises(ProjectStorageError):
+        ensure_first_run(blob_store(stuck), OWNER, model=MODEL, sponsored_enabled=True)
+    assert stuck.writes == BLOB_ATTEMPTS
 
 
 def test_first_run_loads_and_extends_an_existing_snapshot(blob: SharedBlob) -> None:
