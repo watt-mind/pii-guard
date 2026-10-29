@@ -73,7 +73,7 @@ const NAV: readonly { href: string; label: string; wide?: boolean }[] = [
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
 const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
 
-const link = "underline underline-offset-4 hover:text-ink";
+const link = "inline-flex min-h-6 items-center underline underline-offset-4 hover:text-ink";
 
 /** Anonymous visitors get the public page; a signed-in owner gets the console (`console`). */
 export function HostedApp({ call = request, console: renderConsole }: { call?: Requester; console?: (session: HostedSession) => ReactNode }) {
@@ -458,13 +458,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
         <p className="text-muted">Open-source privacy gateway for AI agents. Every example on this page is fictional.</p>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-          <a className="text-ink hover:underline" href={SOURCE}>Source code</a>
-          <a className="text-ink hover:underline" href={SELF_HOST}>Self-host</a>
-          <a className="text-ink hover:underline" href={`${DOCS}/integrations/README.md`}>Integrate</a>
-          <a className="text-ink hover:underline" href="#data">Your data</a>
-          <a className="text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks</a>
-          {PRIVACY_NOTICE_URL && <a className="text-ink hover:underline" href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
-          <a className="text-ink hover:underline" href={CONTACT_URL ?? `${SOURCE}/issues`}>{CONTACT_URL ? "Contact" : "Questions and issues"}</a>
+          <a className="inline-flex min-h-6 items-center text-ink hover:underline" href={SOURCE}>Source code</a>
+          <a className="inline-flex min-h-6 items-center text-ink hover:underline" href={SELF_HOST}>Self-host</a>
+          <a className="inline-flex min-h-6 items-center text-ink hover:underline" href={`${DOCS}/integrations/README.md`}>Integrate</a>
+          <a className="inline-flex min-h-6 items-center text-ink hover:underline" href="#data">Your data</a>
+          <a className="inline-flex min-h-6 items-center text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks</a>
+          {PRIVACY_NOTICE_URL && <a className="inline-flex min-h-6 items-center text-ink hover:underline" href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
+          <a className="inline-flex min-h-6 items-center text-ink hover:underline" href={CONTACT_URL ?? `${SOURCE}/issues`}>{CONTACT_URL ? "Contact" : "Questions and issues"}</a>
         </nav>
         <p className="text-xs text-muted">Apache-2.0 · Built for the Meta Global AI Developer Hackathon 2026</p>
         {OPERATOR && <p className="text-xs text-muted">Operated by {OPERATOR}.</p>}
