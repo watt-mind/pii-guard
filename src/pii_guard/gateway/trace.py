@@ -38,8 +38,25 @@ __all__ = ["MODEL_WITHHELD", "CallTrace", "new_request_id"]
 MODEL_WITHHELD = "[withheld]"
 #: Model ids as providers write them (``org/name:tag``, ``name@version``); no spaces.
 _MODEL_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}")
-#: An e-mail address hidden in an otherwise id-shaped string.
-_EMAIL_RE = re.compile(r"[^@/:\s]+@[^@\s]+\.[A-Za-z]{2,}")
+
+
+def _contains_email(value: str) -> bool:
+    """True when an e-mail address hides in an otherwise id-shaped string.
+
+    Linear scan rather than a regex, so a hostile model name cannot make it backtrack.
+    """
+    for at, char in enumerate(value):
+        if char != "@" or at == 0 or value[at - 1] in "@/: \t\r\n":
+            continue
+        domain = value[at + 1 :].split("@", 1)[0]
+        for dot in range(1, len(domain) - 2):
+            if (
+                domain[dot] == "."
+                and domain[dot + 1 : dot + 3].isascii()
+                and domain[dot + 1 : dot + 3].isalpha()
+            ):
+                return True
+    return False
 
 
 def new_request_id() -> str:
@@ -58,7 +75,7 @@ def _json(raw: bytes | None) -> Any:
 def _model_id(value: object) -> str | None:
     if not isinstance(value, str):
         return None
-    if _MODEL_ID_RE.fullmatch(value) and not _EMAIL_RE.search(value):
+    if _MODEL_ID_RE.fullmatch(value) and not _contains_email(value):
         return value
     return MODEL_WITHHELD
 
