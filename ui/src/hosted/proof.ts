@@ -63,3 +63,9 @@ export const IMAGE_PROOF = [
   { value: "83.8 %", label: "Signatures covered", hint: "Self-hosted with SAM 3.1; kept visible in the hosted preview" },
   { value: "37.9 %", label: "All labelled regions", hint: "Presidio Image Redactor 13.3 %. Printed text is the weak spot: 15.0 %" },
 ] as const;
+
+/**
+ * Where it's weaker, from the same report: Gretel finance (PII Guard fast vs Presidio, 27–28 Oct),
+ * over-masking on CEE-PII, and MAPA EUR-Lex (21 EU languages, 42 docs).
+ */
+export const WEAKER = { gretel: "19.0", gretelPresidio: "18.8", ceeOverMasking: "26.4", mapaLeak: "8.5" } as const;
