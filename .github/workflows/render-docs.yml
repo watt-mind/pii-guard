@@ -30,6 +30,8 @@ concurrency:
 
 env:
   UV_LOCKED: "1"
+  # Keep in step with the uv image pinned in Dockerfile/Dockerfile.hosted.
+  UV_VERSION: "0.13.6"
 
 jobs:
   render:
@@ -46,6 +48,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: false
       - run: uv sync --no-dev
       - name: Render, commit the generated files, push to develop

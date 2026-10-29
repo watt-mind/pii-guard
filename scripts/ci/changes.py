@@ -12,7 +12,7 @@ import subprocess
 import sys
 from collections.abc import Iterable
 
-JOBS = ("ui", "docker", "wheel", "hosted")
+JOBS = ("ui", "docker", "wheel", "hosted", "hosted-image")
 # Metadata used by Python installation, Docker COPY, or the wheel's UI build.
 SHARED_FILES = {
     "pyproject.toml",
@@ -28,6 +28,13 @@ SHARED_FILES = {
 }
 # --print-index currently calls build_outputs: dataset counts and colours are inputs too.
 BENCHMARK_PREFIXES = ("eval/results/", "eval/datasets/results/", "docs/benchmarks/")
+# Only these deploy/azure files enter Dockerfile.hosted (COPY/bind) or its CI smoke. The rest
+# is deployment-time policy checked by the fast hosted-infra job without an image build.
+HOSTED_IMAGE_FILES = {
+    "deploy/azure/ci_hosted_smoke.py",
+    "deploy/azure/entrypoint.py",
+    "deploy/azure/venv_layer.py",
+}
 # These paths are checked elsewhere in CI and are not packaging inputs. Any new top-level
 # area or root configuration file falls back to all packaging checks until classified here.
 NON_PACKAGING_PREFIXES = ("tests/", "docs/", "eval/", "training/", "examples/", ".github/")
@@ -42,11 +49,21 @@ def classify(paths: Iterable[str]) -> dict[str, bool]:
         elif path.startswith("src/"):
             # The report imports other package modules; UI validation must see source changes.
             selected.update(JOBS)
-        elif path.startswith("ui/") or path.startswith(BENCHMARK_PREFIXES):
+        elif (
+            path.startswith("ui/")
+            or path.startswith("eval/results/")
+            or path == "docs/benchmarks/config.json"
+        ):
+            selected.update(("ui", "wheel", "hosted", "hosted-image"))
+        elif path.startswith(BENCHMARK_PREFIXES):
+            # Dataset counts/colours feed the runner-side report and UI, but Dockerfile.hosted
+            # copies only eval/results and docs/benchmarks/config.json (handled above).
             selected.update(("ui", "wheel", "hosted"))
         elif path == ".dockerignore":
-            selected.update(("docker", "hosted"))
-        elif path == "Dockerfile.hosted" or path.startswith("deploy/azure/"):
+            selected.update(("docker", "hosted", "hosted-image"))
+        elif path == "Dockerfile.hosted" or path in HOSTED_IMAGE_FILES:
+            selected.update(("hosted", "hosted-image"))
+        elif path.startswith("deploy/azure/"):
             selected.add("hosted")
         elif path in {"Dockerfile", "scripts/ci/docker_smoke.sh"}:
             selected.add("docker")
