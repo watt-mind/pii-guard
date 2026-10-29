@@ -646,3 +646,58 @@ def test_transcript_keeps_the_expiry_date_when_asked() -> None:
     outcome = label_image(_expiry_ocr(), [], VaultMatcher(session, "hu"), expiry="keep")
     assert outcome.transcript == "Expiry 2020.01.01."
     assert outcome.summary["expiry"] == "2020-01-01"
+
+
+# --- nested duplicate labels and photo caption clipping (LAB-1488) ------------------------------
+
+
+def test_nested_same_label_cover_prints_its_label_once() -> None:
+    # The face inside its ID photo carries the same label: the inner cover is drawn (fill
+    # and border) without its own label, exactly like a labelless cover.
+    image = magenta_png((400, 200))
+    outer = LabelBox(Box(10, 10, 300, 150), "PHOTO · [[PERSON_a1b2c3]]")
+    inner = LabelBox(Box(60, 30, 200, 120), "PHOTO · [[PERSON_a1b2c3]]")
+    assert (
+        render_labels(image, [outer, inner]).image
+        == render_labels(image, [outer, LabelBox(inner.box, None)]).image
+    )
+
+
+def test_nested_different_labels_still_print_both() -> None:
+    image = magenta_png((400, 200))
+    outer = LabelBox(Box(10, 10, 300, 150), "PHOTO · [[PERSON_a1b2c3]]")
+    inner = LabelBox(Box(60, 30, 200, 120), "[[PERSON_a1b2c3]]")
+    assert (
+        render_labels(image, [outer, inner]).image
+        != render_labels(image, [outer, LabelBox(inner.box, None)]).image
+    )
+
+
+def test_photo_cover_is_clipped_at_swallowed_caption_starts() -> None:
+    from pii_guard.visual.masking import clip_photo
+
+    photo = Region(EntityType.ID_PHOTO, Box(10, 79, 329, 561), 0.95, "yunet")
+    face = Box(87, 120, 253, 410)
+    caption = OcrWord("Családi", Box(290, 110, 360, 125), (0,))
+    inside = OcrWord("smudge", Box(300, 200, 320, 220), (1,))  # fully inside: not a start
+    left = OcrWord("KÁRTYA", Box(40, 40, 120, 60), (2,))  # left of the face: untouched
+    clipped = clip_photo(photo, face, [caption, inside, left])
+    assert clipped.box == Box(10, 79, 287, 561)
+    assert clipped.entity_type is EntityType.ID_PHOTO and clipped.source == "yunet"
+
+
+def test_photo_cover_never_shrinks_past_its_face() -> None:
+    from pii_guard.visual.masking import _clip_photos, clip_photo
+
+    photo = Region(EntityType.ID_PHOTO, Box(10, 79, 329, 561), 0.95, "yunet")
+    face = Box(87, 120, 253, 410)
+    assert clip_photo(photo, None, [OcrWord("Családi", Box(290, 110, 360, 125), (0,))]) is photo
+    assert clip_photo(photo, face, []) is photo
+    # A word starting left of the face's right edge is no caption start: unchanged.
+    assert clip_photo(photo, face, [OcrWord("Családi", Box(200, 110, 400, 125), (0,))]) is photo
+    regions = [
+        photo,
+        Region(EntityType.FACE, face, 0.95, "yunet"),
+    ]
+    (clipped, *_) = _clip_photos(regions, [OcrWord("Családi", Box(290, 110, 360, 125), (0,))])
+    assert clipped.box.x2 == 287

@@ -1,8 +1,8 @@
 {
-  "recorded": "2026-10-29",
+  "recorded": "2026-10-30",
   "note": "scripts/record_image_labels.py: POST /v1/mask/image with render=labels on ui/public/samples/id-card-en.png (fictional specimen), configured like the hosted preview (segmenter local/YuNet, Tesseract, rules; signatures and stamps kept), in the session that masked the message. Value-free: placeholders only, no image.",
   "message": {
-    "masked": "[[PERSON_da8daa]] is the seller. Is her ID card attached, and is it still valid?"
+    "masked": "[[PERSON_d97488]] is the seller. Is her ID card attached, and is it still valid?"
   },
   "image": {
     "media_type": "image/png",
@@ -21,8 +21,8 @@
         "detector": "yunet",
         "score": 0.9436,
         "policy": "mask",
-        "placeholder": "[[PERSON_da8daa]]",
-        "label": "PHOTO · [[PERSON_da8daa]]",
+        "placeholder": "[[PERSON_d97488]]",
+        "label": "PHOTO · [[PERSON_d97488]]",
         "match": "fuzzy",
         "match_confidence": null,
         "cover_box": [
@@ -32,7 +32,7 @@
           482
         ],
         "label_lines": [
-          "PHOTO · [[PERSON_da8daa]]"
+          "PHOTO · [[PERSON_d97488]]"
         ],
         "label_px": 21
       },
@@ -48,8 +48,8 @@
         "detector": "yunet",
         "score": 0.9436,
         "policy": "mask",
-        "placeholder": "[[PERSON_da8daa]]",
-        "label": "PHOTO · [[PERSON_da8daa]]",
+        "placeholder": "[[PERSON_d97488]]",
+        "label": "PHOTO · [[PERSON_d97488]]",
         "match": "fuzzy",
         "match_confidence": null,
         "cover_box": [
@@ -59,7 +59,7 @@
           358
         ],
         "label_lines": [
-          "PHOTO · [[PERSON_da8daa]]"
+          "PHOTO · [[PERSON_d97488]]"
         ],
         "label_px": 11
       },
@@ -75,8 +75,8 @@
         "detector": "captions",
         "score": 0.8,
         "policy": "mask",
-        "placeholder": "[[PERSON_da8daa]]",
-        "label": "[[PERSON_da8daa]]",
+        "placeholder": "[[PERSON_d97488]]",
+        "label": "[[PERSON_d97488]]",
         "match": "fuzzy",
         "match_confidence": 1.0,
         "cover_box": [
@@ -86,7 +86,7 @@
           150
         ],
         "label_lines": [
-          "[[PERSON_da8daa]]"
+          "[[PERSON_d97488]]"
         ],
         "label_px": 17
       },
@@ -102,18 +102,18 @@
         "detector": "captions",
         "score": 0.8,
         "policy": "mask",
-        "placeholder": "[[PERSON_da8daa]]",
-        "label": "[[PERSON_da8daa]]",
+        "placeholder": "[[PERSON_d97488]]",
+        "label": "[[PERSON_d97488]]",
         "match": "fuzzy",
         "match_confidence": 1.0,
         "cover_box": [
           317,
           174,
-          440,
+          443,
           196
         ],
         "label_lines": [
-          "[[PERSON_da8daa]]"
+          "[[PERSON_d97488]]"
         ],
         "label_px": 13
       },
@@ -129,18 +129,18 @@
         "detector": "captions",
         "score": 0.8,
         "policy": "mask",
-        "placeholder": "[[DATE_OF_BIRTH_9b7830]]",
-        "label": "[[DATE_OF_BIRTH_9b7830]]",
+        "placeholder": "[[DATE_OF_BIRTH_01776a]]",
+        "label": "[[DATE_OF_BIRTH_01776a]]",
         "match": "new",
         "match_confidence": null,
         "cover_box": [
           318,
           219,
-          493,
+          492,
           242
         ],
         "label_lines": [
-          "[[DATE_OF_BIRTH_9b7830]]"
+          "[[DATE_OF_BIRTH_01776a]]"
         ],
         "label_px": 13
       },
@@ -156,18 +156,18 @@
         "detector": "captions",
         "score": 0.8,
         "policy": "mask",
-        "placeholder": "[[ID_DOCUMENT_ff33c9]]",
-        "label": "[[ID_DOCUMENT_ff33c9]]",
+        "placeholder": "[[ID_DOCUMENT_e7045c]]",
+        "label": "[[ID_DOCUMENT_e7045c]]",
         "match": "new",
         "match_confidence": null,
         "cover_box": [
           317,
           262,
-          475,
+          482,
           296
         ],
         "label_lines": [
-          "[[ID_DOCUMENT_ff33c9]]"
+          "[[ID_DOCUMENT_e7045c]]"
         ],
         "label_px": 13
       }
@@ -213,23 +213,23 @@
         "reason": null
       }
     },
-    "transcript": "FICTIONAL SPECIMEN AUTHORITY\nIDENTITY CARD\nSurname\n[[PERSON_da8daa]]\nGiven names\n[[PERSON_da8daa]]\nDate of birth Sex\n[[DATE_OF_BIRTH_9b7830]] F\nDocument no. Nationality\n[[ID_DOCUMENT_ff33c9]] UTO\nExpiry\n30 JUN 2031\n[PHOTO · [[PERSON_da8daa]]]\nLEO,\nMINTA/ SPECIMEN : Al-generated fictional specimen",
+    "transcript": "FICTIONAL SPECIMEN AUTHORITY\nIDENTITY CARD\nSurname\n[[PERSON_d97488]]\nGiven names\n[[PERSON_d97488]]\nDate of birth Sex\n[[DATE_OF_BIRTH_01776a]] F\nDocument no. Nationality\n[[ID_DOCUMENT_e7045c]] UTO\nExpiry\n[EXPIRY]\n[PHOTO · [[PERSON_d97488]]]\nLEO,\nMINTA/ SPECIMEN : Al-generated fictional specimen",
     "summary": {
       "document_type": "id_card",
-      "holder": "[[PERSON_da8daa]]",
+      "holder": "[[PERSON_d97488]]",
       "holder_match": "fuzzy",
       "holder_confidence": 1.0,
-      "document_number": "[[ID_DOCUMENT_ff33c9]]",
+      "document_number": "[[ID_DOCUMENT_e7045c]]",
       "issuing_country": null,
       "expiry": null,
       "expired": false,
       "mrz_present": false,
       "mrz_valid": null,
       "fields_found": {
-        "date_of_birth": "[[DATE_OF_BIRTH_9b7830]]",
-        "document_number": "[[ID_DOCUMENT_ff33c9]]",
-        "given_names": "[[PERSON_da8daa]]",
-        "surname": "[[PERSON_da8daa]]"
+        "date_of_birth": "[[DATE_OF_BIRTH_01776a]]",
+        "document_number": "[[ID_DOCUMENT_e7045c]]",
+        "given_names": "[[PERSON_d97488]]",
+        "surname": "[[PERSON_d97488]]"
       },
       "fields_uncertain": []
     },
@@ -239,7 +239,7 @@
     }
   },
   "answer": {
-    "masked": "Yes: the attached ID card belongs to [[PERSON_da8daa]], and it has not expired.",
+    "masked": "Yes: the attached ID card belongs to [[PERSON_d97488]], and it has not expired.",
     "by": "stand-in model reading the masked summary"
   }
 }
