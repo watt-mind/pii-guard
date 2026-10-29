@@ -10,6 +10,8 @@ param environmentName string = 'prod'
 param location string = resourceGroup().location
 @description('Production public ingress remains an explicit release gate.')
 param publicEnabled bool = false
+@description('Prod stage only: the driver read the live app as already external (LAB-1541). Keeps, never opens, public ingress.')
+param preserveExternalIngress bool = false
 @description('Dev only: driver has verified the actual internal environment, disabled public network access, and reviewed proxy/TLS/ACL evidence. This flag is not evidence itself.')
 param privateDevReviewed bool = false
 @description('Reviewed immutable hosted image reference, shared by dev and prod.')
@@ -85,7 +87,8 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
       maxInactiveRevisions: 2
       ingress: {
         // An internal environment needs app-external ingress for its VNet proxy to wake it.
-        external: environmentName == 'dev' ? true : publicEnabled
+        // A prod stage keeps the live app's flag instead of rewriting it internal (LAB-1541).
+        external: environmentName == 'dev' ? true : (publicEnabled || preserveExternalIngress)
         targetPort: 8787
         transport: 'http'
         allowInsecure: false
