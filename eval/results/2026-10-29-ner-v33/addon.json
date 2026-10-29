@@ -1,0 +1,159 @@
+{
+  "seed": 1512,
+  "dev_seed": 151200,
+  "files": {
+    "hu-v33-names-train.jsonl": {
+      "documents": 1500,
+      "pii_free_documents": 0,
+      "gold_spans": {
+        "EMAIL": 456,
+        "PERSON": 5260
+      },
+      "distinct_full_names": 2414
+    },
+    "hu-v33-names-dev.jsonl": {
+      "documents": 150,
+      "pii_free_documents": 0,
+      "gold_spans": {
+        "EMAIL": 50,
+        "PERSON": 519
+      },
+      "distinct_full_names": 249
+    },
+    "pl-v33-names-train.jsonl": {
+      "documents": 300,
+      "pii_free_documents": 0,
+      "gold_spans": {
+        "PERSON": 911
+      },
+      "distinct_full_names": 309
+    },
+    "pl-v33-names-dev.jsonl": {
+      "documents": 30,
+      "pii_free_documents": 0,
+      "gold_spans": {
+        "PERSON": 90
+      },
+      "distinct_full_names": 46
+    },
+    "de-v33-names-train.jsonl": {
+      "documents": 300,
+      "pii_free_documents": 0,
+      "gold_spans": {
+        "PERSON": 897
+      },
+      "distinct_full_names": 326
+    },
+    "de-v33-names-dev.jsonl": {
+      "documents": 30,
+      "pii_free_documents": 0,
+      "gold_spans": {
+        "PERSON": 83
+      },
+      "distinct_full_names": 44
+    },
+    "hu-v33-payload-train.jsonl": {
+      "documents": 200,
+      "pii_free_documents": 133,
+      "gold_spans": {
+        "EMAIL": 26,
+        "PERSON": 41
+      },
+      "distinct_full_names": 41
+    },
+    "hu-v33-payload-dev.jsonl": {
+      "documents": 20,
+      "pii_free_documents": 12,
+      "gold_spans": {
+        "EMAIL": 4,
+        "PERSON": 4
+      },
+      "distinct_full_names": 4
+    },
+    "en-v33-payload-train.jsonl": {
+      "documents": 200,
+      "pii_free_documents": 138,
+      "gold_spans": {
+        "EMAIL": 22,
+        "PERSON": 40
+      },
+      "distinct_full_names": 37
+    },
+    "en-v33-payload-dev.jsonl": {
+      "documents": 20,
+      "pii_free_documents": 15,
+      "gold_spans": {
+        "EMAIL": 3,
+        "PERSON": 2
+      },
+      "distinct_full_names": 2
+    },
+    "de-v33-payload-train.jsonl": {
+      "documents": 200,
+      "pii_free_documents": 140,
+      "gold_spans": {
+        "EMAIL": 24,
+        "PERSON": 36
+      },
+      "distinct_full_names": 36
+    },
+    "de-v33-payload-dev.jsonl": {
+      "documents": 20,
+      "pii_free_documents": 12,
+      "gold_spans": {
+        "EMAIL": 4,
+        "PERSON": 4
+      },
+      "distinct_full_names": 4
+    },
+    "hu-v33-agent-train.jsonl": {
+      "documents": 200,
+      "pii_free_documents": 147,
+      "gold_spans": {
+        "PERSON": 53
+      },
+      "distinct_full_names": 53
+    },
+    "hu-v33-agent-dev.jsonl": {
+      "documents": 20,
+      "pii_free_documents": 11,
+      "gold_spans": {
+        "PERSON": 9
+      },
+      "distinct_full_names": 9
+    },
+    "en-v33-agent-train.jsonl": {
+      "documents": 200,
+      "pii_free_documents": 155,
+      "gold_spans": {
+        "PERSON": 45
+      },
+      "distinct_full_names": 39
+    },
+    "en-v33-agent-dev.jsonl": {
+      "documents": 20,
+      "pii_free_documents": 16,
+      "gold_spans": {
+        "PERSON": 4
+      },
+      "distinct_full_names": 4
+    },
+    "de-v33-agent-train.jsonl": {
+      "documents": 200,
+      "pii_free_documents": 152,
+      "gold_spans": {
+        "PERSON": 48
+      },
+      "distinct_full_names": 45
+    },
+    "de-v33-agent-dev.jsonl": {
+      "documents": 20,
+      "pii_free_documents": 15,
+      "gold_spans": {
+        "PERSON": 5
+      },
+      "distinct_full_names": 5
+    }
+  },
+  "eval_name_overlap": 0
+}

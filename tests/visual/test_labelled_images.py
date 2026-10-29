@@ -514,7 +514,7 @@ def test_gateway_sends_labelled_image_with_transcript_and_masks_text_seen_in_the
     with TestClient(app) as http:
         response = http.post("/v1/chat/completions", json={"model": "m", "messages": messages})
     assert response.status_code == 200, response.text
-    parts = forwarded[0]["messages"][0]["content"]
+    parts = forwarded[0]["messages"][-1]["content"]
     assert [p["type"] for p in parts] == ["text", "image_url", "text"]
     annotation = parts[2]["text"]
     assert "Document summary:" in annotation and "Masked transcript:" in annotation
@@ -559,7 +559,7 @@ def test_gateway_opaque_setting_sends_no_annotation() -> None:
         assert http.post(
             "/v1/chat/completions", json={"model": "m", "messages": messages}
         ).is_success
-    assert [p["type"] for p in forwarded[0]["messages"][0]["content"]] == ["image_url"]
+    assert [p["type"] for p in forwarded[0]["messages"][-1]["content"]] == ["image_url"]
 
 
 def _name_line(text: str) -> list[OcrWord]:

@@ -1,7 +1,7 @@
 # Using the gateway
 
-pii-guard's gateway is a drop-in for any OpenAI-compatible client: point the client at
-pii-guard instead of the provider. Every message is masked when it arrives, the masked request
+PII Guard's gateway is a drop-in for any OpenAI-compatible client: point the client at
+PII Guard instead of the provider. Every message is masked when it arrives, the masked request
 is forwarded, and the answer (streamed or not) comes back with the real values restored. How it
 is built: [architecture.md](architecture.md#gateway-the-proxy). Running and exposing it:
 [operations.md](operations.md).
@@ -93,8 +93,10 @@ for chunk in stream:
 | `X-PII-Guard-Session-Source` | response | Which step chose the session: `header`, `path`, `prompt_cache_key` or `default`. Also in the traffic record (`session_source`). |
 | `X-PII-Guard-Mode` | both | Request: `fast` (rules + NER, no model call; the default) or `audit` (+ the LLM detector). The response carries the mode that ran. |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
-| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). |
+| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). `placeholder_note` says whether the [placeholder note](#placeholder-note) was added. |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
+| `X-PII-Guard-Placeholder-Note` | response | `added` when the [placeholder note](#placeholder-note) went upstream with the request. |
+| `X-PII-Guard-Outbound-Check` | response | `passed` when the [outbound re-check](#outbound-re-check) found no value the session knows in the masked request; `blocked` on the `422 outbound_check_failed` refusal. Also in the traffic record (`outbound_check`). |
 | `X-PII-Guard-Request-Id` | response | The call's id in the traffic log; with `PII_GUARD_SERVER_TIMING=true` a `Server-Timing` header gives the per-stage latency ([operations.md](operations.md#timing)). |
 
 ## Sessions
@@ -142,13 +144,72 @@ session then waits under the prefix, and the first main key with that prefix and
 takes it over instead of starting a second one (LAB-1341). The path URL that `connect` writes
 needs none of this.
 
+## Placeholder note
+
+When the masked request holds at least one placeholder this session issued, the gateway puts
+one constant system note in front of the conversation (Chat Completions: a first `system`
+message; Responses: the start of `instructions`). It says placeholders are opaque reference
+tokens, not real data, to be copied exactly as written, and that they are restored after the
+answer. Without it, `muse-spark-1.3` declined 5 of 15 synthetic agent turns over the label
+inside a placeholder (`[[NATIONAL_ID_HU_TAJ_…]]`: "a sensitive health-insurance identifier");
+with it, 0 of 15 ([LAB-1471](../eval/results/2026-10-29-lab-1471-placeholder-refusals/README.md)).
+
+The note is the same text for every request: no value, no placeholder, nothing from the
+request. It is added after masking and isn't scanned, it holds no placeholder-shaped token,
+and the echo (`X-PII-Guard-Echo: masked`) reports it as `placeholder_note: true` next to the
+client's masked messages rather than as one of them. Placeholders keep their type label
+([ADR 0007](decisions/0007-keyed-pseudonyms.md#addendum-2026-10-29-the-placeholder-note-lab-1471)).
+`PII_GUARD_GATEWAY_PLACEHOLDER_NOTE=false` turns it off.
+
+## Outbound re-check
+
+After masking, and before anything goes upstream, the gateway reads the masked request once
+more with the same request walker and searches every text in it for the values its vault
+session holds (LAB-1500, `pii_guard.gateway.outbound`): messages of every role, tool
+definitions, tool-call arguments, tool results, reasoning text, metadata, and the transcript
+and summary sent after a masked image, in Chat Completions and the Responses API, streamed or
+not. The values are those detected in this request and in earlier ones on the session, and
+the operator's pre-loaded known values. They are matched with the vault's own occurrence
+patterns: case, whitespace, Unicode form, `ß`/`ss` and the language's inflection, so
+`TESZT ELEK-nek` is found for `Teszt Elek`. Placeholders never count.
+
+A value found there refuses the request: `422 outbound_check_failed`, the message lists entity
+types and counts only, `X-PII-Guard-Outbound-Check: blocked`, and nothing is sent. Since the
+upstream call is never made, a streamed request gets a JSON error, not a stream. A request
+created by the refused call drops its session, as any refused call does. A request that passes
+carries `X-PII-Guard-Outbound-Check: passed`.
+
+**Short values.** Every value the session holds is searched for, but only one that can't be a
+common short token blocks:
+
+| Value | Blocks from |
+|---|---|
+| pre-loaded (`known`) | always (they are at least 3 characters by their own rule) |
+| a number (no letter) | 6 digits: the gateway's bare-number threshold (LAB-1348) |
+| found only by the NER | 4 letters and digits: the NER reads short words (`pi`, `len`, `89`) as names |
+| found by the rules or the LLM | 3 letters and digits |
+
+A shorter occurrence is counted (`outbound_check.short` in the traffic record) and lets the
+request through: the sweep already masks every occurrence of every value, so a short one left
+over is one the sweep meant to leave alone, and refusing on it would refuse requests over the
+guard's own noise. The exemptions masking makes on purpose apply too: an NER-only value where
+the text's structure rules it out (a product name, a path, a code identifier, LAB-1470/1482),
+an id the upstream issued in the session (LAB-1469), and a declared tool name in an identifier
+(LAB-1324). A tool name that is also a pre-loaded known value still blocks.
+
+Cost: one fold per text (texts masking left unchanged come from the session's memo) and one
+substring search per session value over all texts; a value is matched text by text only when
+it can occur. On the latency corpus it adds well under the 2 ms budget
+([LAB-1500 results](../eval/results/2026-10-29-lab-1500-outbound-check/README.md)).
+
 ## Failing closed
 
 A detection error or timeout (`PII_GUARD_GATEWAY_DETECTION_TIMEOUT`, 30 s), a request field
 or content part it can't mask (remote image URLs, audio, files, unknown keys), or a missing
-tenant key or upstream return an error and nothing is forwarded. Inline images are masked with
+tenant key or upstream return an error and nothing is forwarded. So does a masked request that
+still holds a value the session knows ([outbound re-check](#outbound-re-check)). Inline images are masked with
 SAM 3.1 and OCR, and refused when those aren't available. The full field table is in
 [contracts.md](contracts.md). Further
 settings (`PII_GUARD_GATEWAY_MODE`, `_UPSTREAM_TIMEOUT`, `_CACHE_SIZE`, `_CONCURRENCY`,
-`_KEEP_TYPES`) are documented in `src/pii_guard/gateway/config.py`. Without
+`_KEEP_TYPES`, `_PLACEHOLDER_NOTE`) are documented in `src/pii_guard/gateway/config.py`. Without
 `PII_GUARD_UPSTREAM_API_KEY`, the client's own `Authorization` header is forwarded.

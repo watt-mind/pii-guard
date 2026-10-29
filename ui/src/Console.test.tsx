@@ -85,6 +85,7 @@ describe("console shell", () => {
     const nav = screen.getByRole("navigation", { name: "Console" });
     expect(within(nav).getAllByRole("link")).toHaveLength(8);
     for (const name of ["Overview", "Playground", "Logs", "Vault", "Projects", "Connect", "Policy", "Evaluation"]) expect(within(nav).getByRole("link", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: /^Playground/ })).toHaveTextContent("Try text, chat and images");
     expect(within(nav).getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
     expect(region("Overview")).toBeVisible();
   });
@@ -100,6 +101,16 @@ describe("console shell", () => {
     render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: vi.fn(() => ({ close() {} })), fixtureIntervalMs: 60_000 }} loadStatus={statusOf()} />);
     expect(region(section)).toBeVisible();
     expect(location.hash).toBe(now);
+  });
+
+  it("mounts the Images screen, and so its sample images, only once it is opened (LAB-1458)", async () => {
+    const { container } = render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: vi.fn(() => ({ close() {} })), fixtureIntervalMs: 60_000 }} loadStatus={statusOf()} />);
+    expect(container.querySelector('img[src^="/samples/"]')).toBeNull();
+    act(() => {
+      history.replaceState(null, "", "#playground/images");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    await waitFor(() => expect(container.querySelector('img[src^="/samples/"]')).not.toBeNull());
   });
 
   it("switches sections on a hash change, also away from Images (LAB-1294)", async () => {
@@ -143,9 +154,17 @@ describe("console shell", () => {
     expect(menu).toHaveAttribute("aria-expanded", "false");
     await user.click(menu);
     expect(menu).toHaveAttribute("aria-expanded", "true");
+    const destination = screen.getByRole("main");
+    const scroll = vi.spyOn(destination, "scrollIntoView").mockImplementation(() => {
+      expect(menu).toHaveAttribute("aria-expanded", "false");
+      expect(location.hash).toBe("#connect");
+    });
     await user.click(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /^Connect/ }));
     expect(menu).toHaveAttribute("aria-expanded", "false");
     expect(location.hash).toBe("#connect");
+    expect(screen.getByRole("main")).toHaveFocus();
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
+    scroll.mockRestore();
     await user.click(menu);
     await user.keyboard("{Escape}");
     expect(menu).toHaveAttribute("aria-expanded", "false");
@@ -166,6 +185,21 @@ describe("Overview", () => {
     expect(within(overview).queryByRole("list", { name: /counters/i })).toBeNull();
     expect(within(overview).queryByText("Requests")).toBeNull();
     expect(await within(overview).findByText("http://127.0.0.1:8899/v1")).toBeInTheDocument();
+  });
+
+  it.each([
+    [{ state: "limited", message: "Request allowance reached", retryAfterMs: 4000 }, "Too many requests just now, so the traffic log is paused.", /retries by itself in about 4 s/],
+    [{ state: "denied", reason: "signed_out", message: "Sign in" }, "You're signed out, so the traffic log can't be read.", /answered 401\. Sign in again/],
+    [{ state: "denied", reason: "forbidden", message: "denied" }, "This account can't read this traffic log.", /answered 403/],
+  ] as [TrafficStatus, string, RegExp][])("says %o is not an unreachable API (LAB-1437)", async (status, title, body) => {
+    const f = fakeConnect();
+    render(<App api={liveApi()} mock={createMockClient()} traffic={{ connect: f.connect }} loadStatus={statusOf()} />);
+    await f.ready();
+    f.push([], status);
+    const overview = region("Overview");
+    expect(await within(overview).findByText(title)).toBeInTheDocument();
+    expect(within(overview).getByText(body)).toBeInTheDocument();
+    expect(within(overview).queryByText("The PII Guard API isn't reachable.")).toBeNull();
   });
 
   it("counts real calls: requests, values masked, blocked, top types and stage latency", async () => {
@@ -208,7 +242,7 @@ describe("Overview", () => {
   it("says what it can't know in demo mode instead of guessing", async () => {
     render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: vi.fn(() => ({ close() {} })), fixtureIntervalMs: 60_000 }} />);
     const overview = region("Overview");
-    expect((await within(overview).findAllByText(/Unknown: the pii-guard API isn't reachable/)).length).toBe(2);
+    expect((await within(overview).findAllByText(/Unknown: the PII Guard API isn't reachable/)).length).toBe(2);
   });
 });
 
@@ -227,7 +261,7 @@ describe("Connect", () => {
     history.replaceState(null, "", "#connect");
     render(<App api={offlineApi()} mock={createMockClient()} />);
     const connect = region("Connect");
-    expect(await within(connect).findByText(/the pii-guard API isn't reachable/)).toBeInTheDocument();
+    expect(await within(connect).findByText(/the PII Guard API isn't reachable/)).toBeInTheDocument();
     expect(within(connect).getByTestId("gateway-url")).toHaveTextContent("http://127.0.0.1:8787/v1");
   });
 });

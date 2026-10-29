@@ -1,7 +1,7 @@
-# pi behind pii-guard
+# pi behind PII Guard
 
 [pi](https://pi.dev) (`@earendil-works/pi-coding-agent`) is a terminal coding agent that
-accepts any OpenAI-compatible endpoint as a custom provider. With pii-guard in between, pi
+accepts any OpenAI-compatible endpoint as a custom provider. With PII Guard in between, pi
 reads your files, runs tools and writes code as usual. The model only ever sees placeholders,
 and pi's tool calls come back with the real values, so the files it writes are correct.
 
@@ -79,7 +79,7 @@ dashboard    : http://localhost:5173/#traffic (with PII_GUARD_TRAFFIC_LOG=masked
 pi 1.4.0 sends `model`, `messages` (`system`, `user`, `assistant` with `tool_calls`, `tool`
 with `tool_call_id`), `tools` (read, bash, edit, write), `stream: true`,
 `stream_options.include_usage` and `max_completion_tokens`. The fail-closed allow-list already
-covers all of these, so no request is refused. pii-guard masks:
+covers all of these, so no request is refused. PII Guard masks:
 
 - your prompt, pi's system prompt and every tool result (file contents, command output);
 - the arguments of earlier tool calls in the history, string by string inside the JSON;
@@ -93,13 +93,13 @@ on the mini-repo plus repository code; see the
 [over-masking record](../../examples/coding-agents/runs/2026-10-27-coding-agent-overmask-fast.json)).
 Secrets are not masked either: API keys, tokens and passwords are not personal data types.
 In the end-to-end runs all 3 fake secrets from `.env` reached the model. Don't let an agent
-read real secrets through pii-guard.
+read real secrets through PII Guard.
 
 ## The end-to-end test
 
 `examples/coding-agents/mini-repo` is a fictional support-desk project: a client letter, a
 customer CSV, a `.env` and some code. pi gets one task: read them, then write `reply.md` with
-the client's IBAN, e-mail and phone and every customer's e-mail.
+the client's IBAN, email and phone and every customer's email.
 
 ```bash
 uv run pytest tests/integrations/test_pi_e2e.py        # CI: scripted mock model; needs node + npm
@@ -145,5 +145,5 @@ values. Two things showed up with the real model:
 | pi shows `400 unsupported_content` | A request field the gateway can't mask yet (fail closed). The message names the field, never the value. Please report it; newer pi versions may add fields |
 | pi shows `401` | The gateway runs with `PII_GUARD_API_TOKEN`: export it in pi's shell, and rerun `connect pi` so the provider uses `$PII_GUARD_API_TOKEN` |
 | The model writes placeholders into files | It invented or changed one (`[[EMAIL_xyz]]` that isn't in the conversation). Only placeholders the session issued are restored |
-| The model refuses to copy personal data | It sees placeholders and plays safe. Tell it they are restored locally (see above) |
-| `--check` says "no pii_guard echo" or "no pii-guard headers" | `baseUrl` points at the model itself, not at pii-guard |
+| The model refuses to copy personal data | It sees placeholders and plays safe. The gateway tells it they are opaque tokens restored locally ([placeholder note](../architecture-gateway.md#placeholder-note), on by default since LAB-1471); if it still refuses, say so in `AGENTS.md` too (see above) |
+| `--check` says "no pii_guard echo" or "no pii-guard headers" | `baseUrl` points at the model itself, not at PII Guard |

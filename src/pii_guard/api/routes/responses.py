@@ -85,7 +85,9 @@ def get_responses_gateway(request: Request) -> ResponsesGateway:
 
 
 @router.post(
-    "/v1/responses", tags=["gateway"], responses=error_responses("detection_profile_denied")
+    "/v1/responses",
+    tags=["gateway"],
+    responses=error_responses("detection_profile_denied", "outbound_check_failed"),
 )
 async def responses(request: Request) -> Response:
     gateway = get_responses_gateway(request)

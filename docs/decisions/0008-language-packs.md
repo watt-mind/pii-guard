@@ -19,7 +19,7 @@ that were each made per-language on their own:
 
 Adding a language meant knowing all four, and the rules had no notion of language at all, so a
 format that is only unambiguous in one language's texts (a 4-digit Hungarian postcode before a
-capitalised word) also ran on English text ("In 2019 Robin moved").
+capitalized word) also ran on English text ("In 2019 Robin moved").
 
 ## Decision
 
@@ -40,9 +40,9 @@ Rules for a language come in two scopes:
 
 - **`EVERYWHERE`**: identifiers with a checksum or a distinctive, validated format (Hungarian
   tax ID, TAJ, giro, company numbers, `+36` phone numbers; US SSN `123-45-6789`; UK NINO).
-  They run for every text: a Hungarian tax ID in an English e-mail is still personal data.
+  They run for every text: a Hungarian tax ID in an English email is still personal data.
 - **`RULES`**: formats that are only unambiguous in that language's texts (postcodes, vehicle
-  plates, national phone formats without a country code, labelled ID numbers). They run only
+  plates, national phone formats without a country code, labeled ID numbers). They run only
   when the request's `language` matches the pack.
 
 Language-independent rules (IBAN, email, `+<country>` phone numbers, payment cards) live in

@@ -9,6 +9,10 @@ interface ImportMetaEnv {
   readonly VITE_PII_GUARD_CHAT_MODEL?: string;
   /** Model "Send demo traffic" (Live traffic screen) asks for; default pii-guard-mock. */
   readonly VITE_PII_GUARD_DEMO_MODEL?: string;
+  /** The landing's 3-minute demo video (a page or file URL); the slot is hidden while unset. */
+  readonly VITE_PII_GUARD_DEMO_VIDEO_URL?: string;
+  /** Optional poster image for the demo video slot. */
+  readonly VITE_PII_GUARD_DEMO_VIDEO_POSTER?: string;
 }
 
 interface ImportMeta {

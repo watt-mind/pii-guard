@@ -107,3 +107,61 @@ def test_status_reports_the_traffic_log_level(monkeypatch: pytest.MonkeyPatch) -
 )
 def test_upstream_origin(url: str | None, origin: str | None) -> None:
     assert upstream_origin(url) == origin
+
+
+# The local response's keys before LAB-1431: unchanged, plus ``capabilities`` (ADR 0013).
+LOCAL_KEYS = {
+    "version",
+    "gateway",
+    "rest",
+    "ner",
+    "upstream",
+    "images",
+    "policies",
+    "auth",
+    "default_language",
+    "traffic_log",
+    "vault_inspect",
+    "metrics",
+}
+CAPABILITIES = {
+    "text",
+    "chat",
+    "images",
+    "logs",
+    "vault",
+    "server_policy",
+    "projects",
+    "connect",
+    "evaluation",
+    "accounts",
+}
+
+
+def test_local_status_shape_is_unchanged_plus_capabilities(api: TestClient) -> None:
+    body = api.get("/v1/status", headers={"host": "localhost:8787"}).json()
+    assert set(body) == LOCAL_KEYS | {"capabilities"}
+    assert set(body["gateway"]["modes"]) == {"fast", "audit"}
+    assert body["capabilities"] == {
+        "text": True,
+        "chat": True,
+        "images": True,
+        "logs": False,  # PII_GUARD_TRAFFIC_LOG is off by default
+        "vault": True,  # PII_GUARD_VAULT_INSPECT=masked by default
+        "server_policy": True,
+        "projects": True,
+        "connect": True,
+        "evaluation": True,
+        "accounts": False,
+    }
+
+
+def test_local_capabilities_follow_the_log_and_inspector_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PII_GUARD_TRAFFIC_LOG", "masked")
+    monkeypatch.setenv("PII_GUARD_VAULT_INSPECT", "off")
+    body = _client(Settings(tenant_key=TEST_TENANT_KEY)).get("/v1/status").json()
+    assert body["capabilities"]["logs"] is True
+    assert body["capabilities"]["vault"] is False
+    assert set(body["capabilities"]) == CAPABILITIES

@@ -3,8 +3,9 @@
 - :func:`restore_response` rewrites a ``response`` object in place: every string the upstream
   wrote (``output`` message text, refusals, reasoning summaries, the request fields it echoes
   back) is restored; ``arguments`` (JSON) are restored with JSON-string-escaped values
-  (:class:`~pii_guard.gateway.restore.JsonEscapingSession`); ``encrypted_content`` is never
-  touched.
+  (:class:`~pii_guard.gateway.restore.JsonEscapingSession`); custom tool ``input`` with
+  :class:`~pii_guard.gateway.restore.ToolInputSession`. Both also restore a regex-escaped
+  placeholder as a regex literal (LAB-1481). ``encrypted_content`` is never touched.
 - :class:`ResponsesSseRestorer` rewrites the ``response.*`` server-sent events. Every delta
   stream (``response.output_text.delta``, ``response.refusal.delta``,
   ``response.function_call_arguments.delta``, ``response.reasoning_summary_text.delta``,
@@ -26,14 +27,17 @@ Unknown placeholders are left as is and counted (``unresolved``).
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
+from pii_guard.gateway.opaque_ids import upstream_ids
 from pii_guard.gateway.restore import (
     JsonEscapingSession,
     RestoreReport,
+    ToolInputSession,
     restore_arguments,
     restore_text,
+    restore_tool_input,
 )
 from pii_guard.vault import RestoreBudget, StreamUnmasker, VaultSession
 
@@ -50,20 +54,22 @@ DONE = "[DONE]"
 _OPAQUE = frozenset({"encrypted_content"})
 #: JSON documents (tool-call arguments): restored with JSON-escaped values.
 _JSON_FIELDS = frozenset({"arguments"})
+#: Freeform tool input (custom tool calls): regex-escaped placeholders restored too.
+_TOOL_FIELDS = frozenset({"input"})
 
-#: delta event -> (stream name, index fields, JSON-escaped?). The ``.done`` event of the same
-#: stream has the same prefix.
-_DELTAS: dict[str, tuple[str, tuple[str, ...], bool]] = {
-    "response.output_text.delta": ("text", ("output_index", "content_index"), False),
-    "response.refusal.delta": ("refusal", ("output_index", "content_index"), False),
+#: delta event -> (stream name, index fields, session kind: text, json or tool). The ``.done``
+#: event of the same stream has the same prefix.
+_DELTAS: dict[str, tuple[str, tuple[str, ...], str]] = {
+    "response.output_text.delta": ("text", ("output_index", "content_index"), "text"),
+    "response.refusal.delta": ("refusal", ("output_index", "content_index"), "text"),
     "response.reasoning_summary_text.delta": (
         "summary",
         ("output_index", "summary_index"),
-        False,
+        "text",
     ),
-    "response.reasoning_text.delta": ("reasoning", ("output_index", "content_index"), False),
-    "response.function_call_arguments.delta": ("arguments", ("output_index",), True),
-    "response.custom_tool_call_input.delta": ("input", ("output_index",), False),
+    "response.reasoning_text.delta": ("reasoning", ("output_index", "content_index"), "text"),
+    "response.function_call_arguments.delta": ("arguments", ("output_index",), "json"),
+    "response.custom_tool_call_input.delta": ("input", ("output_index",), "tool"),
 }
 _DONES = {name[: -len(".delta")] + ".done": name for name in _DELTAS}
 
@@ -80,6 +86,8 @@ def _restore_value(
             return value
         if key in _JSON_FIELDS:
             return restore_arguments(session, value, report, budget)
+        if key in _TOOL_FIELDS:
+            return restore_tool_input(session, value, report, budget)
         restored, _, unresolved = restore_text(session, value, budget)
         report.unresolved.update(dict.fromkeys(unresolved))
         return restored
@@ -158,11 +166,15 @@ class ResponsesSseRestorer:
     """Rewrites ``response.*`` events; feed them in order with :meth:`process`, then
     :meth:`finish`. Each returns ``(event name, data)`` pairs to emit."""
 
-    def __init__(self, session: VaultSession) -> None:
+    def __init__(
+        self, session: VaultSession, on_ids: Callable[[list[str]], None] | None = None
+    ) -> None:
+        """``on_ids`` receives the ids each event carries, raw (LAB-1469)."""
         self._session = session
+        self._on_ids = on_ids
         # One budget for every event of the stream (LAB-1350).
         self._budget = session.restore_budget()
-        self._json_session = JsonEscapingSession(session, self._budget)
+        self._tool_session = ToolInputSession(session, self._budget)
         self._unmaskers: dict[tuple[Any, ...], StreamUnmasker] = {}
         #: The last delta event of each stream: the template for a flushed remainder.
         self._last_delta: dict[tuple[Any, ...], dict[str, Any]] = {}
@@ -188,10 +200,14 @@ class ResponsesSseRestorer:
         """Per output index, the upstream (masked) ``output_text`` seen so far."""
         return {index: "".join(parts) for index, parts in self._masked_text.items()}
 
-    def _unmasker(self, key: tuple[Any, ...], json_safe: bool) -> StreamUnmasker:
+    def _unmasker(self, key: tuple[Any, ...], kind: str) -> StreamUnmasker:
         unmasker = self._unmaskers.get(key)
         if unmasker is None:
-            session: Any = self._json_session if json_safe else self._session
+            # A JSON adapter tracks where it is in the arguments, so one per stream (LAB-1483).
+            session: Any = {
+                "json": JsonEscapingSession(self._session, self._budget),
+                "tool": self._tool_session,
+            }.get(kind, self._session)
             unmasker = StreamUnmasker(session, self._budget)
             self._unmaskers[key] = unmasker
         return unmasker
@@ -224,6 +240,8 @@ class ResponsesSseRestorer:
         event_type = parsed.get("type") if isinstance(parsed.get("type"), str) else event
         if event_type == "error" or (event_type is None and "error" in parsed):
             return [self._emit(_error("upstream_error", "upstream stream error"))]
+        if self._on_ids is not None:
+            self._on_ids(upstream_ids(parsed))
         if event_type in _DELTAS:
             return [self._emit(self._delta(event_type, parsed))]
         out: list[tuple[str | None, str]] = []
@@ -244,12 +262,12 @@ class ResponsesSseRestorer:
         if not isinstance(delta, str):
             return data
         key = self._key(event_type, data)
-        _, _, json_safe = _DELTAS[event_type]
+        _, _, kind = _DELTAS[event_type]
         if event_type == "response.output_text.delta":
             index = data.get("output_index")
             if isinstance(index, int):
                 self._masked_text.setdefault(index, []).append(delta)
-        data["delta"] = self._unmasker(key, json_safe).feed(delta)
+        data["delta"] = self._unmasker(key, kind).feed(delta)
         self._last_delta[key] = {k: v for k, v in data.items() if k not in ("delta", "logprobs")}
         return data
 

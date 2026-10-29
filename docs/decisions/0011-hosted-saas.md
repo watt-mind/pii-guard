@@ -4,6 +4,11 @@
 > record's statements that all user configuration and API-key records are ephemeral. The
 > hosted project metadata database currently lives on ephemeral container storage; request
 > mappings, traffic and quota state remain in memory.
+>
+> Follow-up: [ADR 0014](0014-hosted-local-images.md) (2026-10-28) enables hosted **images**
+> for signed-in Google owners, processed on the replica only (Tesseract and the on-device
+> segmenter; no SAM, no remote detector). Uploads of documents and remote LLM detection stay
+> disabled as decided below.
 
 - **Status:** accepted design; public launch remains gated
 - **Date:** 2026-10-28

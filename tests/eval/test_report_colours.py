@@ -88,7 +88,11 @@ def test_registry_round_trips_with_sorted_keys(tmp_path: Path) -> None:
     assert dumps_registry(loaded) == path.read_text(encoding="utf-8")
 
 
+# untraced on the committed-report checks: they rebuild the report from every committed run
+# record, about 7x slower under the branch tracer, and the code they run is covered on the
+# bounded ``report_repo`` copy (tests/eval/conftest.py) by the tests below (LAB-1447).
 @committed_report
+@pytest.mark.untraced
 def test_committed_registry_covers_every_system_in_the_index() -> None:
     reg = load_registry(REPO_ROOT / DEFAULT_REGISTRY)
     index = current_index(REPO_ROOT)
@@ -103,6 +107,7 @@ def test_committed_registry_covers_every_system_in_the_index() -> None:
 
 @pytest.mark.slow
 @committed_report
+@pytest.mark.untraced
 def test_regenerating_without_changes_is_byte_identical(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

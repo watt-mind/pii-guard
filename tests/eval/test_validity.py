@@ -286,11 +286,11 @@ def test_pool_and_compact() -> None:
     assert compact["matches_headline"] is True and compact["rerun"] is False
 
 
-def test_committed_ai4privacy_records_carry_the_breakdown() -> None:
+def test_committed_ai4privacy_records_carry_the_breakdown(
+    committed_records: list[dict[str, Any]],
+) -> None:
     """Acceptance: every system shown on ai4privacy (hu/en/de) has a breakdown."""
-    from pii_guard.eval.record import load_records
-
-    index = build_index(load_records(RUNS), featured=[])
+    index = build_index(committed_records, featured=[])
     snaps = [s for s in index["snapshots"] if s["fixture_set"] == "ai4privacy"]
     assert snaps
     for s in snaps:

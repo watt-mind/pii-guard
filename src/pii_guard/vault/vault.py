@@ -24,6 +24,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pii_guard.detect.ner_context import sweep_vetoed
 from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
 from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
 from pii_guard.vault.fold import FoldedText, fold_value, fold_views, spaced
@@ -64,6 +65,7 @@ __all__ = [
     "SessionNotFoundError",
     "UnmaskOutputTooLargeError",
     "UnmaskResult",
+    "Unmasked",
     "Vault",
     "VaultSession",
 ]
@@ -100,6 +102,33 @@ DEFAULT_MAX_RESTORED_CHARS = 1_000_000
 #: other natural-language values (and their inflection), and IBANs, plates, ID numbers and
 #: e-mail addresses, which are case-insensitive by their own rules.
 CASE_SENSITIVE_TYPES: frozenset[EntityType] = frozenset({EntityType.SECRET})
+
+#: Number-like identifier types a detector can confuse with each other: the same digits read
+#: as a Steuer-ID (``ID_DOCUMENT``) in a Markdown list and as an adóazonosító jel
+#: (``NATIONAL_ID_HU_TAX``) in a JSON ``tax_id`` field. A value one of them already holds
+#: keeps that placeholder when another type finds it again, so one value is one placeholder
+#: per session (LAB-1475: two placeholders for one value sent agents into a "fix the copy"
+#: loop). Names, addresses and e-mails keep their own keys.
+IDENTIFIER_TYPES: frozenset[EntityType] = frozenset(
+    {
+        EntityType.PHONE,
+        EntityType.DATE_OF_BIRTH,
+        EntityType.NATIONAL_ID_HU_TAX,
+        EntityType.NATIONAL_ID_HU_TAJ,
+        EntityType.ID_DOCUMENT,
+        EntityType.BANK_ACCOUNT,
+        EntityType.COMPANY_ID_HU,
+        EntityType.PARCEL_NUMBER_HU,
+        EntityType.VEHICLE_PLATE,
+    }
+)
+
+#: Learned detectors whose values the sweep checks against the text's structure first
+#: (:func:`pii_guard.detect.ner_context.sweep_vetoed`, LAB-1470).
+MODEL_DETECTORS: frozenset[str] = frozenset({"ner", "ner_gliner"})
+#: Spans that only repeat a value the session already holds (the gateway's restored answer,
+#: ``gateway.restore.RESTORED_DETECTOR``): they leave an entry's provenance as it is.
+NEUTRAL_DETECTORS: frozenset[str] = frozenset({"gateway"})
 
 
 class SessionNotFoundError(PiiGuardError):
@@ -220,6 +249,7 @@ class _Entry:
         "exact",
         "initials",
         "language",
+        "model_only",
         "needles",
         "normalized",
         "order",
@@ -263,6 +293,11 @@ class _Entry:
         self.seen_folded: dict[str, str] = {}
         self.casing = casing_class(original)
         self.variants: dict[str, _Entry] = {}
+        # Only a learned model (the NER) has found this value so far: the sweep then leaves
+        # occurrences that the structure of the text rules out (a file extension, a path
+        # segment, a code identifier, a tool name; LAB-1470) alone. Any other detector's span
+        # (rules, the LLM, a known value) clears it for good.
+        self.model_only = False
         # Case-sensitive types only (:data:`CASE_SENSITIVE_TYPES`): the exact keys
         # (:func:`_exact`) an occurrence of this value or of a surface may be written as.
         self.exact: frozenset[str] | None = None
@@ -530,6 +565,8 @@ class VaultSession:
         self._lock = threading.RLock()
         self._by_key: dict[tuple[EntityType, str], _Entry] = {}
         self._by_placeholder: dict[str, _Entry] = {}
+        # Normalized value -> the first entry of an :data:`IDENTIFIER_TYPES` type holding it.
+        self._identifiers: dict[str, _Entry] = {}
         # Placeholder-shaped tokens seen in input that this session did not issue. They are
         # never issued later, so a token the caller wrote can't turn into a masked value.
         self._reserved: set[str] = set()
@@ -578,6 +615,7 @@ class VaultSession:
             self._closed = True
             self._by_key.clear()
             self._by_placeholder.clear()
+            self._identifiers.clear()
             self._reserved.clear()
             self._known.clear()
             self._folds.clear()
@@ -628,6 +666,7 @@ class VaultSession:
             memo: dict[int, Any] = {}
             fork._by_key = copy.deepcopy(self._by_key, memo)
             fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
+            fork._identifiers = copy.deepcopy(self._identifiers, memo)
             fork._reserved = set(self._reserved)
             fork._generation = self._generation
             fork._masked = None  # its journal is replayed in full anyway
@@ -839,7 +878,7 @@ class VaultSession:
         depends: set[tuple[EntityType, str]] | None = set() if key is not None else None
         for plan in self._plans(text, ordered, matcher, depends):
             span, end = plan.span, plan.span.start + plan.stem_length
-            entry = self._entry_for(span.entity_type, plan.lemma, language)
+            entry = self._entry_for(span.entity_type, plan.lemma, language, span.detector)
             if entry.add_surface(span.text):
                 self._touch(entry)
             for alias in plan.aliases:
@@ -934,8 +973,11 @@ class VaultSession:
     ) -> None:
         """Add each occurrence in ``found`` (in its order) that overlaps nothing taken yet."""
         for entry, own, aliases in found:
+            guarded = entry.model_only
             for start, end in own:
                 if any(taken[start:end]):
+                    continue
+                if guarded and sweep_vetoed(text, start, end, entry.entity_type, language):
                     continue
                 replacements.append((start, end, self._cased(entry, text[start:end])))
                 taken[start:end] = b"\x01" * (end - start)
@@ -946,13 +988,20 @@ class VaultSession:
                 for start, end in occurrences:
                     if any(taken[start:end]):
                         continue
+                    if guarded and sweep_vetoed(text, start, end, entry.entity_type, language):
+                        continue
                     written = text[start:end]
                     owner = entry
                     kind = entry.entity_type
                     if not following_suffix(text, end) and _value_key(kind, written) == _value_key(
                         kind, alias
                     ):
-                        owner = self._entry_for(entry.entity_type, written, language)
+                        owner = self._entry_for(
+                            entry.entity_type,
+                            written,
+                            language,
+                            "ner" if entry.model_only else None,
+                        )
                     replacements.append((start, end, self._cased(owner, written)))
                     taken[start:end] = b"\x01" * (end - start)
 
@@ -1132,17 +1181,33 @@ class VaultSession:
                 plans[index] = _Plan(span, choice.lemma, len(choice.stem))
         return [plan for plan in plans if plan is not None]
 
-    def _entry_for(self, entity_type: EntityType, value: str, language: str = "hu") -> _Entry:
+    def _entry_for(
+        self,
+        entity_type: EntityType,
+        value: str,
+        language: str = "hu",
+        detector: str | None = None,
+    ) -> _Entry:
+        """The entry of ``value``, created if new. ``detector`` found it (``None``: unknown,
+        which counts as a validated source): see :attr:`_Entry.model_only`."""
         normalized = _value_key(entity_type, value)
         key = (entity_type, normalized)
         entry = self._by_key.get(key)
+        if entry is None and entity_type in IDENTIFIER_TYPES:
+            entry = self._identifiers.get(normalized)
         if entry is not None:
+            if entry.model_only and detector not in MODEL_DETECTORS | NEUTRAL_DETECTORS:
+                entry.model_only = False
+                self._touch(entry)  # a remask ``since`` now must scan it everywhere
             return entry
         placeholder = self._new_placeholder(entity_type, normalized)
         entry = _Entry(placeholder, entity_type, value, normalized, language)
+        entry.model_only = detector in MODEL_DETECTORS
         entry.order = len(self._by_key)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
+        if entity_type in IDENTIFIER_TYPES:
+            self._identifiers.setdefault(normalized, entry)
         self._touch(entry)
         return entry
 
@@ -1271,11 +1336,94 @@ class VaultSession:
         """How many placeholders this session has issued (casing and layout variants too)."""
         return len(self._by_placeholder)
 
+    def issued_any(self, text: str) -> bool:
+        """Whether ``text`` holds a placeholder this session issued (and so can restore)."""
+        with self._lock:
+            self._check_alive()
+            return any(m.group(0) in self._by_placeholder for m in PLACEHOLDER_RE.finditer(text))
+
     def entities(self) -> list[tuple[str, EntityType, int]]:
         """``(placeholder, entity_type, count)`` for every placeholder this session issued."""
         with self._lock:
             self._check_alive()
             return [(e.placeholder, e.entity_type, e.count) for e in self._by_placeholder.values()]
+
+    def unmasked(self, texts: Sequence[str], language: str = "hu") -> list[Unmasked]:
+        """Every occurrence of a value this session holds that is still written out in ``texts``.
+
+        The outbound re-check (LAB-1500): ``texts`` are what is about to leave the guard, and
+        any value found here would leave it real. The values are the session's confirmed
+        entries (with their surfaces and aliases) and its pre-loaded known values. Each is
+        searched with the sweep's own patterns over the sweep's folded views (case,
+        whitespace, Unicode form, ``ß``/``ss``, inflection), so a value is found however
+        :meth:`mask` would have found it. The sweep's guards apply too: an NER-only value
+        where the text's structure rules it out (``sweep_vetoed``) and a case-sensitive value
+        in another casing are not occurrences. Neither is anything inside a placeholder
+        token. Overlapping occurrences count once, the longest value first.
+
+        Read-only: no entry, count, memo or generation changes. The result holds offsets,
+        types and flags, never a value.
+        """
+        with self._lock:
+            self._check_alive()
+            views = [self._folds.get(text) or fold_views(text) for text in texts]
+            # One string with every view: a value none of whose needles is in it can't occur
+            # in any text, so most entries are skipped after one substring search each.
+            joined = (FoldedText("", "\x00".join(v.text for vs in views for v in vs)),)
+            taken = [bytearray(len(text)) for text in texts]
+            for index, text in enumerate(texts):
+                for match in PLACEHOLDER_RE.finditer(text):
+                    taken[index][match.start() : match.end()] = b"\x01" * (
+                        match.end() - match.start()
+                    )
+            found: list[Unmasked] = []
+
+            def add(index: int, start: int, end: int, unmasked: Unmasked) -> None:
+                if end > start and not any(taken[index][start:end]):
+                    taken[index][start:end] = b"\x01" * (end - start)
+                    found.append(unmasked)
+
+            entries = sorted(self._by_key.values(), key=lambda e: (-len(e.normalized), e.order))
+            for entry in entries:
+                entry.pattern(language)  # compiles the pattern and its prefilter
+                needles = [entry.prefilter(language)]
+                needles += [n for _, _, n in entry.alias_pattern_list(language)]
+                if all(_absent(n, joined) for n in needles):
+                    continue
+                chars, digits = _value_shape(entry.normalized)
+                for index, text in enumerate(texts):
+                    _, own, aliases = self._found(entry, language, views[index], text)
+                    for start, end in itertools.chain(own, *(o for _, o in aliases)):
+                        if entry.model_only and sweep_vetoed(
+                            text, start, end, entry.entity_type, language
+                        ):
+                            continue
+                        add(
+                            index,
+                            start,
+                            end,
+                            Unmasked(
+                                index,
+                                start,
+                                end,
+                                entry.entity_type,
+                                chars,
+                                digits,
+                                model_only=entry.model_only,
+                            ),
+                        )
+            for item, pattern in self._known.patterns(language):
+                if pattern.search(joined[0].text) is None:
+                    continue
+                chars, digits = _value_shape(normalize_value(item.value))
+                for index, view in enumerate(views):
+                    for start, end in _occurrences(pattern, view):
+                        occurrence = Unmasked(
+                            index, start, end, item.entity_type, chars, digits, known=True
+                        )
+                        add(index, start, end, occurrence)
+            found.sort(key=lambda u: (u.index, u.start))
+            return found
 
     def confirmed_values(self, entity_types: Iterable[EntityType]) -> list[str]:
         """The confirmed values of ``entity_types``, as first written, plus pre-loaded ones.
@@ -1293,6 +1441,32 @@ class VaultSession:
                 dict.fromkeys(v.value for v in self._known.values() if v.entity_type in types)
             )
             return list(found)
+
+
+@dataclass(frozen=True, slots=True)
+class Unmasked:
+    """One occurrence of a session value still written out (:meth:`VaultSession.unmasked`).
+
+    ``index`` is the text it is in, ``start``/``end`` its offsets there. ``chars`` counts the
+    letters and digits of the value, ``digits_only`` says it has no letter; ``model_only``:
+    only a learned model (the NER) has found the value; ``known``: the operator pre-loaded it.
+    Never the value itself.
+    """
+
+    index: int
+    start: int
+    end: int
+    entity_type: EntityType
+    chars: int
+    digits_only: bool
+    model_only: bool = False
+    known: bool = False
+
+
+def _value_shape(normalized: str) -> tuple[int, bool]:
+    """Letters and digits in a value, and whether all of them are digits."""
+    alnum = [c for c in normalized if c.isalnum()]
+    return len(alnum), bool(alnum) and all(c.isdigit() for c in alnum)
 
 
 _WHITESPACE_RUN = re.compile(r"\s+")

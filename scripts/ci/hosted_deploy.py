@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import io
 import json
@@ -332,15 +333,43 @@ def release_evidence(image: str, target: str) -> dict:
             "streaming",
             "privacy_review",
         ]
-    if int(os.environ.get("HOSTED_SPONSORED_MICRODOLLARS") or "0") > 0:
-        required += ["meta_proxy_authorized"]
     if (
         not isinstance(evidence, dict)
         or evidence.get("image") != image
         or not all(evidence.get(key) is True for key in required)
     ):
         raise Refused("Reviewed release evidence does not authorize this exact image")
+    # As deploy/azure/deploy.sh: written Meta authorization, or the owner's recorded LAB-1389
+    # risk acceptance, which is not authorization and is never recorded as one (LAB-1461).
+    waiver = evidence.get("meta_proxy_owner_risk_accepted")
+    if waiver is not None and not owner_risk_acceptance_valid(waiver):
+        raise Refused("Malformed owner risk acceptance")
+    if (
+        int(os.environ.get("HOSTED_SPONSORED_MICRODOLLARS") or "0") > 0
+        and evidence.get("meta_proxy_authorized") is not True
+        and waiver is None
+    ):
+        raise Refused("Reviewed release evidence does not authorize this exact image")
     return evidence
+
+
+def owner_risk_acceptance_valid(waiver: object) -> bool:
+    """The exact LAB-1389 owner risk-acceptance object: four keys, a real, non-future date."""
+    if not isinstance(waiver, dict) or set(waiver) != {"by", "ref", "date", "scope"}:
+        return False
+    date = waiver["date"]
+    if not isinstance(date, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return False
+    try:
+        day = datetime.date.fromisoformat(date)
+    except ValueError:
+        return False
+    return (
+        waiver["by"] == "owner"
+        and waiver["ref"] == "LAB-1389"
+        and waiver["scope"] == "hackathon-demo"
+        and day <= datetime.datetime.now(datetime.UTC).date()
+    )
 
 
 def main() -> None:

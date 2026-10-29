@@ -81,6 +81,12 @@ def validate_base_url(value: str) -> str:
         raise EgressPolicyError() from None
 
 
+# NAT64 prefixes embed an IPv4 address that a translator reaches on the caller's behalf, so a
+# private or metadata IPv4 can hide behind a "global" IPv6 address. Python reports the
+# well-known 64:ff9b::/96 as global; the local-use 64:ff9b:1::/48 (RFC 8215) is refused too.
+_NAT64 = (ipaddress.ip_network("64:ff9b::/96"), ipaddress.ip_network("64:ff9b:1::/48"))
+
+
 def _check_addresses(addresses: tuple[str, ...]) -> tuple[str, ...]:
     if not addresses:
         raise EgressPolicyError()
@@ -99,7 +105,12 @@ def _check_addresses(addresses: tuple[str, ...]) -> tuple[str, ...]:
             or ip.is_link_local
             or (
                 isinstance(ip, ipaddress.IPv6Address)
-                and (ip.ipv4_mapped or ip.sixtofour or ip.teredo)
+                and (
+                    ip.ipv4_mapped
+                    or ip.sixtofour
+                    or ip.teredo
+                    or any(ip in network for network in _NAT64)
+                )
             )
         ):
             raise EgressPolicyError()

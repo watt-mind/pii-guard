@@ -1,20 +1,12 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
-import { firstRequest, loadSnippets, newSessionId, type Snippets, type SnippetsLoader, type SnippetsResult, type ToolId, type ToolSnippet } from "../api/connect";
+import { TOOLS, firstRequest, loadSnippets, newSessionId, type Snippets, type SnippetsLoader, type SnippetsResult, type ToolId, type ToolSnippet } from "../api/connect";
 import type { TrafficEvent, TrafficStatus } from "../api/traffic";
-import { Button } from "../components/ui";
+import { Button, SegmentedControl, Select } from "../components/ui";
 import { readPref, writePref } from "../lib/storage";
+import { exampleModel } from "../projects/api";
 import { totalMasked } from "../lib/traffic";
 
 /** The tabs, in order, while the server can't be asked (the server's list wins when it answers). */
-const TOOLS: { id: ToolId; label: string }[] = [
-  { id: "muse-code", label: "Muse Code" },
-  { id: "pi", label: "pi" },
-  { id: "codex", label: "Codex" },
-  { id: "opencode", label: "OpenCode" },
-  { id: "curl", label: "cURL" },
-  { id: "python", label: "Python" },
-  { id: "claude-code", label: "Claude Code" },
-];
 const isTool = (v: string | null): v is ToolId => TOOLS.some((t) => t.id === v);
 const SESSION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -80,10 +72,10 @@ export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSessio
   return (
     <section aria-labelledby="quickstart-title" className="min-w-0 overflow-hidden rounded-xl border border-line bg-surface">
       <div className="border-b border-line px-4 pt-4 sm:px-5">
-        <h2 id="quickstart-title" className="text-base font-medium text-ink">
+        <h2 id="quickstart-title" className="text-lg font-normal text-ink">
           Start building with your coding agent
         </h2>
-        <p className="mt-1 text-sm text-muted">Three steps: a gateway with a real model, one paste in your terminal, one prompt. Every block is filled in for this server.</p>
+        <p className="mt-0.5 text-sm text-muted">Three steps: a gateway with a real model, one paste in your terminal, one prompt. Every block is filled in for this server.</p>
         <ToolTabs tabs={tabs} tool={tool} onTool={setTool} />
       </div>
       <div id={`quickstart-panel-${tool}`} role="tabpanel" aria-labelledby={`quickstart-tab-${tool}`} className="space-y-6 p-4 sm:p-5">
@@ -119,7 +111,7 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: ToolId; label: string }[
     document.getElementById(`quickstart-tab-${next.id}`)?.focus();
   };
   return (
-    <div role="tablist" aria-label="Your tool" className="-mx-1 mt-3 flex gap-1 overflow-x-auto">
+    <div role="tablist" aria-label="Your tool" className="-mx-1 mt-3 flex gap-1 overflow-x-auto [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:[mask-image:none]">
       {tabs.map((t) => {
         const selected = t.id === tool;
         return (
@@ -134,7 +126,7 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: ToolId; label: string }[
             onClick={() => onTool(t.id)}
             onKeyDown={onKey}
             className={[
-              "relative shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+              "relative shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors pointer-coarse:min-h-11",
               "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full",
               selected ? "text-ink after:bg-ink" : "text-muted after:bg-transparent hover:text-ink",
             ].join(" ")}
@@ -172,24 +164,8 @@ function StartStep({ snippets }: { snippets: Snippets }) {
           <>No model provider is configured yet. Start the gateway with one:</>
         )}
       </p>
-      {presets.length > 1 && (
-        <div role="radiogroup" aria-label="Model provider" className="flex flex-wrap gap-1.5">
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              role="radio"
-              aria-checked={p.id === preset?.id}
-              onClick={() => setChosen(p.id)}
-              className={[
-                "h-8 rounded-md border px-2.5 text-xs transition-colors",
-                p.id === preset?.id ? "border-ink bg-surface-2 text-ink" : "border-line text-muted hover:border-line-strong hover:text-ink",
-              ].join(" ")}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+      {presets.length > 1 && preset && (
+        <SegmentedControl label="Model provider" size="sm" options={presets.map((p) => ({ value: p.id, label: p.label }))} value={preset.id} onChange={setChosen} className="overflow-x-auto" />
       )}
       {preset && <CodeBlock text={preset.command} label={`Copy the ${preset.label} start command`} />}
       {preset && (
@@ -225,17 +201,15 @@ function PasteStep({ snippets, snippet, onModel }: { snippets: Snippets; snippet
         {snippets.models.length > 1 && snippets.model !== null && snippet.code.includes(snippets.model) && (
           <label className="flex items-center gap-2">
             Model
-            <select
-              value={snippets.model ?? ""}
-              onChange={(e) => onModel(e.target.value)}
-              className="h-8 max-w-[16rem] rounded-lg border border-field bg-surface px-2 font-mono text-xs text-ink"
-            >
-              {snippets.models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <span className="w-64 max-w-full">
+              <Select size="sm" value={snippets.model ?? ""} onChange={(e) => onModel(e.target.value)}>
+                {snippets.models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </Select>
+            </span>
           </label>
         )}
         {snippet.tested_version && <span>Tested end to end with {snippet.label} {snippet.tested_version}.</span>}
@@ -245,7 +219,15 @@ function PasteStep({ snippets, snippet, onModel }: { snippets: Snippets; snippet
           </a>
         )}
       </div>
-      {!snippets.model && <p className="text-xs text-warn">The gateway lists no model yet: replace {mono("<model-id>")} with one your provider serves.</p>}
+      {!snippets.model &&
+        (snippets.endpoint ? (
+          <p className="text-xs text-muted">
+            This endpoint lets your client choose the model: replace {mono("<model-id>")} with the model your client uses
+            {exampleModel(snippets.upstream.preset) ? <>, for example {mono(exampleModel(snippets.upstream.preset)!)}</> : " (a model ID your endpoint serves)"}, or set it in the client’s own settings.
+          </p>
+        ) : (
+          <p className="text-xs text-warn">The gateway lists no model yet: replace {mono("<model-id>")} with one your provider serves.</p>
+        ))}
     </Step>
   );
 }
@@ -274,7 +256,7 @@ function FirstRequestStep({
   const noNames =
     ner === false ? (
       <p role="note" className="text-xs text-warn">
-        This server runs rules only: e-mail addresses, phone numbers and IBANs are masked, free-text names are not (they reach the model as written). Install the ner extra to mask names.
+        This server runs rules only: email addresses, phone numbers and IBANs are masked, free-text names are not (they reach the model as written). Install the ner extra to mask names.
       </p>
     ) : null;
   if (!snippets.session_ref || !traffic || traffic.source !== "api" || traffic.status.state === "disabled") {
@@ -285,7 +267,12 @@ function FirstRequestStep({
         <p className="text-xs text-muted">
           {traffic?.source === "fixture"
             ? "The console plays recorded demo traffic, so it can't watch for your first request here."
-            : "The traffic log is off, so this page can't watch for the first request. `pii-guard up` turns it on; with `pii-guard serve`, set PII_GUARD_TRAFFIC_LOG=masked."}
+            : (
+              <>
+                The traffic log is off, so this page can't watch for the first request. {mono("pii-guard up")} turns it on; with {mono("pii-guard serve")}, turn it on
+                yourself ({mono("PII_GUARD_TRAFFIC_LOG=masked")}).
+              </>
+            )}
         </p>
       </Step>
     );
@@ -321,7 +308,7 @@ function FirstRequestStep({
         )}
       </p>
       <p className="text-xs text-muted">
-        {ok && masked === 0 ? "Nothing personal in that one: try a prompt with a fictional name or e-mail address. " : null}
+        {ok && masked === 0 ? "Nothing personal in that one: try a prompt with a fictional name or email address. " : null}
         Every later call in this session shows up in Logs too.
       </p>
       {noNames}
@@ -349,7 +336,7 @@ function Unavailable({ missing, tool }: { missing: boolean; tool: ToolId }) {
   return (
     <div className="space-y-3 text-sm">
       <p className="text-ink">
-        {missing ? "This pii-guard server predates the quickstart." : "The pii-guard API isn't reachable from this page."} Start the gateway with a model, then reload:
+        {missing ? "This PII Guard server predates the quickstart." : "The PII Guard API isn't reachable from this page."} Start the gateway with a model, then reload:
       </p>
       <CodeBlock text={"export META_API_KEY=<your-key>\npii-guard up --upstream meta"} label="Copy the start command" />
       <p className="text-xs text-muted">
@@ -388,11 +375,11 @@ function Step({ n, title, done = false, children }: { n: number; title: string; 
 export function CodeBlock({ text, label }: { text: string; label: string }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-line bg-surface-2">
-      <div className="flex items-center justify-between gap-2 border-b border-line py-1 pr-1 pl-3">
+      <div className="flex items-center justify-between gap-2 border-b border-line py-1 pr-1.5 pl-3 pointer-coarse:pr-2">
         <span className="text-2xs text-muted">{text.startsWith("import ") || text.startsWith("from ") ? "Python" : "Terminal"}</span>
         <CopyButton text={text} label={label} />
       </div>
-      <pre className="min-w-0 overflow-x-auto px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre text-ink">{text}</pre>
+      <pre className="min-w-0 overflow-x-auto px-3 py-2 font-mono text-ui whitespace-pre text-ink">{text}</pre>
     </div>
   );
 }
@@ -411,13 +398,8 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
     );
   };
   return (
-    <button
-      type="button"
-      onClick={copy}
-      aria-label={label}
-      className="inline-flex h-7 shrink-0 items-center rounded-md border border-line bg-surface px-2 text-xs font-medium text-ink transition-colors hover:border-line-strong"
-    >
+    <Button size="sm" onClick={copy} aria-label={label} className="shrink-0">
       <span aria-live="polite">{copied === "ok" ? "Copied" : copied === "failed" ? "Select and copy" : "Copy"}</span>
-    </button>
+    </Button>
   );
 }

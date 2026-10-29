@@ -331,3 +331,27 @@ def test_invalid_settings_rejected(tmp_path):
     with pytest.raises(ValueError):
         sponsored(allocation_id="synthetic", allocation_directory=tmp_path)
     assert not sponsored(allocation_expires_at=0).sponsored_enabled
+
+
+def test_images_have_a_separate_daily_count_guests_none_and_rollover_resets_it():
+    now = [float(DAY_SECONDS)]
+    ledger = QuotaLedger(QuotaLimits(user_images=2, global_images=3), clock=lambda: now[0])
+    with pytest.raises(QuotaUnavailableError):
+        admit(ledger, "synthetic-guest", authenticated=False, images=1)
+    with pytest.raises(QuotaUnavailableError):
+        admit(ledger, images=1, sponsored=True)
+    with pytest.raises(QuotaUnavailableError):
+        admit(ledger, images=-1)
+    admit(ledger, images=1).release()
+    admit(ledger, images=1).release()
+    with pytest.raises(QuotaExceededError):
+        admit(ledger, images=1)
+    # Text is still admitted, and a refused image consumed nothing.
+    admit(ledger).release()
+    assert ledger.usage("synthetic-user")["images_today"] == 2
+    admit(ledger, "synthetic-other", images=1).release()
+    with pytest.raises(QuotaExceededError):
+        admit(ledger, "synthetic-third", images=1)
+    now[0] += DAY_SECONDS
+    admit(ledger, images=1).release()
+    assert ledger.usage("synthetic-user")["images_today"] == 1

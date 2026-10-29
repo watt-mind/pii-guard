@@ -144,7 +144,7 @@ rule_packs() -> dict[str, RulePack]          # the language packs' rules, with o
 - **Scopes.** The language-independent rules (`pii_guard.detect.rules.common` and
   `pii_guard.detect.rules.secrets`) run for every text. A language pack ([ADR 0008](decisions/0008-language-packs.md), `languages/<lang>/rules.py`)
   contributes `everywhere` rules (identifiers with a checksum or a distinctive validated format,
-  run whatever the text's language: a Hungarian tax ID in an English e-mail is still personal
+  run whatever the text's language: a Hungarian tax ID in an English email is still personal
   data) and `rules` (formats that are only unambiguous in that language, such as postcodes,
   plates and national phone formats, run only when `language` matches, `en-GB` counting as
   `en`). A language without a pack gets the language-independent rules and every pack's
@@ -162,14 +162,14 @@ label, a consistent postcode and settlement, or valid check digits:
 |---|---|---|
 | all | `BANK_ACCOUNT` (IBAN, mod 97; payment card, issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
 | all | `SECRET` (provider key shapes, PEM private keys, `scheme://user:password@host`, values assigned to a secret-ish key, `Authorization: Bearer/Basic`; [entities.md](entities.md#language-independent)) | provider shape 0.9-0.97, private key 0.99, URL password 0.9 / user 0.85, bearer 0.9, assignment 0.85 |
-| `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labelled ID card / passport / licence / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
+| `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labeled ID card / passport / license / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
 | `hu`, language | `ADDRESS` (postcode, address with settlement and street), `VEHICLE_PLATE`, bare `ID_DOCUMENT` card number, `PERSON` inside a company name with a legal form | postcode 0.75-0.9, address 0.75 / 0.85 / 0.97 (postcode and settlement agree), plate 0.85 / 0.8, bare ID card 0.7, company-name person 0.7-0.9 (`languages/hu/companies.py`) |
 | `en`, everywhere | `ID_DOCUMENT` (US SSN, UK NINO) | SSN 0.95 / 0.85, NINO 0.95 / 0.9 |
-| `en`, language | `PHONE` (UK, US/NANP), `ADDRESS` (UK postcode, US ZIP), `VEHICLE_PLATE` (UK), `ID_DOCUMENT` (labelled passport / licence, SSN after a label) | phone 0.8-0.85, postcode 0.75-0.85, ZIP 0.8 / 0.85, plate 0.8, labelled ID 0.85, SSN after a label 0.9 |
-| `de`, everywhere | `ID_DOCUMENT` (Sozialversicherungsnummer, labelled Steuer-ID) | 0.9 / 0.97 |
+| `en`, language | `PHONE` (UK, US/NANP), `ADDRESS` (UK postcode, US ZIP), `VEHICLE_PLATE` (UK), `ID_DOCUMENT` (labeled passport / license, SSN after a label) | phone 0.8-0.85, postcode 0.75-0.85, ZIP 0.8 / 0.85, plate 0.8, labeled ID 0.85, SSN after a label 0.9 |
+| `de`, everywhere | `ID_DOCUMENT` (Sozialversicherungsnummer, labeled Steuer-ID) | 0.9 / 0.97 |
 | `de`, language | `ID_DOCUMENT` (Steuer-ID without a label), `PHONE`, `ADDRESS` (street + house number, postcode line) | Steuer-ID 0.85, phone 0.8, address 0.75 / 0.85, postcode line 0.7 |
 
-Names, organisations, prose addresses and dates of birth are not rule territory; they come
+Names, organizations, prose addresses and dates of birth are not rule territory; they come
 from the NER and LLM detectors. Scores are heuristics for the resolver, not probabilities;
 the code is the source of truth for the exact values.
 
@@ -250,7 +250,7 @@ REST API. `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
 settings load: an unknown type or policy stops startup. `LlmDetector` resolves its model,
 reasoning effort, max tokens and timeout as the constructor argument, then the setting
 (environment or `.env`), then its built-in default, so the registry and `pii-guard eval`
-honour them too (Muse Spark Open on Baseten needs `REASONING_EFFORT=low`; contract-length
+honor them too (Muse Spark Open on Baseten needs `REASONING_EFFORT=low`; contract-length
 documents need a larger `MAX_TOKENS` and `TIMEOUT`). Folding the text size limit and the
 gateway settings into `Settings` is LAB-1095.
 
@@ -386,7 +386,9 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `blocked_entity` | `/v1/mask` (or the gateway) found an entity type whose policy is `block`. The message lists types and counts only; nothing is masked, stored or forwarded. |
 | 422 | `invalid_project_config` | A project, policy, endpoint or endpoint-key configuration is invalid. |
 | 422 | `upstream_destination_not_allowed` | Hosted endpoint destination does not satisfy the public HTTPS/port policy. |
+| 422 | `outbound_check_failed` | Gateway: after masking, the request still held a value its vault session knows (the [outbound re-check](architecture-gateway.md#outbound-re-check), LAB-1500); nothing was sent. The message lists entity types and counts only; the response has `X-PII-Guard-Outbound-Check: blocked`. |
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
+| 502 | `upstream_credential_rejected` | Listing a provider's models (`POST /v1/projects/{project_id}/endpoints/models`, a pass-through `/e/{endpoint_id}/v1/models`): the provider answered 401 or 403, so the API key is wrong or lacks access. The message is fixed; the provider's own status text and body are never passed on. |
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
@@ -612,7 +614,7 @@ With `render: "labels"` (the default) the response also carries:
   letter↔digit confusions only (`XJXK89KU4` is not `XJXK89KV4`, `HU-ABE-123` is not
   `HU-ABC-123`).
 - Session values printed where no detector found them (a visitor badge's name) are also
-  covered and labelled (`detector: "vault"`), for accepted matches only.
+  covered and labeled (`detector: "vault"`), for accepted matches only.
 - `cover_box` is the area actually painted: the box grown by 2 px and, when the label would
   not fit legibly, extended to the right into free space (never over visible words or another
   box). `box` stays the detected area in both render modes, so coverage is identical.
@@ -635,7 +637,7 @@ With `render: "labels"` (the default) the response also carries:
 - Regions never carry the covered text or pixels. Overlapping regions of the same type and
   source are merged into their union (SAM's `signature` and `squiggly line` prompts).
 - Policies apply per region: `mask` regions are covered (plus 2 px; solid black with `opaque`,
-  a neutral labelled box with `labels`), `keep` regions
+  a neutral labeled box with `labels`), `keep` regions
   (`STAMP` by default) are reported and left visible (`STAMP` is only segmented with
   `sam-api`, or when its policy is not `keep`), any `block` region is
   `422 blocked_entity` with no image.
@@ -702,7 +704,9 @@ message content and in tool-call output arrays; the text that follows each image
 
 What this server runs, read-only, for the web UI's Overview, Connect and Policy pages
 (`pii_guard.api.routes.status`). It takes no body and no parameters, never touches a vault
-session and never calls a detector or the upstream.
+session and never calls a detector or the upstream. One route in both modes
+([ADR 0013](decisions/0013-one-console-owner-scoped-api.md)): hosted owners get the
+[hosted projection](#hosted-projection) below.
 
 **Auth.** Like every route but `/healthz`: when `PII_GUARD_API_TOKEN` is set the request needs
 `Authorization: Bearer <token>` or `X-PII-Guard-Token: <token>`, otherwise
@@ -736,7 +740,10 @@ without its path, query, user or password.
   "default_language": "hu",
   "traffic_log": "off",
   "vault_inspect": "masked",
-  "metrics": false
+  "metrics": false,
+  "capabilities": {"text": true, "chat": true, "images": true, "logs": false, "vault": true,
+                   "server_policy": true, "projects": true, "connect": true,
+                   "evaluation": true, "accounts": false}
 }
 ```
 
@@ -771,9 +778,99 @@ without its path, query, user or password.
 | `traffic_log` | `"off"` \| `"masked"` \| `"full"` | `PII_GUARD_TRAFFIC_LOG` level. |
 | `vault_inspect` | `"off"` \| `"masked"` \| `"full"` | `PII_GUARD_VAULT_INSPECT`: whether the vault inspector answers, and whether it can reveal values. |
 | `metrics` | bool | Request metrics are collected (`/metrics`). |
+| `capabilities` | object | Which console sections this server offers, below. The UI's only source for them: it never branches on the mode or the build. |
 
-Everything but `gateway.url`, `traffic_log` and `metrics` is fixed for the life of the app and
-computed on the first call; a settings change needs a restart.
+Everything but `gateway.url`, `traffic_log`, `metrics` and `capabilities` is fixed for the life
+of the app and computed on the first call; a settings change needs a restart.
+
+**`capabilities`.** Booleans computed from settings and mode. `logs` and `vault` come from the
+caller's own view (the server's settings locally, the owner's runtime when hosted).
+
+| Key | Local | Hosted | Section |
+|---|---|---|---|
+| `text` | `true` | `true` | Text masking (`/v1/analyze`, `/v1/mask`, `/v1/unmask`). |
+| `chat` | `true` | `true` | The gateway chat (`/v1/chat/completions`, `/v1/responses`). |
+| `images` | `true` | `PII_GUARD_HOSTED_IMAGES` and no masked visual type the on-device segmenter can't find | Image masking (`/v1/mask/image`); `images.available` says whether it can run locally. Hosted: signed-in owners, local processing only ([ADR 0014](decisions/0014-hosted-local-images.md)). |
+| `logs` | `traffic_log != "off"` | `true` | The traffic log (`/v1/traffic`). |
+| `vault` | `vault_inspect != "off"` | `true` | The vault inspector (`/v1/vault/sessions`). |
+| `server_policy` | `true` | `false` | The server-wide entity policy page (`policies`). Without it, Policy shows the owner's default project policy read-only (from the project API) and points to Projects. |
+| `projects` | `true` | `true` | Projects, policies and endpoints (`/v1/projects`). |
+| `connect` | `true` | `true` | Connect (`/v1/connect/snippets`). |
+| `evaluation` | `true` | `true` | The benchmark and evaluation pages. |
+| `accounts` | `false` | `true` | Account, API keys and connections (`/v1/account`). |
+
+#### Hosted projection
+
+Hosted, `/v1/status` needs a signed-in Google principal: guests get `401 unauthorized`, and
+guard API keys and endpoint keys are refused with `401` (keys are for the gateway and REST).
+The response is an allow-list of the fields above: a field not listed here is not returned.
+
+```json
+// response 200, hosted
+{
+  "version": "0.1.0",
+  "gateway": {
+    "default_mode": "fast",
+    "url": "https://guard.example/v1",
+    "modes": {"fast": {"detectors": ["rules", "ner"], "available": true, "reason": null}}
+  },
+  "ner": {"available": true, "state": "ready", "error": null},
+  "policies": {"PERSON": "mask", "ORGANIZATION": "keep"},
+  "default_language": "hu",
+  "traffic_log": "masked",
+  "vault_inspect": "masked",
+  "capabilities": {"text": true, "chat": true, "images": true, "logs": true, "vault": true,
+                   "server_policy": false, "projects": true, "connect": true,
+                   "evaluation": true, "accounts": true}
+}
+```
+
+| Field | Local | Hosted |
+|---|---|---|
+| `version` | yes | yes |
+| `gateway.default_mode` | `PII_GUARD_GATEWAY_MODE` | always `fast` |
+| `gateway.url` | the request's base URL + `/v1` | `HOSTED_PUBLIC_ORIGIN` + `/v1`, never the request's `Host` |
+| `gateway.modes` | `fast` and `audit` | `fast` only (audit is not offered hosted) |
+| `rest` | yes | dropped |
+| `ner` | `available`, `model`, `state`, `error` | `available`, `state`, `error` (no model: it may name a local path) |
+| `upstream` | yes | dropped |
+| `images` | yes | dropped |
+| `policies` | effective server policies | the default policies (projects pin their own) |
+| `auth` | yes | dropped |
+| `default_language` | yes | yes |
+| `traffic_log` | server-wide level | the owner's own log (`masked`) |
+| `vault_inspect` | `PII_GUARD_VAULT_INSPECT` | the owner's own inspector (`masked`) |
+| `metrics` | yes | dropped |
+| `capabilities` | yes | yes (hosted values) |
+
+### `GET /v1/connect/snippets`
+
+The Connect quickstart's copy-paste blocks (`pii_guard.api.routes.connect`,
+`pii_guard.integrations.snippets`); `pii-guard connect <tool> --print` prints the same code.
+Never a key: blocks name keys as `$VARIABLE`, and an upstream appears by origin and preset name
+only.
+
+- `?session=<id>`, `?model=<id>` (local): blocks at `<base>/s/<session>/v1` with the
+  operator's upstream and models, `auth.token_env` `PII_GUARD_API_TOKEN`.
+- `?endpoint=<id>`: the same blocks for one of the caller's project endpoints
+  ([ADR 0013](decisions/0013-one-console-owner-scoped-api.md)). `gateway_url` is
+  `<origin>/e/<endpoint>/v1`: `HOSTED_PUBLIC_ORIGIN` hosted, the request's base URL locally.
+  The model is the endpoint's (pass-through: `model` and `endpoint.model` are `null`, `models`
+  is empty and the blocks carry the `<model-id>` placeholder for the client's own), `auth` is `{"token_required": true, "token_env":
+  "PII_GUARD_ENDPOINT_KEY"}`, `session`/`session_url`/`session_ref` are `null`, `presets` is
+  empty, and `upstream` has the preset name but `origin: null`. `endpoint` is
+  `{"id", "name", "model", "enabled"}`. Muse Code is `supported: false` (it reads its catalog
+  from the gateway root, which endpoint URLs don't serve); pi's block adds
+  `--no-session-path --api-key '$PII_GUARD_ENDPOINT_KEY'`. `session` or `model` with
+  `endpoint` is `422 invalid_request`.
+
+**Owner check.** The endpoint must belong to the caller: the signed-in Google principal hosted,
+`local-owner` locally (with no `PII_GUARD_API_TOKEN`, only from loopback on both ends, else
+`403 project_access_denied`, as project management). An unknown id and another owner's id both
+get the same `404 project_not_found`.
+
+**Hosted.** Signed-in Google principals only, as `/v1/status`: guests `401`, API keys and
+endpoint keys `401`. `endpoint` is required (`422 invalid_request` without it).
 
 ### `GET /v1/traffic`
 
@@ -866,6 +963,11 @@ call on the same session (Muse Code sends its main turn and reminder observers t
 (fail closed). Once any call on the session finished masking, the session stays, including
 the entries the refused call added. A refused call never drops a session it did not create
 (as before), and a lone refused call still drops the one it created.
+
+Every gateway response that reached the upstream carries `X-PII-Guard-Outbound-Check: passed`;
+a request refused by the re-check gets `422 outbound_check_failed` with
+`X-PII-Guard-Outbound-Check: blocked` (policy and short-value rules:
+[architecture-gateway.md](architecture-gateway.md#outbound-re-check)).
 
 ## Gateway request fields (implemented)
 
@@ -982,6 +1084,30 @@ kept in the forwarded text, so the first word of the line is detected on its own
 (output text, refusals, reasoning summaries, and the request fields it echoes back).
 `arguments` get JSON-escaped values, as chat tool-call arguments do. `encrypted_content` is
 left as is. `X-PII-Guard-Unresolved` counts unknown placeholders.
+
+**Regex-escaped placeholders in tool input** (both APIs, whole and streamed; LAB-1481). A model with
+only a shell tool may write a placeholder escaped for a `sed`/`perl`/`python` pattern:
+`\[\[EMAIL_x\]\]` (or `\[\[EMAIL_x]]`). In custom tool `input` that form, and in `arguments` the
+same form JSON-encoded (`\\[\\[EMAIL_x\\]\\]`), is restored to the value as a regex literal, so the
+command still matches the file: `.*[]^$/\` get a backslash and `+?(){}|@` are bracketed (`[+]`),
+which is literal in BRE, ERE, Perl, PCRE, Python and JS alike (`\+` and `\(` are operators in GNU
+`sed`, and Perl interpolates `@name`). Nothing else changes: message text keeps an escaped
+placeholder as written; other escape depths (`\\[\\[` in freeform input, an escape after a
+backslash) are left; an unknown or other session's placeholder stays as written and is counted as
+unresolved; the restored value is charged to the response's restore budget.
+
+**Shell quoting in command arguments** (both APIs, whole and streamed; LAB-1483). A restored value
+is byte-exact, except in one context the gateway reads for sure: the string value of a top-level
+`command` or `cmd` key in JSON `arguments` (or the script after `-c`/`-lc` in a `command` array),
+read by a small shell lexer. There a value restored inside a single-quoted string gets `'` written
+as `'\''`; inside the single-quoted script word of a `sed` command, in an `s` replacement, `\`, `&`,
+the delimiter and a newline also get a backslash (an escaped placeholder in an `s` pattern also gets a
+delimiter backslashed that the regex literal leaves as is). Then it is JSON-escaped as usual. So
+`echo '[[PERSON_x]]'` with `O'Brien Teszt` and `sed 's/x/[[ADDRESS_x]]/'` with `Fő utca 1/A` run
+as meant. **Limitation:** everywhere else the value stays byte-exact, so a `$`, backtick, `"` or `\`
+in a double-quoted string, an unquoted value, a heredoc, `$'...'`, a comment, a nested or argv-array
+command, another `sed` command or a bracket expression, and custom tool `input` (it may be a patch,
+not a command) are not escaped. Other keys, message text and file content are never touched.
 
 **Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
 stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
@@ -1127,6 +1253,14 @@ doesn't inflate them).
 
 Messages and `repr()`s carry types, counts and placeholder ids, never an original value.
 
+`VaultSession.unmasked(texts, language)` (LAB-1500) lists every occurrence of a value the
+session holds (its entries, their surfaces and aliases, and its known values) that is still
+written out in `texts`, with the sweep's own patterns and guards; occurrences inside a
+placeholder never count and overlapping ones count once. Each `Unmasked` has the text index,
+offsets, entity type, the value's letter-and-digit count, `digits_only`, `model_only` and
+`known`, never the value. Read-only: nothing is recorded. The gateway's outbound re-check is
+built on it.
+
 ### Lifetime
 
 - A session lives for `ttl_seconds` and the TTL is **sliding**: every use (mask, unmask,
@@ -1189,7 +1323,7 @@ Messages and `repr()`s carry types, counts and placeholder ids, never an origina
   occurrence in another case is not masked with the confirmed secret's placeholder (the
   detector decides about it on its own). Every other type is case-insensitive as below:
   names and other natural-language values (with their inflection), and IBANs, plates, ID
-  numbers and e-mail addresses, which are case-insensitive by their own rules.
+  numbers and email addresses, which are case-insensitive by their own rules.
 - **Casing:** occurrences match case-insensitively, so `TESZT ELEK` and `teszt elek` are
   masked along with a `Teszt Elek` span. By default they share its placeholder and `unmask`
   restores the value as first written (`TESZT ELEK és Teszt Elek.` → `Teszt Elek és Teszt
@@ -1251,7 +1385,7 @@ MAX_SUFFIX_LENGTH = 12   # a longer run is never a suffix; it bounds what the st
   follow them (occurrence expansion in the vault and `LlmDetector.align`).
 - `splits` reads a detected surface form as `lemma + suffix` (`Próba Zsuzsannának` → `Próba
   Zsuzsanna` + `nak`), so the placeholder covers the stem. `restore` re-inflects on unmask.
-- A matcher that only has `suffix_pattern` keeps exact-stem behaviour; call the module
+- A matcher that only has `suffix_pattern` keeps exact-stem behavior; call the module
   functions, which provide the fallbacks. A hook registered with `register_inflection` applies
   to new masking calls of that primary language.
 
@@ -1285,7 +1419,7 @@ Lines, one document per line, UTF-8, **one file per language and set**:
 
 Gold spans don't overlap, aren't blank and don't start or end with whitespace. A Hungarian
 suffix that leaves the value intact stays outside the span (`Teszt Elek|nek`); a
-stem-changing form is labelled as the whole word (`Minta Annának`). Every value is fictional
+stem-changing form is labeled as the whole word (`Minta Annának`). Every value is fictional
 ([ADR 0005](decisions/0005-synthetic-data-only.md)). `load_fixtures` rejects anything else with
 file, line and field, never the value.
 
@@ -1322,7 +1456,7 @@ The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag, version,
 skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
 (one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
 `leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
-contains document text or labelled values.
+contains document text or labeled values.
 
 ## Hosted boundary (implemented, opt-in)
 
@@ -1338,8 +1472,9 @@ guests. Guard authorization and platform identity headers are removed before dow
 
 Only `/v1/account` and the curated `/v1/demo` are anonymous API routes. Landing/static assets
 and health probes remain public. Other data routes require Google identity or an owned guard
-API key. Hosted mode refuses operator status/connect configuration, docs/OpenAPI, metrics,
-image masking and audit detection. Cookie-authenticated mutations require `Origin` to equal
+API key. Hosted mode serves `/v1/status` and `/v1/connect/snippets` only to signed-in Google
+principals, as owner projections (ADR 0013, [`GET /v1/status`](#hosted-projection)), and
+refuses docs/OpenAPI, metrics, image masking and audit detection. Cookie-authenticated mutations require `Origin` to equal
 `HOSTED_PUBLIC_ORIGIN`; cross-site requests are rejected. Responses use `Cache-Control: no-store`.
 The host-prefixed guest cookie is signed, Secure, HttpOnly, SameSite=Strict and lasts one hour.
 A new/expired cookie creates a different guest, with global quotas bounding cookie rotation.
@@ -1356,16 +1491,22 @@ downstream application scope. This does not configure platform or server access 
 Secondary admission immediately HMACs each normalized IPv4 address or IPv6 /64 with a
 random process-only key; mapped IPv4 uses the same bucket as IPv4. Its bounded in-memory
 tables hold digests and counters/timestamps only. Each table holds at most 4096 entries,
-with one-hour idle and 24-hour absolute expiry; a full table refuses new entries without
-evicting live allowances. Anonymous sponsored demo requests share a 30-request network
-burst, refilling 30/minute, and 120 requests per fixed hour starting at bucket creation.
+with one-hour idle and 24-hour absolute expiry; a full table evicts its least recently used
+bucket once it has been idle for five minutes (a fully refilled burst), and otherwise
+refuses new entries without evicting live allowances. Anonymous sponsored demo requests
+share a 30-request network burst, refilling 30/minute, and 120 requests per fixed hour
+starting at bucket creation. Each request also charges its aggregate (IPv4 /24, IPv6 /48):
+a 120-request burst refilling 60/minute and 480 requests per fixed hour, tracking at most
+64 networks, so one allocation cannot fill the network table or multiply its allowance.
 Guest cookie rotation does not reset that network allowance. Authenticated principals
-have separate 10-request bursts refilling 30/minute, independent of network usage and
-without requiring an address signal. Account inspection and sign-in remain reachable.
+have separate 10-request work bursts refilling 30/minute, independent of network usage and
+without requiring an address signal, plus a separate read bucket (120 burst, 10/s) for
+`GET`/`HEAD`. `/v1/account` (every method) is never charged; sign-in remains reachable.
 Secondary charges happen after identity/path/origin validation, before body reads, and
 survive downstream failure. Clock/accounting failure refuses admission.
 
-Burst or capacity exhaustion returns 429 `abuse_throttled` with `Retry-After` seconds.
+Burst or capacity exhaustion returns 429 `abuse_throttled` with `Retry-After` seconds:
+the wait for the slowest refusing level, or until a full table's first slot can free.
 Anonymous hourly exhaustion returns 429 `sign_in_required`, `Retry-After` until the hour
 ends and a message directing Google sign-in or the free walkthrough. Sign-in never
 replenishes global requests, tokens, daily spend or the finite sponsored allocation.
@@ -1379,8 +1520,13 @@ never cross an owner boundary. Detectors are shared, with globally bounded compu
 (including work whose HTTP caller has timed out). Active requests pin their runtime through
 stream completion/cancellation; inactive runtimes expire after one hour. A 30-second cleanup
 loop forgets expired state. Session capacity refuses new sessions rather than evicting active
-ones. Defaults: 256 runtimes, 20 sessions per owner, 256 cached detections, 50 masked traffic
-events. Full vault reveal is never available. All state is ephemeral; restart loses mappings,
+ones. Runtimes are taken only by routes that use one: no `/v1/account` method, no `OPTIONS`
+request and no key or connection management route takes one, and a guest takes one only for
+`POST /v1/demo`. Guests draw on a separate pool (`HOSTED_MAX_GUEST_RUNTIMES`, default 8),
+so anonymous traffic never occupies a signed-in owner's runtime, and a guest's runtime is
+dropped as soon as its demo finishes. Defaults: 256 signed-in runtimes, 20 sessions per
+owner, 256 cached detections, 50 masked traffic events; the owner's traffic log scrubs the
+provider key a request may send (sponsored or the selected connection's). Full vault reveal is never available. All state is ephemeral; restart loses mappings,
 connections and guard API keys. Durable multi-replica state is deferred to LAB-1376.
 
 ### Account and credentials
@@ -1388,11 +1534,16 @@ connections and guard API keys. Durable multi-replica state is deferred to LAB-1
 `GET /v1/account` returns:
 
 ```json
-{"mode":"hosted","authenticated":false,"principal":null,"login_url":"/.auth/login/google","logout_url":"/.auth/logout","tier":"anonymous","providers":["meta","openai","fireworks","openrouter","custom"],"limits":{"requests_per_day":5,"tokens_per_day":100000,"concurrent_requests":2,"max_output_tokens":8192,"sponsored_enabled":false},"usage":{"requests_today":0,"tokens_today":0,"resets_at":"2026-10-29T00:00:00+00:00"},"state":{"persistence":"ephemeral","restart_loses_sessions":true},"connections":[]}
+{"mode":"hosted","authenticated":false,"principal":null,"login_url":"/.auth/login/google","logout_url":"/.auth/logout","tier":"anonymous","providers":["meta","openai","fireworks","openrouter","custom"],"included_model":"muse-spark-1.3","limits":{"requests_per_day":5,"tokens_per_day":100000,"concurrent_requests":2,"max_output_tokens":8192,"sponsored_enabled":false},"usage":{"requests_today":0,"tokens_today":0,"resets_at":"2026-10-29T00:00:00+00:00"},"state":{"persistence":"ephemeral","restart_loses_sessions":true},"connections":[]}
 ```
 
-Authenticated `principal` is `{id,provider:"google"}` with an opaque ID; tier is `standard`.
-The account remains readable when quota is exhausted. `POST /v1/account/api-keys {name}`
+`included_model` is the model free runs answer with (the first of `PII_GUARD_HOSTED_MODELS`), so
+the public page names it from the API. Authenticated `principal` is `{id,provider:"google"}` with an
+opaque ID; tier is `standard`.
+The account remains readable when quota is exhausted. Key and connection management
+(`/v1/account/api-keys*`, `/v1/account/connections*`) requires a signed-in Google session:
+a guard API key gets `401 unauthorized`, so a leaked key cannot mint successors that
+outlive its revocation. `POST /v1/account/api-keys {name}`
 returns 201 `{id,name,key,prefix,created_at}`; only that response contains the raw key.
 `GET /v1/account/api-keys` returns metadata arrays; `DELETE /v1/account/api-keys/{id}` returns
 204 and revokes future use. Keys last 24 hours, at most five per owner and 1000 globally;
@@ -1408,6 +1559,20 @@ or model catalogs. No selection means sponsored Meta. An unknown, deleted, expir
 another owner's connection fails, never falls back to sponsored. Already admitted requests
 may finish with their selected connection after deletion. Supported presets are Meta,
 OpenAI, Fireworks and OpenRouter; custom connections require public HTTPS on port 443.
+
+`POST /v1/account/first-run {issue_key?,meta_api_key?}` (LAB-1455, signed-in Google session
+only; a guard key gets `401`) provisions the owner's default endpoint once and describes it:
+`{project_id,endpoint,state,created,active_keys,key,sponsored_enabled,gateway_url}`. When the
+default project has no endpoint it creates `Default endpoint` on the sponsored route with the
+first allow-listed model and the default policy version; otherwise it creates nothing and
+describes the oldest enabled endpoint. `state` is `ready`, `needs_key` (sponsored while
+sponsorship is unavailable) or `disabled`. `issue_key: true` issues one endpoint key, returned
+raw only in that response, while the endpoint has no active key. `meta_api_key` converts a
+`needs_key` sponsored default endpoint, in place, to an own-key `meta` endpoint on
+`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The
+operation is one atomic store update (a single conditional write on the Blob store, re-read and
+retried up to three times after a conflict), so repeat sign-ins and concurrent first requests never create a second
+endpoint. It spends no daily request or token budget and takes no runtime.
 
 ### Projects, policies and endpoints
 
@@ -1427,38 +1592,78 @@ single-owner routes keep their default namespace.
 |---|---|---|
 | `GET /v1/projects` | — | `{projects:[...],default_project_id}`; creates the default if needed |
 | `POST /v1/projects` | `{name}` | 201 project metadata; maximum 32 projects per owner |
-| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` |
+| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` (the default policy's latest version) |
 | `GET /v1/projects/{project_id}/policies` | — | `{policies:[...]}`; every immutable version |
-| `POST /v1/projects/{project_id}/policies` | `{name,entity_policies?,language?,mode?,detection_profile?}` | 201 first version in a new policy family |
+| `POST /v1/projects/{project_id}/policies` | `{name,entity_policies?,language?,mode?,detection_profile?,visual_detection?}` | 201 first version in a new policy family |
 | `PUT /v1/projects/{project_id}/policies/{policy_id}` | Same policy fields | 201 next immutable version; existing endpoints remain pinned |
 | `GET /v1/projects/{project_id}/policies/versions/{version_id}` | — | Exact policy-version snapshot |
 | `GET /v1/projects/{project_id}/endpoints` | — | `{endpoints:[...]}`; credentials are never returned |
-| `POST /v1/projects/{project_id}/endpoints` | `{name,provider,model,policy_version_id,base_url?,api_key?,enabled?}` | 201 endpoint metadata; maximum 128 per project |
+| `POST /v1/projects/{project_id}/endpoints` | `{name,provider,policy_version_id,model?,base_url?,api_key?,enabled?}` | 201 endpoint metadata; maximum 128 per project. `model` is `null` for a pass-through endpoint |
+| `POST /v1/projects/{project_id}/endpoints/models` | `{provider,base_url?,api_key?,endpoint_id?}` | `{models:[id,...]}` for the endpoint form: the provider's `GET /models` asked with `api_key` (never stored) or, without it, `endpoint_id`'s stored key (same provider and base URL only, else 422); `sponsored` returns the hosted allow-list. No key is 422; a provider 401/403 is `502 upstream_credential_rejected` ("check the API key"); any other provider failure is a generic `502 upstream_unavailable` |
 | `PUT /v1/projects/{project_id}/endpoints/{endpoint_id}` | Complete endpoint fields; `api_key` may be omitted to keep current credential | Updated metadata; explicit `policy_version_id` required. `enabled:false` atomically revokes active keys; re-enabling does not restore them |
 | `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}` | — | 204; permanently deletes endpoint and all its key records |
 | `GET /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | — | `{keys:[id,name,created_at,revoked_at]}`; no raw keys |
 | `POST /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | `{name}` | 201 key metadata plus raw `key`, returned once; maximum 32 active and 128 retained records per endpoint |
 | `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}/keys/{key_id}` | — | 204; revokes future admissions |
 
-Policy versions capture a complete text-entity action map, language and detection mode. Omitted
-entity actions use deployment defaults. Only text entities accept `mask`, `keep` or `block`;
-unknown entities and extra fields are rejected with sanitized validation messages. Hosted
-policies require `fast`; self-hosted policies must use the deployment's detection profile, and
-`local-only` refuses `audit`. A policy revision appends a version and never mutates a prior
-version or silently changes endpoint pins. A project can contain up to 256 policy versions.
+Policy versions capture a complete text- and visual-entity action map, language, detection mode
+and image detection. Omitted entity actions use deployment defaults. Text entities accept
+`mask`, `keep` or `block`; visual entities (`FACE`, `ID_PHOTO`, `SIGNATURE`, `STAMP`) accept
+`mask` or `keep` (LAB-1444). Unknown entities and extra fields are rejected with sanitized
+validation messages. Hosted policies require `fast`; self-hosted policies must use the
+deployment's detection profile, and `local-only` refuses `audit`. A policy revision appends a
+version and never mutates a prior version or silently changes endpoint pins. A project can
+contain up to 256 policy versions.
 
-An endpoint pins one policy version and one provider/model/upstream/credential tuple. Providers
+`visual_detection` chooses who finds visual regions for a selected project policy's images:
+
+- `local` (default): on the CPU only. YuNet finds faces and ID photos, and the pinned YOLOS-tiny
+  signature detector (`mdefrance/yolos-tiny-signature-detection` at a fixed revision,
+  Apache-2.0, safetensors, every file SHA-256 checked; `python -m pii_guard.visual.segmenters
+  fetch`) finds signatures, on the whole image and 2x2 overlapping tiles. No SAM request is
+  made. Stamps cannot be found locally: a `local` policy that masks `STAMP` refuses images.
+  `analysis.sam.model` is `yunet-2023mar+yolos-tiny-signature` once signatures were asked for.
+- `sam`: the server's segmenter (`PII_GUARD_SEGMENTER`, `hybrid` by default: SAM 3.1 on the Meta
+  API for signatures and stamps, so the original image leaves the machine). A server set to
+  `local` or `off` is stricter and wins. `local-only` deployments and the hosted service accept
+  `local` only (`422 invalid_project_config`).
+
+Versions saved before LAB-1444 have no visual actions and no `visual_detection`: they read as
+`local` with the server's visual actions. For visual types, an explicit
+`PII_GUARD_POLICY_OVERRIDES` entry wins over the policy when it is stricter (`keep` < `mask` <
+`block`). Requests without a selected project use the server's policies and segmenter, as
+before.
+
+An endpoint pins one policy version and one provider/upstream/credential tuple, and optionally
+one model (LAB-1451). Providers
 are `meta`, `openai`, `fireworks`, `openrouter`, `custom`, and hosted-only `sponsored` Meta.
 Preset providers use their fixed base URL. `custom` requires a base URL. Hosted destinations
 must pass the public HTTPS port-443 and DNS validation; local/self-hosted destinations accept
 HTTP or HTTPS, including loopback, and reject embedded URL credentials, queries and fragments.
 New BYOK endpoints require an API key; on edit, omitting `api_key` preserves the current key.
 Provider credentials are encrypted in SQLite and omitted from all endpoint metadata. Sponsored
-endpoints store no credential and require an allowlisted hosted model.
+endpoints store no credential and require an allowlisted hosted model: an empty or
+non-allowlisted `model` is `422 invalid_project_config`.
+
+**Endpoint model: pinned or pass-through.** With a `model`, the endpoint is pinned: gateway
+requests get that model injected and any other `model` fails closed with `403`. BYOK endpoints
+(`meta`, `openai`, `fireworks`, `openrouter`, `custom`) may omit `model` (or send `null` or
+`""`): the endpoint is pass-through, metadata reports `model: null`, and the client's own
+`model` is forwarded unchanged, so agent harnesses (Codex, Muse Code, OpenCode, Claude Code)
+can choose theirs. A pass-through request without a non-empty string `model` (at most 256
+characters, no control characters) is `400 invalid_request`, before anything is sent. Storage:
+pass-through is `''` in the existing `model TEXT NOT NULL` column, so the SQLite schema and
+every existing local store or blob snapshot are unchanged and load as is; existing rows keep
+their pinned model. A build from before LAB-1451 reading a pass-through row fails closed (it
+refuses every client `model`).
 
 Endpoint gateway URLs are `/e/{endpoint_id}/v1/chat/completions`,
 `/e/{endpoint_id}/v1/responses`, and `/e/{endpoint_id}/v1/models`. Send the endpoint key as a
-Bearer credential. These routes accept only that endpoint's configured model, language, mode,
+Bearer credential. `/models` lists only the pinned model for a pinned endpoint (the provider is
+not asked) and, for pass-through, the provider's own catalog asked with the endpoint's stored
+credential (`id`, `object`, `created`, `owned_by` only; a provider failure is a generic
+`502 upstream_unavailable`; hosted, through the public-HTTPS egress client). These routes accept
+only that endpoint's configured model (when pinned), language, mode,
 upstream and policy version; caller overrides fail closed. Endpoint keys cannot call owner,
 account, management, traffic or vault routes. A revoked key or disabled endpoint rejects new
 admission; an already admitted call uses its captured endpoint/policy/credential snapshot and
@@ -1483,20 +1688,52 @@ failure or an empty model answer. The static UI walkthrough remains available wi
 
 ### Admission, cost and egress
 
-All data routes and account mutations require atomic admission before detector/provider work.
-Defaults are five guest or 100 standard requests per UTC day, 100,000 guest or 1,000,000
-standard reserved tokens, two active requests per owner, eight globally, 10,000 requests and
-10,000,000 tokens globally per day. A separate 32-slot ingress bound and ten-second body-read
-deadline cover slow clients before parsed admission. Bodies are capped at 32 KiB; hosted
+Every signed-in mutation and data request (any method but `GET`, `HEAD` and `OPTIONS`) and a
+guest's `POST /v1/demo` require atomic admission before detector/provider work. Reads (`GET`,
+`HEAD`, including the console's polling of `/v1/traffic` and `/v1/status`) spend no daily
+request or token budget and hold no inference concurrency; the per-owner read bucket above
+bounds them. `/v1/account` is never admitted. Defaults are five guest or 100 standard
+requests per UTC day, 100,000 guest or 1,000,000 standard reserved tokens, two active requests
+per owner, eight globally, 10,000 requests and 10,000,000 tokens globally per day. Ingress
+slots cover slow clients before parsed admission. A request takes one only after identity,
+path, origin and abuse checks have passed, so a request refused by any of them never holds
+one: 32 slots for signed-in principals (at most eight per principal, a guard key counting
+as its owner) and a separate eight for guests (at most two per guest), `429 hosted_capacity`
+beyond, never a queue. The slot is held from the body read to the end of the response. One
+ten-second deadline from taking the slot bounds the whole body read, however it is
+trickled (`504 hosted_timeout`, no quota charged). Endpoint-key lookup, the only wait
+before identity is known, has its own pool of eight and reads no body. `GET
+/v1/traffic/stream` gives its ingress slot back once admitted and holds a
+stream slot instead: two per owner, sixteen in all (`429 hosted_capacity` beyond). Bodies are capped at 32 KiB; hosted
 requests have a 180-second deadline, fast text detection, one completion and at most 8192
 output/reasoning tokens. Sponsored models are an explicit server allowlist, initially
 `muse-spark-1.3`; model selection cannot change the sponsored destination.
 
-Reservations charge a conservative input expansion bound plus the full output limit before
-work. Completion, cancellation, invalid provider responses and client retries never refund
+Reservations are sized from the request before work. The input charge is the upstream
+payload bound `2 × body bytes + 4096` (in tokens: a byte-level tokenizer never emits more
+tokens than bytes), and the gateway refuses with `413 payload_too_large`, before any upstream
+call, a masked payload larger than that bound. The output charge is the request's own output
+token limit (at most 8192; the default when it sets none), and 4096 for the curated demo.
+`muse-spark-1.3` reasons before it answers and reasoning counts against that limit: measured
+on 2026-10-28 (`eval/results/2026-10-28-lab-1372-meta-reasoning`), every demo-sized call at 512
+tokens or fewer came back with empty content, and at 4096 every call answered (at most 2,994
+completion tokens used). `PII_GUARD_HOSTED_MAX_OUTPUT_TOKENS` therefore cannot be set below
+4096. A client may still ask for less and then gets an empty answer it is charged for. With
+the defaults a guest gets its five demos (about 8,250 reserved tokens and $0.14 each) and a
+fresh signed-in user can send a chat close to the 32 KiB body limit. Sponsored requests may not
+ask for provider-side tools (`web_search_options`, or a `tools` entry other than `function` or
+`custom`): Meta bills web search grounding per query, outside the token usage a reservation
+bounds, so they are refused with `403 hosted_request_denied` before any work. Completion, cancellation, invalid provider responses and client retries never refund
 requests, tokens or money. Concurrency releases only after the response stream and cleanup.
 There are no automatic upstream retries. Monetary units are integer microdollars, and configured
-per-token rates must upper-bound every permitted model and all reasoning charges. The global
+per-token rates must upper-bound every permitted model and all reasoning charges. The rate
+defaults have one source (`hosted/quotas.py`): 5 input and 30 output microdollars per token
+(`HOSTED_INPUT_MICRODOLLARS_PER_TOKEN`, `HOSTED_OUTPUT_MICRODOLLARS_PER_TOKEN`). Reconciled on
+2026-10-28 with Meta's published Standard price for `muse-spark-1.3` (USD 1.25 input and 4.25
+output per million tokens, <https://dev.meta.ai/docs/pricing-rate-limits>; reasoning tokens are
+reported inside `completion_tokens`, so they are charged at the output rate): the defaults are
+4× and about 7× that, and also cover Muse Wonder (4.00 / 20.00). Re-check the page before
+raising an allocation or adding a model to the allowlist. The global
 daily ceiling is $10 and a finite allocation adds a stricter process-lifetime cap.
 
 Sponsored calls default to disabled. Enabling them requires a positive reconciled allocation,
@@ -1505,13 +1742,18 @@ Startup uses an atomic exclusive file claim, fsyncs it, and forfeits the entire 
 restart. Reusing an ID, missing storage, expiry or accounting failure disables sponsored work.
 A new process/day cannot silently replenish spend authority. The operator must reconcile
 provider spend before issuing another allocation; claims must never be removed or stored on
-an ephemeral container filesystem. An operator can disable admission through the ledger kill
-switch; restarting with the same allocation also fails closed. No billing persistence or
+an ephemeral container filesystem. The kill switch is a file: with
+`PII_GUARD_HOSTED_SPONSORED_KILL_SWITCH_PATH` set (an absolute path), creating that file
+disables sponsored admission for the rest of the process. It is checked before every
+sponsored admission and on each cleanup tick; any error other than a missing file also
+disables it, and removing the file does not re-enable it. Restarting with the same allocation
+also fails closed. No billing persistence or
 cross-replica accounting is claimed.
 
 All hosted upstream paths (chat, Responses and catalogs) share the secure transport: no URL
 credentials, query, fragment, IP literal, local domain, non-HTTPS or non-443 endpoint; every
-resolved A/AAAA address must be globally routable. At each new TCP connection DNS is checked
+resolved A/AAAA address must be globally routable (NAT64 `64:ff9b::/96` and
+`64:ff9b:1::/48` are refused, as are IPv4-mapped, 6to4 and Teredo addresses). At each new TCP connection DNS is checked
 again and the connection uses a checked numeric address, preserving original Host and TLS
 SNI/certificate verification. Redirects and environment proxies are disabled. A preflight DNS
 check alone is not considered sufficient. Sponsored credentials only go to the fixed Meta

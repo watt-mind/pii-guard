@@ -1,0 +1,44 @@
+{
+  "agent-traffic": {
+    "documents": 990,
+    "leak": 0.000194,
+    "over_masking": 0.025244,
+    "f1": 0.951515
+  },
+  "ai4privacy": {
+    "documents": 600,
+    "leak": 0.002746,
+    "over_masking": 0.005032,
+    "f1": 0.989017
+  },
+  "nemotron-pii": {
+    "documents": 300,
+    "leak": 0.004304,
+    "over_masking": 0.008178,
+    "f1": 0.96536
+  },
+  "cee-pii": {
+    "documents": 451,
+    "leak": 0.003968,
+    "over_masking": 0.249626,
+    "f1": 0.829268
+  },
+  "gretel-finance": {
+    "documents": 400,
+    "leak": 0.205508,
+    "over_masking": 0.223263,
+    "f1": 0.752752
+  },
+  "pl-pii-bench": {
+    "documents": 346,
+    "leak": 0.013333,
+    "over_masking": 0.161525,
+    "f1": 0.85117
+  },
+  "mapa-eur-lex": {
+    "documents": 42,
+    "leak": 0.085135,
+    "over_masking": 0.433489,
+    "f1": 0.627615
+  }
+}

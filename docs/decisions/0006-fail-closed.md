@@ -37,3 +37,14 @@ OCR engine image parts are refused with `503 ocr_unavailable` (gateway and `/v1/
 the image is still masked (faces, signatures), but its text is not checked, and the response
 says so (`X-PII-Guard-Image-OCR: off`). The container healthcheck fails while OCR is required
 and unavailable.
+
+## Note: the outbound re-check (2026-10-29, LAB-1500)
+
+Every error path above blocks a request that could not be masked. One more check closes the
+case where masking ran without error and still left a value: after masking, the gateway reads
+the masked request again and searches it for every value its vault session holds, with the
+vault's own occurrence patterns. A value found there refuses the request with
+`422 outbound_check_failed` (types and counts only, `X-PII-Guard-Outbound-Check: blocked`) and
+nothing is sent; a request that passes says `passed`. Values too short to tell from common
+tokens are counted but do not block; the policy is in
+[architecture-gateway.md](../architecture-gateway.md#outbound-re-check).

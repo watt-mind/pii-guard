@@ -15,6 +15,7 @@ import {
   type OwnStage,
 } from "../lib/traffic";
 import { useWidth } from "../hooks/useWidth";
+import { Metric } from "../components/ui";
 import { ChartEmpty } from "./BenchmarksCharts";
 
 /* Charts for the Live traffic screen, following the Benchmarks conventions: drawn at the
@@ -53,10 +54,11 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
   const w = waterfall(event.timing);
   if (!w.rows.length) return <ChartEmpty>No timing was recorded for this call.</ChartEmpty>;
   const pct = (ms: number) => `${(ms / w.span) * 100}%`;
+  // Its own size container: the figures and rows follow the card's width, not the viewport's.
   return (
-    <div>
-      <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-        <Figure label="pii-guard added" value={formatMsShort(w.overhead)} strong testId="wf-overhead" />
+    <div className="@container">
+      <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-3 @xl:grid-cols-4">
+        <Figure label="PII Guard added" value={formatMsShort(w.overhead)} strong testId="wf-overhead" />
         <Figure label="Model (upstream)" value={w.upstream > 0 ? formatMsShort(w.upstream) : "not called"} testId="wf-upstream" />
         <Figure label="Total" value={formatMsShort(w.total)} testId="wf-total" />
         {w.addedTtft !== null ? (
@@ -67,7 +69,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
       </dl>
       <ol aria-label="Timing waterfall, stages in pipeline order" className="space-y-1.5" data-testid="waterfall">
         {w.rows.map((r) => (
-          <li key={r.key} className="grid grid-cols-[5.5rem_1fr_4.25rem] items-center gap-2 text-xs sm:grid-cols-[8.5rem_1fr_5rem]">
+          <li key={r.key} className="grid grid-cols-[5.5rem_1fr_4.25rem] items-center gap-2 text-xs @md:grid-cols-[8.5rem_1fr_5rem]">
             <span className="flex min-w-0 items-center gap-1.5 text-ink">
               <span className="truncate" title={STAGE_HINT[r.key]}>
                 {r.label}
@@ -100,7 +102,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
               {formatMsShort(r.ms)}
               <span className="sr-only">
                 {" "}
-                {r.kind === "upstream" ? "waiting on the model" : r.kind === "other" ? "not in any stage" : "pii-guard"}
+                {r.kind === "upstream" ? "waiting on the model" : r.kind === "other" ? "not in any stage" : "PII Guard"}
                 {r.ttfbMs ? `, headers after ${formatMsShort(r.ttfbMs)}` : ""}
               </span>
             </span>
@@ -109,11 +111,11 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
       </ol>
       <p className="mt-3 text-xs text-muted">
         <span className="tabular-nums">
-          {formatMsShort(w.total)} total = {formatMsShort(w.upstream)} model + {formatMsShort(w.overhead)} pii-guard ({formatMsShort(w.own)} in stages
+          {formatMsShort(w.total)} total = {formatMsShort(w.upstream)} model + {formatMsShort(w.overhead)} PII Guard ({formatMsShort(w.own)} in stages
           {w.other > 0 ? ` + ${formatMsShort(w.other)} other` : ""}).
         </span>{" "}
         {w.rows.find((r) => r.key === "forward" && r.ms >= w.own / 2)
-          ? "Forward (most of pii-guard's time here) is serialising the masked body and opening the HTTP connection to the model. "
+          ? "Forward (most of PII Guard's time here) is serializing the masked body and opening the HTTP connection to the model. "
           : ""}
         {event.stream
           ? `Streamed: unmasking runs between upstream reads and is shown summed after it${w.ttft !== null ? `; first token to the client after ${formatMsShort(w.ttft)}` : ""}.`
@@ -127,12 +129,14 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
 
 function Figure({ label, value, strong, testId }: { label: string; value: string; strong?: boolean; testId?: string }) {
   return (
-    <div className="flex flex-col-reverse">
-      <dt className="mt-0.5 text-2xs text-muted">{label}</dt>
-      <dd data-testid={testId} className={["text-lg leading-none font-medium tabular-nums", strong ? "text-guard" : "text-ink"].join(" ")}>
-        {value}
-      </dd>
-    </div>
+    <Metric
+      label={label}
+      value={
+        <span data-testid={testId} className={["whitespace-nowrap", strong ? "text-guard" : ""].join(" ")}>
+          {value}
+        </span>
+      }
+    />
   );
 }
 
@@ -174,7 +178,7 @@ export function OverheadChart({ events }: { events: TrafficEvent[] }) {
         width={width}
         height={height}
         role="img"
-        aria-label={`pii-guard overhead per call, last ${pts.length} calls: now p50 ${formatMsShort(last.p50)}, p95 ${formatMsShort(last.p95)} over the last 20 calls.`}
+        aria-label={`PII Guard overhead per call, last ${pts.length} calls: now p50 ${formatMsShort(last.p50)}, p95 ${formatMsShort(last.p95)} over the last 20 calls.`}
         className="block touch-none overflow-visible font-sans"
         onPointerMove={(e) => pick(e.clientX, e.currentTarget.getBoundingClientRect())}
         onPointerLeave={() => setHover(null)}
@@ -258,7 +262,7 @@ export function ModeChart({ events }: { events: TrafficEvent[] }) {
   const max = niceCeil(Math.max(...rows.map((r) => r.p95)) * 1.1);
   return (
     <div>
-      <ul className="space-y-3" aria-label="pii-guard overhead by gateway mode">
+      <ul className="space-y-3" aria-label="PII Guard overhead by gateway mode">
         {rows.map((r) => (
           <li key={r.mode}>
             <p className="mb-1 flex items-baseline justify-between gap-2 text-sm">
@@ -289,19 +293,27 @@ export function ModeChart({ events }: { events: TrafficEvent[] }) {
 
 // --- Stage breakdown ----------------------------------------------------------------------
 
+/** A column button is at least 24 px wide (44 px on a touch screen): fewer, wider columns on a phone. */
+const COLUMN_MIN = { fine: 24, coarse: 44 } as const;
+const isCoarse = () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
+
 export function StageChart({ events, onSelect }: { events: TrafficEvent[]; onSelect?: (id: string) => void }) {
-  const recent = events.slice(-30);
+  const [ref, width] = useWidth(560);
+  const [coarse] = useState(isCoarse);
+  // The y axis takes about 40 px; each column keeps a 2 px gap.
+  const fit = Math.floor((width - 40) / ((coarse ? COLUMN_MIN.coarse : COLUMN_MIN.fine) + 2));
+  const recent = events.slice(-Math.max(5, Math.min(30, fit)));
   if (!recent.length) return <ChartEmpty>No calls yet.</ChartEmpty>;
   const max = niceCeil(Math.max(...recent.map((e) => OWN_STAGES.reduce((s, k) => s + (e.timing.stages_ms[k] ?? 0), 0))));
   const used = OWN_STAGES.filter((k) => recent.some((e) => (e.timing.stages_ms[k] ?? 0) > 0));
   return (
-    <div>
+    <div ref={ref}>
       <div className="flex gap-2">
         <div aria-hidden="true" className="flex h-40 flex-col justify-between text-right text-xs tabular-nums text-muted">
           <span>{formatMsShort(max)}</span>
           <span>0</span>
         </div>
-        <ol aria-label={`pii-guard's own stages per call, last ${recent.length} calls`} className="flex h-40 flex-1 items-end gap-[2px] border-b border-line">
+        <ol aria-label={`PII Guard's own stages per call, last ${recent.length} calls`} className="flex h-40 flex-1 items-end gap-[2px] border-b border-line">
           {recent.map((e) => {
             const parts = OWN_STAGES.map((k) => [k, e.timing.stages_ms[k] ?? 0] as const).filter(([, v]) => v > 0);
             const label = parts.map(([k, v]) => `${STAGE_LABEL[k]} ${formatMsShort(v)}`).join(", ");

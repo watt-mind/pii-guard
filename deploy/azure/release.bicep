@@ -31,9 +31,9 @@ param ledgerAccountUrl string
 @description('Existing identity-only Blob account for encrypted project configuration. The operator creates project-configuration/<environment>.projects.v1.enc explicitly; app releases never initialize it.')
 @minLength(1)
 param projectAccountUrl string
-@description('Approved cumulative USD microdollar ceiling, reused with the same ID/expiry. Zero disables sponsorship. Releases never issue or replenish credit.')
+@description('Approved cumulative USD microdollar ceiling, reused with the same ID/expiry. Zero disables sponsorship. Releases never issue or replenish credit. Per-environment cap: prod USD 50, dev USD 10.')
 @minValue(0)
-@maxValue(10000000)
+@maxValue(50000000)
 param sponsoredMicrodollars int = 0
 param allocationId string = ''
 @minValue(0)
@@ -56,6 +56,11 @@ var appName = '${namePrefix}-app'
 // ARM resource conditions cannot inspect runtime properties of an existing environment.
 var appDeploymentEnabled = environmentName == 'prod' || privateDevReviewed
 var tags = { project: 'pii-guard', environment: environmentName, state: 'ephemeral-single-process' }
+// Per-environment sponsored ceiling (LAB-1508): prod USD 50 (owner, 2026-10-29), dev USD 10.
+// @maxValue holds only the larger prod cap; ARM has no throw, so int() of a non-numeric string
+// fails template evaluation and refuses an over-cap dev release before anything is written.
+var sponsoredCeilingMicrodollars = environmentName == 'prod' ? 50000000 : 10000000
+var admittedSponsoredMicrodollars = sponsoredMicrodollars <= sponsoredCeilingMicrodollars ? sponsoredMicrodollars : int('sponsoredMicrodollars-exceeds-environment-ceiling')
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: '${replace(projectPrefix, '-', '')}${environmentName}${suffix}'
@@ -107,8 +112,12 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { name: 'PII_GUARD_ALLOWED_HOSTS', value: '${split(replace(publicOrigin, 'https://', ''), '/')[0]},${appName}.${environment.properties.defaultDomain}' }
           { name: 'PII_GUARD_NER_MODEL', value: '/app/models/ner' }
           { name: 'PII_GUARD_DETECTORS', value: 'rules,ner' }
+          // Hosted images (ADR 0014): local OCR + on-device faces and signatures only. The
+          // owner's project policy decides visual actions; no server override (LAB-1444).
+          { name: 'PII_GUARD_HOSTED_IMAGES', value: 'true' }
+          { name: 'PII_GUARD_SEGMENTER', value: 'local' }
           { name: 'PII_GUARD_HOSTED_MODELS', value: 'muse-spark-1.3' }
-          { name: 'PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS', value: string(sponsoredMicrodollars) }
+          { name: 'PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS', value: string(admittedSponsoredMicrodollars) }
           { name: 'PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID', value: allocationId }
           { name: 'PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT', value: string(allocationExpiresAt) }
           // The LAB-1398 ledger is fixed to <environment>.json; only an operator funds it.

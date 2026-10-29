@@ -11,6 +11,7 @@ unknown path) never answers under an API prefix, so a typo there is still a JSON
 from __future__ import annotations
 
 import contextlib
+import gzip
 import html
 import logging
 import threading
@@ -21,13 +22,16 @@ from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, Response
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException
 from starlette.staticfiles import StaticFiles
 from starlette.types import Scope
 
 from pii_guard.api.app import create_app
-from pii_guard.config import Settings
+from pii_guard.config import Settings, get_settings
 from pii_guard.detect import ner_resolve
+from pii_guard.security_headers import SecurityHeadersMiddleware
 
 __all__ = [
     "UI_DIR",
@@ -48,6 +52,15 @@ UI_DIR = Path(__file__).resolve().parent / "_ui"
 _API_PREFIXES = ("v1/", "healthz", "metrics", "docs", "redoc", "openapi.json")
 
 _STRIP_ID = "pii-guard-up-status"
+
+#: Vite's build output: every file name carries a content hash, so a URL never changes content.
+_ASSETS = "assets/"
+_IMMUTABLE = "public, max-age=31536000, immutable"
+#: Text assets worth compressing (fonts and images are compressed already).
+_COMPRESSIBLE = frozenset(
+    {".js", ".mjs", ".css", ".json", ".svg", ".map", ".txt", ".html", ".wasm"}
+)
+_GZIP_MIN_BYTES = 1024
 
 
 @dataclass
@@ -102,22 +115,72 @@ def _strip(status: Status) -> str:
     return f'<style>{style}</style><div id="{_STRIP_ID}" role="status">{html.escape(text)}</div>'
 
 
+def _gzip_file(path: str) -> bytes:
+    return gzip.compress(Path(path).read_bytes(), compresslevel=9, mtime=0)
+
+
+def _accepts_gzip(scope: Scope) -> bool:
+    for item in Headers(scope=scope).get("accept-encoding", "").split(","):
+        name, _, params = item.strip().partition(";")
+        if name.strip().lower() in ("gzip", "*"):
+            q = params.strip().removeprefix("q=")
+            try:
+                return not params.strip() or float(q) > 0
+            except ValueError:
+                return True
+    return False
+
+
 class _SpaFiles(StaticFiles):
-    """Static files with ``index.html`` for client-side routes."""
+    """Static files with ``index.html`` for client-side routes.
+
+    The hashed build output under ``assets/`` is cached for a year (``immutable``) and, for
+    text, served gzip-compressed, each file compressed once and kept in memory: the Evaluation
+    screen's benchmark index alone is several MB of JSON (LAB-1454). ``index.html`` is never
+    cached, so a new build is picked up on the next load.
+    """
 
     def __init__(self, *, directory: Path) -> None:
         super().__init__(directory=directory, html=True)
         self._index = (directory / "index.html").read_bytes()
+        self._gzipped: dict[tuple[str, int, int], bytes] = {}
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         if path in ("", ".", "index.html"):
             return self._index_response()
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
         except HTTPException as exc:
             if exc.status_code != 404 or path.startswith(_API_PREFIXES) or "." in path:
                 raise
-        return self._index_response()
+            return self._index_response()
+        if path.replace("\\", "/").startswith(_ASSETS) and response.status_code in (200, 304):
+            return await self._asset_response(path, scope, response)
+        return response
+
+    async def _asset_response(self, path: str, scope: Scope, response: Response) -> Response:
+        response.headers["Cache-Control"] = _IMMUTABLE
+        suffix = Path(path).suffix.lower()
+        if suffix not in _COMPRESSIBLE or response.status_code != 200:
+            return response
+        response.headers["Vary"] = "Accept-Encoding"
+        full_path, stat = self.lookup_path(path)
+        if stat is None or stat.st_size < _GZIP_MIN_BYTES or not _accepts_gzip(scope):
+            return response
+        key = (full_path, stat.st_mtime_ns, stat.st_size)
+        body = self._gzipped.get(key)
+        if body is None:
+            body = await run_in_threadpool(_gzip_file, full_path)
+            self._gzipped[key] = body
+        return Response(
+            body,
+            headers={
+                "Content-Type": response.headers.get("content-type", "application/octet-stream"),
+                "Cache-Control": _IMMUTABLE,
+                "Content-Encoding": "gzip",
+                "Vary": "Accept-Encoding",
+            },
+        )
 
     def _index_response(self) -> Response:
         return HTMLResponse(self._index, headers={"Cache-Control": "no-cache"})
@@ -145,13 +208,25 @@ padding:0 16px}}</style></head>
 
 
 def create_bundle_app(
-    status: Status, settings: Settings | None = None, *, ui_dir: Path = UI_DIR
+    status: Status,
+    settings: Settings | None = None,
+    *,
+    ui_dir: Path = UI_DIR,
+    security_headers: bool | None = None,
 ) -> FastAPI:
-    """:func:`~pii_guard.api.app.create_app` plus the UI (or a fallback page) at ``/``."""
+    """:func:`~pii_guard.api.app.create_app` plus the UI (or a fallback page) at ``/``.
+
+    ``security_headers`` (default: on in hosted mode) adds the browser security headers of
+    :mod:`pii_guard.security_headers` to every response, with the served page's inline
+    script and style hashes in its Content-Security-Policy (LAB-1460).
+    """
+    settings = settings or get_settings()
     app = create_app(settings)
     app.state.up_status = status
     if ui_available(ui_dir):
-        app.mount("/", _SpaFiles(directory=ui_dir), name="ui")
+        spa = _SpaFiles(directory=ui_dir)
+        app.mount("/", spa, name="ui")
+        page = spa._index.decode("utf-8")
     else:
         page = _no_ui_page(status)
 
@@ -159,6 +234,9 @@ def create_bundle_app(
         def no_ui() -> HTMLResponse:
             return HTMLResponse(page)
 
+    if settings.hosted if security_headers is None else security_headers:
+        # Outermost: the Host check's 400 and every error response carry them too.
+        app.add_middleware(SecurityHeadersMiddleware, page=page)
     return app
 
 

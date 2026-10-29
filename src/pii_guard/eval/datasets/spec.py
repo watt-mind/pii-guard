@@ -85,6 +85,10 @@ class Dataset:
     builder: Callable[[], dict[str, list[Document]]] | None = None
     #: A manifest kept elsewhere (the Ai4Privacy sample's own).
     manifest_file: str | None = None
+    #: A corrected-label variant: the set it is built from and its corrections file
+    #: (:mod:`pii_guard.eval.datasets.corrections`, LAB-1497).
+    derived_from: str | None = None
+    corrections: str | None = None
 
     @property
     def kind(self) -> str:

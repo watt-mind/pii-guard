@@ -24,8 +24,30 @@ if ! unzip -Z1 "$wheel" | grep -c 'pii_guard/_ui/index.html' >/dev/null; then
   echo "wheel-smoke: the web UI is not bundled (pii_guard/_ui/index.html missing)" >&2
   exit 1
 fi
-# The benchmark index is generated at UI build time (pii-guard eval report --print-index, LAB-1269).
-if ! unzip -Z1 "$wheel" | grep -cE 'pii_guard/_ui/assets/benchmarks-index-[^/]+\.js$' >/dev/null; then
+# The benchmark index is generated at UI build time (pii-guard eval report --print-index, LAB-1269)
+# and ships as hashed JSON parts (ui/src/api/benchmarksSplit.ts, LAB-1454): the summary, the run
+# log and one file per fixture set. Each must be there, hold real data, and be the one the app
+# chunk points at (a stale or missing part would leave the Evaluation screen empty).
+if ! python3 - "$wheel" <<'PY'
+import json, re, sys, zipfile
+
+z = zipfile.ZipFile(sys.argv[1])
+assets = {n.split("pii_guard/_ui/", 1)[1]: n for n in z.namelist() if "pii_guard/_ui/assets/" in n}
+part = lambda kind: sorted(k for k in assets if re.fullmatch(rf"assets/benchmarks-{kind}-[\w-]+\.json", k))
+summary, runs, sets = part("summary"), part("runs"), part("set-[\w-]+")
+if len(summary) != 1 or len(runs) != 1 or not sets:
+    sys.exit(f"benchmark parts missing: summary={summary} runs={runs} sets={len(sets)}")
+s = json.loads(z.read(assets[summary[0]]))
+r = json.loads(z.read(assets[runs[0]]))
+if s.get("schema_version") != 1 or not s.get("systems") or not s.get("fixture_sets") or not r.get("runs"):
+    sys.exit("benchmark parts hold no benchmark data")
+app = b"".join(z.read(n) for k, n in assets.items() if k.endswith(".js"))
+missing = [k for k in (summary[0], runs[0], *sets) if k.encode() not in app]
+if missing:
+    sys.exit(f"the app does not reference {missing[:3]}")
+print(f"benchmark index: {len(s['systems'])} systems, {len(r['runs'])} runs, {len(sets)} fixture-set parts")
+PY
+then
   echo "wheel-smoke: the UI was built without the benchmark index" >&2
   exit 1
 fi

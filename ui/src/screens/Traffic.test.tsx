@@ -5,6 +5,8 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { parseTrafficEvent, type TrafficConnectOptions, type TrafficEvent, type TrafficStatus } from "../api/traffic";
 import { Traffic } from "./Traffic";
+import { setSelectedEndpoint, setSelectedProject } from "../projects/selection";
+import { HostedSessionContext, type HostedSession } from "../hosted/session";
 
 const recorded = (full.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
 const [huChat, huStream, deTools, refused] = recorded as [TrafficEvent, TrafficEvent, TrafficEvent, TrafficEvent];
@@ -74,7 +76,7 @@ describe("Live traffic", () => {
     const list = await screen.findByTestId("call-list");
     expect(within(list).getAllByText(/needs NER/)).toHaveLength(2); // the tag and the row summary
     expect(within(list).getByText("1 name reached the model: expected, needs NER")).toBeInTheDocument();
-    expect(within(list).getByTitle(/labelled “needs fast mode \(NER\)”: in rules-only mode its name is an expected miss/)).toBeInTheDocument();
+    expect(within(list).getByTitle(/labeled “needs fast mode \(NER\)”: in rules-only mode its name is an expected miss/)).toBeInTheDocument();
     const note = within(screen.getByRole("region", { name: /Call at/ })).getByRole("note");
     expect(note).toHaveTextContent("Demo scenario hu-needs-ner: needs fast mode (NER). Expected miss in rules-only mode.");
     expect(note).toHaveTextContent("Gipsz Jakab");
@@ -88,9 +90,24 @@ describe("Live traffic", () => {
     f.push([asMasked(huChat), asMasked(deTools)]);
     await screen.findByTestId("masked-request");
     expect(screen.queryByTestId("original-request")).toBeNull();
-    expect(screen.getByText(/Not kept\. The traffic log runs at/)).toBeInTheDocument();
+    expect(screen.getByText(/Not kept: the traffic log holds only what left the machine/)).toBeInTheDocument();
     expect(within(screen.getByTestId("unmasked-response")).getByText(/put back before the answer reached your app/)).toBeInTheDocument();
     for (const v of [...ORIGINALS, "erika.mustermann@example.de"]) expect(container).not.toHaveTextContent(v);
+  });
+
+  it("renders one h1, the request and response as shared panes, and the summary as metrics (LAB-1441)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([asMasked(huChat)]);
+    await screen.findByTestId("masked-request");
+    expect(screen.getAllByRole("heading", { level: 1 }).map((h) => h.textContent)).toEqual(["Logs"]);
+    for (const name of ["Original request", "Masked request", "Response, masked → restored"]) {
+      const pane = screen.getByRole("region", { name });
+      expect(pane).toHaveAttribute("data-side");
+      expect(within(pane).getByRole("heading", { level: 2, name })).toBeInTheDocument();
+    }
+    const summary = screen.getByLabelText("Summary of the calls shown");
+    expect(within(summary).getByText("Calls").nextElementSibling).toHaveTextContent("1");
   });
 
   it("hides originals a full-level server logged when the page is not on localhost", async () => {
@@ -200,6 +217,37 @@ describe("Live traffic", () => {
     expect(screen.queryByRole("button", { name: "Send demo traffic" })).toBeNull();
   });
 
+  it("says the API is rate limiting, not unreachable, and stays on the live log (LAB-1437)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" fixtureIntervalMs={60_000} />);
+    f.status({ state: "limited", message: "Request allowance reached; try again in 3 seconds", retryAfterMs: 3000 });
+    expect(await screen.findByText("Too many requests just now.")).toBeInTheDocument();
+    expect(screen.getByText(/retries in about 3 s/)).toBeInTheDocument();
+    expect(screen.queryByText("Recorded demo traffic.")).toBeNull();
+    expect(screen.queryByText(/isn't reachable|Lost the connection/)).toBeNull();
+  });
+
+  it("says the viewer is signed out or denied, not that the API is unreachable (LAB-1437)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" fixtureIntervalMs={60_000} />);
+    f.status({ state: "denied", reason: "signed_out", message: "Sign in with Google to use this endpoint" });
+    expect(await screen.findByText("You're signed out.")).toBeInTheDocument();
+    expect(screen.queryByText("Recorded demo traffic.")).toBeNull();
+    f.status({ state: "denied", reason: "forbidden", message: "denied" });
+    expect(await screen.findByText("This account can't read this traffic log.")).toBeInTheDocument();
+    expect(screen.queryByText(/isn't reachable|Lost the connection/)).toBeNull();
+  });
+
+  it("hosted: a 401 in the console says the session ended (LAB-1519)", async () => {
+    const f = fakeConnect();
+    const session = { account: {}, error: "", refresh: async () => {}, call: vi.fn() } as unknown as HostedSession;
+    render(<HostedSessionContext.Provider value={session}><Traffic connect={f.connect} pageHost="guard.example" fixtureIntervalMs={60_000} /></HostedSessionContext.Provider>);
+    f.status({ state: "denied", reason: "signed_out", message: "Sign in" });
+    expect(await screen.findByText("Your session ended.")).toBeInTheDocument();
+    expect(screen.queryByText("You're signed out.")).toBeNull();
+    expect(screen.queryByText(/answered 401/)).toBeNull();
+  });
+
   it("plays the recorded traffic once, and Replay again never inflates the counters (LAB-1200)", async () => {
     const user = userEvent.setup();
     const total = (fixture.events as unknown[]).map(parseTrafficEvent).filter(Boolean).length;
@@ -286,6 +334,17 @@ describe("Live traffic", () => {
     expect(await screen.findByText(/Sent 8 fictional calls; 1 refused/)).toBeInTheDocument();
   });
 
+  it("doesn't offer demo traffic where the server has accounts (LAB-1435)", async () => {
+    const f = fakeConnect();
+    const sendDemo = vi.fn();
+    render(<Traffic connect={f.connect} pageHost="localhost" sendDemo={sendDemo} demoTraffic={false} />);
+    f.push([], { state: "live", via: "sse", level: "masked", size: 200 });
+    expect(await screen.findByText(/Calls through any of this project's endpoints show here, each tagged with its endpoint\./)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send demo traffic" })).toBeNull();
+    expect(screen.queryByText(/make demo-traffic/)).toBeNull();
+    expect(sendDemo).not.toHaveBeenCalled();
+  });
+
   it("says which detectors ran, and that rules alone don't find names", async () => {
     const f = fakeConnect();
     render(<Traffic connect={f.connect} pageHost="localhost" />);
@@ -321,7 +380,7 @@ describe("Upstream refusals in the drawer (LAB-1335)", () => {
     const note = await screen.findByText("The upstream refused the masked request (HTTP 404).");
     const box = note.closest("[role=note]")!;
     expect(box).toHaveTextContent("model not found on the upstream? Pick another model");
-    expect(box).toHaveTextContent("Nothing unmasked left pii-guard.");
+    expect(box).toHaveTextContent("Nothing unmasked left PII Guard.");
     expect(box).not.toHaveTextContent("Nothing was sent to the model");
   });
 
@@ -331,5 +390,47 @@ describe("Upstream refusals in the drawer (LAB-1335)", () => {
     f.push([refused]);
     expect(await screen.findByText(/Refused\. Nothing was sent to the model\./)).toBeInTheDocument();
     expect(screen.queryByText(/The upstream refused/)).toBeNull();
+  });
+});
+
+describe("Endpoint traffic in project Logs (LAB-1492)", () => {
+  const viaEndpoint = (e: TrafficEvent, id: string, name: string): TrafficEvent => ({ ...asMasked(e), id: `${e.id}_${id}`, endpoint: { id, name } });
+
+  beforeEach(() => {
+    setSelectedProject(null);
+    setSelectedEndpoint(null);
+  });
+
+  it("tags each call with its endpoint when no endpoint is selected", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} />);
+    f.push([viaEndpoint(huChat, "ep_a", "Synthetic CLI"), asMasked(deTools)]);
+    const list = await screen.findByTestId("call-list");
+    expect(within(list).getByTitle("Endpoint: Synthetic CLI")).toBeInTheDocument();
+    expect(within(list).getAllByTitle(/^Endpoint:/)).toHaveLength(1);
+  });
+
+  it("names the endpoint in the detail and sends its vault session to that endpoint's view", async () => {
+    const f = fakeConnect();
+    const onOpenSession = vi.fn();
+    render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} onOpenSession={onOpenSession} />);
+    f.push([{ ...viaEndpoint(huChat, "ep_a", "Synthetic CLI"), session_ref: "s_0123456789abcdef" }]);
+    const detail = await screen.findByRole("region", { name: /Call at/ });
+    expect(within(detail).getByText("Endpoint")).toBeInTheDocument();
+    await userEvent.click(within(detail).getByRole("button", { name: "Switch to endpoint Synthetic CLI to open its session" }));
+    expect(onOpenSession).not.toHaveBeenCalled();
+    const { getSelectedEndpoint } = await import("../projects/selection");
+    expect(getSelectedEndpoint()).toBe("ep_a");
+  });
+
+  it("drops the tag and says the view is filtered while an endpoint is selected", async () => {
+    setSelectedEndpoint("ep_a");
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} />);
+    f.push([], { state: "live", via: "poll", level: "masked", size: 50 });
+    expect(await screen.findByText(/Only calls through the endpoint picked in the header show here\./)).toBeInTheDocument();
+    f.push([viaEndpoint(huChat, "ep_a", "Synthetic CLI")]);
+    const list = await screen.findByTestId("call-list");
+    expect(within(list).queryByTitle(/^Endpoint:/)).toBeNull();
   });
 });

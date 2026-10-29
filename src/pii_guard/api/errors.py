@@ -27,6 +27,7 @@ __all__ = [
     "ERROR_CODES",
     "ErrorDetail",
     "ErrorResponse",
+    "error_headers",
     "error_response",
     "error_responses",
     "install_error_handlers",
@@ -64,6 +65,10 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
     "project_not_found": (404, "The project resource is unknown or belongs to another owner."),
     "invalid_project_config": (422, "A policy or endpoint configuration is invalid."),
     "project_storage_unavailable": (503, "The project configuration store is unavailable."),
+    "upstream_credential_rejected": (
+        502,
+        "The provider refused the API key while listing its models (HTTP 401/403).",
+    ),
     "upstream_destination_not_allowed": (
         422,
         "Hosted upstream destinations must use public HTTPS on port 443.",
@@ -113,6 +118,10 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
     "blocked_entity": (
         422,
         "An entity type whose policy is `block` was found; nothing is masked or stored.",
+    ),
+    "outbound_check_failed": (
+        422,
+        "After masking, the request still held a value its session knows; nothing was sent.",
     ),
     "placeholder_in_input": (
         422,
@@ -195,14 +204,24 @@ _HTTP_CODES = {
 }
 
 
-def error_response(status_code: int, code: str, message: str) -> JSONResponse:
+def error_response(
+    status_code: int, code: str, message: str, headers: Mapping[str, str] | None = None
+) -> JSONResponse:
     return JSONResponse(
-        status_code=status_code, content={"error": {"code": code, "message": message}}
+        status_code=status_code,
+        content={"error": {"code": code, "message": message}},
+        headers=dict(headers) if headers else None,
     )
 
 
+def error_headers(exc: PiiGuardError) -> Mapping[str, str] | None:
+    """Response headers an error carries (``X-PII-Guard-Outbound-Check: blocked``), if any."""
+    headers = getattr(exc, "headers", None)
+    return headers if isinstance(headers, Mapping) else None
+
+
 async def _pii_guard_error(_: Request, exc: PiiGuardError) -> JSONResponse:
-    return error_response(exc.status_code, exc.code, exc.message)
+    return error_response(exc.status_code, exc.code, exc.message, error_headers(exc))
 
 
 async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:

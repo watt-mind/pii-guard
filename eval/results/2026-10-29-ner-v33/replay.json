@@ -1,0 +1,27 @@
+{
+  "seed": 1512,
+  "files": {
+    "openpii/hu-openpii-train-10k.jsonl": 1000,
+    "openpii/en-openpii-train.jsonl": 500,
+    "openpii/de-openpii-train.jsonl": 500,
+    "openpii/pl-openpii-train.jsonl": 250,
+    "openpii/cs-openpii-train.jsonl": 250,
+    "openpii/sk-openpii-train.jsonl": 250,
+    "openpii/ro-openpii-train.jsonl": 250,
+    "openpii/hr-openpii-train.jsonl": 250,
+    "openpii/sl-openpii-train.jsonl": 250,
+    "s11/hu-distill-train.jsonl": 600,
+    "s11/en-distill-train.jsonl": 600,
+    "negatives/hu-negatives-train.jsonl": 300,
+    "negatives/en-negatives-train.jsonl": 300,
+    "negatives/de-negatives-train.jsonl": 300,
+    "privy/en-privy-train-6k.jsonl": 300,
+    "wismut/en-wismut-train.jsonl": 100,
+    "wismut/de-wismut-train.jsonl": 100,
+    "wismut/pl-wismut-train.jsonl": 100,
+    "wismut/cs-wismut-train.jsonl": 100,
+    "wismut/ro-wismut-train.jsonl": 100,
+    "nemotron/en-nemotron-train.jsonl": 200,
+    "gretel/en-gretel-train.jsonl": 200
+  }
+}

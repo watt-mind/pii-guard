@@ -125,7 +125,7 @@ async function errorFrom(res: Response): Promise<Error> {
     return new ApiError(res.status, err.code, typeof err.message === "string" ? err.message : err.code);
   }
   if (res.status === 404 || res.status === 405) return new ApiError(res.status, "not_found", "the gateway route is not available");
-  return new UnreachableError(`pii-guard answered ${res.status} without a contract error body`);
+  return new UnreachableError(`PII Guard answered ${res.status} without a contract error body`);
 }
 
 export interface HttpChatOptions {

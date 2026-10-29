@@ -49,7 +49,7 @@ rule modules (the same module objects) and `HungarianSuffixMatcher`, `EnglishPos
 and `HungarianForms` stay importable from their old modules, for one release.
 
 **Conformance is a library**, `pii_guard.languages.conformance`, used by the pytest suite in
-`tests/languages/` (parametrised over every registered pack), by `pii-guard lang check`, and by
+`tests/languages/` (parametrized over every registered pack), by `pii-guard lang check`, and by
 a third-party pack's own test hook. `pii-guard lang new <code>` generates a skeleton that passes
 the structural checks as generated.
 
@@ -57,7 +57,7 @@ the structural checks as generated.
 
 - Adding a language is one directory (or one distribution) plus fixtures; the conformance suite
   lists what is missing. [docs/languages.md](../languages.md) is the guide.
-- Behaviour is unchanged for `hu` and `en`: every scorecard on the committed fixtures is
+- Behavior is unchanged for `hu` and `en`: every scorecard on the committed fixtures is
   identical before and after the move. The German pack's `EVERYWHERE` rules were chosen so that
   they don't change them either (the bare Steuer-ID runs only for German text).
 - Lookup is by primary language everywhere, including the eval surface forms, which used to

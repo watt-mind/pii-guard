@@ -185,17 +185,35 @@ PYPRIVATE
   fi
   sponsored=${HOSTED_SPONSORED_MICRODOLLARS:-0}
   [[ "$sponsored" =~ ^[0-9]+$ && ${#sponsored} -le 8 ]] || { echo 'Invalid cumulative allowance ceiling' >&2; exit 2; }
-  ((10#$sponsored <= 10000000)) || { echo 'Invalid cumulative allowance ceiling (maximum USD 10)' >&2; exit 2; }
+  # Per-environment cap (LAB-1508): prod USD 50 (owner, 2026-10-29), dev stays USD 10.
+  if [[ "$AZURE_ENVIRONMENT" == prod ]]; then ceiling=50000000 ceiling_usd=50; else ceiling=10000000 ceiling_usd=10; fi
+  ((10#$sponsored <= ceiling)) || { echo "Invalid cumulative allowance ceiling (maximum USD $ceiling_usd for $AZURE_ENVIRONMENT)" >&2; exit 2; }
   if [[ "$technical_stage" != true ]] && { [[ "$mode" == enable || "$AZURE_ENVIRONMENT" == dev ]] || ((sponsored > 0)); }; then
     : "${HOSTED_RELEASE_EVIDENCE:?Provide reviewed image-bound release evidence}"
     python3 - "$HOSTED_RELEASE_EVIDENCE" "$HOSTED_IMAGE" "$mode" "$sponsored" "$AZURE_ENVIRONMENT" <<'PYEVIDENCE'
-import json,sys
+import datetime,json,re,sys
 with open(sys.argv[1]) as stream: e=json.load(stream)
+if not isinstance(e,dict): raise SystemExit('Release evidence incomplete')
 required=['lab_1372_done']
 if sys.argv[3]=='enable': required += ['isolation','csrf','identity_header_spoofing','quotas_restart','ssrf','synthetic_roundtrip','streaming','privacy_review']
 if sys.argv[5]=='dev': required += ['private_dev_reviewed','tailnet_acl','proxy_tls','proxy_headers']
-if int(sys.argv[4])>0: required += ['meta_proxy_authorized']
 if e.get('image')!=sys.argv[2] or not all(e.get(k) is True for k in required): raise SystemExit('Release evidence incomplete')
+# A positive allocation needs written Meta authorization OR the owner's recorded risk
+# acceptance (LAB-1389). The waiver is not authorization and is never read as one.
+waiver=e.get('meta_proxy_owner_risk_accepted')
+if waiver is not None:
+    date=waiver.get('date') if isinstance(waiver,dict) else None
+    try: day=datetime.date.fromisoformat(date) if isinstance(date,str) and re.fullmatch(r'\d{4}-\d{2}-\d{2}',date) else None
+    except ValueError: day=None
+    if (not isinstance(waiver,dict) or set(waiver)!={'by','ref','date','scope'} or waiver['by']!='owner'
+            or waiver['ref']!='LAB-1389' or waiver['scope']!='hackathon-demo'
+            or day is None or day>datetime.datetime.now(datetime.timezone.utc).date()):
+        raise SystemExit('Malformed owner risk acceptance')
+if int(sys.argv[4])>0:
+    if e.get('meta_proxy_authorized') is True: pass
+    elif waiver is not None:
+        print('Positive allocation admitted under owner risk acceptance LAB-1389; this is not Meta authorization.',file=sys.stderr)
+    else: raise SystemExit('Release evidence incomplete: positive allocation needs meta_proxy_authorized or meta_proxy_owner_risk_accepted')
 PYEVIDENCE
   fi
   if ((sponsored > 0)); then

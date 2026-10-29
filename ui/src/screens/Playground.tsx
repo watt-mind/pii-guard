@@ -10,7 +10,8 @@ import { Legend } from "../components/Legend";
 import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
 import { Popover } from "../components/Popover";
-import { BlockedNotice, Button, EmptyState, Stat } from "../components/ui";
+import { BlockedNotice, Button, EmptyState, KeyValues, Metric, Select, Textarea } from "../components/ui";
+import { useHostedSession } from "../hosted/session";
 import { SAMPLES, sampleBehind, type Sample } from "../content/samples";
 import { detectorsUsed, isKept, joinList, spanKey, summarize, type Summary } from "../lib/analysis";
 import type { RunError, RunResult } from "../lib/run";
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export function Playground({ text, onText, sampleId, onSample, result, running, error, onRun, onContinue, language, onLanguage, known, onKnown, onTryKnown, knownSignature }: Props) {
+  const hosted = useHostedSession() !== null;
   const [editing, setEditing] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -82,7 +84,6 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
 
   return (
     <div className="space-y-6">
-      <Intro />
       <p className="sr-only" aria-live="polite">
         {running ? "Masking the document" : error ? "" : fresh && summary ? `Done: ${summary.masked} values masked, ${summary.kept} kept by policy` : ""}
       </p>
@@ -98,60 +99,73 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
         error={error?.code === "invalid_known_value" && error.knownIndex !== undefined ? { index: error.knownIndex, message: error.message } : null}
       />
 
+      {/* The document's controls sit above the panes, so both pane headers hold only their
+          titles and stay the same height at every width (LAB-1448). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="doc-language" className="text-sm text-muted">
+          Language
+        </label>
+        <div className="w-36">
+          <Select
+            id="doc-language"
+            aria-label="Document language"
+            value={language}
+            onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
+            title="Language of the document: decides which rules and inflections apply"
+          >
+            <option value="hu">Hungarian</option>
+            <option value="en">English</option>
+          </Select>
+        </div>
+        <Button variant="primary" onClick={run} busy={running} disabled={!running && text.trim() === ""} aria-describedby="run-hint">
+          {running ? "Masking…" : fresh ? "Run again" : "Mask document"}
+          <span aria-hidden="true">→</span>
+        </Button>
+      </div>
+
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         <Pane
           id="input"
           side="you"
-          eyebrow="Inside your network"
+          eyebrow={hosted ? "Your input" : "Inside your network"}
           title="Your document"
           className="lg:flex-1"
-          actions={
-            <>
-              <label className="sr-only" htmlFor="doc-language">
-                Document language
-              </label>
-              <select
-                id="doc-language"
-                value={language}
-                onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
-                className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink"
-                title="Language of the document: decides which rules and inflections apply"
-              >
-                <option value="hu">Hungarian</option>
-                <option value="en">English</option>
-              </select>
-              {showHighlighted && (
-                <Button variant="ghost" onClick={() => setEditing(true)}>
-                  Edit text
-                </Button>
-              )}
-              {text !== "" && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setEditing(false);
-                    activate(null);
-                    onText("");
-                    requestAnimationFrame(() => document.getElementById("doc-input")?.focus());
-                  }}
-                >
-                  Clear
-                </Button>
-              )}
-              <Button variant="primary" onClick={run} disabled={running || text.trim() === ""} aria-describedby="run-hint">
-                {running ? "Masking…" : fresh ? "Run again" : "Mask document"}
-                <span aria-hidden="true">→</span>
-              </Button>
-            </>
-          }
           footer={
-            showHighlighted ? (
-              <span>Hover, tap or tab to a highlight to see its type, detector and confidence.</span>
-            ) : (
-              <span id="run-hint">
-                Paste any text, or pick a sample. Only fictional data, please: this is a demo. <kbd className="rounded border border-line px-1 font-mono text-2xs">⌘/Ctrl ↵</kbd> runs it.
-              </span>
-            )
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              {showHighlighted ? (
+                <span className="min-w-0 flex-1">Hover, tap or tab to a highlight to see its type, detector and confidence.</span>
+              ) : (
+                <span id="run-hint" className="min-w-0 flex-1">
+                  Paste any text, or pick a sample. Only fictional data, please: this is a demo.<span className="pointer-coarse:hidden">
+                    {" "}
+                    <kbd className="rounded border border-line px-1 font-mono text-2xs">⌘/Ctrl ↵</kbd> runs it.
+                  </span>
+                </span>
+              )}
+              {(showHighlighted || text !== "") && (
+                <span className="flex shrink-0 items-center gap-1">
+                  {showHighlighted && (
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+                      Edit text
+                    </Button>
+                  )}
+                  {text !== "" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditing(false);
+                        activate(null);
+                        onText("");
+                        requestAnimationFrame(() => document.getElementById("doc-input")?.focus());
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </span>
+              )}
+            </div>
           }
         >
           {showHighlighted && result ? (
@@ -161,7 +175,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
               <label htmlFor="doc-input" className="sr-only">
                 Document text
               </label>
-              <textarea
+              <Textarea
                 id="doc-input"
                 value={text}
                 onChange={(e) => onText(e.target.value)}
@@ -173,19 +187,19 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                 }}
                 spellCheck={false}
                 rows={16}
-                className="doc block min-h-[22rem] w-full resize-y rounded-lg border border-field bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-ink"
+                className="doc block"
                 placeholder="Paste a contract, an email, a referral… (fictional data only)"
               />
             </>
           )}
         </Pane>
 
-        <Boundary direction="outbound" label="pii-guard boundary: only masked text crosses it">
+        <Boundary direction="outbound" label="PII Guard boundary: only masked text crosses it">
           {summary && fresh && (
             <dl className="flex gap-3 text-center lg:flex-col lg:gap-2">
-              <Stat label="found" value={summary.detected} />
-              <Stat label="masked" value={summary.masked} />
-              <Stat label="kept" value={summary.kept} />
+              <Metric label="found" value={summary.detected} className="min-w-12" />
+              <Metric label="masked" value={summary.masked} className="min-w-12" />
+              <Metric label="kept" value={summary.kept} className="min-w-12" />
             </dl>
           )}
         </Boundary>
@@ -210,7 +224,7 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
           }
         >
           {error ? (
-            <BlockedNotice error={error} />
+            <BlockedNotice error={error} onRetry={text.trim() !== "" ? run : undefined} />
           ) : running ? (
             <SkeletonLines />
           ) : result && fresh ? (
@@ -230,7 +244,9 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
               body={
                 result
                   ? "Run the guard again to see what the model would get for this version."
-                  : "Mask the document to see exactly what would leave your network."
+                  : hosted
+                    ? "Mask the document to see exactly what the model would get."
+                    : "Mask the document to see exactly what would leave your network."
               }
             />
           )}
@@ -244,27 +260,31 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
               <h2 id="session-title" className="text-lg font-normal text-ink">
                 Detected entities
               </h2>
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-0.5 text-sm text-muted">
                 Blue values were replaced by a placeholder. A dashed outline means a value was detected but kept by policy (organizations, for example, are usually not personal data and the model needs them).
               </p>
             </div>
             <Legend counts={counts} kept={keptTypes} activeType={info?.entityType ?? null} known={result.spans.filter((s) => s.detector === "known").length} />
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted">
-              <dt>Session</dt>
-              <dd className="truncate font-mono text-ink" title={result.mask.session_id}>
-                {result.mask.session_id}
-              </dd>
-              <dt>Engine</dt>
-              <dd className="text-ink">{result.engine === "api" ? "pii-guard API" : "Demo engine (in browser)"}</dd>
-              <dt>Round trip</dt>
-              <dd className="tabular-nums text-ink">{result.ms} ms</dd>
-            </dl>
+            <KeyValues
+              items={[
+                {
+                  label: "Session",
+                  value: (
+                    <span className="block truncate font-mono" title={result.mask.session_id}>
+                      {result.mask.session_id}
+                    </span>
+                  ),
+                },
+                { label: "Engine", value: result.engine === "api" ? "PII Guard API" : "Demo engine (in browser)" },
+                { label: "Round trip", value: <span className="tabular-nums">{result.ms} ms</span> },
+              ]}
+            />
             <Button variant="primary" onClick={onContinue}>
               Send it to the model <span aria-hidden="true">→</span>
             </Button>
           </div>
           <div>
-            <h3 className="mb-2 text-sm font-medium text-ink">Placeholder map</h3>
+            <h3 className="mb-2 text-lg font-normal text-ink">Placeholder map</h3>
             <EntityTable entities={result.mask.entities} spans={result.spans} activeKey={activeKey} onActivate={activate} />
           </div>
         </section>
@@ -295,51 +315,42 @@ function ScopeNote({ summary, detectors, demo }: { summary: Summary; detectors: 
   );
 }
 
-function Intro() {
-  return (
-    <div className="max-w-3xl">
-      <h1 className="text-2xl font-medium text-balance text-ink">
-        See what the model saw, and what you got back.
-      </h1>
-      <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-        pii-guard finds personal data before a request leaves your network, swaps it for reversible placeholders, and puts the real values back into the answer.
-      </p>
-    </div>
-  );
-}
-
 function SamplePicker({ selected, onPick }: { selected: string | null; onPick: (s: Sample) => void }) {
   return (
     <fieldset className="min-w-0">
       <legend className="mb-2 text-xs font-medium text-muted">Fictional samples</legend>
       <div className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4 sm:px-0 sm:pb-0">
-        {SAMPLES.map((s) => {
-          const on = s.id === selected;
-          return (
-            <button
-              key={s.id}
-              type="button"
-              aria-pressed={on}
-              onClick={(e) => {
-                e.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
+        {SAMPLES.map((s) => (
+          <label
+            key={s.id}
+            className={[
+              // relative: the sr-only radio is absolute and must stay inside the scroller.
+              "group relative flex w-[15rem] shrink-0 cursor-pointer snap-start items-center justify-between gap-3 rounded-lg border border-line px-3.5 py-2.5 text-left transition-colors sm:w-auto",
+              "hover:border-line-strong hover:bg-surface has-[:checked]:border-line-strong has-[:checked]:bg-surface has-[:checked]:shadow-[0_0_0_1px_var(--line-strong)]",
+              "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus)]",
+            ].join(" ")}
+          >
+            <input
+              type="radio"
+              name="playground-sample"
+              value={s.id}
+              checked={s.id === selected}
+              onChange={(e) => {
+                e.currentTarget.closest("label")?.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
                 onPick(s);
               }}
-              className={[
-                "group flex w-[15rem] shrink-0 snap-start items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-colors sm:w-auto",
-                on ? "border-ink bg-surface" : "border-line hover:border-line-strong hover:bg-surface",
-              ].join(" ")}
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-ink">{s.title}</span>
-                <span className="block truncate text-xs text-muted">{s.subtitle}</span>
-              </span>
-              <span
-                aria-hidden="true"
-                className={["size-4 shrink-0 rounded-full border-2", on ? "border-ink bg-ink shadow-[inset_0_0_0_3px_var(--surface)]" : "border-line-strong"].join(" ")}
-              />
-            </button>
-          );
-        })}
+              className="peer sr-only"
+            />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium text-ink">{s.title}</span>
+              <span className="block truncate text-xs text-muted">{s.subtitle}</span>
+            </span>
+            <span
+              aria-hidden="true"
+              className="size-4 shrink-0 rounded-full border-2 border-line-strong peer-checked:border-ink peer-checked:bg-ink peer-checked:shadow-[inset_0_0_0_3px_var(--surface)]"
+            />
+          </label>
+        ))}
       </div>
     </fieldset>
   );

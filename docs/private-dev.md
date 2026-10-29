@@ -117,7 +117,12 @@ machine state requires a fresh approved one-use enrollment key; do not silently 
 dev. Use the same immutable image digest and normal versioned app key references, set
 `HOSTED_PUBLIC_ORIGIN=https://guard-dev.watt-mind.com`, and provide reviewed evidence containing
 `lab_1372_done`, `private_dev_reviewed`, `tailnet_acl`, `proxy_tls`, `proxy_headers` for that image.
-Keep sponsorship zero until provider authorization and approved durable authority exist.
+Keep sponsorship zero until provider authorization (or the owner's recorded LAB-1389 risk
+acceptance, `meta_proxy_owner_risk_accepted`) and approved durable authority exist. That
+waiver is a risk acceptance, not Meta authorization: it is scoped to the hackathon demo, capped
+at USD 10 on dev (prod: USD 50) with a fixed expiry, and sponsored Meta stops being the default before general
+availability unless written authorization arrives
+([hosted.md](hosted.md#owner-risk-acceptance-is-not-authorization)).
 
 ### Operator technical stage before live acceptance
 
@@ -173,6 +178,51 @@ app sidecar cannot provide this wake path. Repeat streaming and synthetic error 
 that OAuth code/state, auth, cookie and body canaries appear in neither proxy output nor generated
 files. Local Linux Nginx tests exercise these properties but cannot prove the deployed Azure path.
 
+## Merge to dev: the image CI built, deployed after `ci-ok`
+
+The dev image is built once, by CI (LAB-1446). On every push to `develop`, `hosted-infra` builds
+and smoke-tests Dockerfile.hosted, then `hosted-image-push` rebuilds it from the same layer cache
+(all hits) and pushes `<dev registry>.azurecr.io/pii-guard:develop-<short sha>`. It runs in the
+`dev-image` GitHub Environment (deployable from `develop` only) with an OIDC identity that has
+`AcrPush` on the dev registry and nothing else: no secret, no deploy right. The job summary
+shows the pushed `HOSTED_IMAGE` (`...pii-guard@sha256:...`). `hosted-image-push` is a delivery
+job outside `ci-ok`, so a registry hiccup leaves CI green without an image; use the fallback.
+
+Develop pushes run the fast test suite (`make test`, the pull-request profile), so `ci-ok`
+lands about as fast as on the pull request; the full suite runs nightly, on `main` and on manual
+dispatch. After a merge:
+
+```bash
+run=$(gh run list --branch develop --workflow ci --event push --limit 1 \
+  --json databaseId -q '.[0].databaseId')
+gh run watch "$run" --exit-status            # wait for ci-ok on that exact commit
+gh run view "$run" --log --job "$(gh run view "$run" --json jobs \
+  -q '.jobs[] | select(.name == "hosted-image-push") | .databaseId')" | grep 'IMAGE '
+```
+
+Deploy only after `ci-ok` on that commit is green: pass the `IMAGE` digest as `HOSTED_IMAGE` to
+`deploy/azure/deploy.sh technical-stage` (or `stage`) with the evidence described above, bound
+to that digest. If `ci-ok` is red, do not deploy that digest; fix forward.
+
+### Manual fallback: `acr_build.sh`
+
+When `hosted-image-push` did not run or failed, build the same commit in the registry. Start it
+as soon as the pull request merges, in parallel with develop CI, and still deploy only after
+`ci-ok` is green:
+
+```bash
+git fetch origin develop
+ACR_NAME=<dev registry> deploy/azure/acr_build.sh origin/develop
+```
+
+`acr_build.sh` exports the commit with `git archive` (committed files only), runs `az acr run`
+with BuildKit, tags `pii-guard:develop-<sha>` and prints `TAG`, `DIGEST` and
+`IMAGE <registry>.azurecr.io/pii-guard@sha256:...` on stdout (build logs on stderr). It needs
+only the operator's existing `az login` and holds no secret. Each Dockerfile.hosted stage is
+also pushed as `pii-guard:buildcache-*`, an inline BuildKit layer cache the next build reads, so
+a change under `src/` reuses the dependency, NER model and apt layers. The cache tags are
+overwritten on every build; delete them to force a cold build.
+
 ## Durable encrypted project configuration
 
 The operator foundation adds a separate private `project-configuration` container in the same
@@ -221,8 +271,8 @@ unknown-write handling and retained limitations. Deployment compilation is not l
 App releases configure LAB-1398's `azure_blob` store and reuse the exact operator-approved
 cumulative ceiling, allocation ID and expiry. The isolated private container is
 `sponsored-allowance`, with a fixed `dev.json` object. Bootstrap creates no object/funding. An
-operator precreates/funds it only after provider permission; releases never create, reset,
-refill or extend it. Total/daily charges survive zero replicas and overlapping revisions under
+operator precreates/funds it only after provider permission or the owner's recorded LAB-1389
+risk acceptance (which is not permission); releases never create, reset, refill or extend it. Total/daily charges survive zero replicas and overlapping revisions under
 CAS. Owner sessions, mappings, profiles and API-key records remain ephemeral; LAB-1376 is not
 implemented by durable spend accounting.
 

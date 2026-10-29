@@ -59,7 +59,7 @@ def test_cited_files_and_headings_exist(doc: str) -> None:
 
 def test_readme_links_the_differentiators_page() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "## Why pii-guard" in readme
+    assert "## Why PII Guard" in readme
     assert "docs/why-pii-guard.md" in readme
     assert "why-pii-guard.md" in (ROOT / "docs/INDEX.md").read_text(encoding="utf-8")
 

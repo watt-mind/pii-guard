@@ -177,6 +177,8 @@ def nginx_config(aca_fqdn: str, tail_ip: str, pem_path: str) -> str:
         "Cookie": "$http_cookie",
         "Content-Type": "$http_content_type",
         "Accept": "$http_accept",
+        # The app compresses static assets itself; nginx gzip stays off (LAB-1472).
+        "Accept-Encoding": "$http_accept_encoding",
         "Origin": "$http_origin",
         "Sec-Fetch-Site": "$http_sec_fetch_site",
         "Referer": "$http_referer",

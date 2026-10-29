@@ -21,7 +21,7 @@ Existing PII tools don't close the gap:
 4. **Unmeasured.** Tools rarely publish recall, and almost never an end-to-end *leak rate*,
    so nobody can say how safe they are.
 
-## What pii-guard is
+## What PII Guard is
 
 A privacy firewall that sits between an application or agent and an LLM:
 
@@ -54,7 +54,7 @@ personal data never has to leave your infrastructure either.
 ## Non-goals (for now)
 
 - **Anonymization guarantees in the legal sense.** Pseudonymized data is still personal data
-  under GDPR. pii-guard reduces exposure, it does not make data anonymous.
+  under GDPR. PII Guard reduces exposure, it does not make data anonymous.
 - **Inference attacks.** A model may still infer identity from context (a unique job title, a
   rare event). Quasi-identifiers are out of scope for the first version; see
   [privacy-model.md](privacy-model.md).

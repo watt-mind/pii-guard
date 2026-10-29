@@ -13,8 +13,9 @@ machine-readable zones of ID cards and passports (TD1 and TD3, with their check 
 land registry parcel numbers next to ``hrsz.`` / ``helyrajzi szám`` also run everywhere: the
 checksum or the label makes them unambiguous.
 
-Addresses, postcodes (four digits before a settlement name, or in context), vehicle plates and
-an ID card number without its label (``123456AB``) are formats without a checksum, so they run
+Addresses, postcodes (four digits before a settlement name, or in context), vehicle plates, a
+TAJ number without its label (its mod-10 check passes one nine-digit run in ten) and an ID
+card number without its label (``123456AB``) have no checksum, or too weak a one, so they run
 only when the text is Hungarian (``RULES``); in other languages "2019 Robin" or "ISO-900" style
 look-alikes would be false positives. A full address is validated against the gazetteer
 instead (``pii_guard.lang``, ADR 0009): its postcode must belong to its settlement.
@@ -89,22 +90,36 @@ _TAJ_DOTTED_RE = re.compile(NUM_START + r"(\d{3})([./])(\d{3})\2(\d{3})" + NUM_E
 _TAJ_CONTEXT = ("taj", "társadalombiztosítási", "social security")
 
 
-def _find_taj(text: str) -> Iterator[_Hit]:
+def _taj_hits(text: str, *, labelled: bool) -> Iterator[_Hit]:
     for m in _TAJ_RE.finditer(text):
         if is_valid_taj(m.group(1) + m.group(3) + m.group(4)):
             # A mod-10 check passes for 1 in 10 random numbers: context matters more here.
             if context_before(text, m.start(), _TAJ_CONTEXT):
-                score = 0.95
-            elif reference_or_amount_before(text, m.start()):
-                continue  # "Order number: 123456788", "INV-123456788", "$123 456 788"
-            else:
-                score = 0.8
-            yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, score)
-    for m in _TAJ_DOTTED_RE.finditer(text):
-        if is_valid_taj(m.group(1) + m.group(3) + m.group(4)) and context_before(
-            text, m.start(), _TAJ_CONTEXT
-        ):
-            yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, 0.95)
+                if labelled:
+                    yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, 0.95)
+            elif not labelled and not reference_or_amount_before(text, m.start()):
+                # Not "Order number: 123456788", "INV-123456788", "$123 456 788".
+                yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, 0.8)
+    if labelled:
+        for m in _TAJ_DOTTED_RE.finditer(text):
+            if is_valid_taj(m.group(1) + m.group(3) + m.group(4)) and context_before(
+                text, m.start(), _TAJ_CONTEXT
+            ):
+                yield _Hit(m.start(), m.end(), EntityType.NATIONAL_ID_HU_TAJ, 0.95)
+
+
+def _find_taj(text: str) -> Iterator[_Hit]:
+    """A TAJ number after its label (``TAJ``, ``társadalombiztosítási``), in any language."""
+    return _taj_hits(text, labelled=True)
+
+
+def _find_bare_taj(text: str) -> Iterator[_Hit]:
+    """A TAJ number without its label: Hungarian text only (LAB-1433).
+
+    One nine-digit run in ten passes the check, so in another language an unlabelled one is
+    far more often that language's own number (a Polish phone number or REGON) than a TAJ.
+    """
+    return _taj_hits(text, labelled=False)
 
 
 # --- Personal identification number (személyi azonosító) --------------------
@@ -558,6 +573,7 @@ EVERYWHERE: tuple[Rule, ...] = (
     _find_parcel_number,
 )
 RULES: tuple[Rule, ...] = (
+    _find_bare_taj,
     _find_vehicle_plate,
     _find_address,
     _find_postcode,

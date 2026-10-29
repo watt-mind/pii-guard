@@ -44,7 +44,7 @@ const POLICY_CLASSES: Record<Policy, Pick<EntityMeta, "mark" | "chip" | "swatch"
   },
   keep: {
     mark: "bg-transparent text-ink ring-kept/60",
-    chip: "bg-surface-2 text-muted ring-kept/50",
+    chip: "bg-surface-2 text-kept-ink ring-kept/50",
     swatch: "bg-kept",
   },
 };

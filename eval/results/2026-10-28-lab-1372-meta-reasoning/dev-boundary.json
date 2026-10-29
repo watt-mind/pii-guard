@@ -1,0 +1,204 @@
+{
+ "target": "https://guard-dev.watt-mind.com (Tailscale -> router VM -> ACA -> Easy Auth)",
+ "measured_at": "2026-10-28T22:00Z",
+ "revision": "piiguard-dev-app--0000005",
+ "signed_in": false,
+ "forged_headers": [
+  "X-MS-CLIENT-PRINCIPAL (valid-shaped base64 Google principal)",
+  "X-MS-CLIENT-PRINCIPAL-ID",
+  "X-MS-CLIENT-PRINCIPAL-NAME",
+  "X-MS-CLIENT-PRINCIPAL-IDP",
+  "X-MS-TOKEN-GOOGLE-ACCESS-TOKEN",
+  "X-MS-TOKEN-GOOGLE-ID-TOKEN",
+  "X-Pii-Guard-External-Host",
+  "X-Pii-Guard-External-Proto",
+  "X-Forwarded-Host",
+  "X-Forwarded-For",
+  "Forwarded",
+  "X-Real-IP",
+  "X-Original-URL",
+  "X-Arr-SSL"
+ ],
+ "requests": 26,
+ "checks": [
+  {
+   "check": "baseline-anonymous",
+   "method": "GET",
+   "path": "/v1/account",
+   "status": 200,
+   "authenticated": false
+  },
+  {
+   "check": "forged-all-identity-headers",
+   "method": "GET",
+   "path": "/v1/account",
+   "status": 200,
+   "authenticated": false
+  },
+  {
+   "check": "forged-principal-only",
+   "method": "GET",
+   "path": "/v1/account",
+   "status": 200,
+   "authenticated": false
+  },
+  {
+   "check": "forged-status",
+   "method": "GET",
+   "path": "/v1/status",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-projects",
+   "method": "GET",
+   "path": "/v1/projects",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-mask",
+   "method": "POST",
+   "path": "/v1/mask",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-api-keys-list",
+   "method": "GET",
+   "path": "/v1/account/api-keys",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-api-key-create",
+   "method": "POST",
+   "path": "/v1/account/api-keys",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-chat",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-demo",
+   "method": "POST",
+   "path": "/v1/demo",
+   "status": 503,
+   "error": "sponsored_unavailable",
+   "note": "treated as a guest; dev sponsorship is 0"
+  },
+  {
+   "check": "forged-guard-key",
+   "method": "GET",
+   "path": "/v1/status",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-endpoint-key",
+   "method": "GET",
+   "path": "/e/synthetic/v1/models",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-x-pii-guard-token",
+   "method": "GET",
+   "path": "/v1/status",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "forged-easy-auth-session-cookie",
+   "method": "GET",
+   "path": "/v1/account",
+   "status": 200,
+   "authenticated": false
+  },
+  {
+   "check": "forged-auth-me",
+   "method": "GET",
+   "path": "/.auth/me",
+   "status": 404,
+   "error": "not_found"
+  },
+  {
+   "check": "dup-principal",
+   "method": "GET",
+   "path": "/v1/account",
+   "status": 200,
+   "authenticated": false
+  },
+  {
+   "check": "dup-authorization",
+   "method": "GET",
+   "path": "/v1/status",
+   "status": 400,
+   "note": "refused by the router (nginx 400) before ACA"
+  },
+  {
+   "check": "dup-origin-mask",
+   "method": "POST",
+   "path": "/v1/mask",
+   "status": 401,
+   "error": "unauthorized",
+   "note": "router forwards the first Origin only"
+  },
+  {
+   "check": "dup-cookie",
+   "method": "GET",
+   "path": "/v1/account",
+   "status": 200,
+   "authenticated": false
+  },
+  {
+   "check": "dup-connection-header",
+   "method": "GET",
+   "path": "/v1/account",
+   "status": 404,
+   "error": "connection_not_found",
+   "note": "router forwards the first value only; a guest has no connections"
+  },
+  {
+   "check": "dup-x-pii-guard-token",
+   "method": "GET",
+   "path": "/v1/status",
+   "status": 401,
+   "error": "unauthorized"
+  },
+  {
+   "check": "cross-origin-demo",
+   "method": "POST",
+   "path": "/v1/demo",
+   "status": 403,
+   "error": "hosted_request_denied"
+  },
+  {
+   "check": "login-forged-host",
+   "method": "GET",
+   "path": "/.auth/login/google",
+   "status": 302,
+   "location_host": "accounts.google.com",
+   "redirect_uri_host": "guard-dev.watt-mind.com"
+  },
+  {
+   "check": "login-forged-host-redirect-uri",
+   "method": "GET",
+   "path": "/.auth/login/google",
+   "status": 302,
+   "redirect_uri_host": "guard-dev.watt-mind.com"
+  },
+  {
+   "check": "direct-aca-fqdn",
+   "method": "GET",
+   "path": "/v1/account",
+   "status": null,
+   "note": "the ACA FQDN has no public DNS answer; unreachable except through the router"
+  }
+ ]
+}

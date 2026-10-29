@@ -1,6 +1,6 @@
 # Operations: demo stack, traffic log and timing
 
-How to run pii-guard end to end on one machine, watch what the gateway does to each LLM call,
+How to run PII Guard end to end on one machine, watch what the gateway does to each LLM call,
 and measure the latency it adds. Everything here works offline and free: a mock upstream
 stands in for the model unless you configure a real one.
 
@@ -90,9 +90,14 @@ cookies do not reset a network allowance, and sign-in cannot replenish global sp
 429 responses include `Retry-After`; hourly anonymous exhaustion asks for Google sign-in
 or the free walkthrough. Missing/untrusted address signals return sanitized 503 errors.
 
-Each in-memory network/principal table is limited to 4096 keyed digests with bounded
-counters/timestamps, one-hour idle expiry and 24-hour absolute expiry. Full tables refuse
-new entries instead of evicting allowances. The HMAC key is random and process-only;
+Each anonymous network (IPv4 address, IPv6 /64) also charges its aggregate (IPv4 /24,
+IPv6 /48): 120-request burst refilling 60/minute, 480 per hour, at most 64 tracked
+networks. A single /48 therefore cannot fill the network table and lock out other clients.
+
+Each in-memory network/aggregate/principal table is limited to 4096 keyed digests with
+bounded counters/timestamps, one-hour idle expiry and 24-hour absolute expiry. A full table
+evicts its least recently used bucket once it has been idle for five minutes; otherwise it
+refuses new entries, and `Retry-After` reports when a slot can free. The HMAC key is random and process-only;
 application abuse buckets retain no raw address. State resets on restart, while the
 separate durable allocation claim still prevents restart from replenishing sponsored
 spend. This is a secondary abuse signal, without an external CAPTCHA or bot-proof claim.
@@ -262,7 +267,7 @@ make smoke-fast       # the same in fast mode with the NER (local)
 **First run of `make demo`.** It installs the `ner` extra (torch, transformers) and, unless
 `PII_GUARD_NER_MODEL` is set, downloads the NER model before the API starts, printing
 `ner: downloading … (Apache-2.0, about 1110 MB, first run only)`. The model is the published
-pii-guard checkpoint, `watt-mind/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
+PII Guard checkpoint, `watt-mind/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
 [models.md](models.md#which-ner-model-fast-mode-runs)), pinned to a hub revision and
 checked against its SHA-256, stored in `~/.cache/pii-guard/models/ner/`
 (`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK=cached`
@@ -273,7 +278,7 @@ uses it only if it is already there; `off` (what `MODE=rules` sets) never uses i
 | Process | Address | Notes |
 |---|---|---|
 | Mock upstream | `http://127.0.0.1:8790/v1` | OpenAI-compatible; answers `Echo: <last user message>`, or calls the first tool with it. No model, no network. |
-| pii-guard API + gateway | `http://127.0.0.1:8787` | Gateway in `fast` mode by default, traffic log `masked`, `Server-Timing` and `/metrics` on, a fresh tenant key per run (unless `.env` sets one). |
+| PII Guard API + gateway | `http://127.0.0.1:8787` | Gateway in `fast` mode by default, traffic log `masked`, `Server-Timing` and `/metrics` on, a fresh tenant key per run (unless `.env` sets one). |
 | UI | `http://localhost:5173` | The Vite dev server, proxying `/v1` to the API. Skipped when pnpm is missing (`--no-ui`). |
 
 It prints a banner with the URLs and what it found:
@@ -284,7 +289,7 @@ It prints a banner with the URLs and what it found:
   sends `model: pii-guard-mock`; set `PII_GUARD_DEMO_MODEL` for a real upstream. The demo
   traffic is fictional, so it may go to a hosted model.
 - **Fast mode** uses rules + the NER model that resolves (`PII_GUARD_NER_MODEL`, else the
-  published pii-guard checkpoint once it is pinned, else the public fallback) and names it,
+  published PII Guard checkpoint once it is pinned, else the public fallback) and names it,
   for example `fast mode  rules + NER: bardsai/eu-pii-anonimization-multilang@62ca57123687
   (public fallback, Apache-2.0)`. Rules only with `MODE=rules`, or when the `ner` extra is
   missing (the banner says so).
@@ -305,7 +310,7 @@ tab's **Send demo traffic** sends the same ones (`ui/src/content/demoScenarios.j
 by `scripts/demo_traffic.py --export-ui` and kept in sync by a test).
 
 **What it shows in rules-only mode** (the default: no `PII_GUARD_NER_MODEL`). Nothing reaches
-the model except in the one labelled scenario:
+the model except in the one labeled scenario:
 
 - **Names** are pre-loaded as session **known values** (`POST /v1/sessions`), the way an
   application that knows its parties would (a CRM record, a case file). The `known` detector
@@ -316,15 +321,15 @@ the model except in the one labelled scenario:
   one when the stack runs `uv run python scripts/demo.py --traffic-log full` (localhost only;
   the recorded replay is `masked`, so it shows the placeholders and their count).
 - **Numbers** are checksum-valid fictional identifiers the rules find on their own: TAJ,
-  adóazonosító jel, HU / GB / DE IBANs, a Luhn test card, phone numbers, e-mail addresses and
+  adóazonosító jel, HU / GB / DE IBANs, a Luhn test card, phone numbers, email addresses and
   a postal address.
-- **`hu-needs-ner`, labelled "needs fast mode (NER)"**: a free-text name with no known value
+- **`hu-needs-ner`, labeled "needs fast mode (NER)"**: a free-text name with no known value
   and no rule cue (`Tegnap Gipsz Jakab telefonált…`). In rules-only mode it reaches the mock
   model as written: an **expected miss**, kept on purpose to show what the NER adds.
   `make demo-traffic` prints it as such, and the Live traffic tab marks the call
   "needs fast mode (NER) · expected miss" with the reason.
 
-**In fast mode with the NER** (`make demo`, the default) the labelled name is masked too, and
+**In fast mode with the NER** (`make demo`, the default) the labeled name is masked too, and
 the tab says the NER ran. With `make demo MODE=rules` it is the expected miss described above.
 
 ### Smoke test
@@ -336,7 +341,7 @@ the tab says the NER ran. With `make demo MODE=rules` it is the expected miss de
    arguments equal to `{"text": <the original message>}`);
 2. no gold value of any scenario reached the upstream, raw, JSON-escaped or without spaces
    (the mock keeps what it received, `GET /_mock/received`). In rules-only mode that covers
-   every scenario except the one labelled "needs fast mode (NER)": its name is printed as an
+   every scenario except the one labeled "needs fast mode (NER)": its name is printed as an
    expected miss, not a failure;
 3. every call has a traffic event with a timing breakdown, and the log holds no raw session
    id and no credentials.
@@ -346,7 +351,7 @@ same checks run in-process in `tests/bench/test_bench.py`.
 
 `make smoke-fast` (`scripts/smoke.py --mode fast`, local) runs the same traffic in fast mode
 with the resolved NER model (downloaded once on the first run, as for `make demo`). It also
-fails unless the NER ran on the call labelled "needs fast mode (NER)" (its traffic event lists
+fails unless the NER ran on the call labeled "needs fast mode (NER)" (its traffic event lists
 `ner`) and that call's name was masked: no expected misses. A fresh cache
 (`PII_GUARD_MODELS_DIR=$(mktemp -d) make smoke-fast`) checks the clean-checkout path.
 
@@ -443,12 +448,12 @@ reverse proxy. A container binds `0.0.0.0`; publish its port on `127.0.0.1` only
 | `PII_GUARD_ALLOWED_HOSTS` | Extra `Host` header names the API answers, comma-separated; `*` answers any | `localhost`, `127.0.0.1`, `[::1]` and `PII_GUARD_HOST` |
 
 - **DNS rebinding.** A web page on another site can point its own host name at `127.0.0.1` and
-  make the browser talk to a local pii-guard; its requests still carry that host name. Any other
+  make the browser talk to a local PII Guard; its requests still carry that host name. Any other
   `Host` gets `400 Invalid host header`. The UI's Vite proxy sends `127.0.0.1:<port>`; behind a
   proxy or a compose service name (`demo-api`), add that name to `PII_GUARD_ALLOWED_HOSTS`.
 - **The token is never forwarded upstream.** The gateway sends `PII_GUARD_UPSTREAM_API_KEY`
   upstream, never the client's token. Without an upstream key the client's own `Authorization`
-  is passed through (bring your own key); a pii-guard token sent as the bearer is removed first,
+  is passed through (bring your own key); a PII Guard token sent as the bearer is removed first,
   so send the token as `X-PII-Guard-Token` and your provider key as `Authorization`.
 
 ## Resource limits
@@ -500,6 +505,14 @@ Both answer `404 traffic_log_disabled` while the log is off.
 startup: a poller that sees it change knows the server restarted and its `after` cursor is
 stale, and starts again from `after=0`. The Logs screen does this.
 
+Hosted mode keeps one log per owner runtime (the project's own, one per endpoint) but numbers
+all of an owner's events from one sequence. With no endpoint selected, `/v1/traffic` and the
+stream merge the project's runtime and every one of its endpoint runtimes by `seq`, so a call
+through `/e/<endpoint>/v1/...` shows up in the project's Logs; `X-PII-Guard-Endpoint` narrows
+the view to that endpoint. Both views share one `boot` and one `seq` space, so `after` is a
+plain cursor in either. Another owner's runtimes are never read, and the Vault stays per
+runtime.
+
 ### Privacy model
 
 - **Nothing is persisted.** Events live in a bounded ring buffer in the API process; they are
@@ -534,9 +547,11 @@ stale, and starts again from `after=0`. The Logs screen does this.
 |---|---|
 | `id` | Request id, also sent back as `X-PII-Guard-Request-Id` on successful responses |
 | `seq`, `time` | Order in this process; UTC timestamp |
+| `endpoint` | Hosted only: `{"id", "name"}` of the endpoint the call went through; absent for calls on the project itself |
 | `level` | `masked` or `full` |
-| `outcome` | `ok`, `blocked` (a `block` policy), `refused` (any other error before or at the upstream), `upstream_error` (upstream HTTP >= 400), `stream_error`, `client_disconnected` (the client went away mid-stream; the partial answer does not seed the detection cache), `error` |
+| `outcome` | `ok`, `blocked` (a `block` policy, or the outbound re-check), `refused` (any other error before or at the upstream), `upstream_error` (upstream HTTP >= 400), `stream_error`, `client_disconnected` (the client went away mid-stream; the partial answer does not seed the detection cache), `error` |
 | `error` | `{"code", "status"}` and, for `blocked`, `entity_types` (counts) |
+| `outbound_check` | The [outbound re-check](architecture-gateway.md#outbound-re-check) of the masked request: `result` (`passed` or `blocked`), `texts` checked, `hits` (blocking occurrences per entity type), `short` (occurrences too short to block), `ms`; `null` when the call was refused before it |
 | `mode`, `language`, `stream`, `model` | As requested |
 | `session_ref`, `session_new`, `session_source` | Hashed session (see above); whether the call started the conversation; which step chose it: `header`, `path`, `prompt_cache_key` or `default` ([architecture-gateway.md](architecture-gateway.md#sessions)) |
 | `detectors` | Detectors that ran (`rules`, `ner`, `llm`, `known`, `visual`) |
@@ -597,21 +612,21 @@ received until the answer is built (non-streamed) or the stream has ended:
 | `detect` | Every detector on every text (concurrent), then the session's known values; wall time |
 | `image` | The visual pipeline (SAM, OCR) for inline images |
 | `mask` | Vault masking of every text |
-| `forward` | Serialising the masked body and opening the upstream client |
+| `forward` | Serializing the masked body and opening the upstream client |
 | `upstream_ttfb` | Send until the upstream's response headers |
 | `upstream` | All time spent waiting on the upstream: headers, body or each stream read |
 | `unmask` | Restoring a stream, summed over its chunks |
 | `response` | Restoring a non-streamed answer and building the response |
-| `client` | Streams: time spent handing each event to the client (its read speed, network backpressure); neither pii-guard's work nor the upstream's |
+| `client` | Streams: time spent handing each event to the client (its read speed, network backpressure); neither PII Guard's work nor the upstream's |
 
 Derived fields:
 
 - `total_ms`, `upstream_ms` and **`overhead_ms = total_ms - upstream_ms - client`**: what
-  pii-guard added to the call. A slow-reading client makes a stream's `total_ms` longer, not
+  PII Guard added to the call. A slow-reading client makes a stream's `total_ms` longer, not
   its overhead.
 - Streams: `ttft_ms` (to the first event sent to the client), `upstream_ttft_ms` (the
   upstream's own time from send to its first data event) and **`added_ttft_ms = ttft_ms -
-  upstream_ttft_ms`**: the delay pii-guard added before the first token.
+  upstream_ttft_ms`**: the delay PII Guard added before the first token.
 - `detectors_ms`: each detector's own time summed over the texts of the request. Texts run
   concurrently, so these can add up to more than the `detect` stage.
 

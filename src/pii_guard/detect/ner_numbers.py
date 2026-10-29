@@ -86,10 +86,13 @@ _NEGATIVE = (
     "rendeles*", "megrendeles*", "sorszam*", "cikkszam*", "csomag*", "kuldemeny*", "jegy",
     "jegyszam*", "ugyszam*", "iktatoszam*", "nyugta*",
     "bestell*", "auftrag*", "artikel*", "sendung*", "rechnung*", "ticketnummer*",
+    "zamowien*", "zlecen*", "faktur*", "paragon*", "przesyłk*", "przesylk*", "przesyłek",
+    "paczk*", "rezerwacj*", "zgłoszen*", "zgloszen*", "transakcj*", "sledzeni*", "sygn",
+    "sygnatur*", "artykuł*", "artykul*",
 )  # fmt: skip
 
 #: Words of a pack cue too generic to count on their own ("account number", "TAJ szám").
-_GENERIC = frozenset({"number", "nummer", "szam", "szama", "mit", "der", "the", "ending"})
+_GENERIC = frozenset({"number", "nummer", "szam", "szama", "numer", "mit", "der", "the", "ending"})
 
 #: How far before a value the nearest cue is looked for, on the same line.
 _WINDOW = 60
@@ -98,7 +101,7 @@ _FIELD_SEPARATORS = ",;|=\"'\t"
 _WORD_RE = re.compile(r"[^\W\d_]+")
 _WORD_OR_NUMBER_RE = re.compile(r"[^\W\d_]+|\d+")
 #: Words of a label that don't count as words between it and its value ("order number").
-_FILLER = frozenset({"number", "no", "nr", "num", "nummer", "szam", "szama", "id"})
+_FILLER = frozenset({"number", "no", "nr", "num", "nummer", "numer", "szam", "szama", "id"})
 #: A negative word counts as a value's label only this close (in words) before it.
 _LABEL_WORDS = 2
 _HEX_RE = re.compile(r"(?:[a-z]+_)?(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{8,}")

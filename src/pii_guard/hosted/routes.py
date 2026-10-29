@@ -7,8 +7,10 @@ upstream text on the server; callers choose a sample, never supply a prompt or m
 from __future__ import annotations
 
 import json
+from functools import partial
 from typing import Any, Literal
 
+import anyio.to_thread
 from fastapi import Path, Request
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from starlette.responses import Response
@@ -25,7 +27,10 @@ from pii_guard.gateway.service import (
     UpstreamError,
 )
 from pii_guard.hosted.connections import PROVIDERS
+from pii_guard.hosted.egress import validate_destination
 from pii_guard.hosted.identity import IdentityError, Principal
+from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS
+from pii_guard.projects.first_run import META_BASE_URL, ensure_first_run
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import PLACEHOLDER_RE, VaultSession
 
@@ -69,6 +74,11 @@ class ConnectionRequest(_StrictBody):
     base_url: str | None = Field(default=None, max_length=2048, repr=False)
 
 
+class FirstRunRequest(_StrictBody):
+    issue_key: bool = False
+    meta_api_key: SecretStr | None = Field(default=None, min_length=1, max_length=4096, repr=False)
+
+
 class DemoRequest(_StrictBody):
     sample_id: Literal["hu-support", "en-support"]
     language: Literal["hu", "en"] | None = None
@@ -77,6 +87,12 @@ class DemoRequest(_StrictBody):
 class _NotFoundError(PiiGuardError):
     code = "not_found"
     status_code = 404
+
+
+# Easy Auth shows its own bare "signed in" page without a return address (LAB-1425);
+# sign-in returns to the dashboard (LAB-1430).
+LOGIN_URL = "/.auth/login/google?post_login_redirect_uri=%2F%23overview"
+LOGOUT_URL = "/.auth/logout?post_logout_redirect_uri=%2F"
 
 
 class _InvalidDemoError(PiiGuardError):
@@ -91,26 +107,43 @@ def _principal(request: Request, *, authenticated: bool = False) -> Principal:
     return principal
 
 
+def _signed_in(request: Request) -> Principal:
+    """Key and connection management: a signed-in Google session, never a guard API key."""
+    principal = _principal(request, authenticated=True)
+    if principal.auth_method != "google":
+        raise IdentityError()
+    return principal
+
+
 @router.get("/v1/account")
 def account(request: Request) -> dict[str, Any]:
     principal = _principal(request)
     hosted = request.app.state.hosted
     limits = hosted.quotas.limits
     authenticated = principal.authenticated
+    images = authenticated and bool(getattr(hosted.settings, "hosted_images", False))
     return {
         "mode": "hosted",
         "authenticated": authenticated,
         "principal": {"id": principal.id, "provider": "google"} if authenticated else None,
-        "login_url": "/.auth/login/google",
-        "logout_url": "/.auth/logout",
+        "login_url": LOGIN_URL,
+        "logout_url": LOGOUT_URL,
         "tier": "standard" if authenticated else "anonymous",
         "providers": list(PROVIDERS),
+        # The model the free runs answer with, so the public page names it rather than
+        # hard-coding it (LAB-1466).
+        "included_model": (
+            hosted.settings.hosted_models[0] if hosted.settings.hosted_models else None
+        ),
         "limits": {
             "requests_per_day": limits.user_requests if authenticated else limits.guest_requests,
             "tokens_per_day": limits.user_tokens if authenticated else limits.guest_tokens,
             "concurrent_requests": limits.principal_concurrency,
             "max_output_tokens": hosted.settings.hosted_max_output_tokens,
             "sponsored_enabled": hosted.sponsored_enabled,
+            # Hosted images (ADR 0014): signed-in owners only; the decoded upload limit.
+            "images_per_day": limits.user_images if images else 0,
+            "max_image_bytes": hosted.settings.hosted_max_image_bytes if images else 0,
         },
         "usage": hosted.quotas.usage(principal.id),
         "state": {"persistence": "ephemeral", "restart_loses_sessions": True},
@@ -120,24 +153,24 @@ def account(request: Request) -> dict[str, Any]:
 
 @router.post("/v1/account/api-keys", status_code=201)
 def create_api_key(body: ApiKeyRequest, request: Request) -> dict[str, str]:
-    return request.app.state.hosted.keys.issue(_principal(request, authenticated=True), body.name)
+    return request.app.state.hosted.keys.issue(_signed_in(request), body.name)
 
 
 @router.get("/v1/account/api-keys")
 def list_api_keys(request: Request) -> list[dict[str, str]]:
-    return request.app.state.hosted.keys.list(_principal(request, authenticated=True))
+    return request.app.state.hosted.keys.list(_signed_in(request))
 
 
 @router.delete("/v1/account/api-keys/{key_id}", status_code=204)
 def delete_api_key(request: Request, key_id: str = Path(min_length=1, max_length=128)) -> Response:
-    if not request.app.state.hosted.keys.revoke(_principal(request, authenticated=True), key_id):
+    if not request.app.state.hosted.keys.revoke(_signed_in(request), key_id):
         raise _NotFoundError("API key is unknown or expired")
     return Response(status_code=204)
 
 
 @router.post("/v1/account/connections", status_code=201)
 async def create_connection(body: ConnectionRequest, request: Request) -> dict[str, str]:
-    principal = _principal(request, authenticated=True)
+    principal = _signed_in(request)
     connection = await request.app.state.hosted.connections.create(
         principal.id, body.provider, body.api_key, body.base_url
     )
@@ -148,9 +181,41 @@ async def create_connection(body: ConnectionRequest, request: Request) -> dict[s
 def delete_connection(
     request: Request, connection_id: str = Path(min_length=1, max_length=128)
 ) -> Response:
-    principal = _principal(request, authenticated=True)
+    principal = _signed_in(request)
     request.app.state.hosted.connections.delete(principal.id, connection_id)
     return Response(status_code=204)
+
+
+@router.post("/v1/account/first-run")
+async def first_run(body: FirstRunRequest, request: Request) -> dict[str, Any]:
+    """The signed-in owner's ready default endpoint, provisioned once (LAB-1455).
+
+    ``issue_key`` returns one endpoint key, shown once, while the endpoint has none.
+    ``meta_api_key`` converts a ``needs_key`` default endpoint to the owner's own Meta key.
+    """
+    principal = _signed_in(request)
+    hosted = request.app.state.hosted
+    sponsored = hosted.sponsored_enabled
+    if body.meta_api_key is not None:
+        # The same public-HTTPS preflight as an endpoint form save; checked again at use.
+        await validate_destination(META_BASE_URL)
+    result = await anyio.to_thread.run_sync(
+        partial(
+            ensure_first_run,
+            request.app.state.projects.store,
+            principal.id,
+            model=hosted.settings.hosted_models[0],
+            sponsored_enabled=sponsored,
+            issue_key=body.issue_key,
+            meta_api_key=body.meta_api_key,
+        )
+    )
+    endpoint = result["endpoint"]
+    return {
+        **result,
+        "sponsored_enabled": sponsored,
+        "gateway_url": f"{hosted.origin.rstrip('/')}/e/{endpoint['id']}/v1",
+    }
 
 
 def _demo_entities(original: str, masked: str, session: VaultSession) -> list[dict[str, Any]]:
@@ -190,7 +255,8 @@ async def demo(body: DemoRequest, request: Request) -> dict[str, Any]:
                 "model": model,
                 "messages": [{"role": "user", "content": original}],
                 "stream": False,
-                "max_completion_tokens": hosted.settings.hosted_max_output_tokens,
+                # Admission reserved exactly this many output tokens for the demo.
+                "max_completion_tokens": DEMO_MAX_OUTPUT_TOKENS,
             },
             {
                 ECHO_HEADER: "masked",
