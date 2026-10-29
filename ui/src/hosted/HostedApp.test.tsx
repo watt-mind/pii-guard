@@ -289,6 +289,13 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
     expect(menu).toHaveAttribute("open");
     await user.click(screen.getAllByRole("link", { name: "Why Europe" })[0]!);
     expect(menu).not.toHaveAttribute("open");
+    await user.click(screen.getByText("Sections"));
+    await user.keyboard("{Escape}");
+    expect(menu).not.toHaveAttribute("open");
+    expect(screen.getByText("Sections").closest("summary")).toHaveFocus();
+    await user.click(screen.getByText("Sections"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
+    expect(menu).not.toHaveAttribute("open");
   });
 });
 
@@ -306,8 +313,8 @@ describe("usage line", () => {
 describe("hosted recovery copy", () => {
   it("mentions the static example only on the public page, and never says reconnect for a 404", () => {
     for (const error of [new ApiError(404, "not_found", "x"), new ApiError(429, "rate_limited", "x"), new ApiError(503, "unavailable", "x"), new Error("offline")]) {
-      expect(recovery(error)).not.toMatch(/worked example/);
-      expect(recovery(error, "site")).toMatch(/worked example/);
+      expect(recovery(error)).not.toMatch(/recorded run/);
+      expect(recovery(error, "site")).toMatch(/recorded run/);
     }
     expect(recovery(new ApiError(404, "not_found", "x"))).not.toMatch(/Reconnect/);
     expect(recovery(new ApiError(404, "not_found", "x"), "site")).not.toMatch(/Reconnect/);

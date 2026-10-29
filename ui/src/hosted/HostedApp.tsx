@@ -107,7 +107,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const signedIn = Boolean(account?.authenticated);
   const loginUrl = account?.login_url || LOGIN;
   // Sponsorship stays off until the provider authorises it (docs/hosted.md): then a guest has
-  // no live run, only the worked example and the way to sign in.
+  // no live run, only the recorded run and the way to sign in.
   const sponsoredOff = account?.limits.sponsored_enabled === false;
   const guestLive = Boolean(account) && !signedIn && !sponsoredOff;
   // Signed in: the included model when it's on; otherwise the owner's first saved provider
@@ -359,7 +359,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <ul aria-label="Under the hood" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 md:grid-cols-3">
           <Inside title="Detect"><span className="font-medium text-ink">No LLM in the masking path.</span> Validated rules for identifiers and our open encoder NER for names, addresses and dates, both inside PII Guard, adding {LATENCY.value} per request (p50, CPU). An LLM detector is an opt-in audit mode.</Inside>
           <Inside title="Swap">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in PII Guard.</Inside>
-          <Inside title="Restore">The real values go back into the answer and into the tool calls your agent runs. If masking fails, the request isn’t sent.</Inside>
+          <Inside title="Restore">The real values go back into the answer and into the tool calls your agent runs. If masking errors, the request isn’t sent.</Inside>
         </ul>
       </section>
 
@@ -402,7 +402,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="account" aria-labelledby="account-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live demo. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."} />
+        <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={!account && accountError ? "The live service isn’t reachable right now. You can still self-host it, or come back to run the live demo." : signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live demo. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."} />
         <div className="flex flex-wrap items-center gap-3">
           {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <>{startsRun && <ButtonLink variant="primary" href="#demo" onClick={heroRun}>Run the live demo ↑</ButtonLink>}<ButtonLink variant={startsRun ? "secondary" : "primary"} href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
         </div>
@@ -473,10 +473,26 @@ function SectionHead({ id, eyebrow, title, lead, focusable }: { id: string; eyeb
 
 /**
  * The section menu below md, where the nav's links don't fit (L1 carryover 3): a disclosure that
- * closes when a link is followed.
+ * closes when a link is followed, on Escape (focus back on its toggle), on a tap outside it and
+ * when the page scrolls, so it never sits over the content.
  */
 function SectionMenu({ current }: { current: string | null }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const menu = ref.current;
+    if (!menu) return;
+    let openedAt = 0;
+    const close = () => menu.removeAttribute("open");
+    const onToggle = () => { openedAt = scrollY; };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && menu.open) { close(); menu.querySelector("summary")?.focus(); } };
+    const onPointer = (e: PointerEvent) => { if (menu.open && !menu.contains(e.target as Node)) close(); };
+    const onScroll = () => { if (menu.open && Math.abs(scrollY - openedAt) > 48) close(); };
+    menu.addEventListener("toggle", onToggle);
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    addEventListener("scroll", onScroll, { passive: true });
+    return () => { menu.removeEventListener("toggle", onToggle); document.removeEventListener("keydown", onKey); document.removeEventListener("pointerdown", onPointer); removeEventListener("scroll", onScroll); };
+  }, []);
   return <details ref={ref} className="group relative md:hidden">
     <summary className="flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">Sections<svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m4 6 4 4 4-4" /></svg></summary>
     <ul className="absolute right-0 z-40 mt-2 w-52 rounded-lg border border-line bg-surface p-1.5 shadow-lg">
