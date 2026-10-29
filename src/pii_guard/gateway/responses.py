@@ -178,13 +178,15 @@ class ResponsesGateway:
         timer = RequestTimer(received_at)
         trace = CallTrace(self.gateway.observability, timer, body)
         try:
-            response, stats = await self._responses(
-                body,
-                headers,
-                max_text_chars=max_text_chars,
-                timer=timer,
-                trace=trace,
-                path_session=path_session,
+            response, stats = await self.gateway._with_session_lease(
+                self._responses(
+                    body,
+                    headers,
+                    max_text_chars=max_text_chars,
+                    timer=timer,
+                    trace=trace,
+                    path_session=path_session,
+                )
             )
         except BaseException as exc:
             trace.fail(exc)

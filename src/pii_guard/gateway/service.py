@@ -44,7 +44,7 @@ import threading
 import time
 import weakref
 from collections import Counter, OrderedDict
-from collections.abc import AsyncIterator, Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
 from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -302,6 +302,29 @@ class _SessionHold:
     refused_creator: bool = False
 
 
+_LEASED_CLASSES: dict[type[StreamingResponse], type[StreamingResponse]] = {}
+
+
+def _leased_class(cls: type[StreamingResponse]) -> type[StreamingResponse]:
+    """``cls`` with an ASGI call that always releases the request's vault leases (LAB-1573)."""
+    if getattr(cls, "_pii_guard_leased", False):
+        return cls
+    leased = _LEASED_CLASSES.get(cls)
+    if leased is None:
+
+        async def __call__(self: Any, scope: Any, receive: Any, send: Any) -> None:
+            try:
+                await super(leased, self).__call__(scope, receive, send)  # type: ignore[arg-type]
+            finally:
+                self._pii_guard_release()
+
+        leased = type(
+            f"Leased{cls.__name__}", (cls,), {"__call__": __call__, "_pii_guard_leased": True}
+        )
+        _LEASED_CLASSES[cls] = leased
+    return leased
+
+
 class Gateway:
     """One per app. Everything is injectable for tests: detectors, cache, upstream transport."""
 
@@ -345,6 +368,9 @@ class Gateway:
         # Session id -> the requests masking into it now (LAB-1316): a refused request drops
         # the session it created only once no other request holds it and none succeeded.
         self._session_holds: dict[str, _SessionHold] = {}
+        self._request_sessions: ContextVar[list[VaultSession] | None] = ContextVar(
+            "request_sessions", default=None
+        )
         self._holds_lock = threading.Lock()
         # Fixed headers added to every upstream call of this gateway (the hosted sponsored
         # route's attribution, LAB-1461); they never override content type or credentials.
@@ -499,7 +525,14 @@ class Gateway:
         The request holds the session until :meth:`_release_session`, which every caller
         must call once masking finished or failed."""
         with self._holds_lock:
-            session, created, source = resolve_session(self.vault, headers, body, path_session)
+            session, created, source = self.vault.acquire_session(
+                lambda: resolve_session(self.vault, headers, body, path_session)
+            )
+            sessions = self._request_sessions.get()
+            if sessions is None:
+                self.vault.release_session(session)
+                raise RuntimeError("session resolution requires a request lease scope")
+            sessions.append(session)
             previous = self._session_incarnations.get(session.session_id)
             if previous is not None and previous() is not session:
                 # New incarnation of this id: start clean (LAB-1565).
@@ -515,6 +548,50 @@ class Gateway:
         trace.session_id, trace.session_new = session.session_id, created
         trace.session_source = source.value
         return session, created
+
+    async def _with_session_lease(
+        self, work: Coroutine[Any, Any, tuple[Response, RequestStats]]
+    ) -> tuple[Response, RequestStats]:
+        """Keep request pins through upstream work and the stream's final cleanup."""
+        sessions: list[VaultSession] = []
+        token = self._request_sessions.set(sessions)
+
+        def release() -> None:
+            while sessions:
+                self.vault.release_session(sessions.pop())
+
+        try:
+            response, stats = await work
+            if isinstance(response, StreamingResponse):
+                source = response.body_iterator
+
+                async def leased_stream() -> AsyncIterator[Any]:
+                    try:
+                        async for chunk in source:
+                            yield chunk
+                    finally:
+                        try:
+                            if hasattr(source, "aclose"):
+                                await source.aclose()
+                        finally:
+                            release()
+
+                response.body_iterator = leased_stream()
+                # The generator's ``finally`` never runs when Starlette never starts it
+                # (client gone before ``http.response.start``), so release around the ASGI
+                # call too, and on garbage collection for a response nobody calls. Release
+                # is idempotent: it pops what is still held.
+                response.__class__ = _leased_class(type(response))
+                response._pii_guard_release = release  # type: ignore[attr-defined]
+                weakref.finalize(response, release)
+            else:
+                release()
+            return response, stats
+        except BaseException:
+            release()
+            raise
+        finally:
+            self._request_sessions.reset(token)
 
     def _release_session(self, session: VaultSession, created: bool, *, masked: bool) -> None:
         """End the hold :meth:`_session` took, once masking finished (``masked``) or failed.
@@ -854,13 +931,15 @@ class Gateway:
         timer = RequestTimer(received_at)
         trace = CallTrace(self.observability, timer, body)
         try:
-            response, stats = await self._chat_completions(
-                body,
-                headers,
-                max_text_chars=max_text_chars,
-                timer=timer,
-                trace=trace,
-                path_session=path_session,
+            response, stats = await self._with_session_lease(
+                self._chat_completions(
+                    body,
+                    headers,
+                    max_text_chars=max_text_chars,
+                    timer=timer,
+                    trace=trace,
+                    path_session=path_session,
+                )
             )
         except BaseException as exc:
             trace.fail(exc)
