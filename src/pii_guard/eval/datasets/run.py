@@ -148,7 +148,8 @@ def _llm_detector(analyzer: Any) -> dict[str, Any]:
 
 _LABELS = {
     "rules": "pii-guard rules",
-    "fast": "pii-guard fast, NER v2 base + hard negatives (LAB-1150)",
+    # The published v2.0 (LAB-1150's checkpoint): the label its other records carry.
+    "fast": "pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)",
     "audit": "pii-guard audit (rules + NER v2 + LLM)",
 }
 
