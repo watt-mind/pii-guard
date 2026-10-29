@@ -170,9 +170,9 @@ dependencies; the test and type-check jobs keep their development dependencies.
 | `test` | a failing test, or total coverage under the floor (see above) | `make test` or `make test-all` |
 | `smoke` | the demo stack leaking on the mock upstream (`make smoke`), or a stale benchmark report (an invalid run record or journey entry when `RENDER_DOCS_ON_MERGE` is on; [Generated files](#generated-files)) | `make smoke` |
 | `eval-gate` | leak or over-masking rising, or round trip falling, against the newest committed run record on the same fixtures, or past a limit in [`eval/gates.json`](eval/gates.json) | `make gate` |
-| `docker` | the image over its size budget (`IMAGE_BUDGET_MB` in `scripts/ci/docker_smoke.sh`), an unhealthy container, or a masked request that leaks to the mock upstream; built-image vulnerabilities are scanned advisory-only for now | `make docker-smoke` |
+| `docker` | the image over its size budget (`IMAGE_BUDGET_MB` in `scripts/ci/docker_smoke.sh`), an unhealthy container, or a masked request that leaks to the mock upstream; a fixable HIGH/CRITICAL vulnerability in the built image | `make docker-smoke` |
 | `hosted-infra` | a Bicep compile error, a shellcheck finding in `deploy/azure/` scripts, or a failing deployment/TLS-proxy regression test | `az bicep build --file deploy/azure/main.bicep` + `python3 -m unittest discover -s deploy/azure -p 'test_*.py'` |
-| `hosted-image` | the hosted image failing to build, or its offline bundled-UI/NER smoke failing; built-image vulnerabilities are scanned advisory-only for now | `docker build -f Dockerfile.hosted .` |
+| `hosted-image` | the hosted image failing to build, or its offline bundled-UI/NER smoke failing; a fixable HIGH/CRITICAL vulnerability in the built image | `docker build -f Dockerfile.hosted .` |
 | `audit` | a known vulnerability in `uv.lock` (`uv audit`), or a GPL/AGPL runtime dependency (the UI halves run in the `ui` job) | `make audit licences` |
 | `ui` | UI lint, typecheck, tests, build, `pnpm audit --prod` (high or critical), GPL/AGPL production dependency; path-filtered like the other packaging jobs | `cd ui && pnpm lint && pnpm typecheck && pnpm test --run && pnpm build` |
 | `wheel` | the bundled-UI wheel over its size budget, missing the UI, or failing the throwaway-install smoke | `make wheel && make wheel-smoke` |

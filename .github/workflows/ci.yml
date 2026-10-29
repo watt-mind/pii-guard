@@ -223,17 +223,16 @@ jobs:
           cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
       - name: Size budget, healthcheck, one masked request on the mock upstream
         run: scripts/ci/docker_smoke.sh pii-guard:ci
-      # Advisory until the first findings are triaged on LAB-1558; secrets stay with
-      # gitleaks (Trivy secret scanning false-positives on model blobs).
-      - name: Vulnerability scan (advisory; OS and library packages)
+      # Blocking on fixable HIGH/CRITICAL (first scan was clean, LAB-1558); secrets stay
+      # with gitleaks (Trivy secret scanning false-positives on model blobs).
+      - name: Vulnerability scan (OS and library packages)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        continue-on-error: true
         with:
           image-ref: pii-guard:ci
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "0"
+          exit-code: "1"
 
   # Secret-free validation of Azure deployment source. The hosted image build is the
   # separate hosted-image job below, so these fast checks do not wait for it serially.
@@ -295,15 +294,14 @@ jobs:
           cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,scope=hosted,mode=max' || '' }}
       - name: Bundled UI and offline CPU NER packaging smoke (no network)
         run: docker run --rm --interactive --network none --entrypoint python pii-guard:hosted-ci - < deploy/azure/ci_hosted_smoke.py
-      - name: Vulnerability scan (advisory; OS and library packages)
+      - name: Vulnerability scan (OS and library packages)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        continue-on-error: true
         with:
           image-ref: pii-guard:hosted-ci
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "0"
+          exit-code: "1"
 
   # Build once (LAB-1446): on a develop push, push the image hosted-image just built and tested
   # to the dev registry, so the operator deploys that digest instead of rebuilding it. The
