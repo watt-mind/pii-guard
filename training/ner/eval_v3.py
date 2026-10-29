@@ -34,6 +34,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+#: Languages with an ``eval/fixtures/eu`` smoke and inflection set (LAB-1525).
+EU_GATE_LANGS = ("lv", "lt", "hr", "sl", "fr", "es", "it", "nl", "ro", "mt", "ga")
 SETS: dict[str, list[str]] = {
     "smoke": [f"eval/fixtures/{lang}-smoke.jsonl" for lang in ("hu", "en", "de")],
     "inflection": ["eval/fixtures/hu-inflection.jsonl"],
@@ -49,6 +51,10 @@ SETS: dict[str, list[str]] = {
     ],
     "pl-pii-bench": ["eval/datasets/pl-pii-bench/pl-pl-pii-bench.jsonl"],
     "mapa-eur-lex": ["data/datasets/fixtures/mapa-eur-lex/*-mapa-eur-lex.jsonl"],
+    # LAB-1525 fictional gate sets for the new languages (LAB-1535 gates, read per language).
+    "eu-smoke": [f"eval/fixtures/eu/{lang}-smoke.jsonl" for lang in EU_GATE_LANGS],
+    "eu-inflection": [f"eval/fixtures/eu/{lang}-inflection.jsonl" for lang in EU_GATE_LANGS],
+    "en-court": ["eval/fixtures/eu/en-court-smoke.jsonl"],
 }
 LABELS = {
     "v20": "pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)",
@@ -65,11 +71,14 @@ LABELS = {
     "v33-t1": "pii-guard fast, NER v3.3 candidate T1: S30 + targeted add-on, 1 epoch (LAB-1512)",
     "v33-t2": "pii-guard fast, NER v3.3 candidate T2: S30 + targeted add-on, 2 epochs (LAB-1512)",
     "v33-h": "pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512)",
+    "v4-a": "pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535)",
+    "v4-b": "pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535)",
+    "v4-braw": "pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535)",
 }
 #: Tickets whose v2.0 runs are selection-only re-scores (LAB-1494): their records get a system
 #: key and label of their own, so the report's latest-per-system pick keeps the published v2.0
 #: rows (timed on a quiet machine) instead of these, timed on a loaded one.
-RESCORE_TICKETS = ("LAB-1494", "LAB-1512")
+RESCORE_TICKETS = ("LAB-1494", "LAB-1512", "LAB-1535")
 
 
 def system_extra(ticket: str, candidate: str) -> dict[str, Any]:
@@ -90,6 +99,7 @@ TICKETS = {
     "LAB-1410": "NER v3.1 candidates vs v2.0 (clean selection set: agent-traffic-dev)",
     "LAB-1494": "NER v3.2 candidates (soups, error-mined data) vs v2.0, v3.1 protocol",
     "LAB-1512": "NER v3.3 candidates (S30 + targeted add-on; thresholds) vs v2.0, v3.1 protocol",
+    "LAB-1535": "NER v4 multilingual candidates (v2.0 + EU phase-1 data) vs v2.0, v3.1 protocol",
 }
 
 
@@ -176,9 +186,14 @@ def _score(args: argparse.Namespace) -> int:
                 "(seed 1393, near-copies removed by decontam.py): closer to distribution than "
                 "for v2.0."
             )
-        if name == "agent-traffic-dev" and args.ticket in ("LAB-1410", "LAB-1494", "LAB-1512"):
+        if name == "agent-traffic-dev" and args.ticket in (
+            "LAB-1410",
+            "LAB-1494",
+            "LAB-1512",
+            "LAB-1535",
+        ):
             notes.append(
-                "Selection set. No v3.1, v3.2 or v3.3 mix holds any agent-traffic generator "
+                "Selection set. No v3.1, v3.2, v3.3 or v4 mix holds any agent-traffic generator "
                 "document, so it is unseen by every candidate, as it was for v2.0."
             )
         records = build_records(
