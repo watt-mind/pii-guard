@@ -121,4 +121,4 @@ export function sampleBehind(text: string): Sample | undefined {
   return SAMPLES.find((s) => text === s.text || text.startsWith(s.text));
 }
 
-export const DEFAULT_SAMPLE = SAMPLES[0]!;
+export const DEFAULT_SAMPLE = SAMPLES.find((sample) => sample.id === "support")!;
