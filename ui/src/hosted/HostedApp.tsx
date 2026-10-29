@@ -15,7 +15,7 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
-import { COMPARISON, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, SETS, WEAKER } from "./proof";
+import { COMPARISON, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, SETS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -249,8 +249,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
-        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway, the masked image goes to the model in place of the original, followed by its masked transcript and summary. On 24 fictional documents, 98&nbsp;% of the values on an image got the same placeholder as in the text, with no false merges (<a className={link} href={`${DOCS}/benchmarks.md#visual-placeholders`}>benchmark</a>).</p>
-        <p className="max-w-3xl text-xs text-muted">In the hosted preview, masking runs on the service and the masked image comes back to you; it isn’t sent to a model. It doesn’t look for signatures or stamps (on this card the photo cover happens to take the signature too); a self-hosted install masks them. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway the masked image replaces the original, with its masked transcript and summary; on {VISUAL_PLACEHOLDERS.docs} fictional documents {VISUAL_PLACEHOLDERS.recall}&nbsp;% of the values on an image got the same placeholder as in the text, with no false merges (<a className={link} href={`${DOCS}/benchmarks.md#visual-placeholders`}>benchmark</a>). In the hosted preview the masked image comes back to you and isn’t sent to a model; it doesn’t look for signatures or stamps (here the photo cover takes the signature too), which a self-hosted install masks. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
         <Card title="Measured on 65 official specimen ID documents from 24 countries" headingLevel={3} subtitle="Self-hosted run with SAM 3.1, Tesseract OCR and the rules, 27 Oct 2026. A region counts as covered when the mask overlaps it at IoU ≥ 0.5.">
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
           <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/benchmarks.md#image-masking`}>Image benchmark details ↗</a></p>

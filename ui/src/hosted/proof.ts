@@ -69,3 +69,6 @@ export const IMAGE_PROOF = [
  * over-masking on CEE-PII, and MAPA EUR-Lex (21 EU languages, 42 docs).
  */
 export const WEAKER = { gretel: "19.0", gretelPresidio: "18.8", ceeOverMasking: "26.4", mapaLeak: "8.5" } as const;
+
+/** Same placeholder in text and image: `visual-placeholders`, fuzzy matching, run of 2026-10-27 (recall; precision 100.0 %). */
+export const VISUAL_PLACEHOLDERS = { docs: 24, recall: "98.0" } as const;
