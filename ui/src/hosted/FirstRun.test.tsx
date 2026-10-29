@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { configure, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignedInConsole } from "../App";
@@ -12,6 +12,11 @@ import bundled from "virtual:pii-guard/benchmarks-index";
 import { HostedApp } from "./HostedApp";
 import type { Account, Requester } from "./api";
 import { endpointState, parseFirstRun, resetFirstRun, testRecovery, TestRequestError, withKey } from "./firstRun";
+
+// Slow runners get longer than the 1 s default for every async query in this file
+// (LAB-1498): the setup region appears only after a chain of account, first-run,
+// projects, endpoints and snippets calls, which flakes under full-suite parallel load.
+configure({ asyncUtilTimeout: 10_000 });
 
 // First run (LAB-1455). Fictional owner, endpoint and keys only (ADR 0005).
 const KEY = "pg_ep_exampleKey0123456789-_exampleKey0123456";
