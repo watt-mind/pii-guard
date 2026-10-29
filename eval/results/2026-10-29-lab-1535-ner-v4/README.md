@@ -82,3 +82,117 @@ seed 13, bf16, A10G on Modal. In selection order:
 Modal ≤ $10 (free tier). Meta Model API: the Muse rerun only, ≤ $4 of credits. Every Modal app
 is ephemeral and stopped after use. If nothing wins by 2026-11-02 morning, v2.0 stays and this
 README says so. Nothing is published or switched without the owner's decision.
+
+## Result: v2.0 stays
+
+No candidate passes every gate, so the selection set doesn't choose anything. **Nothing was
+published, and the production pin (`watt-mind/pii-guard-ner-xlmr-base@95f612a9`) is
+unchanged.** Applied by `training/ner/gates_v4.py` to the run records
+([`gates.json`](gates.json)).
+
+## Gates and selection (v2.0 re-scored on this commit)
+
+Leak % / over-masking %, rules + NER, fast mode, CPU. Smoke = hu + en + de smoke (51 docs, 173
+values), inflection = hu-inflection (12 docs, 50 values), agent-traffic-dev = 300 docs, eu =
+`eval/fixtures/eu/` smoke + inflection + en-court (109 docs, 315 values). Summaries in
+[`stage1/`](stage1/); run records `eval/results/runs/2026-10-29-lab-1535-<set>-<candidate>.json`
+(v2.0's carry the re-score key `rules+ner:xlmr-base-v2-hn@rescore=lab-1535`).
+
+| Candidate | smoke leak ≤ 0.00 | smoke over-mask ≤ 1.59 | inflection leak ≤ 2.0 | eu per language | eu total leak < 0.95 | **agent-traffic-dev** leak / over-mask | Selected |
+|---|--:|--:|--:|---|--:|--:|---|
+| v2.0 (published) | 0.00 | 1.09 | 2.0 | – | 0.95 (3 of 315) | 0.13 / 1.84 | **stays** |
+| A (mix a, 1 ep, 1e-5) | **0.58 fail** | 1.08 pass | 0.0 pass | **mt fail** | **0.95 fail** | 0.00 / **3.38** | no |
+| B (0.5 v2.0 + 0.5 B-raw) | 0.00 pass | **1.62 fail** | 2.0 pass | **mt fail** | **1.27 fail** | 0.00 / **3.21** | no |
+| B-raw (mix b, 2 ep, 2e-5) | 0.00 pass | **3.23 fail** | 2.0 pass | **mt fail** | **0.95 fail** | 0.00 / **5.42** | no |
+
+- **Every candidate stops leaking on the selection set and over-masks it more.** All three
+  leak 0.00 % on agent-traffic-dev (v2.0: 0.13 %, one value), but over-mask 3.2–5.4 % (v2.0:
+  1.84 %). By type, the extra false alarms are mostly `ADDRESS` (v2.0 6, A 26, B 27, B-raw
+  57 of about 1,700 masked values), then `ID_DOCUMENT` (6 → 12–17). That is read after the
+  choice, for the next round only.
+- **The eu gate sets don't separate the models.** v2.0 already leaks 3 of their 315 values
+  (one each in fr, nl and ga) and nothing in lv, lt, hr, sl, es, it, ro, mt or en-court. No
+  candidate finds more; each leaks one Maltese value v2.0 finds, so all fail the per-language
+  gate on mt (a language none of them trained on). A finds the nl value and loses the mt one;
+  B loses mt and keeps the rest.
+- **Latency was not run.** No candidate passed the accuracy gates, so it couldn't change the
+  outcome (the LAB-1512 precedent). The architecture and tokenizer are v2.0's, so the cost per
+  token is the same.
+
+### Per language, eu sets (leak % (values leaked of values) / over-masking %)
+
+| lang | v2.0 | A | B | B-raw |
+|---|--:|--:|--:|--:|
+| lv (31) | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+| lt (31) | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+| hr (32) | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+| sl (31) | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+| fr (26) | 3.8 (1) / 0.0 | 3.8 (1) / 0.0 | 3.8 (1) / 0.0 | 3.8 (1) / 0.0 |
+| es (26) | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+| it (26) | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+| nl (25) | 4.0 (1) / 0.0 | **0.0** / 0.0 | 4.0 (1) / 0.0 | **0.0** / 0.0 |
+| ro (23) | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+| mt (26) | 0.0 / 12.9 | 3.8 (1) / 6.7 | 3.8 (1) / 9.7 | 3.8 (1) / 14.3 |
+| ga (25) | 4.0 (1) / 7.7 | 4.0 (1) / **0.0** | 4.0 (1) / 0.0 | 4.0 (1) / 0.0 |
+| en-court (13) | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 | 0.0 / 0.0 |
+
+## MAPA EUR-Lex test, 21 languages (report-only, scored on this Mac in one process)
+
+42 documents (2 per language), real court text from the git-ignored local fetch; never
+uploaded. 740 `PERSON` values, so one leaked value is 0.14 pp overall.
+
+| | v2.0 | A | B | B-raw |
+|---|--:|--:|--:|--:|
+| leak % (values) | 8.5 (63) | **5.8** (43) | 7.2 (53) | 8.5 (63) |
+| over-masking % | 55.6 | 57.2 | 55.7 | **54.1** |
+| overlap F1 | 0.543 | 0.535 | 0.544 | **0.553** |
+
+A leaks a third fewer MAPA names than v2.0, which is what the new data was for, but MAPA is
+report-only and A fails three gates. It is evidence for the next round, not a reason to ship A.
+
+## Compute and cost
+
+- **Modal: about $1.10** (`modal billing report --for today`): A 13.8 min and B-raw about 45 min
+  of training on an A10G, plus image builds and data upload (56 and 111 MB, through the
+  LAB-1527 allowlist; the only MAPA-named file uploaded is the committed hash manifest). Both
+  apps were ephemeral and are stopped; the checkpoints stay on the `pii-guard-ner-runs`
+  volume (`pii-guard-ner-xlmr-base-v4-a`, `-v4-braw`). B was built locally with `soup.py`.
+- **Meta Model API: $2.50 of credits** for the Muse lv/lt/hr/sl rerun (the LAB-1525 corpus was
+  lost with its worktree; LAB-1542).
+- **Local CPU:** scoring, 4 models × 7 sets, one process at a time. Accuracy doesn't depend on
+  load. The records say `dirty: true`: a docstring line in `v4_data.py` was re-wrapped
+  after the protocol commit; no scored code changed.
+- Weights sha256: A `7ffb0dc9…`, B `9d13895e…`, B-raw `704fd9db…`; v2.0 `4a9a598f…` (checked).
+
+## Reproduce
+
+```
+# data: see docs/training-data-eu-phase1.md "Rebuild", then
+uv run --no-sync python training/ner/v4_data.py build \
+    --json eval/results/2026-10-29-lab-1535-ner-v4/data.json
+modal run training/distill/modal_train.py --config training/ner/v4-a.toml --gpu A10G
+modal run training/distill/modal_train.py --config training/ner/v4-braw.toml --gpu A10G
+modal volume get pii-guard-ner-runs pii-guard-ner-xlmr-base-v4-a models/ner/   # and -v4-braw
+uv run --no-sync python training/ner/soup.py --a <v2.0 snapshot dir> \
+    --b models/ner/pii-guard-ner-xlmr-base-v4-braw --alpha 0.5 \
+    --out models/ner/pii-guard-ner-xlmr-base-v4-b                               # sha256 9d13895e…
+uv run --no-sync python -m pii_guard.eval.datasets fetch mapa-eur-lex          # local only
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python training/ner/eval_v3.py score --ticket LAB-1535 \
+    --candidate v4-a --model models/ner/pii-guard-ner-xlmr-base-v4-a --record \
+    --sets smoke inflection agent-traffic-dev eu-smoke eu-inflection en-court mapa-eur-lex
+uv run --no-sync python training/ner/gates_v4.py --date 2026-10-29 \
+    --json eval/results/2026-10-29-lab-1535-ner-v4/gates.json
+```
+
+## Next
+
+- **Address over-masking is what blocks every candidate.** The phase-1 data (mostly OpenPII
+  rows, whose addresses are loose) teaches the model to mark more spans as `ADDRESS` in agent
+  text. A next round could keep the multilingual `PERSON` signal and drop or down-weight the
+  OpenPII `ADDRESS` spans (`loss_ignore`), or add EU agent-text hard negatives, with its own
+  protocol fixed before training.
+- **The eu gate sets are too easy to show a gain.** v2.0 leaks 3 of 315 values there. A
+  harder fictional set (more court-style and declined forms in lv/lt/mt/ga, where MAPA says
+  v2.0 is weakest) would let a gate reward what A does on MAPA.
+- **Maltese and Irish have no training data.** Every candidate lost one Maltese value; the
+  Muse docs for ga/mt (LAB-1534) are the next input.

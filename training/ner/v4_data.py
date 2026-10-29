@@ -6,7 +6,8 @@ input is rebuilt from a committed script and seed (``docs/training-data-eu-phase
 ``eval/generated/v4-mix/<mix>/`` (git-ignored), so the Modal upload (``modal_train.py``, through
 the LAB-1527 allowlist) holds exactly the files the config names::
 
-    uv run --no-sync python training/ner/v4_data.py build --json eval/results/2026-10-29-lab-1535-ner-v4/data.json
+    uv run --no-sync python training/ner/v4_data.py build \\
+        --json eval/results/2026-10-29-lab-1535-ner-v4/data.json
 
 Mixes (fixed in ``eval/results/2026-10-29-lab-1535-ner-v4/README.md`` before any training):
 

@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-29-lab-1535-en-court-v20",
+  "kind": "text",
+  "date": "2026-10-29",
+  "recorded_at": "2026-10-29T15:45:50+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard rules + ner (xlmr-base-v2-hn) on court-smoke",
+  "notes": [
+    "LAB-1535: NER v4 multilingual candidates (v2.0 + EU phase-1 data) vs v2.0, v3.1 protocol, fast mode (rules + NER), CPU (PII_GUARD_NER_DEVICE=cpu), one commit.",
+    "Wall time 0.2 s, load average at end 10.2."
+  ],
+  "code": {
+    "commit": "51fdc76a8c7d97f830061caadb12b0b3a4565b65",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": "0.1.0",
+    "detectors": [
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "ner",
+        "model": "xlmr-base-v2-hn",
+        "model_ref": "watt-mind/pii-guard-ner-xlmr-base v2.0, revision 95f612a9ad65",
+        "revision": "sha256:4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9",
+        "settings": {},
+        "serving": "local PyTorch, CPU"
+      }
+    ],
+    "key": "rules+ner:xlmr-base-v2-hn@rescore=lab-1535",
+    "label": "pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535)"
+  },
+  "fixture_set": "court-smoke",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/eu/en-court-smoke.jsonl",
+      "sha256": "ac711858534c9f4f3c93fc3b94d39bd94c5e8d5e3c73cc6ad73db6d293629f7c",
+      "set": "court-smoke",
+      "language": "en",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 6
+    }
+  ],
+  "languages": [
+    "en"
+  ],
+  "hardware": {
+    "description": null,
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": null,
+  "metrics": {
+    "overall": {
+      "documents": 6,
+      "gold_spans": 15,
+      "predicted_spans": 14,
+      "unscored_predictions": 0,
+      "exact": {
+        "gold": 15,
+        "pred": 14,
+        "tp_pred": 14,
+        "tp_gold": 14,
+        "precision": 1.0,
+        "recall": 0.933333,
+        "f1": 0.965517
+      },
+      "overlap": {
+        "gold": 15,
+        "pred": 14,
+        "tp_pred": 14,
+        "tp_gold": 14,
+        "precision": 1.0,
+        "recall": 0.933333,
+        "f1": 0.965517
+      },
+      "macro_f1_overlap": 0.965517,
+      "leak": {
+        "values": 13,
+        "leaked": 0,
+        "partial": 0,
+        "rate": 0.0,
+        "partial_rate": 0.0
+      },
+      "over_masking": {
+        "masked": 14,
+        "over_masked": 0,
+        "rate": 0.0
+      },
+      "roundtrip": {
+        "documents": 6,
+        "exact": 6,
+        "rate": 1.0
+      },
+      "consistency": {
+        "entities": 13,
+        "consistent": 13,
+        "multi_occurrence": 2,
+        "multi_consistent": 2,
+        "rate": 1.0,
+        "multi_rate": 1.0
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 33.718,
+          "p95": 37.008
+        },
+        "mask": {
+          "p50": 0.317,
+          "p95": 0.6
+        }
+      },
+      "per_type": {
+        "PERSON": {
+          "gold": 15,
+          "pred": 14,
+          "exact_tp_gold": 14,
+          "exact_tp_pred": 14,
+          "overlap_tp_gold": 14,
+          "overlap_tp_pred": 14,
+          "leak": {
+            "values": 13,
+            "leaked": 0,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 14,
+            "over_masked": 0
+          }
+        }
+      }
+    },
+    "languages": {
+      "en": {
+        "documents": 6,
+        "gold_spans": 15,
+        "predicted_spans": 14,
+        "unscored_predictions": 0,
+        "exact": {
+          "gold": 15,
+          "pred": 14,
+          "tp_pred": 14,
+          "tp_gold": 14,
+          "precision": 1.0,
+          "recall": 0.933333,
+          "f1": 0.965517
+        },
+        "overlap": {
+          "gold": 15,
+          "pred": 14,
+          "tp_pred": 14,
+          "tp_gold": 14,
+          "precision": 1.0,
+          "recall": 0.933333,
+          "f1": 0.965517
+        },
+        "macro_f1_overlap": 0.965517,
+        "leak": {
+          "values": 13,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "over_masking": {
+          "masked": 14,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "roundtrip": {
+          "documents": 6,
+          "exact": 6,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 13,
+          "consistent": 13,
+          "multi_occurrence": 2,
+          "multi_consistent": 2,
+          "rate": 1.0,
+          "multi_rate": 1.0
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 33.718,
+            "p95": 37.008
+          },
+          "mask": {
+            "p50": 0.317,
+            "p95": 0.6
+          }
+        },
+        "per_type": {
+          "PERSON": {
+            "gold": 15,
+            "pred": 14,
+            "exact_tp_gold": 14,
+            "exact_tp_pred": 14,
+            "overlap_tp_gold": 14,
+            "overlap_tp_pred": 14,
+            "leak": {
+              "values": 13,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 14,
+              "over_masked": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}

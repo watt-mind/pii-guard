@@ -22,175 +22,207 @@
 <text x="1322.1" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">75%</text>
 <line x1="1460" y1="210" x2="1460" y2="730" stroke="#E3E3E8" stroke-width="2"/>
 <text x="1460" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">100%</text>
-<circle cx="66" cy="222.4" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="230.4" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
-<rect x="908.2" y="218" width="548" height="-0.8" fill="#4A4A52"/>
-<text x="1464.2" y="213.2" font-size="19" fill="#1B1B1F">99.3</text>
-<text x="914.2" y="217.4" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="220.6" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="227.6" width="548" height="-0.8" fill="#332288"/>
-<text x="1464.2" y="222.8" font-size="19" fill="#1B1B1F">99.3</text>
-<circle cx="66" cy="247.1" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="255.1" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
-<rect x="908.2" y="242.8" width="47" height="-0.8" fill="#4A4A52"/>
-<text x="963.2" y="238" font-size="19" fill="#1B1B1F">8.5</text>
-<text x="914.2" y="242.1" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="245.3" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="252.3" width="47" height="-0.8" fill="#332288"/>
-<text x="963.2" y="247.5" font-size="19" fill="#1B1B1F">8.5</text>
-<circle cx="66" cy="271.9" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="279.9" font-size="21" fill="#1B1B1F" font-weight="600">bardsai/eu-pii-anonimization-multilang v1 alone (MAPA baseline, LAB-1516)</text>
-<rect x="908.2" y="267.5" width="162.6" height="-0.8" fill="#4A4A52"/>
-<text x="1078.8" y="262.7" font-size="19" fill="#1B1B1F">29.5</text>
-<text x="914.2" y="266.9" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="270.1" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="277.1" width="162.6" height="-0.8" fill="#332288"/>
-<text x="1078.8" y="272.3" font-size="19" fill="#1B1B1F">29.5</text>
-<circle cx="66" cy="296.7" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="304.7" font-size="21" fill="#1B1B1F" font-weight="600">tabularisai/eu-pii-safeguard alone (MAPA baseline, LAB-1516)</text>
-<rect x="908.2" y="292.3" width="120.8" height="-0.8" fill="#4A4A52"/>
-<text x="1037" y="287.5" font-size="19" fill="#1B1B1F">21.9</text>
-<text x="914.2" y="291.7" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="294.9" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="301.9" width="120.8" height="-0.8" fill="#332288"/>
-<text x="1037" y="297" font-size="19" fill="#1B1B1F">21.9</text>
-<circle cx="66" cy="321.4" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="329.4" font-size="21" fill="#1B1B1F" font-weight="600">NER v2.0 alone (MAPA baseline, LAB-1516)</text>
-<rect x="908.2" y="317" width="47" height="-0.8" fill="#4A4A52"/>
-<text x="963.2" y="312.2" font-size="19" fill="#1B1B1F">8.5</text>
-<text x="914.2" y="316.4" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="319.6" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="326.6" width="47" height="-0.8" fill="#332288"/>
-<text x="963.2" y="321.8" font-size="19" fill="#1B1B1F">8.5</text>
-<circle cx="66" cy="346.2" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="354.2" font-size="21" fill="#1B1B1F" font-weight="600">rules + bardsai/eu-pii-anonimization-multilang v1 (MAPA baseline, LAB-1516)</text>
-<rect x="908.2" y="341.8" width="162.6" height="-0.8" fill="#4A4A52"/>
-<text x="1078.8" y="337" font-size="19" fill="#1B1B1F">29.5</text>
-<text x="914.2" y="341.2" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="344.4" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="351.4" width="162.6" height="-0.8" fill="#332288"/>
-<text x="1078.8" y="346.6" font-size="19" fill="#1B1B1F">29.5</text>
-<circle cx="66" cy="371" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="379" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)</text>
-<rect x="908.2" y="366.6" width="263.2" height="-0.8" fill="#4A4A52"/>
-<text x="1179.4" y="361.8" font-size="19" fill="#1B1B1F">47.7</text>
-<text x="914.2" y="366" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="369.1" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="376.1" width="263.2" height="-0.8" fill="#332288"/>
-<text x="1179.4" y="371.3" font-size="19" fill="#1B1B1F">47.7</text>
-<circle cx="66" cy="395.7" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="403.7" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)</text>
-<rect x="908.2" y="391.3" width="82.8" height="-0.8" fill="#4A4A52"/>
-<text x="999" y="386.5" font-size="19" fill="#1B1B1F">15.0</text>
-<text x="914.2" y="390.7" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="393.9" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="400.9" width="82.8" height="-0.8" fill="#332288"/>
-<text x="999" y="396.1" font-size="19" fill="#1B1B1F">15.0</text>
-<circle cx="66" cy="420.5" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="428.5" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410)</text>
-<rect x="908.2" y="416.1" width="91" height="-0.8" fill="#4A4A52"/>
-<text x="1007.2" y="411.3" font-size="19" fill="#1B1B1F">16.5</text>
-<text x="914.2" y="415.5" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="418.7" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="425.7" width="91" height="-0.8" fill="#332288"/>
-<text x="1007.2" y="420.9" font-size="19" fill="#1B1B1F">16.5</text>
-<circle cx="66" cy="445.2" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="453.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)</text>
-<rect x="908.2" y="440.9" width="64.1" height="-0.8" fill="#4A4A52"/>
-<text x="980.3" y="436" font-size="19" fill="#1B1B1F">11.6</text>
-<text x="914.2" y="440.2" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="443.4" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="450.4" width="64.1" height="-0.8" fill="#332288"/>
-<text x="980.3" y="445.6" font-size="19" fill="#1B1B1F">11.6</text>
-<circle cx="66" cy="470" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="478" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate C: B without Wismut (LAB-1410)</text>
-<rect x="908.2" y="465.6" width="49.9" height="-0.8" fill="#4A4A52"/>
-<text x="966.2" y="460.8" font-size="19" fill="#1B1B1F">9.0</text>
+<circle cx="66" cy="220.4" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="228.4" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
+<rect x="908.2" y="218" width="548" height="-1.8" fill="#4A4A52"/>
+<text x="1464.2" y="212.2" font-size="19" fill="#1B1B1F">99.3</text>
+<text x="914.2" y="215.4" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="217.6" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="224.6" width="548" height="-1.8" fill="#332288"/>
+<text x="1464.2" y="218.8" font-size="19" fill="#1B1B1F">99.3</text>
+<circle cx="66" cy="241.2" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="249.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
+<rect x="908.2" y="238.8" width="47" height="-1.8" fill="#4A4A52"/>
+<text x="963.2" y="233" font-size="19" fill="#1B1B1F">8.5</text>
+<text x="914.2" y="236.2" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="238.4" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="245.4" width="47" height="-1.8" fill="#332288"/>
+<text x="963.2" y="239.6" font-size="19" fill="#1B1B1F">8.5</text>
+<circle cx="66" cy="262" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="270" font-size="21" fill="#1B1B1F" font-weight="600">bardsai/eu-pii-anonimization-multilang v1 alone (MAPA baseline, LAB-1516)</text>
+<rect x="908.2" y="259.6" width="162.6" height="-1.8" fill="#4A4A52"/>
+<text x="1078.8" y="253.8" font-size="19" fill="#1B1B1F">29.5</text>
+<text x="914.2" y="257" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="259.2" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="266.2" width="162.6" height="-1.8" fill="#332288"/>
+<text x="1078.8" y="260.4" font-size="19" fill="#1B1B1F">29.5</text>
+<circle cx="66" cy="282.8" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="290.8" font-size="21" fill="#1B1B1F" font-weight="600">tabularisai/eu-pii-safeguard alone (MAPA baseline, LAB-1516)</text>
+<rect x="908.2" y="280.4" width="120.8" height="-1.8" fill="#4A4A52"/>
+<text x="1037" y="274.6" font-size="19" fill="#1B1B1F">21.9</text>
+<text x="914.2" y="277.8" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="280" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="287" width="120.8" height="-1.8" fill="#332288"/>
+<text x="1037" y="281.2" font-size="19" fill="#1B1B1F">21.9</text>
+<circle cx="66" cy="303.6" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="311.6" font-size="21" fill="#1B1B1F" font-weight="600">NER v2.0 alone (MAPA baseline, LAB-1516)</text>
+<rect x="908.2" y="301.2" width="47" height="-1.8" fill="#4A4A52"/>
+<text x="963.2" y="295.4" font-size="19" fill="#1B1B1F">8.5</text>
+<text x="914.2" y="298.6" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="300.8" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="307.8" width="47" height="-1.8" fill="#332288"/>
+<text x="963.2" y="302" font-size="19" fill="#1B1B1F">8.5</text>
+<circle cx="66" cy="324.4" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="332.4" font-size="21" fill="#1B1B1F" font-weight="600">rules + bardsai/eu-pii-anonimization-multilang v1 (MAPA baseline, LAB-1516)</text>
+<rect x="908.2" y="322" width="162.6" height="-1.8" fill="#4A4A52"/>
+<text x="1078.8" y="316.2" font-size="19" fill="#1B1B1F">29.5</text>
+<text x="914.2" y="319.4" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="321.6" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="328.6" width="162.6" height="-1.8" fill="#332288"/>
+<text x="1078.8" y="322.8" font-size="19" fill="#1B1B1F">29.5</text>
+<circle cx="66" cy="345.2" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="353.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)</text>
+<rect x="908.2" y="342.8" width="263.2" height="-1.8" fill="#4A4A52"/>
+<text x="1179.4" y="337" font-size="19" fill="#1B1B1F">47.7</text>
+<text x="914.2" y="340.2" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="342.4" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="349.4" width="263.2" height="-1.8" fill="#332288"/>
+<text x="1179.4" y="343.6" font-size="19" fill="#1B1B1F">47.7</text>
+<circle cx="66" cy="366" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="374" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)</text>
+<rect x="908.2" y="363.6" width="82.8" height="-1.8" fill="#4A4A52"/>
+<text x="999" y="357.8" font-size="19" fill="#1B1B1F">15.0</text>
+<text x="914.2" y="361" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="363.2" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="370.2" width="82.8" height="-1.8" fill="#332288"/>
+<text x="999" y="364.4" font-size="19" fill="#1B1B1F">15.0</text>
+<circle cx="66" cy="386.8" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="394.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410)</text>
+<rect x="908.2" y="384.4" width="91" height="-1.8" fill="#4A4A52"/>
+<text x="1007.2" y="378.6" font-size="19" fill="#1B1B1F">16.5</text>
+<text x="914.2" y="381.8" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="384" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="391" width="91" height="-1.8" fill="#332288"/>
+<text x="1007.2" y="385.2" font-size="19" fill="#1B1B1F">16.5</text>
+<circle cx="66" cy="407.6" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="415.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)</text>
+<rect x="908.2" y="405.2" width="64.1" height="-1.8" fill="#4A4A52"/>
+<text x="980.3" y="399.4" font-size="19" fill="#1B1B1F">11.6</text>
+<text x="914.2" y="402.6" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="404.8" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="411.8" width="64.1" height="-1.8" fill="#332288"/>
+<text x="980.3" y="406" font-size="19" fill="#1B1B1F">11.6</text>
+<circle cx="66" cy="428.4" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="436.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate C: B without Wismut (LAB-1410)</text>
+<rect x="908.2" y="426" width="49.9" height="-1.8" fill="#4A4A52"/>
+<text x="966.2" y="420.2" font-size="19" fill="#1B1B1F">9.0</text>
+<text x="914.2" y="423.4" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="425.6" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="432.6" width="49.9" height="-1.8" fill="#332288"/>
+<text x="966.2" y="426.8" font-size="19" fill="#1B1B1F">9.0</text>
+<circle cx="66" cy="449.2" r="9" fill="#332288" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="457.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494)</text>
+<rect x="908.2" y="446.8" width="37.3" height="-1.8" fill="#4A4A52"/>
+<text x="953.5" y="441" font-size="19" fill="#1B1B1F">6.8</text>
+<text x="914.2" y="444.2" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="446.4" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="453.4" width="37.3" height="-1.8" fill="#332288"/>
+<text x="953.5" y="447.6" font-size="19" fill="#1B1B1F">6.8</text>
+<circle cx="66" cy="470" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="478" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494)</text>
+<rect x="908.2" y="467.6" width="38" height="-1.8" fill="#4A4A52"/>
+<text x="954.3" y="461.8" font-size="19" fill="#1B1B1F">6.9</text>
 <text x="914.2" y="465" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="468.2" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="475.2" width="49.9" height="-0.8" fill="#332288"/>
-<text x="966.2" y="470.4" font-size="19" fill="#1B1B1F">9.0</text>
-<circle cx="66" cy="494.8" r="9" fill="#332288" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="502.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494)</text>
-<rect x="908.2" y="490.4" width="37.3" height="-0.8" fill="#4A4A52"/>
-<text x="953.5" y="485.6" font-size="19" fill="#1B1B1F">6.8</text>
-<text x="914.2" y="489.8" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="493" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="500" width="37.3" height="-0.8" fill="#332288"/>
-<text x="953.5" y="495.1" font-size="19" fill="#1B1B1F">6.8</text>
-<circle cx="66" cy="519.5" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="527.5" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494)</text>
-<rect x="908.2" y="515.1" width="38" height="-0.8" fill="#4A4A52"/>
-<text x="954.3" y="510.3" font-size="19" fill="#1B1B1F">6.9</text>
-<text x="914.2" y="514.5" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="517.7" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="524.7" width="38" height="-0.8" fill="#332288"/>
-<text x="954.3" y="519.9" font-size="19" fill="#1B1B1F">6.9</text>
-<circle cx="66" cy="544.3" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="552.3" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494)</text>
-<rect x="908.2" y="539.9" width="47" height="-0.8" fill="#4A4A52"/>
-<text x="963.2" y="535.1" font-size="19" fill="#1B1B1F">8.5</text>
-<text x="914.2" y="539.3" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="542.5" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="549.5" width="47" height="-0.8" fill="#332288"/>
-<text x="963.2" y="544.7" font-size="19" fill="#1B1B1F">8.5</text>
-<circle cx="66" cy="569" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="577" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.3 candidate T1: S30 + targeted add-on, 1 epoch (LAB-1512)</text>
-<rect x="908.2" y="564.7" width="77.5" height="-0.8" fill="#4A4A52"/>
-<text x="993.8" y="559.9" font-size="19" fill="#1B1B1F">14.1</text>
-<text x="914.2" y="564" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="567.2" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="574.2" width="77.5" height="-0.8" fill="#332288"/>
-<text x="993.8" y="569.4" font-size="19" fill="#1B1B1F">14.1</text>
-<circle cx="66" cy="593.8" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="601.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.3 candidate T2: S30 + targeted add-on, 2 epochs (LAB-1512)</text>
-<rect x="908.2" y="589.4" width="85" height="-0.8" fill="#4A4A52"/>
-<text x="1001.3" y="584.6" font-size="19" fill="#1B1B1F">15.4</text>
-<text x="914.2" y="588.8" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="467.2" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="474.2" width="38" height="-1.8" fill="#332288"/>
+<text x="954.3" y="468.4" font-size="19" fill="#1B1B1F">6.9</text>
+<circle cx="66" cy="490.8" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="498.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494)</text>
+<rect x="908.2" y="488.4" width="47" height="-1.8" fill="#4A4A52"/>
+<text x="963.2" y="482.6" font-size="19" fill="#1B1B1F">8.5</text>
+<text x="914.2" y="485.8" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="488" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="495" width="47" height="-1.8" fill="#332288"/>
+<text x="963.2" y="489.2" font-size="19" fill="#1B1B1F">8.5</text>
+<circle cx="66" cy="511.6" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="519.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.3 candidate T1: S30 + targeted add-on, 1 epoch (LAB-1512)</text>
+<rect x="908.2" y="509.2" width="77.5" height="-1.8" fill="#4A4A52"/>
+<text x="993.8" y="503.4" font-size="19" fill="#1B1B1F">14.1</text>
+<text x="914.2" y="506.6" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="508.8" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="515.8" width="77.5" height="-1.8" fill="#332288"/>
+<text x="993.8" y="510" font-size="19" fill="#1B1B1F">14.1</text>
+<circle cx="66" cy="532.4" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="540.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.3 candidate T2: S30 + targeted add-on, 2 epochs (LAB-1512)</text>
+<rect x="908.2" y="530" width="85" height="-1.8" fill="#4A4A52"/>
+<text x="1001.3" y="524.2" font-size="19" fill="#1B1B1F">15.4</text>
+<text x="914.2" y="527.4" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="529.6" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="536.6" width="85" height="-1.8" fill="#332288"/>
+<text x="1001.3" y="530.8" font-size="19" fill="#1B1B1F">15.4</text>
+<circle cx="66" cy="553.2" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="561.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535)</text>
+<rect x="908.2" y="550.8" width="32.1" height="-1.8" fill="#4A4A52"/>
+<text x="948.3" y="545" font-size="19" fill="#1B1B1F">5.8</text>
+<text x="914.2" y="548.2" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="550.4" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="557.4" width="32.1" height="-1.8" fill="#332288"/>
+<text x="948.3" y="551.6" font-size="19" fill="#1B1B1F">5.8</text>
+<circle cx="66" cy="574" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="582" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535)</text>
+<rect x="908.2" y="571.6" width="39.5" height="-1.8" fill="#4A4A52"/>
+<text x="955.7" y="565.8" font-size="19" fill="#1B1B1F">7.2</text>
+<text x="914.2" y="569" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="571.2" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="578.2" width="39.5" height="-1.8" fill="#332288"/>
+<text x="955.7" y="572.4" font-size="19" fill="#1B1B1F">7.2</text>
+<circle cx="66" cy="594.8" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="602.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535)</text>
+<rect x="908.2" y="592.4" width="47" height="-1.8" fill="#4A4A52"/>
+<text x="963.2" y="586.6" font-size="19" fill="#1B1B1F">8.5</text>
+<text x="914.2" y="589.8" font-size="18" fill="#4A4A52">no values</text>
 <text x="914.2" y="592" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="599" width="85" height="-0.8" fill="#332288"/>
-<text x="1001.3" y="594.2" font-size="19" fill="#1B1B1F">15.4</text>
-<circle cx="66" cy="618.6" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="626.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (MAPA 21-language baseline, LAB-1516)</text>
-<rect x="908.2" y="614.2" width="47" height="-0.8" fill="#4A4A52"/>
-<text x="963.2" y="609.4" font-size="19" fill="#1B1B1F">8.5</text>
-<text x="914.2" y="613.6" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="616.8" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="623.8" width="47" height="-0.8" fill="#332288"/>
-<text x="963.2" y="619" font-size="19" fill="#1B1B1F">8.5</text>
-<circle cx="66" cy="643.3" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="651.3" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (selection-only re-score, LAB-1494)</text>
-<rect x="908.2" y="639" width="47" height="-0.8" fill="#4A4A52"/>
-<text x="963.2" y="634.1" font-size="19" fill="#1B1B1F">8.5</text>
-<text x="914.2" y="638.3" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="641.5" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="648.5" width="47" height="-0.8" fill="#332288"/>
-<text x="963.2" y="643.7" font-size="19" fill="#1B1B1F">8.5</text>
-<circle cx="66" cy="668.1" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="676.1" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (selection-only re-score, LAB-1512)</text>
-<rect x="908.2" y="663.7" width="47" height="-0.8" fill="#4A4A52"/>
-<text x="963.2" y="658.9" font-size="19" fill="#1B1B1F">8.5</text>
-<text x="914.2" y="663.1" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="666.3" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="673.3" width="47" height="-0.8" fill="#332288"/>
-<text x="963.2" y="668.5" font-size="19" fill="#1B1B1F">8.5</text>
-<circle cx="66" cy="692.9" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="700.9" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512)</text>
-<rect x="908.2" y="688.5" width="49.9" height="-0.8" fill="#4A4A52"/>
-<text x="966.2" y="683.7" font-size="19" fill="#1B1B1F">9.0</text>
-<text x="914.2" y="687.9" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="691" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="698" width="49.9" height="-0.8" fill="#332288"/>
-<text x="966.2" y="693.2" font-size="19" fill="#1B1B1F">9.0</text>
-<circle cx="66" cy="717.6" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="725.6" font-size="21" fill="#1B1B1F" font-weight="600">rules alone (MAPA baseline, LAB-1516)</text>
-<rect x="908.2" y="713.2" width="548" height="-0.8" fill="#4A4A52"/>
-<text x="1464.2" y="708.4" font-size="19" fill="#1B1B1F">99.3</text>
-<text x="914.2" y="712.6" font-size="18" fill="#4A4A52">no values</text>
-<text x="914.2" y="715.8" font-size="18" fill="#4A4A52">no values</text>
-<rect x="908.2" y="722.8" width="548" height="-0.8" fill="#332288"/>
+<rect x="908.2" y="599" width="47" height="-1.8" fill="#332288"/>
+<text x="963.2" y="593.2" font-size="19" fill="#1B1B1F">8.5</text>
+<circle cx="66" cy="615.6" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="623.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (MAPA 21-language baseline, LAB-1516)</text>
+<rect x="908.2" y="613.2" width="47" height="-1.8" fill="#4A4A52"/>
+<text x="963.2" y="607.4" font-size="19" fill="#1B1B1F">8.5</text>
+<text x="914.2" y="610.6" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="612.8" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="619.8" width="47" height="-1.8" fill="#332288"/>
+<text x="963.2" y="614" font-size="19" fill="#1B1B1F">8.5</text>
+<circle cx="66" cy="636.4" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="644.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (selection-only re-score, LAB-1494)</text>
+<rect x="908.2" y="634" width="47" height="-1.8" fill="#4A4A52"/>
+<text x="963.2" y="628.2" font-size="19" fill="#1B1B1F">8.5</text>
+<text x="914.2" y="631.4" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="633.6" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="640.6" width="47" height="-1.8" fill="#332288"/>
+<text x="963.2" y="634.8" font-size="19" fill="#1B1B1F">8.5</text>
+<circle cx="66" cy="657.2" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="665.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (selection-only re-score, LAB-1512)</text>
+<rect x="908.2" y="654.8" width="47" height="-1.8" fill="#4A4A52"/>
+<text x="963.2" y="649" font-size="19" fill="#1B1B1F">8.5</text>
+<text x="914.2" y="652.2" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="654.4" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="661.4" width="47" height="-1.8" fill="#332288"/>
+<text x="963.2" y="655.6" font-size="19" fill="#1B1B1F">8.5</text>
+<circle cx="66" cy="678" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="686" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (selection-only re-score, LAB-1535)</text>
+<rect x="908.2" y="675.6" width="47" height="-1.8" fill="#4A4A52"/>
+<text x="963.2" y="669.8" font-size="19" fill="#1B1B1F">8.5</text>
+<text x="914.2" y="673" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="675.2" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="682.2" width="47" height="-1.8" fill="#332288"/>
+<text x="963.2" y="676.4" font-size="19" fill="#1B1B1F">8.5</text>
+<circle cx="66" cy="698.8" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="706.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512)</text>
+<rect x="908.2" y="696.4" width="49.9" height="-1.8" fill="#4A4A52"/>
+<text x="966.2" y="690.6" font-size="19" fill="#1B1B1F">9.0</text>
+<text x="914.2" y="693.8" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="696" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="703" width="49.9" height="-1.8" fill="#332288"/>
+<text x="966.2" y="697.2" font-size="19" fill="#1B1B1F">9.0</text>
+<circle cx="66" cy="719.6" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="727.6" font-size="21" fill="#1B1B1F" font-weight="600">rules alone (MAPA baseline, LAB-1516)</text>
+<rect x="908.2" y="717.2" width="548" height="-1.8" fill="#4A4A52"/>
+<text x="1464.2" y="711.4" font-size="19" fill="#1B1B1F">99.3</text>
+<text x="914.2" y="714.6" font-size="18" fill="#4A4A52">no values</text>
+<text x="914.2" y="716.8" font-size="18" fill="#4A4A52">no values</text>
+<rect x="908.2" y="723.8" width="548" height="-1.8" fill="#332288"/>
 <text x="1464.2" y="718" font-size="19" fill="#1B1B1F">99.3</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;mapa-eur-lex&#x27; (hand-written; bg 2 docs + cs 2 docs + da 2 docs + de 2 docs + el 2 docs + en 2 docs + es 2 docs + et 2 docs + fi 2 docs + fr 2 docs + ga 2 docs + hu 2 docs + it 2 docs + lt 2 docs + lv 2 docs + mt 2 docs + nl 2 docs + pt 2 docs + ro 2 docs + sk 2 docs + sv 2 docs), bg + cs + da + de + el + en + es + et + fi + fr + ga + hu + it + lt + lv + mt + nl + pt + ro + sk + sv pooled (micro-averaged).</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">Valid = a validated rule of the type recognises the value (checksum, numbering plan, format). Invalid numbers stay in the headline.</text>
-<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-28 to 2026-10-29 · 6 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-28 to 2026-10-29 · 7 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>
