@@ -35,6 +35,7 @@ const MODEL_CARD = `${NER_MODEL}#model-card`;
 const CI = `${SOURCE}/actions/workflows/ci.yml`;
 const HARNESS_REPORT = `${DOCS}/integrations/harness-matrix-2026-10-29.md`;
 const EU_REGULATION = `${DOCS}/eu-regulation.md`;
+const META_TERMS = "https://dev.meta.ai/legal/terms-of-service";
 // The 3-minute demo video: the slot stays hidden until a URL is configured at build time.
 const DEMO_VIDEO_URL = import.meta.env.VITE_PII_GUARD_DEMO_VIDEO_URL || null;
 
@@ -68,7 +69,7 @@ const NAV: readonly { href: string; label: string; wide?: boolean }[] = [
   { href: "#data", label: "Your data", wide: true },
 ];
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
-const SECTIONS = ["why", "demo", "meta", "for", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
+const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
 
 const initialLanguage = (): Language => (globalThis.navigator?.language ?? "").toLowerCase().startsWith("hu") ? "hu" : "en";
 const link = "underline underline-offset-4 hover:text-ink";
@@ -205,7 +206,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </div>
       <div aria-hidden="true" className="header-hairline" />
     </header>
-    <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-24 lg:px-10">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-20 lg:px-10">
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
           <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible · Built on Meta’s XLM-RoBERTa, Muse Glimmer, Muse Spark and SAM&nbsp;3.1</p>
@@ -246,7 +247,6 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <div className="flex items-center gap-3"><p aria-hidden="true" className="text-sm font-medium text-ink">Sample</p><SegmentedControl label="Sample language" options={LANGUAGES.map((l) => ({ ...l, disabled: running }))} value={language} onChange={(v) => reset(v as Language)} /></div>
             {signedIn && !needsKey && <Field label="Input" className="min-w-36 max-w-56 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">The sample</option><option value="custom">Your text</option></Select></Field>}
             {canRun && !quota && <Button variant="primary" busy={running} disabled={!running && editable && !text.trim()} onClick={() => void run()}>{running ? "Running…" : failed ? "Try again" : editable ? "Run your text" : "Run the live demo"}</Button>}
-            {!account && accountError && <Button variant="primary" disabled>Run the live demo</Button>}
             {result && !running && <Button onClick={() => reset()}>Back to the recorded run</Button>}
             <div className="basis-full sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
             {canRun && !running && !quota && <p className="w-full text-xs text-muted sm:w-auto sm:self-center">{ownConnection ? <>Runs through your {providerLabel(ownConnection.provider)} connection.{hasConsole && <> <a className={link} href="#connect">Change it in Connect</a></>}</> : <>Runs on {modelOr("Meta’s model")} · no key needed{account && runsLeft(account) && <> · <span className="tabular-nums">{runsLeft(account)}</span></>}</>}</p>}
@@ -299,39 +299,41 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </ul>
       </section>
 
-      <section id="for" aria-labelledby="for-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="for-heading" eyebrow="Who it’s for" title="Built for agents that work on people’s files." />
-        <Card as="div">
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-3 md:gap-0 md:divide-x md:divide-line">
-            <Audience title="Legal" task="Summarize the case file and draft the reply to opposing counsel.">Parties, addresses and case-file IDs are masked; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client, and the draft comes back with the name.</Audience>
-            <Audience title="HR" task="Answer this employee’s leave request from their folder.">Names, ID numbers, addresses and dates of birth are masked on the way out, in tool results as well as in the prompt.</Audience>
-            <Audience title="Finance and back office" task="Match these invoices to the account letters and flag the gaps.">IBANs and tax IDs are caught by validated rules with checksums; names and companies by the NER.</Audience>
-          </ul>
-        </Card>
-      </section>
-
       <section id="europe" aria-labelledby="europe-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="europe-heading" eyebrow="Why Europe" title="What EU rules ask, and what PII Guard does." />
         <ul aria-label="EU rules and what PII Guard does" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-3">
-          <EuCard title="Minimize before you send" href={`${EU_REGULATION}#minimization-and-pseudonymization`}>GDPR asks for data minimization and names pseudonymization as a design and security measure (Art. 5, 25, 32). PII Guard swaps names and IDs for placeholders before the prompt leaves.</EuCard>
-          <EuCard title="Less personal data crossing borders" href={`${EU_REGULATION}#international-transfers`}>Non-EU model providers raise Chapter V transfer questions. The model receives placeholders; the mapping back to real values stays with your guard, self-hosted or in our EU-hosted preview.</EuCard>
-          <EuCard title="Built for regulated work" href={`${EU_REGULATION}#sector-rules`}>Lawyers’ secrecy, employee data (GDPR Art. 88) and DORA’s ICT third-party rules for finance all bear on what reaches an outside vendor. Every call is logged and re-checked.</EuCard>
+          <EuCard title="Minimize before you send" href={`${EU_REGULATION}#minimization-and-pseudonymization`}>GDPR requires data minimization (Art. 5) and lists pseudonymization among example design and security measures (Art. 25, 32). PII Guard swaps names and IDs for placeholders before the prompt leaves.</EuCard>
+          <EuCard title="Less personal data crossing borders" href={`${EU_REGULATION}#international-transfers`}>Non-EU model providers raise Chapter V transfer questions. PII Guard reduces the personal data that reaches them: placeholders go out, the mapping stays with your guard. Your transfer obligations remain.</EuCard>
+          <EuCard title="Built for regulated work" href={`${EU_REGULATION}#sector-rules`}>Lawyers’ secrecy, employee data (GDPR Art. 88) and DORA’s ICT third-party rules all bear on what reaches an outside vendor. PII Guard lists every call in Logs, outbound check included.</EuCard>
         </ul>
-        <p className="max-w-3xl text-xs text-muted">A technical measure, not legal advice: pseudonymized data can still be personal data, and you still need your own DPIA and agreements. <a className={link} href={`${EU_REGULATION}#what-we-dont-claim`}>What we don’t claim ↗</a></p>
+        <p className="max-w-3xl text-xs text-muted">A technical measure, not legal advice or a compliance feature: pseudonymized data can still be personal data, and you still need your own DPIA, agreements and transfer assessment. <a className={link} href={`${EU_REGULATION}#what-we-dont-claim`}>What we don’t claim ↗</a></p>
+        <div id="for" className="scroll-mt-20 space-y-3">
+          <h3 className="text-sm font-medium text-ink">Who it’s for: agents that work on people’s files</h3>
+          <Card as="div">
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-3 md:gap-0 md:divide-x md:divide-line">
+              <Audience title="Legal" task="Summarize the case file and draft the reply to opposing counsel.">Parties, addresses and case-file IDs are masked; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client, and the draft comes back with the name.</Audience>
+              <Audience title="HR" task="Answer this employee’s leave request from their folder.">Names, ID numbers, addresses and dates of birth are masked on the way out, in tool results as well as in the prompt.</Audience>
+              <Audience title="Finance and back office" task="Match these invoices to the account letters and flag the gaps.">IBANs and tax IDs are caught by validated rules with checksums; names and companies by the NER.</Audience>
+            </ul>
+          </Card>
+        </div>
       </section>
 
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
         <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a model, and keeps signatures visible; masking them takes a self-hosted install with SAM 3.1. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
-        <Card title="Measured on images" headingLevel={3} subtitle={`Portraits and signatures: ${IMAGE_LIMITS.ids} official specimen IDs from ${IMAGE_LIMITS.countries} countries, self-hosted, IoU ≥ 0.5. Runs of 27 Oct 2026.`}>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
-          <p className="mt-4 text-xs text-muted">Printed text on real ID scans is still the weak spot; it’s listed under <a className={link} href="#privacy">limits</a>. <a className={link} href={`${DOCS}/benchmarks.md#image-masking`}>Image benchmark details ↗</a></p>
-        </Card>
+        <div aria-labelledby="images-proof-heading" role="group" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 border-y border-line py-5 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
+          <div className="min-w-0">
+            <h3 id="images-proof-heading" className="text-sm font-medium text-ink">Measured on images</h3>
+            <p className="mt-1 text-xs text-muted">Portraits and signatures: {IMAGE_LIMITS.ids} official specimen IDs from {IMAGE_LIMITS.countries} countries, self-hosted, IoU ≥ 0.5. Runs of 27 Oct 2026. Printed text on real ID scans is still the weak spot (<a className={link} href="#privacy">limits</a>). <a className={link} href={`${DOCS}/benchmarks.md#image-masking`}>Details ↗</a></p>
+          </div>
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
+        </div>
       </section>
 
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on all three test sets below." lead="Committed runs of 27–28 Oct 2026 on fictional and public data. Leak: personal values that still reach the model; F1 also counts over-masking. The sets are small, so a few points is noise; where it’s weaker is under limits." />
+        <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on each test set below." lead="Committed runs of 27–28 Oct 2026 on fictional and public data. Leak: personal values that still reach the model; F1 also counts over-masking. The sets are small, so treat a gap of a point or two as noise; where PII Guard is weaker is under Limits." />
         <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-6 lg:grid-cols-2">
           <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
             <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
@@ -361,14 +363,9 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <pre tabIndex={0} aria-label="Python client example" className="mt-3 overflow-x-auto rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-ui text-ink"><code>{"client = OpenAI(\n    base_url=\"https://<your-pii-guard>/v1\",\n    api_key=\"…\",\n)"}</code></pre>
             <p className="mt-2 text-xs"><a className={link} href={`${DOCS}/integrations/README.md`}>Integration guides ↗</a></p>
           </Step>
-          <Step n={2} title="Masking and restoring happen automatically: streaming, tool calls, images.">Prompts, tool definitions, arguments and results are masked on the way out; the answer is restored as it streams, even when a placeholder is split across chunks.</Step>
+          <Step n={2} title="Masking and restoring happen automatically: streaming, tool calls, images.">Prompts, tool definitions, arguments and results are masked on the way out; the answer is restored as it streams, even when a placeholder is split across chunks. If masking fails, the request isn’t sent.</Step>
           <Step n={3} title="See every request in Logs, with its outbound check result.">What the model received, and the re-check before it left: a request is blocked if a known value survived masking.</Step>
         </ol>
-        <ul aria-label="Under the hood" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 md:grid-cols-3">
-          <Inside title="Detect"><span className="font-medium text-ink">No LLM in the masking path.</span> Validated rules for identifiers and our open encoder NER for names, addresses and dates, both inside PII Guard, adding {LATENCY.value} per request (p50, CPU). An LLM detector is an opt-in audit mode.</Inside>
-          <Inside title="Swap">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in PII Guard.</Inside>
-          <Inside title="Restore">The real values go back into the answer and into the tool calls your agent runs. If masking errors, the request isn’t sent.</Inside>
-        </ul>
       </section>
 
       <section id="data" aria-labelledby="data-heading" className="scroll-mt-20 space-y-6">
@@ -383,7 +380,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <KeyValues items={[
               { label: "Images", value: "Signed in only. Read and masked inside the service: faces and ID photos are covered, and signatures and stamps stay visible. Images are never stored or sent to a model." },
               { label: "How long", value: "Placeholder mappings expire after 1 hour without use. Your last 50 masked requests are kept in memory for your activity log. A restart clears both. Expiry makes them unavailable; it doesn’t prove the memory is erased." },
-              { label: "What Meta receives", value: "Masked text only. Meta’s standard terms exclude training on it but allow retention as needed, and processing there isn’t guaranteed to stay in the EU." },
+              { label: "What Meta receives", value: <>Masked text only. The <a className={link} href={META_TERMS}>Meta Model API terms ↗</a> exclude training on it (section 5.1) but allow retention as needed (section 4.4), and processing there isn’t guaranteed to stay in the EU.</> },
             ]} />
           </div>
           <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/hosted.md`}>Full processing and retention details ↗</a></p>
@@ -537,11 +534,6 @@ function EuCard({ title, href, children }: { title: string; href: string; childr
 /** One of the three "Live in three steps": a numbered lead and what it means. */
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return <li className="min-w-0 bg-surface p-4 sm:p-5"><p className="flex items-baseline gap-2.5"><span aria-hidden="true" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-guard-soft font-mono text-xs text-guard">{n}</span><span className="font-medium text-ink"><span className="sr-only">Step {n}: </span>{title}</span></p><div className="mt-2 pl-8.5 text-muted">{children}</div></li>;
-}
-
-/** One step of "Under the hood": what PII Guard does inside, in the why band's style. */
-function Inside({ title, children }: { title: string; children: ReactNode }) {
-  return <li className="border-l-2 border-guard/40 pl-3"><h3 className="text-sm font-medium text-ink">{title}</h3><p className="mt-1 text-muted">{children}</p></li>;
 }
 
 /** One list item with its lead in ink. */
