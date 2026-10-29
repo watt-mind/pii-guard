@@ -56,6 +56,13 @@ SETS: dict[str, list[str]] = {
     "eu-inflection": [f"eval/fixtures/eu/{lang}-inflection.jsonl" for lang in EU_GATE_LANGS],
     "en-court": ["eval/fixtures/eu/en-court-smoke.jsonl"],
 }
+#: Sets whose files share a name with another set (``eu/lv-smoke.jsonl`` vs ``hu-smoke.jsonl``):
+#: their records get a fixture-set name of their own, so the report never pools them.
+OWN_SET_NAME = {
+    "eu-smoke": "eu-smoke",
+    "eu-inflection": "eu-inflection",
+    "en-court": "en-court-smoke",
+}
 LABELS = {
     "v20": "pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)",
     "xlmr-v3": "pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)",
@@ -204,6 +211,12 @@ def _score(args: argparse.Namespace) -> int:
             extra={"system": system_extra(args.ticket, args.candidate)},
             notes=notes,
         )[:1]
+        if name in OWN_SET_NAME:  # the eu files are named <lang>-smoke too: keep them apart
+            own = OWN_SET_NAME[name]
+            records[0]["fixture_set"] = own
+            records[0]["title"] = records[0]["title"].rsplit(" on ", 1)[0] + f" on {own}"
+            for f in records[0]["fixtures"]:
+                f["set"] = own
         overall = records[0]["metrics"]["overall"]
         summary[name] = {
             "documents": overall["documents"],
