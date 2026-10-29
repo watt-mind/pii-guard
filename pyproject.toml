@@ -45,6 +45,7 @@ ocr = [
 # huSpaCy's hu_core_news_lg is not listed: Hugging Face serves it uncacheable for uv, so it is
 # fetched once with `pii-guard baselines download` (pii_guard.eval.baselines.models, LAB-1249).
 baselines = [
+    "de-core-news-lg",
     "en-core-web-lg",
     "huggingface-hub>=0.30",
     "presidio-analyzer==2.2.365",
