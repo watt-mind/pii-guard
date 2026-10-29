@@ -507,8 +507,12 @@ approving additional authority; unknown commits are charged conservatively. Neve
 restore the object to replenish credit. Legacy marker-only deployments retain their original
 restart-forfeiture rules and are not the Blob-backed release path.
 
-The app scales to zero when idle and runs at most one 2-vCPU/4-GiB replica. Each cold start
-loads the local NER model before readiness and can delay the first request. Scale-to-zero
+The app scales to zero when idle and runs at most one 2-vCPU/4-GiB replica. A cold start
+serves the landing page, the UI, `/healthz` and `/v1/status` as soon as the process is up and
+loads the bundled NER model in the background (LAB-1548). Until it is loaded, detecting
+requests wait up to `PII_GUARD_NER_WARMUP_TIMEOUT` and then get `503 detector_loading` with
+`Retry-After`; a model that fails to load gets `503 detection_unavailable`. Nothing is ever
+detected without the model or forwarded unmasked. Scale-to-zero
 discards owner state. The Blob store resumes the same finite total/daily authority; it never
 reopens credit automatically.
 ACR Basic, Key Vault, Azure Files, networking and alerting cost extra. The USD 50 (prod) and USD 10 (dev) limits are
@@ -522,8 +526,13 @@ the authority object and any legacy claim markers, and follow Key Vault recovery
 
 ## Observability, refusal and rollback
 
-`/healthz` reports liveness/model state; `/readyz` must refuse until the required hosted NER
-stack is ready. Platform startup/readiness probes allow up to ten minutes for loading. Container Apps ignores Docker `HEALTHCHECK`; the explicit Bicep startup/readiness/liveness
+`/healthz` reports liveness/model state (`ner`: `loading`, `ready` or `failed`); `/readyz`
+refuses until the required hosted NER stack is ready, and the deploy smoke waits for it.
+`/readyz?ner=loading` is serving readiness: it also admits a replica whose model is still
+loading (never one whose load failed or whose image pipeline is missing). The Bicep Readiness
+probe uses it, because Container Apps holds a scale-from-zero request until the replica is
+Ready, so probing full `/readyz` would hold the landing page for the whole model load. The
+Startup probe allows up to ten minutes for the process to answer `/healthz`. Container Apps ignores Docker `HEALTHCHECK`; the explicit Bicep startup/readiness/liveness
 probes are required and send `Host: localhost`. `PII_GUARD_ALLOWED_HOSTS` adds the canonical
 public host and app default Azure host; loopback hosts remain allowed for probes. The image
 also checks `ner=ready` in its Docker healthcheck for local Docker verification. No image/OCR capability is advertised.

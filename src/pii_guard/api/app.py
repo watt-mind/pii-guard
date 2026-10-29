@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from typing import Literal
 
 import anyio.to_thread
 from fastapi import FastAPI
@@ -117,7 +118,11 @@ def create_app(
 
     With ``PII_GUARD_NER_MODEL`` set, the lifespan loads the NER model before the app serves
     (:func:`~pii_guard.detect.stack.warm_up`, LAB-1274), so concurrent first requests don't
-    race to load it; a model that can't be loaded stops startup. Without it, when the stack
+    race to load it; a model that can't be loaded stops startup. Hosted mode is the exception
+    (LAB-1548, scale to zero): it loads the configured model in the background like below, so
+    a cold start serves the landing page at once; a model that can't be loaded fails detecting
+    requests closed (503 ``detection_unavailable``) and keeps ``/readyz`` refusing. Without
+    it, when the stack
     has ``ner`` (the resolved published model or fallback), the lifespan starts loading it in
     the background (:class:`~pii_guard.detect.stack.NerWarmup`, ``app.state.ner_warmup``,
     LAB-1303): the server answers at once, ``/healthz`` and ``/v1/status`` say ``loading``,
@@ -129,7 +134,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        if await anyio.to_thread.run_sync(stack.warm_up, settings):
+        if settings.hosted and warmup.start():
+            # Hosted scales to zero (LAB-1548): a cold start serves the landing page, the UI and
+            # serving readiness at once while the bundled model loads; detecting requests wait.
+            logger.info("bundled ner model loading in the background; detecting requests wait")
+        elif await anyio.to_thread.run_sync(stack.warm_up, settings):
             warmup.mark_ready()
             logger.info("ner model warmed up before serving")
         elif warmup.start():
@@ -227,8 +236,13 @@ def create_app(
         app.state.image_workers = app.state.hosted.image_workers
 
         @app.get("/readyz", include_in_schema=False)
-        def readyz() -> dict[str, str]:
-            if warmup.state not in {"ready", "off"}:
+        def readyz(ner: Literal["ready", "loading"] = "ready") -> dict[str, str]:
+            """Full readiness (deploy smoke): the NER model is loaded. ``?ner=loading``: ready
+            to serve (the platform's Readiness probe, LAB-1548) while it still loads, since
+            detecting requests wait for it; a failed load is never ready."""
+            if warmup.state not in {"ready", "off"} and not (
+                ner == "loading" and warmup.state == "loading"
+            ):
                 raise DetectorLoadingError("Detectors are not ready")
             if settings.hosted_images:
                 from pii_guard.hosted.images import require_image_pipeline

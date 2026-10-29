@@ -2,12 +2,67 @@
 
 import json
 import re
+import runpy
 import shutil
 import subprocess
+import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 TEMPLATE = Path(__file__).with_name("release.bicep").resolve()
+SMOKE = Path(__file__).with_name("smoke.py").resolve()
+
+
+class _FakeHttps:
+    """A fictional public origin: ``/readyz`` answers 503 ``loads`` times, then 200."""
+
+    def __init__(self, loads: int) -> None:
+        self.loads = loads
+        self.paths: list[str] = []
+
+    def __call__(self, *args: object, **kwargs: object) -> "_FakeHttps":
+        return self
+
+    def request(self, method: str, path: str, **kwargs: object) -> None:
+        self.paths.append(path)
+
+    def getresponse(self) -> mock.Mock:
+        path = self.paths[-1]
+        status, body = 200, b"{}"
+        if path == "/readyz" and self.paths.count("/readyz") <= self.loads:
+            status = 503
+        elif path == "/healthz":
+            body = b'{"status": "ok", "ner": "ready"}'
+        elif path == "/v1/analyze":
+            status = 401
+        return mock.Mock(status=status, read=mock.Mock(return_value=body))
+
+    def close(self) -> None:
+        pass
+
+
+class SmokeTests(unittest.TestCase):
+    def run_smoke(self, loads: int, clock: list[float]) -> _FakeHttps:
+        fake = _FakeHttps(loads)
+        with (
+            mock.patch("http.client.HTTPSConnection", fake),
+            mock.patch("time.sleep"),
+            mock.patch("time.monotonic", side_effect=clock),
+            mock.patch.object(sys, "argv", ["smoke.py", "https://guard.example"]),
+            mock.patch("builtins.print"),
+        ):
+            runpy.run_path(str(SMOKE), run_name="__main__")
+        return fake
+
+    def test_smoke_waits_for_the_model_after_the_revision_is_ready(self) -> None:
+        # LAB-1548: the revision is admitted while NER loads; smoke waits for full /readyz.
+        fake = self.run_smoke(loads=2, clock=[0.0, 5.0, 10.0])
+        self.assertEqual(fake.paths[:4], ["/", "/readyz", "/readyz", "/readyz"])
+
+    def test_smoke_fails_when_the_model_never_becomes_ready(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "public readiness failed"):
+            self.run_smoke(loads=99, clock=[0.0, 100.0, 200.0])
 
 
 class ReleaseSourceTests(unittest.TestCase):
@@ -50,11 +105,13 @@ class ReleaseTemplateTests(unittest.TestCase):
         self.assertEqual(len(resources), 1)
         return resources[0]
 
+    def container(self) -> dict:
+        return self.resource("Microsoft.App/containerApps")["properties"]["template"]["containers"][
+            0
+        ]
+
     def env(self) -> dict:
-        container = self.resource("Microsoft.App/containerApps")["properties"]["template"][
-            "containers"
-        ][0]
-        return {entry["name"]: entry for entry in container["env"]}
+        return {entry["name"]: entry for entry in self.container()["env"]}
 
     def test_only_application_auth_and_alert_writes(self) -> None:
         self.assertCountEqual(
@@ -155,8 +212,17 @@ class ReleaseTemplateTests(unittest.TestCase):
             self.assertEqual(
                 probe["httpGet"]["httpHeaders"], [{"name": "Host", "value": "localhost"}]
             )
-        self.assertEqual(probes["Readiness"]["httpGet"]["path"], "/readyz")
         self.assertEqual(probes["Startup"]["failureThreshold"], 60)
+
+    def test_readiness_admits_the_replica_while_the_model_loads(self) -> None:
+        # LAB-1548: scale to zero holds a cold request until a replica is Ready, so Readiness
+        # must not wait for the 1 GB NER load (detecting routes do). Startup and Liveness stay
+        # on /healthz; a failed model load is never ready on either /readyz form.
+        probes = {probe["type"]: probe["httpGet"]["path"] for probe in self.container()["probes"]}
+        self.assertEqual(
+            probes,
+            {"Startup": "/healthz", "Readiness": "/readyz?ner=loading", "Liveness": "/healthz"},
+        )
 
     def test_client_ip_attribution_defaults_off_and_dev_forces_off(self) -> None:
         parameter = self.template["parameters"]["clientIpSource"]
