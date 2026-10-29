@@ -10,16 +10,16 @@ See [entities.md](entities.md) for what counts as personal data.
 
 ## Who we protect it from
 
-| Party | Assumption | What pii-guard does |
+| Party | Assumption | What PII Guard does |
 |---|---|---|
 | **The LLM provider** | Honest but curious: may log, retain, or use data for training depending on the tier and terms | Only masked data reaches it |
-| **Network observers** between pii-guard and the provider | May see traffic if TLS is misconfigured | Only masked data is in flight; TLS required upstream |
+| **Network observers** between PII Guard and the provider | May see traffic if TLS is misconfigured | Only masked data is in flight; TLS required upstream |
 | **Operators reading logs and metrics** | Have access to observability, not to the mapping store | Raw values never appear in logs, metrics, traces or errors |
 | **Other tenants** on a shared deployment | Must not correlate data across tenants | Per-tenant keys; placeholders unlinkable across tenants |
 
 ## Trust boundary
 
-In a self-hosted deployment, pii-guard itself, its mapping store and its detection models are **inside** the trust
+In a self-hosted deployment, PII Guard itself, its mapping store and its detection models are **inside** the trust
 boundary. They see raw data by necessity. That is why detection runs on open-weights models
 that can be hosted on infrastructure you control.
 
@@ -110,12 +110,12 @@ See [setup and refusal behavior](operations.md#local-only-detection).
 
 - **Detection is not perfect.** A missed value is sent upstream. The published recall and leak
   rate tell you how often that happens on the benchmark; real data may differ.
-- **Pseudonymized data is still personal data** under GDPR (Recital 26). pii-guard reduces
+- **Pseudonymized data is still personal data** under GDPR (Recital 26). PII Guard reduces
   exposure; it does not anonymize.
 - **Context can identify people.** "The only female judge at the Kecskemét court" identifies
   someone without containing a name. Quasi-identifiers are out of scope for v1.
 - **The response is only as safe as the model.** If the model hallucinates real personal data,
-  pii-guard won't remove it.
+  PII Guard won't remove it.
 
 ## Operational guidance
 

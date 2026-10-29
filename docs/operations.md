@@ -1,6 +1,6 @@
 # Operations: demo stack, traffic log and timing
 
-How to run pii-guard end to end on one machine, watch what the gateway does to each LLM call,
+How to run PII Guard end to end on one machine, watch what the gateway does to each LLM call,
 and measure the latency it adds. Everything here works offline and free: a mock upstream
 stands in for the model unless you configure a real one.
 
@@ -267,7 +267,7 @@ make smoke-fast       # the same in fast mode with the NER (local)
 **First run of `make demo`.** It installs the `ner` extra (torch, transformers) and, unless
 `PII_GUARD_NER_MODEL` is set, downloads the NER model before the API starts, printing
 `ner: downloading … (Apache-2.0, about 1110 MB, first run only)`. The model is the published
-pii-guard checkpoint, `watt-mind/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
+PII Guard checkpoint, `watt-mind/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
 [models.md](models.md#which-ner-model-fast-mode-runs)), pinned to a hub revision and
 checked against its SHA-256, stored in `~/.cache/pii-guard/models/ner/`
 (`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK=cached`
@@ -278,7 +278,7 @@ uses it only if it is already there; `off` (what `MODE=rules` sets) never uses i
 | Process | Address | Notes |
 |---|---|---|
 | Mock upstream | `http://127.0.0.1:8790/v1` | OpenAI-compatible; answers `Echo: <last user message>`, or calls the first tool with it. No model, no network. |
-| pii-guard API + gateway | `http://127.0.0.1:8787` | Gateway in `fast` mode by default, traffic log `masked`, `Server-Timing` and `/metrics` on, a fresh tenant key per run (unless `.env` sets one). |
+| PII Guard API + gateway | `http://127.0.0.1:8787` | Gateway in `fast` mode by default, traffic log `masked`, `Server-Timing` and `/metrics` on, a fresh tenant key per run (unless `.env` sets one). |
 | UI | `http://localhost:5173` | The Vite dev server, proxying `/v1` to the API. Skipped when pnpm is missing (`--no-ui`). |
 
 It prints a banner with the URLs and what it found:
@@ -289,7 +289,7 @@ It prints a banner with the URLs and what it found:
   sends `model: pii-guard-mock`; set `PII_GUARD_DEMO_MODEL` for a real upstream. The demo
   traffic is fictional, so it may go to a hosted model.
 - **Fast mode** uses rules + the NER model that resolves (`PII_GUARD_NER_MODEL`, else the
-  published pii-guard checkpoint once it is pinned, else the public fallback) and names it,
+  published PII Guard checkpoint once it is pinned, else the public fallback) and names it,
   for example `fast mode  rules + NER: bardsai/eu-pii-anonimization-multilang@62ca57123687
   (public fallback, Apache-2.0)`. Rules only with `MODE=rules`, or when the `ner` extra is
   missing (the banner says so).
@@ -448,12 +448,12 @@ reverse proxy. A container binds `0.0.0.0`; publish its port on `127.0.0.1` only
 | `PII_GUARD_ALLOWED_HOSTS` | Extra `Host` header names the API answers, comma-separated; `*` answers any | `localhost`, `127.0.0.1`, `[::1]` and `PII_GUARD_HOST` |
 
 - **DNS rebinding.** A web page on another site can point its own host name at `127.0.0.1` and
-  make the browser talk to a local pii-guard; its requests still carry that host name. Any other
+  make the browser talk to a local PII Guard; its requests still carry that host name. Any other
   `Host` gets `400 Invalid host header`. The UI's Vite proxy sends `127.0.0.1:<port>`; behind a
   proxy or a compose service name (`demo-api`), add that name to `PII_GUARD_ALLOWED_HOSTS`.
 - **The token is never forwarded upstream.** The gateway sends `PII_GUARD_UPSTREAM_API_KEY`
   upstream, never the client's token. Without an upstream key the client's own `Authorization`
-  is passed through (bring your own key); a pii-guard token sent as the bearer is removed first,
+  is passed through (bring your own key); a PII Guard token sent as the bearer is removed first,
   so send the token as `X-PII-Guard-Token` and your provider key as `Authorization`.
 
 ## Resource limits
@@ -616,16 +616,16 @@ received until the answer is built (non-streamed) or the stream has ended:
 | `upstream` | All time spent waiting on the upstream: headers, body or each stream read |
 | `unmask` | Restoring a stream, summed over its chunks |
 | `response` | Restoring a non-streamed answer and building the response |
-| `client` | Streams: time spent handing each event to the client (its read speed, network backpressure); neither pii-guard's work nor the upstream's |
+| `client` | Streams: time spent handing each event to the client (its read speed, network backpressure); neither PII Guard's work nor the upstream's |
 
 Derived fields:
 
 - `total_ms`, `upstream_ms` and **`overhead_ms = total_ms - upstream_ms - client`**: what
-  pii-guard added to the call. A slow-reading client makes a stream's `total_ms` longer, not
+  PII Guard added to the call. A slow-reading client makes a stream's `total_ms` longer, not
   its overhead.
 - Streams: `ttft_ms` (to the first event sent to the client), `upstream_ttft_ms` (the
   upstream's own time from send to its first data event) and **`added_ttft_ms = ttft_ms -
-  upstream_ttft_ms`**: the delay pii-guard added before the first token.
+  upstream_ttft_ms`**: the delay PII Guard added before the first token.
 - `detectors_ms`: each detector's own time summed over the texts of the request. Texts run
   concurrently, so these can add up to more than the `detect` stage.
 

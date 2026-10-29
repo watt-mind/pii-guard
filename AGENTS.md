@@ -2,7 +2,7 @@
 
 ## Project
 
-**pii-guard** is an open-source privacy gateway for AI agents: it detects personal data in
+**PII Guard** is an open-source privacy gateway for AI agents: it detects personal data in
 text, documents and images, replaces it with reversible keyed pseudonyms before a request
 reaches an LLM, and restores the real values in the (streamed) response. Hungarian first, other
 EU languages next. Built for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026).

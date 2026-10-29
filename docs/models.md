@@ -8,12 +8,12 @@
 
 | Job | Model | Where it runs | Sees real data? |
 |---|---|---|---|
-| Structured identifiers | Rules (no model) | pii-guard container | yes (inside the boundary) |
-| Names, organizations, addresses, dates of birth and (NER v2) contact and ID numbers the rules can't validate | Multilingual NER encoder (XLM-RoBERTa-base, open; GLiNER as an alternative backend) | pii-guard container (CPU / MPS / CUDA) | yes |
+| Structured identifiers | Rules (no model) | PII Guard container | yes (inside the boundary) |
+| Names, organizations, addresses, dates of birth and (NER v2) contact and ID numbers the rules can't validate | Multilingual NER encoder (XLM-RoBERTa-base, open; GLiNER as an alternative backend) | PII Guard container (CPU / MPS / CUDA) | yes |
 | Second-pass detection and adjudication (audit mode, opt-in; fast mode, rules + NER, is the production default) | **Muse Spark Open** (open weights), optionally fine-tuned; **Muse Glimmer** as a smaller local candidate | Baseten (`meta-models/muse-spark-open-1026`), or your own hardware | yes |
-| Faces, ID photos | **YuNet** (OpenCV model zoo, 0.23 MB, MIT; the default `hybrid` segmenter, see [Local segmentation](#local-segmentation)) | pii-guard container (CPU) | yes |
+| Faces, ID photos | **YuNet** (OpenCV model zoo, 0.23 MB, MIT; the default `hybrid` segmenter, see [Local segmentation](#local-segmentation)) | PII Guard container (CPU) | yes |
 | Signatures (and faces with `PII_GUARD_SEGMENTER=sam-api`) | **SAM 3.1** | Meta Model API, or a GPU endpoint (`PII_GUARD_SAM_URL`) | yes |
-| OCR | Open OCR engine | pii-guard container or GPU endpoint | yes |
+| OCR | Open OCR engine | PII Guard container or GPU endpoint | yes |
 | Synthetic corpus generation | **Muse** (Wonder for documents, Spark for variations) | Meta Model API | **no**: fictional data only |
 | The downstream model in the demo | **Muse Spark** | Meta Model API | **no**: only masked data |
 
@@ -56,7 +56,7 @@ would run, without downloading).
 
 1. **`PII_GUARD_NER_MODEL`**, a local directory or a hub id (with `PII_GUARD_NER_REVISION`).
    If it is set and can't load, startup stops (fail closed, ADR 0006).
-2. **The published pii-guard checkpoint**, the default:
+2. **The published PII Guard checkpoint**, the default:
    [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
    (`PII_GUARD_NER_PUBLISHED_MODEL`), release `v2.0` at revision
    `95f612a9ad65cc5ade5b9248bd152020541e7097`, `model.safetensors` SHA-256
@@ -96,7 +96,7 @@ data. Its labels are mapped in `LABEL_MAP` (`src/pii_guard/detect/ner.py`): `PER
 `PERSON`, `ORGANIZATION_NAME` → `ORGANIZATION`, `POSTAL_ADDRESS` and `LOCATION` → `ADDRESS`,
 `EMAIL_ADDRESS`, `PHONE_NUMBER`, `DOCUMENT_IDENTIFIER` and `PERSON_IDENTIFIER` →
 `ID_DOCUMENT`, `BANK_ACCOUNT_IDENTIFIER` and `PAYMENT_CARD` → `BANK_ACCOUNT`, `DATE_OF_BIRTH`.
-Its other classes (health data, IP addresses, amounts…) are not pii-guard types and are
+Its other classes (health data, IP addresses, amounts…) are not PII Guard types and are
 ignored.
 
 **Why this model.** The ticket's three options were GLiNER multi v2.1 through the `gliner`
@@ -128,7 +128,7 @@ extra, so `uvx`, `make demo` and the demo image need no second environment, unli
 3 `PERSON`, 2 `ID_DOCUMENT`). Not chosen:
 
 - its v2 and v3 successors (Apache-2.0, mmBERT base, 1.2 GB) score higher on their own card,
-  but need the card's word-level decoder; with pii-guard's first-sub-token decoder they cut
+  but need the card's word-level decoder; with PII Guard's first-sub-token decoder they cut
   names into fragments (LAB-1192 sanity check). LAB-1391 benchmarked v3 with a word-level
   decoder, next to `Horizon-Labs/pii-redactor-base` / `-small` and `Wismut/nym-pii-multilingual`:
   none leaks less than v1 on the smoke, hu-inflection and cee-pii sets with the rules (v3:
@@ -145,7 +145,7 @@ extra, so `uvx`, `make demo` and the demo image need no second environment, unli
   dates of birth. It still loads with `PII_GUARD_NER_MODEL=Davlan/xlm-roberta-base-ner-hrl`.
 - Fine-tuned: [`FacebookAI/xlm-roberta-base`](https://huggingface.co/FacebookAI/xlm-roberta-base)
   (MIT) trained with `training/ner/train.py` (`training/ner/config.toml`) on 223 synthetic hu+en
-  documents (`pii-guard eval generate --n 160 --seed 7`, train split). Labels are the pii-guard
+  documents (`pii-guard eval generate --n 160 --seed 7`, train split). Labels are the PII Guard
   types (`B-PERSON`, …), with token-level aggregation so Hungarian case suffixes can stay
   outside the span. About 18 minutes on an M1 Max (MPS); `--device cuda` for a GPU. Weights
   are not committed or published yet: train locally and set `PII_GUARD_NER_MODEL`.

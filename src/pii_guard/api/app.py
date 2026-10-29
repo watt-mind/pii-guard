@@ -157,7 +157,7 @@ def create_app(
             app.state.projects.close()
 
     app = FastAPI(
-        title="pii-guard",
+        title="PII Guard",
         version=__version__,
         description="Privacy firewall for AI agents: reversible PII masking.",
         lifespan=lifespan,

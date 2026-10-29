@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="pii-guard: a privacy gateway for AI agents. You send 'Email Jane Placeholder: jane@example.net', the model sees 'Email [[PERSON_7f3a]]: [[EMAIL_20c2]]', you get the real name back." width="100%">
+  <img src="docs/assets/banner.svg" alt="PII Guard: a privacy gateway for AI agents. You send 'Email Jane Placeholder: jane@example.net', the model sees 'Email [[PERSON_7f3a]]: [[EMAIL_20c2]]', you get the real name back." width="100%">
 </p>
 
 <p align="center"><b>Mask personal data before it reaches the LLM, and put it back in the answer. Built on Meta's open models; runs on your machine.</b></p>
@@ -14,7 +14,7 @@
 **For teams building AI agents in Europe's regulated professions** (legal, health, finance, HR,
 public sector). Their useful data is personal data: a case file, a referral letter, an HR
 folder. Under GDPR, sending it to a third-party model is a legal risk; not sending it means the
-agent can't do the job. pii-guard is a drop-in proxy in between: change one base URL, and every
+agent can't do the job. PII Guard is a drop-in proxy in between: change one base URL, and every
 name, address, ID and face is swapped for a reversible placeholder before the request leaves
 your network, then restored in the answer, even mid-stream and inside tool calls.
 
@@ -60,11 +60,11 @@ with 95 % intervals there.
 
 | Leak | Hand-written (de+en+hu, 51 docs) | Agent traffic (990) | Nemotron-PII (300) | CEE-PII (451) | Gretel finance (400) | Ai4Privacy (600) |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard fast** (rules + NER, on-device, $0) | **0.0 %** | **0.2 %** | **0.7 %** | **0.4 %** | 19.0 % | 0.4 % † |
+| **PII Guard fast** (rules + NER, on-device, $0) | **0.0 %** | **0.2 %** | **0.7 %** | **0.4 %** | 19.0 % | 0.4 % † |
 | PrivAiTe | 12.7 % | 2.4 % | 4.0 % | 4.4 % | 27.7 % | 9.5 % |
 | Presidio | 24.3 % | 12.4 % | 12.8 % | 36.5 % | **18.8 %** | 29.6 % |
 | LLM Guard | 45.1 % | 20.2 % | 28.8 % | 75.8 % | 59.3 % | 43.8 % ‡ |
-| pii-guard rules only (no name detection) | 41.6 % | 45.3 % | 56.0 % | 41.3 % | 80.8 % | 62.9 % |
+| PII Guard rules only (no name detection) | 41.6 % | 45.3 % | 56.0 % | 41.3 % | 80.8 % | 62.9 % |
 
 † **In-distribution:** the NER was trained on other rows of the same dataset (the OpenPII
 train split; no evaluated row was trained on). The same recipe trained without those rows
@@ -122,7 +122,7 @@ refused ([LAB-1299](docs/journey/2026-10-27-lab-1299-muse-1-4-14.md),
 [guide](docs/integrations/muse-code.md)). Sessions, headers, modes and settings:
 [docs/architecture-gateway.md](docs/architecture-gateway.md).
 
-## Why pii-guard
+## Why PII Guard
 
 - **Reversible, not redacted.** The answer names the real person, and every document in the
   hand-written set unmasks back to its original exactly.
@@ -156,7 +156,7 @@ screenshots were taken in fast mode without the NER, so free-text names stay rea
 | **Images:** face, photo, signature and printed values covered | **Logs:** every call, its masks and its timing |
 | [![Playground, Images tab: this server refuses images (no OCR, no face detector), so a fictional visitor badge replays regions recorded from a real SAM 3.1 run, and the model saw the face filled](docs/assets/demo/3-images.webp)](docs/assets/demo/3-images.webp) | [![Logs: calls through the gateway with their entity types, a call's details (mock upstream, session from the X-PII-Guard-Session header) and its timing waterfall](docs/assets/demo/6-traffic.webp)](docs/assets/demo/6-traffic.webp) |
 | **Overview:** what the guard protected, from real calls only | **Evaluation:** leak against latency, from the run records |
-| [![Overview: requests, values masked, requests blocked and pii-guard overhead counted from the traffic log, top entity types and latency per stage](docs/assets/demo/7-traffic-charts.webp)](docs/assets/demo/7-traffic-charts.webp) | [![Evaluation: the benchmark headline, fixture sets, languages and systems to compare](docs/assets/demo/4-benchmarks.webp)](docs/assets/demo/4-benchmarks.webp) |
+| [![Overview: requests, values masked, requests blocked and PII Guard overhead counted from the traffic log, top entity types and latency per stage](docs/assets/demo/7-traffic-charts.webp)](docs/assets/demo/7-traffic-charts.webp) | [![Evaluation: the benchmark headline, fixture sets, languages and systems to compare](docs/assets/demo/4-benchmarks.webp)](docs/assets/demo/4-benchmarks.webp) |
 
 At phone width: [Text](docs/assets/demo/5-mask-mobile.webp) ·
 [Logs](docs/assets/demo/8-traffic-mobile.webp). Connect: [copyable commands per client](docs/assets/demo/9-connect.webp). The screens: [ui/README.md](ui/README.md#screens).
@@ -189,7 +189,7 @@ make smoke          # rules only, offline (CI runs it)
 `make demo` runs **fast mode with the NER** from a clean checkout: it installs the `ner` extra
 and, without `PII_GUARD_NER_MODEL`, downloads a NER model once (about 1.1 GB, pinned
 revision, SHA-256 checked, into `~/.cache/pii-guard/models`; the banner says which model
-runs): pii-guard's own NER, [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
+runs): PII Guard's own NER, [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
 `v2.0` (XLM-R base, Apache-2.0; [model card](training/ner/model-card.md)). Free-text names are then masked with no known values, in the gateway and on the Mask and
 Images screens alike. `make demo MODE=rules` is rules only: offline, no download, names need
 known values. Which model and why: [models.md](docs/models.md#which-ner-model-fast-mode-runs).
@@ -211,7 +211,7 @@ with CPU-only torch; [operations.md](docs/operations.md#docker)). More:
  your app / agent ◄───┘
 ```
 
-The mapping between real values and placeholders **never leaves pii-guard**. Design and
+The mapping between real values and placeholders **never leaves PII Guard**. Design and
 engineering choices: [docs/architecture.md](docs/architecture.md); threat model:
 [docs/privacy-model.md](docs/privacy-model.md); everything else: [docs/INDEX.md](docs/INDEX.md).
 
@@ -222,7 +222,7 @@ engineering choices: [docs/architecture.md](docs/architecture.md); threat model:
 ## Contributing, security, license
 
 See [CONTRIBUTING.md](CONTRIBUTING.md); the rule that matters most: **never commit real
-personal data**, not even in a test. **No authentication by default:** keep pii-guard on
+personal data**, not even in a test. **No authentication by default:** keep PII Guard on
 loopback or behind an authenticating proxy, or set `PII_GUARD_API_TOKEN`
 ([operations.md](docs/operations.md#exposure-and-authentication)). Found a way to make personal
 data leak past the guard? Report it privately: [SECURITY.md](SECURITY.md).

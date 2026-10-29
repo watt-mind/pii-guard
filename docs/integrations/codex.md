@@ -1,4 +1,4 @@
-# Codex behind pii-guard
+# Codex behind PII Guard
 
 [Codex](https://github.com/openai/codex) (OpenAI's coding agent, `npm i -g @openai/codex`)
 speaks the OpenAI **Responses API**. It runs through the gateway's `POST /v1/responses` with a

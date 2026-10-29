@@ -58,10 +58,10 @@ an NER-only value into those positions either. `PII_GUARD_NER_AGENT_TEXT=false` 
 The NER detector (`pii_guard.detect.ner`) reports a subset of the types above. A v1 checkpoint
 (LAB-1106, LAB-1128) knows four; a v2 checkpoint (LAB-1150) also proposes identifiers, so a
 number whose checksum fails or whose format no rule knows is still masked. Labels are the
-pii-guard type names (`B-PHONE`, `I-NATIONAL_ID_HU_TAX`, …), so they map one to one. GLiNER
+PII Guard type names (`B-PHONE`, `I-NATIONAL_ID_HU_TAX`, …), so they map one to one. GLiNER
 (`pii_guard.detect.ner_gliner`) is asked for natural-language label names, mapped the same way.
 
-| NER label (v2) | pii-guard type | Trained from | GLiNER label name |
+| NER label (v2) | PII Guard type | Trained from | GLiNER label name |
 |---|---|---|---|
 | `PERSON` | `PERSON` | corpus gold + Glimmer, OpenPII `GIVENNAME`+`SURNAME` | person |
 | `ADDRESS` | `ADDRESS` | corpus gold, OpenPII `STREET`, `BUILDINGNUM`, `ZIPCODE`, `CITY` in an address | street address |
@@ -82,7 +82,7 @@ any other span. Corpus gold of a type the NER isn't trained on (plates, parcel a
 numbers) is left out of the loss, never taught as "not personal data". Titles, ages, gender
 and a town on its own stay `O`, as the policy keeps them.
 
-Not in the label set: **usernames, IP addresses and URLs with an identity in them.** pii-guard
+Not in the label set: **usernames, IP addresses and URLs with an identity in them.** PII Guard
 has no entity type for them yet (adding one is a taxonomy and policy change, not a model
 change), and neither training source labels them. Tracked as a follow-up.
 
