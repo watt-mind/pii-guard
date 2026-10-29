@@ -3,9 +3,12 @@ import {
   documentCount,
   formatMs,
   formatPct,
+  groupOf,
   headline,
   type HeadlineSide,
   languageName,
+  originKind,
+  type SystemGroup,
   coverageTag,
   FAST_MODE_SYSTEM,
   tidyLabels,
@@ -25,8 +28,10 @@ import {
   type LanguageFilter,
   type Metrics,
   type Snapshot,
+  type SystemInfo,
 } from "../api/benchmarks";
-import { Button, Metric, Notice, PageHeader, SegmentedControl } from "../components/ui";
+import { SOURCE } from "../hosted/session";
+import { Button, Metric, Notice, PageHeader, SegmentedControl, Select } from "../components/ui";
 import { LanguageBars, LeakLatencyChart, MarkerIcon, ProgressChart, TypeHeatmap } from "./BenchmarksCharts";
 
 /** Internal ticket ids ("(LAB-1150)", ", LAB-1128)") are maintainer context, not reader copy. */
@@ -35,6 +40,7 @@ function stripTickets(text: string): string {
     .replace(/,\s*LAB-\d+(?=\))/g, "")
     .replace(/\s*\(LAB-\d+\)/g, "")
     .replace(/\bLAB-\d+:?\s*/g, "")
+    .replace(/\bpii-guard(?= (?:NER|rules|fast|audit|LLM|gateway)\b)/g, "PII Guard")
     .trim();
 }
 
@@ -47,50 +53,84 @@ function withoutTickets(index: BenchmarkIndex): BenchmarkIndex {
 
 type Load = { state: "loading" } | { state: "ready"; index: BenchmarkIndex } | { state: "error"; message: string };
 type SetLoad = { state: "ready"; data: SetResults } | { state: "error"; message: string };
+/** The run log, when the source sends it apart from the summary: null while it loads. */
+type RunsLoad = BenchmarkIndex["runs"] | null | { error: string };
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+const DOCS = `${SOURCE}/blob/develop/docs`;
+const MODEL_CARD = "https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base";
 
 /**
  * Every recorded evaluation run, browsable: the same data as docs/benchmarks.md, read from
  * the index shipped with the page (so it works in demo mode, without the API). The summary
- * loads first; each fixture set's results load when the set is picked (LAB-1454).
+ * loads first; each fixture set's results load when the set is picked (LAB-1454), and the run
+ * log arrives on its own without holding up the headline (LAB-1493).
  */
 export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader }) {
   const source = useMemo(() => sourceOf(load), [load]);
   const [data, setData] = useState<Load>({ state: "loading" });
+  const [runs, setRuns] = useState<RunsLoad>(null);
   useEffect(() => {
     let live = true;
     source.summary().then(
       (index) => live && setData({ state: "ready", index: withoutTickets(tidyLabels(index)) }),
       (err: unknown) => live && setData({ state: "error", message: messageOf(err) }),
     );
+    source.runs?.().then(
+      (part) => live && setRuns(part.runs),
+      (err: unknown) => live && setRuns({ error: messageOf(err) }),
+    );
     return () => {
       live = false;
     };
   }, [source]);
+  // A source without `runs()` puts the run log in the summary.
+  const runLog = source.runs ? runs : data.state === "ready" ? data.index.runs : null;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Evaluation"
-        lead="How much personal data gets through, measured on every run. Each evaluation run of PII Guard, and of the open-source tools it is compared with, is recorded with its commit, models, fixtures and hardware. All test documents are fictional."
-      />
-      {data.state === "loading" && (
-        <p role="status" className="text-sm text-muted">
-          Loading benchmark results…
+        lead="How much personal data gets through. Every evaluation run of PII Guard, and of the open-source tools it is compared with, is recorded with its commit (and whether the working tree had uncommitted changes), models, fixtures and hardware. All test documents are fictional or come from public test sets."
+      >
+        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <a className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink" href={`${DOCS}/evaluation.md`}>
+            How we measure
+          </a>
+          <a className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink" href={`${DOCS}/benchmarks.md`}>
+            All results and run records
+          </a>
+          <a className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink" href={MODEL_CARD}>
+            NER model card
+          </a>
         </p>
+      </PageHeader>
+      {data.state === "loading" && (
+        <div role="status" aria-label="Loading benchmark results" className="space-y-2 border-l-2 border-line py-1 pl-4">
+          <div className="h-5 w-3/4 max-w-2xl animate-pulse rounded bg-surface-2 motion-reduce:animate-none" />
+          <div className="h-3 w-1/2 max-w-xl animate-pulse rounded bg-surface-2 motion-reduce:animate-none" />
+        </div>
       )}
       {data.state === "error" && (
         <Notice tone="danger" live title="The benchmark results could not be loaded.">
           <p className="text-muted">{data.message}</p>
         </Notice>
       )}
-      {data.state === "ready" && <Explorer summary={data.index} source={source} />}
+      {data.state === "ready" && <Explorer summary={data.index} runLog={runLog} source={source} />}
     </div>
   );
 }
 
-function Explorer({ summary, source }: { summary: BenchmarkIndex; source: BenchmarkSource }) {
+const GROUPS: { id: SystemGroup; label: string; hint?: string }[] = [
+  { id: "ours", label: "PII Guard" },
+  { id: "other-model", label: "Other open models", hint: "Someone else's model in PII Guard's pipeline" },
+  { id: "tool", label: "Open-source tools" },
+];
+
+function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; runLog: RunsLoad; source: BenchmarkSource }) {
+  const runsReady = Array.isArray(runLog);
+  const summary = useMemo(() => (Array.isArray(runLog) ? { ...base, runs: runLog } : base), [base, runLog]);
   const sets = useMemo(() => textSets(summary), [summary]);
   const [set, setSet] = useState(sets[0] ?? "");
   // Each set's results, fetched the first time the set is picked and kept.
@@ -108,55 +148,88 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
     };
   }, [source, set, part]);
   const ready = part?.state === "ready";
+  const opened = Object.values(loaded).some((p) => p.state === "ready");
   const index = useMemo(() => (part?.state === "ready" ? { ...summary, ...part.data } : summary), [summary, part]);
   const [lang, setLang] = useState<LanguageFilter>("all");
   const available = useMemo(() => systemsOn(index, set), [index, set]);
   const featured = useMemo(() => available.filter((k) => index.systems[k]?.featured), [available, index]);
   const [chosen, setChosen] = useState<string[] | null>(null); // null: the featured systems
+  const [allSystems, setAllSystems] = useState(false);
   const selected = (chosen ?? (featured.length ? featured : available)).filter((k) => available.includes(k));
   const info = index.fixture_sets[set];
   const languages = info?.languages ?? [];
   const snapshots = snapshotsFor(index, set, selected);
   const history = index.history.filter(
-    (h) => h.fixture_set === set && selected.includes(h.system) && index.systems[h.system]?.family === "pii-guard",
+    (h) => h.fixture_set === set && selected.includes(h.system) && groupOf(index.systems[h.system]) === "ours",
   );
-  const lastRun = index.runs.length ? index.runs[index.runs.length - 1]!.date : "–";
+  const lastRun = runsReady && index.runs.length ? index.runs[index.runs.length - 1]!.date : "–";
+  // Collapsed, the picker shows the featured systems and whatever else is selected.
+  const shown = allSystems ? available : available.filter((k) => featured.includes(k) || selected.includes(k));
+  const hiddenCount = available.length - shown.length;
+  const setsByKind = useMemo(() => {
+    const kinds = new Map<string, string[]>();
+    for (const s of sets) {
+      const k = originKind(summary.fixture_sets[s]);
+      kinds.set(k, [...(kinds.get(k) ?? []), s]);
+    }
+    const order = ["hand-written", "mixed origin", "generated"];
+    return [...kinds.entries()].sort(([a], [b]) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+  }, [sets, summary]);
 
   const toggle = (k: string) => {
-    const base = selected;
-    setChosen(base.includes(k) ? base.filter((x) => x !== k) : available.filter((x) => base.includes(x) || x === k));
+    const now = selected;
+    setChosen(now.includes(k) ? now.filter((x) => x !== k) : available.filter((x) => now.includes(x) || x === k));
   };
 
   return (
     <>
-      <dl className="flex flex-wrap gap-x-8 gap-y-3">
-        <Metric label="Runs" value={index.runs.length} />
-        <Metric label="Systems" value={Object.keys(index.systems).length} />
-        <Metric label="Fixture sets" value={`${sets.length} text + ${Object.values(index.fixture_sets).filter((f) => f.kind === "visual").length} image`} />
-        <Metric label="Latest run" value={lastRun} />
-      </dl>
+      {ready ? <Headline index={index} set={set} lang={lang} /> : <SetStatus set={set} part={part} />}
 
-      {ready && <Headline index={index} set={set} lang={lang} />}
-
+      {/* Until the first set's results land, only the headline placeholder shows: nothing below it
+          jumps when they arrive (layout shift, LAB-1493). */}
+      {!opened ? null : (
+      <>
       <section aria-label="Filters" className="space-y-4 rounded-xl border border-line bg-surface p-4 sm:p-5">
-        <Segmented
-          label="Fixture set"
-          value={set}
-          options={sets.map((s) => ({ id: s, label: s, hint: index.fixture_sets[s]?.origin === "generated" ? "generated" : "hand-written" }))}
-          onChange={(s) => {
-            setSet(s);
-            if (lang !== "all" && !index.fixture_sets[s]?.languages.includes(lang)) setLang("all");
-          }}
-        />
-        <Segmented
-          label="Language"
-          value={lang}
-          options={[{ id: "all", label: "All, pooled" }, ...languages.map((l) => ({ id: l, label: languageName(l) }))]}
-          onChange={setLang}
-        />
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
+          <div className="min-w-0">
+            <label htmlFor="bench-set" className="mb-2 block text-xs font-medium text-muted">
+              Fixture set
+            </label>
+            <Select
+              id="bench-set"
+              value={set}
+              className="w-full sm:w-auto sm:min-w-[18rem]"
+              onChange={(e) => {
+                const s = e.target.value;
+                setSet(s);
+                if (lang !== "all" && !index.fixture_sets[s]?.languages.includes(lang)) setLang("all");
+              }}
+            >
+              {setsByKind.map(([kind, keys]) => (
+                <optgroup key={kind} label={kind.charAt(0).toUpperCase() + kind.slice(1)}>
+                  {keys.map((s) => (
+                    <option key={s} value={s}>
+                      {s} · {documentCount(summary.fixture_sets[s], "all") ?? "?"} docs
+                      {s === summary.headline_set ? " · headline" : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </Select>
+          </div>
+          <Segmented
+            label="Language"
+            value={lang}
+            options={[{ id: "all", label: "All, pooled" }, ...languages.map((l) => ({ id: l, label: languageName(l) }))]}
+            onChange={setLang}
+          />
+        </div>
         <fieldset className="min-w-0">
           <legend className="mb-2 flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-muted">
             Systems
+            <span className="font-normal">
+              {selected.length} of {available.length} shown
+            </span>
             <span className="flex gap-1">
               <Button variant="ghost" size="sm" onClick={() => setChosen(null)}>
                 Select featured
@@ -167,39 +240,26 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
             </span>
           </legend>
           <div className="space-y-2">
-            {!ready && <SetStatus set={set} part={part} />}
-            {ready && (["pii-guard", "comparison"] as const).map((family) => {
-              const keys = available.filter((k) => index.systems[k]?.family === family);
-              if (!keys.length) return null;
-              return (
-                <div key={family} className="flex flex-wrap items-center gap-1.5">
-                  <span className="w-full text-xs text-muted sm:w-28 sm:shrink-0">{family === "pii-guard" ? "PII Guard" : "Open-source tools"}</span>
-                  {keys.map((k) => {
-                    const sys = index.systems[k];
-                    const on = selected.includes(k);
-                    return (
-                      <label
-                        key={k}
-                        title={sys?.label}
-                        className={[
-                          "relative inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
-                          on ? "border-ink bg-surface-2 text-ink" : "border-line text-muted hover:border-line-strong",
-                        ].join(" ")}
-                      >
-                        <input type="checkbox" className="sr-only" checked={on} onChange={() => toggle(k)} />
-                        <MarkerIcon info={sys} />
-                        {sys?.short_label ?? k}
-                        {k === FAST_MODE_SYSTEM && (
-                          <span title="Rules + the on-device NER: the gateway's fast mode, its production path. Without a NER checkpoint, fast mode runs the rules alone." className="rounded-sm bg-surface-2 px-1 font-mono text-2xs text-muted ring-1 ring-line">
-                            fast mode
-                          </span>
-                        )}
-                      </label>
-                    );
-                  })}
-                </div>
-              );
-            })}
+            {ready &&
+              GROUPS.map((group) => {
+                const keys = shown.filter((k) => groupOf(index.systems[k]) === group.id);
+                if (!keys.length) return null;
+                return (
+                  <div key={group.id} className="flex flex-wrap items-center gap-1.5">
+                    <span className="w-full text-xs text-muted sm:w-32 sm:shrink-0" title={group.hint}>
+                      {group.label}
+                    </span>
+                    {keys.map((k) => (
+                      <SystemChip key={k} id={k} info={index.systems[k]} on={selected.includes(k)} onToggle={() => toggle(k)} />
+                    ))}
+                  </div>
+                );
+              })}
+            {ready && (hiddenCount > 0 || allSystems) && (
+              <Button variant="ghost" size="sm" className="-ml-2" aria-expanded={allSystems} onClick={() => setAllSystems((v) => !v)}>
+                {allSystems ? "Show featured systems only" : `More systems (${hiddenCount})`}
+              </Button>
+            )}
             {ready && Object.values(index.systems).some((v) => v.family === "comparison") && !available.some((k) => index.systems[k]?.family === "comparison") && (
               <p className="text-xs text-muted">The open-source tools weren’t run on this set; pick another set to compare with them.</p>
             )}
@@ -212,7 +272,7 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
         {lang === "all"
           ? languages.map((l) => `${info?.documents[l] ?? "?"} ${languageName(l)}`).join(" + ") + " documents"
           : `${documentCount(info, lang) ?? "?"} ${languageName(lang)} documents`}
-        . Small sets: a few points of difference is noise.
+        .{(documentCount(info, lang) ?? 0) < 200 ? " Small set: a few points of difference is noise." : ""}
       </p>
       {info?.origin === "generated" && (
         <p role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
@@ -228,7 +288,7 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
         <>
           <Section id="bench-table" title="Results" note="Latest run of each system. Leak = labelled values still readable after masking. Underlined: the best value among systems run on every language.">
             <ResultsTable snapshots={snapshots} index={index} lang={lang} />
-            <RunNotes key={set} snapshots={snapshots} index={index} open={info?.origin === "generated"} />
+            <RunNotes key={set} snapshots={snapshots} index={index} open={info?.origin === "generated"} loading={!runsReady} />
           </Section>
           <Section id="bench-scatter" title="Leak rate vs latency" note="Down and left is better. Latency was measured where each system ran, so it is not a like-for-like speed test.">
             <LeakLatencyChart points={snapshots.flatMap((s) => {
@@ -237,7 +297,7 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
             })} />
           </Section>
           <Section id="bench-lang" title="By language" note="The same fixture set in each language.">
-            <LanguageBars snapshots={snapshots} systems={index.systems} languages={languages} />
+            <LanguageBars snapshots={snapshots} systems={index.systems} languages={languages} highlight={FAST_MODE_SYSTEM} />
           </Section>
           <Section id="bench-progress" title="Leak rate over time" note="Each PII Guard configuration, run by run. Dashed: the best result of any configuration so far, so a drop can mean a new configuration rather than an improved one.">
             <ProgressChart history={history} systems={index.systems} lang={lang} />
@@ -250,7 +310,7 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
               ))}
             </ul>
           </Section>
-          <Section id="bench-types" title="Recall per entity type" note="Share of labelled values of each type found (overlap), in %.">
+          <Section id="bench-types" title="Recall per entity type" note="Share of labelled values of each type found with the right type (overlap), in %. Leak doesn't look at types: a value masked under another type is protected, so it costs recall here but not leak.">
             <TypeHeatmap snapshots={snapshots} systems={index.systems} types={index.entity_types} lang={lang} />
           </Section>
         </>
@@ -262,23 +322,66 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
         </Section>
       )}
 
+      <dl className="flex flex-wrap gap-x-8 gap-y-3">
+        <Metric label="Runs recorded" value={runsReady ? index.runs.length : "–"} />
+        <Metric label="Systems" value={Object.keys(index.systems).length} />
+        <Metric label="Fixture sets" value={`${sets.length} text + ${Object.values(index.fixture_sets).filter((f) => f.kind === "visual").length} image`} />
+        <Metric label="Latest run" value={lastRun} />
+      </dl>
+
       <details className="group rounded-xl border border-line bg-surface">
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink sm:px-5">
           <span className="mr-1.5 inline-block transition-transform group-open:rotate-90" aria-hidden="true">
             ›
           </span>
-          Run log ({index.runs.length} runs)
+          Run log {runsReady ? `(${index.runs.length} runs)` : ""}
         </summary>
         <p className="px-4 pb-3 text-xs text-muted sm:px-5">
           Audit mode used to be called <code className="font-mono">strict</code>: runs recorded before the rename keep that name in their IDs and keys.
         </p>
-        <RunLog index={index} />
+        {runsReady ? (
+          <RunLog index={index} />
+        ) : runLog && "error" in runLog ? (
+          <p role="alert" className="px-4 pb-3 text-sm text-danger sm:px-5">The run log could not be loaded: {runLog.error}</p>
+        ) : (
+          <p role="status" className="px-4 pb-3 text-sm text-muted sm:px-5">Loading the run log…</p>
+        )}
       </details>
+      </>
+      )}
       <p className="text-xs text-faint">
         Generated by <code className="font-mono">pii-guard eval report</code> from <code className="font-mono">eval/results/runs/</code>. Add a run with{" "}
         <code className="font-mono">pii-guard eval --record &lt;slug&gt;</code>.
       </p>
     </>
+  );
+}
+
+function SystemChip({ id, info, on, onToggle }: { id: string; info: SystemInfo | undefined; on: boolean; onToggle: () => void }) {
+  return (
+    <label
+      title={info?.label}
+      className={[
+        "relative inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
+        on ? "border-ink bg-surface-2 text-ink" : "border-line text-muted hover:border-line-strong",
+      ].join(" ")}
+    >
+      <input type="checkbox" className="sr-only" checked={on} onChange={onToggle} />
+      <MarkerIcon info={info} />
+      {info?.short_label ?? id}
+      {id === FAST_MODE_SYSTEM && <FastModeTag />}
+    </label>
+  );
+}
+
+function FastModeTag() {
+  return (
+    <span
+      title="Rules + the published on-device NER v2.0: the gateway's fast mode, its production path. Without a NER checkpoint, fast mode runs the rules alone."
+      className="rounded-sm bg-guard-soft px-1 font-mono text-2xs whitespace-nowrap text-guard-ink ring-1 ring-guard/40"
+    >
+      fast mode
+    </span>
   );
 }
 
@@ -291,37 +394,54 @@ function SetStatus({ set, part }: { set: string; part: SetLoad | undefined }) {
       </Notice>
     );
   return (
-    <p role="status" className="text-sm text-muted">
-      Loading results for {set}…
-    </p>
+    <div role="status" aria-label={`Loading results for ${set}`} className="space-y-2 border-l-2 border-line py-1 pl-4">
+      <div className="h-5 w-3/4 max-w-2xl animate-pulse rounded bg-surface-2 motion-reduce:animate-none" />
+      <div className="h-3 w-1/2 max-w-xl animate-pulse rounded bg-surface-2 motion-reduce:animate-none" />
+    </div>
   );
+}
+
+function dateSpan(dates: string[]): string {
+  const ds = [...new Set(dates)].sort();
+  return ds.length > 1 ? `${ds[0]} to ${ds[ds.length - 1]}` : (ds[0] ?? "–");
 }
 
 function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; lang: LanguageFilter }) {
   const h = headline(index, set, lang);
-  if (!h) return null;
-  const docs = documentCount(index.fixture_sets[set], lang);
   const info = index.fixture_sets[set];
-  const kind = info?.origin === "generated" ? "model-generated" : "hand-written";
-  const scope = `${docs ?? "?"} ${kind} fictional ${lang === "all" ? "" : `${languageName(lang)} `}documents`;
+  if (!h) return null;
+  const docs = documentCount(info, lang);
+  const kind = originKind(info);
+  const where = lang === "all" ? (info?.languages ?? []).map(languageName) : [languageName(lang)];
+  const inLangs = where.length > 1 ? `${where.slice(0, -1).join(", ")} and ${where[where.length - 1]}` : where[0];
+  const scope = `${docs ?? "?"} ${kind === "generated" ? "model-generated" : kind.replace(" ", "-")} ${inLangs} documents`;
   const pct = (x: HeadlineSide) => <strong className="font-medium tabular-nums text-ink">{formatPct(x.leak)}</strong>;
-  const demo = index.snapshots.find((x) => x.fixture_set === set && x.system === FAST_MODE_SYSTEM);
-  const demoLeak = demo ? pick(demo, lang)?.leak : null;
-  const speed = (x: HeadlineSide) => (x.p50 === null ? "" : `${x.label}: ${formatMs(x.p50)} per document${x.hardware ? ` (${x.hardware})` : ""}`);
   return (
     <div className="border-l-2 border-guard py-1 pl-4" data-testid="bench-headline">
       <p className="text-base text-pretty text-ink sm:text-lg">
-        On {scope}, PII Guard lets {pct(h.ours)} of personal values through, against {pct(h.theirs)} for the best open-source tool.
-        {demo && demoLeak !== null && demoLeak !== undefined && demo.system !== h.ours.system && (
+        On {scope} ({set}),{" "}
+        {h.fastMode ? (
           <>
-            {" "}
-            Fast mode, the production path (rules + on-device NER): <strong className="font-medium tabular-nums text-ink">{formatPct(demoLeak)}</strong>.
+            PII Guard’s fast mode lets {pct(h.ours)} of personal values through.
+          </>
+        ) : (
+          <>
+            PII Guard’s best configuration here, {h.ours.label}, lets {pct(h.ours)} of personal values through.
+          </>
+        )}{" "}
+        The best open-source tool, {h.theirs.label}, lets {pct(h.theirs)} through.
+      </p>
+      <p className="mt-1 max-w-4xl text-xs text-pretty text-muted">
+        {h.fastMode ? "Fast mode is the production path: rules + the published on-device NER v2.0. " : "Fast mode wasn’t run on this set. "}
+        {set === index.headline_set && kind === "hand-written" && "This is our own hand-written regression set; pick a public test set above (cee-pii, nemotron-pii …) to check it on data we didn’t write. "}
+        F1 {formatPct(h.ours.f1)} against {formatPct(h.theirs.f1)}; over-masking (masked text that wasn’t personal data) {formatPct(h.ours.over_masking)} against {formatPct(h.theirs.over_masking)}.{" "}
+        {h.otherModel && (
+          <>
+            Best other open NER model with the same rules (switch it on under More systems): {h.otherModel.label}, {formatPct(h.otherModel.leak)}.{" "}
           </>
         )}
-      </p>
-      <p className="mt-1 text-xs text-muted">
-        Best PII Guard configuration: {h.ours.label}. Best tool: {h.theirs.label}. Leak = labelled personal values still readable after masking. Speed was
-        measured where each ran, so it isn't a like-for-like test: {[speed(h.ours), speed(h.theirs)].filter(Boolean).join("; ")}.
+        Leak = labelled personal values still readable after masking. Runs of {dateSpan(h.ours.dates)} (PII Guard) and {dateSpan(h.theirs.dates)} ({h.theirs.label}); speed was measured where each ran, so see the
+        table and “Where these ran” before comparing it.
       </p>
     </div>
   );
@@ -397,6 +517,13 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
   const rows = snapshots
     .map((s) => ({ s, m: pick(s, lang) }))
     .sort((a, b) => {
+      // Pooled, a system run on only some languages is listed after those run on all of them:
+      // its numbers cover fewer documents, so it doesn't lead the table (LAB-1493).
+      if (lang === "all") {
+        const pa = coverageTag(index, a.s) ? 1 : 0;
+        const pb = coverageTag(index, b.s) ? 1 : 0;
+        if (pa !== pb) return pa - pb;
+      }
       const va = a.m?.[sort.key] ?? null;
       const vb = b.m?.[sort.key] ?? null;
       if (va === null) return vb === null ? 0 : 1; // not run / not measured: always last
@@ -422,6 +549,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
       <table className="w-full min-w-max text-sm">
         <caption className="sr-only">
           Results per system, sorted by {COLUMNS.find((c) => c.key === sort.key)!.label}, {sort.dir === "asc" ? "lowest" : "highest"} first
+          {lang === "all" ? "; systems not run on every language are listed last" : ""}
         </caption>
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">
@@ -445,7 +573,7 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                 </button>
               </th>
             ))}
-            <th scope="col" className="hidden px-2 py-2 text-left font-medium xl:table-cell">
+            <th scope="col" className="hidden px-2 py-2 text-left font-medium min-[1400px]:table-cell">
               Run
             </th>
           </tr>
@@ -453,37 +581,43 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
         <tbody>
           {rows.map(({ s, m }) => {
             const sys = index.systems[s.system];
+            const fast = s.system === FAST_MODE_SYSTEM;
             return (
-              <tr key={s.system} className="border-b border-line last:border-0">
-                <th scope="row" title={sys?.label ?? s.system} className="sticky left-0 z-10 max-w-[9.5rem] bg-surface py-2 pr-3 text-left font-medium whitespace-nowrap text-ink sm:max-w-none">
-                  <span className="flex items-center gap-1.5 overflow-hidden">
-                    <MarkerIcon info={sys} />
-                    {sys?.short_label ?? s.system}
-                    {s.system === FAST_MODE_SYSTEM && (
-                      <span className="rounded-sm bg-surface-2 px-1 font-mono text-2xs text-muted ring-1 ring-line">
-                        fast mode
-                      </span>
-                    )}
-                    {lang === "all" && coverageTag(index, s) && (
-                      <span
-                        title="Not run on every language of this set, so its pooled numbers cover fewer documents than the other rows."
-                        className="rounded-sm px-1 font-mono text-2xs text-warn ring-1 ring-warn/40"
-                      >
-                        {coverageTag(index, s)}
-                      </span>
-                    )}
+              <tr key={s.system} className={["border-b border-line last:border-0", fast ? "bg-guard-soft" : ""].join(" ")}>
+                <th
+                  scope="row"
+                  title={sys?.label ?? s.system}
+                  className={["sticky left-0 z-10 max-w-[9.5rem] overflow-hidden py-2 pr-3 text-left font-medium text-ink sm:max-w-[17rem]", fast ? "bg-guard-soft pl-2 shadow-[inset_2px_0_0_var(--guard)]" : "bg-surface"].join(" ")}
+                >
+                  <span className="flex items-start gap-1.5">
+                    <span className="mt-[3px] shrink-0"><MarkerIcon info={sys} /></span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
+                      {sys?.short_label ?? s.system}
+                      {fast && <> <FastModeTag /></>}
+                      {lang === "all" && coverageTag(index, s) && (
+                        <>
+                          {" "}
+                          <span
+                            title="Not run on every language of this set, so its pooled numbers cover fewer documents than the other rows."
+                            className="rounded-sm px-1 font-mono text-2xs whitespace-nowrap text-warn ring-1 ring-warn/40"
+                          >
+                            {coverageTag(index, s)}
+                          </span>
+                        </>
+                      )}
+                    </span>
                   </span>
                 </th>
                 {COLUMNS.map((c) => {
                   const v = m?.[c.key] ?? null;
-                  const top = v !== null && v === best(c.key, c.better) && rows.length > 1;
+                  const top = v !== null && v === best(c.key, c.better) && rows.length > 1 && (lang !== "all" || !coverageTag(index, s));
                   return (
-                    <td key={c.key} className={["px-2 py-2 text-right tabular-nums whitespace-nowrap", top ? "font-medium text-ink underline decoration-line-strong decoration-2 underline-offset-4" : "text-muted"].join(" ")}>
+                    <td key={c.key} className={["px-2 py-2 text-right tabular-nums whitespace-nowrap", top ? "font-medium text-ink underline decoration-line-strong decoration-2 underline-offset-4" : fast ? "text-ink" : "text-muted"].join(" ")}>
                       {m === null ? <span className="text-faint">not run</span> : c.key === "detect_p50_ms" ? formatMs(v) + (m.latency_pooled ? "*" : "") : formatPct(v)}
                     </td>
                   );
                 })}
-                <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted xl:table-cell" title={`Commit ${s.commits.map((c) => c.slice(0, 7)).join(", ")}`}>
+                <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted min-[1400px]:table-cell" title={`Commit ${s.commits.map((c) => c.slice(0, 7)).join(", ")}`}>
                   {s.dates.join(", ")}
                 </td>
               </tr>
@@ -500,7 +634,15 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
 }
 
 /** Where each result ran and what to keep in mind (training data overlap, remote API …). */
-function RunNotes({ snapshots, index, open }: { snapshots: Snapshot[]; index: BenchmarkIndex; open: boolean }) {
+function RunNotes({ snapshots, index, open, loading = false }: { snapshots: Snapshot[]; index: BenchmarkIndex; open: boolean; loading?: boolean }) {
+  // While the run log loads, the disclosure keeps its place so the charts below don't move.
+  if (loading)
+    return (
+      <details className="mt-4 rounded-xl border border-line bg-surface-2">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-ink">Where these ran, and caveats</summary>
+        <p role="status" className="border-t border-line px-3 py-3 text-xs text-muted">Loading the run log…</p>
+      </details>
+    );
   const runs = new Map(index.runs.map((r) => [r.run_id, r]));
   const items = snapshots
     .map((s) => {

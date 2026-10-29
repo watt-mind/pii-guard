@@ -32,66 +32,66 @@
 <text x="1083.3" y="256.7" font-size="19" fill="#1B1B1F">35.1</text>
 <rect x="866.8" y="264.7" width="491.8" height="11.6" fill="#332288"/>
 <text x="1366.6" y="272.3" font-size="19" fill="#1B1B1F">82.9</text>
-<circle cx="66" cy="321.4" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="329.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)</text>
-<rect x="866.8" y="292.3" width="188.4" height="11.6" fill="#4A4A52"/>
-<text x="1063.2" y="299.9" font-size="19" fill="#1B1B1F">31.8</text>
+<circle cx="66" cy="321.4" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="329.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
+<rect x="866.8" y="292.3" width="20.9" height="11.6" fill="#4A4A52"/>
+<text x="895.7" y="299.9" font-size="19" fill="#1B1B1F">3.5</text>
 <rect x="866.8" y="307.9" width="2" height="11.6" fill="#117733"/>
 <text x="876.8" y="315.4" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="866.8" y="323.4" width="39.3" height="11.6" fill="#CC6677"/>
-<text x="914.1" y="331" font-size="19" fill="#1B1B1F">6.6</text>
-<rect x="866.8" y="339" width="308" height="11.6" fill="#332288"/>
-<text x="1182.8" y="346.6" font-size="19" fill="#1B1B1F">51.9</text>
-<circle cx="66" cy="395.7" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="403.7" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)</text>
-<rect x="866.8" y="366.6" width="51.8" height="11.6" fill="#4A4A52"/>
-<text x="926.6" y="374.1" font-size="19" fill="#1B1B1F">8.7</text>
+<rect x="866.8" y="323.4" width="97" height="11.6" fill="#CC6677"/>
+<text x="971.9" y="331" font-size="19" fill="#1B1B1F">16.4</text>
+<rect x="866.8" y="339" width="2.6" height="11.6" fill="#332288"/>
+<text x="877.4" y="346.6" font-size="19" fill="#1B1B1F">0.4</text>
+<circle cx="66" cy="395.7" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="403.7" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)</text>
+<rect x="866.8" y="366.6" width="188.4" height="11.6" fill="#4A4A52"/>
+<text x="1063.2" y="374.1" font-size="19" fill="#1B1B1F">31.8</text>
 <rect x="866.8" y="382.1" width="2" height="11.6" fill="#117733"/>
 <text x="876.8" y="389.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="866.8" y="397.7" width="64.1" height="11.6" fill="#CC6677"/>
-<text x="938.9" y="405.3" font-size="19" fill="#1B1B1F">10.8</text>
-<rect x="866.8" y="413.3" width="52" height="11.6" fill="#332288"/>
-<text x="926.8" y="420.9" font-size="19" fill="#1B1B1F">8.8</text>
-<circle cx="66" cy="470" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="478" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410)</text>
-<rect x="866.8" y="440.9" width="30.9" height="11.6" fill="#4A4A52"/>
-<text x="905.7" y="448.4" font-size="19" fill="#1B1B1F">5.2</text>
+<rect x="866.8" y="397.7" width="39.3" height="11.6" fill="#CC6677"/>
+<text x="914.1" y="405.3" font-size="19" fill="#1B1B1F">6.6</text>
+<rect x="866.8" y="413.3" width="308" height="11.6" fill="#332288"/>
+<text x="1182.8" y="420.9" font-size="19" fill="#1B1B1F">51.9</text>
+<circle cx="66" cy="470" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="478" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)</text>
+<rect x="866.8" y="440.9" width="51.8" height="11.6" fill="#4A4A52"/>
+<text x="926.6" y="448.4" font-size="19" fill="#1B1B1F">8.7</text>
 <rect x="866.8" y="456.4" width="2" height="11.6" fill="#117733"/>
 <text x="876.8" y="464" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="866.8" y="472" width="62" height="11.6" fill="#CC6677"/>
-<text x="936.8" y="479.6" font-size="19" fill="#1B1B1F">10.4</text>
-<rect x="866.8" y="487.6" width="16.5" height="11.6" fill="#332288"/>
-<text x="891.3" y="495.1" font-size="19" fill="#1B1B1F">2.8</text>
-<circle cx="66" cy="544.3" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="552.3" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)</text>
-<rect x="866.8" y="515.1" width="32.3" height="11.6" fill="#4A4A52"/>
-<text x="907.2" y="522.7" font-size="19" fill="#1B1B1F">5.5</text>
+<rect x="866.8" y="472" width="64.1" height="11.6" fill="#CC6677"/>
+<text x="938.9" y="479.6" font-size="19" fill="#1B1B1F">10.8</text>
+<rect x="866.8" y="487.6" width="52" height="11.6" fill="#332288"/>
+<text x="926.8" y="495.1" font-size="19" fill="#1B1B1F">8.8</text>
+<circle cx="66" cy="544.3" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="552.3" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410)</text>
+<rect x="866.8" y="515.1" width="30.9" height="11.6" fill="#4A4A52"/>
+<text x="905.7" y="522.7" font-size="19" fill="#1B1B1F">5.2</text>
 <rect x="866.8" y="530.7" width="2" height="11.6" fill="#117733"/>
 <text x="876.8" y="538.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="866.8" y="546.3" width="24.8" height="11.6" fill="#CC6677"/>
-<text x="899.6" y="553.9" font-size="19" fill="#1B1B1F">4.2</text>
-<rect x="866.8" y="561.9" width="41.8" height="11.6" fill="#332288"/>
-<text x="916.6" y="569.4" font-size="19" fill="#1B1B1F">7.0</text>
-<circle cx="66" cy="618.6" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="626.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate C: B without Wismut (LAB-1410)</text>
-<rect x="866.8" y="589.4" width="53.2" height="11.6" fill="#4A4A52"/>
-<text x="928" y="597" font-size="19" fill="#1B1B1F">9.0</text>
+<rect x="866.8" y="546.3" width="62" height="11.6" fill="#CC6677"/>
+<text x="936.8" y="553.9" font-size="19" fill="#1B1B1F">10.4</text>
+<rect x="866.8" y="561.9" width="16.5" height="11.6" fill="#332288"/>
+<text x="891.3" y="569.4" font-size="19" fill="#1B1B1F">2.8</text>
+<circle cx="66" cy="618.6" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="626.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)</text>
+<rect x="866.8" y="589.4" width="32.3" height="11.6" fill="#4A4A52"/>
+<text x="907.2" y="597" font-size="19" fill="#1B1B1F">5.5</text>
 <rect x="866.8" y="605" width="2" height="11.6" fill="#117733"/>
 <text x="876.8" y="612.6" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="866.8" y="620.6" width="138.4" height="11.6" fill="#CC6677"/>
-<text x="1013.3" y="628.1" font-size="19" fill="#1B1B1F">23.3</text>
-<rect x="866.8" y="636.1" width="8.9" height="11.6" fill="#332288"/>
-<text x="883.7" y="643.7" font-size="19" fill="#1B1B1F">1.5</text>
-<circle cx="66" cy="692.9" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="700.9" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
-<rect x="866.8" y="663.7" width="20.9" height="11.6" fill="#4A4A52"/>
-<text x="895.7" y="671.3" font-size="19" fill="#1B1B1F">3.5</text>
+<rect x="866.8" y="620.6" width="24.8" height="11.6" fill="#CC6677"/>
+<text x="899.6" y="628.1" font-size="19" fill="#1B1B1F">4.2</text>
+<rect x="866.8" y="636.1" width="41.8" height="11.6" fill="#332288"/>
+<text x="916.6" y="643.7" font-size="19" fill="#1B1B1F">7.0</text>
+<circle cx="66" cy="692.9" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="700.9" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate C: B without Wismut (LAB-1410)</text>
+<rect x="866.8" y="663.7" width="53.2" height="11.6" fill="#4A4A52"/>
+<text x="928" y="671.3" font-size="19" fill="#1B1B1F">9.0</text>
 <rect x="866.8" y="679.3" width="2" height="11.6" fill="#117733"/>
 <text x="876.8" y="686.9" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="866.8" y="694.9" width="97" height="11.6" fill="#CC6677"/>
-<text x="971.9" y="702.4" font-size="19" fill="#1B1B1F">16.4</text>
-<rect x="866.8" y="710.4" width="2.6" height="11.6" fill="#332288"/>
-<text x="877.4" y="718" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="866.8" y="694.9" width="138.4" height="11.6" fill="#CC6677"/>
+<text x="1013.3" y="702.4" font-size="19" fill="#1B1B1F">23.3</text>
+<rect x="866.8" y="710.4" width="8.9" height="11.6" fill="#332288"/>
+<text x="883.7" y="718" font-size="19" fill="#1B1B1F">1.5</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Fixture set &#x27;pl-pii-bench&#x27; (hand-written; pl 346 docs), pl only.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">Valid = a validated rule of the type recognises the value (checksum, numbering plan, format). Invalid numbers stay in the headline.</text>
 <text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-28 · commits 72026a5, 793ddf9, da9883e · generated by `pii-guard eval report` from eval/results/runs/</text>

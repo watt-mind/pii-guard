@@ -69,14 +69,15 @@ describe("split benchmark index (LAB-1454)", () => {
   it("loads the summary and the headline set first, and no other set until it is picked", async () => {
     const { src, fetched } = source();
     const summary = await src.summary();
-    expect(summary.runs).toEqual(full.runs);
+    expect(summary.runs).toEqual([]); // the run log comes on its own, already on its way
+    expect((await src.runs!()).runs).toEqual(full.runs);
     expect(summary.systems).toEqual(full.systems);
     expect(summary.snapshots).toEqual([]);
     expect(fetched.sort()).toEqual([manifest.parts[SUMMARY_PART], manifest.parts[RUNS_PART], manifest.parts[setPart(full.headline_set!)]].map((f) => `/${f}`).sort());
     const head = await src.set(full.headline_set!);
     expect(head.snapshots).toEqual(full.snapshots.filter((s) => s.fixture_set === full.headline_set));
     expect(head.history).toEqual(full.history.filter((h) => h.fixture_set === full.headline_set));
-    expect(fetched).toHaveLength(3); // the headline set's part was already on its way
+    expect(fetched).toHaveLength(3); // summary, headline set, run log: the set was already on its way
     expect(await src.set("no-such-set")).toEqual({ snapshots: [], history: [] });
   });
 

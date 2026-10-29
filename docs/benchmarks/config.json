@@ -3,7 +3,7 @@
   "headline_set": "smoke",
   "featured": [
     "rules",
-    "rules+ner:xlmr-large-distilled-glimmer",
+    "rules+ner:xlmr-base-v2-hn",
     "rules+llm:muse-spark-open@reasoning_effort=low",
     "rules+llm:muse-glimmer@reasoning_strength=low",
     "presidio",

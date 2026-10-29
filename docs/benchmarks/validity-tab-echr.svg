@@ -30,7 +30,7 @@
 <text x="872.8" y="280" font-size="18" fill="#4A4A52">no values</text>
 <rect x="866.8" y="287" width="593.2" height="19" fill="#332288"/>
 <text x="1468" y="302" font-size="19" fill="#1B1B1F">100.0</text>
-<circle cx="66" cy="366" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="66" cy="366" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
 <text x="84" y="374" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
 <rect x="866.8" y="322" width="19.6" height="19" fill="#4A4A52"/>
 <text x="894.4" y="337" font-size="19" fill="#1B1B1F">3.3</text>
