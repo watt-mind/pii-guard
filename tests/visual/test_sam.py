@@ -259,6 +259,39 @@ def test_retryable_errors_exhaust_and_fail_closed(answer: Any, message: str) -> 
     assert len(rec.requests) == 3
 
 
+# --- image deadline (LAB-1234) -------------------------------------------------------------
+
+
+def test_expired_deadline_sends_nothing_and_fails_closed() -> None:
+    """Past the image deadline no SAM prompt is even attempted: the request frees its
+    image-pool slot instead of holding it for prompts x timeout x (1 + retries)."""
+    import time
+
+    from pii_guard.visual import ocr as ocr_module
+
+    rec = Recorder()
+    client = rec.client(timeout=60.0, max_retries=1)
+    with ocr_module.deadline(time.monotonic() - 1), pytest.raises(DetectionError, match="deadline"):
+        client.segment(id_card_png(), [EntityType.FACE, EntityType.ID_PHOTO])
+    assert rec.requests == []
+
+
+def test_sam_request_timeout_is_capped_at_the_deadline() -> None:
+    """Each SAM request gets at most the time the image deadline still has."""
+    import time
+
+    from pii_guard.visual import ocr as ocr_module
+
+    rec = Recorder()
+    client = rec.client(timeout=60.0, max_retries=0)
+    with ocr_module.deadline(time.monotonic() + 7):
+        client.segment(id_card_png(), [EntityType.FACE])
+    assert len(rec.requests) == 1
+    timeout = rec.requests[0].extensions["timeout"]
+    capped = max(timeout.values()) if isinstance(timeout, dict) else float(timeout)
+    assert capped <= 7.5
+
+
 def _completed(text: Any) -> dict[str, Any]:
     body = fixture("sam_signature")
     body["output"][0]["content"][0]["text"] = text
