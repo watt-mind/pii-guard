@@ -3,16 +3,16 @@
   "run_id": "2026-10-29-lab-1535-eu-smoke-v20",
   "kind": "text",
   "date": "2026-10-29",
-  "recorded_at": "2026-10-29T15:45:48+00:00",
+  "recorded_at": "2026-10-29T18:26:12+00:00",
   "source": "recorded",
   "imported_from": null,
-  "title": "pii-guard rules + ner (xlmr-base-v2-hn) on smoke",
+  "title": "pii-guard rules + ner (xlmr-base-v2-hn) on eu-smoke",
   "notes": [
     "LAB-1535: NER v4 multilingual candidates (v2.0 + EU phase-1 data) vs v2.0, v3.1 protocol, fast mode (rules + NER), CPU (PII_GUARD_NER_DEVICE=cpu), one commit.",
-    "Wall time 2.0 s, load average at end 10.2."
+    "Wall time 2.0 s, load average at end 22.9."
   ],
   "code": {
-    "commit": "51fdc76a8c7d97f830061caadb12b0b3a4565b65",
+    "commit": "4c4ad56557b6a69cd253b0a47d43ecad55425933",
     "dirty": true,
     "pii_guard_version": "0.1.0",
     "note": null
@@ -42,12 +42,12 @@
     "key": "rules+ner:xlmr-base-v2-hn@rescore=lab-1535",
     "label": "pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535)"
   },
-  "fixture_set": "smoke",
+  "fixture_set": "eu-smoke",
   "fixtures": [
     {
       "path": "eval/fixtures/eu/lv-smoke.jsonl",
       "sha256": "90ebebb3a62ca3e80801b87665ab45f33e041207f7029f66db017dc496fc61c6",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "lv",
       "origin": "hand-written",
       "generator": null,
@@ -56,7 +56,7 @@
     {
       "path": "eval/fixtures/eu/lt-smoke.jsonl",
       "sha256": "fbbe29d9d2c37c65297f67c9a6a6555ccc3dbf9f7039610165aeecc0d3f0c3c0",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "lt",
       "origin": "hand-written",
       "generator": null,
@@ -65,7 +65,7 @@
     {
       "path": "eval/fixtures/eu/hr-smoke.jsonl",
       "sha256": "9362a9cc95de4410545994fadc5be9a3aa72e927e6bc8c0786702b3bda38bc36",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "hr",
       "origin": "hand-written",
       "generator": null,
@@ -74,7 +74,7 @@
     {
       "path": "eval/fixtures/eu/sl-smoke.jsonl",
       "sha256": "0831015408840a8f699ace042ce4db5b8732c82b5874a41b9ab89b35f1ca7733",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "sl",
       "origin": "hand-written",
       "generator": null,
@@ -83,7 +83,7 @@
     {
       "path": "eval/fixtures/eu/fr-smoke.jsonl",
       "sha256": "ba4cbe79d295d8a25ad96a565081eab0dc583b241bf126dcd5092dbf44e6bdbe",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "fr",
       "origin": "hand-written",
       "generator": null,
@@ -92,7 +92,7 @@
     {
       "path": "eval/fixtures/eu/es-smoke.jsonl",
       "sha256": "a2c4e6f034e88a004b32eedf3a4221e410b609652d60f66b5295115aa659b0c2",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "es",
       "origin": "hand-written",
       "generator": null,
@@ -101,7 +101,7 @@
     {
       "path": "eval/fixtures/eu/it-smoke.jsonl",
       "sha256": "8b5e6dda2f33373535facc108ee02e64af25bc0360da68931a29d179465d22f8",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "it",
       "origin": "hand-written",
       "generator": null,
@@ -110,7 +110,7 @@
     {
       "path": "eval/fixtures/eu/nl-smoke.jsonl",
       "sha256": "55c0bf1eb89a7b27b7ffa1051ae61f525d4adc96363ad092d028d1374b4816d8",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "nl",
       "origin": "hand-written",
       "generator": null,
@@ -119,7 +119,7 @@
     {
       "path": "eval/fixtures/eu/ro-smoke.jsonl",
       "sha256": "a729538c9be6eefe7357b800209a1eb19cf63d4108eca042deca9e770e5f78af",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "ro",
       "origin": "hand-written",
       "generator": null,
@@ -128,7 +128,7 @@
     {
       "path": "eval/fixtures/eu/mt-smoke.jsonl",
       "sha256": "efd9624c3a050273fe4dc5c8b474b30ffc832faf8c059dd2b549c7ab226a3e57",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "mt",
       "origin": "hand-written",
       "generator": null,
@@ -137,7 +137,7 @@
     {
       "path": "eval/fixtures/eu/ga-smoke.jsonl",
       "sha256": "9255f3896c6842375d12c4ee8a7423c7767e9c33fed0f4f43eb8f5cd1c5cf55f",
-      "set": "smoke",
+      "set": "eu-smoke",
       "language": "ga",
       "origin": "hand-written",
       "generator": null,
@@ -218,12 +218,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 34.582,
-          "p95": 46.705
+          "p50": 35.568,
+          "p95": 47.19
         },
         "mask": {
-          "p50": 0.477,
-          "p95": 0.823
+          "p50": 0.496,
+          "p95": 0.772
         }
       },
       "per_type": {
@@ -410,12 +410,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 31.179,
-            "p95": 41.909
+            "p50": 31.6,
+            "p95": 38.142
           },
           "mask": {
-            "p50": 0.481,
-            "p95": 0.592
+            "p50": 0.507,
+            "p95": 0.595
           }
         },
         "per_type": {
@@ -601,12 +601,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 32.18,
-            "p95": 41.286
+            "p50": 28.272,
+            "p95": 37.547
           },
           "mask": {
-            "p50": 0.483,
-            "p95": 0.628
+            "p50": 0.457,
+            "p95": 0.626
           }
         },
         "per_type": {
@@ -792,12 +792,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 41.164,
-            "p95": 43.703
+            "p50": 37.652,
+            "p95": 43.327
           },
           "mask": {
-            "p50": 0.497,
-            "p95": 0.763
+            "p50": 0.496,
+            "p95": 0.74
           }
         },
         "per_type": {
@@ -983,12 +983,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 41.879,
-            "p95": 46.779
+            "p50": 38.217,
+            "p95": 46.49
           },
           "mask": {
-            "p50": 0.568,
-            "p95": 0.625
+            "p50": 0.54,
+            "p95": 0.641
           }
         },
         "per_type": {
@@ -1174,12 +1174,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 31.636,
-            "p95": 45.408
+            "p50": 38.48,
+            "p95": 47.586
           },
           "mask": {
-            "p50": 0.472,
-            "p95": 0.773
+            "p50": 0.504,
+            "p95": 1.216
           }
         },
         "per_type": {
@@ -1365,12 +1365,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 34.582,
-            "p95": 39.342
+            "p50": 37.186,
+            "p95": 40.454
           },
           "mask": {
-            "p50": 0.477,
-            "p95": 0.848
+            "p50": 0.469,
+            "p95": 0.721
           }
         },
         "per_type": {
@@ -1556,12 +1556,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 38.355,
-            "p95": 47.032
+            "p50": 36.181,
+            "p95": 44.743
           },
           "mask": {
-            "p50": 0.454,
-            "p95": 0.66
+            "p50": 0.485,
+            "p95": 0.797
           }
         },
         "per_type": {
@@ -1747,12 +1747,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 35.568,
-            "p95": 46.431
+            "p50": 31.336,
+            "p95": 45.267
           },
           "mask": {
-            "p50": 0.465,
-            "p95": 0.94
+            "p50": 0.605,
+            "p95": 1.846
           }
         },
         "per_type": {
@@ -1938,12 +1938,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 32.445,
-            "p95": 40.606
+            "p50": 30.848,
+            "p95": 40.275
           },
           "mask": {
-            "p50": 0.383,
-            "p95": 0.491
+            "p50": 0.442,
+            "p95": 0.52
           }
         },
         "per_type": {
@@ -2129,12 +2129,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 31.671,
-            "p95": 42.105
+            "p50": 35.907,
+            "p95": 47.362
           },
           "mask": {
-            "p50": 0.454,
-            "p95": 0.708
+            "p50": 0.516,
+            "p95": 0.721
           }
         },
         "per_type": {
@@ -2320,12 +2320,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 41.228,
-            "p95": 44.472
+            "p50": 35.781,
+            "p95": 43.2
           },
           "mask": {
-            "p50": 0.564,
-            "p95": 0.617
+            "p50": 0.473,
+            "p95": 0.647
           }
         },
         "per_type": {

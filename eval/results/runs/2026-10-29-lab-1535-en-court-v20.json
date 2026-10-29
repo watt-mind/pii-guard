@@ -3,16 +3,16 @@
   "run_id": "2026-10-29-lab-1535-en-court-v20",
   "kind": "text",
   "date": "2026-10-29",
-  "recorded_at": "2026-10-29T15:45:50+00:00",
+  "recorded_at": "2026-10-29T18:26:14+00:00",
   "source": "recorded",
   "imported_from": null,
-  "title": "pii-guard rules + ner (xlmr-base-v2-hn) on court-smoke",
+  "title": "pii-guard rules + ner (xlmr-base-v2-hn) on en-court-smoke",
   "notes": [
     "LAB-1535: NER v4 multilingual candidates (v2.0 + EU phase-1 data) vs v2.0, v3.1 protocol, fast mode (rules + NER), CPU (PII_GUARD_NER_DEVICE=cpu), one commit.",
-    "Wall time 0.2 s, load average at end 10.2."
+    "Wall time 0.2 s, load average at end 22.9."
   ],
   "code": {
-    "commit": "51fdc76a8c7d97f830061caadb12b0b3a4565b65",
+    "commit": "4c4ad56557b6a69cd253b0a47d43ecad55425933",
     "dirty": true,
     "pii_guard_version": "0.1.0",
     "note": null
@@ -42,12 +42,12 @@
     "key": "rules+ner:xlmr-base-v2-hn@rescore=lab-1535",
     "label": "pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535)"
   },
-  "fixture_set": "court-smoke",
+  "fixture_set": "en-court-smoke",
   "fixtures": [
     {
       "path": "eval/fixtures/eu/en-court-smoke.jsonl",
       "sha256": "ac711858534c9f4f3c93fc3b94d39bd94c5e8d5e3c73cc6ad73db6d293629f7c",
-      "set": "court-smoke",
+      "set": "en-court-smoke",
       "language": "en",
       "origin": "hand-written",
       "generator": null,
@@ -118,12 +118,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 33.718,
-          "p95": 37.008
+          "p50": 31.058,
+          "p95": 35.312
         },
         "mask": {
-          "p50": 0.317,
-          "p95": 0.6
+          "p50": 0.425,
+          "p95": 0.615
         }
       },
       "per_type": {
@@ -198,12 +198,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 33.718,
-            "p95": 37.008
+            "p50": 31.058,
+            "p95": 35.312
           },
           "mask": {
-            "p50": 0.317,
-            "p95": 0.6
+            "p50": 0.425,
+            "p95": 0.615
           }
         },
         "per_type": {

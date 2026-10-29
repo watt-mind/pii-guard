@@ -71,41 +71,42 @@
 <text x="1160.2" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-29</text>
 <text x="1160.2" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">6d02b8d</text>
 <line x1="150" y1="670" x2="1180" y2="670" stroke="#8A8A93" stroke-width="2"/>
+<path d="M367.5,323.2H407.1V323.2H446.7V323.2H486.3V323.2H526V323.2H565.6V323.2H605.2V323.2H644.8V670H684.4V670H724V670H763.7V670H803.3V670H842.9V670H882.5V670H922.1V670H961.7V670H1001.3V670H1041V670H1080.6V670H1120.2V670H1200.2" fill="none" stroke="#1B1B1F" stroke-width="3" stroke-dasharray="10 7"/>
 <path d="M169.8,243.5L209.4,243.5L288.7,243.5L407.5,323.2L447.1,323.2L486.7,323.2L526.3,323.2L566,323.2L605.6,323.2L645.2,323.2L724.4,323.2" fill="none" stroke="#0072B2" stroke-width="4"/>
 <circle cx="169.8" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
 <circle cx="209.4" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
 <circle cx="288.7" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="407.5" cy="323.2" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="447.1" cy="323.2" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="486.7" cy="323.2" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="526.3" cy="323.2" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="566" cy="323.2" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="605.6" cy="323.2" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="645.2" cy="323.2" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="724.4" cy="323.2" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
+<circle cx="407.5" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="447.1" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="486.7" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="526.3" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="566" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="605.6" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="645.2" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="724.4" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
 <path d="M684.8,670L764,670L803.7,670L843.3,670L882.9,670L922.5,670L962.1,670L1001.7,670L1041.3,670L1081,670L1120.6,670L1160.2,670" fill="none" stroke="#009E73" stroke-width="4"/>
-<circle cx="684.8" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="764" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="803.7" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="843.3" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="882.9" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="922.5" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="962.1" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="1001.7" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="1041.3" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="1081" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="1120.6" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
-<circle cx="1160.2" cy="670" r="11" fill="#FFFFFF" stroke="#009E73" stroke-width="4"/>
+<circle cx="684.8" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="764" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="803.7" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="843.3" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="882.9" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="922.5" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="962.1" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1001.7" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1041.3" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1081" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1120.6" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1160.2" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
 <path d="M328.3,663.8L367.9,663.8" fill="none" stroke="#D55E00" stroke-width="4"/>
 <circle cx="328.3" cy="663.8" r="11" fill="#FFFFFF" stroke="#D55E00" stroke-width="4"/>
 <circle cx="367.9" cy="663.8" r="11" fill="#FFFFFF" stroke="#D55E00" stroke-width="4"/>
 <circle cx="249" cy="670" r="11" fill="#FFFFFF" stroke="#CC79A7" stroke-width="4"/>
 <circle cx="1230" cy="180" r="10" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
 <text x="1250" y="187" font-size="20" fill="#1B1B1F" font-weight="600">rules (default)</text>
-<text x="1250" y="213" font-size="19" fill="#4A4A52">latest 41.6% leak, other documents</text>
+<text x="1250" y="213" font-size="19" fill="#4A4A52">latest 41.6% leak</text>
 <circle cx="1230" cy="250" r="10" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
 <text x="1250" y="257" font-size="20" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
-<text x="1250" y="283" font-size="19" fill="#4A4A52">latest 0.0% leak, other documents</text>
+<text x="1250" y="283" font-size="19" fill="#4A4A52">latest 0.0% leak</text>
 <circle cx="1230" cy="320" r="10" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
 <text x="1250" y="327" font-size="20" fill="#1B1B1F" font-weight="600">rules + Muse Spark Open (Baseten)</text>
 <text x="1250" y="353" font-size="19" fill="#4A4A52">latest 0.7% leak, other documents</text>
@@ -114,7 +115,7 @@
 <text x="1250" y="423" font-size="19" fill="#4A4A52">latest 0.0% leak, other documents</text>
 <line x1="1218" y1="460" x2="1242" y2="460" stroke="#1B1B1F" stroke-width="3" stroke-dasharray="8 5"/>
 <text x="1250" y="467" font-size="20" fill="#1B1B1F" font-weight="600">best of any configuration so far</text>
-<text x="56" y="780" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + es 5 docs + fr 5 docs + ga 5 docs + hr 5 docs + hu 31 docs + it 5 docs + lt 5 docs + lv 5 docs + mt 5 docs + nl 5 docs + ro 5 docs + sl 5 docs), de + en + es + fr + ga + hr + hu + it + lt + lv + mt + nl + ro + sl pooled (micro-averaged); one configuration at one commit merged.</text>
+<text x="56" y="780" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs), de + en + hu pooled (micro-averaged); one configuration at one commit merged.</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Hollow: run on an earlier fixture file or on fewer languages (other documents), not comparable with filled points or the best line.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">The default pipeline (rules only) finds no names by design; names come from the NER and LLM stages.</text>
 <text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-26 to 2026-10-29 · 26 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>

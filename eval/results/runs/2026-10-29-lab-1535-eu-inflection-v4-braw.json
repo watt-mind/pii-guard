@@ -3,16 +3,16 @@
   "run_id": "2026-10-29-lab-1535-eu-inflection-v4-braw",
   "kind": "text",
   "date": "2026-10-29",
-  "recorded_at": "2026-10-29T18:11:03+00:00",
+  "recorded_at": "2026-10-29T18:27:14+00:00",
   "source": "recorded",
   "imported_from": null,
-  "title": "pii-guard rules + ner (pii-guard-ner-xlmr-base-v4-braw) on inflection",
+  "title": "pii-guard rules + ner (pii-guard-ner-xlmr-base-v4-braw) on eu-inflection",
   "notes": [
     "LAB-1535: NER v4 multilingual candidates (v2.0 + EU phase-1 data) vs v2.0, v3.1 protocol, fast mode (rules + NER), CPU (PII_GUARD_NER_DEVICE=cpu), one commit.",
-    "Wall time 1.8 s, load average at end 21.3."
+    "Wall time 1.6 s, load average at end 13.2."
   ],
   "code": {
-    "commit": "51fdc76a8c7d97f830061caadb12b0b3a4565b65",
+    "commit": "4c4ad56557b6a69cd253b0a47d43ecad55425933",
     "dirty": true,
     "pii_guard_version": "0.1.0",
     "note": null
@@ -42,12 +42,12 @@
     "key": "rules+ner:pii-guard-ner-xlmr-base-v4-braw",
     "label": "pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535)"
   },
-  "fixture_set": "inflection",
+  "fixture_set": "eu-inflection",
   "fixtures": [
     {
       "path": "eval/fixtures/eu/lv-inflection.jsonl",
       "sha256": "f3c309fbaf31246dc90411f7f3f9bebf4442cfcb00e59187041e5469b8a1edb0",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "lv",
       "origin": "hand-written",
       "generator": null,
@@ -56,7 +56,7 @@
     {
       "path": "eval/fixtures/eu/lt-inflection.jsonl",
       "sha256": "abb465dc0e5f7f934aca24f83968a90ca6421bde5539c2cd7bdfef395591c40a",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "lt",
       "origin": "hand-written",
       "generator": null,
@@ -65,7 +65,7 @@
     {
       "path": "eval/fixtures/eu/hr-inflection.jsonl",
       "sha256": "474677ed6abef634da165183676d59bcad62d3bcc386d0aa238935f64b160f89",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "hr",
       "origin": "hand-written",
       "generator": null,
@@ -74,7 +74,7 @@
     {
       "path": "eval/fixtures/eu/sl-inflection.jsonl",
       "sha256": "97ee271220efe181e19fbbb8407b6709d313b0567d716a12861da4ee2fa2ca5b",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "sl",
       "origin": "hand-written",
       "generator": null,
@@ -83,7 +83,7 @@
     {
       "path": "eval/fixtures/eu/fr-inflection.jsonl",
       "sha256": "5c0557c8587924eb63754744320344b42f4942210f7a96989545de01b0aabcc5",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "fr",
       "origin": "hand-written",
       "generator": null,
@@ -92,7 +92,7 @@
     {
       "path": "eval/fixtures/eu/es-inflection.jsonl",
       "sha256": "bd75792ba31c571bf77139ce4584900a849ca494c142da95a7a3f1340e660abd",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "es",
       "origin": "hand-written",
       "generator": null,
@@ -101,7 +101,7 @@
     {
       "path": "eval/fixtures/eu/it-inflection.jsonl",
       "sha256": "b5a45394f16c93b99d2f594ceaeaf2723c9503a8c5dcfb4443fb010acfd762f5",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "it",
       "origin": "hand-written",
       "generator": null,
@@ -110,7 +110,7 @@
     {
       "path": "eval/fixtures/eu/nl-inflection.jsonl",
       "sha256": "515d94a3bb621c3a7ff13a9349088b52753eee08cfe60580b263b30dc19f5d9c",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "nl",
       "origin": "hand-written",
       "generator": null,
@@ -119,7 +119,7 @@
     {
       "path": "eval/fixtures/eu/ro-inflection.jsonl",
       "sha256": "1d032e881916b9db378c6b9c0932f97d406b892408c636a5acc0dd49e56a7cc0",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "ro",
       "origin": "hand-written",
       "generator": null,
@@ -128,7 +128,7 @@
     {
       "path": "eval/fixtures/eu/mt-inflection.jsonl",
       "sha256": "88264b2c217251f907f577004a9c8cdbd01d4b36963af2978cf9f572513f559c",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "mt",
       "origin": "hand-written",
       "generator": null,
@@ -137,7 +137,7 @@
     {
       "path": "eval/fixtures/eu/ga-inflection.jsonl",
       "sha256": "cfb24f6fb611bbb5c82435b9e9081cbd358291be6eb6701099d89d3d547a7671",
-      "set": "inflection",
+      "set": "eu-inflection",
       "language": "ga",
       "origin": "hand-written",
       "generator": null,
@@ -218,12 +218,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 35.8,
-          "p95": 42.938
+          "p50": 31.169,
+          "p95": 36.176
         },
         "mask": {
-          "p50": 0.353,
-          "p95": 0.505
+          "p50": 0.342,
+          "p95": 0.449
         }
       },
       "per_type": {
@@ -328,12 +328,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 38.401,
-            "p95": 42.58
+            "p50": 30.624,
+            "p95": 31.666
           },
           "mask": {
-            "p50": 0.355,
-            "p95": 0.41
+            "p50": 0.32,
+            "p95": 0.377
           }
         },
         "per_type": {
@@ -407,12 +407,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 35.974,
-            "p95": 50.37
+            "p50": 30.945,
+            "p95": 35.205
           },
           "mask": {
-            "p50": 0.311,
-            "p95": 0.408
+            "p50": 0.305,
+            "p95": 0.355
           }
         },
         "per_type": {
@@ -486,12 +486,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 33.708,
-            "p95": 39.458
+            "p50": 31.972,
+            "p95": 34.505
           },
           "mask": {
-            "p50": 0.327,
-            "p95": 0.351
+            "p50": 0.342,
+            "p95": 0.369
           }
         },
         "per_type": {
@@ -565,12 +565,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 31.616,
-            "p95": 36.194
+            "p50": 33.433,
+            "p95": 36.135
           },
           "mask": {
-            "p50": 0.38,
-            "p95": 0.41
+            "p50": 0.404,
+            "p95": 0.43
           }
         },
         "per_type": {
@@ -661,12 +661,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 37.877,
-            "p95": 39.235
+            "p50": 31.678,
+            "p95": 33.399
           },
           "mask": {
-            "p50": 0.311,
-            "p95": 0.559
+            "p50": 0.299,
+            "p95": 0.356
           }
         },
         "per_type": {
@@ -740,12 +740,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 32.195,
-            "p95": 35.613
+            "p50": 27.922,
+            "p95": 30.493
           },
           "mask": {
-            "p50": 0.427,
-            "p95": 0.492
+            "p50": 0.438,
+            "p95": 0.545
           }
         },
         "per_type": {
@@ -836,12 +836,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 35.708,
-            "p95": 36.941
+            "p50": 35.397,
+            "p95": 37.627
           },
           "mask": {
-            "p50": 0.411,
-            "p95": 0.491
+            "p50": 0.388,
+            "p95": 0.449
           }
         },
         "per_type": {
@@ -932,12 +932,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 35.127,
-            "p95": 45.215
+            "p50": 30.695,
+            "p95": 34.235
           },
           "mask": {
-            "p50": 0.321,
-            "p95": 0.522
+            "p50": 0.334,
+            "p95": 0.404
           }
         },
         "per_type": {
@@ -1011,12 +1011,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 38.339,
-            "p95": 39.193
+            "p50": 31.53,
+            "p95": 33.508
           },
           "mask": {
-            "p50": 0.343,
-            "p95": 0.401
+            "p50": 0.264,
+            "p95": 0.27
           }
         },
         "per_type": {
@@ -1103,12 +1103,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 40.453,
-            "p95": 42.214
+            "p50": 30.765,
+            "p95": 31.718
           },
           "mask": {
-            "p50": 0.31,
-            "p95": 0.312
+            "p50": 0.279,
+            "p95": 0.285
           }
         },
         "per_type": {
@@ -1182,12 +1182,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 32.472,
-            "p95": 36.631
+            "p50": 33.698,
+            "p95": 36.205
           },
           "mask": {
-            "p50": 0.355,
-            "p95": 0.373
+            "p50": 0.402,
+            "p95": 0.455
           }
         },
         "per_type": {
