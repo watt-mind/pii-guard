@@ -15,6 +15,9 @@
   (:func:`regex_literal`), so the command still matches the file (LAB-1481). In JSON arguments
   the escape is JSON-encoded too (``\\\\[\\\\[``). Only tool-call fields get this; message
   text keeps an escaped placeholder as written.
+- In a shell command in JSON arguments (a top-level ``command``/``cmd``), a value restored in a
+  single-quoted string or a ``sed`` ``s`` replacement is escaped for it (LAB-1483,
+  :mod:`~pii_guard.gateway.shell_context`). Everywhere else a value is byte-exact.
 
 Unknown placeholders are left as is and counted (``unresolved``). Every restored value is
 charged to one :class:`~pii_guard.vault.RestoreBudget` per response, so a response restores at
@@ -29,6 +32,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from pii_guard.gateway.shell_context import ArgumentsContext, shell_escape
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, RestoreBudget, UnmaskResult, VaultSession
 from pii_guard.vault.inflection import following_suffix
@@ -215,9 +219,12 @@ def _restore_escaped(
     form: _EscapeForm,
     encode: Callable[[str], str],
     rest: Callable[[str], UnmaskResult],
+    observe: Callable[[str], None] | None = None,
 ) -> UnmaskResult:
     """Escaped placeholders in ``text`` restored to ``encode(regex_literal(value))``; the text
-    between them goes through ``rest`` (the plain restore). Unknown ones stay as written."""
+    between them goes through ``rest`` (the plain restore). Unknown ones stay as written.
+    ``observe`` sees each escaped placeholder as written, after it is encoded (the text around
+    it goes through ``rest``), so a context tracker reads the whole text in order."""
     unresolved: dict[str, None] = {}
     parts: list[str] = []
     cursor = 0
@@ -233,6 +240,8 @@ def _restore_escaped(
             parts.append(match.group(0))
         else:
             parts.append(encode(regex_literal(result.text)))
+        if observe is not None:
+            observe(match.group(0))
     plain = rest(text[cursor:])
     parts.append(plain.text)
     unresolved.update(dict.fromkeys(plain.unresolved))
@@ -272,11 +281,17 @@ class ToolInputSession:
 
 
 class JsonEscapingSession:
-    """Restores placeholders as JSON-string-escaped values (for tool-call ``arguments``)."""
+    """Restores placeholders as JSON-string-escaped values (for tool-call ``arguments``).
+
+    Inside a shell command string of the arguments (a top-level ``command``/``cmd``), a value
+    in a single-quoted string or a ``sed`` ``s`` replacement is escaped for it first
+    (:mod:`~pii_guard.gateway.shell_context`, LAB-1483). The instance reads one arguments text
+    in order, so use one per text (or per streamed arguments)."""
 
     def __init__(self, session: VaultSession, budget: RestoreBudget | None = None) -> None:
         self._session = session
         self._budget = budget
+        self._context = ArgumentsContext()
 
     def restore_budget(self) -> RestoreBudget:
         return self._budget or self._session.restore_budget()
@@ -288,8 +303,11 @@ class JsonEscapingSession:
             text,
             budget,
             _JSON_ESCAPE,
-            _json_string,
+            lambda literal: _json_string(
+                shell_escape(literal, self._context.context(), regex=True)
+            ),
             lambda part: self._plain(part, budget),
+            self._context.feed,
         )
 
     @staticmethod
@@ -301,13 +319,17 @@ class JsonEscapingSession:
         parts: list[str] = []
         cursor = 0
         for item in _restorations(self._session, text, budget):
+            self._context.feed(text[cursor : item.start])
             parts.append(text[cursor : item.start])
             cursor = item.end
             if item.value is None:
                 unresolved[item.placeholder] = None
                 parts.append(item.placeholder)
             else:
-                parts.append(_json_string(item.value + item.suffix))
+                value = shell_escape(item.value + item.suffix, self._context.context())
+                parts.append(_json_string(value))
+            self._context.feed(text[item.start : item.end])
+        self._context.feed(text[cursor:])
         parts.append(text[cursor:])
         return UnmaskResult("".join(parts), tuple(unresolved))
 
