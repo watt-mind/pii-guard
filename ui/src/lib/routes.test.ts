@@ -21,6 +21,20 @@ describe("console routes (LAB-1287)", () => {
     expect(hashOf(parsed.route)).toBe(hash);
   });
 
+  it.each(["#connect/pi", "#connect/muse-code", "#connect/codex", "#connect/opencode", "#connect/curl", "#connect/python", "#connect/claude-code"])(
+    "reads %s as itself (LAB-1314)",
+    (hash) => {
+      const parsed = parseHash(hash)!;
+      expect(parsed.redirect).toBe(false);
+      expect(hashOf(parsed.route)).toBe(hash);
+    },
+  );
+
+  it("rewrites an unknown Connect client to #connect (LAB-1314)", () => {
+    expect(parseHash("#connect/bogus")).toEqual({ route: { section: "connect", tab: "text" }, redirect: true });
+    expect(hashOf({ section: "connect", tab: "text", client: "bogus" })).toBe("#connect");
+  });
+
   it("falls back to the Text tab for an unknown Playground tab, and rewrites the URL", () => {
     expect(parseHash("#playground/nope")).toEqual({ route: { section: "playground", tab: "text" }, redirect: true });
   });

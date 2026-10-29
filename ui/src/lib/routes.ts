@@ -8,6 +8,8 @@ export interface Route {
   section: Section;
   /** The Playground's sub-tab; only meaningful when `section` is "playground". */
   tab: PlaygroundTab;
+  /** The Connect screen's client tab; only meaningful when `section` is "connect". */
+  client?: string;
 }
 
 export const SECTIONS: readonly { id: Section; label: string; hint: string }[] = [
@@ -39,11 +41,25 @@ export const LEGACY_HASHES: Readonly<Record<string, Route>> = {
   "#traffic": { section: "logs", tab: "text" },
 };
 
+/** The Connect screen's client tabs (`api/connect.ts` TOOLS): `#connect/<client>` deep-links one. */
+export const CONNECT_CLIENTS: readonly string[] = [
+  "muse-code",
+  "pi",
+  "codex",
+  "opencode",
+  "curl",
+  "python",
+  "claude-code",
+];
+
 const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
 const TAB_IDS = new Set<string>(PLAYGROUND_TABS.map((t) => t.id));
+const CLIENT_IDS = new Set<string>(CONNECT_CLIENTS);
 
 export function hashOf(route: Route): string {
-  return route.section === "playground" ? `#playground/${route.tab}` : `#${route.section}`;
+  if (route.section === "playground") return `#playground/${route.tab}`;
+  if (route.section === "connect" && route.client && CLIENT_IDS.has(route.client)) return `#connect/${route.client}`;
+  return `#${route.section}`;
 }
 
 /**
@@ -55,10 +71,15 @@ export function parseHash(hash: string): { route: Route; redirect: boolean } | n
   if (legacy) return { route: legacy, redirect: true };
   // No hash, and the skip link's #main, are not routes: the section stays as it is.
   if (hash === "" || hash === "#" || hash === "#main") return null;
-  const m = /^#([a-z]+)(?:\/([a-z]+))?$/.exec(hash);
+  // Client ids contain hyphens (`muse-code`); section ids don't.
+  const m = /^#([a-z]+)(?:\/([a-z][a-z-]*))?$/.exec(hash);
   // Any other unknown hash lands on the Overview, with the URL cleaned up.
   if (!m || !SECTION_IDS.has(m[1]!)) return { route: DEFAULT_ROUTE, redirect: true };
   const section = m[1] as Section;
+  if (section === "connect" && m[2] !== undefined)
+    return CLIENT_IDS.has(m[2])
+      ? { route: { section, tab: "text", client: m[2] }, redirect: false }
+      : { route: { section, tab: "text" }, redirect: true };
   if (section !== "playground") return { route: { section, tab: "text" }, redirect: m[2] !== undefined };
   const tab = m[2] && TAB_IDS.has(m[2]) ? (m[2] as PlaygroundTab) : "text";
   return { route: { section, tab }, redirect: m[2] !== tab };
@@ -68,4 +89,5 @@ export function routeFromLocation(): Route {
   return parseHash(globalThis.location?.hash ?? "")?.route ?? DEFAULT_ROUTE;
 }
 
-export const sameRoute = (a: Route, b: Route) => a.section === b.section && (a.section !== "playground" || a.tab === b.tab);
+export const sameRoute = (a: Route, b: Route) =>
+  a.section === b.section && (a.section !== "playground" || a.tab === b.tab) && (a.section !== "connect" || a.client === b.client);

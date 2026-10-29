@@ -3,6 +3,7 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { parseTrafficEvent, type TrafficEvent } from "../api/traffic";
 import {
+  refusalDetail,
   refusalReason,
   OWN_STAGES,
   alignValues,
@@ -160,5 +161,18 @@ describe("refusalReason (LAB-1287)", () => {
     expect(refusalReason("detection_unavailable", false)).toMatch(/audit mode/);
     expect(refusalReason("blocked_entity", false)).toMatch(/policy block/);
     expect(refusalReason(undefined, false)).toMatch(/fails closed/);
+  });
+});
+
+describe("refusalDetail (LAB-1314)", () => {
+  it("prefers the server's message when the event carries it", () => {
+    expect(refusalDetail({ code: "blocked_entity", message: "the text contains entity types blocked by policy: EMAIL (1)" }, false)).toBe(
+      "the text contains entity types blocked by policy: EMAIL (1)",
+    );
+  });
+
+  it("falls back to the client-side reason without a server message", () => {
+    expect(refusalDetail({ code: "not_found" }, false)).toMatch(/Unknown or expired session/);
+    expect(refusalDetail(null, false)).toMatch(/fails closed/);
   });
 });

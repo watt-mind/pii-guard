@@ -390,3 +390,13 @@ export function refusalReason(code: string | undefined, image: boolean): string 
       return "PII Guard fails closed: when it can't mask a request, the request stops instead of going out unmasked.";
   }
 }
+
+/**
+ * What the Logs detail says about a refusal: the server's own message when the event
+ * carries it (types and counts only, never values, LAB-1314), else the client-side
+ * explanation of the error code.
+ */
+export function refusalDetail(error: { code?: string; message?: string | null } | null | undefined, image: boolean): string {
+  if (error?.message) return error.message;
+  return refusalReason(error?.code, image);
+}

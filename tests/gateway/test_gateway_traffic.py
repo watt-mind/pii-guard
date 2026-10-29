@@ -154,7 +154,12 @@ def test_blocked_request_is_recorded_with_types_only() -> None:
         (event,) = events(client)
     assert upstream.requests == []
     assert event["outcome"] == "blocked"
-    assert event["error"] == {"code": "blocked_entity", "status": 422, "entity_types": {"EMAIL": 1}}
+    assert event["error"] == {
+        "code": "blocked_entity",
+        "status": 422,
+        "message": "the text contains entity types blocked by policy: EMAIL (1)",
+        "entity_types": {"EMAIL": 1},
+    }
     assert event["request"] == {"masked": None}
     assert EMAILS[0] not in json.dumps(event)
 

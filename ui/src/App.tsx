@@ -452,6 +452,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
             {sectionOpened("connect") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading connect…</p>}>
             <Connect
               status={status}
+              initialClient={route.section === "connect" ? (route.client ?? null) : null}
               serverSnippets={!caps.accounts || (server !== null && hostedSnippets !== undefined)}
               loadSnippets={hostedSnippets}
               gatewayLine={!caps.accounts}
