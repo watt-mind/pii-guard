@@ -15,7 +15,7 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
-import { COMPARISON, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, SETS } from "./proof";
+import { COMPARISON, IMAGE_PROOF, MEASURED, OPEN_MODELS, PROOF, SETS } from "./proof";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -247,33 +247,38 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-6 space-y-6">
         <SectionHead id="results-heading" title="Among the best at keeping personal data out." lead="The lowest leak rate of the tools we compared on every set in the table below. It is not the lowest everywhere: on Gretel finance, Presidio leaks slightly less (18.8 % against 19.0 %). Fictional data only, from committed run records of 27–28 October 2026. The sets are small: a few points’ difference is noise." />
-        <Card aria-label="Headline results">
-          <dl className="grid grid-cols-2 gap-6 lg:grid-cols-4">{[...PROOF, LATENCY].map((p) => <Metric key={p.label} label={p.label} value={p.value} />)}</dl>
-          <p className="mt-4 text-xs text-muted">{MEASURED}</p>
-        </Card>
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
-          <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better; each tool’s time was measured where it ran.">
-            <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+            <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better; each tool’s time was measured where it ran.">
+              <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
+            </Card>
+          <Card title="Where it’s weaker" headingLevel={3}>
+            <ul className="grid gap-3">
+              <Point title="Finance text.">19.0 % leak on Gretel finance, level with Presidio (18.8 %).</Point>
+              <Point title="Over-masking.">It can mask too much: reference numbers without a cue word can be masked as IDs (26.4 % over-masking on CEE-PII).</Point>
+              <Point title="Other EU languages.">Trained on Hungarian, German and English. On EU legal text in 21 languages it leaks 8.5 % (MAPA EUR-Lex, 42 docs).</Point>
+            </ul>
+            <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{signedIn && hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
           </Card>
-          <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labelled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better).">
-            <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="overflow-x-auto rounded-md">
-              <table className="w-full min-w-[28rem] border-collapse text-sm">
-                <caption className="sr-only">Leak rate and F1 in percent, by dataset, for pii-guard and three comparison tools</caption>
-                <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
-                <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
-              </table>
-            </div>
-            <p className="mt-3 text-xs text-muted">pii-guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits pii-guard was not trained on.</p>
-          </Card>
+          </div>
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+            <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labelled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better).">
+              <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">
+                <table className="w-full min-w-[28rem] border-collapse text-sm">
+                  <caption className="sr-only">Leak rate and F1 in percent, by dataset, for pii-guard and three comparison tools</caption>
+                  <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
+                  <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
+                </table>
+              </div>
+              <div className="space-y-5 sm:hidden">{SETS.map((set, i) => <ResultTable key={set} caption={set} columns={["Leak", "F1"]} rows={COMPARISON.map((row) => ({ name: row.system, ours: row.ours, values: [row.leak[i]!, row.f1[i]!] }))} />)}</div>
+              <p className="mt-3 text-xs text-muted">pii-guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits pii-guard was not trained on.</p>
+            </Card>
+            <Card title="Our NER against other open PII models" headingLevel={3} subtitle="The same rules and the same 51 hand-written documents; only the NER model differs. Over-masking: text masked that wasn’t personal data.">
+              <ResultTable hideCaption caption="Leak, F1 and over-masking in percent, by NER model, with the same rules" columns={["Leak", "F1", "Over-masking"]} rows={OPEN_MODELS.map((m) => ({ name: m.model, title: m.id, ours: "ours" in m, values: [m.leak, m.f1, m.over] }))} />
+              <p className="mt-3 text-xs text-muted">Runs of 28 Oct 2026. The closest, bardsai multilang v1, leaks 1.2 % but masks about nine times as much text that isn’t personal data. <a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
+            </Card>
+          </div>
         </div>
-        <Card title="Where it’s weaker" headingLevel={3}>
-          <ul className="grid gap-3 md:grid-cols-3">
-            <Point title="Finance text.">19.0 % leak on Gretel finance, level with Presidio (18.8 %).</Point>
-            <Point title="Over-masking.">It can mask too much: reference numbers without a cue word can be masked as IDs (26.4 % over-masking on CEE-PII).</Point>
-            <Point title="Other EU languages.">Trained on Hungarian, German and English. On EU legal text in 21 languages it leaks 8.5 % (MAPA EUR-Lex, 42 docs).</Point>
-          </ul>
-          <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{signedIn && hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
-        </Card>
       </section>
 
       <section id="how" aria-labelledby="how-heading" className="scroll-mt-6 space-y-6">
@@ -420,6 +425,15 @@ function SectionHead({ id, title, lead }: { id: string; title: string; lead?: st
 /** One of the hero's three differences: a short lead that links to the section that shows it. */
 function Differentiator({ href, title, children }: { href: string; title: string; children: ReactNode }) {
   return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink hover:underline">{title}</a><span className="mt-0.5 block">{children}</span></li>;
+}
+
+/** A small results table: one row per system, values in percent; ours in ink. Fits a phone. */
+function ResultTable({ caption, hideCaption = false, columns, rows }: { caption: string; hideCaption?: boolean; columns: string[]; rows: { name: string; title?: string; ours?: boolean; values: readonly string[] }[] }) {
+  return <table className="w-full border-collapse text-sm">
+    <caption className={hideCaption ? "sr-only" : "pb-1 text-left text-xs font-medium text-ink"}>{caption}</caption>
+    <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-1.5 pr-3 text-left font-normal">System</th>{columns.map((c) => <th key={c} scope="col" className="py-1.5 pl-2 text-right font-normal">{c}</th>)}</tr></thead>
+    <tbody>{rows.map((row) => <tr key={row.name} className="border-b border-line last:border-0"><th scope="row" title={row.title} className={["py-1.5 pr-3 text-left", row.ours ? "font-medium text-ink" : "font-normal text-ink"].join(" ")}>{row.name}</th>{row.values.map((v, i) => <td key={i} className={["py-1.5 pl-2 text-right whitespace-nowrap tabular-nums", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;%</td>)}</tr>)}</tbody>
+  </table>;
 }
 
 /** One list item with its lead in ink. */
