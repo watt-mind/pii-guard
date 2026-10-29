@@ -42,7 +42,8 @@ def test_sdk_uses_guard_and_restores_provider_placeholders(examples, capsys, str
         body = json.loads(request.content)
         forwarded.append(body)
         assert request.headers["authorization"] == "Bearer " + PROVIDER_KEY
-        masked = body["messages"][0]["content"]
+        # A gateway system note comes first (LAB-1471): read the last user message.
+        masked = [m for m in body["messages"] if m["role"] == "user"][-1]["content"]
         assert EMAIL not in masked
         assert "[[EMAIL_" in masked
         answer = masked[masked.index("[[EMAIL_") :].split("]]", 1)[0] + "]]"

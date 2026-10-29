@@ -13,8 +13,13 @@ The runnable [examples](../examples/integrations/) use only a fictional email on
 | Integration | `GUARD_BASE_URL` | `GUARD_API_KEY` | `GUARD_MODEL` |
 |---|---|---|---|
 | Self-hosted root gateway | `http://127.0.0.1:8787/v1` | The server's `PII_GUARD_API_TOKEN`, if enabled; otherwise unset | A model accepted by the configured upstream |
-| Hosted project endpoint | Copy the endpoint URL: `https://<guard-host>/e/<endpoint-id>/v1` | The guard endpoint key shown once when issued | Exactly the model pinned to that endpoint |
-| Self-hosted project endpoint | `http://127.0.0.1:8787/e/<endpoint-id>/v1` | That endpoint's guard key | Exactly the model pinned to that endpoint |
+| Hosted project endpoint | `https://guard.watt-mind.com/e/<endpoint-id>/v1` (copy it from Connect) | The guard endpoint key shown once when issued | The endpoint's pinned model, or any provider model for a pass-through BYOK endpoint (see `GET <base>/models`) |
+| Self-hosted project endpoint | `http://127.0.0.1:8787/e/<endpoint-id>/v1` | That endpoint's guard key | The endpoint's pinned model, or any provider model for a pass-through BYOK endpoint (see `GET <base>/models`) |
+
+The Connect page in the console and `pii-guard connect curl|python --print` print ready-made
+blocks with the URL and model filled in. `GUARD_API_KEY` here corresponds to
+`PII_GUARD_ENDPOINT_KEY` in those blocks. Client-specific setups (Codex, pi, OpenCode, Muse
+Code) are in [the harness guides](integrations/README.md).
 
 The URL ends in `/v1`, not `/chat/completions`: the SDK appends the route. An endpoint key is
 different from the upstream provider key and cannot manage projects, inspect the vault or
@@ -32,8 +37,9 @@ which receives original text. See [the privacy boundary](privacy-model.md#trust-
 
 For a project endpoint, sign in to the guard, create/select a project and policy version,
 configure a provider, model and provider credential, then issue an endpoint key. The endpoint
-pins the provider, model, policy version, language and mode. Matching those settings is required;
-caller overrides are refused. Hosted policy mode is `fast`. `sponsored` uses the deployment's
+pins the provider, policy version, language and mode, and a model unless it is a pass-through
+BYOK endpoint (see [Endpoint model: pinned or pass-through](contracts.md#projects-policies-and-endpoints)).
+Matching the pinned settings is required; caller overrides are refused. Hosted policy mode is `fast`. `sponsored` uses the deployment's
 allowlisted Meta model and available allocation; a BYOK endpoint uses its stored provider
 credential. Responses support still depends on the selected provider's native `/responses`
 route. See [projects](projects.md) and the [API contract](contracts.md#projects-policies-and-endpoints).
@@ -53,8 +59,8 @@ export GUARD_BASE_URL='http://127.0.0.1:8787/v1'
 export GUARD_MODEL='your-upstream-model'
 ```
 
-For hosted use, replace those values with your copied endpoint URL and its exact pinned
-model. Supply `GUARD_API_KEY` from your secret manager or read it without terminal echo
+For hosted use, replace those values with your copied endpoint URL and its pinned model (or
+your own model for a pass-through BYOK endpoint). Supply `GUARD_API_KEY` from your secret manager or read it without terminal echo
 (Bash or Zsh):
 
 ```bash
@@ -112,8 +118,9 @@ or try to restore placeholders yourself.
 
 ## Images: self-hosted root gateway only
 
-**Hosted preview and all project endpoints currently reject images.** The project runtime
-sets its image allowance to zero and disables segmentation. These examples use the
+**Project endpoints (hosted and self-hosted) reject image parts in chat requests.** Hosted
+signed-in owners can mask images with native `/v1/mask/image` in the console; see
+[hosted.md](hosted.md). These examples use the
 self-hosted root `/v1` URL for images, without an `/e/<endpoint-id>` prefix or a nondefault
 `X-PII-Guard-Project` selection.
 
@@ -123,8 +130,10 @@ Provision OCR and segmentation before using the live image path; see
 The default `hybrid` segmenter sends the **unmasked image** to the configured SAM service
 for signature detection before OCR masking; SAM is inside that trusted processing boundary.
 `sam-api` also sends original pixels remotely. Do not describe either mode as local-only.
-Local segmentation has no signature detector and fails closed under the default signature
-policy; changing signatures to `keep` means they stay visible. OCR is required by default;
+Server-level `PII_GUARD_SEGMENTER=local` without a project policy has no signature detector
+and fails closed under the default signature policy; changing signatures to `keep` means they
+stay visible. Project policies with `visual_detection: local` use the on-device signature
+detector instead (see [contracts](contracts.md#projects-policies-and-endpoints)). OCR is required by default;
 do not disable that check to make an image request pass.
 
 Generate a fictional image locally, then use a vision-capable upstream model:

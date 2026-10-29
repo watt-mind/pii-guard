@@ -11,7 +11,9 @@ URLs, credential setup, provider/model configuration, streaming and image limita
 
 Both clients accept `--stream` and `--image <synthetic.png>`, and read `GUARD_BASE_URL`,
 `GUARD_API_KEY`, `GUARD_MODEL` at runtime. Images require a provisioned self-hosted root
-gateway and vision model. Hosted preview and project endpoints are text-only.
+gateway and vision model. Project endpoints (hosted and self-hosted) reject image parts in chat requests. Hosted
+signed-in owners can mask images with native `/v1/mask/image` in the console; see
+[hosted.md](../../docs/hosted.md). Full guide: [integrations.md](../../docs/integrations.md).
 
 ```bash
 uv run --no-sync python examples/integrations/curl_chat.py
