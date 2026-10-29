@@ -103,6 +103,16 @@ describe("console shell", () => {
     expect(location.hash).toBe(now);
   });
 
+  it("mounts the Images screen, and so its sample images, only once it is opened (LAB-1458)", async () => {
+    const { container } = render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: vi.fn(() => ({ close() {} })), fixtureIntervalMs: 60_000 }} loadStatus={statusOf()} />);
+    expect(container.querySelector('img[src^="/samples/"]')).toBeNull();
+    act(() => {
+      history.replaceState(null, "", "#playground/images");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    await waitFor(() => expect(container.querySelector('img[src^="/samples/"]')).not.toBeNull());
+  });
+
   it("switches sections on a hash change, also away from Images (LAB-1294)", async () => {
     history.replaceState(null, "", "#playground/images");
     render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: vi.fn(() => ({ close() {} })), fixtureIntervalMs: 60_000 }} loadStatus={statusOf()} />);
