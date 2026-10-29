@@ -53,7 +53,11 @@ COPY ui ./
 COPY --from=python-build /app/benchmarks-index.json /app/benchmarks-index.json
 # robots.txt: "allow" only for the public production build; the default keeps crawlers out (docs/hosted.md).
 ARG VITE_PII_GUARD_ROBOTS=disallow
-ENV VITE_PII_GUARD_MODE=api VITE_PII_GUARD_HOSTED=true VITE_PII_GUARD_ROBOTS=$VITE_PII_GUARD_ROBOTS PII_GUARD_BENCHMARKS_INDEX=/app/benchmarks-index.json
+# The landing's demo video slot: hidden while the URL is empty (docs/hosted.md).
+ARG VITE_PII_GUARD_DEMO_VIDEO_URL=""
+ARG VITE_PII_GUARD_DEMO_VIDEO_POSTER=""
+ENV VITE_PII_GUARD_MODE=api VITE_PII_GUARD_HOSTED=true VITE_PII_GUARD_ROBOTS=$VITE_PII_GUARD_ROBOTS PII_GUARD_BENCHMARKS_INDEX=/app/benchmarks-index.json \
+    VITE_PII_GUARD_DEMO_VIDEO_URL=$VITE_PII_GUARD_DEMO_VIDEO_URL VITE_PII_GUARD_DEMO_VIDEO_POSTER=$VITE_PII_GUARD_DEMO_VIDEO_POSTER
 RUN pnpm build
 
 FROM python:3.12-slim-trixie@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159 AS runtime
