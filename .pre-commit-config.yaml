@@ -9,3 +9,11 @@ repos:
     rev: 0.13.5
     hooks:
       - id: uv-lock
+  - repo: local
+    hooks:
+      - id: conventional-commit
+        name: conventional commit message
+        entry: python3 scripts/ci/check_commit_msg.py
+        language: system
+        stages: [commit-msg]
+        always_run: true

@@ -26,7 +26,7 @@ You need [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 for you if ne
 ```bash
 git clone https://github.com/watt-mind/pii-guard.git
 cd pii-guard
-make setup                 # uv sync + pre-commit hook (ruff)
+make setup                 # uv sync + git hooks (ruff, commit message)
 cp .env.example .env       # optional; nothing is required to run the tests
 ```
 
