@@ -94,7 +94,6 @@ jobs:
     timeout-minutes: 15
     env:
       FULL: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
-      PYTEST_ADDOPTS: --durations=30
       # Tests of the committed report follow the smoke job's choice (LAB-1269).
       RENDER_DOCS_ON_MERGE: ${{ vars.RENDER_DOCS_ON_MERGE }}
     steps:
@@ -112,12 +111,27 @@ jobs:
           uv run --no-sync python -c "import azure.identity, azure.storage.blob"
           uv run --no-sync pytest tests/hosted/test_spend_adapter.py -k real_sdk --no-cov -q
       - name: Test (parallel, coverage floor, derandomized Hypothesis)
+        env:
+          PYTEST_ADDOPTS: >-
+            --durations=30 --junitxml=reports/junit.xml
+            --cov-report=xml:reports/coverage.xml
         run: |
+          mkdir -p reports
           if [ "$FULL" = true ]; then
             HYPOTHESIS_PROFILE=ci-full make test-all
           else
             HYPOTHESIS_PROFILE=ci make test
           fi
+      # Synthetic fixtures only (AGENTS.md): junit/coverage may name tests and files, never
+      # real values. One day is enough to debug the failure that produced them.
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-reports-${{ github.run_id }}
+          path: reports/
+          retention-days: 1
+          if-no-files-found: ignore
 
   smoke:
     name: smoke
