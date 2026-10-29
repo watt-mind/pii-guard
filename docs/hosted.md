@@ -528,8 +528,10 @@ the authority object and any legacy claim markers, and follow Key Vault recovery
 
 `/healthz` reports liveness/model state (`ner`: `loading`, `ready` or `failed`); `/readyz`
 refuses until the required hosted NER stack is ready, and the deploy smoke waits for it.
-`/readyz?ner=loading` is serving readiness: it also admits a replica whose model is still
-loading (never one whose load failed or whose image pipeline is missing). The Bicep Readiness
+`/readyz/serving` is serving readiness: it also admits a replica whose model is still
+loading (never one whose load failed, which answers `503 detection_unavailable`, or whose
+image pipeline is missing). It is a plain path because Container Apps documents no query
+string in probe paths. The Bicep Readiness
 probe uses it, because Container Apps holds a scale-from-zero request until the replica is
 Ready, so probing full `/readyz` would hold the landing page for the whole model load. The
 Startup probe allows up to ten minutes for the process to answer `/healthz`. Container Apps ignores Docker `HEALTHCHECK`; the explicit Bicep startup/readiness/liveness

@@ -146,7 +146,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
         // get 503 detector_loading. Full /readyz (model loaded) stays the deploy smoke gate.
         probes: [
           { type: 'Startup', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 60, timeoutSeconds: 5 }
-          { type: 'Readiness', httpGet: { path: '/readyz?ner=loading', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 3, timeoutSeconds: 5 }
+          { type: 'Readiness', httpGet: { path: '/readyz/serving', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 3, timeoutSeconds: 5 }
           { type: 'Liveness', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 30, failureThreshold: 3, timeoutSeconds: 5 }
         ]
       }]

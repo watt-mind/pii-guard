@@ -301,7 +301,7 @@ def test_hosted_serves_the_landing_page_while_the_configured_model_loads(
         full = client.get("/readyz")
         assert full.status_code == 503
         assert full.json()["error"]["code"] == "detector_loading"
-        assert client.get("/readyz", params={"ner": "loading"}).status_code == 200
+        assert client.get("/readyz/serving").json() == {"status": "ready"}
         # Detecting requests still fail closed: nothing ran, nothing was sent.
         r = client.post("/v1/analyze", json={"text": TEXT, "language": "hu"}, headers=_signed_in())
         assert r.status_code == 503
@@ -326,17 +326,24 @@ def test_hosted_failed_load_keeps_the_landing_page_and_fails_detection_closed(
         assert client.get("/").status_code == 200
         assert client.get("/healthz").json()["ner"] == "failed"
         # Neither readiness admits a replica whose model failed to load.
-        assert client.get("/readyz").status_code == 503
-        assert client.get("/readyz", params={"ner": "loading"}).status_code == 503
+        for path in ("/readyz", "/readyz/serving"):
+            ready = client.get(path)
+            assert ready.status_code == 503
+            # A failed load is unavailable, not loading: retrying will not help.
+            assert ready.json()["error"]["code"] == "detection_unavailable"
+            assert "fictional detail" not in ready.text
         r = client.post("/v1/mask", json={"text": TEXT, "language": "hu"}, headers=_signed_in())
         assert r.status_code == 503
         assert r.json()["error"]["code"] == "detection_unavailable"
         assert "fictional detail" not in r.text  # the exception type only (ADR 0006)
 
 
-def test_hosted_readiness_rejects_an_unknown_ner_mode(load: FakeLoad, tmp_path: Any) -> None:
+def test_hosted_serving_readiness_passes_once_the_model_is_ready(
+    load: FakeLoad, tmp_path: Any
+) -> None:
     load.release.set()
     app = _hosted_app(tmp_path)
     with TestClient(app, base_url=ORIGIN) as client:
         _wait_for(lambda: app.state.ner_warmup.state == "ready")
-        assert client.get("/readyz", params={"ner": "failed"}).status_code == 422
+        assert client.get("/readyz").json() == {"status": "ready"}
+        assert client.get("/readyz/serving").json() == {"status": "ready"}

@@ -225,7 +225,7 @@ class ReleaseTemplateTests(unittest.TestCase):
         probes = {probe["type"]: probe["httpGet"]["path"] for probe in self.container()["probes"]}
         self.assertEqual(
             probes,
-            {"Startup": "/healthz", "Readiness": "/readyz?ner=loading", "Liveness": "/healthz"},
+            {"Startup": "/healthz", "Readiness": "/readyz/serving", "Liveness": "/healthz"},
         )
 
     def test_client_ip_attribution_defaults_off_and_dev_forces_off(self) -> None:

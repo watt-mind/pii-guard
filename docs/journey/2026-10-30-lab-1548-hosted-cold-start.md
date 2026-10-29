@@ -6,7 +6,7 @@ anything, and the platform's Readiness probe waited for the same load: the visit
 page for about 30 s on Azure.
 
 Now hosted loads the model in the background (the LAB-1303 path), and the Readiness probe asks
-`/readyz?ner=loading`, which admits a replica whose model is still loading. The landing page,
+`/readyz/serving`, which admits a replica whose model is still loading. The landing page,
 the UI and `/healthz` answer as soon as the process is up. Detecting requests wait for the
 model and then fail closed (`503 detector_loading` with `Retry-After`, or
 `503 detection_unavailable` if the load failed), so nothing is detected without it or sent
