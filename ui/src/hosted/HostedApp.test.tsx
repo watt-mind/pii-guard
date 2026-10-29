@@ -87,7 +87,7 @@ describe("public hosted workflow", () => {
     const call = requester(() => { throw new Error("offline"); });
     render(<HostedApp call={call} />);
     await screen.findByRole("alert");
-    expect(screen.getByRole("button", { name: "Run the live demo" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Run the live demo" })).not.toBeInTheDocument();
     expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
     expect(screen.getByText("The live service isn’t reachable")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reconnect to API" })).toBeInTheDocument();
@@ -276,7 +276,10 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
     render(<HostedApp call={requester((path) => path === "/v1/account" ? account : result)} />);
     await screen.findByText(/Runs on Muse Spark 1.3/);
     expect(screen.getByRole("list", { name: "EU rules and what PII Guard does" })).toHaveTextContent(/Minimize before you send.*Less personal data crossing borders.*Built for regulated work/);
-    expect(screen.getByText(/^A technical measure, not legal advice/)).toBeInTheDocument();
+    expect(screen.getByText(/^A technical measure, not legal advice or a compliance feature: .* transfer assessment\./)).toBeInTheDocument();
+    expect(screen.getByText(/placeholders go out, the mapping stays with your guard\. Your transfer obligations remain\./)).toBeInTheDocument();
+    expect(screen.getByText(/PII Guard lists every call in Logs, outbound check included\./)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Meta Model API terms ↗" })).toHaveAttribute("href", "https://dev.meta.ai/legal/terms-of-service");
     expect(screen.getByRole("link", { name: "What we don’t claim ↗" })).toHaveAttribute("href", expect.stringMatching(/docs\/eu-regulation\.md#what-we-dont-claim$/));
     expect(screen.getByRole("list", { name: "Live in three steps" })).toHaveTextContent(/Change one base URL\..*Masking and restoring happen automatically: streaming, tool calls, images\..*See every request in Logs, with its outbound check result\./);
     expect(document.body.textContent).not.toMatch(/GDPR[- ]compliant|special categor|anonymi[sz]ed data/i);
