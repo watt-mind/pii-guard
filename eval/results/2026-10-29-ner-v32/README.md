@@ -59,6 +59,10 @@ there was nothing to mine). **Nothing was published. The production pin
 Smoke = hu + en + de smoke (51 docs, 173 values), inflection = hu-inflection (12 docs, 50
 values), agent-traffic-dev = 300 docs, 1,555 values. Per-set summaries in
 [`stage1/`](stage1/); run records `eval/results/runs/2026-10-29-lab-1494-<set>-<candidate>.json`.
+The v2.0 re-score records carry their own system key
+(`rules+ner:xlmr-base-v2-hn@rescore=lab-1494`, label "NER v2.0 (selection-only re-score,
+LAB-1494)"; `eval_v3.system_extra`). They were timed on a loaded machine, and the report's
+latest-per-system pick would otherwise show them in place of the published v2.0 rows.
 
 | Candidate | smoke leak ≤ 0.00 % | smoke over-mask ≤ 1.59 % | inflection leak ≤ 2.0 % | CPU p95 ≤ 1.2× | **agent-traffic-dev** leak / over-mask | Selected |
 |---|--:|--:|--:|--:|--:|---|

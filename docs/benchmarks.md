@@ -63,7 +63,7 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 51 | 100.0% | 54.1% | 70.2% | 41.6% | 6.4% | 0.0% | 100.0% | 0.28 ms | 2026-10-27 | `752ff9a` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 80 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 50 ms | 2026-10-29 | `10c53ad` |
 | pii-guard rules + Muse Spark Open (Baseten) † | 41 | 98.1% | 99.4% | 98.7% | 0.7% | 1.5% | 0.0% | 100.0% | 1.5 s* | 2026-10-27 | `9fad0fa` |
 | pii-guard rules + Muse Glimmer (low) † | 10 | 100.0% | 100.0% | 100.0% | 0.0% | 3.3% | 0.0% | 100.0% | 7.6 s | 2026-10-27 | `c759b54` |
 | pii-guard Muse Glimmer (low) † | 10 | 97.1% | 97.1% | 97.1% | 0.0% | 3.3% | 0.0% | 100.0% | 7.7 s | 2026-10-27 | `c759b54` |
@@ -95,6 +95,7 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | pii-guard rules + NER (fine-tuned) † | 10 | 80.0% | 94.1% | 86.5% | 3.3% | 6.7% | 16.2% | 100.0% | 14 ms | 2026-10-26 | `0ba3c1a` |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 51 | 88.7% | 90.7% | 89.7% | 1.2% | 1.7% | 6.2% | 100.0% | 16 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 51 | 90.0% | 96.4% | 93.1% | 0.0% | 2.3% | 7.2% | 100.0% | 81 ms* | 2026-10-27 | `910a6a2` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 80 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 51 | 98.0% | 98.5% | 98.2% | 1.2% | 2.9% | 1.1% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 51 | 89.0% | 92.3% | 90.6% | 1.2% | 2.9% | 5.9% | 100.0% | 14 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 51 | 93.5% | 94.3% | 93.9% | 0.6% | 3.5% | 2.2% | 100.0% | 16 ms* | 2026-10-27 | `477196a` |
@@ -157,6 +158,7 @@ By language:
 | pii-guard rules + NER (fine-tuned) | — | 86.5% | — | — | 3.3% | — |
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 91.7% | 88.8% | 89.3% | 0.0% | 0.0% | 1.9% |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 95.3% | 94.3% | 91.9% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 97.4% | 94.2% | 93.3% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 98.8% | 98.6% | 97.9% | 0.0% | 0.0% | 1.9% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 94.0% | 87.3% | 90.4% | 0.0% | 0.0% | 1.9% |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 96.3% | 95.8% | 92.5% | 0.0% | 0.0% | 0.9% |
@@ -223,7 +225,7 @@ generated; documents: de 330 + en 330 + hu 330.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 990 | 99.5% | 50.3% | 66.8% | 45.3% | 10.9% | 0.0% | 100.0% | 0.84 ms | 2026-10-27 | `18b15fa` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 95.6% | 97.6% | 96.6% | 0.2% | 0.0% | 1.7% | 100.0% | 72 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 95.4% | 97.4% | 96.4% | 0.2% | 0.0% | 1.7% | 100.0% | 53 ms | 2026-10-28 | `72026a5` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 990 | 76.1% | 44.4% | 56.1% | 33.4% | 24.2% | 3.6% | 92.1% | 159 ms | 2026-10-28 | `36a78e3` |
 | pii-guard NER v2.0 alone (no rules) | 990 | 96.2% | 96.7% | 96.5% | 0.2% | 0.0% | 1.7% | 100.0% | 52 ms | 2026-10-28 | `36a78e3` |
 | rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) | 990 | 91.6% | 79.8% | 85.3% | 8.8% | 14.1% | 3.9% | 93.4% | 166 ms | 2026-10-28 | `36a78e3` |
@@ -236,6 +238,7 @@ generated; documents: de 330 + en 330 + hu 330.
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 990 | 93.4% | 98.0% | 95.7% | 0.0% | 0.0% | 2.5% | 100.0% | 84 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 990 | 92.8% | 97.6% | 95.2% | 0.0% | 0.0% | 2.5% | 100.0% | 105 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard audit (rules + NER v2 + LLM) | 30 | 82.0% | 100.0% | 90.1% | 0.0% | 0.0% | 11.2% | 100.0% | 1.9 s | 2026-10-27 | `cd119ae` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 990 | 95.6% | 97.6% | 96.6% | 0.2% | 0.0% | 1.7% | 100.0% | 72 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 990 | 82.4% | 93.2% | 87.5% | 3.4% | 0.5% | 12.4% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
 | Presidio | 990 | 52.1% | 71.8% | 60.4% | 12.4% | 12.3% | 36.8% | — | 15 ms | 2026-10-27 | `cd119ae` |
 | LLM Guard | 990 | 74.7% | 67.6% | 71.0% | 20.2% | 8.6% | 16.9% | 100.0% | 59 ms | 2026-10-27 | `cd119ae` |
@@ -247,7 +250,7 @@ By language:
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 68.0% | 65.2% | 67.2% | 43.3% | 46.8% | 45.8% |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 96.6% | 95.9% | 97.4% | 0.1% | 0.7% | 0.0% |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 96.6% | 95.3% | 97.4% | 0.1% | 0.6% | 0.0% |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 59.2% | 55.1% | 53.7% | 31.5% | 31.1% | 37.6% |
 | pii-guard NER v2.0 alone (no rules) | 96.5% | 96.7% | 96.2% | 0.1% | 0.7% | 0.0% |
 | rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) | 85.4% | 83.1% | 87.2% | 8.3% | 11.7% | 6.5% |
@@ -260,6 +263,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 95.2% | 95.4% | 96.3% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 94.9% | 94.8% | 95.8% | 0.0% | 0.1% | 0.0% |
 | pii-guard audit (rules + NER v2 + LLM) | 88.0% | 91.5% | 90.9% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 96.6% | 95.9% | 97.4% | 0.1% | 0.7% | 0.0% |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 87.5% | 87.2% | 87.8% | 2.9% | 4.6% | 2.7% |
 | Presidio | 55.8% | 62.4% | 63.7% | 8.1% | 9.3% | 19.7% |
 | LLM Guard | 73.5% | 78.4% | 64.2% | 18.4% | 18.2% | 23.9% |
@@ -272,7 +276,7 @@ generated; documents: de 100 + en 100 + hu 100.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 96.0% | 98.2% | 97.1% | 0.1% | 0.1% | 1.8% | 100.0% | 113 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 96.0% | 98.2% | 97.1% | 0.1% | 0.1% | 1.8% | 100.0% | 69 ms | 2026-10-29 | `10c53ad` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 300 | 88.2% | 89.8% | 89.0% | 5.0% | 3.6% | 3.1% | 99.3% | 95 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 300 | 78.4% | 45.8% | 57.8% | 32.9% | 24.1% | 3.3% | 91.7% | 157 ms | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 300 | 89.7% | 77.4% | 83.1% | 15.8% | 16.9% | 4.9% | 99.0% | 92 ms | 2026-10-28 | `97ee284` |
@@ -293,6 +297,7 @@ generated; documents: de 100 + en 100 + hu 100.
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 300 | 93.5% | 98.3% | 95.9% | 0.0% | 0.0% | 2.3% | 100.0% | 148 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 300 | 92.9% | 98.0% | 95.4% | 0.0% | 0.0% | 2.5% | 100.0% | 100 ms | 2026-10-29 | `2b3c7ba` |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 300 | 74.9% | 98.3% | 85.0% | 0.3% | 3.0% | 20.5% | 99.7% | 178 ms | 2026-10-28 | `97ee284` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 300 | 96.0% | 98.2% | 97.1% | 0.1% | 0.1% | 1.8% | 100.0% | 113 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 300 | 76.5% | 92.1% | 83.6% | 2.5% | 0.7% | 16.6% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
 | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 300 | 81.7% | 92.0% | 86.6% | 4.8% | 0.3% | 14.2% | 100.0% | 16 ms* | 2026-10-27 | `477196a` |
 | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 300 | 84.2% | 94.0% | 88.8% | 3.1% | 0.7% | 12.1% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
@@ -325,6 +330,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 95.1% | 96.3% | 96.3% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 94.7% | 95.9% | 95.7% | 0.0% | 0.0% | 0.0% |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 88.6% | 83.9% | 82.7% | 0.0% | 0.8% | 0.2% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 96.7% | 96.8% | 97.7% | 0.0% | 0.4% | 0.0% |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 83.9% | 83.9% | 82.9% | 3.8% | 1.8% | 1.9% |
 | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 84.6% | 86.7% | 88.5% | 7.2% | 4.4% | 2.9% |
 | pii-guard fast, NER v2.1 base, epoch 3 of 5 (LAB-1306) | 87.7% | 88.3% | 90.5% | 4.0% | 2.6% | 2.7% |
@@ -339,7 +345,7 @@ mixed; documents: de 200 + en 200 + hu 200.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 600 | 98.5% | 36.5% | 53.2% | 62.9% | 1.6% | 0.1% | 100.0% | 0.59 ms | 2026-10-28 | `26975e8` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 600 | 98.0% | 99.0% | 98.5% | 0.4% | 0.1% | 1.3% | 100.0% | 61 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 600 | 98.0% | 99.0% | 98.5% | 0.4% | 0.1% | 1.3% | 100.0% | 45 ms | 2026-10-28 | `72026a5` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 600 | 95.9% | 95.6% | 95.7% | 0.5% | 0.1% | 0.2% | 100.0% | 72 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 600 | 90.0% | 82.8% | 86.2% | 11.7% | 5.1% | 1.9% | 100.0% | 131 ms | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 600 | 97.6% | 97.3% | 97.5% | 0.6% | 0.3% | 0.4% | 100.0% | 63 ms | 2026-10-28 | `97ee284` |
@@ -365,6 +371,7 @@ mixed; documents: de 200 + en 200 + hu 200.
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 600 | 98.4% | 99.0% | 98.7% | 0.4% | 0.1% | 0.9% | 100.0% | 16 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard audit (rules + NER v2 + LLM) | 30 | 91.4% | 97.1% | 94.2% | 1.0% | 0.0% | 3.0% | 100.0% | 2.2 s | 2026-10-27 | `cd119ae` |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 600 | 86.6% | 98.7% | 92.2% | 0.4% | 0.1% | 5.4% | 100.0% | 136 ms* | 2026-10-27 | `b6e7bac` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 600 | 98.0% | 99.0% | 98.5% | 0.4% | 0.1% | 1.3% | 100.0% | 61 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 600 | 86.7% | 79.3% | 82.8% | 13.8% | 1.7% | 2.6% | 100.0% | 18 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 600 | 97.5% | 98.5% | 98.0% | 0.5% | 0.2% | 1.0% | 100.0% | 17 ms* | 2026-10-27 | `b6e7bac` |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 600 | 96.7% | 97.6% | 97.2% | 0.5% | 0.8% | 1.1% | 100.0% | 14 ms* | 2026-10-27 | `477196a` |
@@ -418,6 +425,7 @@ By language:
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 98.6% | 98.0% | 99.4% | 0.5% | 0.2% | 0.4% |
 | pii-guard audit (rules + NER v2 + LLM) | 95.0% | 96.1% | 91.2% | 3.2% | 0.0% | 0.0% |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 92.5% | 90.8% | 93.5% | 0.3% | 0.2% | 0.5% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 98.4% | 97.7% | 99.3% | 0.3% | 0.2% | 0.5% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 82.1% | 79.5% | 86.9% | 13.5% | 15.0% | 12.6% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 97.7% | 97.2% | 99.0% | 0.6% | 0.5% | 0.4% |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 98.1% | 95.2% | 98.5% | 0.3% | 0.8% | 0.4% |
@@ -471,6 +479,7 @@ By language:
 | pii-guard fast, NER v2 base (xlm-roberta-base, LAB-1150) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 0.6% (8/1276) |
 | pii-guard audit (rules + NER v2 + LLM) | 1.0% | 100.0% (9/9) | 0.0% (0/9) | 92.3% (24/26) | 0.0% (0/26) | 1.5% (1/67) |
 | pii-guard fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150) | 0.4% | 99.4% (165/166) | 0.0% (0/166) | 97.7% (726/743) | 0.0% (0/743) | 0.6% (8/1276) |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 0.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 0.6% (8/1276) |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 13.8% | 98.2% (163/166) | 0.0% (0/166) | 61.2% (455/743) | 20.3% (151/743) | 11.8% (150/1276) |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 0.5% | 100.0% (166/166) | 0.0% (0/166) | 97.3% (723/743) | 0.0% (0/743) | 0.9% (11/1276) |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 0.5% | 100.0% (166/166) | 0.0% (0/166) | 94.1% (699/743) | 0.5% (4/743) | 0.5% (7/1276) |
@@ -519,7 +528,7 @@ mixed; documents: en 200 + hu 251.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 451 | 97.3% | 56.9% | 71.8% | 41.3% | 14.1% | 0.0% | 100.0% | 0.32 ms | 2026-10-28 | `26975e8` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 451 | 71.9% | 97.2% | 82.6% | 0.4% | 0.2% | 26.4% | 100.0% | 47 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 451 | 71.9% | 97.2% | 82.6% | 0.4% | 0.2% | 26.4% | 100.0% | 35 ms | 2026-10-28 | `72026a5` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 451 | 48.7% | 44.8% | 46.7% | 24.8% | 0.0% | 18.2% | 100.0% | 51 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 451 | 67.8% | 85.7% | 75.7% | 8.7% | 3.0% | 26.5% | 100.0% | 118 ms | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 451 | 39.0% | 44.4% | 41.5% | 19.6% | 0.8% | 30.3% | 100.0% | 58 ms | 2026-10-28 | `97ee284` |
@@ -541,6 +550,7 @@ mixed; documents: en 200 + hu 251.
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 451 | 72.0% | 97.8% | 82.9% | 0.4% | 0.4% | 25.0% | 100.0% | 48 ms | 2026-10-29 | `2b3c7ba` |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 451 | 73.3% | 92.1% | 81.6% | 5.6% | 0.2% | 23.4% | 100.0% | 78 ms | 2026-10-28 | `97ee284` |
 | pii-guard audit (rules + NER v2 + LLM) | 20 | 54.0% | 100.0% | 70.1% | 0.0% | 0.0% | 42.5% | 100.0% | 1.6 s | 2026-10-27 | `cd119ae` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 451 | 71.9% | 97.2% | 82.6% | 0.4% | 0.2% | 26.4% | 100.0% | 47 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 451 | 67.9% | 98.0% | 80.2% | 0.4% | 0.0% | 29.0% | 100.0% | 17 ms* | 2026-10-27 | `477196a` |
 | Presidio | 451 | 34.0% | 53.0% | 41.4% | 36.5% | 13.5% | 52.5% | — | 42 ms | 2026-10-27 | `cd119ae` |
 | LLM Guard | 451 | 31.3% | 20.4% | 24.7% | 75.8% | 0.6% | 66.4% | 100.0% | 55 ms | 2026-10-27 | `cd119ae` |
@@ -574,6 +584,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 82.7% | 83.0% | 0.0% | 0.7% |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 78.7% | 83.4% | 10.2% | 2.6% |
 | pii-guard audit (rules + NER v2 + LLM) | 68.4% | 71.8% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 83.1% | 82.4% | 0.0% | 0.7% |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 75.1% | 83.8% | 0.5% | 0.3% |
 | Presidio | 36.4% | 50.6% | 11.2% | 52.6% |
 | LLM Guard | 20.6% | 27.4% | 78.1% | 74.4% |
@@ -609,6 +620,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 0.4% | 100.0% (219/219) | 0.0% (0/219) | 77.5% (31/40) | 0.0% (0/40) | 0.8% (2/245) |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 5.6% | 99.1% (217/219) | 0.0% (0/219) | 77.5% (31/40) | 0.0% (0/40) | 11.4% (28/245) |
 | pii-guard audit (rules + NER v2 + LLM) | 0.0% | 100.0% (9/9) | 0.0% (0/9) | 100.0% (2/2) | 0.0% (0/2) | 0.0% (0/16) |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 0.4% | 100.0% (219/219) | 0.0% (0/219) | 70.0% (28/40) | 0.0% (0/40) | 0.8% (2/245) |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 0.4% | 100.0% (219/219) | 0.0% (0/219) | 77.5% (31/40) | 2.5% (1/40) | 0.4% (1/245) |
 | Presidio | 36.5% | 11.4% (25/219) | 80.4% (176/219) | 40.0% (16/40) | 0.0% (0/40) | 3.3% (8/245) |
 | LLM Guard | 75.8% | 11.0% (24/219) | 88.6% (194/219) | 0.0% (0/40) | 57.5% (23/40) | 67.3% (165/245) |
@@ -747,7 +759,7 @@ mixed; documents: de 200 + en 200.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 400 | 77.2% | 12.1% | 20.9% | 80.8% | 5.6% | 21.7% | 100.0% | 2.6 ms | 2026-10-28 | `26975e8` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 400 | 74.8% | 68.8% | 71.7% | 19.1% | 2.5% | 21.8% | 99.5% | 145 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 400 | 74.2% | 68.8% | 71.4% | 19.0% | 2.5% | 22.6% | 99.5% | 93 ms | 2026-10-28 | `72026a5` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 400 | 83.6% | 60.8% | 70.4% | 27.8% | 4.9% | 15.1% | 100.0% | 132 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 400 | 74.3% | 41.7% | 53.4% | 35.1% | 14.3% | 25.7% | 99.5% | 286 ms | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 400 | 81.8% | 61.8% | 70.4% | 27.7% | 7.0% | 17.9% | 100.0% | 146 ms | 2026-10-28 | `97ee284` |
@@ -769,6 +781,7 @@ mixed; documents: de 200 + en 200.
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 400 | 78.7% | 72.1% | 75.3% | 20.5% | 2.5% | 22.3% | 100.0% | 135 ms | 2026-10-29 | `2b3c7ba` |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 400 | 71.9% | 73.3% | 72.6% | 21.8% | 5.2% | 27.2% | 100.0% | 187 ms | 2026-10-28 | `97ee284` |
 | pii-guard audit (rules + NER v2 + LLM) | 20 | 62.2% | 75.0% | 68.0% | 26.7% | 0.0% | 36.6% | 100.0% | 2.2 s | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 400 | 74.8% | 68.8% | 71.7% | 19.1% | 2.5% | 21.8% | 99.5% | 145 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 400 | 73.7% | 69.1% | 71.3% | 19.9% | 3.5% | 24.4% | 99.0% | 29 ms* | 2026-10-27 | `477196a` |
 | Presidio | 400 | 19.1% | 64.3% | 29.4% | 18.8% | 16.8% | 75.4% | — | 25 ms | 2026-10-27 | `18b15fa` |
 | LLM Guard | 400 | 76.0% | 27.7% | 40.6% | 59.3% | 8.3% | 17.0% | 100.0% | 130 ms | 2026-10-27 | `18b15fa` |
@@ -780,7 +793,7 @@ By language:
 | System | de F1 | en F1 | de leak | en leak |
 |---|---:|---:|---:|---:|
 | **pii-guard rules** | 20.0% | 22.0% | 82.7% | 78.2% |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 64.4% | 79.6% | 29.1% | 5.1% |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 64.2% | 79.3% | 29.1% | 4.8% |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 71.9% | 68.5% | 34.4% | 18.5% |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 50.6% | 56.6% | 43.7% | 23.0% |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 66.4% | 75.0% | 35.1% | 17.2% |
@@ -802,6 +815,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 68.0% | 83.3% | 29.5% | 8.1% |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 68.4% | 77.1% | 31.0% | 9.1% |
 | pii-guard audit (rules + NER v2 + LLM) | 75.7% | 56.3% | 35.7% | 11.8% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 64.4% | 79.6% | 29.1% | 5.1% |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 66.6% | 76.4% | 30.4% | 5.3% |
 | Presidio | 22.9% | 41.3% | 20.2% | 16.7% |
 | LLM Guard | 40.3% | 41.2% | 61.2% | 56.7% |
@@ -815,7 +829,7 @@ By language:
 | System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 80.8% | 98.0% (50/51) | 2.3% (1/44) | 54.5% (36/66) | 39.3% (24/61) | 88.0% (738/839) |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 19.1% | 96.1% (49/51) | 2.3% (1/44) | 87.9% (58/66) | 4.9% (3/61) | 21.0% (176/839) |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 19.0% | 96.1% (49/51) | 2.3% (1/44) | 87.9% (58/66) | 4.9% (3/61) | 20.9% (175/839) |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 27.8% | 82.4% (42/51) | 15.9% (7/44) | 59.1% (39/66) | 41.0% (25/61) | 27.4% (230/839) |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 35.1% | 74.5% (38/51) | 11.4% (5/44) | 69.7% (46/66) | 21.3% (13/61) | 37.3% (313/839) |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 27.7% | 80.4% (41/51) | 13.6% (6/44) | 40.9% (27/66) | 54.1% (33/61) | 26.5% (222/839) |
@@ -837,6 +851,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 20.5% | 100.0% (51/51) | 0.0% (0/44) | 95.5% (63/66) | 1.6% (1/61) | 23.0% (193/839) |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 21.8% | 98.0% (50/51) | 2.3% (1/44) | 93.9% (62/66) | 1.6% (1/61) | 24.3% (204/839) |
 | pii-guard audit (rules + NER v2 + LLM) | 26.7% | 0.0% (0/1) | 0.0% (0/1) | 100.0% (3/3) | 0.0% (0/3) | 29.3% (12/41) |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 19.1% | 96.1% (49/51) | 2.3% (1/44) | 87.9% (58/66) | 4.9% (3/61) | 21.0% (176/839) |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 19.9% | 98.0% (50/51) | 2.3% (1/44) | 89.4% (59/66) | 8.2% (5/61) | 21.7% (182/839) |
 | Presidio | 18.8% | 66.7% (34/51) | 13.6% (6/44) | 43.9% (29/66) | 26.2% (16/61) | 18.5% (155/839) |
 | LLM Guard | 59.3% | 90.2% (46/51) | 6.8% (3/44) | 34.8% (23/66) | 41.0% (25/61) | 63.4% (532/839) |
@@ -849,7 +864,7 @@ hand-written; documents: hu 12.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 12 | 100.0% | 14.8% | 25.7% | 84.0% | 4.0% | 0.0% | 100.0% | 0.29 ms | 2026-10-28 | `cce2b66` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 30.0% | 0.0% | 100.0% | 119 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 30.0% | 0.0% | 100.0% | 37 ms | 2026-10-28 | `72026a5` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 12 | 88.9% | 52.5% | 66.0% | 40.0% | 24.0% | 0.0% | 100.0% | 65 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 12 | 91.7% | 34.4% | 50.0% | 22.0% | 24.0% | 0.0% | 100.0% | 110 ms | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 12 | 94.6% | 57.4% | 71.4% | 20.0% | 42.0% | 0.0% | 100.0% | 51 ms | 2026-10-28 | `97ee284` |
@@ -870,6 +885,7 @@ hand-written; documents: hu 12.
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 12 | 100.0% | 96.7% | 98.3% | 0.0% | 26.0% | 0.0% | 100.0% | 68 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 12 | 100.0% | 100.0% | 100.0% | 0.0% | 22.0% | 0.0% | 100.0% | 70 ms | 2026-10-29 | `2b3c7ba` |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 12 | 96.7% | 96.7% | 96.7% | 0.0% | 10.0% | 0.0% | 100.0% | 105 ms | 2026-10-28 | `97ee284` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 30.0% | 0.0% | 100.0% | 119 ms | 2026-10-29 | `2b3c7ba` |
 
 
 By language:
@@ -898,6 +914,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 98.3% | 0.0% |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 100.0% | 0.0% |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 96.7% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 96.6% | 2.0% |
 
 
 ### `injection`
@@ -927,7 +944,7 @@ hand-written; documents: bg 2 + cs 2 + da 2 + de 2 + el 2 + en 2 + es 2 + et 2 +
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 42 | 0.0% | 0.0% | 0.0% | 99.3% | 0.4% | 100.0% | 100.0% | 190 ms | 2026-10-28 | `57ab2ed` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 4.8 s | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 3.5 s | 2026-10-28 | `72026a5` |
 | pii-guard fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393) | 42 | 16.5% | 32.5% | 21.9% | 47.7% | 7.8% | 79.3% | 7.1% | 5.1 s | 2026-10-28 | `da9883e` |
 | pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393) | 42 | 38.5% | 72.5% | 50.3% | 15.0% | 0.3% | 46.8% | 71.4% | 2.6 s | 2026-10-28 | `da9883e` |
 | pii-guard fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410) | 42 | 44.4% | 72.6% | 55.1% | 16.5% | 0.0% | 49.8% | 88.1% | 2.9 s | 2026-10-28 | `72026a5` |
@@ -936,6 +953,7 @@ hand-written; documents: bg 2 + cs 2 + da 2 + de 2 + el 2 + en 2 + es 2 + et 2 +
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 42 | 48.2% | 78.0% | 59.6% | 6.8% | 0.0% | 49.3% | 73.8% | 5.9 s | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 42 | 52.1% | 77.8% | 62.4% | 6.9% | 0.3% | 44.8% | 69.0% | 4.6 s | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 42 | 53.0% | 76.8% | 62.8% | 8.5% | 0.0% | 43.4% | 81.0% | 5.3 s | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 4.8 s | 2026-10-29 | `2b3c7ba` |
 
 
 By language:
@@ -952,6 +970,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 64.5% | 64.4% | 73.6% | 63.8% | 62.7% | 70.7% | 73.7% | 62.2% | 55.2% | 60.5% | 66.2% | 58.8% | 65.0% | 59.2% | 61.9% | 22.7% | 63.7% | 70.2% | 65.4% | 62.4% | 65.0% | 2.8% | 0.0% | 0.0% | 11.8% | 2.8% | 21.6% | 5.9% | 5.6% | 12.1% | 0.0% | 13.5% | 5.7% | 2.9% | 11.4% | 13.2% | 14.3% | 6.1% | 5.4% | 0.0% | 0.0% | 5.7% |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 64.5% | 66.8% | 73.4% | 65.7% | 63.1% | 68.6% | 73.4% | 63.5% | 54.9% | 59.0% | 69.0% | 60.3% | 65.5% | 60.0% | 62.0% | 36.2% | 59.5% | 69.9% | 64.0% | 63.6% | 67.5% | 5.6% | 0.0% | 0.0% | 11.8% | 2.8% | 13.5% | 5.9% | 5.6% | 15.2% | 8.8% | 13.5% | 5.7% | 5.9% | 11.4% | 10.5% | 11.4% | 6.1% | 5.4% | 5.9% | 0.0% | 0.0% |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 66.9% | 66.4% | 72.2% | 64.3% | 61.7% | 67.7% | 71.6% | 62.6% | 57.0% | 58.8% | 65.3% | 60.7% | 64.1% | 60.8% | 59.4% | 44.2% | 59.1% | 70.2% | 63.6% | 63.7% | 67.2% | 2.8% | 0.0% | 2.9% | 11.8% | 8.3% | 18.9% | 8.8% | 8.3% | 15.2% | 11.8% | 16.2% | 5.7% | 2.9% | 11.4% | 15.8% | 17.1% | 6.1% | 8.1% | 5.9% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
 
 
 **Number validity.** The headline leak above, split by whether a structured identifier passes the language packs' own validators (card Luhn, IBAN, TAJ and tax-ID check digits, phone numbering plans, ID-document checksums and formats). Invalid numbers stay in the headline: a mistyped real identifier is still personal data ([evaluation.md](evaluation.md#number-validity)). Valid values per type: .
@@ -970,6 +989,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 6.8% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 6.8% (50/740) |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 6.9% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 6.9% (51/740) |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
 
 ### `nemotron-pii`
 
@@ -978,7 +998,7 @@ mixed; documents: en 300.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 300 | 98.9% | 36.8% | 53.6% | 56.0% | 8.6% | 0.8% | 100.0% | 1.2 ms | 2026-10-27 | `18b15fa` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 90.9% | 87.8% | 89.4% | 0.7% | 0.4% | 1.4% | 100.0% | 91 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 90.9% | 87.8% | 89.4% | 0.7% | 0.4% | 1.4% | 100.0% | 59 ms | 2026-10-28 | `72026a5` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 300 | 99.4% | 96.4% | 97.8% | 2.7% | 1.4% | 0.5% | 99.7% | 82 ms | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 300 | 87.8% | 63.1% | 73.5% | 13.1% | 8.5% | 2.0% | 97.3% | 208 ms | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 300 | 98.7% | 96.4% | 97.5% | 2.9% | 1.6% | 0.5% | 99.7% | 98 ms | 2026-10-28 | `97ee284` |
@@ -1000,6 +1020,7 @@ mixed; documents: en 300.
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 300 | 96.0% | 97.1% | 96.5% | 0.4% | 0.4% | 0.8% | 99.7% | 84 ms | 2026-10-29 | `2b3c7ba` |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 300 | 94.3% | 89.7% | 91.9% | 3.0% | 1.9% | 1.2% | 99.7% | 275 ms | 2026-10-28 | `97ee284` |
 | pii-guard audit (rules + NER v2 + LLM) | 10 | 97.6% | 100.0% | 98.8% | 0.0% | 0.0% | 0.0% | 100.0% | 2.0 s | 2026-10-27 | `18b15fa` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 300 | 90.9% | 87.8% | 89.4% | 0.7% | 0.4% | 1.4% | 100.0% | 91 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 300 | 91.8% | 86.8% | 89.2% | 0.7% | 0.4% | 2.4% | 99.7% | 19 ms | 2026-10-27 | `477196a` |
 | Presidio | 300 | 58.7% | 76.3% | 66.4% | 12.8% | 5.3% | 32.0% | — | 16 ms | 2026-10-27 | `18b15fa` |
 | LLM Guard | 300 | 93.8% | 59.7% | 72.9% | 28.8% | 4.6% | 0.6% | 100.0% | 62 ms | 2026-10-27 | `18b15fa` |
@@ -1033,6 +1054,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 96.5% | 0.4% |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 91.9% | 3.0% |
 | pii-guard audit (rules + NER v2 + LLM) | 98.8% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 89.4% | 0.7% |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 89.2% | 0.7% |
 | Presidio | 66.4% | 12.8% |
 | LLM Guard | 72.9% | 28.8% |
@@ -1068,6 +1090,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 0.4% | 100.0% (139/139) | 0.0% (0/115) | 84.2% (80/95) | 1.1% (1/87) | 0.4% (2/495) |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 3.0% | 100.0% (139/139) | 0.0% (0/115) | 62.1% (59/95) | 16.1% (14/87) | 1.4% (7/495) |
 | pii-guard audit (rules + NER v2 + LLM) | 0.0% | 100.0% (5/5) | 0.0% (0/5) | 100.0% (7/7) | 0.0% (0/6) | 0.0% (0/14) |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 0.7% | 100.0% (139/139) | 0.0% (0/115) | 58.9% (56/95) | 3.4% (3/87) | 0.4% (2/495) |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 0.7% | 100.0% (139/139) | 0.0% (0/115) | 60.0% (57/95) | 1.1% (1/87) | 0.8% (4/495) |
 | Presidio | 12.8% | 91.4% (127/139) | 2.6% (3/115) | 14.7% (14/95) | 35.6% (31/87) | 11.1% (55/495) |
 | LLM Guard | 28.8% | 96.4% (134/139) | 2.6% (3/115) | 30.5% (29/95) | 51.7% (45/87) | 30.9% (153/495) |
@@ -1080,7 +1103,7 @@ hand-written; documents: pl 346.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 346 | 91.4% | 39.0% | 54.7% | 54.1% | 6.1% | 8.6% | 100.0% | 0.06 ms | 2026-10-28 | `793ddf9` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 346 | 87.6% | 91.2% | 89.3% | 3.5% | 9.1% | 11.2% | 100.0% | 53 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 346 | 87.2% | 91.3% | 89.2% | 3.5% | 9.1% | 11.7% | 100.0% | 39 ms | 2026-10-28 | `793ddf9` |
 | pii-guard fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393) | 346 | 40.0% | 65.7% | 49.7% | 31.8% | 8.5% | 59.3% | 100.0% | 50 ms | 2026-10-28 | `da9883e` |
 | pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393) | 346 | 77.5% | 89.7% | 83.2% | 8.7% | 6.6% | 19.4% | 100.0% | 36 ms | 2026-10-28 | `da9883e` |
 | pii-guard fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410) | 346 | 82.6% | 92.5% | 87.2% | 5.2% | 6.7% | 17.3% | 100.0% | 36 ms | 2026-10-28 | `72026a5` |
@@ -1089,6 +1112,7 @@ hand-written; documents: pl 346.
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 346 | 82.4% | 94.0% | 87.8% | 0.2% | 6.8% | 12.7% | 100.0% | 62 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 346 | 78.8% | 93.9% | 85.7% | 0.2% | 6.4% | 15.1% | 100.0% | 46 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 346 | 77.8% | 93.9% | 85.1% | 1.3% | 5.3% | 16.2% | 100.0% | 45 ms | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 346 | 87.6% | 91.2% | 89.3% | 3.5% | 9.1% | 11.2% | 100.0% | 53 ms | 2026-10-29 | `2b3c7ba` |
 
 
 By language:
@@ -1096,7 +1120,7 @@ By language:
 | System | pl F1 | pl leak |
 |---|---:|---:|
 | **pii-guard rules** | 54.7% | 54.1% |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 89.3% | 3.5% |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 89.2% | 3.5% |
 | pii-guard fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393) | 49.7% | 31.8% |
 | pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393) | 83.2% | 8.7% |
 | pii-guard fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410) | 87.2% | 5.2% |
@@ -1105,6 +1129,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 87.8% | 0.2% |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 85.7% | 0.2% |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 85.1% | 1.3% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 89.3% | 3.5% |
 
 
 **Number validity.** The headline leak above, split by whether a structured identifier passes the language packs' own validators (card Luhn, IBAN, TAJ and tax-ID check digits, phone numbering plans, ID-document checksums and formats). Invalid numbers stay in the headline: a mistyped real identifier is still personal data ([evaluation.md](evaluation.md#number-validity)). Valid values per type: `PHONE` 22/30, `ID_DOCUMENT` 139/241, `BANK_ACCOUNT` 63/88, `VEHICLE_PLATE` 0/30.
@@ -1123,6 +1148,7 @@ By language:
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 0.2% | 100.0% (224/224) | 0.0% (0/192) | 80.0% (132/165) | 1.2% (2/165) | 0.0% (0/468) |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 0.2% | 100.0% (224/224) | 0.0% (0/192) | 80.0% (132/165) | 1.2% (2/165) | 0.0% (0/468) |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 1.3% | 100.0% (224/224) | 0.0% (0/192) | 81.8% (135/165) | 5.5% (9/165) | 0.4% (2/468) |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 3.5% | 99.6% (223/224) | 0.0% (0/192) | 69.1% (114/165) | 16.4% (27/165) | 0.4% (2/468) |
 
 ### `secrets`
 
@@ -1558,13 +1584,13 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-29 | `2026-10-29-lab-1494-nemotron-pii-v32-s30` | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | nemotron-pii | en | recorded | `2b3c7ba` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1494-ai4privacy-v32-s30` | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | ai4privacy | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1494-agent-traffic-v32-s30` | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | agent-traffic | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-mapa-eur-lex-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-pl-pii-bench-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | pl-pii-bench | pl | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-gretel-finance-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | gretel-finance | de, en | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-cee-pii-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | cee-pii | en, hu | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-nemotron-pii-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | nemotron-pii | en | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-ai4privacy-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | ai4privacy | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-agent-traffic-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-mapa-eur-lex-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-pl-pii-bench-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | pl-pii-bench | pl | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-gretel-finance-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | gretel-finance | de, en | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-cee-pii-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | cee-pii | en, hu | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-nemotron-pii-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | nemotron-pii | en | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-ai4privacy-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | ai4privacy | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-agent-traffic-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | agent-traffic | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1494-agent-traffic-dev-v32-s70` | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | agent-traffic-dev | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1494-inflection-v32-s70` | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | inflection | hu | recorded | `2b3c7ba` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1494-smoke-v32-s70` | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | smoke | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
@@ -1574,9 +1600,9 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-29 | `2026-10-29-lab-1494-agent-traffic-dev-v32-s30` | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | agent-traffic-dev | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1494-inflection-v32-s30` | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | inflection | hu | recorded | `2b3c7ba` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1494-smoke-v32-s30` | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | smoke | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-agent-traffic-dev-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic-dev | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-inflection-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | inflection | hu | recorded | `2b3c7ba` (dirty) | — | — |
-| 2026-10-29 | `2026-10-29-lab-1494-smoke-v20` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | smoke | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-agent-traffic-dev-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | agent-traffic-dev | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-inflection-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | inflection | hu | recorded | `2b3c7ba` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-lab-1494-smoke-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | smoke | de, en, hu | recorded | `2b3c7ba` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1482-uncued-numbers-after` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | uncued-numbers | de, en, hu | recorded | `10c53ad` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1482-brand-names-after` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | brand-names | de, en, hu | recorded | `10c53ad` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1482-synth-sample-after` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | synth-sample | en, hu | recorded | `10c53ad` (dirty) | — | — |

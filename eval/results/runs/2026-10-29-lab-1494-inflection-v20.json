@@ -39,8 +39,8 @@
         "serving": "local PyTorch, CPU"
       }
     ],
-    "key": "rules+ner:xlmr-base-v2-hn",
-    "label": "pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)"
+    "key": "rules+ner:xlmr-base-v2-hn@rescore=lab-1494",
+    "label": "pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494)"
   },
   "fixture_set": "inflection",
   "fixtures": [

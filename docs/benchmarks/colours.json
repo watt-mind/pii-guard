@@ -185,6 +185,10 @@
       "color": "#CC79A7",
       "shape": "circle"
     },
+    "rules+ner:xlmr-base-v2-hn@rescore=lab-1494": {
+      "color": "#117733",
+      "shape": "circle"
+    },
     "rules+ner:xlmr-base-v2-no-ai4privacy": {
       "color": "#999933",
       "shape": "circle"

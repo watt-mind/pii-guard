@@ -79,3 +79,15 @@ def test_soup_averages_float_tensors_and_refuses_mismatches(tmp_path):
         soup.check_compatible(a, ckpt("c", 1.0, shape=(3, 2)))
     with pytest.raises(ValueError, match="alpha"):
         soup.soup(a, b, 1.5, tmp_path / "bad")
+
+
+def test_v20_rescore_has_its_own_system_key():
+    """LAB-1494's v2.0 re-scores must not become the published v2.0's latest rows."""
+    ev = load_script("training/ner/eval_v3.py", "ner_eval_v3_v32")
+    plain = ev.system_extra("LAB-1410", "v20")
+    rescore = ev.system_extra("LAB-1494", "v20")
+    assert "key" not in plain
+    assert rescore["key"] != "rules+ner:xlmr-base-v2-hn"
+    assert rescore["key"].startswith("rules+ner:xlmr-base-v2-hn@rescore=")
+    assert "re-score" in rescore["label"]
+    assert "key" not in ev.system_extra("LAB-1494", "v32-s30")

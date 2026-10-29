@@ -63,6 +63,24 @@ LABELS = {
     "v32-d": "pii-guard fast, NER v3.2 candidate D: v2.0 warm start + error-mined data (LAB-1494)",
     "v32-e": "pii-guard fast, NER v3.2 candidate E: v2.0 recipe + error-mined data (LAB-1494)",
 }
+#: Tickets whose v2.0 runs are selection-only re-scores (LAB-1494): their records get a system
+#: key and label of their own, so the report's latest-per-system pick keeps the published v2.0
+#: rows (timed on a quiet machine) instead of these, timed on a loaded one.
+RESCORE_TICKETS = ("LAB-1494",)
+
+
+def system_extra(ticket: str, candidate: str) -> dict[str, Any]:
+    """The ``system`` block merged into each record: label, and a re-score key for v2.0."""
+    label = LABELS.get(candidate, candidate)
+    if candidate != "v20" or ticket not in RESCORE_TICKETS:
+        return {"label": label}
+    tag = ticket.lower()
+    return {
+        "key": f"rules+ner:xlmr-base-v2-hn@rescore={tag}",
+        "label": f"pii-guard fast, NER v2.0 (selection-only re-score, {ticket})",
+    }
+
+
 #: Per ticket: the record slug prefix and what the run notes say. ``--ticket`` picks one.
 TICKETS = {
     "LAB-1393": "NER v3 candidates vs v2.0",
@@ -150,7 +168,7 @@ def _score(args: argparse.Namespace) -> int:
             slug=f"{args.ticket.lower()}-{name}-{args.candidate}",
             detectors=detectors,
             hardware=host_info(),
-            extra={"system": {"label": LABELS.get(args.candidate, args.candidate)}},
+            extra={"system": system_extra(args.ticket, args.candidate)},
             notes=notes,
         )[:1]
         overall = records[0]["metrics"]["overall"]
