@@ -2,6 +2,12 @@
 
 Only configuration is durable. Request texts, vault mappings and activity are never written
 here. Policy versions are append-only and each endpoint pins one exact version.
+
+A policy version holds text and visual entity actions (``FACE``, ``ID_PHOTO``, ``SIGNATURE``,
+``STAMP``: ``mask`` or ``keep`` only) and ``visual_detection`` (``local`` by default, or ``sam``;
+``local-only`` deployments accept ``local`` only), LAB-1444. Versions saved before then hold
+text types only and no ``visual_detection``; they read as ``local`` with the server's visual
+actions (:mod:`pii_guard.projects.visual`).
 """
 
 from __future__ import annotations
@@ -27,7 +33,12 @@ from cryptography.fernet import Fernet, InvalidToken
 from pydantic import SecretStr
 
 from pii_guard.policy import Policy, PolicySet
-from pii_guard.types import TEXT_ENTITY_TYPES, EntityType, PiiGuardError
+from pii_guard.types import TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, EntityType, PiiGuardError
+
+#: The actions a project policy may give a visual type (``block`` is text-only here).
+VISUAL_POLICY_ACTIONS = frozenset({Policy.MASK, Policy.KEEP})
+#: ``visual_detection`` values; the first is the default.
+VISUAL_DETECTIONS = ("local", "sam")
 
 _SCHEMA = """
                 CREATE TABLE IF NOT EXISTS store_metadata (
@@ -93,7 +104,8 @@ class EndpointSnapshot:
     name: str
     provider: str
     base_url: str
-    model: str
+    # ``None`` is pass-through: the client's own ``model`` is forwarded unchanged.
+    model: str | None
     api_key: SecretStr | None = field(repr=False)
     enabled: bool
     policy_id: str
@@ -115,6 +127,20 @@ def _name(value: object, *, maximum: int = 64) -> str:
     return value
 
 
+def _model(value: object, provider: str) -> str:
+    """The stored model: one pinned id, or ``''`` for pass-through (BYOK only).
+
+    Pass-through is stored as ``''`` in the existing ``model TEXT NOT NULL`` column, so the
+    schema (and every existing snapshot, which the loader checks against it) is unchanged.
+    Sponsored endpoints always pin a model; the allow-list is checked by the caller.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        if provider == "sponsored":
+            raise InvalidProjectConfigError()
+        return ""
+    return _name(value, maximum=256)
+
+
 class ProjectStore:
     """Single SQLite connection protected by a lock; SQL transactions protect other processes."""
 
@@ -123,6 +149,14 @@ class ProjectStore:
             raise ValueError("Invalid project storage configuration")
         self._lock = threading.RLock()
         self._defaults = {t.value: defaults.of(t).value for t in TEXT_ENTITY_TYPES}
+        # A visual default the server blocks is stored as mask; the server still wins when
+        # stricter (pii_guard.projects.visual), so the image is refused either way.
+        self._defaults.update(
+            {
+                t.value: (Policy.KEEP if defaults.of(t) is Policy.KEEP else Policy.MASK).value
+                for t in VISUAL_ENTITY_TYPES
+            }
+        )
         self._profile = detection_profile
         derived = hmac.digest(key, b"pii-guard-project-credentials-v1", "sha256")
         self._cipher = Fernet(base64.urlsafe_b64encode(derived))
@@ -273,9 +307,11 @@ class ProjectStore:
         return row
 
     def _project_metadata(self, row: sqlite3.Row) -> dict[str, Any]:
+        # The default policy is its family's latest version: what the Policy view shows and
+        # what requests without an endpoint apply. Endpoints pin their own version (LAB-1537).
         version = self._db.execute(
             "SELECT policy_version_id FROM policy_versions "
-            "WHERE project_id = ? AND policy_id = ? AND version = 1",
+            "WHERE project_id = ? AND policy_id = ? ORDER BY version DESC LIMIT 1",
             (row["id"], row["default_policy_id"]),
         ).fetchone()
         if version is None:
@@ -347,15 +383,19 @@ class ProjectStore:
         try:
             for entity, policy in overrides.items():
                 typed = EntityType(entity)
-                if typed not in TEXT_ENTITY_TYPES:
+                action = Policy(policy)
+                if typed in VISUAL_ENTITY_TYPES and action not in VISUAL_POLICY_ACTIONS:
                     raise InvalidProjectConfigError()
-                policies[typed.value] = Policy(policy).value
+                policies[typed.value] = action.value
         except (TypeError, ValueError):
             raise InvalidProjectConfigError() from None
         language = data.get("language", "hu")
         mode = data.get("mode", "fast")
+        detection = data.get("visual_detection", VISUAL_DETECTIONS[0])
         if (
-            not isinstance(language, str)
+            detection not in VISUAL_DETECTIONS
+            or (self._profile == "local-only" and detection != "local")
+            or not isinstance(language, str)
             or not 2 <= len(language) <= 16
             or not all(char.isascii() and (char.isalpha() or char == "-") for char in language)
             or mode not in {"fast", "audit"}
@@ -368,6 +408,7 @@ class ProjectStore:
             "language": language,
             "mode": mode,
             "detection_profile": self._profile,
+            "visual_detection": detection,
         }
 
     @staticmethod
@@ -478,7 +519,7 @@ class ProjectStore:
             "policy_version": row["policy_version"],
             "provider": row["provider"],
             "base_url": row["base_url"],
-            "model": row["model"],
+            "model": row["model"] or None,
             "credential_configured": row["credential"] is not None,
             "enabled": bool(row["enabled"]),
             "base_path": f"/e/{row['id']}/v1",
@@ -521,7 +562,7 @@ class ProjectStore:
                 raise InvalidProjectConfigError()
             if not isinstance(base_url, str) or not 1 <= len(base_url) <= 2048:
                 raise InvalidProjectConfigError()
-            model = _name(data.get("model"), maximum=256)
+            model = _model(data.get("model"), provider)
             enabled = data.get("enabled", True)
             if type(enabled) is not bool:
                 raise InvalidProjectConfigError()
@@ -635,7 +676,7 @@ class ProjectStore:
             row["name"],
             row["provider"],
             row["base_url"],
-            row["model"],
+            row["model"] or None,
             key,
             bool(row["enabled"]),
             row["policy_id"],

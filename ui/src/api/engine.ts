@@ -49,10 +49,10 @@ export function engineReason(s: EngineState): string {
     if (s.status.state === "offline") return "Live API selected, but it is not reachable";
     return "Live API selected";
   }
-  if (s.status.state === "checking") return "Looking for the pii-guard API";
-  if (s.status.state === "offline") return "pii-guard API is not reachable, using the demo engine";
+  if (s.status.state === "checking") return "Looking for the PII Guard API";
+  if (s.status.state === "offline") return "PII Guard API is not reachable, using the demo engine";
   if (s.endpointsMissing) return "API is up, but /v1 endpoints are not available yet";
-  return "Connected to the pii-guard API";
+  return "Connected to the PII Guard API";
 }
 
 export function parseModePreference(value: string | null | undefined): ModePreference {

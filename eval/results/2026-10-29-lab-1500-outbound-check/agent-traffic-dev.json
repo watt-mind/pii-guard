@@ -1,0 +1,51 @@
+{
+  "ticket": "LAB-1500",
+  "commit": "6d02b8d5335e72e82eb25631ddc82cdc4b3850a0",
+  "mode": "fast (rules + NER)",
+  "ner": "watt-mind/pii-guard-ner-xlmr-base",
+  "hardware": "macOS-26.5.2-arm64-arm-64bit, python 3.12.15",
+  "recorded_at": "2026-10-29T10:18:00+0100",
+  "set": "agent-traffic-dev",
+  "documents": 300,
+  "languages": {
+    "de": 100,
+    "en": 100,
+    "hu": 100
+  },
+  "per_document": {
+    "requests": 300,
+    "checked": 300,
+    "passed": 300,
+    "blocked": 0,
+    "false_block_rate": 0.0,
+    "blocked_types": {},
+    "short_occurrences": 0,
+    "refused_before_the_check": {},
+    "texts_per_request": {
+      "p50": 1
+    },
+    "check_ms": {
+      "p50": 0.167,
+      "p95": 0.438,
+      "max": 0.995
+    }
+  },
+  "shared_session": {
+    "requests": 300,
+    "checked": 300,
+    "passed": 300,
+    "blocked": 0,
+    "false_block_rate": 0.0,
+    "blocked_types": {},
+    "short_occurrences": 0,
+    "refused_before_the_check": {},
+    "texts_per_request": {
+      "p50": 1
+    },
+    "check_ms": {
+      "p50": 0.837,
+      "p95": 2.007,
+      "max": 2.631
+    }
+  }
+}

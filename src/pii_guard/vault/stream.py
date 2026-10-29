@@ -36,10 +36,15 @@ class StreamUnmasker:
     one across the unmaskers of one response) or, by default, a fresh one of the session's,
     so a stream restores at most ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of
     original values and then raises :class:`~pii_guard.vault.UnmaskOutputTooLargeError`.
+
+    ``session`` may be an adapter with the same ``unmask_with_report``. If it also has
+    ``hold_from(buffer) -> int`` (the index of a trailing part it may still restore, such as a
+    split escaped placeholder in the gateway's tool input, LAB-1481), that is held back too.
     """
 
     def __init__(self, session: VaultSession, budget: RestoreBudget | None = None) -> None:
         self._session = session
+        self._extra_hold = getattr(session, "hold_from", None)
         self._budget = budget if budget is not None else session.restore_budget()
         self._buffer = ""
         self._unresolved: dict[str, None] = {}
@@ -61,6 +66,8 @@ class StreamUnmasker:
             raise RuntimeError("StreamUnmasker.feed() after flush()")
         self._buffer += chunk
         hold = _hold_from(self._buffer)
+        if self._extra_hold is not None:
+            hold = min(hold, self._extra_hold(self._buffer))
         ready, self._buffer = self._buffer[:hold], self._buffer[hold:]
         return self._unmask(ready)
 

@@ -1,0 +1,245 @@
+{
+  "recorded": "2026-10-29",
+  "note": "scripts/record_image_labels.py: POST /v1/mask/image with render=labels on ui/public/samples/id-card-en.png (fictional specimen), configured like the hosted preview (segmenter local/YuNet, Tesseract, rules; signatures and stamps kept), in the session that masked the message. Value-free: placeholders only, no image.",
+  "message": {
+    "masked": "[[PERSON_da8daa]] is the seller. Is her ID card attached, and is it still valid?"
+  },
+  "image": {
+    "media_type": "image/png",
+    "width": 1012,
+    "height": 638,
+    "regions": [
+      {
+        "entity_type": "ID_PHOTO",
+        "box": [
+          24,
+          85,
+          313,
+          480
+        ],
+        "source": "local",
+        "detector": "yunet",
+        "score": 0.9436,
+        "policy": "mask",
+        "placeholder": "[[PERSON_da8daa]]",
+        "label": "PHOTO · [[PERSON_da8daa]]",
+        "match": "fuzzy",
+        "match_confidence": null,
+        "cover_box": [
+          22,
+          83,
+          315,
+          482
+        ],
+        "label_lines": [
+          "PHOTO · [[PERSON_da8daa]]"
+        ],
+        "label_px": 21
+      },
+      {
+        "entity_type": "FACE",
+        "box": [
+          93,
+          118,
+          244,
+          356
+        ],
+        "source": "local",
+        "detector": "yunet",
+        "score": 0.9436,
+        "policy": "mask",
+        "placeholder": "[[PERSON_da8daa]]",
+        "label": "PHOTO · [[PERSON_da8daa]]",
+        "match": "fuzzy",
+        "match_confidence": null,
+        "cover_box": [
+          91,
+          116,
+          246,
+          358
+        ],
+        "label_lines": [
+          "PHOTO · [[PERSON_da8daa]]"
+        ],
+        "label_px": 11
+      },
+      {
+        "entity_type": "PERSON",
+        "box": [
+          320,
+          130,
+          488,
+          148
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[PERSON_da8daa]]",
+        "label": "[[PERSON_da8daa]]",
+        "match": "fuzzy",
+        "match_confidence": 1.0,
+        "cover_box": [
+          318,
+          128,
+          490,
+          150
+        ],
+        "label_lines": [
+          "[[PERSON_da8daa]]"
+        ],
+        "label_px": 17
+      },
+      {
+        "entity_type": "PERSON",
+        "box": [
+          319,
+          176,
+          378,
+          194
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[PERSON_da8daa]]",
+        "label": "[[PERSON_da8daa]]",
+        "match": "fuzzy",
+        "match_confidence": 1.0,
+        "cover_box": [
+          317,
+          174,
+          440,
+          196
+        ],
+        "label_lines": [
+          "[[PERSON_da8daa]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "DATE_OF_BIRTH",
+        "box": [
+          320,
+          221,
+          453,
+          240
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[DATE_OF_BIRTH_9b7830]]",
+        "label": "[[DATE_OF_BIRTH_9b7830]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          318,
+          219,
+          493,
+          242
+        ],
+        "label_lines": [
+          "[[DATE_OF_BIRTH_9b7830]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "ID_DOCUMENT",
+        "box": [
+          319,
+          264,
+          429,
+          294
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[ID_DOCUMENT_ff33c9]]",
+        "label": "[[ID_DOCUMENT_ff33c9]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          317,
+          262,
+          475,
+          296
+        ],
+        "label_lines": [
+          "[[ID_DOCUMENT_ff33c9]]"
+        ],
+        "label_px": 13
+      }
+    ],
+    "masked": [
+      {
+        "entity_type": "DATE_OF_BIRTH",
+        "count": 1
+      },
+      {
+        "entity_type": "FACE",
+        "count": 1
+      },
+      {
+        "entity_type": "ID_DOCUMENT",
+        "count": 1
+      },
+      {
+        "entity_type": "ID_PHOTO",
+        "count": 1
+      },
+      {
+        "entity_type": "PERSON",
+        "count": 2
+      }
+    ],
+    "kept": [],
+    "analysis": {
+      "sam": {
+        "model": "yunet-2023mar",
+        "entity_types": [
+          "FACE",
+          "ID_PHOTO"
+        ]
+      },
+      "ocr": {
+        "ran": true,
+        "engine": "tesseract",
+        "detectors": [
+          "rules"
+        ],
+        "models": {},
+        "reason": null
+      }
+    },
+    "transcript": "FICTIONAL SPECIMEN AUTHORITY\nIDENTITY CARD\nSurname\n[[PERSON_da8daa]]\nGiven names\n[[PERSON_da8daa]]\nDate of birth Sex\n[[DATE_OF_BIRTH_9b7830]] F\nDocument no. Nationality\n[[ID_DOCUMENT_ff33c9]] UTO\nExpiry\n30 JUN 2031\n[PHOTO · [[PERSON_da8daa]]]\nLEO,\nMINTA/ SPECIMEN : Al-generated fictional specimen",
+    "summary": {
+      "document_type": "id_card",
+      "holder": "[[PERSON_da8daa]]",
+      "holder_match": "fuzzy",
+      "holder_confidence": 1.0,
+      "document_number": "[[ID_DOCUMENT_ff33c9]]",
+      "issuing_country": null,
+      "expiry": null,
+      "expired": false,
+      "mrz_present": false,
+      "mrz_valid": null,
+      "fields_found": {
+        "date_of_birth": "[[DATE_OF_BIRTH_9b7830]]",
+        "document_number": "[[ID_DOCUMENT_ff33c9]]",
+        "given_names": "[[PERSON_da8daa]]",
+        "surname": "[[PERSON_da8daa]]"
+      },
+      "fields_uncertain": []
+    },
+    "matches": {
+      "fuzzy": 1,
+      "new": 2
+    }
+  },
+  "answer": {
+    "masked": "Yes: the attached ID card belongs to [[PERSON_da8daa]], and it has not expired.",
+    "by": "stand-in model reading the masked summary"
+  }
+}

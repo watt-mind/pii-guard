@@ -11,11 +11,16 @@ interface Props {
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Cap the body's height and scroll it (Logs' request and response panes). */
+  scroll?: boolean;
+  /** 3 inside a page section that has its own h2 (the landing); 2 on a console screen. */
+  headingLevel?: 2 | 3;
 }
 
 /** A document pane. `side` says which side of the guard boundary its content lives on. */
-export function Pane({ side, eyebrow, title, id, actions, footer, children, className = "" }: Props) {
+export function Pane({ side, eyebrow, title, id, actions, footer, children, className = "", scroll = false, headingLevel = 2 }: Props) {
   const headingId = id ? `${id}-title` : undefined;
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   return (
     <section
       aria-labelledby={headingId}
@@ -32,7 +37,7 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
           side === "model" ? "border-model/20 bg-model-soft/60" : "border-line bg-surface-2",
         ].join(" ")}
       >
-        <div className="min-w-[11rem] flex-1">
+        <div className="min-w-0 flex-[1_1_11rem]">
           <p
             className={[
               "flex items-center gap-1.5 font-mono text-2xs",
@@ -42,13 +47,13 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
             <SideIcon side={side} />
             {eyebrow}
           </p>
-          <h2 id={headingId} className="mt-0.5 text-lg font-normal text-balance text-ink">
+          <Heading id={headingId} className="mt-0.5 text-lg font-normal text-balance text-ink">
             {title}
-          </h2>
+          </Heading>
         </div>
         {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
       </header>
-      <div className="min-h-0 flex-1 px-4 py-4 sm:px-5">{children}</div>
+      <div className={["min-h-0 flex-1 px-4 py-4 sm:px-5", scroll ? "max-h-[32rem] overflow-y-auto" : ""].join(" ")}>{children}</div>
       {footer && <footer className="border-t border-line px-4 py-2.5 text-xs text-muted sm:px-5">{footer}</footer>}
     </section>
   );
@@ -56,12 +61,12 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
 
 function SideIcon({ side }: { side: Side }) {
   return side === "you" ? (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="3" y="7" width="10" height="7" rx="1.5" />
       <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
     </svg>
   ) : (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M4.5 12.5h7a3 3 0 0 0 .4-6 4 4 0 0 0-7.7.9A2.6 2.6 0 0 0 4.5 12.5Z" />
     </svg>
   );

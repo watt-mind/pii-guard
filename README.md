@@ -1,11 +1,13 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="pii-guard: a privacy firewall for AI agents. You send 'Email Jane Placeholder: jane@example.net', the model sees 'Email [[PERSON_7f3a]]: [[EMAIL_20c2]]', you get the real name back." width="100%">
+  <img src="docs/assets/banner.svg" alt="PII Guard: a privacy gateway for AI agents. You send 'Email Jane Placeholder: jane@example.net', the model sees 'Email [[PERSON_7f3a]]: [[EMAIL_20c2]]', you get the real name back." width="100%">
 </p>
 
 <p align="center"><b>Mask personal data before it reaches the LLM, and put it back in the answer. Built on Meta's open models; runs on your machine.</b></p>
 
 <p align="center">
+  <a href="https://guard.watt-mind.com"><img alt="Try it live: guard.watt-mind.com" src="https://img.shields.io/badge/try%20it%20live-guard.watt--mind.com-b6f36b"></a>
   <a href="https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml/badge.svg?branch=develop"></a>
+  <a href="https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base"><img alt="Model on Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20model-watt--mind%2Fpii--guard--ner--xlmr--base-yellow"></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
   <a href="pyproject.toml"><img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-blue"></a>
   <a href="docs/decisions/0005-synthetic-data-only.md"><img alt="Fictional data only" src="https://img.shields.io/badge/data-fictional%20only-b6f36b"></a>
@@ -14,9 +16,18 @@
 **For teams building AI agents in Europe's regulated professions** (legal, health, finance, HR,
 public sector). Their useful data is personal data: a case file, a referral letter, an HR
 folder. Under GDPR, sending it to a third-party model is a legal risk; not sending it means the
-agent can't do the job. pii-guard is a drop-in proxy in between: change one base URL, and every
+agent can't do the job. PII Guard is a drop-in proxy in between: change one base URL, and every
 name, address, ID and face is swapped for a reversible placeholder before the request leaves
 your network, then restored in the answer, even mid-stream and inside tool calls.
+
+**Try it live: https://guard.watt-mind.com**. Run the guest demo with no sign-up and no key, or sign in with Google for your own gateway endpoint. Use fictional data only; it is a hackathon demo with a capped sponsored allowance.
+
+**Why it matters in the EU.** The GDPR requires data minimization (Art. 5) and lists
+pseudonymization among example by-design and security measures (Art. 25, 32). Placeholders
+reduce the personal data that reaches a model provider outside the EU, though they don't by
+themselves settle Chapter V transfer obligations. Pseudonymized data stay personal data for
+whoever holds the mapping: a technical measure, not a compliance certificate. Sources, the 2025
+CJEU ruling, DORA and the AI Act: [docs/eu-regulation.md](docs/eu-regulation.md).
 
 **Try it offline** (no key; needs [uv](https://docs.astral.sh/uv/) and
 [pnpm](https://pnpm.io/)): `git clone https://github.com/watt-mind/pii-guard.git && cd pii-guard && make demo`,
@@ -25,7 +36,7 @@ will do it without a clone: `uvx --from wattmind-pii-guard pii-guard up`.
 [More ways to run it](#try-it).
 
 <p align="center">
-  <img src="docs/assets/demo/demo.webp" alt="Demo of the console in the light theme with fictional English data: the Overview counts real gateway calls, a support e-mail is masked in the Playground, the same session continues in Chat and comes back restored, Logs shows each call, and Connect gives the commands for a client" width="100%">
+  <img src="docs/assets/demo/demo.webp" alt="Demo of the console in the light theme with fictional English data: the Overview counts real gateway calls, a support email is masked in the Playground, the same session continues in Chat and comes back restored, Logs shows each call, and Connect gives the commands for a client" width="100%">
 </p>
 
 <p align="center"><sub>Recorded from <code>pii-guard up</code> in fast mode (rules only, no NER, so free-text names pass); the offline mock upstream echoes the masked text back (with a key, the same flow runs on Muse Spark). <b>▶ Video walkthrough:</b> <i>link coming with the submission</i><!-- LAB-1123: video link --></sub></p>
@@ -51,7 +62,7 @@ yourself; hosted models only see fictional or already-masked text. All jobs, wit
 
 ## Results
 
-Leak = labelled personal values still readable in what the model receives (lower is safer).
+Leak = labeled personal values still readable in what the model receives (lower is safer).
 Fast mode is the published NER `v2.0` (`NER v2 base + hard negatives` in the reports). Copied
 from the generated [docs/benchmarks.md](docs/benchmarks.md): the hand-written set from
 [results by fixture set](docs/benchmarks.md#smoke), the public and agent-traffic test splits
@@ -60,11 +71,11 @@ with 95 % intervals there.
 
 | Leak | Hand-written (de+en+hu, 51 docs) | Agent traffic (990) | Nemotron-PII (300) | CEE-PII (451) | Gretel finance (400) | Ai4Privacy (600) |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard fast** (rules + NER, on-device, $0) | **0.0 %** | 2.6 % | **0.7 %** | **0.4 %** | 19.1 % | 0.4 % † |
-| PrivAiTe | 12.7 % | **2.4 %** | 4.0 % | 4.4 % | 27.6 % | 9.5 % |
+| **PII Guard fast** (rules + NER, on-device, $0) | **0.0 %** | **0.2 %** | **0.7 %** | **0.4 %** | 19.0 % | 0.4 % † |
+| PrivAiTe | 12.7 % | 2.4 % | 4.0 % | 4.4 % | 27.7 % | 9.5 % |
 | Presidio | 24.3 % | 12.4 % | 12.8 % | 36.5 % | **18.8 %** | 29.6 % |
 | LLM Guard | 45.1 % | 20.2 % | 28.8 % | 75.8 % | 59.3 % | 43.8 % ‡ |
-| pii-guard rules only (no name detection) | 41.6 % | 45.3 % | 56.0 % | 40.9 % | 80.7 % | 63.1 % |
+| PII Guard rules only (no name detection) | 41.6 % | 45.3 % | 56.0 % | 41.3 % | 80.8 % | 62.9 % |
 
 † **In-distribution:** the NER was trained on other rows of the same dataset (the OpenPII
 train split; no evaluated row was trained on). The same recipe trained without those rows
@@ -72,8 +83,8 @@ leaks **13.8 %** ([ablation](docs/benchmarks.md#ai4privacy)), so on unseen text 
 **PrivAiTe leaks less than fast mode** (9.5 %). ‡ LLM Guard's model was fine-tuned on
 Ai4Privacy data too ([configurations](eval/results/2026-10-27-comparison/README.md#systems)).
 
-- **Where fast mode is weak:** finance text (19.1 %, level with Presidio), and over-masking:
-  1.1 % on the hand-written set, but 14.0 % on agent traffic and 39.4 % on CEE-PII, where
+- **Where fast mode is weak:** finance text (19.0 %, level with Presidio's 18.8 %), and over-masking:
+  1.1 % on the hand-written set and 1.7 % on agent traffic, but 26.4 % on CEE-PII, where
   reference numbers without a cue word come out as IDs
   ([model card](training/ner/model-card.md#limitations)).
 - **Audit mode** (opt-in: rules + NER + Muse Spark Open, one hosted Baseten call per message,
@@ -94,7 +105,8 @@ Ai4Privacy data too ([configurations](eval/results/2026-10-27-comparison/README.
 
 The gateway speaks the OpenAI chat API, so an agent framework only changes its base URL. It
 masks every message, **tool definitions, tool-call arguments and tool results**, restores
-placeholders in streamed answers chunk by chunk (also when one is split across chunks), keeps
+placeholders in streamed answers chunk by chunk (when a chunk ends in what could be the start of
+a placeholder, only that tail is held back until the next chunk completes or rules it out), keeps
 the same placeholder for the same person across a whole session, masks inline images, and
 fails closed on anything it can't mask ([field table](docs/contracts.md#gateway-request-fields-implemented)).
 Clients that can't send a session header still get one sticky session: from the URL path
@@ -116,13 +128,19 @@ stream = client.chat.completions.create(
 )  # the model sees [[PERSON_…]] and [[EMAIL_…]]; your code gets the real values back
 ```
 
-It also serves the Responses API, so coding agents run behind it: with **Muse Code 1.4.14**
-on the Meta Model API, 0 of 16 fictional values reached the upstream and no request was
-refused ([LAB-1299](docs/journey/2026-10-27-lab-1299-muse-1-4-14.md),
-[guide](docs/integrations/muse-code.md)). Sessions, headers, modes and settings:
+It also serves the Responses API, so coding agents run behind it unmodified. **Four real
+harnesses, pi, OpenCode, Codex and Muse Code**, did a two-turn task on a fictional customer file
+(`cat` it, reply with an email, then edit the file) through the gateway on Muse Spark: across
+**115 agent requests, none of the 9 fictional values reached the model**, refused turns went from
+7 of 15 to **0 of 10** after the placeholder note, and 8 of 10 turns finished, with real values
+restored in the answers and on disk. Streaming, multi-turn sessions and tool calls (`read`,
+`write`, `bash`, `edit`) passed in all four; the one Codex failure was a regex-escaped placeholder,
+since fixed ([#221](https://github.com/watt-mind/pii-guard/pull/221)). Ten turns is a small sample, not a benchmark
+([matrix and setup](docs/integrations/harness-matrix-2026-10-29.md),
+[Muse Code guide](docs/integrations/muse-code.md)). Sessions, headers, modes and settings:
 [docs/architecture-gateway.md](docs/architecture-gateway.md).
 
-## Why pii-guard
+## Why PII Guard
 
 - **Reversible, not redacted.** The answer names the real person, and every document in the
   hand-written set unmasks back to its original exactly.
@@ -136,6 +154,9 @@ refused ([LAB-1299](docs/journey/2026-10-27-lab-1299-muse-1-4-14.md),
   | You get back | Megírtam a levelet Próba Zsuzsannának. | I wrote *to Zsuzsanna Próba*. |
 
   Inflected-name leaks went [18/30 → 0/30](docs/journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333).
+- **Language packs.** Hungarian, English, German and Polish (`hu`, `en`, `de`, `pl`) each ship
+  validated identifier rules, cue words and case handling; a new language is one package
+  ([docs/languages.md](docs/languages.md)).
 - **Measured in the open.** Every number is a committed [run record](eval/results/runs/); the
   report is regenerated and checked in CI; all data is fictional.
 
@@ -149,11 +170,11 @@ screenshots were taken in fast mode without the NER, so free-text names stay rea
 
 | **Text:** every value found, and what the model saw | **Gateway:** a chat, masked out and restored back |
 |---|---|
-| [![Playground, Text tab: a fictional English support e-mail with each value the rules found highlighted, and the placeholders the model sees](docs/assets/demo/1-mask.webp)](docs/assets/demo/1-mask.webp) | [![Playground, Chat tab: the same e-mail sent through the gateway in the same session; a note says names are not detected without NER, and the model received placeholders](docs/assets/demo/2-chat.webp)](docs/assets/demo/2-chat.webp) |
+| [![Playground, Text tab: a fictional English support email with each value the rules found highlighted, and the placeholders the model sees](docs/assets/demo/1-mask.webp)](docs/assets/demo/1-mask.webp) | [![Playground, Chat tab: the same email sent through the gateway in the same session; a note says names are not detected without NER, and the model received placeholders](docs/assets/demo/2-chat.webp)](docs/assets/demo/2-chat.webp) |
 | **Images:** face, photo, signature and printed values covered | **Logs:** every call, its masks and its timing |
 | [![Playground, Images tab: this server refuses images (no OCR, no face detector), so a fictional visitor badge replays regions recorded from a real SAM 3.1 run, and the model saw the face filled](docs/assets/demo/3-images.webp)](docs/assets/demo/3-images.webp) | [![Logs: calls through the gateway with their entity types, a call's details (mock upstream, session from the X-PII-Guard-Session header) and its timing waterfall](docs/assets/demo/6-traffic.webp)](docs/assets/demo/6-traffic.webp) |
 | **Overview:** what the guard protected, from real calls only | **Evaluation:** leak against latency, from the run records |
-| [![Overview: requests, values masked, requests blocked and pii-guard overhead counted from the traffic log, top entity types and latency per stage](docs/assets/demo/7-traffic-charts.webp)](docs/assets/demo/7-traffic-charts.webp) | [![Evaluation: the benchmark headline, fixture sets, languages and systems to compare](docs/assets/demo/4-benchmarks.webp)](docs/assets/demo/4-benchmarks.webp) |
+| [![Overview: requests, values masked, requests blocked and PII Guard overhead counted from the traffic log, top entity types and latency per stage](docs/assets/demo/7-traffic-charts.webp)](docs/assets/demo/7-traffic-charts.webp) | [![Evaluation: the benchmark headline, fixture sets, languages and systems to compare](docs/assets/demo/4-benchmarks.webp)](docs/assets/demo/4-benchmarks.webp) |
 
 At phone width: [Text](docs/assets/demo/5-mask-mobile.webp) ·
 [Logs](docs/assets/demo/8-traffic-mobile.webp). Connect: [copyable commands per client](docs/assets/demo/9-connect.webp). The screens: [ui/README.md](ui/README.md#screens).
@@ -186,7 +207,7 @@ make smoke          # rules only, offline (CI runs it)
 `make demo` runs **fast mode with the NER** from a clean checkout: it installs the `ner` extra
 and, without `PII_GUARD_NER_MODEL`, downloads a NER model once (about 1.1 GB, pinned
 revision, SHA-256 checked, into `~/.cache/pii-guard/models`; the banner says which model
-runs): pii-guard's own NER, [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
+runs): PII Guard's own NER, [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
 `v2.0` (XLM-R base, Apache-2.0; [model card](training/ner/model-card.md)). Free-text names are then masked with no known values, in the gateway and on the Mask and
 Images screens alike. `make demo MODE=rules` is rules only: offline, no download, names need
 known values. Which model and why: [models.md](docs/models.md#which-ner-model-fast-mode-runs).
@@ -208,7 +229,7 @@ with CPU-only torch; [operations.md](docs/operations.md#docker)). More:
  your app / agent ◄───┘
 ```
 
-The mapping between real values and placeholders **never leaves pii-guard**. Design and
+The mapping between real values and placeholders **never leaves PII Guard**. Design and
 engineering choices: [docs/architecture.md](docs/architecture.md); threat model:
 [docs/privacy-model.md](docs/privacy-model.md); everything else: [docs/INDEX.md](docs/INDEX.md).
 
@@ -219,7 +240,7 @@ engineering choices: [docs/architecture.md](docs/architecture.md); threat model:
 ## Contributing, security, license
 
 See [CONTRIBUTING.md](CONTRIBUTING.md); the rule that matters most: **never commit real
-personal data**, not even in a test. **No authentication by default:** keep pii-guard on
+personal data**, not even in a test. **No authentication by default:** keep PII Guard on
 loopback or behind an authenticating proxy, or set `PII_GUARD_API_TOKEN`
 ([operations.md](docs/operations.md#exposure-and-authentication)). Found a way to make personal
 data leak past the guard? Report it privately: [SECURITY.md](SECURITY.md).

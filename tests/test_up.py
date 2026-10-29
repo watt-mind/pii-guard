@@ -5,6 +5,7 @@ Fictional data only (ADR 0005). The wheel itself is smoke-tested by scripts/ci/w
 
 from __future__ import annotations
 
+import json
 import os
 import signal
 import socket
@@ -84,6 +85,36 @@ def test_ui_index_is_served_byte_for_byte(ui_dir: Path) -> None:
     client = _client(ui_dir)
     for path in ("/", "/index.html", "/traffic"):
         assert client.get(path).text == INDEX
+
+
+def test_hashed_assets_are_immutable_and_gzipped_once(ui_dir: Path) -> None:
+    # The Evaluation screen's benchmark index ships as hashed JSON parts (LAB-1454).
+    body = json.dumps({"runs": [{"run_id": f"run-{i}", "date": "2026-10-28"} for i in range(200)]})
+    (ui_dir / "assets" / "benchmarks-runs-abc123.json").write_text(body, encoding="utf-8")
+    client = _client(ui_dir)
+    url = "/assets/benchmarks-runs-abc123.json"
+    first = client.get(url, headers={"Accept-Encoding": "gzip, br"})
+    assert first.status_code == 200
+    assert first.headers["content-encoding"] == "gzip"
+    assert first.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert first.headers["vary"] == "Accept-Encoding"
+    assert first.headers["content-type"].startswith("application/json")
+    assert int(first.headers["content-length"]) < len(body) / 5
+    assert first.text == body  # httpx decodes it
+    again = client.get(url, headers={"Accept-Encoding": "gzip"})
+    assert again.content == first.content
+    plain = client.get(url, headers={"Accept-Encoding": "identity"})
+    assert "content-encoding" not in plain.headers
+    assert plain.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert plain.text == body
+    refused = client.get(url, headers={"Accept-Encoding": "gzip;q=0"})
+    assert "content-encoding" not in refused.headers
+    # Small files are not worth it; the page itself is never cached.
+    small = client.get("/assets/app.js", headers={"Accept-Encoding": "gzip"})
+    assert "content-encoding" not in small.headers
+    assert small.headers["cache-control"] == "public, max-age=31536000, immutable"
+    page = client.get("/", headers={"Accept-Encoding": "gzip"})
+    assert page.headers["cache-control"] == "no-cache"
 
 
 def test_no_ui_page_says_mock_upstream_not_demo_mode(tmp_path: Path) -> None:

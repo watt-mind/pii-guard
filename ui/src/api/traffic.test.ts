@@ -3,7 +3,7 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { DEMO_SCENARIOS } from "./demoTraffic";
 import { ApiError, UnreachableError } from "./http";
-import { DEDUP_WINDOW, SSE_MAX_ERRORS, connectTraffic, fetchTraffic, parseTrafficEvent, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
+import { DEDUP_WINDOW, MAX_BACKOFF_MS, SSE_MAX_ERRORS, TrafficRateLimitedError, connectTraffic, fetchTraffic, outboundCheckLabel, parseRetryAfter, parseTrafficEvent, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
 
 const events = (full.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -173,6 +173,99 @@ describe("connectTraffic", () => {
   });
 });
 
+// LAB-1437: the server answered, so a 429 or a 401/403 is never "unreachable".
+describe("connectTraffic refusals", () => {
+  afterEach(() => vi.useRealTimers());
+  const throttled = (retryAfter?: string) =>
+    new Response(JSON.stringify({ error: { code: "abuse_throttled", message: "Request allowance reached; try again in 7 seconds" } }), {
+      status: 429,
+      headers: { "Content-Type": "application/json", ...(retryAfter ? { "Retry-After": retryAfter } : {}) },
+    });
+
+  it("parses Retry-After as seconds or an HTTP date", () => {
+    expect(parseRetryAfter("7")).toBe(7000);
+    expect(parseRetryAfter(new Date(10_000).toUTCString(), 4_000)).toBe(6000);
+    expect(parseRetryAfter(null)).toBe(0);
+    expect(parseRetryAfter("soon")).toBe(0);
+  });
+
+  it("throws a rate-limit error with Retry-After, also without a contract body", async () => {
+    const err = await fetchTraffic(async () => throttled("7"), "", {}).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(TrafficRateLimitedError);
+    expect(err).toMatchObject({ status: 429, code: "abuse_throttled", retryAfterMs: 7000 });
+    const bare = await fetchTraffic(async () => new Response("slow down", { status: 429 }), "", {}).catch((e: unknown) => e);
+    expect(bare).toMatchObject({ status: 429, code: "rate_limited", retryAfterMs: 0 });
+  });
+
+  it("reports a 429 as limited, waits at least Retry-After, backs off, then goes live", async () => {
+    vi.useFakeTimers();
+    const statuses: TrafficStatus[] = [];
+    const f = vi.fn(async () => (f.mock.calls.length <= 2 ? throttled(f.mock.calls.length === 1 ? "7" : undefined) : json(200, { level: "masked", size: 200, events: [] })));
+    const conn = connectTraffic({ fetch: f as unknown as typeof fetch, EventSource: null, pollMs: 1000, onEvents: () => {}, onStatus: (s) => statuses.push(s) });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statuses.at(-1)).toEqual({ state: "limited", message: "Request allowance reached; try again in 7 seconds", retryAfterMs: 7000 });
+    expect(statuses.some((s) => s.state === "offline")).toBe(false);
+    await vi.advanceTimersByTimeAsync(6999); // Retry-After (7 s) beats the 2 s backlog retry
+    expect(f).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f).toHaveBeenCalledTimes(2);
+    expect(statuses.at(-1)).toMatchObject({ state: "limited", retryAfterMs: 0 });
+    await vi.advanceTimersByTimeAsync(3999); // second refusal in a row: 2 s doubled
+    expect(f).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f).toHaveBeenCalledTimes(3);
+    expect(statuses.at(-1)).toMatchObject({ state: "live", via: "poll" });
+    conn.close();
+  });
+
+  it("caps the backoff of repeated 429s", async () => {
+    vi.useFakeTimers();
+    const f = vi.fn(async () => throttled());
+    const conn = connectTraffic({ fetch: f as unknown as typeof fetch, EventSource: null, pollMs: 1000, onEvents: () => {}, onStatus: () => {} });
+    await vi.advanceTimersByTimeAsync(2000 + 4000 + 8000 + 16000 + 32000); // five retries
+    expect(f).toHaveBeenCalledTimes(6);
+    await vi.advanceTimersByTimeAsync(MAX_BACKOFF_MS - 1);
+    expect(f).toHaveBeenCalledTimes(6);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f).toHaveBeenCalledTimes(7);
+    conn.close();
+  });
+
+  it("reports 401 as signed out and 403 as forbidden, and keeps retrying", async () => {
+    vi.useFakeTimers();
+    for (const [code, reason] of [
+      [401, "signed_out"],
+      [403, "forbidden"],
+    ] as const) {
+      const statuses: TrafficStatus[] = [];
+      const f = vi.fn(async () => json(code, { error: { code: "unauthorized", message: "Sign in with Google to use this endpoint" } }));
+      const conn = connectTraffic({ fetch: f as unknown as typeof fetch, EventSource: null, pollMs: 1000, onEvents: () => {}, onStatus: (s) => statuses.push(s) });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(statuses.at(-1)).toEqual({ state: "denied", reason, message: "Sign in with Google to use this endpoint" });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(f).toHaveBeenCalledTimes(2);
+      conn.close();
+    }
+    const bare = await fetchTraffic(async () => new Response("", { status: 401 }), "", {}).catch((e: unknown) => e);
+    expect(bare).toBeInstanceOf(ApiError);
+    expect(bare).toMatchObject({ status: 401 });
+  });
+
+  it("backs off polls that get 429 after the backlog loaded", async () => {
+    vi.useFakeTimers();
+    const statuses: TrafficStatus[] = [];
+    const f = vi.fn(async () => (f.mock.calls.length === 1 ? json(200, { level: "masked", size: 200, events: [] }) : throttled("5")));
+    const conn = connectTraffic({ fetch: f as unknown as typeof fetch, EventSource: null, pollMs: 1000, onEvents: () => {}, onStatus: (s) => statuses.push(s) });
+    await vi.advanceTimersByTimeAsync(1000); // first poll: 429, Retry-After 5 s
+    expect(statuses.at(-1)).toMatchObject({ state: "limited", retryAfterMs: 5000 });
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(f).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f).toHaveBeenCalledTimes(3);
+    conn.close();
+  });
+});
+
 // LAB-1357: a restarted backend, a stalled endpoint, a long-running connection.
 describe("connectTraffic resilience", () => {
   /** Events from a restarted server: fresh ids, seq numbering from 1 again. */
@@ -259,7 +352,7 @@ describe("connectTraffic resilience", () => {
     expect(signals[0]!.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1000); // timeoutMs reached
     expect(signals[0]!.aborted).toBe(true);
-    expect(statuses.at(-1)).toEqual({ state: "offline", message: "pii-guard API did not answer within 5 s" });
+    expect(statuses.at(-1)).toEqual({ state: "offline", message: "PII Guard API did not answer within 5 s" });
     await vi.advanceTimersByTimeAsync(1000); // the next poll, only after the previous one settled
     expect(f).toHaveBeenCalledTimes(3);
     conn.close();
@@ -379,5 +472,35 @@ describe("startFixtureFeed", () => {
     const none = vi.fn();
     startFixtureFeed([], () => {}, { onDone: none });
     expect(none).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("parseTrafficEvent endpoint (LAB-1492)", () => {
+  const base = { id: "r_1", seq: 1, timing: {} };
+  it("keeps a hosted event's endpoint tag", () => {
+    expect(parseTrafficEvent({ ...base, endpoint: { id: "ep_a", name: "Synthetic CLI" } })?.endpoint).toEqual({ id: "ep_a", name: "Synthetic CLI" });
+  });
+  it("falls back to the id without a name, and to null without a tag", () => {
+    expect(parseTrafficEvent({ ...base, endpoint: { id: "ep_a" } })?.endpoint).toEqual({ id: "ep_a", name: "ep_a" });
+    expect(parseTrafficEvent(base)?.endpoint).toBeNull();
+    expect(parseTrafficEvent({ ...base, endpoint: "ep_a" })?.endpoint).toBeNull();
+  });
+});
+
+describe("outbound re-check field (LAB-1500)", () => {
+  const base = { id: "req_1", seq: 1, timing: {} };
+
+  it("parses the counts and labels a pass and a block", () => {
+    const passed = parseTrafficEvent({ ...base, outbound_check: { result: "passed", texts: 3, hits: {}, short: 1, ms: 0.4 } });
+    expect(passed?.outbound_check).toEqual({ result: "passed", texts: 3, hits: {}, short: 1, ms: 0.4 });
+    expect(outboundCheckLabel(passed!.outbound_check)).toBe("passed · 3 texts");
+    const blocked = parseTrafficEvent({ ...base, outbound_check: { result: "blocked", texts: 1, hits: { PERSON: 1 }, short: 0, ms: 0.2 } });
+    expect(outboundCheckLabel(blocked!.outbound_check)).toBe("blocked · 1 value left");
+  });
+
+  it("is null for events from servers without it, or refused before it", () => {
+    const old = parseTrafficEvent(base);
+    expect(old?.outbound_check).toBeNull();
+    expect(outboundCheckLabel(null)).toBe("not reached");
   });
 });

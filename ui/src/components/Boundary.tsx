@@ -23,7 +23,7 @@ export function Boundary({ direction, label, children }: Props) {
             <path d="M8.8 12h6.4" strokeLinecap="round" />
           </svg>
         </span>
-        <span className="font-mono text-2xs font-medium text-guard">pii-guard</span>
+        <span className="font-mono text-2xs font-medium text-guard">PII Guard</span>
         <span aria-hidden="true" className="text-lg leading-none text-faint">
           <span className="lg:hidden">↓</span>
           <span className="hidden lg:inline">→</span>

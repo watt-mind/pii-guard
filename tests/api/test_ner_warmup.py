@@ -34,6 +34,7 @@ NON_DETECTING_POSTS = frozenset(
         "/v1/projects",
         "/v1/projects/{project_id}/policies",
         "/v1/projects/{project_id}/endpoints",
+        "/v1/projects/{project_id}/endpoints/models",
         "/v1/projects/{project_id}/endpoints/{endpoint_id}/keys",
     }
 )

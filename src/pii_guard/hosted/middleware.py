@@ -12,12 +12,39 @@ import anyio.to_thread
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pii_guard.api.errors import error_response
+from pii_guard.api.errors import error_headers, error_response
+from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT
 from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
+from pii_guard.hosted.images import IMAGE_COMPUTE_TOKENS, IMAGE_PATH, image_body_limit
+from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, upstream_payload_bound
 from pii_guard.hosted.runtime import HostedService
 from pii_guard.projects.middleware import endpoint_body, endpoint_path, prepare_project
 from pii_guard.types import PiiGuardError
+
+# The whole body (endpoint and hosted reads together) must arrive within this many seconds
+# of taking an ingress slot, however it is trickled.
+BODY_READ_SECONDS = 10
+
+
+# Tool types a client executes itself; any other type (web search, file search, code
+# interpreter, MCP) runs and bills at the provider, outside the reserved token usage.
+_CLIENT_TOOL_TYPES = frozenset({"function", "custom"})
+
+
+def _provider_billed_tools(body: dict[str, Any]) -> bool:
+    """Whether a chat or Responses body asks the provider for separately billed tool work."""
+    if "web_search_options" in body:
+        return True
+    tools = body.get("tools")
+    if tools is None:
+        return False
+    if not isinstance(tools, list):
+        return True
+    return any(
+        not isinstance(tool, dict) or tool.get("type", "function") not in _CLIENT_TOOL_TYPES
+        for tool in tools
+    )
 
 
 class HostedRequestError(PiiGuardError):
@@ -49,7 +76,10 @@ class HostedMiddleware:
         started = False
         runtime = None
         reservation = None
-        entered = False
+        # The principal holding an ingress slot; set only once identity and admission pass.
+        ingress: Principal | None = None
+        streaming: str | None = None
+        payload_limit = None
         state: dict[str, Any] = dict(scope.get("state", {}))
 
         async def tracked_send(message: Message) -> None:
@@ -74,8 +104,6 @@ class HostedMiddleware:
 
         cookie_header = None
         try:
-            self.service.enter_ingress()
-            entered = True
             headers = Headers(scope=scope)
             protected_headers = {
                 "authorization",
@@ -103,9 +131,15 @@ class HostedMiddleware:
                 if auth.startswith("pg_ep_"):
                     if routed is None or headers.get("x-pii-guard-token"):
                         raise HostedUnauthorizedError("Endpoint key requires its endpoint path")
-                    endpoint_snapshot = await anyio.to_thread.run_sync(
-                        self.service.projects.store.resolve_key, auth, routed[0]
-                    )
+                    # The only pre-authentication await: bounded by its own small pool,
+                    # and no body is read while it is held.
+                    self.service.enter_preauth()
+                    try:
+                        endpoint_snapshot = await anyio.to_thread.run_sync(
+                            self.service.projects.store.resolve_key, auth, routed[0]
+                        )
+                    finally:
+                        self.service.leave_preauth()
                     principal = (
                         Principal(endpoint_snapshot.owner_id, True, "api_key")
                         if endpoint_snapshot
@@ -147,7 +181,21 @@ class HostedMiddleware:
                 "/v1/vault/sessions",
                 "/v1/account/api-keys",
                 "/v1/account/connections",
+                "/v1/account/first-run",
+                "/v1/status",
+                "/v1/connect/snippets",
             }
+            # Hosted images (ADR 0014): signed-in Google owners only, never by key or as a
+            # guest, never through an endpoint path, and only while the operator offers them.
+            image = canonical == IMAGE_PATH and self.service.settings.hosted_images
+            if image:
+                allowed.add(IMAGE_PATH)
+                if principal.auth_method != "google":
+                    raise HostedUnauthorizedError("Image masking requires signed-in owner access")
+                if routed is not None or scope.get("method") != "POST":
+                    raise HostedRequestError("Image masking accepts a direct POST only")
+            # The shared console's reads (ADR 0013): the owner's projection, never by key.
+            console = canonical in {"/v1/status", "/v1/connect/snippets"}
             parameterized = re.fullmatch(
                 r"/v1/(?:sessions/[^/]+/known-values|vault/sessions/[^/]+|"
                 r"account/(?:api-keys|connections)/[^/]+)",
@@ -167,6 +215,21 @@ class HostedMiddleware:
             )
             if project_management and principal.auth_method != "google":
                 raise HostedUnauthorizedError("Project management requires signed-in owner access")
+            if console and principal.auth_method != "google":
+                raise HostedUnauthorizedError("The console requires signed-in owner access")
+            # First run (LAB-1455) provisions the owner's default endpoint and its first key:
+            # a signed-in owner's, like key management, and free like the account itself.
+            first_run = canonical == "/v1/account/first-run"
+            credentials = canonical in {
+                "/v1/account/api-keys",
+                "/v1/account/connections",
+                "/v1/account/first-run",
+            } or bool(re.fullmatch(r"/v1/account/(?:api-keys|connections)/[^/]+", canonical))
+            if credentials and principal.auth_method != "google":
+                # A guard API key must never mint keys or connections that outlive it.
+                raise HostedUnauthorizedError(
+                    "Key and connection management requires a signed-in session"
+                )
             if canonical not in allowed and parameterized is None and not project_management:
                 raise HostedRequestError("This endpoint is unavailable in hosted mode")
             if canonical not in {"/v1/account", "/v1/demo"} and not principal.authenticated:
@@ -187,14 +250,37 @@ class HostedMiddleware:
                     raise HostedRequestError("A same-origin request is required")
                 if headers.get("sec-fetch-site") == "cross-site":
                     raise HostedRequestError("A same-origin request is required")
-            account_inspection = canonical == "/v1/account" and scope.get("method") == "GET"
-            if not account_inspection:
+            method = scope.get("method")
+            read = method in {"GET", "HEAD"}
+            preflight = method == "OPTIONS"
+            # /v1/account is free under every method: it never admits, reserves budget or
+            # takes a runtime, so cookieless calls cannot exhaust capacity (LAB-1412).
+            account = canonical == "/v1/account"
+            if not principal.authenticated:
+                # A guest's only work is the curated demo itself.
+                needs_runtime = work = canonical == "/v1/demo" and method == "POST"
+            else:
+                # Key and connection management uses the account stores, never a runtime.
+                needs_runtime = not (account or preflight or credentials)
+                # Reads (the console polls them) spend no daily request or token budget and
+                # hold no inference concurrency; the abuse read bucket bounds them instead.
+                work = not (account or preflight or read or first_run)
+            if not account:
                 self.service.abuse.admit(
                     headers,
                     principal_id=principal.id,
                     authenticated=principal.authenticated,
                     anonymous_sponsored=canonical == "/v1/demo" and scope.get("method") == "POST",
+                    read=read or first_run,
                 )
+            # Only now, with identity, path, origin and abuse admission settled, does the
+            # request take an ingress slot: from the guest or the signed-in pool, and within
+            # its principal's share (LAB-1442). One deadline then bounds every body read.
+            self.service.enter_ingress(principal)
+            ingress = principal
+            deadline = asyncio.get_running_loop().time() + min(
+                BODY_READ_SECONDS, self.service.settings.hosted_request_timeout
+            )
             if principal.authenticated and canonical not in {"/v1/account", "/v1/demo"}:
                 state = await anyio.to_thread.run_sync(
                     prepare_project,
@@ -203,19 +289,26 @@ class HostedMiddleware:
                     principal.id,
                     endpoint_snapshot,
                 )
-                scope, receive = await endpoint_body(
-                    scope, receive, state, self.service.settings.hosted_max_body_bytes
-                )
+                async with asyncio.timeout_at(deadline):
+                    scope, receive = await endpoint_body(
+                        scope, receive, state, self.service.settings.hosted_max_body_bytes
+                    )
                 headers = Headers(scope=scope)
+            # Text routes stay text-sized; the image route gets its own bounded limit.
+            body_limit = (
+                image_body_limit(self.service.settings)
+                if image
+                else self.service.settings.hosted_max_body_bytes
+            )
             raw = bytearray()
             if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}:
-                async with asyncio.timeout(min(10, self.service.settings.hosted_request_timeout)):
+                async with asyncio.timeout_at(deadline):
                     while True:
                         message = await receive()
                         if message["type"] == "http.disconnect":
                             return
                         raw.extend(message.get("body", b""))
-                        if len(raw) > self.service.settings.hosted_max_body_bytes:
+                        if len(raw) > body_limit:
                             raise HostedRequestError("Hosted request body is too large")
                         if not message.get("more_body", False):
                             break
@@ -229,16 +322,22 @@ class HostedMiddleware:
             if canonical in {"/v1/chat/completions", "/v1/responses"}:
                 try:
                     body = json.loads(raw)
-                except (ValueError, UnicodeDecodeError):
+                except (ValueError, UnicodeDecodeError, RecursionError):
                     raise HostedRequestError("Invalid JSON request") from None
                 if not isinstance(body, dict) or headers.get("x-pii-guard-mode", "fast") != "fast":
                     raise HostedRequestError("Hosted requests require fast text mode")
-                if (
-                    not connection_id
-                    and (selected_endpoint is None or selected_endpoint.provider == "sponsored")
-                    and body.get("model") not in self.service.settings.hosted_models
-                ):
+                sponsored_route = not connection_id and (
+                    selected_endpoint is None or selected_endpoint.provider == "sponsored"
+                )
+                if sponsored_route and body.get("model") not in self.service.settings.hosted_models:
                     raise HostedRequestError("Model is not allowed for sponsored requests")
+                if sponsored_route and _provider_billed_tools(body):
+                    # Provider-side tools (Meta web search grounding: USD 2.50 per 1,000
+                    # queries, LAB-1372) are billed outside the token usage the reservation
+                    # bounds, so the sponsored route never asks for them.
+                    raise HostedRequestError(
+                        "Provider-side tools are not allowed for sponsored requests"
+                    )
                 if body.get("n", 1) != 1:
                     raise HostedRequestError("Hosted requests allow one completion")
                 maximum = self.service.settings.hosted_max_output_tokens
@@ -252,26 +351,48 @@ class HostedMiddleware:
                     maximum = min(maximum, value)
                 body[output_field] = maximum
                 raw = bytearray(json.dumps(body).encode())
+                output_limit = maximum
+            else:
+                output_limit = DEMO_MAX_OUTPUT_TOKENS
             state["hosted_principal"] = principal
-            # Account inspection remains available after exhaustion; all mutations and data
-            # routes consume compute quotas. The full conservative charge survives failure.
-            if not account_inspection:
-                input_tokens = (max(len(raw), 1024) * 32 + 4096) if paid else len(raw)
-                output_tokens = self.service.settings.hosted_max_output_tokens if paid else 0
+            # The account remains available after exhaustion; mutations and data work consume
+            # compute quotas. The full conservative charge survives failure.
+            if work:
+                if paid:
+                    # Sized from this request: the gateway refuses a masked payload beyond
+                    # the bound, and output is the request's own (capped) token limit.
+                    payload_limit = upstream_payload_bound(len(raw))
+                    input_tokens, output_tokens = payload_limit, output_limit
+                else:
+                    input_tokens, output_tokens = len(raw), 0
+                if image:
+                    # A fixed compute charge plus one from the separate daily image count:
+                    # reserved here, before any decoding or OCR, and never refunded.
+                    input_tokens = IMAGE_COMPUTE_TOKENS
                 sponsored = (
                     paid
                     and not connection_id
                     and (selected_endpoint is None or selected_endpoint.provider == "sponsored")
                 )
+                if sponsored:
+                    self.service.check_kill_switch()
                 reservation = self.service.quotas.admit(
                     principal.id,
                     authenticated=principal.authenticated,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     sponsored=sponsored and self.service.spend is None,
+                    images=1 if image else 0,
                 )
                 if sponsored and self.service.spend is not None:
                     await self.service.charge_spend(input_tokens, output_tokens)
+            if needs_runtime and canonical == "/v1/traffic/stream":
+                # A live stream trades its ingress slot for a bounded stream slot.
+                self.service.enter_stream(principal.id)
+                streaming = principal.id
+                self.service.leave_ingress(principal)
+                ingress = None
+            if needs_runtime:
                 project_id = state.get("project_id")
                 default = (
                     (
@@ -287,6 +408,16 @@ class HostedMiddleware:
                     namespace = str(project_id) + ":" + selected_endpoint.id
                 runtime = self.service.acquire(principal, namespace=namespace)
                 state["hosted_runtime"] = runtime
+                if selected_endpoint is not None:
+                    # Each stored event names the endpoint it went through, so the project's
+                    # merged Logs can tell them apart (the name as of this request).
+                    runtime.observability.traffic.labels = {
+                        "endpoint": {"id": selected_endpoint.id, "name": selected_endpoint.name}
+                    }
+                elif canonical in {"/v1/traffic", "/v1/traffic/stream"}:
+                    # No endpoint selected: the project's own runtime plus its endpoints'
+                    # (LAB-1492). Vault and session routes stay on one runtime.
+                    state["hosted_traffic"] = self.service.project_traffic(runtime, project_id)
             filtered = [
                 (k, v)
                 for k, v in scope.get("headers", [])
@@ -312,13 +443,19 @@ class HostedMiddleware:
                     return {"type": "http.request", "body": bytes(raw), "more_body": False}
                 return await receive()
 
-            async with asyncio.timeout(self.service.settings.hosted_request_timeout):
-                await self.app(
-                    {**scope, "headers": filtered, "state": state}, body_receive, tracked_send
-                )
+            limit_token = UPSTREAM_PAYLOAD_LIMIT.set(payload_limit)
+            try:
+                async with asyncio.timeout(self.service.settings.hosted_request_timeout):
+                    await self.app(
+                        {**scope, "headers": filtered, "state": state}, body_receive, tracked_send
+                    )
+            finally:
+                UPSTREAM_PAYLOAD_LIMIT.reset(limit_token)
         except PiiGuardError as exc:
             if not started:
-                response = error_response(exc.status_code, exc.code, exc.message)
+                response = error_response(
+                    exc.status_code, exc.code, exc.message, error_headers(exc)
+                )
                 if isinstance(exc, AbuseAdmissionError):
                     response.headers["Retry-After"] = str(exc.retry_after)
                 await response(scope, receive, tracked_send)
@@ -338,5 +475,7 @@ class HostedMiddleware:
                     self.service.release(runtime)
                 if reservation is not None:
                     reservation.release()
-                if entered:
-                    self.service.leave_ingress()
+                if ingress is not None:
+                    self.service.leave_ingress(ingress)
+                if streaming is not None:
+                    self.service.leave_stream(streaming)

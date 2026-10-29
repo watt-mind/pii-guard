@@ -2,16 +2,19 @@
 
 | Doc | What it covers |
 |---|---|
-| [why-pii-guard.md](why-pii-guard.md) | What is different about pii-guard, each claim with its evidence and status |
+| [why-pii-guard.md](why-pii-guard.md) | What is different about PII Guard, each claim with its evidence and status |
 | [vision.md](vision.md) | The problem, who it is for, goals and non-goals |
 | [architecture.md](architecture.md) | Components, data flow, APIs, the gateway and streaming re-identification |
 | [private-dev.md](private-dev.md) | Tailnet-only dev networking, proxy credentials, app-only releases and live activation gates |
 | [hosted.md](hosted.md) | Hosted deployment, trust boundary, actual retention, release gates and rollback |
 | [projects.md](projects.md) | Projects, immutable policy versions, endpoint configuration and persistence boundaries |
-| [privacy-model.md](privacy-model.md) | Threat model, what pii-guard guarantees and what it does not |
+| [privacy-model.md](privacy-model.md) | Threat model, what PII Guard guarantees and what it does not |
+| [eu-regulation.md](eu-regulation.md) | Why it matters in the EU: GDPR, transfers, sector rules and the AI Act, mapped to primary sources, and what we don't claim |
 | [entities.md](entities.md) | The entity taxonomy: what counts as personal data, per language |
 | [evaluation.md](evaluation.md) | Synthetic benchmark, metrics, baselines, how results are reported |
 | [languages.md](languages.md) | Adding a language: the language pack, the conformance suite, what "done" means |
+| [data-sources-eu24.md](data-sources-eu24.md) | Research: license and coverage audit of NER/PII data and national identifiers for the 24 EU languages |
+| [training-data-eu-phase1.md](training-data-eu-phase1.md) | Multilingual NER phase 1 (LAB-1525): training sources, licenses, per-language counts and the fictional gate sets |
 | [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [journey.md](journey.md) | The project's story so far: dated milestones with before/after metrics, cost and the decisions made |
@@ -36,3 +39,5 @@
 | [0010](decisions/0010-language-pack-plugins.md) | Language packs as one plugin unit: one `LanguagePack`, entry-point discovery, a conformance suite |
 | [0011](decisions/0011-hosted-saas.md) | Opt-in hosted demo: Google-first identity, scoped ephemeral state and conservative sponsored allocations |
 | [0012](decisions/0012-hosted-projects-and-endpoint-configuration.md) | Persist project configuration separately from ephemeral request state |
+| [0013](decisions/0013-one-console-owner-scoped-api.md) | One console, one API: owner-scoped runtime, hosted projections and server-declared capabilities |
+| [0014](decisions/0014-hosted-local-images.md) | Hosted image masking for signed-in owners, processed locally and in memory only |

@@ -83,7 +83,7 @@ def boundary(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, list
                     ],
                 },
             )
-        text = body["messages"][0]["content"]
+        text = body["messages"][-1]["content"]
         return httpx.Response(
             200,
             json={
@@ -241,8 +241,8 @@ def test_same_explicit_session_is_owner_scoped(
     two = chat(client, auth("synthetic-two"), "/s/shared-synthetic/v1/chat/completions")
     assert one.status_code == two.status_code == 200, (one.text, two.text)
     assert one.headers["x-pii-guard-session"] == two.headers["x-pii-guard-session"]
-    masked_one = json.loads(seen[0].content)["messages"][0]["content"]
-    masked_two = json.loads(seen[1].content)["messages"][0]["content"]
+    masked_one = json.loads(seen[0].content)["messages"][-1]["content"]
+    masked_two = json.loads(seen[1].content)["messages"][-1]["content"]
     assert EMAIL not in masked_one + masked_two
     assert masked_one != masked_two
     body = {"session_id": "shared-synthetic", "text": masked_one}
@@ -298,8 +298,9 @@ def test_anonymous_data_routes_refused(
     assert not seen
 
 
-@pytest.mark.parametrize("path", ["/metrics", "/docs", "/redoc", "/openapi.json", "/v1/mask/image"])
-def test_operator_and_image_routes_refused(
+# Hosted images (LAB-1390) are admitted for signed-in owners: see test_images.py.
+@pytest.mark.parametrize("path", ["/metrics", "/docs", "/redoc", "/openapi.json"])
+def test_operator_routes_refused(
     boundary: tuple[TestClient, list[httpx.Request]], path: str
 ) -> None:
     client, _ = boundary
@@ -467,14 +468,14 @@ def test_curated_demo_success_and_guest_identity_isolation(
     assert payload["entities"]
     assert first.headers["set-cookie"].startswith("__Host-pii-guard-guest=")
     service = client.app.state.hosted
-    guest_one = next(iter(service._runtimes))
+    # A guest runtime holds only the ephemeral demo, so it is gone once the demo is (LAB-1412).
+    assert service._runtimes == {}
     client.cookies.clear()
     second = client.post("/v1/demo", json={"sample_id": "en-support"}, headers={"origin": ORIGIN})
     assert second.status_code == 200, second.text
-    assert len(service._runtimes) == 2
+    assert service._runtimes == {}
     assert second.json()["session_id"] != payload["session_id"]
     assert second.json()["masked"] != payload["masked"]
-    assert guest_one in service._runtimes
 
 
 def test_connection_owner_selection_deletion_and_no_sponsored_fallback(
@@ -607,7 +608,7 @@ def test_sponsored_model_and_output_limits_admit_no_upstream_work(
     assert client.get("/v1/account", headers=auth()).json()["usage"]["requests_today"] == 0
 
 
-def test_cancelled_stream_releases_runtime_and_admission_but_keeps_charge() -> None:
+def test_cancelled_stream_releases_runtime_and_stream_slot_without_charge() -> None:
     app = create_app(settings(hosted_max_principals=1))
     app.router.routes[:] = [
         route for route in app.router.routes if getattr(route, "path", None) != "/v1/traffic/stream"
@@ -634,13 +635,17 @@ def test_cancelled_stream_releases_runtime_and_admission_but_keeps_charge() -> N
             await asyncio.wait_for(entered.wait(), 2)
             owner, runtime = next(iter(service._runtimes.items()))
             assert runtime.active == 1
-            assert service.quotas._active == 1
+            # A live stream is a read (LAB-1412): no inference slot, no ingress slot, no
+            # daily request; it holds one of its own bounded stream slots instead.
+            assert service.quotas._active == 0
+            assert service._ingress == 0
+            assert service._streams == {owner: 1}
             pending.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await pending
             assert runtime.active == 0
-            assert service.quotas._active == 0
-            assert service.quotas.usage(owner)["requests_today"] == 1
+            assert service._streams == {}
+            assert service.quotas.usage(owner)["requests_today"] == 0
         await service.close()
 
     asyncio.run(scenario())
@@ -819,3 +824,109 @@ def test_compressed_custom_upstream_is_refused_before_consumption(
         assert observed.closed
         assert observed.reads == 0
     _assert_hosted_work_released(client)
+
+
+# --- Sponsored-route attribution headers (LAB-1461) ---------------------------------------
+
+
+def _attribution_free(request: httpx.Request) -> None:
+    assert "x-pii-guard-source" not in request.headers
+    assert not request.headers.get("user-agent", "").startswith("pii-guard/")
+
+
+def test_sponsored_upstream_calls_carry_only_fixed_attribution_headers(
+    boundary: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    from pii_guard import __version__
+
+    client, seen = boundary
+    subject = "synthetic-attribution-subject"
+    assert chat(client, auth(subject)).status_code == 200
+    assert (
+        client.post(
+            "/v1/responses", json={"model": "muse-spark-1.3", "input": EMAIL}, headers=auth(subject)
+        ).status_code
+        == 200
+    )
+    assert len(seen) == 2
+    principal = client.get("/v1/account", headers=auth(subject)).json()["principal"]["id"]
+    for request in seen:
+        assert request.headers["x-pii-guard-source"] == "pii-guard-hosted-demo"
+        assert request.headers["user-agent"] == (
+            f"pii-guard/{__version__} (+https://github.com/watt-mind/pii-guard)"
+        )
+        assert request.headers["authorization"] == "Bearer synthetic-sponsored-key"
+        # Neither header (nor any other) names the user, their principal or their session.
+        for value in request.headers.values():
+            assert subject not in value and principal not in value and EMAIL not in value
+
+
+def test_own_connection_upstream_calls_carry_no_source_header(
+    boundary: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, seen = boundary
+    headers = _custom_profile(client)
+    # A client-supplied tag never reaches an own endpoint either.
+    headers["x-pii-guard-source"] = "spoofed-by-client"
+    assert chat(client, headers).status_code == 200
+    assert seen[-1].url.host == "provider.example"
+    _attribution_free(seen[-1])
+
+
+def test_project_endpoints_tag_only_the_sponsored_route(
+    boundary: tuple[TestClient, list[httpx.Request]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, recorded = boundary
+
+    def project_upstream(request: httpx.Request) -> httpx.Response:
+        recorded.append(request)
+        text = json.loads(request.content)["messages"][-1]["content"]
+        return httpx.Response(
+            200,
+            json={
+                "id": "synthetic-completion",
+                "object": "chat.completion",
+                "model": "synthetic-model",
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": text}}],
+            },
+        )
+
+    monkeypatch.setattr(
+        "pii_guard.hosted.egress.SecureTransport", lambda: httpx.MockTransport(project_upstream)
+    )
+    owner = client.get("/v1/account", headers=auth()).json()["principal"]["id"]
+    store = client.app.state.projects.store
+    project = store.default_project(owner)["id"]
+    policy = store.list_policies(owner, project)[0]["policy_version_id"]
+    sponsored = store.save_endpoint(
+        owner,
+        project,
+        {
+            "name": "Synthetic sponsored endpoint",
+            "policy_version_id": policy,
+            "provider": "sponsored",
+            "base_url": "https://api.meta.ai/v1",
+            "model": "muse-spark-1.3",
+        },
+    )
+    own = store.save_endpoint(
+        owner,
+        project,
+        {
+            "name": "Synthetic own Meta key",
+            "policy_version_id": policy,
+            "provider": "meta",
+            "base_url": "https://api.meta.ai/v1",
+            "model": "muse-spark-1.3",
+            "api_key": "synthetic-own-meta-key",
+        },
+    )
+    body = {"model": "muse-spark-1.3", "messages": [{"role": "user", "content": EMAIL}]}
+    tagged = client.post(f"/e/{sponsored['id']}/v1/chat/completions", json=body, headers=auth())
+    assert tagged.status_code == 200, tagged.text
+    assert recorded[-1].headers["x-pii-guard-source"] == "pii-guard-hosted-demo"
+    assert recorded[-1].headers["user-agent"].startswith("pii-guard/")
+    untagged = client.post(f"/e/{own['id']}/v1/chat/completions", json=body, headers=auth())
+    assert untagged.status_code == 200, untagged.text
+    assert recorded[-1].headers["authorization"] == "Bearer synthetic-own-meta-key"
+    _attribution_free(recorded[-1])

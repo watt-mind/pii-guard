@@ -128,6 +128,13 @@ class RouterTests(unittest.TestCase):
         self.assertNotIn("$http_forwarded", config)
         self.assertNotIn("$http_host", config)
 
+    def test_proxy_forwards_accept_encoding_without_nginx_compression(self):
+        # LAB-1472: without the client's Accept-Encoding the app serves static assets raw.
+        config = router.nginx_config(CONFIG["aca_fqdn"], "100.101.102.103", "/proc/123/fd/4")
+        self.assertIn("proxy_set_header Accept-Encoding $http_accept_encoding;", config)
+        self.assertNotRegex(config, r"(?m)^\s*gzip\b")
+        self.assertIn("access_log off;", config)
+
     @unittest.skipUnless(hasattr(os, "memfd_create"), "Linux memfd is required")
     def test_tls_memfd_is_root_private_sealed_and_not_a_file(self):
         fd = router.sealed_pem("synthetic test bytes")

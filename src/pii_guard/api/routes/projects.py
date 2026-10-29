@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
+import anyio.to_thread
 from anyio import from_thread
 from fastapi import Path, Request
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
@@ -12,11 +13,14 @@ from starlette.responses import Response
 
 from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import v1_router
+from pii_guard.api.routes.models import provider_catalog
 from pii_guard.hosted.egress import validate_destination
 from pii_guard.projects.runtime import ProjectAccessError
 from pii_guard.projects.store import InvalidProjectConfigError, ProjectStore
-from pii_guard.types import TEXT_ENTITY_TYPES
+from pii_guard.types import TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES
 from pii_guard.upstreams import PRESETS
+
+VISUAL_TYPE_NAMES = frozenset(entity.value for entity in VISUAL_ENTITY_TYPES)
 
 router = v1_router()
 router.tags = ["projects"]
@@ -28,6 +32,7 @@ router.responses = error_responses(
     "invalid_project_config",
     "project_storage_unavailable",
     "upstream_destination_not_allowed",
+    "upstream_credential_rejected",
 )
 ResourceId = Annotated[
     str,
@@ -73,7 +78,14 @@ class PolicyRequest(NameRequest):
     """A new complete immutable policy version; omitted actions use deployment defaults."""
 
     entity_policies: dict[str, Literal["mask", "keep", "block"]] = Field(
-        default_factory=dict, description="Text entity actions: mask, keep or block."
+        default_factory=dict,
+        description="Entity actions: mask, keep or block for text types; mask or keep for "
+        "visual types (FACE, ID_PHOTO, SIGNATURE, STAMP).",
+    )
+    visual_detection: Literal["local", "sam"] = Field(
+        default="local",
+        description="Image detection: local (on-device faces, ID photos and signatures) or "
+        "sam (SAM 3.1 on the Meta API for signatures and stamps; sends the image to Meta).",
     )
     language: str = Field(
         default="hu", min_length=2, max_length=16, description="Detection language tag."
@@ -87,16 +99,19 @@ class PolicyRequest(NameRequest):
 
     @field_validator("entity_policies", mode="before")
     @classmethod
-    def text_policies_only(cls, value: object) -> object:
+    def known_policies_only(cls, value: object) -> object:
         if not isinstance(value, dict) or any(
-            key not in {entity.value for entity in TEXT_ENTITY_TYPES} for key in value
+            key not in {entity.value for entity in TEXT_ENTITY_TYPES | VISUAL_ENTITY_TYPES}
+            for key in value
         ):
-            raise ValueError("unknown text entity type")
+            raise ValueError("unknown entity type")
+        if any(value[key] == "block" for key in value if key in VISUAL_TYPE_NAMES):
+            raise ValueError("visual entity types are mask or keep")
         return value
 
 
 class EndpointRequest(NameRequest):
-    """One provider, model, credential and explicitly pinned policy version."""
+    """One provider, optional pinned model, credential and explicitly pinned policy version."""
 
     policy_version_id: str = Field(
         min_length=1, max_length=128, description="Immutable policy version in this project."
@@ -111,11 +126,13 @@ class EndpointRequest(NameRequest):
         repr=False,
         description="Upstream API base URL; required for custom providers.",
     )
-    model: str = Field(
-        min_length=1,
+    model: str | None = Field(
+        default=None,
         max_length=256,
         repr=False,
-        description="The single upstream model served by this endpoint.",
+        description="The upstream model this endpoint pins. Omit it, or send null or an empty "
+        "string, for pass-through: the client's own `model` is forwarded unchanged. Optional "
+        "for own-key providers; sponsored endpoints require an allow-listed model.",
     )
     api_key: SecretStr | None = Field(
         default=None,
@@ -147,7 +164,8 @@ def _context(request: Request) -> tuple[ProjectStore, str]:
 
 def _policy_data(body: PolicyRequest, request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
-    if settings.hosted and body.mode != "fast":
+    # Hosted images are on-device only until SAM has its own spend reservation (LAB-1444).
+    if settings.hosted and (body.mode != "fast" or body.visual_detection != "local"):
         raise InvalidProjectConfigError()
     return body.model_dump(exclude_none=True)
 
@@ -171,29 +189,30 @@ def _local_base_url(value: str) -> str:
         raise InvalidProjectConfigError() from None
 
 
+def _destination(provider: str, base_url: str | None) -> str:
+    """The upstream base URL an endpoint of ``provider`` may use (before DNS validation)."""
+    if provider == "sponsored":
+        destination = PRESETS["meta"].base_url
+    elif provider in PRESETS:
+        destination = PRESETS[provider].base_url
+    else:
+        if base_url is None:
+            raise InvalidProjectConfigError()
+        destination = base_url
+    if provider != "custom" and base_url is not None and _local_base_url(base_url) != destination:
+        raise InvalidProjectConfigError()
+    return destination
+
+
 def _endpoint_data(body: EndpointRequest, request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     data = body.model_dump(exclude_none=True)
-    if body.provider == "sponsored":
-        if (
-            not settings.hosted
-            or body.api_key is not None
-            or body.model not in settings.hosted_models
-        ):
-            raise InvalidProjectConfigError()
-        destination = PRESETS["meta"].base_url
-    elif body.provider in PRESETS:
-        destination = PRESETS[body.provider].base_url
-    else:
-        if body.base_url is None:
-            raise InvalidProjectConfigError()
-        destination = body.base_url
-    if (
-        body.provider != "custom"
-        and body.base_url is not None
-        and _local_base_url(body.base_url) != destination
+    if body.provider == "sponsored" and (
+        not settings.hosted or body.api_key is not None or body.model not in settings.hosted_models
     ):
+        # Sponsored endpoints always pin one allow-listed model (LAB-1451): no pass-through.
         raise InvalidProjectConfigError()
+    destination = _destination(body.provider, body.base_url)
     # Sync FastAPI handlers run in AnyIO workers; DNS preflight returns to the event loop.
     # The hosted gateway validates again when connecting, preserving DNS-rebinding protection.
     data["base_url"] = (
@@ -202,6 +221,36 @@ def _endpoint_data(body: EndpointRequest, request: Request) -> dict[str, Any]:
         else _local_base_url(destination)
     )
     return data
+
+
+class EndpointModelsRequest(_Body):
+    """Which provider catalog to read for the endpoint form's model choices (LAB-1451)."""
+
+    provider: Literal["meta", "openai", "fireworks", "openrouter", "custom", "sponsored"] = Field(
+        description="Upstream provider, or hosted sponsored Meta inference."
+    )
+    base_url: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=2048,
+        repr=False,
+        description="Upstream API base URL; required for custom providers.",
+    )
+    api_key: SecretStr | None = Field(
+        default=None,
+        min_length=1,
+        max_length=4096,
+        repr=False,
+        description="Provider key to ask with; never stored. Omit it with `endpoint_id` to use "
+        "that endpoint's stored key (same provider and base URL only).",
+    )
+    endpoint_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="An endpoint in this project whose stored credential may be used.",
+    )
 
 
 @router.get("/v1/projects")
@@ -273,6 +322,48 @@ def create_endpoint(
     store, owner = _context(request)
     store.get_project(owner, project_id)
     return store.save_endpoint(owner, project_id, _endpoint_data(body, request))
+
+
+@router.post("/v1/projects/{project_id}/endpoints/models")
+async def endpoint_models(
+    body: EndpointModelsRequest, request: Request, project_id: ResourceId
+) -> dict[str, Any]:
+    """Model ids an endpoint of this provider can pin: the provider's own catalog, asked
+    with the given key (never stored) or an existing endpoint's stored key; for sponsored,
+    the hosted allow-list. Provider failures are a generic 502 with no provider message."""
+    store, owner = _context(request)
+    settings = request.app.state.settings
+    await anyio.to_thread.run_sync(store.get_project, owner, project_id)
+    if body.provider == "sponsored":
+        if not settings.hosted or body.api_key is not None:
+            raise InvalidProjectConfigError()
+        return {"models": list(settings.hosted_models)}
+    destination = _destination(body.provider, body.base_url)
+    destination = (
+        await validate_destination(destination) if settings.hosted else _local_base_url(destination)
+    )
+    if body.api_key is not None:
+        key = body.api_key.get_secret_value()
+    elif body.endpoint_id is not None:
+        snapshot = await anyio.to_thread.run_sync(
+            store.endpoint_snapshot, owner, project_id, body.endpoint_id
+        )
+        if (snapshot.provider, snapshot.base_url) != (body.provider, destination):
+            raise InvalidProjectConfigError()
+        if snapshot.api_key is None:
+            raise InvalidProjectConfigError()
+        key = snapshot.api_key.get_secret_value()
+    else:
+        raise InvalidProjectConfigError()
+    models = await provider_catalog(
+        destination,
+        key,
+        hosted=settings.hosted,
+        transport=None
+        if settings.hosted
+        else getattr(request.app.state, "gateway_transport", None),
+    )
+    return {"models": [model["id"] for model in models]}
 
 
 @router.put("/v1/projects/{project_id}/endpoints/{endpoint_id}")

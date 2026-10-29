@@ -18,6 +18,10 @@ import { createProjectFetch, inspectionHeaders } from "./project";
 // - One `/v1/traffic` request at a time: the next poll is scheduled once the previous one
 //   settles, and each request is aborted after `timeoutMs`.
 // - The dedup set keeps the newest `dedupWindow` ids, not every id ever seen.
+//
+// Status honesty (LAB-1437): a 429 is `limited` and a 401/403 is `denied`, never `offline`. The
+// server answered, so the page must not say it is unreachable. Both keep retrying with an
+// exponential backoff (capped at `MAX_BACKOFF_MS`); a 429's `Retry-After` is a floor.
 
 import { getOwnerToken } from "./localOwner";
 import type { EntityType } from "./types";
@@ -63,6 +67,8 @@ export interface TrafficEvent {
   session_new: boolean;
   /** How the gateway picked the vault session (LAB-1286): `header`, `path`, `prompt_cache_key` or `default`. */
   session_source: string | null;
+  /** The outbound re-check of the masked request (LAB-1500); `null` when the call was refused before it. */
+  outbound_check: TrafficOutboundCheck | null;
   detectors: string[];
   entities: TrafficEntities | null;
   cache: { hits: number; misses: number; seeded: number } | null;
@@ -73,6 +79,18 @@ export interface TrafficEvent {
   request: { masked?: unknown; original?: unknown } | null;
   /** `masked`: the upstream's answer; `unmasked`: what the client got (level `full` only). */
   response: { masked?: unknown; unmasked?: unknown; chunks?: number } | null;
+  /** Hosted: the endpoint the call went through (LAB-1492); `null` for a call on the project itself. */
+  endpoint?: { id: string; name: string } | null;
+}
+
+export interface TrafficOutboundCheck {
+  result: "passed" | "blocked" | string;
+  texts: number;
+  /** Blocking occurrences per entity type: counts only, never values. */
+  hits: Partial<Record<EntityType, number>>;
+  /** Occurrences too short to block. */
+  short: number;
+  ms: number;
 }
 
 export interface TrafficPage {
@@ -89,6 +107,23 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 const numOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+function parseOutboundCheck(raw: unknown): TrafficOutboundCheck | null {
+  if (!isRecord(raw) || typeof raw.result !== "string") return null;
+  const hits: Partial<Record<EntityType, number>> = {};
+  if (isRecord(raw.hits)) for (const [k, v] of Object.entries(raw.hits)) hits[k as EntityType] = num(v);
+  return { result: raw.result, texts: num(raw.texts), hits, short: num(raw.short), ms: num(raw.ms) };
+}
+
+/** What the Logs detail says about the outbound re-check. */
+export function outboundCheckLabel(check: TrafficOutboundCheck | null): string {
+  if (!check) return "not reached";
+  if (check.result === "blocked") {
+    const n = Object.values(check.hits).reduce((sum, v) => sum + (v ?? 0), 0);
+    return `blocked · ${n} value${n === 1 ? "" : "s"} left`;
+  }
+  return `passed · ${check.texts} text${check.texts === 1 ? "" : "s"}`;
+}
 
 /** A traffic event from the wire, or null when it doesn't have the fields the screen needs. */
 export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
@@ -112,6 +147,7 @@ export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
     session_ref: typeof raw.session_ref === "string" ? raw.session_ref : null,
     session_new: raw.session_new === true,
     session_source: typeof raw.session_source === "string" ? raw.session_source : null,
+    outbound_check: parseOutboundCheck(raw.outbound_check),
     detectors: Array.isArray(raw.detectors) ? raw.detectors.filter((d): d is string => typeof d === "string") : [],
     entities: isRecord(raw.entities) ? (raw.entities as unknown as TrafficEntities) : null,
     cache: isRecord(raw.cache) ? (raw.cache as TrafficEvent["cache"]) : null,
@@ -129,6 +165,10 @@ export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
     },
     request: isRecord(raw.request) ? raw.request : null,
     response: isRecord(raw.response) ? raw.response : null,
+    endpoint:
+      isRecord(raw.endpoint) && typeof raw.endpoint.id === "string"
+        ? { id: raw.endpoint.id, name: typeof raw.endpoint.name === "string" && raw.endpoint.name ? raw.endpoint.name : raw.endpoint.id }
+        : null,
   };
 }
 
@@ -138,7 +178,31 @@ export type TrafficStatus =
   /** The server answers, but its traffic log is off (`PII_GUARD_TRAFFIC_LOG=off`) or absent. */
   | { state: "disabled"; reason: "off" | "unsupported"; message: string }
   /** The API can't be reached (or stopped answering); polling keeps retrying. */
-  | { state: "offline"; message: string };
+  | { state: "offline"; message: string }
+  /** The API answered 429: too many requests for now. Retried after `retryAfterMs` at the earliest. */
+  | { state: "limited"; message: string; retryAfterMs: number }
+  /** The API answered 401 (`signed_out`) or 403 (`forbidden`). Retried with backoff (a sign-in in another tab heals it). */
+  | { state: "denied"; reason: "signed_out" | "forbidden"; message: string };
+
+/** A 429 from `/v1/traffic`, with the server's `Retry-After` in milliseconds (0 when absent). */
+export class TrafficRateLimitedError extends ApiError {
+  readonly retryAfterMs: number;
+
+  constructor(code: string, message: string, retryAfterMs: number) {
+    super(429, code, message);
+    this.name = "TrafficRateLimitedError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+/** `Retry-After` as delay-seconds or an HTTP date, in milliseconds; 0 when absent or invalid. */
+export function parseRetryAfter(value: string | null, now: number = Date.now()): number {
+  if (!value) return 0;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000;
+  const at = Date.parse(trimmed);
+  return Number.isFinite(at) ? Math.max(0, at - now) : 0;
+}
 
 type EventSourceCtor = new (url: string) => Pick<EventSource, "addEventListener" | "close" | "readyState"> & {
   onopen: ((ev: Event) => unknown) | null;
@@ -177,6 +241,9 @@ export const TRAFFIC_TIMEOUT_MS = 10_000;
  */
 export const DEDUP_WINDOW = 500;
 
+/** Longest wait between retries while the API rate-limits or denies traffic reads. */
+export const MAX_BACKOFF_MS = 60_000;
+
 export async function fetchTraffic(
   doFetch: typeof fetch,
   baseUrl: string,
@@ -209,11 +276,14 @@ export async function fetchTraffic(
       events: payload.events.map(parseTrafficEvent).filter((e): e is TrafficEvent => e !== null),
     };
   }
-  if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.code === "string") {
-    throw new ApiError(res.status, payload.error.code, typeof payload.error.message === "string" ? payload.error.message : payload.error.code);
-  }
+  const contract = isRecord(payload) && isRecord(payload.error) && typeof payload.error.code === "string" ? payload.error : null;
+  const code = contract ? (contract.code as string) : null;
+  const message = contract && typeof contract.message === "string" ? contract.message : code;
+  if (res.status === 429) throw new TrafficRateLimitedError(code ?? "rate_limited", message ?? "Too many requests", parseRetryAfter(res.headers.get("retry-after")));
+  if (contract) throw new ApiError(res.status, code as string, message as string);
+  if (res.status === 401 || res.status === 403) throw new ApiError(res.status, res.status === 401 ? "unauthorized" : "forbidden", `PII Guard API answered ${res.status}`);
   if (res.status === 404 || res.status === 405) throw new ApiError(res.status, "not_found", "GET /v1/traffic is not available");
-  throw new UnreachableError(`pii-guard API answered ${res.status} without a contract error body`);
+  throw new UnreachableError(`PII Guard API answered ${res.status} without a contract error body`);
 }
 
 /** Load the backlog, then follow the live stream (or poll). Call `close()` to stop. */
@@ -266,8 +336,24 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
   const failure = (err: unknown): TrafficStatus => {
     if (err instanceof ApiError && err.code === "traffic_log_disabled") return { state: "disabled", reason: "off", message: err.message };
     if (err instanceof ApiError && err.code === "not_found")
-      return { state: "disabled", reason: "unsupported", message: "this pii-guard server has no traffic log (it predates /v1/traffic)" };
+      return { state: "disabled", reason: "unsupported", message: "this PII Guard server has no traffic log (it predates /v1/traffic)" };
+    if (err instanceof TrafficRateLimitedError) return { state: "limited", message: err.message, retryAfterMs: err.retryAfterMs };
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403))
+      return { state: "denied", reason: err.status === 401 ? "signed_out" : "forbidden", message: err.message };
     return { state: "offline", message: err instanceof Error ? err.message : String(err) };
+  };
+
+  // Failed attempts in a row that the server answered (429, 401, 403): each doubles the wait.
+  let refusals = 0;
+  /** The wait before the next attempt after a failure; `base` is the usual retry interval. */
+  const retryDelay = (s: TrafficStatus, base: number): number => {
+    if (s.state !== "limited" && s.state !== "denied") {
+      refusals = 0;
+      return base;
+    }
+    refusals += 1;
+    const backoff = Math.min(MAX_BACKOFF_MS, base * 2 ** (refusals - 1));
+    return s.state === "limited" ? Math.max(backoff, s.retryAfterMs) : backoff;
   };
 
   /** One `/v1/traffic` request, aborted after `timeoutMs` or on `close()`, whatever the fetch does with the signal. */
@@ -278,7 +364,7 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
     let timer: ReturnType<typeof setTimeout> | undefined;
     const stop = new Promise<never>((_, reject) => {
       const onAbort = () =>
-        reject(controller.signal.aborted ? new DOMException("closed", "AbortError") : new UnreachableError(`pii-guard API did not answer within ${timeoutMs / 1000} s`));
+        reject(controller.signal.aborted ? new DOMException("closed", "AbortError") : new UnreachableError(`PII Guard API did not answer within ${timeoutMs / 1000} s`));
       request.signal.addEventListener("abort", onAbort);
       timer = setTimeout(abort, timeoutMs);
     });
@@ -314,14 +400,16 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
     load({ after, limit: 200 }).then(
       (page) => {
         if (closed) return;
+        refusals = 0;
         if (!accept(page, after)) return schedulePoll(0); // restarted: fetch again from seq 0 right away
         status({ state: "live", via: "poll", level, size });
         schedulePoll(pollMs);
       },
       (err: unknown) => {
         if (closed) return;
-        status(failure(err));
-        schedulePoll(pollMs);
+        const s = failure(err);
+        status(s);
+        schedulePoll(retryDelay(s, pollMs));
       },
     );
   };
@@ -377,6 +465,7 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
     load({ limit: backlog }).then(
       (page) => {
         if (closed) return;
+        refusals = 0;
         accept(page, 0);
         status({ state: "live", via: ES ? "sse" : "poll", level, size });
         follow();
@@ -385,8 +474,8 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
         if (closed) return;
         const s = failure(err);
         status(s);
-        // Keep trying while the API is down; a disabled log needs a restart, so stop there.
-        if (s.state === "offline") pollTimer = setTimeout(loadBacklog, pollMs * 2);
+        // Keep trying while the API is down, limited or denied; a disabled log needs a restart, so stop there.
+        if (s.state !== "disabled") pollTimer = setTimeout(loadBacklog, retryDelay(s, pollMs * 2));
       },
     );
   };

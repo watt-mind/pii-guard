@@ -13,6 +13,7 @@ from pii_guard.eval.record import load_schema, validate
 ROOT = Path(__file__).resolve().parents[2]
 EN_SMOKE = ROOT / "eval" / "fixtures" / "en-smoke.jsonl"
 HU_PUBLIC = ROOT / "eval" / "fixtures" / "public" / "hu-ai4privacy.jsonl"
+PUBLIC_SAMPLE = 20
 SCHEMA = ROOT / "eval" / "results" / "schema" / "run.schema.json"
 
 
@@ -66,7 +67,15 @@ def test_audit_card_gets_detectors_cost_and_hardware(tmp_path, system):
 
 @pytest.mark.slow
 def test_public_fixture_is_marked_generated_with_notes(tmp_path):
-    card = _card(tmp_path, HU_PUBLIC)
+    # The first documents of the public set, under its file name: the origin, generator and
+    # set name come from the file name and the first record's meta.source, not from how many
+    # documents are scored, so all 200 (52 s on CI) are not needed (LAB-1447).
+    sample = tmp_path / "public" / HU_PUBLIC.name
+    sample.parent.mkdir()
+    lines = HU_PUBLIC.read_text(encoding="utf-8").splitlines(keepends=True)
+    sample.write_text("".join(lines[:PUBLIC_SAMPLE]), encoding="utf-8")
+    card = _card(tmp_path, sample)
+    assert card["overall"]["documents"] == PUBLIC_SAMPLE
     card["baselines"] = {
         "llm-guard": {
             "overall": card["overall"],

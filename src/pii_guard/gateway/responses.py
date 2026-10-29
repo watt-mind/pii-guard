@@ -38,6 +38,8 @@ import httpx
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
+from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
+from pii_guard.gateway.placeholder_note import add_responses_note
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
 from pii_guard.gateway.responses_restore import (
@@ -58,6 +60,7 @@ from pii_guard.gateway.service import (
     _counts_of,
     _read_limited,
     _upstream_error,
+    check_upstream_payload,
 )
 from pii_guard.gateway.tool_names import tool_names, without_tool_names
 from pii_guard.gateway.trace import CallTrace
@@ -95,7 +98,7 @@ class _Stats(RequestStats):
         logger.info(
             "responses %s mode=%s stream=%s texts=%d cache_hits=%d cache_misses=%d seeded=%d "
             "spans=%s masked=%s detect_ms=%.0f upstream=%s upstream_ms=%.0f unresolved=%d "
-            "images=%d image_masked=%s image_ms=%.0f",
+            "images=%d image_masked=%s image_ms=%.0f outbound=%s outbound_hits=%s",
             outcome,
             self.mode.value,
             self.stream,
@@ -112,6 +115,8 @@ class _Stats(RequestStats):
             self.images,
             _counts(self.image_masked),
             self.image_ms,
+            self.outbound.result if self.outbound is not None else "-",
+            _counts(self.outbound.hits) if self.outbound is not None else "-",
         )
 
 
@@ -239,6 +244,8 @@ class ResponsesGateway:
                 spans = await gw._detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
                 spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
+                issued = gw.issued_ids.of(session.session_id)
+                spans = without_opaque_ids(collected.slots, spans, issued)
             # Inline images go through the chat path (LAB-1285): mask the texts, then the
             # images, then remask the texts with the values the images added (LAB-1278).
             generation = session.generation
@@ -252,9 +259,13 @@ class ResponsesGateway:
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                gw._write(collected.slots, masked, session, language, remask, generation, names)
+                gw._write(
+                    collected.slots, masked, session, language, remask, generation, names, issued
+                )
                 collected.finalize()
             _count_masked(stats, before, session)
+            with timer.span("mask"):
+                gw._recheck(body, collect_response_texts, session, language, stats, names, issued)
         except BaseException:
             stats.log("blocked")
             gw._release_session(session, created, masked=False)
@@ -262,7 +273,12 @@ class ResponsesGateway:
         gw._release_session(session, created, masked=True)
 
         forwarding = time.perf_counter()
-        payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        payload = gw._forwarded(body, session, stats, add_responses_note)
+        try:
+            check_upstream_payload(payload)
+        except PayloadTooLargeError:
+            stats.log("blocked")
+            raise
         if trace.payloads:
             trace.masked_request = payload
         masked_input = _masked_input(body) if echo else None
@@ -283,6 +299,10 @@ class ResponsesGateway:
             timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")
             raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
+        except UpstreamError:
+            timer.add("upstream", time.perf_counter() - started)
+            stats.log("upstream_unreachable")
+            raise
         timer.add("upstream_ttfb", time.perf_counter() - started)
         timer.add("upstream", time.perf_counter() - started)
 
@@ -355,6 +375,7 @@ class ResponsesGateway:
         if not isinstance(answer, dict):
             raise UpstreamError("upstream returned a body that is not a JSON object")
         masked_output = _masked_output(answer) if echo else None
+        self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
         report = restore_response(session, answer)
         stats.unresolved = len(report.unresolved)
         self.gateway._seed_cache(session, language, detector, report.restored_spans, stats)
@@ -382,7 +403,10 @@ class ResponsesGateway:
         detector: Any,
         out_headers: dict[str, str],
     ) -> tuple[Response, RequestStats]:
-        restorer = ResponsesSseRestorer(session)
+        issued = self.gateway.issued_ids
+        restorer = ResponsesSseRestorer(
+            session, on_ids=lambda ids: issued.add(session.session_id, ids)
+        )
         trace.streaming = True
 
         async def timed_lines() -> AsyncIterator[str]:

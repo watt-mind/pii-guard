@@ -12,7 +12,7 @@ import anyio.to_thread
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pii_guard.api.errors import error_response
+from pii_guard.api.errors import error_headers, error_response
 from pii_guard.api.security import _addr_is_loopback
 from pii_guard.projects.runtime import ProjectAccessError, ProjectService
 from pii_guard.types import PiiGuardError
@@ -20,6 +20,13 @@ from pii_guard.types import PiiGuardError
 ENDPOINT_PATH = re.compile(
     r"^/e/([A-Za-z0-9_-]{1,128})(/v1/(?:chat/completions|responses|models))$"
 )
+
+
+class EndpointModelRequiredError(PiiGuardError):
+    """A pass-through endpoint (no pinned model) got a request that names no model."""
+
+    code = "invalid_request"
+    status_code = 400
 
 
 def endpoint_path(path: str) -> tuple[str, str] | None:
@@ -100,9 +107,23 @@ async def endpoint_body(
             raise ProjectAccessError("Invalid endpoint JSON request") from None
         if not isinstance(body, dict):
             raise ProjectAccessError("Endpoint request must be an object")
-        if "model" in body and body["model"] != endpoint.model:
-            raise ProjectAccessError("Endpoint allows only its configured model")
-        body["model"] = endpoint.model
+        if endpoint.model is not None:
+            # Pinned: the configured model, whatever the client sends.
+            if "model" in body and body["model"] != endpoint.model:
+                raise ProjectAccessError("Endpoint allows only its configured model")
+            body["model"] = endpoint.model
+        else:
+            # Pass-through (BYOK only; sponsored always pins): the client's model, unchanged.
+            model = body.get("model")
+            if (
+                not isinstance(model, str)
+                or not model.strip()
+                or len(model) > 256
+                or any(ord(c) < 32 or ord(c) == 127 for c in model)
+            ):
+                raise EndpointModelRequiredError(
+                    "This endpoint has no pinned model: the request must name one in 'model'"
+                )
         raw = bytearray(json.dumps(body).encode())
     filtered = [
         (k, v)
@@ -238,7 +259,9 @@ class ProjectMiddleware:
             await self.app({**scope, "state": state}, receive, scoped_send)
         except PiiGuardError as exc:
             if not started:
-                await error_response(exc.status_code, exc.code, exc.message)(scope, receive, send)
+                await error_response(exc.status_code, exc.code, exc.message, error_headers(exc))(
+                    scope, receive, send
+                )
         except TimeoutError:
             if started:
                 return

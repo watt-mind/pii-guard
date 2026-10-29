@@ -251,6 +251,9 @@ def test_candidates_and_parser() -> None:
     assert (args.candidate, args.set_name, args.offline) == ("local", "fictional", False)
 
 
+# untraced: building the index from every committed run record is about 7x slower under the
+# branch tracer; report_charts and report_cli are covered by tests/eval/test_report*.py (LAB-1447).
+@pytest.mark.untraced
 def test_report_keeps_segmenter_runs_apart() -> None:
     from pii_guard.eval import report_charts as charts
     from pii_guard.eval import report_cli

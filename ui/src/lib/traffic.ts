@@ -29,10 +29,10 @@ export const STAGE_HINT: Record<OwnStage | "upstream" | "other", string> = {
   detect: "every detector on every text, then known values (wall time)",
   image: "the visual pipeline for inline images",
   mask: "replacing values with placeholders in the vault",
-  forward: "serialising the masked body and opening the HTTP connection to the model (pii-guard's side)",
+  forward: "serializing the masked body and opening the HTTP connection to the model (PII Guard's side)",
   unmask: "restoring the stream, summed over its chunks",
   response: "restoring a non-streamed answer and building the response",
-  upstream: "waiting on the model: headers and body (not pii-guard's time)",
+  upstream: "waiting on the model: headers and body (not PII Guard's time)",
   other: "inside the timer but outside any stage (scheduling, framing)",
 };
 
@@ -372,21 +372,21 @@ export function modeNote(events: TrafficEvent[]): string {
 export function refusalReason(code: string | undefined, image: boolean): string {
   switch (code) {
     case "detection_unavailable":
-      return "The requested mode can't run on this server (audit mode needs the LLM detector's key), so pii-guard refused instead of masking with less.";
+      return "The requested mode can't run on this server (audit mode needs the LLM detector's key), so PII Guard refused instead of masking with less.";
     case "detection_failed":
-      return `A detector failed${image ? " (or the image pipeline is missing OCR or a face detector)" : ""}, so pii-guard refused instead of sending the text unmasked.`;
+      return `A detector failed${image ? " (or the image pipeline is missing OCR or a face detector)" : ""}, so PII Guard refused instead of sending the text unmasked.`;
     case "blocked_entity":
       return "A detected type has the policy block (see Policy), so the request stopped.";
     case "not_found":
       return "Unknown or expired session: drop the X-PII-Guard-Session header, or reuse the one from an earlier answer. Sessions live in the server's memory, so a restart clears them.";
     case "invalid_request":
     case "unsupported_content":
-      return "pii-guard couldn't read the request body, so it sent nothing rather than guess what to mask.";
+      return "PII Guard couldn't read the request body, so it sent nothing rather than guess what to mask.";
     case "payload_too_large":
       return "The request is larger than the server accepts.";
     case "unauthorized":
       return "The server needs a bearer token (PII_GUARD_API_TOKEN).";
     default:
-      return "pii-guard fails closed: when it can't mask a request, the request stops instead of going out unmasked.";
+      return "PII Guard fails closed: when it can't mask a request, the request stops instead of going out unmasked.";
   }
 }

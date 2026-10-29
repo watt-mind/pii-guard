@@ -147,6 +147,10 @@ class GatewayConfig(BaseSettings):
     keep_types: Annotated[frozenset[EntityType] | None, NoDecode] = Field(
         default=None, validation_alias="PII_GUARD_GATEWAY_KEEP_TYPES"
     )
+    # Tell the model placeholders are opaque tokens to copy as written (LAB-1471).
+    placeholder_note: bool = Field(
+        default=True, validation_alias="PII_GUARD_GATEWAY_PLACEHOLDER_NOTE"
+    )
     llm_reasoning_effort: str | None = Field(
         default=None, validation_alias="PII_GUARD_LLM_DETECTOR_REASONING_EFFORT"
     )

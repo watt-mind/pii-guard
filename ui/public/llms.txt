@@ -1,0 +1,13 @@
+# PII Guard
+
+> PII Guard is an open-source privacy firewall for AI agents. It detects personal data in text and images, replaces it with reversible placeholders before a request reaches the model, then puts the real values back in the answer. Hungarian first, other EU languages next. Apache-2.0.
+
+This site is the hosted preview: a public worked example, and sign-in with Google for your own text. All examples on it are fictional. Pseudonymisation is not anonymisation, and PII Guard does not by itself make a deployment GDPR or EU AI Act compliant.
+
+## Docs
+
+- [Source code and quick start](https://github.com/watt-mind/pii-guard): self-host the guard, console and vault
+- [Hosted processing and retention](https://github.com/watt-mind/pii-guard/blob/develop/docs/hosted.md): what this hosted preview processes, where, and for how long
+- [Privacy model](https://github.com/watt-mind/pii-guard/blob/develop/docs/privacy-model.md): who PII Guard protects data from, and the trust boundary
+- [Benchmarks](https://github.com/watt-mind/pii-guard/blob/develop/docs/benchmarks.md): measured recall and leak rate on synthetic data
+- [NER model](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base): the open detection model on Hugging Face

@@ -41,12 +41,24 @@
       "color": "#E69F00",
       "shape": "circle"
     },
+    "ner:bardsai-v1-fallback@baseline=lab-1516": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
     "ner:bardsai-v3@decoder=word": {
       "color": "#E69F00",
       "shape": "circle"
     },
     "ner:eu-pii-safeguard": {
       "color": "#999933",
+      "shape": "circle"
+    },
+    "ner:eu-pii-safeguard@decoder=first": {
+      "color": "#332288",
+      "shape": "circle"
+    },
+    "ner:eu-pii-safeguard@decoder=first@baseline=lab-1516": {
+      "color": "#E69F00",
       "shape": "circle"
     },
     "ner:horizon-base@decoder=word": {
@@ -63,6 +75,10 @@
     },
     "ner:xlmr-base-v2-hn": {
       "color": "#117733",
+      "shape": "circle"
+    },
+    "ner:xlmr-base-v2-hn@baseline=lab-1516": {
+      "color": "#0072B2",
       "shape": "circle"
     },
     "presidio": {
@@ -97,6 +113,10 @@
       "color": "#CC79A7",
       "shape": "circle"
     },
+    "rules+ner:bardsai-v1-fallback@baseline=lab-1516": {
+      "color": "#009E73",
+      "shape": "circle"
+    },
     "rules+ner:bardsai-v3@decoder=word": {
       "color": "#332288",
       "shape": "circle"
@@ -107,6 +127,10 @@
     },
     "rules+ner:eu-pii-safeguard": {
       "color": "#AA4499",
+      "shape": "circle"
+    },
+    "rules+ner:eu-pii-safeguard@decoder=first": {
+      "color": "#999933",
       "shape": "circle"
     },
     "rules+ner:horizon-base@decoder=word": {
@@ -137,6 +161,26 @@
       "color": "#D55E00",
       "shape": "circle"
     },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s30": {
+      "color": "#332288",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s50": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s70": {
+      "color": "#882255",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v33-t1": {
+      "color": "#882255",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v33-t2": {
+      "color": "#117733",
+      "shape": "circle"
+    },
     "rules+ner:wismut-nym@decoder=word": {
       "color": "#117733",
       "shape": "circle"
@@ -158,7 +202,7 @@
       "shape": "circle"
     },
     "rules+ner:xlmr-base-v2-hn": {
-      "color": "#CC79A7",
+      "color": "#009E73",
       "shape": "circle"
     },
     "rules+ner:xlmr-base-v2-hn+llm:muse-spark-1.3@reasoning_effort=minimal": {
@@ -167,6 +211,26 @@
     },
     "rules+ner:xlmr-base-v2-hn+ner_gliner:gliner-multi-v2.1@labels=pii_guard.detect.ner_gliner.GLINER_LABELS": {
       "color": "#332288",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn@PII_GUARD_NER_AGENT_TEXT=false": {
+      "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn@baseline=lab-1516": {
+      "color": "#D55E00",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn@rescore=lab-1494": {
+      "color": "#117733",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn@rescore=lab-1512": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn@thresholds_file=eval/results/2026-10-29-ner-v33/thresholds-h.json,thresholds_sha256=97afe86b2e5fcc45ba687d46ab8da23a556f22880a00e0bdf3b6f821e199206b": {
+      "color": "#E69F00",
       "shape": "circle"
     },
     "rules+ner:xlmr-base-v2-no-ai4privacy": {
@@ -198,7 +262,7 @@
       "shape": "circle"
     },
     "rules+ner:xlmr-large-distilled-glimmer": {
-      "color": "#009E73",
+      "color": "#CC79A7",
       "shape": "circle"
     },
     "rules+ner:xlmr-large-distilled-glimmer+llm:muse-spark-open@reasoning_effort=low": {
@@ -231,6 +295,10 @@
     },
     "rules+ner_gliner:gliner-multi-v2.1@labels=pii_guard.detect.ner_gliner.GLINER_LABELS": {
       "color": "#D55E00",
+      "shape": "circle"
+    },
+    "rules@baseline=lab-1516": {
+      "color": "#CC79A7",
       "shape": "circle"
     },
     "visual-labels:exact": {

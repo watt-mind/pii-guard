@@ -1,0 +1,39 @@
+# Field captions on Polish identity documents and forms (visual/captions.py).
+# caption <TAB> entity type of the value printed next to it, or "-" when that value is not
+# personal data (the caption is still recognised, so it bounds its neighbours).
+Nazwisko	PERSON
+Nazwisko rodowe	PERSON
+Imię	PERSON
+Imiona	PERSON
+Imię i nazwisko	PERSON
+Imiona rodziców	PERSON
+Imię ojca	PERSON
+Imię matki	PERSON
+Data urodzenia	DATE_OF_BIRTH
+Miejsce urodzenia	ADDRESS
+Adres	ADDRESS
+Adres zamieszkania	ADDRESS
+Adres zameldowania	ADDRESS
+Adres do korespondencji	ADDRESS
+Numer PESEL	ID_DOCUMENT
+PESEL	ID_DOCUMENT
+NIP	ID_DOCUMENT
+Numer dowodu osobistego	ID_DOCUMENT
+Seria i numer	ID_DOCUMENT
+Numer dokumentu	ID_DOCUMENT
+Numer paszportu	ID_DOCUMENT
+Numer prawa jazdy	ID_DOCUMENT
+Numer blankietu	ID_DOCUMENT
+Telefon	PHONE
+E-mail	EMAIL
+Płeć	-
+Obywatelstwo	-
+Data wydania	-
+Data ważności	-
+Termin ważności	-
+Organ wydający	-
+Wydany przez	-
+Podpis posiadacza	-
+Kategorie	-
+Wzrost	-
+Kolor oczu	-

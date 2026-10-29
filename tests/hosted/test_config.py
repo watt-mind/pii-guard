@@ -78,3 +78,20 @@ def test_hosted_client_ip_source_is_explicit_and_defaults_off(monkeypatch):
     monkeypatch.setenv("PII_GUARD_HOSTED_CLIENT_IP_SOURCE", "x_real_ip")
     with pytest.raises(ValueError):
         Settings(_env_file=None)
+
+
+def test_hosted_source_tag_is_configurable_and_restricted(monkeypatch) -> None:
+    import pydantic
+
+    from pii_guard.config import Settings
+
+    assert Settings(_env_file=None).hosted_source_tag == "pii-guard-hosted-demo"
+    monkeypatch.setenv("PII_GUARD_HOSTED_SOURCE_TAG", "pii-guard.judges_2026")
+    assert Settings(_env_file=None).hosted_source_tag == "pii-guard.judges_2026"
+    for bad in ("has space", "a" * 65, "user@example.com", "tag\r\nX-Injected: 1", "ü"):
+        monkeypatch.setenv("PII_GUARD_HOSTED_SOURCE_TAG", bad)
+        try:
+            Settings(_env_file=None)
+        except pydantic.ValidationError:
+            continue
+        raise AssertionError(f"accepted invalid source tag {bad!r}")

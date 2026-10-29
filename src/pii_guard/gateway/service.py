@@ -42,7 +42,8 @@ import re
 import threading
 import time
 from collections import Counter
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -55,7 +56,16 @@ from pii_guard.detect.known import KNOWN_DETECTOR, WIDENED_TYPES, merge_known, w
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
+from pii_guard.gateway.opaque_ids import IssuedIds, upstream_ids, without_opaque_ids
+from pii_guard.gateway.outbound import (
+    OUTBOUND_CHECK_HEADER,
+    OutboundCheck,
+    OutboundCheckFailedError,
+    check_outbound,
+)
+from pii_guard.gateway.placeholder_note import NOTE_HEADER, add_chat_note, needs_note
 from pii_guard.gateway.request import (
+    CollectedTexts,
     ImageSlot,
     InvalidChatRequestError,
     TextSlot,
@@ -118,6 +128,19 @@ _SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _MAX_ERROR_BODY = 65_536
 _UNSET: Any = object()
 
+#: The largest masked upstream payload (bytes) the current request was admitted for. Hosted
+#: admission charges this bound in advance (hosted/quotas.py); None means no bound (local).
+UPSTREAM_PAYLOAD_LIMIT: ContextVar[int | None] = ContextVar(
+    "pii_guard_upstream_payload_limit", default=None
+)
+
+
+def check_upstream_payload(payload: bytes) -> None:
+    """Refuse a masked payload larger than the bound its admission was charged for."""
+    limit = UPSTREAM_PAYLOAD_LIMIT.get()
+    if limit is not None and len(payload) > limit:
+        raise PayloadTooLargeError("the masked request is larger than its admitted size bound")
+
 
 class UpstreamNotConfiguredError(PiiGuardError):
     code = "upstream_not_configured"
@@ -156,6 +179,10 @@ class RequestStats:
     image_ocr: bool | None = None
     image_ms: float = 0.0
     session_source: SessionSource | None = None
+    #: The placeholder note went upstream with the request (LAB-1471).
+    note: bool = False
+    #: The outbound re-check of the masked request (LAB-1500); ``None``: not reached.
+    outbound: OutboundCheck | None = None
 
     def headers(self, session_id: str) -> dict[str, str]:
         out = {
@@ -167,6 +194,10 @@ class RequestStats:
         }
         if self.session_source is not None:
             out[SESSION_SOURCE_HEADER] = self.session_source.value
+        if self.note:
+            out[NOTE_HEADER] = "added"
+        if self.outbound is not None:
+            out[OUTBOUND_CHECK_HEADER] = self.outbound.result
         if self.mode_alias:
             out["Deprecation"] = "true"
             out["Warning"] = (
@@ -188,6 +219,8 @@ class RequestStats:
             "masked": _counts(self.masked),
             "detect_ms": f"{self.detect_ms:.0f}",
         }
+        if self.outbound is not None:
+            fields["outbound_check"] = self.outbound.result
         if self.images:
             fields["images"] = self.images
             fields["image_masked"] = _counts(self.image_masked)
@@ -198,7 +231,8 @@ class RequestStats:
         logger.info(
             "chat.completions %s mode=%s stream=%s texts=%d cache_hits=%d cache_misses=%d "
             "seeded=%d spans=%s masked=%s detect_ms=%.0f detectors=%s upstream=%s "
-            "upstream_ms=%.0f unresolved=%d images=%d image_masked=%s image_ms=%.0f",
+            "upstream_ms=%.0f unresolved=%d images=%d image_masked=%s image_ms=%.0f "
+            "outbound=%s outbound_hits=%s outbound_ms=%.1f",
             outcome,
             self.mode.value,
             self.stream,
@@ -216,6 +250,9 @@ class RequestStats:
             self.images,
             _counts(self.image_masked),
             self.image_ms,
+            self.outbound.result if self.outbound is not None else "-",
+            _counts(self.outbound.hits) if self.outbound is not None else "-",
+            self.outbound.ms if self.outbound is not None else 0.0,
         )
 
 
@@ -306,6 +343,12 @@ class Gateway:
         # the session it created only once no other request holds it and none succeeded.
         self._session_holds: dict[str, _SessionHold] = {}
         self._holds_lock = threading.Lock()
+        # Fixed headers added to every upstream call of this gateway (the hosted sponsored
+        # route's attribution, LAB-1461); they never override content type or credentials.
+        self.upstream_extra_headers: dict[str, str] = {}
+        # Ids the upstream issued per session (LAB-1469): sent back as identifiers, they are
+        # forwarded without detection (the NER reads some random call ids as phone numbers).
+        self.issued_ids = IssuedIds()
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
@@ -483,6 +526,25 @@ class Gateway:
             self.vault.drop(session_id)
             self.cache.drop_session(session_id)
 
+    def _forwarded(
+        self,
+        body: dict[str, Any],
+        session: VaultSession,
+        stats: RequestStats,
+        add_note: Callable[[dict[str, Any]], None],
+    ) -> bytes:
+        """The masked body as sent upstream, with the placeholder note if it needs one.
+
+        The note goes in after masking, so it is never scanned; it is a constant, so it can't
+        carry a value (LAB-1471).
+        """
+        text = json.dumps(body, ensure_ascii=False)
+        if self.config.placeholder_note and needs_note(text, session):
+            add_note(body)
+            stats.note = True
+            text = json.dumps(body, ensure_ascii=False)
+        return text.encode("utf-8")
+
     def _upstream_url(self) -> str:
         base = self.settings.upstream_base_url
         if not base:
@@ -493,7 +555,11 @@ class Gateway:
         return base if base.endswith("/chat/completions") else base + "/chat/completions"
 
     def _upstream_headers(self, headers: Mapping[str, str]) -> dict[str, str]:
-        out = {"Content-Type": "application/json", "Accept": "application/json"}
+        out = {
+            **self.upstream_extra_headers,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
         if self.settings.hosted:
             out["Accept-Encoding"] = "identity"
         key = self.settings.upstream_api_key
@@ -635,6 +701,7 @@ class Gateway:
         remask: bool,
         since: int | None = None,
         names: frozenset[str] = frozenset(),
+        issued: frozenset[str] = frozenset(),
     ) -> None:
         """Write ``masked`` back. With ``remask``, values first seen in an image are masked in
         the texts too; ``since`` (the session generation before the images) scans only the
@@ -642,7 +709,10 @@ class Gateway:
 
         ``names``: the tool names the request declares. An identifier whose only rewrites are
         those names is written as sent, whatever the session holds (LAB-1324); a declared name
-        that is also a pre-loaded known value gets no exemption and still fails closed."""
+        that is also a pre-loaded known value gets no exemption and still fails closed.
+
+        ``issued``: the ids the upstream issued in this session (LAB-1469). An identifier that
+        is one of them is written as sent."""
         if remask:
             masked = [
                 session.mask(text, [], language=language, remask=True, since=since)
@@ -661,10 +731,31 @@ class Gateway:
             if (
                 slot.kind == "identifier"
                 and text != slot.text
-                and identifier_keeps_tool_names(slot.text, text, exempt, original)
+                and (
+                    slot.text in issued
+                    or identifier_keeps_tool_names(slot.text, text, exempt, original)
+                )
             ):
                 text = slot.text
             slot.write(text)
+
+    @staticmethod
+    def _recheck(
+        body: Mapping[str, Any],
+        collect: Callable[[object], CollectedTexts],
+        session: VaultSession,
+        language: str,
+        stats: RequestStats,
+        names: frozenset[str],
+        issued: frozenset[str],
+    ) -> None:
+        """The outbound re-check (:mod:`pii_guard.gateway.outbound`, LAB-1500): read the masked
+        ``body`` again and refuse it if a value the session knows is still in it."""
+        stats.outbound = check_outbound(
+            body, collect, session, language, tool_names=names, issued=issued
+        )
+        if stats.outbound.hits:
+            raise OutboundCheckFailedError(stats.outbound.hits)
 
     def _seed_cache(
         self,
@@ -807,6 +898,8 @@ class Gateway:
                 spans = await self._detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
                 spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
+                issued = self.issued_ids.of(session.session_id)
+                spans = without_opaque_ids(collected.slots, spans, issued)
             # Every older entry has scanned every text by the end of _mask: an image's remask
             # needs only the entries this request added (LAB-1278).
             generation = session.generation
@@ -820,9 +913,13 @@ class Gateway:
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                self._write(collected.slots, masked, session, language, remask, generation, names)
+                self._write(
+                    collected.slots, masked, session, language, remask, generation, names, issued
+                )
                 collected.finalize()
             _count_masked(stats, before, session)
+            with timer.span("mask"):
+                self._recheck(body, collect_texts, session, language, stats, names, issued)
         except BaseException:
             stats.log("blocked")
             self._release_session(session, created, masked=False)
@@ -830,10 +927,17 @@ class Gateway:
         self._release_session(session, created, masked=True)
 
         forwarding = time.perf_counter()
-        payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        payload = self._forwarded(body, session, stats, add_chat_note)
+        try:
+            check_upstream_payload(payload)
+        except PayloadTooLargeError:
+            stats.log("blocked")
+            raise
         if trace.payloads:
             trace.masked_request = payload
-        masked_messages = _masked_messages(body) if echo else None
+        # The client's messages as masked: the note is a flag, not a message, so a UI that
+        # picks the first system message still finds its own.
+        masked_messages = _masked_messages(body)[int(stats.note) :] if echo else None
         client = self.upstream_client()
         request = client.build_request(
             "POST",
@@ -852,6 +956,11 @@ class Gateway:
             timer.add("upstream", time.perf_counter() - started)
             stats.log("upstream_unreachable")
             raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
+        except UpstreamError:
+            # A refused (compressed or oversized) hosted response counts like no response.
+            timer.add("upstream", time.perf_counter() - started)
+            stats.log("upstream_unreachable")
+            raise
         timer.add("upstream_ttfb", time.perf_counter() - started)
         timer.add("upstream", time.perf_counter() - started)
 
@@ -888,6 +997,7 @@ class Gateway:
             if not isinstance(answer, dict):
                 raise UpstreamError("upstream returned a body that is not a JSON object")
             masked_answer = _masked_answer(answer) if echo else None
+            self.issued_ids.add(session.session_id, upstream_ids(answer))
             report = restore_completion(session, answer)
             stats.unresolved = len(report.unresolved)
             self._seed_cache(session, language, detector, report.restored_spans, stats)
@@ -895,6 +1005,7 @@ class Gateway:
             if echo:
                 answer["pii_guard"] = {
                     "masked_messages": masked_messages,
+                    "placeholder_note": stats.note,
                     "masked_answer": masked_answer,
                 }
             stats.log("ok")
@@ -907,7 +1018,9 @@ class Gateway:
             timer.finish()
             return result, stats
 
-        restorer = SseRestorer(session)
+        restorer = SseRestorer(
+            session, on_ids=lambda ids: self.issued_ids.add(session.session_id, ids)
+        )
         trace.streaming = True
 
         async def timed_lines() -> AsyncIterator[str]:
@@ -945,7 +1058,11 @@ class Gateway:
             if echo:
                 yield sse_event(
                     json.dumps(
-                        {"object": "pii_guard.masked_request", "messages": masked_messages},
+                        {
+                            "object": "pii_guard.masked_request",
+                            "messages": masked_messages,
+                            "placeholder_note": stats.note,
+                        },
                         ensure_ascii=False,
                     )
                 )

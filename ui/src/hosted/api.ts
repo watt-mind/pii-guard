@@ -4,8 +4,12 @@ export interface Connection { id: string; provider: string; origin: string; expi
 export interface GuardKey { id: string; name: string; prefix: string; created_at: string }
 export interface Account {
   mode: "hosted"; authenticated: boolean;
+  /** The signed-in owner: an opaque id today; a display name or email only if the server adds one. */
+  principal?: { id: string; provider: string; name?: string; email?: string } | null;
   login_url: string; logout_url: string; tier: "anonymous" | "standard";
   providers: unknown[];
+  /** The model the free (included) runs answer with, e.g. "muse-spark-1.3"; absent on an older server. */
+  included_model?: string | null;
   limits: Record<string, number | string | boolean | null>;
   usage: { requests_today: number; resets_at: string };
   state: { persistence: "ephemeral"; restart_loses_sessions: boolean };
@@ -38,14 +42,23 @@ export const createRequester = (doFetch: typeof fetch): Requester => async <T>(p
 
 export const request = createRequester((...args) => fetch(...args));
 
-export function recovery(error: unknown): string {
+/**
+ * What to do after a failed hosted request, by status only (never server text). The console's
+ * screens get the default copy; the public page passes `"site"`, which also points to its static
+ * walkthrough, because only that page has one.
+ */
+export function recovery(error: unknown, context: "console" | "site" = "console"): string {
+  const site = context === "site";
+  const fallback = site ? " The recorded run is still shown." : "";
   if (error instanceof ApiError) {
-    if (error.status === 401 || error.status === 403) return "Your session is no longer authorized. Sign in again, then retry.";
-    if (error.status === 429) return "The live allowance is used up or requests are arriving too quickly. Check the reset time below and retry later; the static example remains available.";
+    // Free runs on the included model are off (zero until the provider authorises them, docs/hosted.md).
+    if (error.code === "sponsored_unavailable") return site ? "Free runs are paused right now. The recorded run is still shown below. Sign in to run your own text with your own model key." : "Free runs are paused right now. Connect your own model key, or try again later.";
+    if (error.status === 401 || error.status === 403) return "Your session has ended. Sign in again, then retry.";
+    if (error.status === 429) return site ? "Today’s free runs are used up, or requests are coming in too fast. The recorded run is still shown." : "The allowance is used up or requests are arriving too quickly. Check the reset time on Overview and retry later.";
     if (error.status === 410 || /expired|session|connection/.test(error.code)) return "This session or connection has expired. Reconnect your provider or start a fresh request.";
-    if (error.status === 404) return "This hosted API feature is unavailable. Reconnect to the API or retry after the service is restored. The static example remains available.";
+    if (error.status === 404) return `This hosted API feature is unavailable. Retry after the service is restored.${fallback}`;
     if (error.status === 400 || error.status === 422) return "The request was refused. Check the input and provider settings, then retry.";
-    if (error.status === 502 || error.status === 503 || error.status === 504) return "The guard or model provider is unavailable. No completed live result is available. Retry later or inspect the static example.";
+    if (error.status === 502 || error.status === 503 || error.status === 504) return site ? "The guard or the model provider isn’t responding. Try again in a moment; the recorded run is still shown." : "The guard or model provider is unavailable. Retry later.";
   }
-  return "The hosted API could not complete this request. Check your connection and retry. The static example remains available.";
+  return `The request didn’t complete. Check your connection and retry.${fallback}`;
 }

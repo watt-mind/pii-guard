@@ -30,7 +30,7 @@ export class ApiError extends Error {
 
 /** The API could not be reached, or answered with something that isn't the contract (proxy error page). */
 export class UnreachableError extends Error {
-  constructor(message = "pii-guard API is not reachable") {
+  constructor(message = "PII Guard API is not reachable") {
     super(message);
     this.name = "UnreachableError";
   }
@@ -103,7 +103,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpGuardClie
     }
 
     if (res.ok) {
-      if (payload === undefined) throw new UnreachableError("pii-guard API returned a non-JSON response");
+      if (payload === undefined) throw new UnreachableError("PII Guard API returned a non-JSON response");
       return payload as T;
     }
     if (isErrorBody(payload)) {
@@ -114,7 +114,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpGuardClie
       throw new ApiError(res.status, "not_found", `${method} ${path} is not available`);
     }
     // A dev-proxy error page or a gateway in front of a stopped API.
-    throw new UnreachableError(`pii-guard API answered ${res.status} without a contract error body`);
+    throw new UnreachableError(`PII Guard API answered ${res.status} without a contract error body`);
   }
 
   return {

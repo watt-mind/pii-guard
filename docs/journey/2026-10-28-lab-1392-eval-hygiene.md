@@ -55,7 +55,7 @@ wasn't kept after training, so it couldn't be checked. v2.0's ai4privacy scores 
 in-distribution (same generator, different rows), as before.
 
 - **OpenPII-1.5M wasn't checked.** The ticket suspected it contains our validation rows. Its
-  card lists the licence as "other", not CC-BY-4.0, so it is not a candidate for training
+  card lists the license as "other", not CC-BY-4.0, so it is not a candidate for training
   here, and we didn't download it. If it is ever proposed, the gate checks it by default.
 - **Cost:** $0. Everything ran on a local CPU. The downloads were the pinned public files:
   the OpenPII train split (3.7 GB, to rebuild the rows) and the two new sets.

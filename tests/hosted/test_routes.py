@@ -21,7 +21,7 @@ from pii_guard.gateway.service import Gateway
 from pii_guard.hosted import routes
 from pii_guard.hosted.connections import ConnectionStore
 from pii_guard.hosted.identity import ApiKeyStore, Principal
-from pii_guard.hosted.quotas import QuotaLedger
+from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, QuotaLedger
 from pii_guard.policy import PolicySet
 from pii_guard.vault import Vault
 
@@ -51,7 +51,10 @@ def route_app(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, list[dict[str, 
                 "choices": [
                     {
                         "index": 0,
-                        "message": {"role": "assistant", "content": body["messages"][0]["content"]},
+                        "message": {
+                            "role": "assistant",
+                            "content": body["messages"][-1]["content"],
+                        },
                     }
                 ]
             },
@@ -94,7 +97,23 @@ def test_account_hides_guest_identity_and_secrets(route_app: tuple[FastAPI, list
     assert account["authenticated"] is False
     assert account["connections"] == []
     assert account["state"] == {"persistence": "ephemeral", "restart_loses_sessions": True}
+
+
+def test_account_links_return_to_the_dashboard(route_app: tuple[FastAPI, list[Any]]) -> None:
+    app, _ = route_app
+    with TestClient(app) as client:
+        account = client.get("/v1/account").json()
+    assert account["login_url"] == "/.auth/login/google?post_login_redirect_uri=%2F%23overview"
+    assert account["logout_url"] == "/.auth/logout?post_logout_redirect_uri=%2F"
     assert account["limits"]["sponsored_enabled"] is False
+
+
+def test_account_names_the_included_model(route_app: tuple[FastAPI, list[Any]]) -> None:
+    """The public page names the free runs' model from the API, never hard-coded (LAB-1466)."""
+    app, _ = route_app
+    with TestClient(app) as client:
+        account = client.get("/v1/account").json()
+    assert account["included_model"] == app.state.hosted.settings.hosted_models[0]
 
 
 def test_key_revealed_once_owner_scoped_and_revoked(route_app: tuple[FastAPI, list[Any]]) -> None:
@@ -198,10 +217,10 @@ def test_demo_real_masking_and_exact_roundtrip(
         "request_id",
     }
     assert result["original"] == routes.DEMO_SAMPLES[sample][1]
-    assert result["masked"] == calls[0]["messages"][0]["content"]
+    assert result["masked"] == calls[0]["messages"][-1]["content"]
     assert result["answer"] == result["masked"]
     assert result["restored"] == result["original"]
-    assert calls[0]["max_completion_tokens"] == 8192
+    assert calls[0]["max_completion_tokens"] == DEMO_MAX_OUTPUT_TOKENS
     assert calls[0]["stream"] is False
     assert result["entities"]
     for entity in result["entities"]:

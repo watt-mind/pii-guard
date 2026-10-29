@@ -56,7 +56,10 @@ def test_per_document_counts_are_committed() -> None:
 
 
 # One item per record lets xdist distribute the expensive bootstrap recomputations.
-# Paths are sorted so every worker collects the same items in the same order.
+# Paths are sorted so every worker collects the same items in the same order. untraced: a
+# check of the committed counts, 3-9 s each under the branch tracer; the bootstrap code is
+# measured by the tests above (LAB-1447).
+@pytest.mark.untraced
 @pytest.mark.parametrize("path", sorted(COUNTS.glob("*.json")), ids=lambda path: path.stem)
 def test_stored_summaries_match_a_recompute(path: Path) -> None:
     counts = json.loads(path.read_text(encoding="utf-8"))

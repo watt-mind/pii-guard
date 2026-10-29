@@ -16,7 +16,7 @@ export interface ErrorCopy {
 }
 
 const FAIL_CLOSED =
-  "pii-guard fails closed: if detection or masking fails, the request is stopped rather than forwarded unmasked.";
+  "PII Guard fails closed: if detection or masking fails, the request is stopped rather than forwarded unmasked.";
 
 /** The HTTP status in a message like "upstream returned HTTP 404", for errors that carry no status field. */
 export function statusFromMessage(message: string | undefined): number | null {
@@ -56,20 +56,20 @@ export function errorCopy(code: string | undefined, status: number | null = null
       return {
         kind: "upstream",
         title: `The upstream refused the masked request${status === null ? "" : ` (HTTP ${status})`}.`,
-        body: `The masked request reached the upstream, which answered ${answered}: ${upstreamHint(status)}. Nothing unmasked left pii-guard.`,
+        body: `The masked request reached the upstream, which answered ${answered}: ${upstreamHint(status)}. Nothing unmasked left PII Guard.`,
       };
     }
     case "upstream_unavailable":
       return {
         kind: "upstream",
         title: "The upstream could not be reached, or its answer was unusable.",
-        body: "pii-guard masked the request before forwarding it; the upstream didn't give a usable answer. Nothing unmasked left pii-guard. Retry, or check the upstream URL.",
+        body: "PII Guard masked the request before forwarding it; the upstream didn't give a usable answer. Nothing unmasked left PII Guard. Retry, or check the upstream URL.",
       };
     case "stream_failed":
       return {
         kind: "stream",
         title: "The answer stream failed partway.",
-        body: "The masked request reached the upstream, but its answer stream broke off. Nothing unmasked left pii-guard. Retry the message.",
+        body: "The masked request reached the upstream, but its answer stream broke off. Nothing unmasked left PII Guard. Retry the message.",
       };
     default:
       return { kind: "fail_closed", title: "Blocked. Nothing was sent to the model.", body: FAIL_CLOSED };

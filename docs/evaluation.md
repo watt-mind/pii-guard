@@ -18,8 +18,8 @@ where.
    drawn by frequency from the language pack's lexicons
    ([ADR 0009](decisions/0009-third-party-lexicons.md)) and combined at random; every address
    uses one of its settlement's own postcodes. Each prompt also asks for a few **hard
-   negatives** that are never labelled: a surname that is a common word, used as the word
-   ("egy nagy doboz"), a town outside an address ("a Szeged felé tartó vonat"), a capitalised
+   negatives** that are never labeled: a surname that is a common word, used as the word
+   ("egy nagy doboz"), a town outside an address ("a Szeged felé tartó vonat"), a capitalized
    phrase ("Eladó lakás", "Fekete Péntek").
 2. **Documents.** A Meta Muse model writes realistic documents around those identities, from
    templates that cover the real shapes of the work:
@@ -30,7 +30,7 @@ where.
    including inflected forms**, and records the spans as labels. Documents where a value
    can't be located are discarded rather than hand-fixed.
 3. **Images.** Synthetic ID cards and scanned pages are rendered from the same identities
-   (with blur, rotation, noise and JPEG artefacts), labelled with text boxes and region masks.
+   (with blur, rotation, noise and JPEG artefacts), labeled with text boxes and region masks.
 4. **Hard cases.** A smaller hand-written set of adversarial examples: names that are also
    common words, numbers that look like IDs but aren't, addresses split across lines, mixed
    languages.
@@ -43,21 +43,33 @@ The test split is never used for training or prompt tuning.
 | Metric | Definition |
 |---|---|
 | **Precision / recall / F1, per entity type** | Span-level, exact match and overlap match |
-| **Leak rate (end to end)** | Share of labelled values that appear, in any surface form, in the request the gateway sends upstream. This is the number that matters most. |
+| **Leak rate (end to end)** | Share of labeled values that appear, in any surface form, in the request the gateway sends upstream. This is the number that matters most. |
 | **Over-masking rate** | Share of masked spans (spans, not characters) that overlap no gold span: not personal data (hurts answer quality). Predictions on an *ignore region* are left out (below). |
 | **Re-identification accuracy** | Share of placeholders in responses restored to the correct, correctly inflected value |
 | **Placeholder consistency** | Share of gold entities (per document; the gold spans of one type that are surface forms of each other, `Minta Anna` / `Minta Annának`) whose occurrences are all fully masked by one and the same placeholder. Fully: every letter and digit of the gold span is inside the placeholder, except a case ending right after it (`[[PERSON_x]]nak`, `[[PERSON_x]]'s`) and words that identify no one by the partial-leak rule (`Ms`, `Frau`). An unmasked or partly masked occurrence (`Próba [[PERSON_x]]`, `[[ID_DOCUMENT_x]]010`, digits joined to the placeholder by `.`, `-` or `/`: `[[ID_DOCUMENT_x]].91`) counts as inconsistent. Until LAB-1355 any overlap counted, so the consistency of earlier run records is an upper bound ([comparison](../eval/results/2026-10-28-consistency-metric/README.md)). Also reported over entities with 2+ occurrences (`multi_rate`). |
 | **Number validity** (public sets) | Recall and leak rate split by whether a structured identifier passes the language packs' validators, plus the leak of every other value; the headline is unchanged ([below](#number-validity)) |
-| **Visual recall** | Share of labelled image regions covered by a mask (IoU threshold) |
+| **Visual recall** | Share of labeled image regions covered by a mask (IoU threshold) |
 | **Latency** | p50 / p95 per request, per pipeline stage |
 
-**Ignore regions.** A fixture document may list text its source labelled but pii-guard's
+**Ignore regions.** A fixture document may list text its source labeled but PII Guard's
 policy doesn't score (`meta.ignore`: offsets and the source's label, never the value), such as
 every date in a public dataset. A prediction that overlaps one and matches no gold span is
 neither credited nor charged: it is left out of precision and over-masking and counted as
 `unscored_predictions`. Recall and leak rate don't change. A sample converted before ignore
 regions existed falls back to a per-type rule (`scorer.LEGACY_UNSCORED_TYPES`:
 `DATE_OF_BIRTH` on Ai4Privacy).
+
+**Corrected labels.** A public set's gold can be plainly wrong: Gretel finance labels German set
+phrases (`Damen`, `Herren`, `Im Rahmen`), common nouns (`Saldo`) and template slots
+(`[Borrower Name]`) as names, and every system pays for them as leaks. We never edit the
+upstream set for that. A committed corrections file (`eval/datasets/<set>/corrections.json`)
+lists each class of error with its rationale and the exact span texts it covers, and
+`python -m pii_guard.eval.datasets fetch <set>-corrected` builds a **separate** set from it in
+which those spans are ignore regions (`corrected:<rule>`). The rules match the span's own text,
+never a system's output, and every system is scored on the same corrected files, so both the
+upstream number and the corrected one are reported side by side. Only `gretel-finance` has one
+(LAB-1497): 178 of its 1,710 gold spans; what, why and the before/after are in
+[datasets.md](datasets.md#corrected-labels).
 
 **Percentiles.** Every latency percentile the harnesses write (text and visual evals, segmenter
 eval, `pii-guard bench latency`) uses one definition, `pii_guard.eval.stats.percentile`:
@@ -135,13 +147,13 @@ The scorecard reports every metric per language and per entity type, plus an ove
 ## Leak rate in practice
 
 The harness masks each document with the vault (only `mask`-policy predictions, as the
-gateway would) and searches the masked text for each labelled value: case- and
+gateway would) and searches the masked text for each labeled value: case- and
 whitespace-insensitive, through the language's surface forms, and for structured identifiers
 on their letters and digits with any separators (a phone number also by its national number,
 a Hungarian IBAN also by the giro number inside it). A value is **leaked** if any form
 survives. It is **partially leaked** if not, but an identifying token of it survives (for
 example the street of an address whose postcode alone was masked). Tokens that also occur
-outside the labelled spans, and generic words such as `utca` or month names, don't count.
+outside the labeled spans, and generic words such as `utca` or month names, don't count.
 A value is also partially leaked when a placeholder covers an occurrence of it in part and
 leaves digits of it right at its edge: a digit run the edge cuts (`[[ID_DOCUMENT_x]]010`,
 `8[[NATIONAL_ID_HU_TAX_x]]`) or one joined to it by `.`, `-` or `/` (`[[ID_DOCUMENT_x]].91`).
@@ -163,7 +175,7 @@ Every run worth keeping becomes one **run record**: `eval/results/runs/<YYYY-MM-
 specified by the JSON Schema `eval/results/schema/run.schema.json` (`schema_version` 1) and
 validated in the tests. A record says:
 
-- **what ran**: the system (`family` pii-guard or comparison, `tool`, `version`), each
+- **what ran**: the system (`family` `pii-guard` or comparison, `tool`, `version`), each
   detector with its `model`, `model_ref`, `revision`, `settings` (reasoning strength, mode,
   thresholds) and `serving`, and a derived `system.key` such as `rules+ner:xlmr-base-ft-s7` or
   `rules+llm:muse-glimmer@reasoning_strength=low` that groups runs of the same configuration;
@@ -234,11 +246,12 @@ existed were converted by `python -m pii_guard.eval.record_import` and are marke
   date merged, for progress over time), `snapshots` (latest result per set, system and
   language **on the set's current fixture files**, with an exactly pooled, micro-averaged
   `all`), `stale_snapshots`, `visual`, `headline_set`, and the vocabularies `systems` (with
-  chart colours and markers), `fixture_sets`, `languages` and `entity_types`. Rates are 0 to 1,
+  chart colors and markers), `fixture_sets`, `languages` and `entity_types`. Rates are 0 to 1,
   latency in milliseconds. Latency percentiles can't be pooled: a pooled value built from
   several runs is their document-weighted mean and says `latency_pooled: true`;
-- the same, compact, on stdout with `--print-index`: the UI build bundles it into the
-  Benchmarks tab (`ui/vite.config.ts`);
+- the same, compact, on stdout with `--print-index`: the UI build ships it with the
+  Benchmarks tab as hashed static JSON parts, the summary and run log first and each fixture
+  set's results when the set is picked (`ui/vite.config.ts`, `ui/src/api/benchmarksSplit.ts`);
 - `docs/benchmarks/*.svg`: leak vs latency, F1 and leak by language, leak over time, recall
   per entity type and visual recall: hand-written SVG, 1600 x 900, each captioned with the
   fixture set, its size, the run dates and the commits;
@@ -322,7 +335,7 @@ keeps the address shape but isn't boosted above a bare postcode's score.
 ## ID documents and parcel numbers
 
 Rules-only detection of `ID_DOCUMENT` and `PARCEL_NUMBER_HU`, before and after the Hungarian
-recognisers for the personal identification number, labelled document numbers, MRZ zones and
+recognisers for the personal identification number, labeled document numbers, MRZ zones and
 parcel numbers (`uv run pii-guard eval --fixtures eval/fixtures/<set>.jsonl --detectors
 rules`). hu-smoke gained three documents for them (`hu-idcard-0029` with a TD1 zone,
 `hu-contract-0030`, and `hu-court-0031` with only hard negatives: case numbers, fractions,
@@ -347,7 +360,7 @@ predictions, P/R, leak and over-masking). The one partial leak is the MRZ in
 
 ## Comparison with open-source tools
 
-pii-guard is also scored against the closest open-source alternatives, on the same fixtures
+PII Guard is also scored against the closest open-source alternatives, on the same fixtures
 and with the same scorer (`pii_guard.eval.baselines`):
 
 ```bash
@@ -378,7 +391,7 @@ the lockfile used to carry), and unpacks its package once into `$PII_GUARD_MODEL
 (default `~/.cache/pii-guard/models`). The Presidio baselines import that package, which
 registers huSpaCy's lemmatizer components, and give spaCy the pipeline directory: the same
 files and code as the installed wheel, and identical scores. huSpaCy `hu_core_news_lg` is by
-SzegedAI and MILAB (<https://github.com/huspacy/huspacy>), licensed CC BY-SA 4.0; pii-guard
+SzegedAI and MILAB (<https://github.com/huspacy/huspacy>), licensed CC BY-SA 4.0; PII Guard
 doesn't redistribute it.
 
 ### The tools and their configuration
@@ -386,7 +399,7 @@ doesn't redistribute it.
 Every tool runs with its **default configuration**. The only choices we made are the ones a
 default doesn't cover, listed here.
 
-| Tool | How it runs | Configuration | Licences (tool; models) |
+| Tool | How it runs | Configuration | Licenses (tool; models) |
 |---|---|---|---|
 | **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default); Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. | MIT; `en_core_web_lg` MIT, huSpaCy `hu_core_news_lg` CC BY-SA 4.0 |
 | **LLM Guard** 0.3.16 | worker process, own environment | `Anonymize(Vault())` with defaults: the `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` NER model, threshold 0.5, its default entity list, language `en` (it supports only `en` and `zh`, so Hungarian documents also go through `en`). `Deanonymize` restores. A fresh vault per document. | MIT; `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` CC-BY-NC-4.0 (non-commercial) |
@@ -397,7 +410,7 @@ LLM Guard pins `transformers==4.51.3` and Presidio 2.2.358; PrivAiTe needs
 worker (`src/pii_guard/eval/baselines/workers/`) in an ephemeral `uv` environment built from
 pinned requirements (`src/pii_guard/eval/baselines/envs/*.txt`, compiled from `*.in` with
 `uv pip compile --universal --python-version 3.12 --no-header --no-annotate X.in -o X.txt`).
-pii-guard's own dependencies are unchanged. Presidio caps `numpy` below 2.5, so the `baselines` extra is declared as conflicting with the `ner` extra (`[tool.uv] conflicts`): uv resolves each on its own and the two can't be installed together. Documents reach a worker over a local pipe; the
+PII Guard's own dependencies are unchanged. Presidio caps `numpy` below 2.5, so the `baselines` extra is declared as conflicting with the `ner` extra (`[tool.uv] conflicts`): uv resolves each on its own and the two can't be installed together. Documents reach a worker over a local pipe; the
 only network traffic is the first-run download of packages and models (Hugging Face Hub,
 spaCy wheels). Workers get no credentials from the environment, telemetry switches are set,
 and their stderr is discarded (the tools log detected values) unless
@@ -407,16 +420,16 @@ and their stderr is discarded (the tools log detected values) unless
 
 - **Spans.** P/R/F1 use the spans the tool actually replaced: LLM Guard's and PrivAiTe's
   are captured from the call into their own replacement step, Presidio's are the analyzer
-  results. Where spans overlap (Presidio), pii-guard's own resolver applies
+  results. Where spans overlap (Presidio), PII Guard's own resolver applies
   (`detect.pipeline.resolve_spans`, with no detector authoritative): same-type overlaps
   merge, otherwise `keep` types lose, then longer spans and higher scores win.
 - **Leak rate** is measured on the text the tool itself produces (its own masking), with its
-  placeholders blanked out like pii-guard's. Leak checking doesn't look at types, so a value
+  placeholders blanked out like PII Guard's. Leak checking doesn't look at types, so a value
   the tool masked under the wrong type counts as protected for leak rate while costing it a
   false positive and a miss in P/R.
 - **Over-masking** counts the tool's mapped spans that overlap no gold span. A tool masks
-  everything it detects, including organisations, which pii-guard's policy keeps; masked
-  organisations overlap gold spans, so they don't count as over-masking. Spans on an ignore
+  everything it detects, including organizations, which PII Guard's policy keeps; masked
+  organizations overlap gold spans, so they don't count as over-masking. Spans on an ignore
   region (a policy-excluded label of the public set) are left out for every system alike.
 - **Placeholder consistency** is `null` for the tools: they don't report which placeholder
   replaced which span.
@@ -431,7 +444,7 @@ All three tools use Presidio's label vocabulary plus a few labels of their own. 
 (`pii_guard.eval.baselines.mapping.LABEL_MAP`) maps them for every tool; LLM Guard's regex
 variants (`EMAIL_ADDRESS_RE`, `CREDIT_CARD_RE`, `US_SSN_RE`) map like the label without `_RE`.
 
-| Tool label | pii-guard type | Emitted by | Note |
+| Tool label | PII Guard type | Emitted by | Note |
 |---|---|---|---|
 | `PERSON` | `PERSON` | all | |
 | `EMAIL_ADDRESS` | `EMAIL` | all | |
@@ -439,7 +452,7 @@ variants (`EMAIL_ADDRESS_RE`, `CREDIT_CARD_RE`, `US_SSN_RE`) map like the label 
 | `LOCATION` | `ADDRESS` | Presidio, PrivAiTe | cities, countries and streets; overlap matching credits a city inside an address |
 | `DATE_TIME` | `DATE_OF_BIRTH` | Presidio, PrivAiTe | no tool separates birth dates from other dates: recall for the birth dates it masks, a false positive for every other date |
 | `IBAN_CODE` | `BANK_ACCOUNT` | all | |
-| `CREDIT_CARD` | `BANK_ACCOUNT` | all | cards are `BANK_ACCOUNT` in pii-guard's taxonomy |
+| `CREDIT_CARD` | `BANK_ACCOUNT` | all | cards are `BANK_ACCOUNT` in PII Guard's taxonomy |
 | `US_BANK_NUMBER` | `BANK_ACCOUNT` | Presidio, LLM Guard | |
 | `FINANCIAL` | `BANK_ACCOUNT` | PrivAiTe | privacy-filter `account_number` |
 | `US_SSN` | `ID_DOCUMENT` | all | national numbers without a type of their own |
@@ -449,7 +462,7 @@ variants (`EMAIL_ADDRESS_RE`, `CREDIT_CARD_RE`, `US_SSN_RE`) map like the label 
 | `UK_NHS` | `ID_DOCUMENT` | Presidio, PrivAiTe | |
 | `UK_NINO` | `ID_DOCUMENT` | none by default | not in the default recognizer set; mapped for completeness |
 | `UK_PASSPORT` | `ID_DOCUMENT` | none by default | as above |
-| `ORGANIZATION` | `ORGANIZATION` | Presidio | `keep` policy in pii-guard |
+| `ORGANIZATION` | `ORGANIZATION` | Presidio | `keep` policy in PII Guard |
 | `ORG` | `ORGANIZATION` | none by default | alias, mapped for completeness |
 | `URL` | unmapped | all | |
 | `IP_ADDRESS` | unmapped | all | |
@@ -461,7 +474,7 @@ variants (`EMAIL_ADDRESS_RE`, `CREDIT_CARD_RE`, `US_SSN_RE`) map like the label 
 | `SECRET` | unmapped | PrivAiTe | credentials |
 | `CUSTOM` | unmapped | LLM Guard | hidden names; none by default |
 
-**Unmapped** labels (and any label not in the table) have no pii-guard counterpart: they are
+**Unmapped** labels (and any label not in the table) have no PII Guard counterpart: they are
 left out of P/R and over-masking, but the tool still masks them, so the leak rate sees what
 it sent. Their counts per label are in the scorecard (`unmapped_labels`).
 
@@ -473,7 +486,7 @@ under another label (a tax number caught as `PHONE_NUMBER`, say).
 ### Reading the numbers
 
 - The **Muse-generated** fixtures (`*-synth-sample.jsonl`) were written by the same model
-  family pii-guard's LLM detector uses, which flatters Muse-based detection. The hand-written
+  family PII Guard's LLM detector uses, which flatters Muse-based detection. The hand-written
   smoke sets don't have that bias.
 - The fixture sets are small (51 smoke, 30 synthetic documents): differences of a few
   points are noise.
@@ -489,9 +502,9 @@ Leak rate in %, pooled over languages, and detection p50:
 
 | System | Hand-written smoke (hu 31 + en 10 + de 10) | Ai4Privacy (hu + en + de, 600) | p50 | $ / 1k msgs |
 |---|---:|---:|---:|---:|
-| pii-guard rules | 41.6 | 73.5 | 0.2–0.4 ms | |
-| **pii-guard fast** (rules + distilled NER, large) | **0.6** | 38.0 | 24–31 ms (MPS) | |
-| **pii-guard audit** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.9** | 1.8–2.3 s | 2.03–2.95 |
+| PII Guard rules | 41.6 | 73.5 | 0.2–0.4 ms | |
+| **PII Guard fast** (rules + distilled NER, large) | **0.6** | 38.0 | 24–31 ms (MPS) | |
+| **PII Guard audit** (+ Muse Spark Open, Baseten, `low`) | **0.6** | **3.9** | 1.8–2.3 s | 2.03–2.95 |
 | Presidio | 24.3 | 29.6 | 8–136 ms | |
 | LLM Guard | 45.1 | 43.8 | 61–133 ms | |
 | PrivAiTe | 12.7 | 9.5 | 93–182 ms | |
@@ -504,14 +517,14 @@ rules and fast mode (LAB-1170 and LAB-1204, commit `3d9eb8b`) leak less on Ai4Pr
 commit. The machine was under unrelated load during
 these runs (load average 13–27 on 10 cores), so latency is relative. Fast mode, the
 production path, is as safe as audit mode on the hand-written sets but leaks 35–40 % on the
-public set, mostly numbers that fail the checksums pii-guard's rules require (see the caveats
+public set, mostly numbers that fail the checksums PII Guard's rules require (see the caveats
 below). Audit mode leaks least on both, which makes it the upper bound and the reference for
 quality checks, not a production setting: every message is a remote LLM call (about 2 s and
 $2–3 per 1k messages) and its text leaves the machine.
 
 ### Public benchmark: Ai4Privacy OpenPII 1M
 
-Our own fixtures are small and partly written by the model family pii-guard's LLM detector
+Our own fixtures are small and partly written by the model family PII Guard's LLM detector
 uses, so the comparison also runs on a public set nobody here wrote:
 [`ai4privacy/pii-masking-openpii-1m`](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m)
 by Ai4Privacy / Ai Suisse SA, CC-BY-4.0. A seeded sample of its validation split (200
@@ -527,21 +540,21 @@ uv run pii-guard eval --fixtures eval/fixtures/public/hu-ai4privacy.jsonl --dete
 
 Only the open OpenPII component is used. The older Ai4Privacy releases (`pii-masking-400k`,
 `-300k`) are licensed for academic, non-commercial use without redistribution, and the other
-components of the commercial PII-Masking-2M set need a commercial licence.
+components of the commercial PII-Masking-2M set need a commercial license.
 
 **Label mapping** (`pii_guard.eval.public.ai4privacy.LABEL_MAP`):
 
-| Dataset label | pii-guard type | Note |
+| Dataset label | PII Guard type | Note |
 |---|---|---|
 | `GIVENNAME`, `SURNAME` | `PERSON` | merged into one span when only spaces separate them |
 | `STREET`, `BUILDINGNUM`, `ZIPCODE`, `CITY` | `ADDRESS` | parts separated only by spaces or a comma are merged into one address |
 | `EMAIL` | `EMAIL` | |
 | `TELEPHONENUM` | `PHONE` | |
-| `CREDITCARDNUMBER` | `BANK_ACCOUNT` | cards are `BANK_ACCOUNT` in pii-guard's taxonomy |
+| `CREDITCARDNUMBER` | `BANK_ACCOUNT` | cards are `BANK_ACCOUNT` in PII Guard's taxonomy |
 | `IDCARDNUM`, `PASSPORTNUM`, `DRIVERLICENSENUM` | `ID_DOCUMENT` | |
 | `SOCIALNUM` | `ID_DOCUMENT`; `NATIONAL_ID_HU_TAJ` for `hu` | |
 | `TAXNUM` | `ID_DOCUMENT`; `NATIONAL_ID_HU_TAX` for `hu` | |
-| `DATE`, `AGE`, `GENDER`, `SEX`, `TITLE`, a `CITY` on its own | *policy-excluded* | not masked by pii-guard's policy (any date, not only birth dates; bare towns are kept on purpose) |
+| `DATE`, `AGE`, `GENDER`, `SEX`, `TITLE`, a `CITY` on its own | *policy-excluded* | not masked by PII Guard's policy (any date, not only birth dates; bare towns are kept on purpose) |
 
 **Policy-excluded** labels are left out of the gold spans, so they count neither as leaks nor
 as misses; the manifest counts them per language (about 3 per document). The converter keeps
@@ -562,12 +575,12 @@ predictions (kept, never masked) still count against precision here.
   correct but the text is slot-filled and often unnatural ("Asszony Cermeli 64 éves Nem
   meghatározott végezte el"), most names are not Hungarian, dates and months are often in
   English formats ("November/62", "May 16, 1999"), districts are repeated ("6726 Szeged
-  Tarján Tarján"), one row labelled `hu` is in English, and gender words and honorifics sit
+  Tarján Tarján"), one row labeled `hu` is in English, and gender words and honorifics sit
   where a name would. Labels were accurate on all 20 (offsets, types), but a few names were
-  labelled only in part (a surname without its given name).
+  labeled only in part (a surname without its given name).
 - **Numbers aren't valid.** Only about 10 % of the sample's card, tax and TAJ numbers pass
   their checksums (2 of 41 English cards, 1 of 41 Hungarian tax numbers, 4 of 42 TAJ numbers),
-  and phone numbers use formats no numbering plan has (`+9-559-028.9863`). pii-guard's rules
+  and phone numbers use formats no numbering plan has (`+9-559-028.9863`). PII Guard's rules
   validate checksums and numbering plans on purpose, to avoid masking order numbers and
   amounts, so its rules miss most of these; tools that match the shape alone, or a model,
   don't. On real text these numbers would be valid. The report splits the leak by validity
@@ -575,7 +588,7 @@ predictions (kept, never masked) still count against precision here.
 - **Contamination.** LLM Guard's default model,
   `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2`, was fine-tuned on an earlier
   Ai4Privacy release generated by the same pipeline, so its numbers here are probably
-  optimistic. PrivAiTe's `openai/privacy-filter` training data isn't documented. pii-guard's
+  optimistic. PrivAiTe's `openai/privacy-filter` training data isn't documented. PII Guard's
   NER and LLM detector have not seen this dataset.
 - Leak is measured on what survives in the masked text, regardless of type, so a value masked
   under the wrong label still counts as protected.
@@ -583,11 +596,11 @@ predictions (kept, never masked) still count against precision here.
 ### Number validity
 
 **Invalid numbers stay in the headline.** On the public set most structured identifiers fail
-their own validators, and pii-guard's rules validate on purpose (a checksum is what tells a
-TAJ number from an order number). Leaving the invalid ones out would flatter pii-guard and
+their own validators, and PII Guard's rules validate on purpose (a checksum is what tells a
+TAJ number from an order number). Leaving the invalid ones out would flatter PII Guard and
 make the numbers incomparable with the runs already published. A mistyped or made-up-looking
 identifier in a real message is still personal data: the person it belongs to is just as
-exposed if it leaks. So the headline leak rate counts every labelled value, and the report adds
+exposed if it leaks. So the headline leak rate counts every labeled value, and the report adds
 a **breakdown** next to it, so a reader can see where the gap comes from (owner decision,
 2026-10-27, LAB-1201).
 
@@ -595,12 +608,12 @@ a **breakdown** next to it, so a reader can see where the gap comes from (owner 
 `BANK_ACCOUNT`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `COMPANY_ID_HU`,
 `PARCEL_NUMBER_HU`, `VEHICLE_PLATE`) with the language packs' own validators: it is **valid**
 when a rule of that type (every pack's `everywhere` rules plus the document language's own,
-cued numbers off) recognises the whole value on its own: card issuer prefix and Luhn, IBAN
+cued numbers off) recognizes the whole value on its own: card issuer prefix and Luhn, IBAN
 check digits, TAJ and tax-ID check digits, the numbering plan of a phone number, an ID
 document's checksum or distinctive format. Otherwise it is **invalid**. A new language pack's
 validators are picked up with no change here. For each class the scorecard reports gold spans
 and how many were found (overlap recall), and distinct values and how many leaked; it also
-reports the leak of every value that is *not* a number type (names, addresses, e-mail:
+reports the leak of every value that is *not* a number type (names, addresses, email:
 "leak excluding number types"). The three parts add up to the headline counts exactly, and
 record validation checks that.
 
@@ -615,14 +628,14 @@ reproduced the record's leak and recall counts exactly; where it didn't (audit m
 doesn't answer the same way twice) the re-run's own totals are kept in
 `source.rerun_headline` and the report marks the row.
 
-Pooled over `de` + `en` + `hu` (600 documents; 2,185 labelled values, 909 of them numbers, 166
+Pooled over `de` + `en` + `hu` (600 documents; 2,185 labeled values, 909 of them numbers, 166
 of those valid):
 
 | System | Leak (headline) | Valid numbers: recall / leak | Invalid numbers: recall / leak | Leak, other values |
 |---|---:|---:|---:|---:|
-| pii-guard rules | 63.1 % | 100.0 / 0.0 % | 35.1 / 63.4 % | 71.1 % |
-| pii-guard fast | 27.6 % | 100.0 / 0.0 % | 35.1 / 63.4 % | 10.4 % |
-| pii-guard audit ¹ | 3.9 % | 100.0 / 0.0 % | 87.8 / 6.5 % | 2.8 % |
+| PII Guard rules | 63.1 % | 100.0 / 0.0 % | 35.1 / 63.4 % | 71.1 % |
+| PII Guard fast | 27.6 % | 100.0 / 0.0 % | 35.1 / 63.4 % | 10.4 % |
+| PII Guard audit ¹ | 3.9 % | 100.0 / 0.0 % | 87.8 / 6.5 % | 2.8 % |
 | Presidio | 29.6 % | 28.9 / 48.2 % | 28.8 / 40.2 % | 21.0 % |
 | LLM Guard | 43.8 % | 73.5 / 25.9 % | 23.3 / 70.8 % | 30.4 % |
 | PrivAiTe | 9.5 % | 68.1 / 4.2 % | 33.8 / 3.0 % | 14.0 % |
@@ -630,30 +643,30 @@ of those valid):
 ¹ Re-run leak 3.8 % against the published 3.9 %; its breakdown adds up to the re-run.
 Rules and fast are the latest runs ([benchmarks.md](benchmarks.md#ai4privacy) has every row).
 
-What it shows: pii-guard's rules find and mask **every** valid number (0 of 166 leaked) and the
+What it shows: PII Guard's rules find and mask **every** valid number (0 of 166 leaked) and the
 fast-mode NER adds nothing on numbers; fast mode's 27.6 % headline is mostly invalid numbers
-(63.4 % of them leak), while on names, addresses and e-mail it leaks 10.4 %. The comparison
+(63.4 % of them leak), while on names, addresses and email it leaks 10.4 %. The comparison
 tools match a number's shape, so they don't care whether it validates.
 
 ### NER comparison: tabularisai/eu-pii-safeguard (LAB-1386)
 
 [`tabularisai/eu-pii-safeguard`](https://huggingface.co/tabularisai/eu-pii-safeguard) is the
-closest public alternative to pii-guard's own NER: XLM-RoBERTa **large** (about 560M
+closest public alternative to PII Guard's own NER: XLM-RoBERTa **large** (about 560M
 parameters) fine-tuned for PII in 26 EU languages with 42 BIO labels, self-reported F1 97.0 % on
 its own (undisclosed) data. It is scored as a **comparison model, never as a product default**:
 nothing outside `pii_guard.eval` imports it, and fast mode keeps resolving its model through
 `pii_guard.detect.ner_resolve`.
 
-**Its licence is conflicting, pending the owner's decision.** The card's metadata says
+**Its license is conflicting, pending the owner's decision.** The card's metadata says
 `apache-2.0`, but the repository's `LICENSE.md` at the pinned revision is the "Tabularis AI
 Commercial License" v1.0 (30-day free evaluation, free academic research, an annual paid
-licence for commercial use), and the card shows an "Accept License & Download" prompt that the
-hub does not enforce. pii-guard uses it for this evaluation only; its weights are never
+license for commercial use), and the card shows an "Accept License & Download" prompt that the
+hub does not enforce. PII Guard uses it for this evaluation only; its weights are never
 committed or bundled.
 
 Unlike the tools above it is a bare NER model, so it is not wrapped as a `--baselines` tool
 with its own masking. `pii_guard.eval.baselines.eu_pii_safeguard.EuPiiSafeguardDetector` runs
-it through pii-guard's own `NerDetector` post-processing (thresholds 0.5, word and token snap,
+it through PII Guard's own `NerDetector` post-processing (thresholds 0.5, word and token snap,
 number checks, the resolver, the vault), which makes two configurations directly comparable
 with ours, placeholder consistency included: the model alone (in place of `ner`) and rules +
 the model (in place of fast mode's NER). Pinned to revision
@@ -668,47 +681,47 @@ PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.
 
 **Label mapping** (`LABEL_MAP` in that module; every one of the 42 labels has an entry):
 
-| Model labels | pii-guard type | Note |
+| Model labels | PII Guard type | Note |
 |---|---|---|
-| `FIRSTNAME`, `MIDDLENAME`, `LASTNAME` | `PERSON` | neighbouring parts merged into one span |
+| `FIRSTNAME`, `MIDDLENAME`, `LASTNAME` | `PERSON` | neighboring parts merged into one span |
 | `PREFIX` | dropped | honorifics are outside `PERSON` in the gold |
 | `EMAIL`, `PHONE_NUMBER` | `EMAIL`, `PHONE` | |
-| `ADDRESS`, `STREET`, `BUILDING_NUMBER`, `POSTAL_CODE` | `ADDRESS` | neighbouring parts merged |
-| `CITY`, `STATE`, `COUNTRY` | `ADDRESS` inside an address | on their own dropped: a lone town is not an address under pii-guard's policy (the datasets mark it as an ignore region) |
+| `ADDRESS`, `STREET`, `BUILDING_NUMBER`, `POSTAL_CODE` | `ADDRESS` | neighboring parts merged |
+| `CITY`, `STATE`, `COUNTRY` | `ADDRESS` inside an address | on their own dropped: a lone town is not an address under PII Guard's policy (the datasets mark it as an ignore region) |
 | `DOB` | `DATE_OF_BIRTH` | |
-| `IBAN`, `ACCOUNT_NUMBER`, `CREDIT_CARD_NUMBER` | `BANK_ACCOUNT` | cards are `BANK_ACCOUNT` in pii-guard's taxonomy |
+| `IBAN`, `ACCOUNT_NUMBER`, `CREDIT_CARD_NUMBER` | `BANK_ACCOUNT` | cards are `BANK_ACCOUNT` in PII Guard's taxonomy |
 | `TAX_ID` | `NATIONAL_ID_HU_TAX` on `hu` text, else `ID_DOCUMENT` | the Ai4Privacy conversion's rule |
 | `HEALTH_INSURANCE_ID` | `NATIONAL_ID_HU_TAJ` on `hu` text, else `ID_DOCUMENT` | TAJ is the Hungarian health insurance number |
 | `NATIONAL_ID`, `PASSPORT_NUMBER`, `DRIVER_LICENSE` | `ID_DOCUMENT` | |
 | `COMPANY_NAME` | `ORGANIZATION` | `keep` policy, as for our NER |
 | `PASSWORD` | `SECRET` | |
-| `USERNAME`, `URL`, `IP_ADDRESS`, `MAC_ADDRESS`, `DEVICE_ID`, `LATITUDE`, `LONGITUDE` | dropped | no pii-guard type |
-| `AGE`, `GENDER`, `JOB_TITLE`, `AMOUNT`, `CURRENCY`, `SALARY` | dropped | no pii-guard type; policy-excluded in the public sets' gold |
-| `ETHNICITY`, `RELIGION`, `POLITICAL_OPINION`, `SEXUAL_ORIENTATION`, `HEALTH_CONDITION` | dropped | GDPR Art. 9 special categories: pii-guard has no type for them (a gap, not a scoring choice) |
+| `USERNAME`, `URL`, `IP_ADDRESS`, `MAC_ADDRESS`, `DEVICE_ID`, `LATITUDE`, `LONGITUDE` | dropped | no PII Guard type |
+| `AGE`, `GENDER`, `JOB_TITLE`, `AMOUNT`, `CURRENCY`, `SALARY` | dropped | no PII Guard type; policy-excluded in the public sets' gold |
+| `ETHNICITY`, `RELIGION`, `POLITICAL_OPINION`, `SEXUAL_ORIENTATION`, `HEALTH_CONDITION` | dropped | GDPR Art. 9 special categories: PII Guard has no type for them (a gap, not a scoring choice) |
 
 Parts are merged when only up to three spaces, tabs or commas separate them, the gap the gold
 conversions merge across, so one name is one placeholder and placeholder consistency is not
-penalised for the model's finer labels. **Dropped labels are removed before scoring** and
+penalized for the model's finer labels. **Dropped labels are removed before scoring** and
 counted per set (`eval/results/2026-10-28-eu-pii-safeguard/unmapped.json`, and in each run
 record's notes). The gold never contains them, so masking them could only count as
 over-masking, and dropping them can't count as a leak: neither direction is unfair. In a
-deployment that masks them, over-masking under pii-guard's policy would be higher than shown.
+deployment that masks them, over-masking under PII Guard's policy would be higher than shown.
 The model labels words (`aggregation="first"`, its default): its spans can carry trailing
 punctuation (`john@example.com.`), which costs exact-match F1 but not overlap F1 or leak.
 
-**Result (2026-10-28):** pii-guard's NER v2.0 leaks less on every set, alone and with the
+**Result (2026-10-28):** PII Guard's NER v2.0 leaks less on every set, alone and with the
 rules: fast mode 0.0–0.7 % on smoke, agent-traffic, ai4privacy, nemotron-pii and cee-pii against
 2.8–8.8 % with this model in its place, at 2× the size and about 3× the CPU latency. It finds
-more organisations (a `keep` type), which doesn't change what leaks. Full table, latency and
+more organizations (a `keep` type), which doesn't change what leaks. Full table, latency and
 caveats: [eval/results/2026-10-28-eu-pii-safeguard](../eval/results/2026-10-28-eu-pii-safeguard/README.md).
 
 ### NER comparison: public encoders (LAB-1391)
 
 Three newer public PII encoders, all mmBERT (ModernBERT) token classifiers, benchmarked the same
-way as `eu-pii-safeguard` above, against pii-guard's NER v2.0. They are **comparison models,
+way as `eu-pii-safeguard` above, against PII Guard's NER v2.0. They are **comparison models,
 never product defaults**: nothing outside `pii_guard.eval` imports them.
 
-| Registry name | Checkpoint (pinned revision) | Licence, as read from the files at that revision |
+| Registry name | Checkpoint (pinned revision) | License, as read from the files at that revision |
 |---|---|---|
 | `bardsai-v3` | [`bardsai/eu-pii-anonimization-multilang-v3`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang-v3) `091984b5fbce` | `apache-2.0` in the card metadata only: **no LICENSE file** in the repository |
 | `horizon-base` | [`Horizon-Labs/pii-redactor-base`](https://huggingface.co/Horizon-Labs/pii-redactor-base) `42dfb0dccb08` | Apache-2.0: card, `LICENSE` (Apache 2.0 text) and `NOTICE` (mmBERT, MIT) agree |
@@ -729,26 +742,26 @@ PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py l
 ```
 
 **Word-level decoding.** Their tokenizer (Gemma-style) attaches the preceding space to a token
-and splits numbers into single digits, often with a bare `" "` token first, so pii-guard's
+and splits numbers into single digits, often with a bare `" "` token first, so PII Guard's
 first-sub-token decoder cuts names and numbers into fragments (the LAB-1192 sanity check).
 `WordLevelBackend` decodes words instead (`decode_words`): text in 512-token windows with
 128 overlap, each token's probabilities averaged over its windows, B- and I- pooled per type;
 each word (split on whitespace and `, ; | " < > ( ) [ ] { } * ^`, edge punctuation trimmed)
-takes the type with the highest mean probability over its sub-tokens, and neighbouring words
+takes the type with the highest mean probability over its sub-tokens, and neighboring words
 of one type are merged unless the next word's first token is more likely a B- than not. This is
 a fresh implementation of the decoding the bardsai v3 card describes, without its format checks
-and e-mail regex (pii-guard's number checks and rules do that job). Horizon-Labs and Wismut
+and email regex (PII Guard's number checks and rules do that job). Horizon-Labs and Wismut
 recommend the `transformers` pipeline with `aggregation_strategy="simple"` plus a merge of close
 pieces, which this approximates; every mmBERT model is decoded alike. The rest of the
-post-processing is pii-guard's own (`NerDetector`: thresholds 0.5, snapping, number checks).
+post-processing is PII Guard's own (`NerDetector`: thresholds 0.5, snapping, number checks).
 
 **Label mapping** (each spec's `LabelAdapter`; every model label has an entry, checked by
 `tests/eval/test_new_encoders.py`). The rules are those of `eu-pii-safeguard`: name and address
 parts merged, a lone town or country dropped, tax and health-insurance numbers become the
-Hungarian types on `hu` text, and labels with no pii-guard type are dropped before scoring and
+Hungarian types on `hu` text, and labels with no PII Guard type are dropped before scoring and
 counted (`eval/results/2026-10-28-new-encoders/unmapped-<model>.json`).
 
-| pii-guard type | bardsai v3 | Horizon (base, small) | Wismut nym |
+| PII Guard type | bardsai v3 | Horizon (base, small) | Wismut nym |
 |---|---|---|---|
 | `PERSON` | `PERSON_NAME` | `PERSON` | `GIVEN_NAME`, `SURNAME` |
 | `ORGANIZATION` | `ORGANIZATION_NAME` | `ORGANIZATION` | `COMPANY_NAME` |
@@ -758,7 +771,7 @@ counted (`eval/results/2026-10-28-new-encoders/unmapped-<model>.json`).
 | `BANK_ACCOUNT` | `BANK_ACCOUNT_IDENTIFIER`, `PAYMENT_CARD` | `BANK_ACCOUNT`, `CREDIT_CARD` | `IBAN`, `ACCOUNT_NUMBER`, `CREDIT_DEBIT_CARD` |
 | `ID_DOCUMENT` | `PERSON_IDENTIFIER`, `DOCUMENT_IDENTIFIER` | `NATIONAL_ID`, `PASSPORT`, `DRIVER_LICENSE`, `TAX_ID`†, `MEDICAL_ID`‡ | `GOVERNMENT_ID`, `SSN`, `PASSPORT`, `DRIVERS_LICENSE`, `TAX_ID`† |
 | `SECRET` | `AUTH_SECRET` | `SECRET`, `PASSWORD` | `API_KEY`, `PASSWORD` |
-| dropped | dates and times, URLs, links, IP and device ids, handles, aliases, accounts, amounts, card CVVs, document references, vehicle and organisation ids, proper names, roles and attributes, the GDPR Art. 9 categories | `DATE`, `AGE`, `URL`, `USERNAME`, `ACCOUNT_ID`, `IP_ADDRESS`, `MAC_ADDRESS`, `DEVICE_ID`, `COORDINATE`, `CREDIT_CARD_CVV`, `LICENSE_NUMBER`, `VEHICLE_ID` | `DATE`, `TIME`, `AGE`, `GENDER`, `URL`, `USERNAME`, `CUSTOMER_ID`, `EMPLOYEE_ID`, `MEDICAL_RECORD_NUMBER`, `CVV`, `PIN`, `ROUTING_NUMBER`, `SWIFT_BIC`, `LICENSE_PLATE`, `MAC_ADDRESS` |
+| dropped | dates and times, URLs, links, IP and device ids, handles, aliases, accounts, amounts, card CVVs, document references, vehicle and organization ids, proper names, roles and attributes, the GDPR Art. 9 categories | `DATE`, `AGE`, `URL`, `USERNAME`, `ACCOUNT_ID`, `IP_ADDRESS`, `MAC_ADDRESS`, `DEVICE_ID`, `COORDINATE`, `CREDIT_CARD_CVV`, `LICENSE_NUMBER`, `VEHICLE_ID` | `DATE`, `TIME`, `AGE`, `GENDER`, `URL`, `USERNAME`, `CUSTOMER_ID`, `EMPLOYEE_ID`, `MEDICAL_RECORD_NUMBER`, `CVV`, `PIN`, `ROUTING_NUMBER`, `SWIFT_BIC`, `LICENSE_PLATE`, `MAC_ADDRESS` |
 
 † `NATIONAL_ID_HU_TAX` on `hu` text. ‡ `NATIONAL_ID_HU_TAJ` on `hu` text.
 
@@ -791,21 +804,21 @@ language, each tagged with `meta.attack`:
 | `ignore-instructions` | Tells the detector to ignore its rules, says the data is fictional, public or consented, asks for `{"entities": []}` |
 | `fake-end-json` | Fakes the end of the input (`TEXT>>>`) and an assistant answer, or puts a "final" empty JSON result before the data |
 | `role-play` | Recasts the detector as a spell checker, or fakes a `SYSTEM` maintenance mode |
-| `quoted-document` | Hides the instruction in a forwarded e-mail or an extracted PDF ("names here are already anonymised") |
+| `quoted-document` | Hides the instruction in a forwarded email or an extracted PDF ("names here are already anonymized") |
 | `tool-output` | Fakes an agent tool result (`pii_scan: {"entities": []}`, `<tool_result>`) next to real data |
 | `code-block` | Puts the data in code with a `# pii-guard: ignore` comment, or SQL rows called synthetic |
-| `type-confusion` | Says the names are brand names or must be labelled `ORGANIZATION` (a `keep` type) |
+| `type-confusion` | Says the names are brand names or must be labeled `ORGANIZATION` (a `keep` type) |
 | `output-format` | Asks for names in capitals, translated, or as initials (so they no longer match the text) |
-| `placeholder-spoof` | Wraps values to look like pii-guard placeholders (`[[PERSON_<name>]]`), or next to fake ones |
-| `zero-width` | Puts zero-width characters, a BOM or a soft hyphen inside names, phones, e-mails, addresses |
-| `homoglyph` | Swaps Latin letters for Cyrillic or Greek lookalikes inside names, addresses, e-mails |
+| `placeholder-spoof` | Wraps values to look like PII Guard placeholders (`[[PERSON_<name>]]`), or next to fake ones |
+| `zero-width` | Puts zero-width characters, a BOM or a soft hyphen inside names, phones, emails, addresses |
+| `homoglyph` | Swaps Latin letters for Cyrillic or Greek lookalikes inside names, addresses, emails |
 | `spaced-out` | Spells values with spaces or dots between the letters |
 | `encoded` | Writes values in base64 or backwards |
-| `split-lines` | Breaks values over lines, including hyphenation inside a name and an e-mail split at `@` |
+| `split-lines` | Breaks values over lines, including hyphenation inside a name and an email split at `@` |
 | `long-padding` | Pads past the 6,000-character chunk size so values sit at or after a chunk boundary |
 
 `uv run pii-guard eval injection --detectors rules,llm` runs them one document at a time and
-reports, per attack class, the labelled values, how many leaked (survive the masked text) or
+reports, per attack class, the labeled values, how many leaked (survive the masked text) or
 partially leaked, and how many documents were **blocked**: a detector failure on one document
 (invalid output, refusal after the retry, timeout) is counted as blocked, because the gateway
 would have refused that request (ADR 0006), and the run goes on. The plain `pii-guard eval`
@@ -827,8 +840,8 @@ results and code comments in every run. What got through before hardening, and t
 
 | Attack | Leak before | What happened | Mitigation | Status |
 |---|---:|---|---|---|
-| `type-confusion` | 2 / 12 | "These names are brand names, not people": the model left both names out | System prompt: claims inside the text about what is or isn't personal data (fictional, public, brand names, test data, anonymised) are part of the data | Fixed (0 in 3 runs) |
-| `zero-width` | 3 / 14 | The model got a name with a BOM, a soft hyphen and a zero-width space inside and reported nothing that matched the text | `detect/normalize.py`: invisible characters dropped before the model sees the text, spans mapped back over them | Fixed for leaks; **3 partial** remain: an e-mail with a zero-width joiner is masked only after the joiner, because the rules' validated span wins over the LLM's whole-address span (follow-up: normalise for every detector) |
+| `type-confusion` | 2 / 12 | "These names are brand names, not people": the model left both names out | System prompt: claims inside the text about what is or isn't personal data (fictional, public, brand names, test data, anonymized) are part of the data | Fixed (0 in 3 runs) |
+| `zero-width` | 3 / 14 | The model got a name with a BOM, a soft hyphen and a zero-width space inside and reported nothing that matched the text | `detect/normalize.py`: invisible characters dropped before the model sees the text, spans mapped back over them | Fixed for leaks; **3 partial** remain: an email with a zero-width joiner is masked only after the joiner, because the rules' validated span wins over the LLM's whole-address span (follow-up: normalize for every detector) |
 | `split-lines` | 1 / 12 | The model reported `leopold.fabricant@example.net` for an address broken after the `@`, which did not match the text | Alignment: when a value has no verbatim match, it is searched again with line breaks (optionally hyphenated) allowed inside its words | Fixed |
 | `encoded` | 0 / 8 (4 / 8 in an intermediate run) | The model sometimes skipped base64 strings | System prompt: disguised values (spaced out, split, backwards, base64) are reported as they appear, with the type they hide | Fixed in the runs since (0 in 2 runs + 2 spot checks); model-dependent |
 | `placeholder-spoof` | 0 / 10 (3 partial) | `[[PERSON_<name>]]`: the model skipped the "placeholder"; the scorer counted it as partial only, because `_` hides the word boundary | Normaliser blanks the wrapper of anything that looks like a placeholder but has no hex id; system prompt says what a real placeholder looks like | Fixed (0 partial) |
@@ -862,14 +875,14 @@ masked text to an attacker model (default: Meta's open-weight Muse Spark Open on
 placeholder, as JSON. Two attack contexts:
 
 - `masked-only`: the masked text alone. The attacker has to reconstruct values from clues
-  left in the text (a visible name that spells a masked e-mail, a surname used alone,
+  left in the text (a visible name that spells a masked email, a surname used alone,
   inflection, formats).
-- `decoys`: every placeholder that hides a labelled value comes with 5 shuffled candidates of
+- `decoys`: every placeholder that hides a labeled value comes with 5 shuffled candidates of
   its type, the true value and 4 values from other documents of the same corpus (same
   language first, fixed seed). This is an attacker who holds a customer list and wants to
   link a masked document to a row; picking at random gives the reported `chance` rate.
 
-Scored per distinct labelled value of a `mask`-policy type (the leak-rate unit): *leaked*
+Scored per distinct labeled value of a `mask`-policy type (the leak-rate unit): *leaked*
 (survives the masked text, not attacked), *masked* (the targets), *recovered* (a guess equals
 the value after NFKC, case folding and ignoring spaces and punctuation; inflected surface forms
 accepted), *partial* (an identifying token of the value is in the guess). **Re-id rate** =
@@ -892,7 +905,7 @@ tables, the Muse Spark 1.3 comparison and cost in
 
 Placeholders hold against reconstruction from the masked text. They don't prevent linkage:
 with a candidate list the attacker does about twice as well as chance, because the context
-that stays readable narrows the candidates. Masking is pseudonymisation, not anonymisation.
+that stays readable narrows the candidates. Masking is pseudonymization, not anonymization.
 
 ## Where the specimen images live (visual)
 
@@ -942,7 +955,7 @@ overprint are recorded as `unscored` regions.
 ### Text detectors, captions and OCR size (visual)
 
 `--detectors` takes the same comma-separated list as the text eval: `rules,llm` runs the
-detection pipeline the API uses (overlaps resolved, `keep` types honoured) on the OCR text;
+detection pipeline the API uses (overlaps resolved, `keep` types honored) on the OCR text;
 a detector that can't be loaded fails the run. Values next to known field captions
 (`visual/captions.py`) are masked unless `--no-captions`, and Tesseract reads images enlarged
 to 2000 px on the longer side unless `--ocr-upscale 0`; the report's `pipeline` block records
@@ -969,12 +982,12 @@ configured as for the API (`PII_GUARD_LLM_DETECTOR_*`); its runs are not determi
 
 `pii-guard eval visual --baseline NAME` scores an open-source image redaction tool on the same
 images, with the same scorer (IoU ≥ 0.5 region recall per region type, coverage,
-over-masking) and the same 2 px padding as pii-guard
+over-masking) and the same 2 px padding as PII Guard
 (`pii_guard.eval.baselines.image`, LAB-1164). Like the text baselines, each tool runs as a
 worker in its own pinned `uv` environment (`src/pii_guard/eval/baselines/envs/presidio-image.txt`,
 `eka.txt`; workers in `.../workers/`, protocol in `workers/_image_protocol.py`). The worker
-gets each image as the PNG pii-guard sees and returns the boxes the tool would black out, with
-no recognised text. Its own time per image is the latency.
+gets each image as the PNG PII Guard sees and returns the boxes the tool would black out, with
+no recognized text. Its own time per image is the latency.
 
 - `presidio-image`: Presidio Image Redactor's `ImageAnalyzerEngine` (Tesseract + Presidio
   analyzer, predefined recognizers, default threshold) with spaCy models for en, de and hu
@@ -984,21 +997,21 @@ no recognised text. Its own time per image is the latency.
 - `eka`: Eka PII Redaction's `ImagePIIRedactor` (LayoutLMv3 text PII over Tesseract words,
   plus YOLO11m faces, signatures, stamps, QR codes and logos), all categories, CPU, weights
   pinned to a revision.
-- `presidio-image-tuned`, `eka-tuned`: the same tools with pii-guard's OCR input
+- `presidio-image-tuned`, `eka-tuned`: the same tools with PII Guard's OCR input
   (Tesseract `hun+eng`, images enlarged to 2000 px).
 
-| Baseline | Licences (tool; models) |
+| Baseline | Licenses (tool; models) |
 |---|---|
 | `presidio-image` | Presidio Image Redactor MIT; spaCy and huSpaCy models as in the text baseline |
 | `eka` | Eka PII Redaction library Apache-2.0; `ultralytics` and the YOLO11m weights **AGPL-3.0**; the LayoutLMv3 fine-tune **CC-BY-NC-SA-4.0** (non-commercial) |
 
-The baselines are evaluation-only: none of these tools or models is in pii-guard's default
+The baselines are evaluation-only: none of these tools or models is in PII Guard's default
 install or its image (they come with `--extra baselines` or a worker's own environment), and
-none is redistributed. The non-commercial and AGPL licences above apply to anyone who runs
-those baselines, not to pii-guard.
+none is redistributed. The non-commercial and AGPL licenses above apply to anyone who runs
+those baselines, not to PII Guard.
 
 Text tools return one box per OCR word. The words of one detected entity are merged per text
-line before scoring, which is the rule pii-guard applies to its own spans. Region types a tool
+line before scoring, which is the rule PII Guard applies to its own spans. Region types a tool
 can't mask are left out of its per-type breakdown (`pipeline.unsupported_region_types`) and
 still count as missed in `overall`. The run records have family `comparison` and system key
 `visual:<name>`. LeakageBench (arXiv 2609.02207) was considered as a public image set and
@@ -1006,20 +1019,20 @@ skipped: its data is available only under a research Data Use Agreement.
 
 **Results** (2026-10-27; full tables, versions, cost and caveats in
 [eval/results/2026-10-27-image-baselines](../eval/results/2026-10-27-image-baselines/README.md)).
-Recall@IoU ≥ 0.5 in %; "all" counts every labelled region:
+Recall@IoU ≥ 0.5 in %; "all" counts every labeled region:
 
 | Set | System | Portrait | Signature | MRZ | Text | All | Over-masking |
 |---|---|---:|---:|---:|---:|---:|---:|
-| fictional (24) | pii-guard rules + LLM | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 1.2 |
+| fictional (24) | PII Guard rules + LLM | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 1.2 |
 | fictional (24) | Eka (tuned) | 100.0 | 86.7 | 0.0 | 95.5 | 91.3 | 3.2 |
 | fictional (24) | Presidio (defaults) | n/a | n/a | 0.0 | 50.9 | 37.6 | 1.1 |
-| specimens (65) | pii-guard rules + LLM | 90.8 | 83.8 | 80.0 | 30.3 | 48.5 | 4.7 |
+| specimens (65) | PII Guard rules + LLM | 90.8 | 83.8 | 80.0 | 30.3 | 48.5 | 4.7 |
 | specimens (65) | Eka (tuned) | 55.4 | 48.6 | 10.0 | 32.5 | 36.0 | 12.0 |
 | specimens (65) | Presidio (defaults) | n/a | n/a | 0.0 | 19.7 | 13.3 | 3.4 |
 
-pii-guard masks the most regions overall, mainly through portraits, signatures and MRZ zones.
+PII Guard masks the most regions overall, mainly through portraits, signatures and MRZ zones.
 Eka's layout-aware classifier finds slightly more of the hard specimen text values than
-pii-guard with the LLM, at about 2.5× the over-masking.
+PII Guard with the LLM, at about 2.5× the over-masking.
 
 ## Person names inside company names
 
@@ -1031,7 +1044,7 @@ partnerships (`Tóth és Társa Bt.`, `Balogh és Fia Kkt.`, `Varga és Kiss Kkt
 inflected forms (`Bt.-nek`, `Kft-vel`, `egyéni vállalkozónak`), plus 11 hard-negative
 documents of company names made of ordinary words, several of them also surnames
 (`Fekete Kavics Kft.`, `Magyar Kalapács Zrt.`, `Pécsi Kerámia Kft.`, `Vörös Rózsa Kft.`). Only
-the name part is labelled `PERSON` (`{{PERSON|Tóth}} és Társa Bt.`); a company name without a
+the name part is labeled `PERSON` (`{{PERSON|Tóth}} és Társa Bt.`); a company name without a
 person is `ORGANIZATION`. The rule and its false-positive decision are described in
 [entities.md](entities.md#person-names-in-company-names).
 
@@ -1080,7 +1093,7 @@ recipe is in [models.md](models.md#answer-only-muse-glimmer-lora-fine-tune-lab-1
 - **Test split.** The model is trained on the LAB-1128 distillation **train** split only. Its
   **dev** split (seed 11: hu 368, en 373 documents) is the held-out test set, together with the
   committed fixtures. `training/llm/build_sft.py` refuses to write the training file if any
-  test or fixture document is in it (sha256 of the normalised text).
+  test or fixture document is in it (sha256 of the normalized text).
 - **What is compared** on hu/en/de smoke, hu/en synth-sample and the test split: `rules,llm`
   with the fine-tuned model against Glimmer zero-shot (`reasoning_strength` low), Muse Spark
   Open on Baseten, Muse Spark 1.3, and fast mode (`rules,ner`, distilled large). Overlap F1,

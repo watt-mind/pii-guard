@@ -2,10 +2,12 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { LABELLED_SCENARIOS, labelledScenarioFor, sendDemoTraffic, type DemoProgress, type LabelledMatch } from "../api/demoTraffic";
 import { ApiError } from "../api/http";
 import type { TrafficConnectOptions, TrafficEvent, TrafficStatus } from "../api/traffic";
+import { outboundCheckLabel } from "../api/traffic";
 import type { EntityType } from "../api/types";
 import { MaskedText } from "../components/MaskedText";
 import { RestoredText } from "../components/RestoredText";
-import { Button } from "../components/ui";
+import { Pane } from "../components/Pane";
+import { Button, Card, Checkbox, Metric, PageHeader, Select } from "../components/ui";
 import { errorCopy } from "../lib/errorCopy";
 import { useTraffic, type TrafficHandle, type TrafficSource } from "../hooks/useTraffic";
 import { ENTITY_META, metaFor } from "../lib/entities";
@@ -30,6 +32,8 @@ import {
   type Message,
 } from "../lib/traffic";
 import { NerHint } from "../components/NerHint";
+import { useHostedSession } from "../hosted/session";
+import { setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 import { TimingWaterfall } from "./TrafficCharts";
 
 export interface TrafficProps {
@@ -51,22 +55,27 @@ export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureInterv
   focus?: { id: string; nonce: number } | null;
   /** Open a call's vault session in the Vault screen (by its `session_ref`). */
   onOpenSession?: (ref: string) => void;
+  /** Offer "Send demo traffic" (`offersDemoTraffic`); off where the server has accounts. */
+  demoTraffic?: boolean;
 }
 
 
 type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 
 /** The Logs screen with its own traffic connection (tests, and embedding on its own). */
-export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps) {
+export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession">) {
   const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
   return <Logs t={t} forceFixture={forceFixture} {...rest} />;
 }
 
-export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null, onOpenSession }: LogsProps) {
+export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null, onOpenSession, demoTraffic = true }: LogsProps) {
   const [filters, setFilters] = useState<Filters>({ mode: "all", type: "all", problems: false });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cleared, setCleared] = useState(0);
   const detailRef = useRef<HTMLDivElement>(null);
+  // No endpoint picked in the header: the server merges the project's endpoints (LAB-1492),
+  // so each call names the endpoint it went through.
+  const endpointSelected = useSelectedEndpoint() !== null;
   const lastTime = t.events.length ? Date.parse(t.events[t.events.length - 1]!.time) : 0;
 
   const filtered = useMemo(
@@ -110,12 +119,15 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
 
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl">
-        <h1 className="text-2xl font-medium text-balance text-ink">Logs</h1>
-        <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-          {t.source === "fixture" ? "Recorded calls, replayed in your browser." : "Every call through the gateway, live."} Pick one to see what your client sent, what the model received, and what your client got back with the values restored.
-        </p>
-      </div>
+      <PageHeader
+        title="Logs"
+        lead={
+          <>
+            {t.source === "fixture" ? "Recorded calls, replayed in your browser." : "Every call through the gateway, live."} Pick one to see what your client sent, what the model
+            received, and what your client got back with the values restored.
+          </>
+        }
+      />
 
       <SourceBanner source={t.source} status={t.status} apiStatus={t.apiStatus} forced={forceFixture} paused={t.paused} onFixture={t.showFixture} onRetry={t.retryApi} replayDone={t.replayDone} onReplay={t.replay} />
 
@@ -149,80 +161,81 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
           >
             Clear view
           </Button>
-          {t.source === "api" && t.status.state === "live" && <DemoButton key={cleared} send={sendDemo} />}
+          {t.source === "api" && t.status.state === "live" && demoTraffic && <DemoButton key={cleared} send={sendDemo} />}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <label className="flex items-center gap-2 text-muted">
             Mode
-            <select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })} className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink">
-              <option value="all">All</option>
-              {modes.map((m) => (
-                <option key={m} value={m}>
-                  {m.charAt(0).toUpperCase() + m.slice(1)}
-                </option>
-              ))}
-            </select>
+            <span className="w-32">
+              <Select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })}>
+                <option value="all">All</option>
+                {modes.map((m) => (
+                  <option key={m} value={m}>
+                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                  </option>
+                ))}
+              </Select>
+            </span>
           </label>
           <label className="flex items-center gap-2 text-muted">
             Entity
-            <select
-              value={filters.type}
-              onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters["type"] })}
-              className="h-9 max-w-[11rem] rounded-lg border border-field bg-surface px-2 text-sm text-ink"
-            >
-              <option value="all">All types</option>
-              {types.map((ty) => (
-                <option key={ty} value={ty}>
-                  {ENTITY_META[ty]?.label ?? ty}
-                </option>
-              ))}
-            </select>
+            <span className="w-44">
+              <Select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters["type"] })}>
+                <option value="all">All types</option>
+                {types.map((ty) => (
+                  <option key={ty} value={ty}>
+                    {ENTITY_META[ty]?.label ?? ty}
+                  </option>
+                ))}
+              </Select>
+            </span>
           </label>
-          <label className="flex min-h-9 items-center gap-2 text-ink">
-            <input type="checkbox" checked={filters.problems} onChange={(e) => setFilters({ ...filters, problems: e.target.checked })} className="size-4 accent-[var(--ink)]" />
-            Blocked or failed only
-          </label>
+          <Checkbox label="Blocked or failed only" checked={filters.problems} onChange={(e) => setFilters({ ...filters, problems: e.target.checked })} />
         </div>
       </section>
 
-      <dl className="flex flex-wrap gap-x-8 gap-y-3 text-sm" aria-label="Summary of the calls shown">
-        <Fact label={filtered.length === t.events.length ? "Calls" : `Calls (of ${t.events.length}, filtered)`} value={filtered.length} />
-        <Fact label="Overhead p50, all shown" value={formatMsShort(p50)} />
-        <Fact label="Overhead p95, all shown" value={formatMsShort(p95)} />
-        <Fact label="Values masked" value={masked} />
-        <Fact label="Blocked or failed" value={problems} />
+      <dl className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-x-8" aria-label="Summary of the calls shown">
+        <Metric label={filtered.length === t.events.length ? "Calls" : `Calls (of ${t.events.length}, filtered)`} value={filtered.length} />
+        <Metric label="Overhead p50, all shown" value={formatMsShort(p50)} />
+        <Metric label="Overhead p95, all shown" value={formatMsShort(p95)} />
+        <Metric label="Values masked" value={masked} />
+        <Metric label="Blocked or failed" value={problems} />
       </dl>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(19rem,25rem)_minmax(0,1fr)]">
-        <section aria-labelledby="calls-title" className="flex min-w-0 flex-col rounded-xl border border-line bg-surface">
-          <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-            <h2 id="calls-title" className="text-lg font-normal text-ink">
-              Calls <span className="font-normal text-muted">newest first</span>
-            </h2>
-            <span aria-live="polite" className="text-xs text-muted tabular-nums">
+      <div className="grid gap-6 lg:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)] xl:grid-cols-[minmax(19rem,25rem)_minmax(0,1fr)]">
+        <section aria-labelledby="calls-title" className="flex min-w-0 flex-col rounded-xl border border-line bg-surface lg:sticky lg:top-4 lg:self-start">
+          <header className="flex items-start justify-between gap-2 border-b border-line p-4 sm:p-5">
+            <div className="min-w-0">
+              <h2 id="calls-title" className="text-lg font-normal text-ink">
+                Calls
+              </h2>
+              <p className="mt-0.5 text-sm text-muted">Newest first</p>
+            </div>
+            <span aria-live="polite" className="pt-1.5 text-xs whitespace-nowrap text-muted tabular-nums">
               {t.paused ? "paused" : lastTime ? `last ${clock(new Date(lastTime).toISOString())}` : ""}
             </span>
           </header>
           {filtered.length === 0 ? (
-            <div className="p-4">
-              <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} />
+            <div className="p-4 sm:p-5">
+              <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} demoTraffic={demoTraffic} endpointSelected={endpointSelected} />
             </div>
           ) : (
-            <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[46rem]" data-testid="call-list">
+            <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[calc(100dvh-10rem)]" data-testid="call-list">
               {[...filtered].reverse().map((e) => (
                 <li key={e.id}>
-                  <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} />
+                  <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} showEndpoint={!endpointSelected} />
                 </li>
               ))}
             </ul>
           )}
         </section>
 
-        <div ref={detailRef} className="min-w-0 scroll-mt-4 space-y-6">
+        <div ref={detailRef} className="@container min-w-0 scroll-mt-4 space-y-6">
           {selected ? (
             <CallDetail event={selected} following={following} source={t.source} pageHost={pageHost} onFollow={() => setSelectedId(null)}
               mockUpstream={mockUpstream}
               onOpenSession={t.source === "api" ? onOpenSession : undefined}
+              aggregated={!endpointSelected}
             />
           ) : (
             <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-xl border border-line px-6 py-10 text-center">
@@ -260,10 +273,11 @@ function SourceBanner({
   replayDone: boolean;
   onReplay: () => void;
 }) {
+  const hosted = useHostedSession() !== null;
   const code = (s: string) => <code className="rounded bg-surface px-1 font-mono text-xs">{s}</code>;
   if (source === "fixture") {
     return (
-      <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+      <div role="status" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4 text-ink">
         <p className="min-w-0 flex-1">
           <strong className="font-medium text-warn">Recorded demo traffic.</strong>{" "}
           {forced
@@ -276,7 +290,7 @@ function SourceBanner({
           Recorded at level {code("masked")}: they hold only what the model received.
         </p>
         {!forced && (
-          <Button onClick={onRetry} className="h-8">
+          <Button size="sm" onClick={onRetry}>
             Back to the live log
           </Button>
         )}
@@ -290,9 +304,9 @@ function SourceBanner({
           </p>
           {/* Always rendered (aria-disabled while playing) so focus stays on it after a replay. */}
           <Button
+            size="sm"
             onClick={() => replayDone && onReplay()}
             aria-disabled={!replayDone}
-            className={`h-8 ${replayDone ? "" : "cursor-not-allowed opacity-45"}`}
             title={replayDone ? "Play the recorded calls again from the start" : "Available when the replay has finished"}
           >
             Replay again
@@ -303,18 +317,19 @@ function SourceBanner({
   }
   if (status.state === "disabled") {
     return (
-      <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+      <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-surface p-3 text-sm sm:p-4 text-ink">
         <p className="min-w-0 flex-1">
           <strong className="font-medium">The traffic log is off on this server.</strong>{" "}
           {status.reason === "off" ? (
             <>
-              Restart the API with {code("PII_GUARD_TRAFFIC_LOG=masked")} ({code("make demo")} does this), or {code("full")} on localhost to also see the original values.
+              Restart the API with its traffic log on ({code("PII_GUARD_TRAFFIC_LOG=masked")}; {code("make demo")} does this). On localhost, level {code("full")} also shows
+              the original values.
             </>
           ) : (
             <>{status.message}.</>
           )}
         </p>
-        <Button onClick={onFixture} className="h-8">
+        <Button size="sm" onClick={onFixture}>
           Show recorded demo traffic
         </Button>
       </div>
@@ -322,8 +337,41 @@ function SourceBanner({
   }
   if (status.state === "offline") {
     return (
-      <div role="alert" className="rounded-xl border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-ink">
+      <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4 text-ink">
         <strong className="font-medium text-danger">Lost the connection to the API.</strong> Retrying every few seconds; the calls already shown stay. ({status.message})
+      </div>
+    );
+  }
+  if (status.state === "limited") {
+    const wait = status.retryAfterMs ? ` in about ${Math.ceil(status.retryAfterMs / 1000)} s` : " shortly";
+    return (
+      <div role="status" className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4 text-ink">
+        <strong className="font-medium text-warn">Too many requests just now.</strong> The API is up but asked this page to slow down; it retries{wait}. The calls already shown stay.
+      </div>
+    );
+  }
+  if (status.state === "denied") {
+    return (
+      <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4 text-ink">
+        {status.reason === "signed_out" ? (
+          <>
+            {hosted ? (
+              // Hosted: the console only opens signed in, so a 401 means the session ended (LAB-1519).
+              <>
+                <strong className="font-medium text-danger">Your session ended.</strong> Sign in again; this page reconnects by itself.
+              </>
+            ) : (
+              <>
+                <strong className="font-medium text-danger">You're signed out.</strong> The API is up but answered 401. Sign in again; this page reconnects by itself.
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <strong className="font-medium text-danger">This account can't read this traffic log.</strong> The API is up but answered 403. Check the selected project, or sign in with the account
+            that owns it.
+          </>
+        )}
       </div>
     );
   }
@@ -345,8 +393,8 @@ function SourceBanner({
               Live · {status.via === "sse" ? "streaming" : "polling every 2 s"}
             </span>
           )}
-          <span className="inline-flex items-center rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink">
-            Log level {status.level}
+          <span title={`Traffic log level: ${status.level}`} className="inline-flex items-center rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink">
+            {status.level === "full" ? "Originals logged" : "Placeholders only"}
           </span>
           <span className="text-xs">
             {status.level === "full" ? "Originals are kept in memory on this machine only." : "Only what left the machine is logged: placeholders, never values."}
@@ -357,7 +405,21 @@ function SourceBanner({
   );
 }
 
-function EmptyCalls({ hasAny, source, status, replayDone }: { hasAny: boolean; source: TrafficSource; status: TrafficStatus; replayDone: boolean }) {
+function EmptyCalls({
+  hasAny,
+  source,
+  status,
+  replayDone,
+  demoTraffic,
+  endpointSelected = false,
+}: {
+  hasAny: boolean;
+  source: TrafficSource;
+  status: TrafficStatus;
+  replayDone: boolean;
+  demoTraffic: boolean;
+  endpointSelected?: boolean;
+}) {
   if (hasAny) return <p className="py-6 text-center text-sm text-muted">No call matches these filters.</p>;
   if (source === "fixture" && replayDone)
     return (
@@ -369,7 +431,14 @@ function EmptyCalls({ hasAny, source, status, replayDone }: { hasAny: boolean; s
   return (
     <div className="py-6 text-center text-sm text-muted">
       <p className="font-medium text-ink">{status.state === "connecting" ? "Connecting…" : "Waiting for the first call"}</p>
-      {source === "api" && status.state === "live" && (
+      {source === "api" && status.state === "live" && !demoTraffic && (
+        <p className="mt-1">
+          {endpointSelected
+            ? "Only calls through the endpoint picked in the header show here. Pick All endpoints in the header menu to see the whole project."
+            : "Calls through any of this project's endpoints show here, each tagged with its endpoint. Connect a client to one (Connect), or mask a text in the Playground."}
+        </p>
+      )}
+      {source === "api" && status.state === "live" && demoTraffic && (
         <p className="mt-1">
           Press <strong className="text-ink">Send demo traffic</strong>, run <code className="font-mono text-xs">make demo-traffic</code>, or point an OpenAI client at{" "}
           <code className="font-mono text-xs">/v1</code> of the gateway.
@@ -380,7 +449,7 @@ function EmptyCalls({ hasAny, source, status, replayDone }: { hasAny: boolean; s
 }
 
 const LABELLED_NOTE = LABELLED_SCENARIOS.length
-  ? `; ${LABELLED_SCENARIOS.length} labelled “${LABELLED_SCENARIOS[0]!.label}”: in rules-only mode its name is an expected miss`
+  ? `; ${LABELLED_SCENARIOS.length} labeled “${LABELLED_SCENARIOS[0]!.label}”: in rules-only mode its name is an expected miss`
   : "";
 
 export function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
@@ -401,7 +470,7 @@ export function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
   const p = state.progress;
   return (
     <>
-      <Button variant="primary" onClick={() => void run()} disabled={state.running}>
+      <Button variant="primary" onClick={() => void run()} busy={state.running}>
         <SendIcon /> {state.running ? "Sending…" : "Send demo traffic"}
       </Button>
       <span aria-live="polite" className="text-xs text-muted tabular-nums">
@@ -444,7 +513,7 @@ function LabelTag({ match }: { match: LabelledMatch }) {
   const missed = match.missed.length > 0;
   return (
     <span
-      title={`Demo scenario labelled “${match.scenario.label}”${missed ? ": in rules-only mode its name is an expected miss" : ""}`}
+      title={`Demo scenario labeled “${match.scenario.label}”${missed ? ": in rules-only mode its name is an expected miss" : ""}`}
       className={[
         "rounded-sm px-1.5 py-0.5 text-2xs font-medium whitespace-nowrap ring-1 ring-inset",
         missed ? "bg-leak-soft text-leak ring-leak/40" : "text-muted ring-line-strong",
@@ -467,7 +536,7 @@ function LabelledNote({ match }: { match: LabelledMatch }) {
       <p className="mt-1 text-ink">
         {missed ? (
           <>
-            This call names a person in free text, with no pre-loaded known value and nothing a rule can recognise, so the name ({match.missed.join(", ")}) reached the
+            This call names a person in free text, with no pre-loaded known value and nothing a rule can recognize, so the name ({match.missed.join(", ")}) reached the
             mock model as written. Every other demo call masks its names, because they are pre-loaded as session known values. This one is kept on purpose, to show what
             the NER adds. With <NerHint />, it is masked too.
           </>
@@ -505,7 +574,19 @@ function modelOf(e: TrafficEvent, mockUpstream: boolean): string {
   return e.upstream?.model ?? e.model ?? "–";
 }
 
-function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: TrafficEvent; selected: boolean; onSelect: () => void; mockUpstream: boolean }) {
+function CallRow({
+  event: e,
+  selected,
+  onSelect,
+  mockUpstream,
+  showEndpoint = false,
+}: {
+  event: TrafficEvent;
+  selected: boolean;
+  onSelect: () => void;
+  mockUpstream: boolean;
+  showEndpoint?: boolean;
+}) {
   const hasTools = requestTools(e.request?.masked ?? e.request?.original).length > 0;
   const hasImage = (e.entities?.images?.count ?? 0) > 0;
   const labelled = labelledScenarioFor(e);
@@ -515,19 +596,27 @@ function CallRow({ event: e, selected, onSelect, mockUpstream }: { event: Traffi
       onClick={onSelect}
       aria-current={selected ? "true" : undefined}
       className={[
-        "flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors",
-        selected ? "bg-model-soft/70 shadow-[inset_3px_0_0_var(--model)]" : "hover:bg-surface-2",
+        "flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors sm:px-5",
+        selected ? "bg-surface-2 shadow-[inset_3px_0_0_var(--ink)]" : "hover:bg-surface-2",
       ].join(" ")}
     >
-      <span className="flex w-full items-center gap-2 text-xs">
-        <span className="font-mono text-muted tabular-nums">{clock(e.time)}</span>
+      <span className="flex w-full items-start gap-2 text-xs">
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-mono whitespace-nowrap text-muted tabular-nums">{clock(e.time)}</span>
+        {showEndpoint && e.endpoint && (
+          <span className="max-w-[10rem] truncate rounded bg-surface-2 px-1.5 py-0.5 text-2xs font-medium text-ink ring-1 ring-line-strong ring-inset" title={`Endpoint: ${e.endpoint.name}`}>
+            <span className="sr-only">Endpoint </span>
+            {e.endpoint.name}
+          </span>
+        )}
         {e.mode && <Tag>{e.mode}</Tag>}
         {e.stream && <Tag>stream</Tag>}
         {hasTools && <Tag>tools</Tag>}
         {hasImage && <Tag>image</Tag>}
         {labelled && <LabelTag match={labelled} />}
         <OutcomeBadge outcome={e.outcome} />
-        <span className="ml-auto font-medium text-ink tabular-nums" title="pii-guard overhead">
+        </span>
+        <span className="shrink-0 font-medium whitespace-nowrap text-ink tabular-nums" title="PII Guard overhead">
           +{formatMsShort(e.timing.overhead_ms)}
         </span>
       </span>
@@ -555,6 +644,7 @@ function CallDetail({
   onFollow,
   mockUpstream,
   onOpenSession,
+  aggregated = false,
 }: {
   event: TrafficEvent;
   following: boolean;
@@ -563,8 +653,11 @@ function CallDetail({
   onFollow: () => void;
   mockUpstream: boolean;
   onOpenSession?: (ref: string) => void;
+  /** The project's merged view: an endpoint call's vault session lives on that endpoint. */
+  aggregated?: boolean;
 }) {
   const showOriginals = canShowOriginals(e, pageHost, source);
+  const hosted = useHostedSession() !== null;
   const maskedBody = e.request?.masked;
   const forwarded = maskedBody !== undefined && maskedBody !== null;
   const labelled = labelledScenarioFor(e);
@@ -585,24 +678,31 @@ function CallDetail({
           {following ? (
             <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-muted ring-1 ring-line">Following the latest call</span>
           ) : (
-            <Button className="h-8" onClick={onFollow}>
+            <Button size="sm" onClick={onFollow}>
               Follow the latest call
             </Button>
           )}
         </div>
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs @xl:grid-cols-3 @3xl:grid-cols-4">
+          {e.endpoint && <Meta label="Endpoint" value={e.endpoint.name} />}
           <Meta label="Mode" value={e.mode ?? "–"} />
           <Meta label="Model" value={modelOf(e, mockUpstream)} />
           <Meta label="Language" value={e.language ?? "auto"} />
           <Meta label="Session" value={e.session_ref ? `${e.session_new ? "new" : "continued"} · ${e.session_ref}` : "–"} />
           <Meta label="Session from" value={e.session_source ? (SESSION_SOURCE_LABEL[e.session_source] ?? e.session_source) : "–"} />
+          <Meta label="Outbound check" value={outboundCheckLabel(e.outbound_check)} />
           <Meta label="Detectors" value={e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "–"} />
           <Meta label="Upstream" value={e.upstream?.status ? `HTTP ${e.upstream.status}` : "not called"} />
           <Meta label="Tokens" value={e.usage?.total_tokens !== undefined ? `${e.usage.prompt_tokens ?? "?"} in · ${e.usage.completion_tokens ?? "?"} out` : "–"} />
           <Meta label="Detection cache" value={e.cache ? `${e.cache.hits} hit · ${e.cache.misses} miss` : "–"} />
         </dl>
-        {e.session_ref && onOpenSession && (
-          <Button className="mt-3 h-8 text-xs" onClick={() => onOpenSession(e.session_ref!)}>
+        {e.session_ref && onOpenSession && aggregated && e.endpoint ? (
+          // The Vault is per endpoint: switch the console to this one, where the session lives.
+          <Button size="sm" className="mt-3" onClick={() => setSelectedEndpoint(e.endpoint!.id)}>
+            Switch to endpoint {e.endpoint.name} to open its session
+          </Button>
+        ) : e.session_ref && onOpenSession && (
+          <Button size="sm" className="mt-3" onClick={() => onOpenSession(e.session_ref!)}>
             Open session <span className="font-mono">{e.session_ref}</span> in Vault
           </Button>
         )}
@@ -620,7 +720,7 @@ function CallDetail({
       </section>
 
       {e.outcome !== "ok" && (!forwarded || upstreamSide) && (
-        <div role="note" data-error-kind={upstreamSide ? upstreamCopy.kind : e.outcome === "blocked" ? "policy" : "fail_closed"} className="rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm">
+        <div role="note" data-error-kind={upstreamSide ? upstreamCopy.kind : e.outcome === "blocked" ? "policy" : "fail_closed"} className="rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm sm:p-4">
           <p className="font-medium text-warn">
             {upstreamSide ? upstreamCopy.title : `${e.outcome === "blocked" ? "Blocked by policy." : "Refused."} Nothing was sent to the model.`}
           </p>
@@ -636,35 +736,37 @@ function CallDetail({
       )}
 
       <section aria-labelledby="timing-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
-        <h2 id="timing-title" className="mb-3 text-lg font-normal text-ink">
+        <h2 id="timing-title" className="mb-4 text-lg font-normal text-ink">
           Timing
         </h2>
         <TimingWaterfall event={e} />
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <DetailPane eyebrow="Your app sent" title="Original request" side="you">
+      <div className="grid gap-6 @3xl:grid-cols-2">
+        <DetailPane id="log-original" eyebrow="Your app sent" title="Original request" side="you">
           {showOriginals && e.request?.original ? (
             <OriginalView original={e.request.original} masked={maskedBody} />
           ) : (
-            <Notice>
+            <Quiet>
               {source === "fixture" ? (
                 <>Recorded demo traffic never holds original values.</>
+              ) : hosted ? (
+                <>Not kept: the hosted service never stores original values. This log holds only what was sent to the model.</>
               ) : e.level === "full" ? (
                 <>The server logged originals, but they are only shown on a page served from localhost.</>
               ) : (
                 <>
-                  Not kept. The traffic log runs at <code className="font-mono">masked</code>: only what left the machine. Run the API on localhost with{" "}
-                  <code className="font-mono">PII_GUARD_TRAFFIC_LOG=full</code> (fictional data only) to see originals here.
+                  Not kept: the traffic log holds only what left the machine (level <code className="font-mono">masked</code>). To see originals here, run the API on localhost
+                  with its traffic log at level full, with fictional data only (<code className="font-mono">PII_GUARD_TRAFFIC_LOG=full</code>).
                 </>
               )}
-            </Notice>
+            </Quiet>
           )}
         </DetailPane>
-        <DetailPane eyebrow="The model received" title="Masked request, as sent upstream" side="model">
-          {forwarded ? <MaskedRequestView body={maskedBody} event={e} /> : <Notice>Nothing was forwarded.</Notice>}
+        <DetailPane id="log-masked" eyebrow="The model received" title="Masked request" side="model">
+          {forwarded ? <MaskedRequestView body={maskedBody} event={e} /> : <Quiet>Nothing was forwarded.</Quiet>}
         </DetailPane>
-        <DetailPane eyebrow="The model answered" title="Response, masked → restored" side="model" wide>
+        <DetailPane id="log-response" eyebrow="The model answered" title="Response, masked → restored" side="model" wide>
           <ResponseView event={e} showOriginals={showOriginals} />
         </DetailPane>
       </div>
@@ -675,7 +777,7 @@ function CallDetail({
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-2xs text-muted">{label}</dt>
+      <dt className="text-xs text-muted">{label}</dt>
       <dd className="truncate text-ink" title={value}>
         {value}
       </dd>
@@ -683,27 +785,18 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DetailPane({ eyebrow, title, side, wide, children }: { eyebrow: string; title: string; side: "you" | "model"; wide?: boolean; children: ReactNode }) {
+/** A request or response pane: the shared `Pane`, its body capped and scrolled. */
+function DetailPane({ id, eyebrow, title, side, wide, children }: { id: string; eyebrow: string; title: string; side: "you" | "model"; wide?: boolean; children: ReactNode }) {
   return (
-    <section
-      aria-label={title}
-      className={[
-        "flex min-w-0 flex-col overflow-hidden rounded-xl border bg-surface",
-        side === "model" ? "border-model/25" : "border-line",
-        wide ? "md:col-span-2" : "",
-      ].join(" ")}
-    >
-      <header className={["border-b px-4 py-2.5", side === "model" ? "border-model/20 bg-model-soft/60" : "border-line bg-surface-2"].join(" ")}>
-        <p className={["font-mono text-2xs", side === "model" ? "text-model" : "text-guard"].join(" ")}>{eyebrow}</p>
-        <h3 className="text-sm font-medium text-ink">{title}</h3>
-      </header>
-      <div className="max-h-[32rem] min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">{children}</div>
-    </section>
+    <Pane id={id} eyebrow={eyebrow} title={title} side={side} scroll className={wide ? "@3xl:col-span-2" : ""}>
+      <div className="space-y-3">{children}</div>
+    </Pane>
   );
 }
 
-function Notice({ children }: { children: ReactNode }) {
-  return <p className="py-4 text-sm text-muted">{children}</p>;
+/** A quiet note inside a pane (no card inside a card). */
+function Quiet({ children }: { children: ReactNode }) {
+  return <p className="text-sm text-muted">{children}</p>;
 }
 
 function Role({ role }: { role: string }) {
@@ -824,16 +917,16 @@ function OriginalView({ original, masked }: { original: unknown; masked: unknown
 function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
   const free = e.detectors.some((d) => d === "ner" || d === "llm");
   return (
-    <p className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-muted">
+    <p className="text-xs text-muted">
       Only highlighted values were replaced; anything else reached the model as written.{" "}
       {free ? null : e.detectors.includes("known") ? (
         <>
-          This call ran {e.detectors.map((d) => detectorName(d)).join(", ")}: pre-loaded known values (names included) and structured values (e-mail, phone, IBAN, IDs) are
+          This call ran {e.detectors.map((d) => detectorName(d)).join(", ")}: pre-loaded known values (names included) and structured values (email, phone, IBAN, IDs) are
           masked; other names need <NerHint />.
         </>
       ) : (
         <>
-          This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (e-mail, phone, IBAN, IDs) but{" "}
+          This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (email, phone, IBAN, IDs) but{" "}
           <strong className="font-medium text-ink">not names</strong>: names need <NerHint />.
         </>
       )}
@@ -844,18 +937,19 @@ function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
 const placeholdersIn = (text: string) => tokenize(text).filter((t) => t.kind === "placeholder").length;
 
 function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOriginals: boolean }) {
+  const hosted = useHostedSession() !== null;
   const masked = responseChoices(e.response?.masked);
   const unmasked = showOriginals ? responseChoices(e.response?.unmasked) : [];
-  if (!e.response) return <Notice>{e.outcome === "ok" ? "No answer was logged." : "No answer: the call did not reach the model."}</Notice>;
+  if (!e.response) return <Quiet>{e.outcome === "ok" ? "No answer was logged." : "No answer: the call did not reach the model."}</Quiet>;
   const nothing = masked.every((c) => !c.content && !c.toolCalls.length);
   const streamedTool = nothing && e.stream && e.outcome === "ok";
   const count = masked.reduce((n, c) => n + placeholdersIn(c.content ?? "") + c.toolCalls.reduce((k, t) => k + placeholdersIn(t.arguments), 0), 0);
   return (
-    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+    <div className="grid gap-4 @2xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
       <div data-testid="masked-response" className="min-w-0 space-y-2">
         <p className="mb-1 text-xs font-medium text-model">From the model{e.stream ? ` (streamed, ${e.response.chunks ?? "?"} chunks)` : ""}</p>
         {nothing ? (
-          <Notice>{e.stream ? "A streamed tool call: the log keeps streamed text, not tool-call arguments." : "Empty answer."}</Notice>
+          <Quiet>{e.stream ? "A streamed tool call: the log keeps streamed text, not tool-call arguments." : "Empty answer."}</Quiet>
         ) : (
           masked.map((c) => (
             <div key={c.index} className="space-y-2">
@@ -869,14 +963,14 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
           ))
         )}
       </div>
-      <div aria-hidden="true" className="flex items-center gap-2 font-mono text-2xs text-guard md:flex-col md:justify-center">
-        <span className="h-px flex-1 bg-guard/40 md:h-auto md:w-px" />
-        <span className="whitespace-nowrap">pii-guard</span>
+      <div aria-hidden="true" className="flex items-center gap-2 font-mono text-2xs text-guard @2xl:flex-col @2xl:justify-center">
+        <span className="h-px flex-1 bg-guard/40 @2xl:h-auto @2xl:w-px" />
+        <span className="whitespace-nowrap">PII Guard</span>
         <span className="text-faint">
-          <span className="md:hidden">↓</span>
-          <span className="hidden md:inline">→</span>
+          <span className="@2xl:hidden">↓</span>
+          <span className="hidden @2xl:inline">→</span>
         </span>
-        <span className="h-px flex-1 bg-guard/40 md:h-auto md:w-px" />
+        <span className="h-px flex-1 bg-guard/40 @2xl:h-auto @2xl:w-px" />
       </div>
       <div data-testid="unmasked-response" className="min-w-0 space-y-2">
         <p className="mb-1 text-xs font-medium text-guard">To your app</p>
@@ -895,14 +989,14 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
             );
           })
         ) : (
-          <Notice>
+          <Quiet>
             {streamedTool
               ? "The streamed tool-call arguments were restored on the way to your app; the log doesn't keep them. "
               : count
                 ? `${count} placeholder${count === 1 ? " was" : "s were"} put back before the answer reached your app. `
                 : "Nothing to restore in this answer. "}
-            {showOriginals ? "" : "The restored answer holds real values, so it is only logged at level full, on localhost."}
-          </Notice>
+            {showOriginals ? "" : hosted ? "The restored answer holds real values, so the hosted service doesn't keep it." : "The restored answer holds real values, so it is only logged at level full, on localhost."}
+          </Quiet>
         )}
       </div>
     </div>
@@ -911,24 +1005,11 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
 
 // --- Bits ---------------------------------------------------------------------------------
 
-export function Fact({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="flex flex-col-reverse">
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="text-lg font-medium tabular-nums text-ink">{value}</dd>
-    </div>
-  );
-}
-
 export function ChartCard({ id, title, note, children }: { id: string; title: string; note: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-title`} className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <h3 id={`${id}-title`} className="text-lg font-normal text-ink">
-        {title}
-      </h3>
-      <p className="mt-0.5 mb-4 text-sm text-muted">{note}</p>
+    <Card title={title} titleId={`${id}-title`} subtitle={note} headingLevel={3} className="min-w-0">
       {children}
-    </section>
+    </Card>
   );
 }
 
@@ -950,7 +1031,7 @@ function PlayIcon() {
 }
 function SendIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className={icon} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className={icon} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
       <path d="M2.5 8 13.5 2.5 11 13.5 8 9.5 2.5 8Z" />
       <path d="M8 9.5 13.5 2.5" />
     </svg>

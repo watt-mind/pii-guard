@@ -1,6 +1,8 @@
 """Train the NER student (``training/ner/train.py``) on a Modal GPU.
 
-Fictional data only. The labelled corpus files named in the config are uploaded with the job;
+Fictional data only. The labelled corpus files named in the config are uploaded with the job,
+and the image carries only the synthetic evaluation files the decontamination gate needs
+(``modal_upload.py``, LAB-1527: never MAPA, TAB or other real text);
 the checkpoint is written to the Modal volume ``pii-guard-ner-runs`` and fetched back with
 ``modal volume get``::
 
@@ -14,6 +16,7 @@ The app is ephemeral (``modal run``): it stops when the function returns.
 
 from __future__ import annotations
 
+import sys
 import tomllib
 from pathlib import Path
 
@@ -42,16 +45,17 @@ image = (
     .env({"PYTHONPATH": f"{REMOTE}/src", "TOKENIZERS_PARALLELISM": "false"})
     .add_local_dir(ROOT / "src" / "pii_guard", f"{REMOTE}/src/pii_guard", ignore=["__pycache__"])
     .add_local_dir(ROOT / "training" / "ner", f"{REMOTE}/training/ner", ignore=["__pycache__"])
-    # The decontamination gate in train.py (LAB-1392) needs every evaluation text.
-    .add_local_dir(ROOT / "eval" / "fixtures", f"{REMOTE}/eval/fixtures", ignore=["visual"])
-    .add_local_dir(ROOT / "eval" / "datasets", f"{REMOTE}/eval/datasets", ignore=["results"])
-    # agent-traffic test and dev (LAB-1226) live here; without them the gate can't see them.
-    .add_local_dir(ROOT / "eval" / "synthetic", f"{REMOTE}/eval/synthetic")
 )
-if modal.is_local() and (ROOT / "data" / "datasets" / "fixtures").is_dir():  # fetch-only sets
-    image = image.add_local_dir(
-        ROOT / "data" / "datasets" / "fixtures", f"{REMOTE}/data/datasets/fixtures"
-    )
+if modal.is_local():
+    # LAB-1527: an allowlist of files, never a directory. The decontamination gate (LAB-1392)
+    # gets every synthetic evaluation text and every manifest; real text (MAPA, TAB, dataset
+    # downloads, mining pools) never leaves the machine (LAB-1419). The gate compares training
+    # documents with the real sets by their manifest hashes only; see modal_upload.py.
+    sys.path[:0] = [str(ROOT / "src"), str(Path(__file__).resolve().parent)]
+    from modal_upload import eval_upload_files
+
+    for rel in eval_upload_files(ROOT):
+        image = image.add_local_file(ROOT / rel, f"{REMOTE}/{rel}")
 runs = modal.Volume.from_name("pii-guard-ner-runs", create_if_missing=True)
 app = modal.App("pii-guard-ner-train", image=image)
 
@@ -59,7 +63,6 @@ app = modal.App("pii-guard-ner-train", image=image)
 def _train(config_text: str, files: dict[str, bytes]) -> str:
     import os
     import subprocess
-    import sys
 
     os.chdir(REMOTE)
     for rel, data in files.items():
@@ -112,7 +115,11 @@ def train_a100(config_text: str, files: dict[str, bytes]) -> str:
 def main(config: str, gpu: str = "A10G") -> None:
     text = (ROOT / config).read_text(encoding="utf-8")
     cfg = tomllib.loads(text)
-    files = {rel: (ROOT / rel).read_bytes() for rel in [*cfg["train"], *cfg["dev"]]}
+    # The config's train/dev files go with the call; refuse any that could be real text.
+    from modal_upload import check_payload
+
+    paths = check_payload([*cfg["train"], *cfg["dev"]])
+    files = {rel: (ROOT / rel).read_bytes() for rel in paths}
     fn = {"A10G": train_a10g, "L40S": train_l40s, "A100": train_a100}[gpu.upper()]
     name = fn.remote(text, files)
     print(f"checkpoint on volume pii-guard-ner-runs: {name}")

@@ -7,7 +7,6 @@ from typing import Any
 
 from pii_guard.bench.latency import CellResult, build_records
 from pii_guard.eval import report_charts as charts
-from pii_guard.eval.record import load_records
 from pii_guard.eval.report_cli import render_page
 from pii_guard.eval.report_index import build_index
 from pii_guard.observability.timing import STAGES
@@ -48,8 +47,10 @@ def latency_record(mode: str = "fast") -> dict[str, Any]:
     return record
 
 
-def test_index_lists_latency_runs_apart_from_detection_systems() -> None:
-    records = [*load_records(REPO / "eval/results/runs"), latency_record()]
+def test_index_lists_latency_runs_apart_from_detection_systems(
+    committed_records: list[dict[str, Any]],
+) -> None:
+    records = [*committed_records, latency_record()]
     index = build_index(records)
     (run,) = [r for r in index["latency"] if r["run_id"] == "2026-10-27-latency-fast"]
     assert run["system"] == "gateway-latency:fast:rules" and len(run["cells"]) == 4
@@ -58,8 +59,8 @@ def test_index_lists_latency_runs_apart_from_detection_systems() -> None:
     assert any(r["kind"] == "latency" for r in index["runs"])
 
 
-def test_chart_and_page() -> None:
-    records = [*load_records(REPO / "eval/results/runs"), latency_record()]
+def test_chart_and_page(committed_records: list[dict[str, Any]]) -> None:
+    records = [*committed_records, latency_record()]
     index = build_index(records)
     svg = charts.latency(index)
     assert svg.startswith("<svg") and "Gateway overhead" in svg
@@ -120,11 +121,13 @@ def test_unknown_device_keeps_the_old_key() -> None:
     assert record["system"]["detectors"][1]["settings"] == {}
 
 
-def test_cpu_and_mps_runs_both_reach_the_latency_table() -> None:
+def test_cpu_and_mps_runs_both_reach_the_latency_table(
+    committed_records: list[dict[str, Any]],
+) -> None:
     cpu = _ner_record("cpu", serving="in-process, PyTorch on CPU")
     mps = _ner_record("mps", serving="in-process, PyTorch on Apple MPS")
     old = _ner_record("old")
-    index = build_index([*load_records(REPO / "eval/results/runs"), cpu, mps, old])
+    index = build_index([*committed_records, cpu, mps, old])
     latest = {r["run_id"]: charts.latency_label(r) for r in charts.latest_latency(index)}
     assert latest["2026-10-28-cpu-fast"] == "fast: rules + ner (cpu)"
     assert latest["2026-10-28-mps-fast"] == "fast: rules + ner (mps)"

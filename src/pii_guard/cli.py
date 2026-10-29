@@ -16,7 +16,7 @@ __all__ = ["build_parser", "main"]
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pii-guard",
-        description="Privacy firewall for AI agents: reversible PII masking.",
+        description="PII Guard, a privacy firewall for AI agents: reversible PII masking.",
     )
     parser.add_argument("--version", action="version", version=f"pii-guard {__version__}")
     sub = parser.add_subparsers(dest="command", metavar="<command>")

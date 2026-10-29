@@ -33,7 +33,7 @@ def test_lookup_is_by_primary_language() -> None:
     assert primary_language("") == "und"
     assert get_pack("hu-HU") is get_pack("hu")
     assert get_pack("fi") is None
-    assert available_languages() == ("de", "en", "hu")
+    assert available_languages() == ("de", "en", "hu", "pl")
 
 
 def test_register_and_unregister_override_a_built_in_pack() -> None:
@@ -73,12 +73,12 @@ def _entry_points(*eps: _EntryPoint):
 
 
 def test_entry_points_add_a_language(monkeypatch: pytest.MonkeyPatch, fresh_registry: None) -> None:
-    pack = LanguagePack(code="pl", name="Polish")
+    pack = LanguagePack(code="cs", name="Czech")
     monkeypatch.setattr(
-        metadata, "entry_points", _entry_points(_EntryPoint("pl", "third_party.pl:pack", pack))
+        metadata, "entry_points", _entry_points(_EntryPoint("cs", "third_party.cs:pack", pack))
     )
-    assert get_pack("pl-PL") is pack
-    assert set(available_languages()) == {"de", "en", "hu", "pl"}
+    assert get_pack("cs-CZ") is pack
+    assert set(available_languages()) == {"cs", "de", "en", "hu", "pl"}
 
 
 def test_an_entry_point_may_replace_a_built_in_pack(
@@ -107,11 +107,11 @@ def test_this_packages_own_entry_points_are_the_built_ins(
 @pytest.mark.parametrize(
     ("ep", "message"),
     [
-        (_EntryPoint("pl", "broken.pl:pack", ImportError("x")), "failed to import: ImportError"),
-        (_EntryPoint("pl", "broken.pl:pack", 42), "is a int, not a LanguagePack"),
+        (_EntryPoint("cs", "broken.cs:pack", ImportError("x")), "failed to import: ImportError"),
+        (_EntryPoint("cs", "broken.cs:pack", 42), "is a int, not a LanguagePack"),
         (
-            _EntryPoint("pl", "broken.pl:pack", LanguagePack(code="cs", name="Czech")),
-            "declares code 'cs', expected 'pl'",
+            _EntryPoint("cs", "broken.cs:pack", LanguagePack(code="sk", name="Slovak")),
+            "declares code 'sk', expected 'cs'",
         ),
     ],
 )
@@ -177,7 +177,7 @@ def test_the_hungarian_profile_asks_for_every_type_as_before() -> None:
     from pii_guard.detect.llm import ENTITY_DESCRIPTIONS, LANGUAGES, language_profile
 
     assert language_profile("hu").entity_types == tuple(ENTITY_DESCRIPTIONS)
-    assert set(LANGUAGES) == {"de", "en", "hu"}
+    assert set(LANGUAGES) == {"de", "en", "hu", "pl"}
     assert LANGUAGES["en"].allow_suffix is False
     with pytest.raises(KeyError):
         LANGUAGES["en-GB"]

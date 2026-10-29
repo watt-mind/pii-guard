@@ -140,7 +140,20 @@ def test_decontam_load_training_docs_gates_by_default_and_fails_closed(tmp_path:
         decontam.load_training_docs([path], decontam.EvalIndex(), decontam.Report())
 
 
-def test_decontam_cli_writes_report_and_clean_files(tmp_path: Path) -> None:
+def test_decontam_cli_writes_report_and_clean_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The CLI's plumbing on a corpus of the one set it must hit; building the whole eval
+    # corpus (21 s on CI) is the previous test's job (LAB-1447).
+    thresholds: list[float] = []
+
+    def pl_corpus(*, threshold: float) -> decontam.EvalIndex:
+        thresholds.append(threshold)
+        index = decontam.EvalIndex(threshold=threshold)
+        index.add("pl-pii-bench", _doc("pl-core", _pl_core_text(), "pl"))
+        return index
+
+    monkeypatch.setattr(decontam, "eval_corpus", pl_corpus)
     path = tmp_path / "pl-x-train.jsonl"
     write_fixtures(
         path, [_doc("leak", _pl_core_text(), "pl"), _doc("ok", "Zupełnie inny tekst.", "pl")]
@@ -150,6 +163,7 @@ def test_decontam_cli_writes_report_and_clean_files(tmp_path: Path) -> None:
     data = json.loads(report.read_text())
     assert data["dropped"] == 1 and data["by_eval_set"] == {"pl-pii-bench": 1}
     assert [json.loads(line)["id"] for line in (out / path.name).read_text().splitlines()] == ["ok"]
+    assert thresholds == [decontam.THRESHOLD]
 
 
 def test_decontam_train_py_runs_the_gate_by_default() -> None:
@@ -159,4 +173,4 @@ def test_decontam_train_py_runs_the_gate_by_default() -> None:
     assert re.search(r'"decontam": True', source)
     assert "load_fixtures(train_paths)" not in source  # no path around the gate
     modal = (ROOT / "training/distill/modal_train.py").read_text(encoding="utf-8")
-    assert '"eval" / "fixtures"' in modal and '"eval" / "datasets"' in modal
+    assert "eval_upload_files(ROOT)" in modal  # the gate's texts go, by allowlist (LAB-1527)

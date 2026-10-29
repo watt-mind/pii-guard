@@ -33,6 +33,9 @@ def existing_bindings(app: str, group: str, mode: str, *, run=subprocess.run) ->
         if absent and mode == "stage":
             return []
         raise ValueError("existing_app_bindings_unavailable")
+    if not result.stdout.strip():
+        # az prints nothing, not "null", for an app without custom domains (LAB-1432).
+        return []
     value = json.loads(result.stdout)
     if value is None:
         return []

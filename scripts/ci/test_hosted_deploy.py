@@ -452,6 +452,33 @@ class ReleaseEvidenceTests(unittest.TestCase):
             with self.subTest(target=target, authorization="string"), self.assertRaises(Refused):
                 self.validate(evidence | {"meta_proxy_authorized": "true"}, target, sponsored="1")
 
+    def test_owner_risk_acceptance_substitutes_only_for_provider_authorization(self) -> None:
+        waiver = {"by": "owner", "ref": "LAB-1389", "date": "2026-10-28", "scope": "hackathon-demo"}
+        for target in ("dev", "prod"):
+            evidence = self.evidence(target)
+            waived = evidence | {"meta_proxy_owner_risk_accepted": waiver}
+            with self.subTest(target=target):
+                self.assertEqual(self.validate(waived, target, sponsored="1"), waived)
+            with self.subTest(target=target, gate="lab_1372"), self.assertRaises(Refused):
+                self.validate(waived | {"lab_1372_done": False}, target, sponsored="1")
+            for bad in (
+                True,
+                {},
+                waiver | {"by": "agent"},
+                waiver | {"ref": "LAB-1372"},
+                waiver | {"scope": "general-availability"},
+                waiver | {"date": "2026-02-30"},
+                waiver | {"date": "2999-01-01"},
+                waiver | {"extra": True},
+            ):
+                with self.subTest(target=target, waiver=bad), self.assertRaises(Refused):
+                    self.validate(
+                        evidence
+                        | {"meta_proxy_authorized": True, "meta_proxy_owner_risk_accepted": bad},
+                        target,
+                        sponsored="1",
+                    )
+
 
 class CurrentRunTests(unittest.TestCase):
     @staticmethod

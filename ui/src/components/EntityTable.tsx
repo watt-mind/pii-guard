@@ -19,7 +19,8 @@ export function EntityTable({ entities, spans, activeKey, onActivate }: Props) {
     return <p className="text-sm text-muted">Nothing was masked in this document.</p>;
   }
   return (
-    <div className="-mx-4 overflow-x-auto sm:mx-0">
+    // Focusable, so a keyboard can scroll the table sideways on a phone.
+    <div tabIndex={0} role="region" aria-label="Placeholders issued" className="-mx-4 overflow-x-auto sm:mx-0">
       <table className="w-full min-w-[30rem] border-separate border-spacing-0 text-left text-sm">
         <caption className="sr-only">Placeholders issued for this session. Original values are not listed.</caption>
         <thead>

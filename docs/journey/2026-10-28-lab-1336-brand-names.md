@@ -11,14 +11,14 @@ thing anyone types. `Llama`, `Muse` and `Gemini` in one comparison prompt went t
   spans before they leave the detector. A span that is exactly a listed company, product or
   model name becomes `ORGANIZATION`, which policy keeps, so the word stays in the prompt. A
   policy with `ORGANIZATION=mask` still masks it. The name may carry a suffix that the text
-  language's inflection matcher allows for an organisation (`Meta's`, `Google-nél`, Hungarian
+  language's inflection matcher allows for an organization (`Meta's`, `Google-nél`, Hungarian
   `Metáról` with its lengthened stem).
 - **Add-a-language.** The cross-language names (Meta, Llama, Muse, WhatsApp, Instagram,
   Google, OpenAI, Anthropic …) are in `languages/brands.tsv`. Each pack adds its own with the
   new optional `LanguagePack.brands` field (`hu`: `OTP Bank`, `MOL`, `Yettel`; `de`:
   `Deutsche Bahn`, `Lufthansa`; `en`: `BBC`, `NHS`). The conformance suite checks the file and
   `pii-guard lang new` writes a commented one. See [languages.md](../languages.md).
-- **Persons stay persons.** A span is not relabelled when it is longer than the name
+- **Persons stay persons.** A span is not relabeled when it is longer than the name
   (`Meta Kovács`), when an honorific stands next to it (`Ms. Apple`, `Herr Meta`, `Meta úr`),
   when another person span or a known given name or surname touches it (`Kovács Meta`), or
   when a pack's name lexicon lists the name. Brands that are also common personal names are

@@ -225,7 +225,9 @@ class ApiKeyStore:
 
     @staticmethod
     def _require_user(principal: Principal) -> None:
-        if not principal.authenticated or principal.auth_method == "guest":
+        # A signed-in session only: a guard API key must never mint or list its successors,
+        # or a leaked key could outlive its own revocation.
+        if not principal.authenticated or principal.auth_method != "google":
             raise IdentityError()
 
     def issue(self, principal: Principal, name: str) -> dict[str, str]:

@@ -11,10 +11,15 @@ service has passed review. Start with internal ingress and zero sponsored budget
 |---|---|---|---|
 | Anonymous walkthrough | Curated server-owned HU/EN synthetic sample; local rules and CPU NER | Masked sample to sponsored Meta, only when budget permits | Public; sample IDs only |
 | Signed-in editable text | Azure hosted service receives original text; local rules and CPU NER | Masked text to configured sponsored Meta or approved BYOK destination | Google identity or owner API key; owner-scoped vault |
+| Signed-in images | Azure hosted service receives the original image in memory; local Tesseract OCR, on-device face/ID-photo detector, local rules and CPU NER; never stored | None: the masked image returns to the owner | Google identity only (no API keys, no guests); owner-scoped vault |
 | BYOK | The service receives the provider key and configured endpoint | Masked input, key sent only to that approved public HTTPS destination | Signed-in owner; the endpoint credential is encrypted in project configuration (see [projects](projects.md)) |
 | Self-hosted | Original input stays in the operator's chosen guard/detector infrastructure | Masked input to the operator's provider | The operator controls access and retention |
 
-Hosted images/uploads and remote LLM detection are outside the initial scope. A remote detector
+Hosted images are processed on the replica only ([ADR 0014](decisions/0014-hosted-local-images.md)):
+no SAM, no remote detector, no image spend. Faces and ID photos are found by YuNet and
+signatures by the pinned YOLOS-tiny detector, both on the CPU; the owner's project policy decides
+what is masked (LAB-1444). Nothing local finds stamps, so a policy that masks `STAMP` is refused.
+Document uploads (PDF/DOCX) and remote LLM detection are outside the initial scope. A remote detector
 is different from downstream generation: it receives originals. Never enable one without an
 explicitly approved trust boundary and terms review. See [models](models.md) and LAB-1139 for
 remote detector terms still requiring confirmation.
@@ -27,6 +32,33 @@ authority to process. Respect provider terms, quotas and endpoint restrictions; 
 to bypass them. The project maintainer must review the final public privacy and acceptable-use
 notice before editable inputs are enabled. Put that notice beside the editable text/BYOK form,
 with an explicit acknowledgement before the first submission, not only on the landing page.
+
+## First run for signed-in owners
+
+Straight after Google sign-in the console calls `POST /v1/account/first-run` (contract in
+[contracts](contracts.md)). The server provisions, once per owner, the default project (with its
+default policy), one **Default endpoint** and that endpoint's first key, and the console lands
+on Connect, "Connect your client": the guard key shown once, copy-paste blocks for Codex, pi,
+the OpenAI SDK, cURL and OpenCode with the key and endpoint URL filled in, and a **Send a test
+request** button that shows the masked round trip. Muse Code cannot use an endpoint URL yet, so
+its tab explains that instead of showing a block.
+
+- **Sponsorship available** (`limits.sponsored_enabled`): the endpoint uses the server-owned
+  sponsored Meta route with the first `PII_GUARD_HOSTED_MODELS` model and is ready immediately.
+- **Sponsorship unavailable** (the default until the launch gate below is met): the same
+  endpoint is marked **Needs a key** and refuses requests with `sponsored_unavailable` before
+  any upstream call. The first screen asks for one field, the owner's Meta API key; saving it
+  converts the endpoint in place to an own-key Meta endpoint whose credential is encrypted in
+  project configuration (ADR 0012). The browser never stores the key. An own-key endpoint never
+  falls back to sponsored inference, and the sponsored key is never sent to an owner endpoint.
+  If sponsorship is enabled later, endpoints still on the sponsored route become ready without
+  any action.
+
+The guard key exists only in that page's memory: after a reload the console offers one-click
+**Create a new guard key** rather than showing the old one. Policies and endpoints remain
+editable in Projects; nothing about first run is required for owners who configure their own.
+Provisioning adds rows only and needs no schema change, so existing encrypted snapshots load
+unchanged.
 
 ## Sponsored provider launch gate
 
@@ -146,8 +178,9 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_UPSTREAM_API_KEY` | Versioned Key Vault reference; sponsored Meta Standard key |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `https://api.meta.ai/v1`; server-owned sponsored route |
 | `PII_GUARD_HOSTED_MODELS` | `muse-spark-1.3` allowlist |
+| `PII_GUARD_HOSTED_SOURCE_TAG` | Default `pii-guard-hosted-demo`, `[A-Za-z0-9._-]{1,64}`; sent as `X-PII-Guard-Source` on sponsored Meta calls only ([attribution](#sponsored-upstream-attribution)) |
 | `PII_GUARD_NER_MODEL`, `PII_GUARD_DETECTORS` | `/app/models/ner`, `rules,ner`; cannot silently drop NER |
-| `PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS` | Default `0`; approved cumulative ceiling, max USD 10 |
+| `PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS` | Default `0`; approved cumulative ceiling, max USD 50 on prod and USD 10 on dev |
 | `PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID` | Exact operator-approved ID; reused across Blob-backed restarts |
 | `PII_GUARD_HOSTED_SPEND_STORE` | `azure_blob`; requires LAB-1398 and the image SDK extra |
 | `PII_GUARD_HOSTED_SPEND_ACCOUNT_URL` | Environment-specific identity-only Blob account |
@@ -158,9 +191,37 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_PROJECT_CONTAINER` | `project-configuration`; fixed `<environment>.projects.v1.enc` snapshot |
 | `PII_GUARD_HOSTED_PROJECT_ENVIRONMENT` | `dev` or `prod`; separate account, identity and stable tenant key |
 | `PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID` | The environment runtime identity's client ID |
+| `PII_GUARD_HOSTED_IMAGES` | Default `true`: signed-in image masking; `/readyz` then requires Tesseract and the on-device segmenter |
+| `PII_GUARD_SEGMENTER` | `local` (image default); `hybrid`/`sam-api`/`off` refuse startup while hosted images are on |
+| `PII_GUARD_POLICY_OVERRIDES` | Unset: owners' project policies decide visual actions; an override set here wins when stricter |
+| `PII_GUARD_HOSTED_MAX_IMAGE_BYTES`, `PII_GUARD_HOSTED_IMAGE_MAX_PIXELS` | Defaults 4 MiB decoded and 8 MP, checked before OCR |
+| `PII_GUARD_HOSTED_IMAGE_TIMEOUT` | Default 60 s per image; one image job per replica, a busy replica answers `429` |
+| `PII_GUARD_HOSTED_USER_IMAGES_PER_DAY`, `PII_GUARD_HOSTED_GLOBAL_IMAGES_PER_DAY` | Defaults 20 and 500, reserved before work, never refunded |
 | `PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` | Dedicated runtime UAMI client ID |
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
 | `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |
+| `VITE_PII_GUARD_ROBOTS` (UI build arg) | Default `disallow`: `robots.txt` keeps crawlers out. Build with `--build-arg VITE_PII_GUARD_ROBOTS=allow` only for the public production image. Dev and prod currently share one image, so prod indexing needs its own build or a runtime switch first |
+| `VITE_PII_GUARD_DEMO_VIDEO_URL`, `VITE_PII_GUARD_DEMO_VIDEO_POSTER` (UI build args) | Unset by default: the landing's demo video slot stays hidden. Set the URL (and optionally a poster image) to show a poster with a play button above the demo |
+
+### Browser security headers
+
+The hosted app sets these on every response itself, once each (`src/pii_guard/security_headers.py`,
+LAB-1460); a header a route already set is not repeated. The dev router forwards and collapses
+headers (LAB-1467), so they do not belong there. `Strict-Transport-Security` comes from the Azure
+Container Apps ingress, so the app does not send a second one.
+
+| Header | Value |
+|---|---|
+| `Content-Security-Policy` | `default-src 'self'`; scripts and styles from the origin plus the SHA-256 of each inline `<script>`/`<style>` in the served `index.html` (computed at startup, so the build-dependent theme script stays allowed); `img-src 'self' data: blob:`; `font-src 'self' data:`; `connect-src 'self'`; `object-src 'none'`; `base-uri 'none'`; `form-action 'self'`; `frame-ancestors 'none'`. `/docs` and `/redoc` (Swagger UI and ReDoc load from a CDN) keep only `frame-ancestors`, `object-src` and `base-uri` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `same-origin`: not `no-referrer`, under which a browser may send `Origin: null` on a write and the same-origin check refuses it |
+| `Permissions-Policy` | camera, microphone, geolocation, payment, USB, serial, HID, Bluetooth, MIDI, display capture and topics off |
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+
+Anything the UI loads from another origin needs the policy widened first: for example a
+`VITE_PII_GUARD_DEMO_VIDEO_POSTER` on another host is blocked by `img-src`; ship it in `ui/public/`
+instead. `pii-guard up` (local) sends none of these unless `create_bundle_app(..., security_headers=True)`.
 
 ## Dedicated Azure deployment
 
@@ -333,9 +394,11 @@ release evidence and `latest=ready`. No app/image yet means these checks are pen
   verify private Blob DNS/MI access and missing-object refusal. After provider authorization,
   use approved synthetic finite authority to prove exact-pin validation, concurrent CAS
   charging, expiry, exhaustion and restart resumption without resetting total/daily charges.
-- **Spend and rollback:** require written provider authorization, Standard routing, reviewed
-  pricing/reservations and exact approved ID/ceiling/expiry pins before setting positive
-  sponsorship. Keep it zero for technical-only releases. Save the previous immutable image
+- **Spend and rollback:** require written provider authorization **or** the owner's recorded
+  risk acceptance (LAB-1389, [below](#owner-risk-acceptance-is-not-authorization)), Standard
+  routing, reviewed pricing/reservations and exact approved ID/ceiling/expiry pins before
+  setting positive sponsorship. Before any general-availability launch, remove sponsored Meta
+  as the default route unless written authorization has arrived. Keep it zero for technical-only releases. Save the previous immutable image
   and secret-version references, exercise `disable`, and require fresh review before public
   rollback. Preserve the ledger; rollback never restores spent credit. Record an owner for
   provider-spend reconciliation and Azure budget alerts.
@@ -387,10 +450,56 @@ The script checks pre-existing Easy Auth before opening external ingress and run
 landing/readiness/anonymous-API-refusal smoke. On failure it restores internal ingress. This
 smoke does not replace browser sign-in, provider streaming or privacy review.
 
-Sponsored budget remains zero until written provider authorization and the other launch gates
-are recorded, and the operator supplies `HOSTED_SPONSORED_MICRODOLLARS`,
-`HOSTED_ALLOCATION_ID` and `HOSTED_ALLOCATION_EXPIRES_AT`. The `meta_proxy_authorized` key is required for positive allocations and may be set only
-after the maintainer records written Meta authorization. Releases reuse the operator's exact
+Sponsored budget remains zero until written provider authorization (or the owner risk
+acceptance below) and the other launch gates are recorded, and the operator supplies
+`HOSTED_SPONSORED_MICRODOLLARS`, `HOSTED_ALLOCATION_ID` and `HOSTED_ALLOCATION_EXPIRES_AT`.
+A positive allocation needs **one** of two evidence keys. `meta_proxy_authorized: true` may be
+set only after the maintainer records written Meta authorization.
+
+### Owner risk acceptance is not authorization
+
+No written Meta gateway/proxy authorization exists today. On 2026-10-28 the account owner
+decided, on LAB-1389, to run the sponsored route for the hackathon demo anyway and to accept
+responsibility for the possible non-compliance with the Meta Model API Terms (§10.1(i)). That
+is a **risk acceptance, not an authorization**, and the evidence says so with a separately
+named key; never record `meta_proxy_authorized: true` on the strength of it:
+
+```json
+"meta_proxy_owner_risk_accepted": {
+  "by": "owner", "ref": "LAB-1389", "date": "2026-10-28", "scope": "hackathon-demo"
+}
+```
+
+`deploy.sh` accepts exactly these four keys with these values (`date` a real, non-future
+`YYYY-MM-DD`), refuses any other shape even next to `meta_proxy_authorized`, and prints that the
+allocation is admitted under risk acceptance. It replaces no other gate: LAB-1372, image
+binding, the dev network keys, the per-environment ceiling and the operator's allocation pins all still
+apply. Its conditions: hosted demo only (dev now, prod for judges), a finite allocation with a fixed expiry after the hackathon, and attribution headers on
+every sponsored call. **Before any general-availability launch, sponsored Meta stops being the
+default route unless written authorization arrives**; delete the waiver from new evidence then.
+
+The allocation cap is per environment and enforced in both `deploy.sh` and `release.bicep`:
+
+| Environment | Cap | Approved pins | Owner decision |
+|---|---|---|---|
+| dev | USD 10 (`10000000` µ$) | `dev-hackathon-20261029` | LAB-1389, 2026-10-28 |
+| prod | USD 50 (`50000000` µ$) | `prod-hackathon-20261029`, expires `1796083200` (2026-12-01T00:00Z) | 2026-10-29, in chat: "do with $50 please." (LAB-1508, recorded on LAB-1389) |
+
+The prod extension widens only the amount and expiry. The evidence key above is unchanged and is
+still a risk acceptance, not authorization.
+
+### Sponsored upstream attribution
+
+Every sponsored upstream call (the server-owned Meta route: no own connection selected, or a
+project endpoint whose provider is `sponsored`) sends `User-Agent:
+pii-guard/<version> (+https://github.com/watt-mind/pii-guard)` and `X-PII-Guard-Source:
+<PII_GUARD_HOSTED_SOURCE_TAG>`, so Meta can attribute the traffic to this deployment. Both are
+fixed per deployment and carry no user, principal, project, session or network identifier;
+the tag is validated at startup (`[A-Za-z0-9._-]{1,64}`). Bring-your-own-key and custom
+endpoints, including an own Meta key, get neither header, and a client-sent
+`X-PII-Guard-Source` is never forwarded.
+
+Releases reuse the operator's exact
 existing authority pins. The operator precreates the private object; neither bootstrap nor
 app release funds it. Changing the ID or cumulative ceiling must preserve charged total and
 current-day charges. Reconcile actual upstream usage and outstanding reservations before
@@ -402,8 +511,8 @@ The app scales to zero when idle and runs at most one 2-vCPU/4-GiB replica. Each
 loads the local NER model before readiness and can delay the first request. Scale-to-zero
 discards owner state. The Blob store resumes the same finite total/daily authority; it never
 reopens credit automatically.
-ACR Basic, Key Vault, Azure Files, networking and alerting cost extra. The USD 10 limit is an
-application sponsored allocation ceiling, not an Azure hard cap or a verified price estimate.
+ACR Basic, Key Vault, Azure Files, networking and alerting cost extra. The USD 50 (prod) and USD 10 (dev) limits are
+application sponsored allocation ceilings, not Azure hard caps or verified price estimates.
 Bootstrap creates the owner-approved EUR 25/month resource-group budget with 50/80/100%
 notifications routed to the existing selected action group. `stage` and `enable` refuse to run
 without that budget and preserve its start date/recipients. Azure budgets alert; they do not

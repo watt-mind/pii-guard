@@ -1,0 +1,17 @@
+{
+  "dev": {
+    "documents": 100,
+    "person_spans": 911,
+    "standalone_surnames": 711,
+    "file_sha256": "cd404d4813e9ba2f947d0a5411e62cd8fa27b316babb7b5104b654c4a7d99a41"
+  },
+  "train": {
+    "documents": 1500,
+    "person_spans": 13513,
+    "standalone_surnames": 10513,
+    "file_sha256": "d19e33c17b1ac1f245bb920d3947d595893853305284b382f3fd9e5fb5c67b1e"
+  },
+  "kinds": {
+    "court-style-surnames": 1600
+  }
+}

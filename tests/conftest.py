@@ -20,8 +20,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # ~300 ms on a loaded machine, past the 200 ms default, which failed a full run once (LAB-1230).
 # The CI profiles are also derandomized: the same examples on every run, so a red CI run
 # reproduces locally with the same profile; a failure prints the reproduce blob. "ci" (pull
-# requests) runs 25 examples where a test sets no max_examples of its own; "ci-full" (develop,
-# main, nightly) runs Hypothesis's default 100 (LAB-1267).
+# requests, merge queue, develop) runs 25 examples where a test sets no max_examples of its own;
+# "ci-full" (main, nightly, manual) runs Hypothesis's default 100 (LAB-1267, LAB-1446).
 hypothesis_settings.register_profile("dev", deadline=None)
 hypothesis_settings.register_profile(
     "ci", deadline=None, derandomize=True, print_blob=True, max_examples=25
@@ -71,6 +71,7 @@ def local_test_client(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 NER_AUTODETECT = "ner_autodetect"
+UNTRACED = "untraced"
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -79,6 +80,37 @@ def pytest_configure(config: pytest.Config) -> None:
         f"{NER_AUTODETECT}: let build_mode_detectors add NER when the ner extra is installed "
         "(by default the suite pins the gateway base detectors to rules only)",
     )
+    config.addinivalue_line(
+        "markers",
+        f"{UNTRACED}: run the test body with coverage measurement stopped (LAB-1447); for "
+        "checks of committed data or a whole corpus whose code other tests measure",
+    )
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Iterator[None]:
+    """Stop every running coverage measurement around an ``untraced`` test body.
+
+    Under the branch tracer a pure-Python hot loop runs 7-16x slower. pytest-cov's own
+    ``no_cover`` is not enough: in an xdist worker a second, automatically started
+    ``Coverage`` keeps tracing, and with ``--no-cov`` it fails. Fixtures stay measured.
+    """
+    if item.get_closest_marker(UNTRACED) is None:
+        return (yield)
+    stopped = []
+    try:
+        import coverage
+    except ImportError:  # pragma: no cover - coverage is a dev dependency
+        pass
+    else:
+        while (cov := coverage.Coverage.current()) is not None and cov not in stopped:
+            cov.stop()
+            stopped.append(cov)
+    try:
+        return (yield)
+    finally:
+        for cov in reversed(stopped):
+            cov.start()
 
 
 @pytest.fixture(autouse=True)

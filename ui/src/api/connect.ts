@@ -7,6 +7,17 @@ import type { TrafficEvent } from "./traffic";
 
 export type ToolId = "muse-code" | "pi" | "codex" | "opencode" | "curl" | "python" | "claude-code";
 
+/** The client tools the quickstart has a block for, in tab order. */
+export const TOOLS: { id: ToolId; label: string }[] = [
+  { id: "muse-code", label: "Muse Code" },
+  { id: "pi", label: "pi" },
+  { id: "codex", label: "Codex" },
+  { id: "opencode", label: "OpenCode" },
+  { id: "curl", label: "cURL" },
+  { id: "python", label: "Python" },
+  { id: "claude-code", label: "Claude Code" },
+];
+
 export interface ToolSnippet {
   id: ToolId | string;
   label: string;
@@ -33,8 +44,10 @@ export interface UpstreamPreset {
 
 export interface Snippets {
   gateway_url: string;
-  session: string;
-  session_url: string;
+  /** Null for an endpoint's blocks (`?endpoint=`): the endpoint pins its URL and model. */
+  session: string | null;
+  session_url: string | null;
+  endpoint?: { id: string; name: string; model: string | null };
   models: string[];
   model: string | null;
   auth: { token_required: boolean; token_env: string };
@@ -51,7 +64,7 @@ export type SnippetsResult = { state: "ok"; snippets: Snippets } | { state: "mis
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 export function parseSnippets(raw: unknown): Snippets | null {
-  if (!isRecord(raw) || typeof raw.session_url !== "string" || !Array.isArray(raw.tools) || !isRecord(raw.upstream) || !Array.isArray(raw.presets)) return null;
+  if (!isRecord(raw) || !(typeof raw.session_url === "string" || (isRecord(raw.endpoint) && raw.session_url === null)) || !Array.isArray(raw.tools) || !isRecord(raw.upstream) || !Array.isArray(raw.presets)) return null;
   const tools = raw.tools.filter((t): t is ToolSnippet => isRecord(t) && typeof t.id === "string" && typeof t.code === "string" && typeof t.label === "string");
   return {
     ...(raw as unknown as Snippets),
@@ -61,14 +74,17 @@ export function parseSnippets(raw: unknown): Snippets | null {
   };
 }
 
+export interface SnippetsQuery { session: string; model?: string | null }
+
 export async function fetchSnippets(
-  query: { session: string; model?: string | null },
+  query: SnippetsQuery | { endpoint: string },
   doFetch: typeof fetch = (...a) => fetch(...a),
   baseUrl = "",
   signal?: AbortSignal,
 ): Promise<SnippetsResult> {
-  const params = new URLSearchParams({ session: query.session });
-  if (query.model) params.set("model", query.model);
+  // An endpoint pins its URL and model, so `endpoint` goes alone (hosted requires it).
+  const params = new URLSearchParams("endpoint" in query ? { endpoint: query.endpoint } : { session: query.session });
+  if (!("endpoint" in query) && query.model) params.set("model", query.model);
   let res: Response;
   try {
     res = await createProjectFetch(doFetch)(`${baseUrl.replace(/\/$/, "")}/v1/connect/snippets?${params}`, { headers: projectHeaders({ Accept: "application/json" }), signal });
@@ -87,9 +103,12 @@ export async function fetchSnippets(
   return snippets ? { state: "ok", snippets } : { state: "missing" };
 }
 
-export type SnippetsLoader = (query: { session: string; model?: string | null }, signal?: AbortSignal) => Promise<SnippetsResult>;
+export type SnippetsLoader = (query: SnippetsQuery, signal?: AbortSignal) => Promise<SnippetsResult>;
 
 export const loadSnippets: SnippetsLoader = (query, signal) => fetchSnippets(query, undefined, "", signal);
+
+/** One project endpoint's blocks, whatever session the quickstart asks for. */
+export const endpointSnippets = (endpoint: string): SnippetsLoader => (_query, signal) => fetchSnippets({ endpoint }, undefined, "", signal);
 
 /** A new vault session id for one tool's block: `c_` + 32 hex, as `pii-guard connect` makes. */
 export function newSessionId(random: (n: number) => Uint8Array = (n) => crypto.getRandomValues(new Uint8Array(n))): string {

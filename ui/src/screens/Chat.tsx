@@ -4,7 +4,7 @@ import { MaskedText } from "../components/MaskedText";
 import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
 import { NerHint } from "../components/NerHint";
-import { BlockedNotice, Button } from "../components/ui";
+import { BlockedNotice, Button, ConfirmAction, Input, SegmentedControl, Select, Textarea } from "../components/ui";
 import { CHAT_SAMPLES } from "../content/chatSamples";
 import { metaFor } from "../lib/entities";
 import { SESSION_SOURCE_LABEL } from "../lib/traffic";
@@ -56,7 +56,11 @@ interface Props {
   ner?: boolean | null;
   /** The server's upstream is the offline mock model, which echoes (LAB-1264). */
   mockUpstream?: boolean;
+  /** The detection modes the server offers (`/v1/status` `gateway.modes`); a hosted owner gets fast only. */
+  modes?: readonly ChatMode[];
 }
+
+const ALL_MODES: readonly ChatMode[] = ["fast", "audit"];
 
 const MODES: { id: ChatMode; label: string; hint: string }[] = [
   {
@@ -71,8 +75,10 @@ const MODES: { id: ChatMode; label: string; hint: string }[] = [
   },
 ];
 
-export function Chat({ client, live, draft, ner = null, mockUpstream = false }: Props) {
-  const [mode, setMode] = useState<ChatMode>("fast");
+export function Chat({ client, live, draft, ner = null, mockUpstream = false, modes = ALL_MODES }: Props) {
+  const [chosenMode, setMode] = useState<ChatMode>("fast");
+  // A mode the server stops offering (or never offered) is never sent.
+  const mode = modes.includes(chosenMode) ? chosenMode : (modes[0] ?? "fast");
   const [language, setLanguage] = useState<"hu" | "en">(CHAT_SAMPLES[0]!.language);
   const [model, setModel] = useState(FALLBACK_CHAT_MODEL);
   /** The last `/v1/models` answer, and which client it came from (null ids: it failed). */
@@ -134,6 +140,8 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
     setSessionSource(null);
     setHandedOver(false);
     activate(null);
+    // The confirmation unmounts with the conversation: keep the keyboard user in the composer.
+    requestAnimationFrame(() => document.getElementById("chat-input")?.focus({ preventScroll: true }));
   };
 
   // A different engine (demo vs live) can't continue the other's session.
@@ -147,8 +155,8 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
   const update = (id: number, patch: Partial<Turn>) =>
     setTurns((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
-  const send = async (override?: { text: string; language: "hu" | "en"; sessionId?: string | null }) => {
-    const message = (override?.text ?? text).trim();
+  const send = async (override?: { text: string; language: "hu" | "en"; sessionId?: string | null }, retry?: string) => {
+    const message = (override?.text ?? retry ?? text).trim();
     const lang = override?.language ?? language;
     const fresh = override !== undefined;
     if (!message || (busy && !fresh) || needsModel) return;
@@ -215,7 +223,11 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
     }
   };
 
-  const stop = () => abortRef.current?.abort();
+  // Stop swaps back to Send: keep the keyboard user in the composer.
+  const stop = () => {
+    abortRef.current?.abort();
+    requestAnimationFrame(() => document.getElementById("chat-input")?.focus({ preventScroll: true }));
+  };
 
   // A document handed over from the Mask screen starts a new conversation and is sent at once.
   const conversationRef = useRef<HTMLElement | null>(null);
@@ -232,36 +244,29 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="max-w-3xl">
-          <h1 className="text-2xl font-medium text-balance text-ink">
-            Chat through the gateway. The model only ever sees placeholders.
-          </h1>
-          <p className="mt-2 text-sm text-pretty text-muted sm:text-base">
-            Your message goes through the pii-guard gateway, a drop-in for any OpenAI-compatible API. It is masked on the way out and the
-            streamed answer is restored on the way back, with the same placeholder for the same person in every turn.
-          </p>
-        </div>
-      </div>
+      <p className="max-w-3xl text-sm text-pretty text-muted">
+        Your message goes through the PII Guard gateway, a drop-in for any OpenAI-compatible API. The model only ever sees placeholders: the message is masked on the way
+        out and the streamed answer is restored on the way back, with the same placeholder for the same person in every turn.
+      </p>
 
       <>
           {client.kind === "mock" && (
-            <p role="note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+            <p role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
               <strong className="font-medium text-warn">Simulated model.</strong> The demo engine masks in your browser and a scripted
               reply stands in for the LLM.{" "}
               {live ? "Switch the engine to Auto or Live API to chat with the real model." : "Start the API with an upstream model to chat for real."}
             </p>
           )}
           {client.kind === "api" && ner === false && (
-            <p role="note" data-testid="rules-only-note" className="rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
-              <strong className="font-medium text-warn">Names are not detected.</strong> This server runs fast mode with the rules only, so e-mail addresses, phone numbers,
+            <p role="note" data-testid="rules-only-note" className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
+              <strong className="font-medium text-warn">Names are not detected.</strong> This server runs fast mode with the rules only, so email addresses, phone numbers,
               IBANs and IDs are masked but free-text names reach the model as written. Names need <NerHint />.
             </p>
           )}
           {client.kind === "api" && mockUpstream && (
-            <p role="note" className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+            <p role="note" className="rounded-lg border border-line bg-surface px-4 py-3 text-sm text-ink">
               <strong className="font-medium">Mock upstream.</strong> The server's model is the offline mock: it answers by echoing the masked text it received, whatever model
-              is named. Start pii-guard with <code className="font-mono text-xs">--upstream-url</code> for a real one.
+              is named. Start PII Guard with <code className="font-mono text-xs">--upstream-url</code> for a real one.
             </p>
           )}
 
@@ -286,7 +291,15 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
               </div>
             )}
             {turns.map((t, i) => (
-              <TurnView key={t.id} turn={t} first={i === 0} simulated={client.kind === "mock"} activeKey={activeKey} onActivate={activate} />
+              <TurnView
+                key={t.id}
+                turn={t}
+                first={i === 0}
+                simulated={client.kind === "mock"}
+                activeKey={activeKey}
+                onActivate={activate}
+                onRetry={t.status === "error" && i === turns.length - 1 && !busy && !needsModel ? () => void send(undefined, t.user) : undefined}
+              />
             ))}
           </section>
 
@@ -297,6 +310,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false }: 
             onStop={stop}
             busy={busy}
             mode={mode}
+            modes={modes}
             onMode={setMode}
             language={language}
             onLanguage={setLanguage}
@@ -350,12 +364,14 @@ function TurnView({
   simulated,
   activeKey,
   onActivate,
+  onRetry,
 }: {
   turn: Turn;
   first: boolean;
   simulated: boolean;
   activeKey: string | null;
   onActivate: (key: string | null, el?: HTMLElement | null) => void;
+  onRetry?: () => void;
 }) {
   const userSegments = segmentsFor(turn.maskedUser, turn.user);
   const maskedValues = userSegments.filter((s) => s.kind === "restored").length;
@@ -405,7 +421,7 @@ function TurnView({
       {/* Row 2: what you got back | what the model said */}
       {turn.status === "error" && turn.error ? (
         <div className="lg:col-span-2">
-          <BlockedNotice error={turn.error} />
+          <BlockedNotice error={turn.error} onRetry={onRetry} />
           {(turn.error.code === "detection_unavailable" ||
             (turn.error.code === "detection_failed" && turn.mode === "audit")) && (
             <p className="mt-2 text-sm text-muted">
@@ -513,6 +529,7 @@ interface ComposerProps {
   onStop: () => void;
   busy: boolean;
   mode: ChatMode;
+  modes: readonly ChatMode[];
   onMode: (m: ChatMode) => void;
   language: "hu" | "en";
   onLanguage: (l: "hu" | "en") => void;
@@ -528,7 +545,7 @@ interface ComposerProps {
   handedOver: boolean;
 }
 
-function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, onLanguage, model, onModel, models, needsModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
+function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, language, onLanguage, model, onModel, models, needsModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
   const chatIds = models.ids.filter(isChatModel);
   const options = model && !chatIds.includes(model) ? [model, ...chatIds] : chatIds;
   const modeHint = mock
@@ -536,26 +553,27 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
     : MODES.find((m) => m.id === mode)!.hint;
   return (
     <section aria-label="New message" className="space-y-3 rounded-xl border border-line bg-surface p-4 sm:p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted">Fictional samples</span>
+      <div role="group" aria-labelledby="chat-samples-label" className="flex flex-wrap items-center gap-2">
+        <span id="chat-samples-label" className="text-xs font-medium text-muted">
+          Fictional samples
+        </span>
         {CHAT_SAMPLES.map((s) => (
-          <button
+          <Button
             key={s.id}
-            type="button"
+            size="sm"
             onClick={() => {
               onText(s.text);
               onLanguage(s.language);
             }}
-            className="rounded-full border border-line px-3 py-1 text-xs font-medium text-ink hover:border-line-strong"
           >
             {s.label}
-          </button>
+          </Button>
         ))}
       </div>
       <label htmlFor="chat-input" className="sr-only">
         Message
       </label>
-      <textarea
+      <Textarea
         id="chat-input"
         value={text}
         onChange={(e) => onText(e.target.value)}
@@ -568,71 +586,63 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
         rows={4}
         spellCheck={false}
         placeholder="Write a message with some (fictional) personal data in it…"
-        className="doc block w-full resize-y rounded-lg border border-field bg-surface-2 p-3 text-ink placeholder:text-faint focus:border-ink"
+        className="doc block"
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <div role="radiogroup" aria-label="Detection mode" className="flex rounded-lg border border-line bg-surface-2 p-0.5 text-sm">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={mode === m.id}
-              title={m.hint}
-              onClick={() => onMode(m.id)}
-              className={["rounded-md px-3 py-1.5 font-medium", mode === m.id ? "bg-primary text-on-primary" : "text-muted hover:text-ink"].join(" ")}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Detection mode"
+          name="chat-mode"
+          value={mode}
+          onChange={onMode}
+          options={MODES.filter((m) => modes.includes(m.id)).map((m) => ({ value: m.id, label: m.label, title: m.hint }))}
+        />
         <label className="flex items-center gap-2 text-sm text-muted">
           Language
-          <select
-            value={language}
-            onChange={(e) => onLanguage(e.target.value as "hu" | "en")}
-            className="h-9 rounded-lg border border-field bg-surface px-2 text-sm text-ink"
-          >
-            <option value="hu">Hungarian</option>
-            <option value="en">English</option>
-          </select>
+          <span className="w-32">
+            <Select value={language} onChange={(e) => onLanguage(e.target.value as "hu" | "en")}>
+              <option value="hu">Hungarian</option>
+              <option value="en">English</option>
+            </Select>
+          </span>
         </label>
         {!mock && !mockUpstream && (
           <label className="flex min-w-0 items-center gap-2 text-sm text-muted">
             Model
-            {models.status === "ok" && options.length > 0 ? (
-              <select
-                id="chat-model"
-                aria-label="Model"
-                value={model}
-                onChange={(e) => onModel(e.target.value)}
-                className="h-9 min-w-0 max-w-[16rem] rounded-lg border border-field bg-surface px-2 font-mono text-xs text-ink"
-              >
-                {options.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                id="chat-model"
-                aria-label="Model"
-                value={model}
-                onChange={(e) => onModel(e.target.value)}
-                disabled={models.status === "loading"}
-                placeholder={models.status === "loading" ? "Loading models…" : "upstream model id"}
-                spellCheck={false}
-                className="h-9 w-56 min-w-0 rounded-lg border border-field bg-surface px-2 font-mono text-xs text-ink placeholder:text-faint"
-              />
-            )}
+            <span className="w-56 min-w-0 max-w-full">
+              {models.status === "ok" && options.length > 0 ? (
+                <Select id="chat-model" aria-label="Model" value={model} onChange={(e) => onModel(e.target.value)} className="font-mono">
+                  {options.map((id) => (
+                    <option key={id} value={id}>
+                      {id}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  id="chat-model"
+                  aria-label="Model"
+                  value={model}
+                  onChange={(e) => onModel(e.target.value)}
+                  disabled={models.status === "loading"}
+                  placeholder={models.status === "loading" ? "Loading models…" : "upstream model id"}
+                  spellCheck={false}
+                  className="font-mono"
+                />
+              )}
+            </span>
           </label>
         )}
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {onReset && (
-            <Button variant="ghost" onClick={onReset} disabled={busy}>
-              New conversation
-            </Button>
+            <ConfirmAction
+              trigger="New conversation"
+              triggerVariant="ghost"
+              title="Start a new conversation?"
+              body="This conversation and its placeholders are cleared from the screen. The next message starts a new session."
+              confirm="Clear and start over"
+              disabled={busy}
+              onConfirm={onReset}
+            />
           )}
           {busy ? (
             <Button variant="secondary" onClick={onStop}>
@@ -640,7 +650,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, onMode, language, 
             </Button>
           ) : (
             <Button variant="primary" onClick={onSend} disabled={text.trim() === "" || needsModel} title={needsModel ? "Choose a model first" : undefined}>
-              Send through pii-guard <span aria-hidden="true">→</span>
+              Send through PII Guard <span aria-hidden="true">→</span>
             </Button>
           )}
         </div>
