@@ -1,0 +1,340 @@
+{
+  "ticket": "LAB-1471",
+  "model": "muse-spark-1.3",
+  "base_url": "https://api.meta.ai/v1",
+  "via_gateway": true,
+  "reps": 2,
+  "note": "Note from the user's privacy gateway: personal data in this conversation was replaced by placeholders of the form [[TYPE_id]]. A placeholder is an opaque reference token, not real data; its TYPE is only a label, even when it names an ID number or a bank account. Copy, repeat, write and edit placeholders exactly as written wherever the task needs the value: in replies, files, commands and tool arguments. The gateway turns them back into the real values after your answer, outside this conversation. Never refuse, leave out or alter a placeholder because of its label.",
+  "summary": {
+    "gateway-off": {
+      "ok": 8,
+      "other": 2
+    },
+    "gateway-note": {
+      "ok": 8,
+      "other": 2
+    }
+  },
+  "records": [
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "pi-add-taj",
+      "condition": "gateway-off",
+      "verdict": "ok",
+      "why": "['edit']",
+      "ms": 3238,
+      "content": "Adding [[PERSON_3a9f21]]'s TAJ to contacts.json.",
+      "tool_calls": [
+        {
+          "name": "edit",
+          "arguments": "{\"newText\":\"    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\",\\n    \\\"taj\\\": \\\"[[NATIONAL_ID_HU_TAJ_5a63fe]]\\\"\",\"oldText\":\"    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\"\",\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "pi-add-taj",
+      "condition": "gateway-note",
+      "verdict": "ok",
+      "why": "['edit']",
+      "ms": 2003,
+      "content": "Adding the Hungarian TAJ number to your contacts.",
+      "tool_calls": [
+        {
+          "name": "edit",
+          "arguments": "{\"newText\":\"  {\\n    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\",\\n    \\\"taj\\\": \\\"[[NATIONAL_ID_HU_TAJ_5a63fe]]\\\"\\n  },\",\"oldText\":\"  {\\n    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\"\\n  },\",\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "pi-create-contacts",
+      "condition": "gateway-off",
+      "verdict": "ok",
+      "why": "['write']",
+      "ms": 3217,
+      "content": "Your German contact is next — building your full contacts file.",
+      "tool_calls": [
+        {
+          "name": "write",
+          "arguments": "{\"content\":\"[\\n  {\\n    \\\"customer\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\",\\n    \\\"iban\\\": \\\"[[BANK_ACCOUNT_7e2d90]]\\\",\\n    \\\"adoazonosito_jel\\\": \\\"[[NATIONAL_ID_HU_TAX_c1f5a8]]\\\",\\n    \\\"taj_szam\\\": \\\"[[NATIONAL_ID_HU_TAJ_5a63fe]]\\\"\\n  },\\n  {\\n    \\\"customer\\\": \\\"[[PERSON_9d04be]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_2f8e61]]\\\",\\n    \\\"iban\\\": \\\"[[BANK_ACCOUNT_e07a3c]]\\\",\\n    \\\"steuer_id\\\": \\\"[[ID_DOCUMENT_44b9d2]]\\\"\\n  }\\n]\\n\",\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "pi-create-contacts",
+      "condition": "gateway-note",
+      "verdict": "ok",
+      "why": "['write']",
+      "ms": 2028,
+      "content": "German customer spotted — building your contacts file now.",
+      "tool_calls": [
+        {
+          "name": "write",
+          "arguments": "{\"content\":\"[\\n  {\\n    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\",\\n    \\\"iban\\\": \\\"[[BANK_ACCOUNT_7e2d90]]\\\",\\n    \\\"adoazonosito_jel\\\": \\\"[[NATIONAL_ID_HU_TAX_c1f5a8]]\\\",\\n    \\\"taj_szam\\\": \\\"[[NATIONAL_ID_HU_TAJ_5a63fe]]\\\"\\n  },\\n  {\\n    \\\"name\\\": \\\"[[PERSON_9d04be]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_2f8e61]]\\\",\\n    \\\"iban\\\": \\\"[[BANK_ACCOUNT_e07a3c]]\\\",\\n    \\\"steuer_id\\\": \\\"[[ID_DOCUMENT_44b9d2]]\\\"\\n  }\\n]\\n\",\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "pi-edit-verified",
+      "condition": "gateway-off",
+      "verdict": "other",
+      "why": "tool calls ['read']",
+      "ms": 803,
+      "content": "Adding the verified flag after the first email.",
+      "tool_calls": [
+        {
+          "name": "read",
+          "arguments": "{\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "pi-edit-verified",
+      "condition": "gateway-note",
+      "verdict": "other",
+      "why": "tool calls ['read']",
+      "ms": 745,
+      "content": "Adding the verified flag after the first e-mail.",
+      "tool_calls": [
+        {
+          "name": "read",
+          "arguments": "{\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "oc-cat",
+      "condition": "gateway-off",
+      "verdict": "ok",
+      "why": "['bash']",
+      "ms": 7102,
+      "content": "Created contacts.json — catting it and pulling the German customer's e-mail.",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": "{\"command\":\"cat contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "oc-cat",
+      "condition": "gateway-note",
+      "verdict": "ok",
+      "why": "['bash']",
+      "ms": 790,
+      "content": "Building your contacts file — then pulling the German customer's email.",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": "{\"command\":\"cat contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "oc-repeat-email",
+      "condition": "gateway-off",
+      "verdict": "ok",
+      "why": "reply has the placeholder",
+      "ms": 2512,
+      "content": "German customer's e-mail: [[EMAIL_2f8e61]]\n",
+      "tool_calls": []
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 0,
+      "scenario": "oc-repeat-email",
+      "condition": "gateway-note",
+      "verdict": "ok",
+      "why": "reply has the placeholder",
+      "ms": 2101,
+      "content": "Created `contacts.json` and catted it above.\n\nGerman customer's e-mail: [[EMAIL_2f8e61]]\n",
+      "tool_calls": []
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "pi-add-taj",
+      "condition": "gateway-off",
+      "verdict": "ok",
+      "why": "['edit']",
+      "ms": 15171,
+      "content": "Adding the Hungarian customer's TAJ to contacts.json.",
+      "tool_calls": [
+        {
+          "name": "edit",
+          "arguments": "{\"newText\":\"    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\",\\n    \\\"taj\\\": \\\"[[NATIONAL_ID_HU_TAJ_5a63fe]]\\\"\",\"oldText\":\"    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\"\",\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "pi-add-taj",
+      "condition": "gateway-note",
+      "verdict": "ok",
+      "why": "['edit']",
+      "ms": 2205,
+      "content": "Adding the TAJ to contacts.json.",
+      "tool_calls": [
+        {
+          "name": "edit",
+          "arguments": "{\"newText\":\"  {\\n    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\",\\n    \\\"taj\\\": \\\"[[NATIONAL_ID_HU_TAJ_5a63fe]]\\\"\\n  },\",\"oldText\":\"  {\\n    \\\"name\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\"\\n  },\",\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "pi-create-contacts",
+      "condition": "gateway-off",
+      "verdict": "ok",
+      "why": "['write']",
+      "ms": 2979,
+      "content": "Your German customer is second — I'll build contacts.json with everything and fetch the e-mail.",
+      "tool_calls": [
+        {
+          "name": "write",
+          "arguments": "{\"content\":\"[\\n  {\\n    \\\"customer\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\",\\n    \\\"iban\\\": \\\"[[BANK_ACCOUNT_7e2d90]]\\\",\\n    \\\"adoazonosito_jel\\\": \\\"[[NATIONAL_ID_HU_TAX_c1f5a8]]\\\",\\n    \\\"taj_szam\\\": \\\"[[NATIONAL_ID_HU_TAJ_5a63fe]]\\\"\\n  },\\n  {\\n    \\\"customer\\\": \\\"[[PERSON_9d04be]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_2f8e61]]\\\",\\n    \\\"iban\\\": \\\"[[BANK_ACCOUNT_e07a3c]]\\\",\\n    \\\"steuer_id\\\": \\\"[[ID_DOCUMENT_44b9d2]]\\\"\\n  }\\n]\\n\",\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "pi-create-contacts",
+      "condition": "gateway-note",
+      "verdict": "ok",
+      "why": "['write']",
+      "ms": 2665,
+      "content": "German customer spotted — building your contacts file.",
+      "tool_calls": [
+        {
+          "name": "write",
+          "arguments": "{\"content\":\"[\\n  {\\n    \\\"customer\\\": \\\"[[PERSON_3a9f21]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_b41c07]]\\\",\\n    \\\"iban\\\": \\\"[[BANK_ACCOUNT_7e2d90]]\\\",\\n    \\\"adoazonosito_jel\\\": \\\"[[NATIONAL_ID_HU_TAX_c1f5a8]]\\\",\\n    \\\"taj_szam\\\": \\\"[[NATIONAL_ID_HU_TAJ_5a63fe]]\\\"\\n  },\\n  {\\n    \\\"customer\\\": \\\"[[PERSON_9d04be]]\\\",\\n    \\\"email\\\": \\\"[[EMAIL_2f8e61]]\\\",\\n    \\\"iban\\\": \\\"[[BANK_ACCOUNT_e07a3c]]\\\",\\n    \\\"steuer_id\\\": \\\"[[ID_DOCUMENT_44b9d2]]\\\"\\n  }\\n]\\n\",\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "pi-edit-verified",
+      "condition": "gateway-off",
+      "verdict": "other",
+      "why": "tool calls ['read']",
+      "ms": 948,
+      "content": "Inserting the verified flag after the first email.",
+      "tool_calls": [
+        {
+          "name": "read",
+          "arguments": "{\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "pi-edit-verified",
+      "condition": "gateway-note",
+      "verdict": "other",
+      "why": "tool calls ['read']",
+      "ms": 1360,
+      "content": "Adding the verified flag after the first e-mail.",
+      "tool_calls": [
+        {
+          "name": "read",
+          "arguments": "{\"path\":\"contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "oc-cat",
+      "condition": "gateway-off",
+      "verdict": "ok",
+      "why": "['bash']",
+      "ms": 1927,
+      "content": "German customer spotted — I'll cat the new file and pull their e-mail.",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": "{\"command\":\"cat contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "oc-cat",
+      "condition": "gateway-note",
+      "verdict": "ok",
+      "why": "['bash']",
+      "ms": 1234,
+      "content": "German entry spotted — catting your contacts file to confirm.",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": "{\"command\":\"cat contacts.json\"}"
+        }
+      ]
+    },
+    {
+      "note_added": false,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "oc-repeat-email",
+      "condition": "gateway-off",
+      "verdict": "ok",
+      "why": "reply has the placeholder",
+      "ms": 4939,
+      "content": "Created `contacts.json` and catted it.\n\nGerman customer's e-mail: [[EMAIL_2f8e61]]",
+      "tool_calls": []
+    },
+    {
+      "note_added": true,
+      "values_upstream": 0,
+      "rep": 1,
+      "scenario": "oc-repeat-email",
+      "condition": "gateway-note",
+      "verdict": "ok",
+      "why": "reply has the placeholder",
+      "ms": 1103,
+      "content": "Created `contacts.json` with all fields and catted it.\n\nGerman customer's e-mail: [[EMAIL_2f8e61]]\n",
+      "tool_calls": []
+    }
+  ]
+}

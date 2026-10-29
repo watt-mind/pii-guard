@@ -30,6 +30,7 @@ from gateway_helpers import (
     full_conversation,
     leaked_values,
     make_app,
+    without_note,
 )
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -189,7 +190,7 @@ def test_tool_call_arguments_restored_as_valid_json() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         upstream.requests.append(request)
-        body = json.loads(request.content)
+        body = without_note(json.loads(request.content))
         placeholder = PLACEHOLDER_RE.search(body["messages"][0]["content"]).group(0)
         args = json.dumps({"name": placeholder, "note": f"to {placeholder}"})
         calls = [{"id": "c1", "type": "function", "function": {"name": "f", "arguments": args}}]

@@ -176,7 +176,8 @@ def run(
             json.dumps(forwarded[0], ensure_ascii=False, indent=1), encoding="utf-8"
         )
         index = 0
-        for part in forwarded[0]["messages"][0]["content"]:
+        user = next(m for m in forwarded[0]["messages"] if m["role"] == "user")
+        for part in user["content"]:
             if part.get("type") == "image_url":
                 index += 1
                 png = base64.b64decode(part["image_url"]["url"].split(",", 1)[1])

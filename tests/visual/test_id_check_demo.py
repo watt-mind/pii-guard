@@ -60,7 +60,7 @@ def test_demo_answers_every_party_and_forwards_no_raw_value(tmp_path: Path) -> N
                 assert values[key] not in forwarded, key
     assert (tmp_path / "masked-1.png").is_file()
     body = json.loads(forwarded)
-    parts = body["messages"][0]["content"]
+    parts = next(m["content"] for m in body["messages"] if m["role"] == "user")
     assert sum(p["type"] == "image_url" for p in parts) == len(demo.images)
     assert sum("Document summary:" in p.get("text", "") for p in parts) == len(demo.images)
 

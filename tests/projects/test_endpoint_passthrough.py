@@ -63,7 +63,10 @@ def gateway(tmp_path: Path):
                 "choices": [
                     {
                         "index": 0,
-                        "message": {"role": "assistant", "content": body["messages"][0]["content"]},
+                        "message": {
+                            "role": "assistant",
+                            "content": body["messages"][-1]["content"],
+                        },
                     }
                 ],
             },

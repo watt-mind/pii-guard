@@ -99,7 +99,7 @@ def echo(request: httpx.Request) -> httpx.Response:
             "choices": [
                 {
                     "index": 0,
-                    "message": {"role": "assistant", "content": body["messages"][0]["content"]},
+                    "message": {"role": "assistant", "content": body["messages"][-1]["content"]},
                 }
             ],
         },

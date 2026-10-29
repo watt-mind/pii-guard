@@ -1271,6 +1271,12 @@ class VaultSession:
         """How many placeholders this session has issued (casing and layout variants too)."""
         return len(self._by_placeholder)
 
+    def issued_any(self, text: str) -> bool:
+        """Whether ``text`` holds a placeholder this session issued (and so can restore)."""
+        with self._lock:
+            self._check_alive()
+            return any(m.group(0) in self._by_placeholder for m in PLACEHOLDER_RE.finditer(text))
+
     def entities(self) -> list[tuple[str, EntityType, int]]:
         """``(placeholder, entity_type, count)`` for every placeholder this session issued."""
         with self._lock:

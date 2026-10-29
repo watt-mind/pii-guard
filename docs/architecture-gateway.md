@@ -93,8 +93,9 @@ for chunk in stream:
 | `X-PII-Guard-Session-Source` | response | Which step chose the session: `header`, `path`, `prompt_cache_key` or `default`. Also in the traffic record (`session_source`). |
 | `X-PII-Guard-Mode` | both | Request: `fast` (rules + NER, no model call; the default) or `audit` (+ the LLM detector). The response carries the mode that ran. |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
-| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). |
+| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]`. Masked text only; for UIs that show the boundary (the demo's Chat screen). `placeholder_note` says whether the [placeholder note](#placeholder-note) was added. |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
+| `X-PII-Guard-Placeholder-Note` | response | `added` when the [placeholder note](#placeholder-note) went upstream with the request. |
 | `X-PII-Guard-Request-Id` | response | The call's id in the traffic log; with `PII_GUARD_SERVER_TIMING=true` a `Server-Timing` header gives the per-stage latency ([operations.md](operations.md#timing)). |
 
 ## Sessions
@@ -142,6 +143,23 @@ session then waits under the prefix, and the first main key with that prefix and
 takes it over instead of starting a second one (LAB-1341). The path URL that `connect` writes
 needs none of this.
 
+## Placeholder note
+
+When the masked request holds at least one placeholder this session issued, the gateway puts
+one constant system note in front of the conversation (Chat Completions: a first `system`
+message; Responses: the start of `instructions`). It says placeholders are opaque reference
+tokens, not real data, to be copied exactly as written, and that they are restored after the
+answer. Without it, `muse-spark-1.3` declined 5 of 15 synthetic agent turns over the label
+inside a placeholder (`[[NATIONAL_ID_HU_TAJ_…]]`: "a sensitive health-insurance identifier");
+with it, 0 of 15 ([LAB-1471](../eval/results/2026-10-29-lab-1471-placeholder-refusals/README.md)).
+
+The note is the same text for every request: no value, no placeholder, nothing from the
+request. It is added after masking and isn't scanned, it holds no placeholder-shaped token,
+and the echo (`X-PII-Guard-Echo: masked`) reports it as `placeholder_note: true` next to the
+client's masked messages rather than as one of them. Placeholders keep their type label
+([ADR 0007](decisions/0007-keyed-pseudonyms.md#addendum-2026-10-29-the-placeholder-note-lab-1471)).
+`PII_GUARD_GATEWAY_PLACEHOLDER_NOTE=false` turns it off.
+
 ## Failing closed
 
 A detection error or timeout (`PII_GUARD_GATEWAY_DETECTION_TIMEOUT`, 30 s), a request field
@@ -150,5 +168,5 @@ tenant key or upstream return an error and nothing is forwarded. Inline images a
 SAM 3.1 and OCR, and refused when those aren't available. The full field table is in
 [contracts.md](contracts.md). Further
 settings (`PII_GUARD_GATEWAY_MODE`, `_UPSTREAM_TIMEOUT`, `_CACHE_SIZE`, `_CONCURRENCY`,
-`_KEEP_TYPES`) are documented in `src/pii_guard/gateway/config.py`. Without
+`_KEEP_TYPES`, `_PLACEHOLDER_NOTE`) are documented in `src/pii_guard/gateway/config.py`. Without
 `PII_GUARD_UPSTREAM_API_KEY`, the client's own `Authorization` header is forwarded.
