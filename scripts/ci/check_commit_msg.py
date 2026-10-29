@@ -31,7 +31,7 @@ def main(argv: list[str]) -> int:
     if valid_subject(subject):
         return 0
     print(
-        "commit subject must be 'type(scope): summary (LAB-XX)' "
+        "commit subject must be 'type(scope): summary', plus '(LAB-XX)' where one applies, "
         f"(types: {_TYPES.replace('|', ', ')}); got: {subject!r}",
         file=sys.stderr,
     )
