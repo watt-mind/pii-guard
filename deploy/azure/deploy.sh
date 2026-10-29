@@ -240,7 +240,10 @@ if r.returncode:
     if re.search(r'^ERROR:\s+\((ResourceNotFound|ContainerAppNotFound)\)', r.stderr, re.M):
         print('false'); raise SystemExit(0)
     raise SystemExit('Current app ingress is unreadable; release refused')
-value = json.loads(r.stdout) if r.stdout.strip() else None
+try:
+    value = json.loads(r.stdout) if r.stdout.strip() else None
+except ValueError:
+    raise SystemExit('Current app ingress is invalid; release refused') from None
 if value not in (True, False, None):
     raise SystemExit('Current app ingress is invalid; release refused')
 print('true' if value is True else 'false')
