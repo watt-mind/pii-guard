@@ -79,3 +79,21 @@ it("replaces endpoint failure with pending feedback while retrying", async () =>
   await act(async () => { finish({ projects: [] }); });
   expect(await screen.findByTestId("client-setup-preview")).toBeInTheDocument();
 });
+
+it("does not flash the loading text over earlier progress, but shows it after a delay", async () => {
+  vi.useFakeTimers();
+  try {
+    publish({ provider: true, policy: true, endpoint: true, key: true, call: true });
+    const call = vi.fn(() => new Promise(() => {})) as unknown as Requester;
+    render(<SetupChecklist call={call} account={account} active calls={0} />);
+    expect(screen.queryByText(/Checking setup progress/)).not.toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(350); });
+    expect(screen.getByRole("status")).toHaveTextContent("Checking setup progress");
+  } finally { vi.useRealTimers(); }
+});
+
+it("shows the loading text at once when there is no earlier progress", () => {
+  const call = vi.fn(() => new Promise(() => {})) as unknown as Requester;
+  render(<SetupChecklist call={call} account={account} active calls={0} />);
+  expect(screen.getByRole("status")).toHaveTextContent("Checking setup progress");
+});

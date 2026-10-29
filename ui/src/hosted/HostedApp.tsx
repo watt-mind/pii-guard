@@ -185,6 +185,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     document.getElementById("demo-heading")?.focus({ preventScroll: true });
     if (signedIn) {
       if (!editable) { setEditable(true); reset(); }
+      else if (result) { focusEditor.current = true; setResult(null); setAnnounce("Your draft is ready to edit."); }
     }
     else void run();
   }
@@ -517,7 +518,9 @@ function SectionMenu({ current }: { current: string | null }) {
         // Let native hash navigation finish before moving keyboard focus.
         const link = e.currentTarget;
         requestAnimationFrame(() => {
-          if (document.activeElement === link) document.querySelector<HTMLElement>(`${item.href} h2`)?.focus({ preventScroll: true });
+          // Safari doesn't focus links on click, so focus may sit on the body.
+          const at = document.activeElement;
+          if (at === link || at === document.body || at === null) document.querySelector<HTMLElement>(`${item.href} h2`)?.focus({ preventScroll: true });
         });
       }} className="flex min-h-11 items-center rounded-md px-3 text-ink hover:bg-surface-2 aria-[current]:font-medium aria-[current]:text-guard">{item.label}</a></li>)}
       <li><a href={SELF_HOST} onClick={() => ref.current?.removeAttribute("open")} className="flex min-h-11 items-center rounded-md px-3 text-ink hover:bg-surface-2">Self-host ↗</a></li>

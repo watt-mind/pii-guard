@@ -47,7 +47,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
     focusDestination.current = false;
     const main = document.getElementById("main");
     main?.focus({ preventScroll: true });
-    main?.scrollIntoView({ block: "start", behavior: "instant" });
+    main?.scrollIntoView({ block: "start", behavior: "auto" });
   }, [open, routeKey]);
 
   // So does another menu opening (the profile or project menu: useMenu announces it).
