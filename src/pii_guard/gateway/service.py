@@ -991,6 +991,9 @@ class Gateway:
         if response.status_code >= 400:
             try:
                 raw = await _read_limited(response)
+            except httpx.HTTPError as exc:
+                stats.log("upstream_unreachable")
+                raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
             finally:
                 await response.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
