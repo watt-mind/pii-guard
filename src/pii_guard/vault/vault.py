@@ -102,6 +102,26 @@ DEFAULT_MAX_RESTORED_CHARS = 1_000_000
 #: e-mail addresses, which are case-insensitive by their own rules.
 CASE_SENSITIVE_TYPES: frozenset[EntityType] = frozenset({EntityType.SECRET})
 
+#: Number-like identifier types a detector can confuse with each other: the same digits read
+#: as a Steuer-ID (``ID_DOCUMENT``) in a Markdown list and as an adóazonosító jel
+#: (``NATIONAL_ID_HU_TAX``) in a JSON ``tax_id`` field. A value one of them already holds
+#: keeps that placeholder when another type finds it again, so one value is one placeholder
+#: per session (LAB-1475: two placeholders for one value sent agents into a "fix the copy"
+#: loop). Names, addresses and e-mails keep their own keys.
+IDENTIFIER_TYPES: frozenset[EntityType] = frozenset(
+    {
+        EntityType.PHONE,
+        EntityType.DATE_OF_BIRTH,
+        EntityType.NATIONAL_ID_HU_TAX,
+        EntityType.NATIONAL_ID_HU_TAJ,
+        EntityType.ID_DOCUMENT,
+        EntityType.BANK_ACCOUNT,
+        EntityType.COMPANY_ID_HU,
+        EntityType.PARCEL_NUMBER_HU,
+        EntityType.VEHICLE_PLATE,
+    }
+)
+
 #: Learned detectors whose values the sweep checks against the text's structure first
 #: (:func:`pii_guard.detect.ner_context.sweep_vetoed`, LAB-1470).
 MODEL_DETECTORS: frozenset[str] = frozenset({"ner", "ner_gliner"})
@@ -544,6 +564,8 @@ class VaultSession:
         self._lock = threading.RLock()
         self._by_key: dict[tuple[EntityType, str], _Entry] = {}
         self._by_placeholder: dict[str, _Entry] = {}
+        # Normalized value -> the first entry of an :data:`IDENTIFIER_TYPES` type holding it.
+        self._identifiers: dict[str, _Entry] = {}
         # Placeholder-shaped tokens seen in input that this session did not issue. They are
         # never issued later, so a token the caller wrote can't turn into a masked value.
         self._reserved: set[str] = set()
@@ -592,6 +614,7 @@ class VaultSession:
             self._closed = True
             self._by_key.clear()
             self._by_placeholder.clear()
+            self._identifiers.clear()
             self._reserved.clear()
             self._known.clear()
             self._folds.clear()
@@ -642,6 +665,7 @@ class VaultSession:
             memo: dict[int, Any] = {}
             fork._by_key = copy.deepcopy(self._by_key, memo)
             fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
+            fork._identifiers = copy.deepcopy(self._identifiers, memo)
             fork._reserved = set(self._reserved)
             fork._generation = self._generation
             fork._masked = None  # its journal is replayed in full anyway
@@ -1168,6 +1192,8 @@ class VaultSession:
         normalized = _value_key(entity_type, value)
         key = (entity_type, normalized)
         entry = self._by_key.get(key)
+        if entry is None and entity_type in IDENTIFIER_TYPES:
+            entry = self._identifiers.get(normalized)
         if entry is not None:
             if entry.model_only and detector not in MODEL_DETECTORS | NEUTRAL_DETECTORS:
                 entry.model_only = False
@@ -1179,6 +1205,8 @@ class VaultSession:
         entry.order = len(self._by_key)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
+        if entity_type in IDENTIFIER_TYPES:
+            self._identifiers.setdefault(normalized, entry)
         self._touch(entry)
         return entry
 
