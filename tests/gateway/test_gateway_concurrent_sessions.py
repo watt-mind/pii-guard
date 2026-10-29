@@ -317,3 +317,46 @@ def test_stream_keeps_pin_until_iterator_cleanup(endpoint: str, close_early: boo
             await gw.aclose()
 
     asyncio.run(main())
+
+
+@pytest.mark.parametrize("endpoint", ["chat", "responses"])
+def test_stream_lease_released_when_client_leaves_before_the_body(endpoint: str) -> None:
+    """Starlette never starts the body iterator when the client is gone at
+    ``http.response.start``; the lease must still be released (LAB-1573)."""
+    gw = _gateway(FakeLlm())
+    gw.vault = Vault(bytes.fromhex(TEST_TENANT_KEY), max_sessions=1)
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, content=b"data: [DONE]\n\n"
+        )
+
+    gw._transport = httpx.MockTransport(upstream)
+
+    async def main() -> None:
+        body = _body(endpoint, SERVE, None)
+        body["stream"] = True
+        try:
+            if endpoint == "chat":
+                response, _ = await gw.chat_completions(body, BEARER, path_session="active")
+            else:
+                response, _ = await ResponsesGateway(gw).responses(
+                    body, BEARER, path_session="active"
+                )
+            assert gw.vault._leases
+
+            async def receive() -> dict[str, Any]:
+                return {"type": "http.disconnect"}
+
+            async def send(message: dict[str, Any]) -> None:
+                raise OSError("client went away")  # at http.response.start
+
+            scope = {"type": "http", "asgi": {"spec_version": "2.4"}, "method": "POST"}
+            with pytest.raises(Exception):  # noqa: B017 - Starlette's own disconnect error
+                await response(scope, receive, send)
+            assert not gw.vault._leases
+            gw.vault.session()  # capacity is available again
+        finally:
+            await gw.aclose()
+
+    asyncio.run(main())

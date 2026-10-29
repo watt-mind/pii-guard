@@ -45,6 +45,7 @@ import time
 import weakref
 from collections import Counter, OrderedDict
 from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
+from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -301,6 +302,29 @@ class _SessionHold:
     refused_creator: bool = False
 
 
+_LEASED_CLASSES: dict[type[StreamingResponse], type[StreamingResponse]] = {}
+
+
+def _leased_class(cls: type[StreamingResponse]) -> type[StreamingResponse]:
+    """``cls`` with an ASGI call that always releases the request's vault leases (LAB-1573)."""
+    if getattr(cls, "_pii_guard_leased", False):
+        return cls
+    leased = _LEASED_CLASSES.get(cls)
+    if leased is None:
+
+        async def __call__(self: Any, scope: Any, receive: Any, send: Any) -> None:
+            try:
+                await super(leased, self).__call__(scope, receive, send)  # type: ignore[arg-type]
+            finally:
+                self._pii_guard_release()
+
+        leased = type(
+            f"Leased{cls.__name__}", (cls,), {"__call__": __call__, "_pii_guard_leased": True}
+        )
+        _LEASED_CLASSES[cls] = leased
+    return leased
+
+
 class Gateway:
     """One per app. Everything is injectable for tests: detectors, cache, upstream transport."""
 
@@ -553,6 +577,13 @@ class Gateway:
                             release()
 
                 response.body_iterator = leased_stream()
+                # The generator's ``finally`` never runs when Starlette never starts it
+                # (client gone before ``http.response.start``), so release around the ASGI
+                # call too, and on garbage collection for a response nobody calls. Release
+                # is idempotent: it pops what is still held.
+                response.__class__ = _leased_class(type(response))
+                response._pii_guard_release = release  # type: ignore[attr-defined]
+                weakref.finalize(response, release)
             else:
                 release()
             return response, stats
@@ -1051,7 +1082,20 @@ class Gateway:
             return _upstream_error(response.status_code, raw, out_headers), stats
 
         is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
-        if not stream or not is_sse:
+        if stream and not is_sse:
+            # The client requested SSE: never pass through or buffer a whole JSON answer.
+            # Closing must not replace the protocol error with transport exception text.
+            with suppress(httpx.HTTPError):
+                await response.aclose()
+            stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+            stats.log("upstream_did_not_stream")
+            raise UpstreamError(
+                "upstream did not return an event stream; retry without stream",
+                code="upstream_did_not_stream",
+            ) from None
+
+        if not stream:
             try:
                 raw = await _read_bounded(response, self.config.upstream_max_response_bytes)
             except httpx.HTTPError as exc:
