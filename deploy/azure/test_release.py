@@ -4,6 +4,8 @@ import json
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -81,12 +83,15 @@ class ReleaseTemplateTests(unittest.TestCase):
         ingress = self.resource("Microsoft.App/containerApps")["properties"]["configuration"][
             "ingress"
         ]
+        # LAB-1541: a prod stage keeps whatever external flag the live app already has;
+        # only the explicit enable gate (publicEnabled) can open a closed app.
         self.assertEqual(
             ingress["external"],
             "[if(equals(parameters('environmentName'), 'dev'), true(), "
-            "parameters('publicEnabled'))]",
+            "or(parameters('publicEnabled'), parameters('preserveExternalIngress')))]",
         )
         self.assertFalse(params["publicEnabled"]["defaultValue"])
+        self.assertFalse(params["preserveExternalIngress"]["defaultValue"])
         self.assertFalse(ingress["allowInsecure"])
         self.assertEqual(ingress["targetPort"], 8787)
         self.assertEqual(ingress["customDomains"], "[parameters('customDomains')]")
@@ -263,6 +268,191 @@ class ReleaseTemplateTests(unittest.TestCase):
             self.assertIn("parameters(", secret["keyVaultUrl"])
         alerts = self.resource("Microsoft.Insights/metricAlerts")["properties"]
         self.assertIn("alertActionGroupIds", json.dumps(alerts["copy"]))
+
+
+FAKE_SUBSCRIPTION = "00000000-0000-4000-8000-000000000000"
+FAKE_VAULT = "https://piiguardkv.vault.azure.net/"
+FAKE_REGISTRY = "piiguardprod.azurecr.io"
+FAKE_ACCOUNT = "https://piiguardsp.blob.core.windows.net"
+FAKE_GROUP = (
+    f"/subscriptions/{FAKE_SUBSCRIPTION}/resourceGroups/rg-pii-guard-prod"
+    "/providers/Microsoft.Insights/actionGroups/fictional-oncall"
+)
+
+# Stand-in for the Azure CLI: answers only the read-only queries deploy.sh makes, records
+# every call, and refuses anything unexpected. The real az is never on PATH for these runs.
+FAKE_AZ = r"""#!PYTHON
+import json, os, sys
+args = sys.argv[1:]
+with open(os.environ["FAKE_AZ_LOG"], "a") as log:
+    log.write(json.dumps(args) + "\n")
+def arg(flag):
+    return args[args.index(flag) + 1] if flag in args else ""
+def out(value):
+    print(value)
+    raise SystemExit(0)
+query, head = arg("--query"), args[:3]
+if args[:2] == ["bicep", "build"]: out("{}")
+if args[:2] == ["account", "show"]: out(os.environ["FAKE_SUBSCRIPTION"])
+if args[:2] == ["resource", "show"] and query == "properties.amount": out("50")
+if args[:2] == ["resource", "show"] and query == "properties.notifications":
+    out(json.dumps({"actual50": {"enabled": True, "operator": "GreaterThan", "threshold": 50,
+        "thresholdType": "Actual", "contactGroups": [os.environ["FAKE_GROUP"]]}}))
+if args[:2] == ["monitor", "action-group"]: out("true")
+if args[:2] == ["group", "exists"]: out("true")
+if args[:2] == ["group", "show"]:
+    out({"tags.project": "pii-guard", "tags.environment": "prod",
+         "location": "swedencentral"}[query])
+if head == ["deployment", "group", "show"]:
+    out({"properties.outputs.vaultUri.value": os.environ["FAKE_VAULT"],
+         "properties.outputs.registryServer.value": os.environ["FAKE_REGISTRY"],
+         "properties.outputs.ledgerAccountUrl.value": os.environ["FAKE_ACCOUNT"],
+         "properties.outputs.projectAccountUrl.value": os.environ["FAKE_ACCOUNT"]}[query])
+if args[:2] == ["containerapp", "show"]:
+    live = os.environ["FAKE_LIVE_EXTERNAL"]
+    if live == "missing" and "ingress" in query:
+        print("ERROR: (ResourceNotFound) The Resource was not found.", file=sys.stderr)
+        raise SystemExit(3)
+    if live == "unavailable" and query == "properties.configuration.ingress.external":
+        print("ERROR: (AuthorizationFailed) transient", file=sys.stderr)
+        raise SystemExit(1)
+    if query == "properties.configuration.ingress.customDomains": out("[]")
+    if query == "properties.configuration.ingress.external": out(live)
+    if query in ("properties.latestRevisionName", "properties.latestReadyRevisionName"):
+        out("piiguard-prod-app--r1")
+if args[:2] == ["rest", "--method"] and arg("--method") == "get": out("true")
+if head in (["deployment", "group", "validate"], ["deployment", "group", "create"]):
+    if head[2] == "create" and os.environ.get("FAKE_FAIL_CREATE") == "1": raise SystemExit(1)
+    raise SystemExit(0)
+if args[:3] == ["containerapp", "ingress", "update"]: raise SystemExit(0)
+print("fake az: unexpected call", file=sys.stderr)
+raise SystemExit(97)
+"""
+
+
+@unittest.skipUnless(shutil.which("bash"), "bash is required to run the release driver")
+class ReleaseDriverIngressTests(unittest.TestCase):
+    """Run deploy.sh against a recording fake az: nothing here can reach Azure."""
+
+    def run_driver(self, mode: str, live: str, **extra: str) -> tuple:
+        root = Path(tempfile.mkdtemp(prefix="lab1541-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        fake = bin_dir / "az"
+        fake.write_text(FAKE_AZ.replace("PYTHON", sys.executable, 1))
+        fake.chmod(0o755)
+        (bin_dir / "python3").symlink_to(sys.executable)
+        log = root / "az.jsonl"
+        evidence = root / "evidence.json"
+        image = f"{FAKE_REGISTRY}/pii-guard@sha256:{'a' * 64}"
+        evidence.write_text(
+            json.dumps(
+                {
+                    "image": image,
+                    **dict.fromkeys(
+                        [
+                            "lab_1372_done",
+                            "isolation",
+                            "csrf",
+                            "identity_header_spoofing",
+                            "quotas_restart",
+                            "ssrf",
+                            "synthetic_roundtrip",
+                            "streaming",
+                            "privacy_review",
+                        ],
+                        True,
+                    ),
+                }
+            )
+        )
+        secret = FAKE_VAULT + "secrets/{}/" + "b" * 32
+        env = {
+            # Only the fake az is reachable; the real CLI's directory is never on PATH.
+            "PATH": f"{bin_dir}:/usr/bin:/bin",
+            "HOME": str(root),
+            "FAKE_AZ_LOG": str(log),
+            "FAKE_LIVE_EXTERNAL": live,
+            "FAKE_SUBSCRIPTION": FAKE_SUBSCRIPTION,
+            "FAKE_VAULT": FAKE_VAULT,
+            "FAKE_REGISTRY": FAKE_REGISTRY,
+            "FAKE_ACCOUNT": FAKE_ACCOUNT,
+            "FAKE_GROUP": FAKE_GROUP,
+            "AZURE_SUBSCRIPTION_ID": FAKE_SUBSCRIPTION,
+            "AZURE_ENVIRONMENT": "prod",
+            "HOSTED_IMAGE": image,
+            "HOSTED_PUBLIC_ORIGIN": "https://guard.example.test",
+            "HOSTED_RELEASE_EVIDENCE": str(evidence),
+            "GOOGLE_CLIENT_ID": "fictional-client.apps.example.test",
+            "META_KEY_SECRET_URI": secret.format("meta-key"),
+            "TENANT_KEY_SECRET_URI": secret.format("tenant-key"),
+            "GOOGLE_SECRET_URI": secret.format("google-client-secret"),
+            **extra,
+        }
+        result = subprocess.run(  # noqa: S603 - local driver against a fake az, no cloud
+            [shutil.which("bash") or "/bin/bash", str(TEMPLATE.parent / "deploy.sh"), mode],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+            timeout=120,
+        )
+        calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+        return result, calls
+
+    @staticmethod
+    def deployment_parameters(calls: list, verb: str) -> dict:
+        found = [c for c in calls if c[:3] == ["deployment", "group", verb]]
+        assert len(found) == 1, found  # noqa: S101 - test helper
+        values = {}
+        for item in found[0]:
+            name, sep, value = item.partition("=")
+            if sep and re.fullmatch(r"[A-Za-z]+", name):
+                values[name] = value
+        return values
+
+    def test_prod_stage_preserves_live_public_ingress(self) -> None:
+        # The LAB-1541 outage: staging a release on a live public app rewrote it internal.
+        result, calls = self.run_driver("stage", "true")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for verb in ("validate", "create"):
+            params = self.deployment_parameters(calls, verb)
+            self.assertEqual(params["publicEnabled"], "false")
+            self.assertEqual(params["preserveExternalIngress"], "true")
+        self.assertNotIn(["containerapp", "ingress", "update"], [c[:3] for c in calls])
+
+    def test_prod_stage_keeps_internal_app_internal(self) -> None:
+        for live in ("false", ""):
+            with self.subTest(live=live):
+                result, calls = self.run_driver("stage", live)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                params = self.deployment_parameters(calls, "create")
+                self.assertEqual(params["publicEnabled"], "false")
+                self.assertEqual(params["preserveExternalIngress"], "false")
+
+    def test_prod_stage_of_new_app_stays_internal(self) -> None:
+        result, calls = self.run_driver("stage", "missing")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        params = self.deployment_parameters(calls, "create")
+        self.assertEqual(params["preserveExternalIngress"], "false")
+
+    def test_unreadable_ingress_refuses_before_any_write(self) -> None:
+        result, calls = self.run_driver("stage", "unavailable")
+        self.assertNotEqual(result.returncode, 0)
+        verbs = [c[:3] for c in calls]
+        self.assertNotIn(["deployment", "group", "create"], verbs)
+        self.assertNotIn(["deployment", "group", "validate"], verbs)
+
+    def test_enable_remains_the_only_mode_that_opens_ingress(self) -> None:
+        # Fail the write so the driver stops before its public smoke; the arguments are what
+        # matter, and the failed enable must still roll ingress back to internal.
+        result, calls = self.run_driver("enable", "false", FAKE_FAIL_CREATE="1")
+        self.assertNotEqual(result.returncode, 0)
+        params = self.deployment_parameters(calls, "create")
+        self.assertEqual(params["publicEnabled"], "true")
+        self.assertEqual(params["preserveExternalIngress"], "false")
+        self.assertIn(["containerapp", "ingress", "update"], [c[:3] for c in calls])
 
 
 @unittest.skipUnless(shutil.which("az"), "Azure CLI is required to compile Bicep")

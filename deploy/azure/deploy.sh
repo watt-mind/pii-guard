@@ -224,11 +224,30 @@ PYEVIDENCE
     params+=(--parameters "sponsoredMicrodollars=$sponsored" "allocationId=$HOSTED_ALLOCATION_ID" "allocationExpiresAt=$HOSTED_ALLOCATION_EXPIRES_AT")
   fi
   public=false
+  preserve_external=false
   if [[ "$mode" == enable ]]; then
     [[ $(az rest --method get --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP/providers/Microsoft.App/containerApps/$app/authConfigs/current?api-version=2025-01-01" --query properties.platform.enabled --output tsv) == true ]] || { echo 'Stage Easy Auth first' >&2; exit 2; }
     public=true
+  elif [[ "$AZURE_ENVIRONMENT" == prod ]]; then
+    # LAB-1541: a stage must not close a live public app. Read its current ingress (read-only)
+    # and keep it; only enable may open ingress. Only an explicit not-found means a new app.
+    preserve_external=$(python3 - "$app" "$AZURE_RESOURCE_GROUP" <<'PYINGRESS'
+import json, re, subprocess, sys
+r = subprocess.run(['az', 'containerapp', 'show', '--name', sys.argv[1], '--resource-group', sys.argv[2],
+                    '--query', 'properties.configuration.ingress.external', '--output', 'json'],
+                   capture_output=True, text=True, check=False)
+if r.returncode:
+    if re.search(r'^ERROR:\s+\((ResourceNotFound|ContainerAppNotFound)\)', r.stderr, re.M):
+        print('false'); raise SystemExit(0)
+    raise SystemExit('Current app ingress is unreadable; release refused')
+value = json.loads(r.stdout) if r.stdout.strip() else None
+if value not in (True, False, None):
+    raise SystemExit('Current app ingress is invalid; release refused')
+print('true' if value is True else 'false')
+PYINGRESS
+)
   fi
-  params+=(--parameters "privateDevReviewed=$private" "publicEnabled=$public" "image=$HOSTED_IMAGE" "publicOrigin=$HOSTED_PUBLIC_ORIGIN" "googleClientId=$GOOGLE_CLIENT_ID" "metaKeySecretUri=$META_KEY_SECRET_URI" "tenantKeySecretUri=$TENANT_KEY_SECRET_URI" "googleSecretUri=$GOOGLE_SECRET_URI" "ledgerAccountUrl=$ledger" "projectAccountUrl=$projects" "customDomains=$domains" "clientIpSource=${HOSTED_CLIENT_IP_SOURCE:-off}")
+  params+=(--parameters "privateDevReviewed=$private" "publicEnabled=$public" "preserveExternalIngress=$preserve_external" "image=$HOSTED_IMAGE" "publicOrigin=$HOSTED_PUBLIC_ORIGIN" "googleClientId=$GOOGLE_CLIENT_ID" "metaKeySecretUri=$META_KEY_SECRET_URI" "tenantKeySecretUri=$TENANT_KEY_SECRET_URI" "googleSecretUri=$GOOGLE_SECRET_URI" "ledgerAccountUrl=$ledger" "projectAccountUrl=$projects" "customDomains=$domains" "clientIpSource=${HOSTED_CLIENT_IP_SOURCE:-off}")
 fi
 name=hosted-release
 [[ "$operator" != true ]] || name=hosted-foundation
