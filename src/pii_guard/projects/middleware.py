@@ -13,7 +13,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pii_guard.api.errors import error_headers, error_response
-from pii_guard.api.security import _addr_is_loopback
+from pii_guard.api.security import _addr_is_loopback, looks_like_endpoint_key
 from pii_guard.projects.runtime import ProjectAccessError, ProjectService
 from pii_guard.types import PiiGuardError
 
@@ -187,8 +187,10 @@ class ProjectMiddleware:
             scheme, _, credential = auth.partition(" ")
             credential = credential.strip()
             snapshot = None
-            if credential.startswith("pg_ep_") or headers.get("x-pii-guard-token", "").startswith(
-                "pg_ep_"
+            # Same recognition as BearerTokenMiddleware (LAB-1562): any cased
+            # pg_ep_ credential is an endpoint key that must resolve here.
+            if looks_like_endpoint_key(credential) or looks_like_endpoint_key(
+                headers.get("x-pii-guard-token", "")
             ):
                 if routed is None or scheme.lower() != "bearer" or headers.get("x-pii-guard-token"):
                     raise ProjectAccessError(
@@ -200,10 +202,14 @@ class ProjectMiddleware:
                 if snapshot is None:
                     raise ProjectAccessError("Invalid or revoked endpoint key")
             elif routed is not None:
-                # Local owner calls use the authenticated/trusted-local management boundary.
-                if self.service.settings.api_token is None and not _addr_is_loopback(
-                    scope.get("client")
-                ):
+                if self.service.settings.api_token is not None:
+                    # With an API token configured, routed calls are admitted only
+                    # by a resolved endpoint key. The token alone must not load an
+                    # endpoint snapshot through the local-owner fallthrough in
+                    # prepare_project (LAB-1562).
+                    raise ProjectAccessError("Endpoint access requires an endpoint key")
+                # Local owner calls use the trusted-local management boundary.
+                if not _addr_is_loopback(scope.get("client")):
                     raise ProjectAccessError(
                         "Local owner access requires a trusted local connection"
                     )

@@ -186,6 +186,18 @@ def test_token_is_never_forwarded_upstream() -> None:
     assert all(TOKEN not in str(dict(r.headers)) for r in upstream.requests)
 
 
+def test_token_in_both_headers_is_never_forwarded_upstream() -> None:
+    # LAB-1562: the X-header match must not skip stripping an Authorization that
+    # carries the guard token, or the gateway forwards it upstream as a BYOK key.
+    upstream = MockUpstream()
+    settings = Settings(tenant_key=TEST_TENANT_KEY, upstream_base_url=UPSTREAM_URL, api_token=TOKEN)
+    both = {"Authorization": f"Bearer {TOKEN}", "X-PII-Guard-Token": TOKEN}
+    with TestClient(make_app(upstream, settings=settings)) as client:
+        assert _chat(client, both) == 200
+    assert "authorization" not in upstream.requests[0].headers
+    assert all(TOKEN not in str(dict(r.headers)) for r in upstream.requests)
+
+
 def test_public_bind_without_token_warns(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING, logger="pii_guard.api"):
         create_app(Settings(host="0.0.0.0"))  # noqa: S104
