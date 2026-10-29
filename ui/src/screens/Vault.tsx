@@ -14,8 +14,10 @@ export interface VaultProps {
   /** The section is on screen: the list refreshes only then. */
   active: boolean;
   client?: VaultClient;
-  /** Open this session (a Logs row's "Open in Vault"); `nonce` reopens the same one. */
+  /** Open this session (a Logs row's "Open in Vault", or a #vault/<ref> deep link); `nonce` reopens the same one. */
   focus?: { ref: string; nonce: number } | null;
+  /** The open session changed (or cleared): the URL hash follows it (LAB-1333). */
+  onSelectRef?: (ref: string | null) => void;
   refreshMs?: number;
 }
 
@@ -50,7 +52,7 @@ function duration(seconds: number): string {
 
 const typeLabel = (t: string) => metaFor(t as EntityType).label ?? t;
 
-export function Vault({ status, live, active, client, focus = null, refreshMs = 5000 }: VaultProps) {
+export function Vault({ status, live, active, client, focus = null, onSelectRef, refreshMs = 5000 }: VaultProps) {
   const vault = useMemo(() => client ?? createVaultClient(), [client]);
   const server = status.state === "ok" ? status.status : null;
   const mode = server?.vault_inspect ?? (server ? "masked" : null);
@@ -136,6 +138,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
     setNotice(null);
     setDetail({ state: "loading" });
     setWant((w) => ({ ref, reveal: false, nonce: (w?.nonce ?? 0) + 1 }));
+    onSelectRef?.(ref);
   };
 
   if (focus && focus.nonce !== handledFocus && usable) {
@@ -153,6 +156,16 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
 
   const sessions = list.state === "ok" ? list.list.sessions : [];
   const shown = sessions.filter((s) => (source === "all" || s.source === source) && (query.trim() === "" || s.ref.includes(query.trim().toLowerCase())));
+  // A filter that hides the open session clears its detail (LAB-1333): the screen never
+  // shows a session under a list that no longer contains it. Without a filter the detail
+  // stays, so an expired session still says it is gone instead of vanishing silently.
+  if (selected !== null && (source !== "all" || query.trim() !== "") && !shown.some((s) => s.ref === selected)) {
+    setSelected(null);
+    setDetail({ state: "idle" });
+    setWant(null);
+    setRevealed(false);
+    onSelectRef?.(null);
+  }
   const current = detail.state === "ok" && detail.detail.ref === selected ? detail.detail : null;
 
   const latest = sessions.find((s) => s.ref === selected);
@@ -177,6 +190,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
       await vault.drop(selected);
       setNotice(`Dropped session ${selected}. Its placeholders can't be restored any more.`);
       setSelected(null);
+      onSelectRef?.(null);
       setDetail({ state: "idle" });
       setWant(null);
       setRevealed(false);
