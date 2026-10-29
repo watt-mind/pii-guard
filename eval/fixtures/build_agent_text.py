@@ -19,6 +19,10 @@ LAB-1482 adds what the real-harness re-run (LAB-1475,
 and its debug output (``len 89``), and pi's install path (an ``@scope`` under ``node_modules/``).
 Its positives put a phone number, an account number and a name right next to those shapes.
 
+LAB-1477 adds the bare numbers the NER typed ``ADDRESS`` (ports, a size, a ``"ticket"`` JSON
+value) and an algorithm's eponym typed ``PERSON`` (``a Luhn test card``). Its positives put a
+postcode and a settlement, a street and a house number, and a person's name next to them.
+
 Every value is **fictional** (ADR 0005): names from the language packs' test names, ``example``
 e-mail domains, textbook IBANs, test phone numbers. No tool or company here is a client.
 
@@ -62,6 +66,10 @@ def PH(v: str) -> str:
 
 def B(v: str) -> str:
     return label("BANK_ACCOUNT", v)
+
+
+def A(v: str) -> str:
+    return label("ADDRESS", v)
 
 
 IBAN_HU = "HU42117730161111101800000000"
@@ -144,12 +152,28 @@ PI_INSTALL_PATH = (
     "examples/extensions/)"
 )
 
+# LAB-1477: ports, sizes and ticket numbers next to no address word, and an eponym.
+OPERATIONS_DOC = (
+    "## Ports\nThe proxy listens on localhost (default 8787, `--port` to change it); the "
+    "admin UI uses 18787 and the metrics exporter 18790. Ports 18790 and 18787 are documented "
+    "in docs/operations.md. The vault holds up to 4096 keyed digests; raise "
+    "`VAULT_MAX_KEYS=8192` for larger sessions."
+)
+TICKET_TOOL_RESULT = (
+    'Tool result (crm.lookup): {"customer": "x", "email": "y", "iban": "z", "ticket": 4471, '
+    '"priority": 2, "sla_minutes": 1440}'
+)
+LUHN_PROSE = (
+    "Validate the card with a Luhn test card number before you call the payment API, and "
+    "run the Luhn check again after the edit. Keep the Levenshtein distance under 3."
+)
+
 
 def _negatives(prompt: str, edit: str) -> list[str]:
     return [
         SYSTEM_OPENCODE, prompt, edit, SKILLS_MUSE, SKILLS_XML, LS_OUTPUT, TOOL_SUMMARY, CODE,
         CODEX_CACHE_KEY, CODEX_TURN_METADATA, CODEX_CLIENT_METADATA, OPENCODE_BASH,
-        OPENCODE_DEBUG, PI_INSTALL_PATH,
+        OPENCODE_DEBUG, PI_INSTALL_PATH, OPERATIONS_DOC, TICKET_TOOL_RESULT, LUHN_PROSE,
     ]  # fmt: skip
 
 
@@ -211,9 +235,18 @@ def _positives(lang: str) -> list[str]:
         f"{P(hu_name)} reported a crash in /opt/homebrew/lib/node_modules/@quillstone-works/"
         f"pi-coding-agent/dist/cli.js; reply to {E(hu_mail)}."
     )
+    # LAB-1477: real addresses and a real name next to ports, ticket numbers and a test card.
+    address_record = (
+        'Tool result (crm.lookup): {"ticket": 4471, "customer": "'
+        f'{P(hu_name)}", "address": "{A("1051 Budapest, Minta utca 12.")}", "port": 8787}}'
+    )
+    shipping_note = (
+        f"Ship ticket 4471 to {A('Musterstraße 12, 10115 Berlin')} for {P(de_name)}; the proxy "
+        f"on port 18787 logs it. Card holder for the Luhn test card: {P(hu_name)}."
+    )
     return [
         prompts[lang], cat_json, csv_fence, export_path, edit_with_value, metadata_values,
-        uuid_prose, command_with_name, path_with_name,
+        uuid_prose, command_with_name, path_with_name, address_record, shipping_note,
     ]  # fmt: skip
 
 

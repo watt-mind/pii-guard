@@ -275,6 +275,10 @@ def create_app(
     # Outermost last: Host check, then (full only) loopback sockets, then the token.
     token = settings.api_token
     if token is not None:
+        if not token.get_secret_value().strip():
+            # Fail closed at construction: Starlette builds middleware lazily, so a check in
+            # BearerTokenMiddleware alone would let the server start and answer 500 (LAB-1570).
+            raise ValueError("PII_GUARD_API_TOKEN is set but empty")
         app.add_middleware(BearerTokenMiddleware, token=token.get_secret_value())
     elif not settings.hosted and not is_loopback(settings.host):
         logger.warning(
