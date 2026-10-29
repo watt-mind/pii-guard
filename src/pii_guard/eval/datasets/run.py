@@ -203,8 +203,14 @@ def run_dataset(
     runs_dir: Path = Path("eval/results/runs"),
     counts_dir: Path = COUNTS_DIR,
     day: str | None = None,
+    tag: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Run each system; returns one summary per system. Writes records when ``record``."""
+    """Run each system; returns one summary per system. Writes records when ``record``.
+
+    ``tag`` (``--tag``) appends a slug-safe suffix to the run slug
+    (``datasets-<set>-<system>[-<tag>]``), so a second fast-mode run on the same day gets
+    its own record instead of refusing to overwrite (LAB-1347).
+    """
     from pii_guard.eval.record import build_records, host_info, write_records
     from pii_guard.eval.report import build_scorecard
 
@@ -231,6 +237,14 @@ def run_dataset(
     summaries = []
     for system in systems:
         slug_system = system if limit is None else f"{system}-n{limit}"
+        if tag:
+            import re as _re
+
+            if not _re.match(r"^[a-z0-9][a-z0-9.-]*$", tag):
+                raise ValueError(
+                    f"--tag {tag!r} must be lower-case letters, digits, '.' and '-'"
+                )
+            slug_system = f"{slug_system}-{tag}"
         if system in PII_GUARD_SYSTEMS:
             results, info = _run_pii_guard(system, documents)
             card = build_scorecard(results, detectors=info["loaded"], fixture_paths=paths)
