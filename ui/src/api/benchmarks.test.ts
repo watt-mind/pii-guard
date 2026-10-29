@@ -1,6 +1,7 @@
 import type { BenchmarkIndex } from "./benchmarks";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
+  sourceOf,
   coverageTag,
   FAST_MODE_SYSTEM,
   groupOf,
@@ -106,4 +107,14 @@ describe("headline", () => {
     expect(Object.values(index.systems).some((v) => /(^|\s)pii-guard\s/.test(v.label))).toBe(false);
     expect(index.systems["rules+ner:xlmr-base-v2-hn"]?.label).toContain("watt-mind/pii-guard-ner-xlmr-base");
   });
+});
+
+
+it("evicts a rejected whole-index loader so a later read recovers", async () => {
+  let attempts = 0;
+  const index = await loadBenchmarks();
+  const source = sourceOf(async () => { if (++attempts === 1) throw new Error("offline"); return index; });
+  await expect(source.summary()).rejects.toThrow("offline");
+  await expect(source.summary()).resolves.toBe(index);
+  expect(attempts).toBe(2);
 });

@@ -89,6 +89,14 @@ type RunsLoad = BenchmarkIndex["runs"] | null | { error: string };
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
+const datasetLabels: Record<string, string> = {
+  "gretel-finance": "Gretel",
+  "gretel-finance-corrected": "Gretel fixed",
+  "nemotron-pii": "Nemotron",
+  "mapa-eur-lex": "MAPA",
+  "pl-pii-bench": "PL PII",
+};
+
 const DOCS = `${SOURCE}/blob/develop/docs`;
 const MODEL_CARD = "https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base";
 
@@ -102,12 +110,18 @@ export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader 
   const source = useMemo(() => sourceOf(load), [load]);
   const [data, setData] = useState<Load>({ state: "loading" });
   const [runs, setRuns] = useState<RunsLoad>(null);
+  const [summaryAttempt, retrySummary] = useState(0);
+  const [runsAttempt, retryRuns] = useState(0);
   useEffect(() => {
     let live = true;
     source.summary().then(
       (index) => live && setData({ state: "ready", index: withoutTickets(tidyLabels(index)) }),
       (err: unknown) => live && setData({ state: "error", message: messageOf(err) }),
     );
+    return () => { live = false; };
+  }, [source, summaryAttempt]);
+  useEffect(() => {
+    let live = true;
     source.runs?.().then(
       (part) => live && setRuns(part.runs),
       (err: unknown) => live && setRuns({ error: messageOf(err) }),
@@ -115,12 +129,12 @@ export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader 
     return () => {
       live = false;
     };
-  }, [source]);
+  }, [source, runsAttempt]);
   // A source without `runs()` puts the run log in the summary.
   const runLog = source.runs ? runs : data.state === "ready" ? data.index.runs : null;
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen space-y-6">
       <PageHeader
         title="Evaluation"
         lead="How much personal data gets through. Every evaluation run of PII Guard, and of the open-source tools it is compared with, is recorded with its commit (and whether the working tree had uncommitted changes), models, fixtures and hardware. All test documents are fictional or come from public test sets."
@@ -145,10 +159,11 @@ export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader 
       )}
       {data.state === "error" && (
         <Notice tone="danger" live title="The benchmark results could not be loaded.">
-          <p className="text-muted">{data.message}</p>
+          <p>Check your connection and try again.</p>
+          <Button size="sm" onClick={() => { setData({ state: "loading" }); retrySummary((n) => n + 1); }}>Retry benchmark results</Button>
         </Notice>
       )}
-      {data.state === "ready" && <Explorer summary={data.index} runLog={runLog} source={source} />}
+      {data.state === "ready" && <Explorer summary={data.index} runLog={runLog} source={source} retryRuns={() => { setRuns(null); retryRuns((n) => n + 1); }} />}
     </div>
   );
 }
@@ -159,7 +174,7 @@ const GROUPS: { id: SystemGroup; label: string; hint?: string }[] = [
   { id: "tool", label: "Open-source tools" },
 ];
 
-function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; runLog: RunsLoad; source: BenchmarkSource }) {
+function Explorer({ summary: base, runLog, source, retryRuns }: { summary: BenchmarkIndex; runLog: RunsLoad; source: BenchmarkSource; retryRuns: () => void }) {
   const runsReady = Array.isArray(runLog);
   const summary = useMemo(() => (Array.isArray(runLog) ? { ...base, runs: runLog } : base), [base, runLog]);
   const sets = useMemo(() => textSets(summary), [summary]);
@@ -253,7 +268,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
 
   return (
     <>
-      {ready ? <Headline index={index} set={set} lang={lang} /> : <SetStatus set={set} part={part} />}
+      {ready ? <Headline index={index} set={set} lang={lang} /> : <SetStatus set={set} part={part} retry={() => setLoaded((m) => { const next = { ...m }; delete next[set]; return next; })} />}
 
       {/* Until the first set's results land, only the headline placeholder shows: nothing below it
           jumps when they arrive (layout shift, LAB-1493). */}
@@ -409,7 +424,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
         {runsReady ? (
           <RunLog index={index} />
         ) : runLog && "error" in runLog ? (
-          <p role="alert" className="px-4 pb-3 text-sm text-danger sm:px-5">The run log could not be loaded: {runLog.error}</p>
+          <div className="px-4 pb-3 sm:px-5"><Notice tone="danger" live title="The run log could not be loaded."><p>Check your connection and try again.</p><Button size="sm" onClick={retryRuns}>Retry run log</Button></Notice></div>
         ) : (
           <p role="status" className="px-4 pb-3 text-sm text-muted sm:px-5">Loading the run log…</p>
         )}
@@ -453,11 +468,11 @@ function FastModeTag() {
 }
 
 /** In place of a set's results while they load, or when they could not be loaded. */
-function SetStatus({ set, part }: { set: string; part: SetLoad | undefined }) {
+function SetStatus({ set, part, retry }: { set: string; part: SetLoad | undefined; retry: () => void }) {
   if (part?.state === "error")
     return (
       <Notice tone="danger" live title={`The results for ${set} could not be loaded.`}>
-        <p className="text-muted">{part.message}</p>
+        <p>Check your connection and try again.</p><Button size="sm" onClick={retry}>Retry dataset results</Button>
       </Notice>
     );
   return (
@@ -530,10 +545,12 @@ function AcrossSets({ rows, summary, current, onPick }: { rows: AcrossRow[] | nu
                       <button
                         type="button"
                         onClick={() => onPick(set)}
+                        title={set}
+                        aria-label={`${datasetLabels[set] ?? set.replace(/-/g, " ")} (${set})`}
                         aria-current={on ? "true" : undefined}
-                        className="rounded text-left font-medium [overflow-wrap:anywhere] text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                        className="rounded text-left font-medium text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                       >
-                        {set}
+                        <span className="block max-w-28 truncate sm:max-w-none">{datasetLabels[set] ?? set.replace(/-/g, " ")}</span>
                       </button>
                     ) : (
                       <span className="block h-4 w-28 animate-pulse rounded bg-surface-2 motion-reduce:animate-none" />

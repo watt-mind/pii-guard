@@ -43,7 +43,7 @@ export function PublicEvaluation({ loginUrl, hash }: { loginUrl: string; hash: s
         </div>
         <div aria-hidden="true" className="header-hairline" />
       </header>
-      <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-10">
+      <main id="main" tabIndex={-1} className="mx-auto min-h-screen max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-10">
         <Suspense fallback={<p role="status" className="text-muted">Loading the benchmarks…</p>}>
           <Benchmarks />
         </Suspense>
