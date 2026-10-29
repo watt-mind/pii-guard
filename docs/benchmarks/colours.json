@@ -53,6 +53,10 @@
       "color": "#999933",
       "shape": "circle"
     },
+    "ner:eu-pii-safeguard@decoder=first": {
+      "color": "#332288",
+      "shape": "circle"
+    },
     "ner:eu-pii-safeguard@decoder=first@baseline=lab-1516": {
       "color": "#E69F00",
       "shape": "circle"
@@ -123,6 +127,10 @@
     },
     "rules+ner:eu-pii-safeguard": {
       "color": "#AA4499",
+      "shape": "circle"
+    },
+    "rules+ner:eu-pii-safeguard@decoder=first": {
+      "color": "#999933",
       "shape": "circle"
     },
     "rules+ner:horizon-base@decoder=word": {

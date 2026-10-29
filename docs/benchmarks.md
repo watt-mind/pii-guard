@@ -857,6 +857,78 @@ By language:
 | LLM Guard | 59.3% | 90.2% (46/51) | 6.8% (3/44) | 34.8% (23/66) | 41.0% (25/61) | 63.4% (532/839) |
 | PrivAiTe | 27.7% | 82.4% (42/51) | 6.8% (3/44) | 54.5% (36/66) | 9.8% (6/61) | 30.0% (252/839) |
 
+### `gretel-finance-corrected`
+
+hand-written; documents: de 200 + en 200.
+
+| System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| **pii-guard rules** | 400 | 77.5% | 13.5% | 23.0% | 77.1% | 6.7% | 21.8% | 100.0% | 4.1 ms | 2026-10-29 | `e6e2fc1` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 400 | 74.9% | 76.7% | 75.8% | 2.4% | 3.0% | 21.8% | 99.5% | 329 ms | 2026-10-29 | `f2f9818` |
+| bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 400 | 83.9% | 67.8% | 75.0% | 12.7% | 5.8% | 14.7% | 100.0% | 593 ms | 2026-10-29 | `e6e2fc1` |
+| tabularisai/eu-pii-safeguard alone (comparison) | 400 | 74.3% | 46.5% | 57.2% | 21.7% | 17.2% | 25.7% | 99.5% | 377 ms | 2026-10-29 | `e6e2fc1` |
+| Horizon-Labs/pii-redactor-base alone (comparison) | 400 | 81.8% | 68.9% | 74.8% | 12.6% | 8.3% | 17.9% | 100.0% | 949 ms | 2026-10-29 | `e6e2fc1` |
+| Horizon-Labs/pii-redactor-small alone (comparison) | 400 | 80.5% | 65.8% | 72.4% | 11.8% | 7.7% | 18.1% | 100.0% | 645 ms | 2026-10-29 | `e6e2fc1` |
+| Wismut/nym-pii-multilingual alone (comparison) | 400 | 72.6% | 79.9% | 76.1% | 8.2% | 6.2% | 26.4% | 100.0% | 571 ms | 2026-10-29 | `e6e2fc1` |
+| pii-guard NER v2.0 alone (no rules) | 400 | 74.8% | 75.3% | 75.0% | 4.1% | 3.0% | 22.0% | 99.5% | 107 ms | 2026-10-29 | `e6e2fc1` |
+| rules + the public fallback bardsai/eu-pii-anonimization-multilang v1 (reference) | 400 | 65.3% | 87.9% | 74.9% | 6.6% | 8.1% | 31.0% | 99.5% | 112 ms | 2026-10-29 | `e6e2fc1` |
+| rules + bardsai/eu-pii-anonimization-multilang-v3 in place of pii-guard NER (comparison) | 400 | 83.1% | 71.6% | 76.9% | 7.5% | 5.5% | 15.6% | 100.0% | 965 ms | 2026-10-29 | `e6e2fc1` |
+| rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison) | 400 | 75.1% | 51.9% | 61.4% | 15.3% | 17.1% | 25.2% | 99.8% | 368 ms | 2026-10-29 | `e6e2fc1` |
+| rules + Horizon-Labs/pii-redactor-base in place of pii-guard NER (comparison) | 400 | 81.2% | 71.9% | 76.2% | 8.2% | 8.5% | 18.5% | 100.0% | 856 ms | 2026-10-29 | `e6e2fc1` |
+| rules + Horizon-Labs/pii-redactor-small in place of pii-guard NER (comparison) | 400 | 80.2% | 68.7% | 74.0% | 8.0% | 7.5% | 18.4% | 100.0% | 855 ms | 2026-10-29 | `e6e2fc1` |
+| rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 400 | 72.3% | 81.7% | 76.7% | 5.8% | 6.2% | 26.8% | 100.0% | 416 ms | 2026-10-29 | `e6e2fc1` |
+| Presidio | 400 | 18.3% | 67.5% | 28.8% | 14.8% | 20.2% | 76.7% | — | 38 ms | 2026-10-29 | `e6e2fc1` |
+| LLM Guard | 400 | 76.0% | 30.9% | 43.9% | 51.3% | 9.9% | 17.0% | 100.0% | 193 ms | 2026-10-29 | `e6e2fc1` |
+| PrivAiTe | 400 | 46.5% | 54.2% | 50.1% | 13.2% | 6.8% | 46.6% | 94.8% | 504 ms | 2026-10-29 | `e6e2fc1` |
+
+
+By language:
+
+| System | de F1 | en F1 | de leak | en leak |
+|---|---:|---:|---:|---:|
+| **pii-guard rules** | 23.7% | 22.4% | 76.2% | 78.1% |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 71.2% | 80.3% | 2.3% | 2.6% |
+| bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 80.0% | 69.4% | 9.1% | 16.4% |
+| tabularisai/eu-pii-safeguard alone (comparison) | 57.1% | 57.3% | 22.3% | 21.1% |
+| Horizon-Labs/pii-redactor-base alone (comparison) | 74.0% | 75.7% | 10.1% | 15.1% |
+| Horizon-Labs/pii-redactor-small alone (comparison) | 72.0% | 72.9% | 9.4% | 14.4% |
+| Wismut/nym-pii-multilingual alone (comparison) | 75.4% | 76.7% | 5.8% | 10.7% |
+| pii-guard NER v2.0 alone (no rules) | 70.6% | 79.5% | 3.5% | 4.7% |
+| rules + the public fallback bardsai/eu-pii-anonimization-multilang v1 (reference) | 76.6% | 73.4% | 5.3% | 7.8% |
+| rules + bardsai/eu-pii-anonimization-multilang-v3 in place of pii-guard NER (comparison) | 80.6% | 72.8% | 5.6% | 9.4% |
+| rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison) | 60.8% | 62.0% | 16.0% | 14.6% |
+| rules + Horizon-Labs/pii-redactor-base in place of pii-guard NER (comparison) | 74.8% | 77.8% | 6.8% | 9.7% |
+| rules + Horizon-Labs/pii-redactor-small in place of pii-guard NER (comparison) | 72.6% | 75.4% | 7.6% | 8.4% |
+| rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 75.4% | 78.0% | 4.6% | 7.0% |
+| Presidio | 21.5% | 41.5% | 14.7% | 14.9% |
+| LLM Guard | 46.2% | 41.7% | 47.1% | 55.6% |
+| PrivAiTe | 48.8% | 51.5% | 12.7% | 13.8% |
+
+
+**Number validity.** The headline leak above, split by whether a structured identifier passes the language packs' own validators (card Luhn, IBAN, TAJ and tax-ID check digits, phone numbering plans, ID-document checksums and formats). Invalid numbers stay in the headline: a mistyped real identifier is still personal data ([evaluation.md](evaluation.md#number-validity)). Valid values per type: `PHONE` 32/50, `ID_DOCUMENT` 8/33, `BANK_ACCOUNT` 11/33.
+
+![Leak rate by number validity](benchmarks/validity-gretel-finance-corrected.svg)
+
+| System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
+|---|---:|---:|---:|---:|---:|---:|
+| **pii-guard rules** | 77.1% | 98.0% (50/51) | 2.3% (1/44) | 55.4% (36/65) | 38.3% (23/60) | 85.5% (576/674) |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 2.4% | 96.1% (49/51) | 2.3% (1/44) | 89.2% (58/65) | 3.3% (2/60) | 2.4% (16/674) |
+| bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 12.7% | 82.4% (42/51) | 15.9% (7/44) | 60.0% (39/65) | 40.0% (24/60) | 10.1% (68/674) |
+| tabularisai/eu-pii-safeguard alone (comparison) | 21.7% | 74.5% (38/51) | 11.4% (5/44) | 70.8% (46/65) | 20.0% (12/60) | 22.6% (152/674) |
+| Horizon-Labs/pii-redactor-base alone (comparison) | 12.6% | 80.4% (41/51) | 13.6% (6/44) | 41.5% (27/65) | 53.3% (32/60) | 8.9% (60/674) |
+| Horizon-Labs/pii-redactor-small alone (comparison) | 11.8% | 88.2% (45/51) | 9.1% (4/44) | 55.4% (36/65) | 41.7% (25/60) | 9.3% (63/674) |
+| Wismut/nym-pii-multilingual alone (comparison) | 8.2% | 96.1% (49/51) | 2.3% (1/44) | 93.8% (61/65) | 1.7% (1/60) | 9.2% (62/674) |
+| pii-guard NER v2.0 alone (no rules) | 4.1% | 88.2% (45/51) | 4.5% (2/44) | 87.7% (57/65) | 5.0% (3/60) | 4.0% (27/674) |
+| rules + the public fallback bardsai/eu-pii-anonimization-multilang v1 (reference) | 6.6% | 92.2% (47/51) | 2.3% (1/44) | 76.9% (50/65) | 13.3% (8/60) | 6.2% (42/674) |
+| rules + bardsai/eu-pii-anonimization-multilang-v3 in place of pii-guard NER (comparison) | 7.5% | 98.0% (50/51) | 2.3% (1/44) | 80.0% (52/65) | 18.3% (11/60) | 6.8% (46/674) |
+| rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison) | 15.3% | 96.1% (49/51) | 2.3% (1/44) | 78.5% (51/65) | 13.3% (8/60) | 16.3% (110/674) |
+| rules + Horizon-Labs/pii-redactor-base in place of pii-guard NER (comparison) | 8.2% | 98.0% (50/51) | 2.3% (1/44) | 72.3% (47/65) | 20.0% (12/60) | 7.6% (51/674) |
+| rules + Horizon-Labs/pii-redactor-small in place of pii-guard NER (comparison) | 8.0% | 98.0% (50/51) | 2.3% (1/44) | 75.4% (49/65) | 20.0% (12/60) | 7.3% (49/674) |
+| rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 5.8% | 98.0% (50/51) | 2.3% (1/44) | 95.4% (62/65) | 0.0% (0/60) | 6.5% (44/674) |
+| Presidio | 14.8% | 66.7% (34/51) | 13.6% (6/44) | 44.6% (29/65) | 25.0% (15/60) | 13.9% (94/674) |
+| LLM Guard | 51.3% | 90.2% (46/51) | 6.8% (3/44) | 35.4% (23/65) | 40.0% (24/60) | 55.2% (372/674) |
+| PrivAiTe | 13.2% | 82.4% (42/51) | 6.8% (3/44) | 55.4% (36/65) | 8.3% (5/60) | 14.1% (95/674) |
+
 ### `inflection`
 
 hand-written; documents: hu 12.
@@ -1392,6 +1464,16 @@ Every registered dataset ([datasets.md](datasets.md): licences, splits, label ma
 | LLM Guard | 400 | 59.3 (55.8-62.6) | 76.0 (71.7-80.8) | 27.7 (25.1-30.7) | 40.6 (37.6-44.0) | 17.0 (13.2-20.9) | 130 | 323 |
 | PrivAiTe | 400 | 27.6 (23.6-31.9) | 46.6 (42.2-51.2) | 48.9 (45.1-52.8) | 47.8 (44.2-51.3) | 46.5 (41.9-51.2) | 180 | 245 |
 
+### `gretel-finance-corrected`: Gretel synthetic PII finance (multilingual), corrected labels (test split)
+
+| System | Docs | Leak | Precision | Recall | F1 | Over-masking | p50 ms | p95 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| pii-guard rules | 400 | 77.1 (73.3-80.7) | 77.5 (70.9-83.5) | 13.5 (11.1-16.1) | 23.0 (19.4-26.8) | 21.8 (15.7-28.1) | 4.1 | 7.4 |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 400 | 2.4 (1.4-3.7) | 74.9 (71.4-78.6) | 76.7 (73.1-80.1) | 75.8 (72.8-78.6) | 21.8 (18.0-25.8) | 329 | 572 |
+| Presidio | 400 | 14.8 (12.3-17.5) | 18.3 (16.4-20.3) | 67.5 (64.6-70.4) | 28.8 (26.3-31.3) | 76.7 (74.3-78.9) | 37.8 | 67.3 |
+| LLM Guard | 400 | 51.3 (47.8-54.9) | 76.0 (71.7-80.8) | 30.9 (28.0-34.2) | 43.9 (40.7-47.6) | 17.0 (13.2-20.9) | 193 | 342 |
+| PrivAiTe | 400 | 13.2 (10.3-16.3) | 46.5 (42.0-51.0) | 54.2 (50.0-58.2) | 50.1 (46.1-53.8) | 46.6 (42.0-51.4) | 504 | 1,296 |
+
 ### `nemotron-pii`: NVIDIA Nemotron-PII (test split)
 
 | System | Docs | Leak | Precision | Recall | F1 | Over-masking | p50 ms | p95 ms |
@@ -1581,12 +1663,29 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-29 | `2026-10-29-datasets-gretel-finance-corrected-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | gretel-finance-corrected | de, en | recorded | `f2f9818` | — | — |
+| 2026-10-29 | `2026-10-29-datasets-gretel-finance-corrected-rules` | pii-guard rules | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-fast-eu-pii-safeguard` | rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-eu-pii-safeguard` | tabularisai/eu-pii-safeguard alone (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-fast-wismut-nym` | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
 | 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-eu-pii-safeguard` | tabularisai/eu-pii-safeguard alone (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-wismut-nym` | Wismut/nym-pii-multilingual alone (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-fast-horizon-small` | rules + Horizon-Labs/pii-redactor-small in place of pii-guard NER (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-horizon-small` | Horizon-Labs/pii-redactor-small alone (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-fast-horizon-base` | rules + Horizon-Labs/pii-redactor-base in place of pii-guard NER (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-horizon-base` | Horizon-Labs/pii-redactor-base alone (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
 | 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-ner-v20` | pii-guard NER v2.0 alone (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
 | 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-ner-fallback-v1` | bardsai/eu-pii-anonimization-multilang v1 alone (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-fast-bardsai-v3` | rules + bardsai/eu-pii-anonimization-multilang-v3 in place of pii-guard NER (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
 | 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-fast-v20` | pii-guard fast, NER v2.0 (MAPA 21-language baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
 | 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-fast-fallback-v1` | rules + bardsai/eu-pii-anonimization-multilang v1 (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-bardsai-v3` | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
 | 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-rules` | pii-guard rules alone (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-fast-fallback-v1` | rules + the public fallback bardsai/eu-pii-anonimization-multilang v1 (reference) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1497-gretel-finance-corrected-ner-v20` | pii-guard NER v2.0 alone (no rules) | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | — | — |
+| 2026-10-29 | `2026-10-29-datasets-gretel-finance-corrected-presidio` | Presidio | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | arm64, 10 CPUs, CPU only | — |
+| 2026-10-29 | `2026-10-29-datasets-gretel-finance-corrected-privaite` | PrivAiTe | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | arm64, 10 CPUs, CPU only | — |
+| 2026-10-29 | `2026-10-29-datasets-gretel-finance-corrected-llm-guard` | LLM Guard | gretel-finance-corrected | de, en | recorded | `e6e2fc1` | arm64, 10 CPUs, CPU only | — |
 | 2026-10-29 | `2026-10-29-lab-1500-synth-sample` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | synth-sample | en, hu | recorded | `6d02b8d` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1500-agent-text` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-text | de, en, hu | recorded | `6d02b8d` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1500-agent-traffic-dev` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic-dev | de, en, hu | recorded | `6d02b8d` (dirty) | — | — |

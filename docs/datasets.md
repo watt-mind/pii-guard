@@ -41,6 +41,7 @@ set here and every `dev` set, which NER candidates are selected on, by text wher
 |---|---|---|---|---:|---|---|
 | `ai4privacy` | [Ai4Privacy OpenPII 1M](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m), `validation` @ `ecfdc54` | CC-BY-4.0 | hu, en, de | 600 | test | yes (synthetic) |
 | `gretel-finance` | [gretelai/synthetic_pii_finance_multilingual](https://huggingface.co/datasets/gretelai/synthetic_pii_finance_multilingual), `test` @ `7b844d1` | Apache-2.0 | en, de | 400 | test | yes (synthetic) |
+| `gretel-finance-corrected` | `gretel-finance` with [committed label corrections](#corrected-labels) | Apache-2.0 | en, de | 400 | test (variant) | rebuilt locally from the committed rows |
 | `nemotron-pii` | [nvidia/Nemotron-PII](https://huggingface.co/datasets/nvidia/Nemotron-PII), `test` @ `b70ffaf` | CC-BY-4.0 | en | 300 | test | yes (synthetic) |
 | `cee-pii` | [flowxai/cee-pii-bench](https://huggingface.co/datasets/flowxai/cee-pii-bench) v0.2 @ `84ee883` | Apache-2.0 | hu, en | 451 | test | yes (synthetic) |
 | `pl-pii-bench` | [pl-pii-bench/pl-pii-bench](https://huggingface.co/datasets/pl-pii-bench/pl-pii-bench) v1.0.0 @ `bef947d` | CC-BY-4.0 | pl | 346 | test | yes (synthetic) |
@@ -80,7 +81,10 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
 
 - **`gretel-finance`**: long financial documents (EDI messages, loan agreements, statements)
   and German text. Its labels were made during generation and checked with GLiNER, so some
-  values are unlabelled or mislabelled. This shows up as over-masking for every system. A few
+  values are unlabelled or mislabelled. This shows up as over-masking for every system. Many
+  of its `PERSON` labels aren't names (`Damen`, `Saldo`, `[Borrower Name]`), which shows up as leaks
+  for every system; [`gretel-finance-corrected`](#corrected-labels) scores the same documents
+  with those corrected. A few
   generated documents contain credentials: a Slack-style token, a JWT, or an API key after
   `API key:`. These rows are skipped (`skipped_unconvertible`). Secret scanning (GitHub push
   protection and gitleaks) rejects them, a public dataset's token can't be shown to be fake,
@@ -186,6 +190,78 @@ rebuilds them and compares.
   because the text policy has no secret type.
 - **No LLM-written prose.** The ticket allowed it within free credits, but template text keeps
   the gold exact.
+
+## Corrected labels
+
+Some gold labels in a public set are plainly wrong, and every system pays for them as leaks.
+We never edit an upstream set because of that. Instead, a committed corrections file lists
+each class of error, why it is an error, and the exact span texts it covers. A **separate**
+set is built from it, so every system has two numbers side by side: on the set as published
+upstream, and on the corrected set.
+
+| Corrected set | Built from | Corrections | Spans corrected | Text committed |
+|---|---|---|---:|---|
+| `gretel-finance-corrected` | `gretel-finance` (same 400 documents) | [`gretel-finance/corrections.json`](../eval/datasets/gretel-finance/corrections.json) | 178 of 1,710 | no: rebuilt locally from the committed rows |
+
+```bash
+python -m pii_guard.eval.datasets fetch gretel-finance-corrected   # data/ + manifest
+python -m pii_guard.eval.datasets check gretel-finance-corrected   # rebuild, compare
+```
+
+**The rule.** A correction matches a gold span of one of its entity types whose text (whitespace
+runs collapsed) equals one of its listed values exactly. It reads the span's own text and never
+any system's output. A matched span stops being gold and becomes an ignore region
+(`corrected:<rule>`): unmasked it is not a leak, masked it is not over-masking. So no system
+is credited or charged for it, and every system is scored on the same corrected files. The
+values were picked by reading every distinct gold value of the sample (275 de and 159 en
+`PERSON` values; the other types in full), not from any model's misses.
+
+**What was corrected in `gretel-finance`** (counts from
+[`gretel-finance-corrected/manifest.json`](../eval/datasets/gretel-finance-corrected/manifest.json)):
+
+| Rule | What it covers | Spans (de + en) |
+|---|---|---:|
+| `greeting-or-phrase` | salutations and set phrases labelled as names: `Damen`, `Herren` (from "Sehr geehrte Damen und Herren"), `Vielen Dank`, `Guten Morgen`, `Im Rahmen`, `Ihnen` | 74 + 0 |
+| `common-noun` | dictionary words: `Saldo`, `Betrag`, `Sitz`, `Recht`, `Stahl`, `Seife`, `Engineering`, … | 45 + 1 |
+| `possessive-noun-phrase` | German "Ihr/Ihre/Ihren + noun": `Ihr Vertrauen`, `Ihren Warenkorb`, … | 26 + 0 |
+| `template-slot` | template fields, not values: `[Buyer's Name]`, `BORROWER NAME]`, `[Address]`, `phone number`, `[contact email]` | 10 + 7 |
+| `role-word` | roles, not names: `Schuldner`, `Arbeitnehmer 1`, `Valued Customer`, `Data Protection Officer` | 9 + 2 |
+| `code-not-a-name` | numbers and codes labelled as names or e-mails: `123456789`, `MD123456`, `BALI15`, an EDI segment | 1 + 3 |
+
+`PERSON` gold goes from 694 to 524 spans. **Kept as gold on purpose:** placeholder names used
+as a person's name (`Max Mustermann`, `John Doe`); spans holding a name next to a greeting
+(`Hallo Lola`); name-like user names (`Carina20`); address parts labelled `PERSON` (`Mettmann`,
+`An der Wupper`), which still say where someone lives or works. Missing labels (values the
+generator never labelled) aren't added; they still count as over-masking for every system.
+
+**Before and after** (leak; every system on the same corrected files; the full table and the
+records are in the [audit](../eval/results/2026-10-29-lab-1497-label-audit/README.md) and
+[benchmarks.md](benchmarks.md)). For PII Guard fast (NER v2.0) one run is scored against both
+label sets, so the change is label noise only: **19.07 % → 2.44 %** (German 29.1 → 2.3 %,
+English 5.1 → 2.6 %); 161 of its 180 upstream leaks are corrected values.
+
+| System | Upstream | Corrected |
+|---|--:|--:|
+| PII Guard fast (rules + NER v2.0) | 19.0 % | **2.4 %** |
+| PII Guard NER v2.0 alone | 20.3 % | 4.1 % |
+| rules + Wismut/nym-pii-multilingual | 21.8 % | 5.8 % |
+| rules + bardsai v3 | 23.3 % | 7.5 % |
+| PrivAiTe | 27.7 % | 13.2 % |
+| Presidio | 18.8 % | 14.8 % |
+| LLM Guard | 59.3 % | 51.3 % |
+| PII Guard rules | 80.8 % | 77.1 % |
+
+Every system gains, and on the corrected labels PII Guard fast has the lowest leak of the 17
+systems; on the upstream labels Presidio (18.8 %) edged it. Presidio gains least because it
+masks almost everything (76.7 % over-masking). The upstream rows stay the published ones.
+
+**MAPA EUR-Lex was audited and needs no correction** (LAB-1511). LAB-1494 found role words
+labelled `PERSON` ("Rapporteur", "Registrar", "agentes") in the MAPA project's *validation*
+split. The test set scored here doesn't have them: none of its 1,028 gold `PERSON` spans is one
+of 79 role words in the MAPA languages, and of the 63 values NER v2.0 leaks, 41 are the same
+string, gold-labelled `PERSON`, in 6 or more of the 21 language versions. A name isn't
+translated; a role word is. Its 8.5 % leak is model error, mostly lone surnames
+([audit](../eval/results/2026-10-29-lab-1497-label-audit/README.md)).
 
 ## Commands
 
