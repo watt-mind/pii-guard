@@ -3,6 +3,13 @@
 The mapping (placeholder -> original value) lives only in this process and expires after a
 TTL of inactivity. Nothing in this module logs, reprs or raises with an original value: logs
 and errors carry entity types, counts and placeholder ids only (AGENTS.md, ADR 0006).
+
+Doubled case suffixes are out of scope (LAB-1142): a case ending stacked on a case ending
+is not Hungarian (``Hajnának`` + ``nak``), so the vault does not split the surface to its
+lemma first. Both occurrences share one placeholder keyed on the labelled value's lemma
+and the extra suffix is not restored on unmask; nothing leaks, the text just does not
+round-trip. Real stacked suffixes (``-é``/``-ék``/``-éi`` plus a case ending, LAB-1337)
+round-trip normally.
 """
 
 from __future__ import annotations
