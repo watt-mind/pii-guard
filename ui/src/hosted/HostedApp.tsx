@@ -178,7 +178,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <a className="hidden text-muted hover:text-ink md:inline" href="#how">How it works</a>
           <a className="hidden text-muted hover:text-ink lg:inline" href="#data">Your data</a>
           <a className="hidden text-muted hover:text-ink md:inline" href={SELF_HOST}>Self-host</a>
-          {signedIn ? <ButtonLink href={hasConsole ? "#overview" : "#account"}>{hasConsole ? "Open console" : "Your account"}</ButtonLink> : <ButtonLink href={loginUrl}>Sign in with Google</ButtonLink>}
+          {signedIn ? <ButtonLink href={hasConsole ? "#overview" : "#account"}>{hasConsole ? "Console" : "Your account"}</ButtonLink> : <ButtonLink href={loginUrl}>Console</ButtonLink>}
         </nav>
       </div>
       <div aria-hidden="true" className="header-hairline" />
@@ -363,7 +363,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
               { label: "What leaves", value: `Masked text, to ${modelOr("Meta’s model")} or the provider you connect.` },
               { label: "Who runs it", value: "We run the guard. You bring text, a model key if you like, and your app." },
             ]} />
-            <div className="mt-auto pt-5">{signedIn ? <ButtonLink href={hasConsole ? "#overview" : "#account"}>{hasConsole ? "Open console" : "Your account"}</ButtonLink> : <ButtonLink href={loginUrl}>Sign in with Google</ButtonLink>}</div>
+            <div className="mt-auto pt-5">{signedIn ? <ButtonLink href={hasConsole ? "#overview" : "#account"}>{hasConsole ? "Console" : "Your account"}</ButtonLink> : <ButtonLink href={loginUrl}>Console</ButtonLink>}</div>
           </Card>
         </div>
       </section>
