@@ -1,0 +1,272 @@
+{
+  "recorded": "2026-10-29",
+  "note": "scripts/record_image_labels.py: POST /v1/mask/image with render=labels on ui/public/samples/id-card.png (fictional specimen), configured like the hosted preview (segmenter local/YuNet, Tesseract, rules; signatures and stamps kept), in the session that masked the message. Value-free: placeholders only, no image.",
+  "message": {
+    "masked": "[[PERSON_130ec9]] is the seller. Is her ID card attached, and is it still valid?"
+  },
+  "image": {
+    "media_type": "image/png",
+    "width": 1012,
+    "height": 638,
+    "regions": [
+      {
+        "entity_type": "ID_PHOTO",
+        "box": [
+          10,
+          79,
+          329,
+          561
+        ],
+        "source": "local",
+        "detector": "yunet",
+        "score": 0.9501,
+        "policy": "mask",
+        "placeholder": "[[PERSON_130ec9]]",
+        "label": "PHOTO · [[PERSON_130ec9]]",
+        "match": "exact",
+        "match_confidence": null,
+        "cover_box": [
+          8,
+          77,
+          331,
+          563
+        ],
+        "label_lines": [
+          "PHOTO · [[PERSON_130ec9]]"
+        ],
+        "label_px": 23
+      },
+      {
+        "entity_type": "FACE",
+        "box": [
+          87,
+          120,
+          253,
+          410
+        ],
+        "source": "local",
+        "detector": "yunet",
+        "score": 0.9501,
+        "policy": "mask",
+        "placeholder": "[[PERSON_130ec9]]",
+        "label": "PHOTO · [[PERSON_130ec9]]",
+        "match": "exact",
+        "match_confidence": null,
+        "cover_box": [
+          85,
+          118,
+          255,
+          412
+        ],
+        "label_lines": [
+          "PHOTO · [[PERSON_130ec9]]"
+        ],
+        "label_px": 12
+      },
+      {
+        "entity_type": "PERSON",
+        "box": [
+          320,
+          130,
+          390,
+          148
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[PERSON_130ec9]]",
+        "label": "[[PERSON_130ec9]]",
+        "match": "exact",
+        "match_confidence": 1.0,
+        "cover_box": [
+          318,
+          128,
+          442,
+          150
+        ],
+        "label_lines": [
+          "[[PERSON_130ec9]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "PERSON",
+        "box": [
+          319,
+          171,
+          393,
+          195
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[PERSON_130ec9]]",
+        "label": "[[PERSON_130ec9]]",
+        "match": "exact",
+        "match_confidence": 1.0,
+        "cover_box": [
+          317,
+          169,
+          441,
+          197
+        ],
+        "label_lines": [
+          "[[PERSON_130ec9]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "DATE_OF_BIRTH",
+        "box": [
+          320,
+          221,
+          436,
+          240
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[DATE_OF_BIRTH_707a9b]]",
+        "label": "[[DATE_OF_BIRTH_707a9b]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          318,
+          219,
+          492,
+          242
+        ],
+        "label_lines": [
+          "[[DATE_OF_BIRTH_707a9b]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "ID_DOCUMENT",
+        "box": [
+          319,
+          267,
+          427,
+          286
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.95,
+        "policy": "mask",
+        "placeholder": "[[ID_DOCUMENT_844e84]]",
+        "label": "[[ID_DOCUMENT_844e84]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          317,
+          265,
+          483,
+          288
+        ],
+        "label_lines": [
+          "[[ID_DOCUMENT_844e84]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "ID_DOCUMENT",
+        "box": [
+          320,
+          302,
+          453,
+          331
+        ],
+        "source": "ocr",
+        "detector": "rules",
+        "score": 0.85,
+        "policy": "mask",
+        "placeholder": "[[ID_DOCUMENT_42038b]]",
+        "label": "[[ID_DOCUMENT_42038b]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          318,
+          300,
+          485,
+          333
+        ],
+        "label_lines": [
+          "[[ID_DOCUMENT_42038b]]"
+        ],
+        "label_px": 13
+      }
+    ],
+    "masked": [
+      {
+        "entity_type": "DATE_OF_BIRTH",
+        "count": 1
+      },
+      {
+        "entity_type": "FACE",
+        "count": 1
+      },
+      {
+        "entity_type": "ID_DOCUMENT",
+        "count": 2
+      },
+      {
+        "entity_type": "ID_PHOTO",
+        "count": 1
+      },
+      {
+        "entity_type": "PERSON",
+        "count": 2
+      }
+    ],
+    "kept": [],
+    "analysis": {
+      "sam": {
+        "model": "yunet-2023mar",
+        "entity_types": [
+          "FACE",
+          "ID_PHOTO"
+        ]
+      },
+      "ocr": {
+        "ran": true,
+        "engine": "tesseract",
+        "detectors": [
+          "rules"
+        ],
+        "models": {},
+        "reason": null
+      }
+    },
+    "transcript": "KITALÁLT MINTAHATÓSÁG - FICTIONAL SPECIMEN AUTHORITY\nAZONOSÍTÓ KÁRTYA : IDENTITY CARD\nCsaládi név / Surname\n[[PERSON_130ec9]]\nUtónév / Given names\n[[PERSON_130ec9]]\nSzületési idő / Date of birth\n[[DATE_OF_BIRTH_707a9b]]\nOkmanyszam / Document no.\n[[ID_DOCUMENT_844e84]]\n[[ID_DOCUMENT_42038b]]\nErvényes / Expiry\n2031.06.30.\nNem/ Sex\nF\nAllampolgarsag / Nationality\nUTO\nMINTA / SPECIMEN : MI által generált fiktív minta - Al-generated fictional specimen",
+    "summary": {
+      "document_type": "id_card",
+      "holder": "[[PERSON_130ec9]]",
+      "holder_match": "exact",
+      "holder_confidence": 1.0,
+      "document_number": "[[ID_DOCUMENT_844e84]]",
+      "issuing_country": null,
+      "expiry": null,
+      "expired": false,
+      "mrz_present": false,
+      "mrz_valid": null,
+      "fields_found": {
+        "date_of_birth": "[[DATE_OF_BIRTH_707a9b]]",
+        "document_number": "[[ID_DOCUMENT_844e84]]",
+        "given_names": "[[PERSON_130ec9]]",
+        "surname": "[[PERSON_130ec9]]"
+      },
+      "fields_uncertain": []
+    },
+    "matches": {
+      "exact": 2,
+      "new": 3
+    }
+  },
+  "answer": {
+    "masked": "Yes: the attached ID card belongs to [[PERSON_130ec9]], and it has not expired.",
+    "by": "stand-in model reading the masked summary"
+  }
+}

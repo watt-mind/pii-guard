@@ -184,7 +184,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
           <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">An OpenAI-compatible privacy gateway for AI agents. Names, emails and IDs in text, and faces in images, become placeholders before the request leaves; the real values come back in the answer.</p>
           <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 sm:grid-cols-3">
-            <Differentiator href="#images" title="Images too">Faces, ID photos and printed details are covered before an image is sent.</Differentiator>
+            <Differentiator href="#images" title="Images too">Faces are blocked and printed ID details become placeholders before an image is sent.</Differentiator>
             <Differentiator href="#how" title="No LLM in the masking path">Rules and a small encoder NER run on the gateway itself.</Differentiator>
             <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
           </ul>
@@ -248,9 +248,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="images-heading" title="Images too: faces are covered before they leave." lead="A gateway that only reads text passes screenshots and scans on untouched. pii-guard reads the image itself: a segmenter finds faces and ID photos, OCR and the text detectors find printed names and numbers, and all of it is covered before the image goes on." />
+        <SectionHead id="images-heading" title="Images too: faces blocked, ID details tokenized." lead="A gateway that only reads text passes screenshots and scans on untouched. pii-guard reads the image itself: faces and ID photos are covered, and each printed name and number is covered by a box with its placeholder. The same person gets the same placeholder in your text and in the image, so the model can still answer, and the answer comes back to you with the real values." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
-        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway, the masked image goes to the model in place of the original. In the hosted preview, masking runs on the service and the masked image comes back to you; it isn’t sent to a model, and signatures and stamps stay visible, as here. A self-hosted install masks them too. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway, the masked image goes to the model in place of the original, followed by its masked transcript and summary. On 24 fictional documents, 98&nbsp;% of the values on an image got the same placeholder as in the text, with no false merges (<a className={link} href={`${DOCS}/benchmarks.md#visual-placeholders`}>benchmark</a>).</p>
+        <p className="max-w-3xl text-xs text-muted">In the hosted preview, masking runs on the service and the masked image comes back to you; it isn’t sent to a model. It doesn’t look for signatures or stamps (on this card the photo cover happens to take the signature too); a self-hosted install masks them. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
         <Card title="Measured on 65 official specimen ID documents from 24 countries" headingLevel={3} subtitle="Self-hosted run with SAM 3.1, Tesseract OCR and the rules, 27 Oct 2026. A region counts as covered when the mask overlaps it at IoU ≥ 0.5.">
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
           <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/benchmarks.md#image-masking`}>Image benchmark details ↗</a></p>
@@ -458,7 +459,7 @@ function Point({ title, children }: { title: string; children: ReactNode }) {
 function MiniFlow({ model, name }: { model: string | null; name: string }) {
   const masked = metaFor("PERSON");
   return <figure className="hidden min-w-0 space-y-2 lg:block" aria-labelledby="mini-flow-caption">
-    <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back. Below it, a fictional ID card before and after masking: the face and ID details are covered in black.</figcaption>
+    <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back. Below it, a fictional ID card before and after masking: the face is blocked and each ID detail is covered by a box printed with its placeholder.</figcaption>
     <div aria-hidden="true" className="space-y-2">
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You send</p><p className="doc mt-1">Name: <mark className={["rounded-md px-0.5 -mx-0.5 ring-1 ring-inset", masked.mark].join(" ")}>{name}</mark></p></div>
       <p className="text-center font-mono text-2xs text-guard">↓ pii-guard masks</p>
@@ -466,7 +467,7 @@ function MiniFlow({ model, name }: { model: string | null; name: string }) {
       <p className="text-center font-mono text-2xs text-guard">↓ pii-guard restores</p>
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You get back</p><p className="doc mt-1">Dear <mark className="rounded-md bg-restored-soft px-0.5 -mx-0.5 text-ink ring-1 ring-restored/45 ring-inset">{name}</mark>, …</p></div>
       <p className="text-center font-mono text-2xs text-guard">↓ and in images</p>
-      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">Faces and ID details covered</p><div className="mt-2"><Suspense fallback={<div className="aspect-[3/1] rounded-md bg-surface-2" />}><HeroImage /></Suspense></div></div>
+      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">Faces blocked · ID details tokenized</p><div className="mt-2"><Suspense fallback={<div className="aspect-[3/1] rounded-md bg-surface-2" />}><HeroImage /></Suspense></div></div>
     </div>
   </figure>;
 }
