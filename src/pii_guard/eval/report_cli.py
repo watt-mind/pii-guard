@@ -16,9 +16,9 @@ function of the inputs so ``--check`` compares them byte for byte:
 - ``docs/benchmarks/*.svg``: the charts (:mod:`pii_guard.eval.report_charts`), plus
   ``validity-<set>.svg`` for each set with a number-validity breakdown;
 - ``docs/benchmarks.md``: tables, embedded charts and method notes;
-- ``docs/benchmarks/colours.json``: the append-only colour registry
+- ``docs/benchmarks/colours.json``: the append-only color registry
   (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
-  needs a colour;
+  needs a color;
 - with ``--journey``, the generated block of ``docs/journey.md``.
 
 The index (:mod:`pii_guard.eval.report_index`) is a build output, never committed: the report
@@ -582,7 +582,7 @@ def _run_log(index: Mapping[str, Any]) -> str:
 _METHOD = """\
 ## How to read this
 
-- **Leak rate** is the share of labelled values that still appear, in any surface form, in
+- **Leak rate** is the share of labeled values that still appear, in any surface form, in
   the text the model would receive after masking (case- and whitespace-insensitive, through
   the language's inflected forms, structured identifiers by their letters and digits with any
   separators). Lower is safer; it is the number that matters most. **Partial leak** counts
@@ -597,7 +597,7 @@ _METHOD = """\
   (comparison tools that can't unmask show —).
 - **Hand-written vs generated sets.** `smoke` is written by hand with inline labels and has
   adversarial look-alikes; `synth-*` sets are written by a Meta Muse model around fictional
-  identities and labelled automatically. **Generated sets flatter Muse-based detectors**: the
+  identities and labeled automatically. **Generated sets flatter Muse-based detectors**: the
   same model family wrote the text and reads it, so its phrasing and its idea of what an
   entity is match. The headline charts use the hand-written set for that reason.
 - **Small sets.** The sets have tens of documents per language: differences of a few points
@@ -668,7 +668,7 @@ def render_page(
     if index["visual"]:
         out.append("## Image masking\n")
         out.append(
-            "Share of labelled regions masked with IoU >= 0.5. `specimens` are official "
+            "Share of labeled regions masked with IoU >= 0.5. `specimens` are official "
             "specimen ID documents published by their issuers; `fictional-specimens` are "
             "specimen-style documents built from Muse Image output (LAB-1121). The two sets "
             "hold different documents, so compare runs within a set.\n"
@@ -736,8 +736,8 @@ def build_outputs(
 ) -> dict[Path, str]:
     """Every generated file and its content, from the records in ``runs_dir``.
 
-    ``colours`` is the append-only colour registry; it is an output too, so a new system's
-    colour is committed with it and ``--check`` fails until it is.
+    ``colours`` is the append-only color registry; it is an output too, so a new system's
+    color is committed with it and ``--check`` fails until it is.
     """
     records = load_records(runs_dir)
     if not records:

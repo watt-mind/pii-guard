@@ -1,7 +1,7 @@
 """Static SVG charts from the benchmark index, hand-written (no plotting dependency).
 
 Every chart is 1600 x 900 (16:9, slide-sized: at 1920 px wide the smallest text is >= 24 px),
-on a white card with dark text, colour-blind-safe colours (Okabe-Ito / Paul Tol; comparison
+on a white card with dark text, color-blind-safe colours (Okabe-Ito / Paul Tol; comparison
 tools grey with distinct marker shapes) and a caption naming the fixture set, its size,
 the run dates and the commits. Output depends only on the index, so it is byte-stable.
 
@@ -45,7 +45,7 @@ MUTED = "#4A4A52"
 GRID = "#E3E3E8"
 AXIS = "#8A8A93"
 BG = "#FFFFFF"
-#: Language colours (Paul Tol bright/muted, colour-blind safe), assigned in index order.
+#: Language colors (Paul Tol bright/muted, colour-blind safe), assigned in index order.
 LANG_COLORS = ["#332288", "#44AA99", "#DDCC77", "#CC6677", "#88CCEE", "#AA4499", "#117733"]
 
 
@@ -354,7 +354,7 @@ def leak_vs_latency(index: Mapping[str, Any], *, fixture_set: str, systems: Sequ
             _text(p["lx"], p["ly"] + 8, p["label"], size=22, anchor=p["anchor"], weight="600")
         )
     # Legend: ours vs comparison tools, one row under the subtitle.
-    legend_a = "pii-guard (filled, one colour per configuration)"
+    legend_a = "pii-guard (filled, one color per configuration)"
     body.append(_marker("circle", 66, 151, 10, "#0072B2"))
     body.append(_text(86, 158, legend_a, size=20, fill=MUTED))
     lx = 86 + text_width(legend_a, 20) + 48
@@ -470,7 +470,7 @@ def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence
     caption = [
         set_caption(index, fixture_set) + ". Bars: runs on the current fixture files only.",
         (
-            "Full leak = labelled values of mask-policy types surviving masking in any surface "
+            "Full leak = labeled values of mask-policy types surviving masking in any surface "
             "form. F1 = span overlap match, micro."
         ),
         _provenance(snaps),
@@ -487,7 +487,7 @@ def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence
 
 # --- (b2) number validity ------------------------------------------------------------------
 
-#: (key in the compact validity block or ``None`` for the headline, legend, colour)
+#: (key in the compact validity block or ``None`` for the headline, legend, color)
 VALIDITY_BARS: tuple[tuple[str | None, str, str], ...] = (
     (None, "All values (headline)", "#4A4A52"),
     ("valid", "Valid numbers", "#117733"),
@@ -729,7 +729,7 @@ _BLUES = [(0.0, (0xF3, 0xF6, 0xFB)), (0.5, (0x6B, 0xAE, 0xD6)), (1.0, (0x08, 0x3
 
 
 def _blue(v: float) -> tuple[str, bool]:
-    """A sequential single-hue colour for ``v`` in [0, 1], and whether text on it is white."""
+    """A sequential single-hue color for ``v`` in [0, 1], and whether text on it is white."""
     for (a, ca), (b, cb) in itertools.pairwise(_BLUES):
         if v <= b:
             t = (v - a) / (b - a)
@@ -867,7 +867,7 @@ def is_segment_run(run: Mapping[str, Any]) -> bool:
 
 
 def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
-    # The latest run of each system on each set: bars grouped by set, coloured by system.
+    # The latest run of each system on each set: bars grouped by set, colored by system.
     # ``segmenters``: only the segmenter comparison runs (else: every other visual run).
     latest: dict[tuple[str, str], Mapping[str, Any]] = {}
     for r in index["visual"]:
@@ -901,7 +901,7 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
         _text(
             56,
             112,
-            "Share of labelled image regions masked (IoU >= 0.5), by region type; in each group, "
+            "Share of labeled image regions masked (IoU >= 0.5), by region type; in each group, "
             + " | ".join(set_order),
             size=24,
             fill=MUTED,
@@ -1002,7 +1002,7 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
 
 # --- Gateway latency ----------------------------------------------------------------------
 
-#: Stage colours (Okabe-Ito), in pipeline order; ``other`` is untimed glue (HTTP, scheduling).
+#: Stage colors (Okabe-Ito), in pipeline order; ``other`` is untimed glue (HTTP, scheduling).
 STAGE_COLORS = {
     "parse": "#56B4E9",
     "detect": "#0072B2",
