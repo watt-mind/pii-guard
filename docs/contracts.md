@@ -388,6 +388,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `upstream_destination_not_allowed` | Hosted endpoint destination does not satisfy the public HTTPS/port policy. |
 | 422 | `outbound_check_failed` | Gateway: after masking, the request still held a value its vault session knows (the [outbound re-check](architecture-gateway.md#outbound-re-check), LAB-1500); nothing was sent. The message lists entity types and counts only; the response has `X-PII-Guard-Outbound-Check: blocked`. |
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
+| 409 | `session_entry_limit_reached` | An explicit vault session (`X-PII-Guard-Session`, or a path or `prompt_cache_key` id) already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders. Explicit sessions are never rotated, so nothing is masked or sent; start a new session (LAB-1565). |
 | 502 | `upstream_credential_rejected` | Listing a provider's models (`POST /v1/projects/{project_id}/endpoints/models`, a pass-through `/e/{endpoint_id}/v1/models`): the provider answered 401 or 403, so the API key is wrong or lacks access. The message is fixed; the provider's own status text and body are never passed on. |
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
@@ -949,10 +950,17 @@ this order (`pii_guard.gateway.sessions`, LAB-1286; details in
 | 3 | `prompt_cache_key` | `HMAC(tenant key, "pck:" + identity + ":" + prompt_cache_key)` | created |
 | 4 | `default` | `HMAC(tenant key, "default:" + identity)` | created |
 
-`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous`. Every
+`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous` (a single
+local principal by construction: see `gateway/sessions.py`). Every
 response carries `X-PII-Guard-Session` (the id used, including a derived `d_…` one) and
 `X-PII-Guard-Session-Source`; the traffic record has `session_source` next to `session_ref`.
 Steps 2-4 go through `Vault.session_or_create` and its `PII_GUARD_VAULT_MAX_ENTRIES` cap.
+An explicit session (steps 1-2) is bound to the credentialed identity that first presents
+it to the gateway (LAB-1565): another credentialed identity presenting the same id gets
+`404 not_found` (the credential-less local principal is never refused by a binding), and
+session ids are 3-128 characters. A dropped, expired or rotated session id re-created as a
+new incarnation starts clean: no detection-cache entries and no issued-id exemptions carry
+over.
 
 Lifetime of a session a refused call created (LAB-1316): a call holds its session from
 resolving it until masking finished or failed. When the call that created the session is
@@ -1272,6 +1280,7 @@ doesn't inflate them).
 | `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
 | `MaskingError` | `vault_not_configured` | 500 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
+| `SessionEntryLimitError` (`MaskingError`) | `session_entry_limit_reached` | 409 | An explicit session already holds its `max_entries` placeholders; it is never rotated. |
 
 Messages and `repr()`s carry types, counts and placeholder ids, never an original value.
 

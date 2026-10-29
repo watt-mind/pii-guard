@@ -42,7 +42,8 @@ import logging
 import re
 import threading
 import time
-from collections import Counter
+import weakref
+from collections import Counter, OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -350,6 +351,10 @@ class Gateway:
         # Ids the upstream issued per session (LAB-1469): sent back as identifiers, they are
         # forwarded without detection (the NER reads some random call ids as phone numbers).
         self.issued_ids = IssuedIds()
+        # Session id -> the VaultSession object last seen for it (LAB-1565): a different
+        # object under the same id is a new incarnation (dropped/expired/rotated and
+        # re-created), so its detection-cache entries and issued-id exemptions are dropped.
+        self._session_incarnations: OrderedDict[str, weakref.ref[VaultSession]] = OrderedDict()
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
@@ -494,6 +499,15 @@ class Gateway:
         must call once masking finished or failed."""
         with self._holds_lock:
             session, created, source = resolve_session(self.vault, headers, body, path_session)
+            previous = self._session_incarnations.get(session.session_id)
+            if previous is not None and previous() is not session:
+                # New incarnation of this id: start clean (LAB-1565).
+                self.cache.drop_session(session.session_id)
+                self.issued_ids.drop(session.session_id)
+            self._session_incarnations[session.session_id] = weakref.ref(session)
+            self._session_incarnations.move_to_end(session.session_id)
+            while len(self._session_incarnations) > 16384:
+                self._session_incarnations.popitem(last=False)
             hold = self._session_holds.setdefault(session.session_id, _SessionHold())
             hold.in_flight += 1
         stats.session_source = source
@@ -526,6 +540,8 @@ class Gateway:
                 return
             self.vault.drop(session_id)
             self.cache.drop_session(session_id)
+            self.issued_ids.drop(session_id)
+            self._session_incarnations.pop(session_id, None)
 
     def _forwarded(
         self,
@@ -985,7 +1001,7 @@ class Gateway:
         is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
         if not stream or not is_sse:
             try:
-                raw = await response.aread()
+                raw = await _read_bounded(response, self.config.upstream_max_response_bytes)
             except httpx.HTTPError as exc:
                 raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
             finally:
@@ -1030,12 +1046,20 @@ class Gateway:
         trace.streaming = True
 
         async def timed_lines() -> AsyncIterator[str]:
-            """The upstream's lines; time spent waiting on them counts as upstream time."""
+            """The upstream's lines; time spent waiting on them counts as upstream time.
+
+            The whole stream has a total deadline (LAB-1566), separate from the per-read
+            httpx timeout: past it the stream ends with the generic stream error.
+            """
             lines = response.aiter_lines().__aiter__()
+            deadline = time.perf_counter() + self.config.upstream_stream_timeout
             while True:
                 waiting = time.perf_counter()
+                remaining = deadline - waiting
+                if remaining <= 0:
+                    raise TimeoutError("upstream stream deadline exceeded")
                 try:
-                    line = await lines.__anext__()
+                    line = await asyncio.wait_for(lines.__anext__(), remaining)
                 except StopAsyncIteration:
                     timer.add("upstream", time.perf_counter() - waiting)
                     return
@@ -1201,6 +1225,20 @@ async def _read_limited(response: httpx.Response) -> bytes:
         data.extend(chunk)
         if len(data) > _MAX_ERROR_BODY:
             break
+    return bytes(data)
+
+
+async def _read_bounded(response: httpx.Response, limit: int) -> bytes:
+    """A whole upstream success body, byte-bounded in every mode (LAB-1566).
+
+    Raises :class:`UpstreamError` (sanitised, no body text) once the body passes ``limit``,
+    without buffering more than the limit plus one chunk.
+    """
+    data = bytearray()
+    async for chunk in response.aiter_bytes():
+        data.extend(chunk)
+        if len(data) > limit:
+            raise UpstreamError("upstream response is too large")
     return bytes(data)
 
 

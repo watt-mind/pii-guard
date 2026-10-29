@@ -62,6 +62,7 @@ __all__ = [
     "MaskResult",
     "PlaceholderInInputError",
     "RestoreBudget",
+    "SessionEntryLimitError",
     "SessionNotFoundError",
     "UnmaskOutputTooLargeError",
     "UnmaskResult",
@@ -82,6 +83,17 @@ class PlaceholderInInputError(MaskingError):
 
     code = "placeholder_in_input"
     status_code = 422
+
+
+class SessionEntryLimitError(MaskingError):
+    """An explicit session holds ``max_entries`` placeholders (409, LAB-1565).
+
+    Nobody can rotate an explicit session for the client, so it fails closed; the client
+    recovers by starting a new session.
+    """
+
+    code = "session_entry_limit_reached"
+    status_code = 409
 
 
 DEFAULT_TTL_SECONDS = 3600.0
@@ -468,6 +480,14 @@ _MASK_MEMO = True
 _MASK_MEMO_ENTRIES = 1024
 _MASK_MEMO_CHARS = 512_000
 
+#: Most foreign placeholder-shaped tokens a session reserves (LAB-1565): the oldest are
+#: forgotten (a forgotten token could in principle be derived later, as after a restart).
+_MAX_RESERVED = DEFAULT_MAX_ENTRIES
+
+#: Most ``_touched`` generations kept (LAB-1565); older ones are forgotten and a memo from
+#: before them is re-masked from scratch, which changes cost, never output.
+_MAX_TOUCHED = 8192
+
 
 @dataclass(frozen=True, slots=True)
 class _Masked:
@@ -554,10 +574,14 @@ class VaultSession:
         clock: Callable[[], float],
         case_sensitive_placeholders: bool = False,
         max_restored_chars: int = DEFAULT_MAX_RESTORED_CHARS,
+        entry_limit: int | None = None,
     ) -> None:
         self.session_id = session_id
         self._case_sensitive = case_sensitive_placeholders
         self._max_restored = max_restored_chars
+        #: Explicit-session placeholder cap enforced at mask time (LAB-1565); ``None``:
+        #: a get-or-create session, which the vault rotates instead (:meth:`Vault.session`).
+        self._entry_limit = entry_limit
         self._tenant_key = tenant_key
         self._ttl = ttl_seconds
         self._id_length = id_length
@@ -569,7 +593,8 @@ class VaultSession:
         self._identifiers: dict[str, _Entry] = {}
         # Placeholder-shaped tokens seen in input that this session did not issue. They are
         # never issued later, so a token the caller wrote can't turn into a masked value.
-        self._reserved: set[str] = set()
+        # Bounded (LAB-1565): at most _MAX_RESERVED, oldest forgotten first (see above).
+        self._reserved: OrderedDict[str, None] = OrderedDict()
         self._closed = False
         self._expires_at = clock() + ttl_seconds
         self._known = KnownValues()
@@ -586,7 +611,10 @@ class VaultSession:
         # (generation, language) -> folded initial -> entries (see :meth:`_starting_with`).
         self._initials: tuple[int, str, dict[str, list[_Entry]]] | None = None
         # The entry each generation was touched for: ``_touched[g:]`` changed after ``g``.
+        # Bounded (LAB-1565): ``_touched[0]`` is generation ``_touched_base + 1``; generations
+        # at or before ``_touched_base`` are forgotten.
         self._touched: list[_Entry] = []
+        self._touched_base = 0
         # (text, spans, language) -> its last mask from spans: the next request re-sends the
         # same history, so pass 1 scans only the entries changed since (LAB-1315). Bounded;
         # forgotten with the session; ``None`` in a fork.
@@ -624,6 +652,7 @@ class VaultSession:
                 self._masked.clear()
             self._masked_chars = 0
             self._touched.clear()
+            self._touched_base = self._generation
 
     @property
     def known_values(self) -> KnownValues:
@@ -662,12 +691,13 @@ class VaultSession:
                 clock=self._clock,
                 case_sensitive_placeholders=self._case_sensitive,
                 max_restored_chars=self._max_restored,
+                entry_limit=self._entry_limit,
             )
             memo: dict[int, Any] = {}
             fork._by_key = copy.deepcopy(self._by_key, memo)
             fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
             fork._identifiers = copy.deepcopy(self._identifiers, memo)
-            fork._reserved = set(self._reserved)
+            fork._reserved = OrderedDict(self._reserved)
             fork._generation = self._generation
             fork._masked = None  # its journal is replayed in full anyway
             fork._known = self._known
@@ -764,6 +794,12 @@ class VaultSession:
             since = None
         with self._lock:
             self._check_alive()
+            if self._entry_limit is not None and len(self._by_placeholder) >= self._entry_limit:
+                # An explicit session has nobody to rotate it for (LAB-1565): fail closed
+                # rather than grow without bound; the client starts a new session.
+                raise SessionEntryLimitError(
+                    "vault session entry limit reached; start a new session"
+                )
             if since is not None and not self._edges_unchanged(text, since, language):
                 since = None
             if since is not None and since >= self._generation:
@@ -774,14 +810,24 @@ class VaultSession:
             if _MASK_MEMO and self._masked is not None and not remask:
                 key = (text, tuple(spans), language)
             foreign = self._foreign_tokens(text, remask)
-            added = foreign - self._reserved
-            self._reserved |= added
+            added = [token for token in foreign if token not in self._reserved]
+            for token in foreign:
+                self._reserved[token] = None
+                self._reserved.move_to_end(token)
+            # Bound _reserved (LAB-1565), but never forget a token of the current text:
+            # it must not be issued as a placeholder by this very mask.
+            while len(self._reserved) > _MAX_RESERVED:
+                oldest = next(iter(self._reserved))
+                if oldest in foreign:
+                    break
+                del self._reserved[oldest]
             try:
                 result = self._mask_again(text, key, language) if key is not None else None
                 if result is None:
                     result = self._mask_validated(text, ordered, language, since, key)
             except BaseException:
-                self._reserved -= added
+                for token in added:
+                    self._reserved.pop(token, None)
                 raise
             # A fork's journal is replayed as a full remask: ``since`` is in the fork's
             # numbering, and the replay must come out the same either way (else it fails).
@@ -919,7 +965,9 @@ class VaultSession:
         if masked is None or any(k in self._by_key for k in masked.depends):
             return None
         generation = self._generation
-        changed = dict.fromkeys(self._touched[masked.generation :])
+        if masked.generation < self._touched_base:
+            return None  # older changes were forgotten (LAB-1565): mask from scratch
+        changed = dict.fromkeys(self._touched[masked.generation - self._touched_base :])
         entries = sorted(changed, key=lambda e: (-len(e.normalized), e.order))
         self.entries_scanned += len(entries)
         replacements = list(masked.replacements)
@@ -1217,6 +1265,10 @@ class VaultSession:
         entry.changed = self._generation
         if self._masked is not None:
             self._touched.append(entry)
+            if len(self._touched) > _MAX_TOUCHED:
+                drop = len(self._touched) // 2
+                del self._touched[:drop]
+                self._touched_base += drop
 
     def _form(self, value: str, entity_type: EntityType) -> str:
         """The variant key of ``value``: its casing class (case-sensitive mode) and layout.
@@ -1642,7 +1694,9 @@ class Vault:
     generation is no longer handed out and expires with its TTL. A conversation that crosses
     a rotation is re-masked from its re-sent history under the new generation; only a
     placeholder it kept from before the rotation (and no longer sends the value of) stays
-    unrestored. Explicit sessions (:meth:`session`) have no cap: their client owns them.
+    unrestored. Explicit sessions (:meth:`session`) cannot rotate (the client addresses them
+    by id), so the same ``max_entries`` is enforced at mask time instead: a full explicit
+    session fails closed and its client starts a new one (LAB-1565).
 
     ``max_restored_chars`` caps the characters of original values one unmask call (or one
     :meth:`VaultSession.restore_budget`, a gateway response) restores: see
@@ -1725,11 +1779,15 @@ class Vault:
         with self._lock:
             self._purge_locked()
             if session_id is None:
-                return self._create_locked(f"s_{secrets.token_hex(16)}")
+                created = self._create_locked(f"s_{secrets.token_hex(16)}")
+                created._entry_limit = self._max_entries  # explicit: capped, not rotated
+                return created
             session = self._sessions.get(session_id)
             if session is None:
                 raise SessionNotFoundError("vault session not found or expired")
             session._check_alive()
+            if session._entry_limit is None:
+                session._entry_limit = self._max_entries  # addressed explicitly now
             return session
 
     def session_or_create(self, session_id: str) -> tuple[VaultSession, bool]:

@@ -43,6 +43,12 @@ from pii_guard.gateway.restore import (
     restore_text,
     restore_tool_input,
 )
+from pii_guard.gateway.stream import (
+    MAX_MASKED_CONTENT_CHARS,
+    MAX_SSE_EVENT_CHARS,
+    MAX_UNMASKERS,
+    StreamTooLargeError,
+)
 from pii_guard.vault import RestoreBudget, StreamUnmasker, VaultSession
 
 __all__ = [
@@ -160,15 +166,20 @@ async def iter_sse_events(lines: AsyncIterator[str]) -> AsyncIterator[tuple[str 
     """``(event name, data)`` of each server-sent event (multi-line data joined by ``\\n``)."""
     event: str | None = None
     data: list[str] = []
+    buffered = 0
     async for line in lines:
         if line == "":
             if data:
                 yield event, "\n".join(data)
-            event, data = None, []
+            event, data, buffered = None, [], 0
             continue
         if line.startswith("data:"):
             value = line[5:]
-            data.append(value[1:] if value.startswith(" ") else value)
+            value = value[1:] if value.startswith(" ") else value
+            buffered += len(value) + 1
+            if buffered > MAX_SSE_EVENT_CHARS:
+                raise StreamTooLargeError("upstream SSE event is too large")
+            data.append(value)
         elif line.startswith("event:"):
             event = line[6:].strip() or None
         # Comments (":"), "id:" and "retry:" lines are not used by the Responses API.
@@ -200,12 +211,16 @@ class ResponsesSseRestorer:
         self._budget = session.restore_budget()
         self._charged_texts: set[str] = set()
         self._stream_texts: dict[tuple[Any, ...], list[str]] = {}
+        self._stream_len: dict[tuple[Any, ...], int] = {}
+        self._stream_overflow: set[tuple[Any, ...]] = set()
         self._unmaskers: dict[tuple[Any, ...], StreamUnmasker] = {}
         #: The last delta event of each stream: the template for a flushed remainder.
         self._last_delta: dict[tuple[Any, ...], dict[str, Any]] = {}
         self._retired: dict[str, None] = {}
         self._report = RestoreReport()
         self._masked_text: dict[int, list[str]] = {}
+        self._masked_len: dict[int, int] = {}
+        self._masked_overflow: set[int] = set()
         self._sequence: int | None = None
         self._done = False
         self.chunks = 0
@@ -227,6 +242,8 @@ class ResponsesSseRestorer:
 
     def _unmasker(self, key: tuple[Any, ...], kind: str) -> StreamUnmasker:
         unmasker = self._unmaskers.get(key)
+        if unmasker is None and len(self._unmaskers) >= MAX_UNMASKERS:
+            raise StreamTooLargeError("upstream stream has too many open fields")
         if unmasker is None:
             # A JSON/tool adapter tracks where it is in its text, so one per stream (LAB-1483).
             session: Any = {
@@ -316,9 +333,24 @@ class ResponsesSseRestorer:
             return data
         if event_type == "response.output_text.delta":
             index = data.get("output_index")
-            if isinstance(index, int):
-                self._masked_text.setdefault(index, []).append(delta)
-        self._stream_texts.setdefault(key, []).append(delta)
+            if isinstance(index, int) and index not in self._masked_overflow:
+                if self._masked_len.get(index, 0) + len(delta) > MAX_MASKED_CONTENT_CHARS:
+                    self._masked_text.pop(index, None)
+                    self._masked_len.pop(index, None)
+                    self._masked_overflow.add(index)
+                else:
+                    self._masked_text.setdefault(index, []).append(delta)
+                    self._masked_len[index] = self._masked_len.get(index, 0) + len(delta)
+        # Bounded like the masked text: past the cap the copy is dropped, so a later whole
+        # copy is charged again (more restore budget spent, never less).
+        if key not in self._stream_overflow:
+            if self._stream_len.get(key, 0) + len(delta) > MAX_MASKED_CONTENT_CHARS:
+                self._stream_texts.pop(key, None)
+                self._stream_len.pop(key, None)
+                self._stream_overflow.add(key)
+            else:
+                self._stream_texts.setdefault(key, []).append(delta)
+                self._stream_len[key] = self._stream_len.get(key, 0) + len(delta)
         data["delta"] = self._unmasker(key, kind).feed(delta)
         self._last_delta[key] = {k: v for k, v in data.items() if k not in ("delta", "logprobs")}
         return data
@@ -326,6 +358,7 @@ class ResponsesSseRestorer:
     def _flush(self, key: tuple[Any, ...]) -> dict[str, Any] | None:
         """The held-back rest of one delta stream, as a last delta event (or ``None``)."""
         streamed = self._stream_texts.pop(key, None)
+        self._stream_len.pop(key, None)
         if streamed:
             self._charged_texts.add("".join(streamed))
         unmasker = self._unmaskers.pop(key, None)

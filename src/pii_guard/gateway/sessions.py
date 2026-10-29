@@ -28,6 +28,18 @@ the ``X-PII-Guard-Session`` response header (a client may send it back, step 1);
 ``X-PII-Guard-Session-Source`` says which step matched. Steps 2-4 use
 :meth:`~pii_guard.vault.Vault.session_or_create`, whose entry cap rotates a full session to a
 new generation (``PII_GUARD_VAULT_MAX_ENTRIES``).
+
+Explicit sessions (steps 1-2) are bound to the credentialed client identity that first
+presents them through the gateway (LAB-1565): a *different credentialed* identity presenting
+an existing explicit id gets ``session_not_found`` (fail closed, no distinction from a
+missing session), never the mapping. The credential-less ``anonymous`` identity is a
+*single* principal by construction: in the documented local (loopback) deployment every
+local client without ``Authorization`` is the same user, so they share the anonymous derived
+session (multi-turn restore needs that) and anonymous presenters never refuse each other;
+a credentialed identity takes an anonymous binding over. An anonymous presenter is refused
+by a *credentialed* binding: dropping ``Authorization`` is the caller's choice, so it must
+not unlock a session another credential owns. Distinct ``Authorization`` values always
+derive distinct sessions.
 """
 
 from __future__ import annotations
@@ -44,7 +56,7 @@ from enum import StrEnum
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from pii_guard.gateway.request import InvalidChatRequestError
-from pii_guard.vault import Vault, VaultSession
+from pii_guard.vault import SessionNotFoundError, Vault, VaultSession
 
 __all__ = [
     "PATH_SESSION_KEY",
@@ -62,7 +74,10 @@ SESSION_SOURCE_HEADER = "X-PII-Guard-Session-Source"
 #: Where :class:`SessionPathMiddleware` leaves the path's session id in the ASGI scope.
 PATH_SESSION_KEY = "pii_guard.path_session"
 
-SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+#: At least 3 characters: 1-2 character client-chosen ids are refused (LAB-1565). Generated
+#: ids (``s_``/``c_``/``d_`` + 32 hex) are 34 chars; short human-chosen path ids (``box``)
+#: stay legal, so the floor stays low and identity binding is the access control.
+SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{3,128}$")
 _PATH_RE = re.compile(r"^/s/([^/]*)(/(?:v1|muse-code)(?:/.*)?)$")
 # Muse Code's prompt_cache_key grammar (1.4.13, 1.4.14): the main agent's key carries the
 # conversation's UUID, each reminder observer's key the UUID's first 8 hex digits.
@@ -148,6 +163,59 @@ def _conversations(vault: Vault) -> _Conversations:
         return found
 
 
+#: Explicit-session identity bindings remembered per vault (oldest forgotten first).
+MAX_BINDINGS = 16384
+
+
+class _Bindings:
+    """Session id -> (client identity, the session object it was recorded for) (LAB-1565).
+
+    Keyed by session object identity via a weak reference: a dropped/expired/rotated id that
+    is re-created as a new :class:`VaultSession` starts unbound.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._by_id: OrderedDict[str, tuple[str, weakref.ref[VaultSession]]] = OrderedDict()
+
+    def check_and_bind(self, session: VaultSession, identity: str) -> None:
+        """Record ``identity`` for ``session``; refuse a different credentialed identity.
+
+        The credential-less ``anonymous`` identity is the one local principal (see the
+        module docstring): it matches an anonymous binding, and a credentialed identity
+        presenting an anonymous-bound session takes the binding over. Any other mismatch
+        is refused, including ``anonymous`` presenting a credentialed binding: leaving
+        ``Authorization`` out is the caller's choice and must not bypass the binding.
+        """
+        with self._lock:
+            found = self._by_id.get(session.session_id)
+            if found is not None:
+                recorded, ref = found
+                if ref() is session:
+                    if recorded == identity:
+                        self._by_id.move_to_end(session.session_id)
+                        return
+                    if recorded != "anonymous":
+                        raise SessionNotFoundError("vault session not found or expired")
+                    # Fall through: a credentialed identity takes an anonymous binding over.
+            self._by_id[session.session_id] = (identity, weakref.ref(session))
+            self._by_id.move_to_end(session.session_id)
+            while len(self._by_id) > MAX_BINDINGS:
+                self._by_id.popitem(last=False)
+
+
+_BINDINGS: weakref.WeakKeyDictionary[Vault, _Bindings] = weakref.WeakKeyDictionary()
+_BINDINGS_LOCK = threading.Lock()
+
+
+def _bindings(vault: Vault) -> _Bindings:
+    with _BINDINGS_LOCK:
+        found = _BINDINGS.get(vault)
+        if found is None:
+            found = _BINDINGS[vault] = _Bindings()
+        return found
+
+
 def _cache_key_session_id(vault: Vault, identity: str, key: str) -> str:
     """The derived id for ``key`` (step 3); Muse's main and observer keys of one conversation
     share one, whichever is resolved first."""
@@ -169,24 +237,30 @@ def resolve_session(
 
     ``body`` is the request before masking (its ``prompt_cache_key`` as the client sent it).
     """
+    identity = client_identity(headers)
     raw = headers.get(SESSION_HEADER)
     if raw is not None and raw.strip():
         if not SESSION_RE.match(raw.strip()):
             raise InvalidChatRequestError(f"{SESSION_HEADER} is malformed")
         # Unknown or expired -> SessionNotFoundError (404). Start a new conversation without
         # the header; the mapping is gone, so a silent new session would be a different one.
-        return vault.session(raw.strip()), False, SessionSource.HEADER
+        # LAB-1565: a different identity than the recorded creator gets the same 404.
+        session = vault.session(raw.strip())
+        _bindings(vault).check_and_bind(session, identity)
+        return session, False, SessionSource.HEADER
     if path_session is not None:
         if not SESSION_RE.match(path_session):  # the middleware checked it already
             raise InvalidChatRequestError("the session in the URL path is malformed")
         session, created = vault.session_or_create(path_session)
+        _bindings(vault).check_and_bind(session, identity)
         return session, created, SessionSource.PATH
-    identity = client_identity(headers)
     key = body.get("prompt_cache_key")
     if isinstance(key, str) and key:
         session, created = vault.session_or_create(_cache_key_session_id(vault, identity, key))
+        _bindings(vault).check_and_bind(session, identity)
         return session, created, SessionSource.PROMPT_CACHE_KEY
     session, created = vault.session_or_create(vault.derive_session_id(f"default:{identity}"))
+    _bindings(vault).check_and_bind(session, identity)
     return session, created, SessionSource.DEFAULT
 
 
@@ -215,7 +289,7 @@ class SessionPathMiddleware:
                 {
                     "error": {
                         "code": InvalidChatRequestError.code,
-                        "message": "the session in the URL path is malformed: use 1-128 of "
+                        "message": "the session in the URL path is malformed: use 3-128 of "
                         "A-Z a-z 0-9 _ -",
                     }
                 }

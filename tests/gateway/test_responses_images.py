@@ -225,3 +225,22 @@ def test_collect_queues_one_image_slot() -> None:
     assert len(collected.images) == 1
     assert collected.images[0].where == "input.1.content.1"
     assert collected.images[0].data == png()
+
+
+def test_large_image_passes_the_responses_route_at_a_small_text_limit() -> None:
+    # LAB-1566: /v1/responses uses the gateway route class, so a ~60 KB+ image body is
+    # not 413'd by the text body limit before image validation (max_text_chars=1000).
+    import random
+
+    raw = random.Random(4711).randbytes(300 * 200 * 3)  # noqa: S311 - synthetic noise
+    noisy = Image.frombytes("RGB", (300, 200), raw)
+    buf = io.BytesIO()
+    noisy.save(buf, format="PNG")
+    data = buf.getvalue()
+    assert len(data) > 60_000
+    upstream, sam = ResponsesUpstream(), Sam()
+    app = make_app(upstream, sam)
+    app.state.max_text_chars = 1000
+    response = post(app, muse_image_body(image_part(data_url(data))))
+    assert response.status_code == 200, response.text
+    assert len(upstream.requests) == 1  # reached the gateway and the upstream, not a 413

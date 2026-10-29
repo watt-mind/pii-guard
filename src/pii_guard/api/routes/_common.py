@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Callable, Coroutine, Iterator
@@ -29,8 +30,12 @@ from pii_guard.types import PiiGuardError
 from pii_guard.vault import Vault, VaultSession
 
 __all__ = [
+    "BODY_READ_TIMEOUT_SECONDS",
+    "BodyReadTimeoutError",
+    "ClientDisconnectedError",
     "LoggedRoute",
     "check_text_size",
+    "ensure_connected",
     "ephemeral_session",
     "log_extra",
     "text_body_limit",
@@ -43,6 +48,30 @@ access_logger = logging.getLogger("pii_guard.api.access")
 # pair); allow that plus room for the other fields, so a legal text is never rejected here.
 _BODY_BYTES_PER_CHAR = 12
 _BODY_OVERHEAD_BYTES = 16_384
+
+#: Whole request-body read deadline (LAB-1566): bytes alone do not stop a slow-loris client
+#: from holding a request open; the projects middleware bounds its body read the same way.
+BODY_READ_TIMEOUT_SECONDS = 30.0
+
+
+class BodyReadTimeoutError(PiiGuardError):
+    """The request body did not arrive within the deadline; nothing was processed."""
+
+    code = "request_timeout"
+    status_code = 408
+
+
+class ClientDisconnectedError(PiiGuardError):
+    """The client went away before its request was processed (no detection, no upstream)."""
+
+    code = "client_disconnected"
+    status_code = 499
+
+
+async def ensure_connected(request: Request) -> None:
+    """Fail before detection/upstream work if the client already disconnected (LAB-1566)."""
+    if await request.is_disconnected():
+        raise ClientDisconnectedError("client disconnected before the request was processed")
 
 
 def log_extra(request: Request, **fields: object) -> None:
@@ -124,16 +153,22 @@ async def _read_body_capped(request: Request, limit: int) -> None:
     """Read the body with a running byte count; 413 once it passes ``limit``.
 
     The body is cached on the request (Starlette's ``request.body()`` / ``stream()`` then
-    return it), so the handler reads what was counted here."""
+    return it), so the handler reads what was counted here. A time deadline
+    (:data:`BODY_READ_TIMEOUT_SECONDS`, LAB-1566) bounds the whole read as well: past it,
+    408 and nothing is processed."""
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return
     chunks: list[bytes] = []
     size = 0
-    async for chunk in request.stream():
-        size += len(chunk)
-        if size > limit:
-            raise PayloadTooLargeError("request body is too large")
-        chunks.append(chunk)
+    try:
+        async with asyncio.timeout(BODY_READ_TIMEOUT_SECONDS):
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > limit:
+                    raise PayloadTooLargeError("request body is too large")
+                chunks.append(chunk)
+    except TimeoutError:
+        raise BodyReadTimeoutError("request body read timed out") from None
     request._body = b"".join(chunks)
 
 
