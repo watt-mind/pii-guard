@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
-import type { BenchmarkIndex, BenchmarkLoader } from "../api/benchmarks";
+import { FAST_MODE_SYSTEM, groupOf, type BenchmarkIndex, type BenchmarkLoader } from "../api/benchmarks";
 import bundled from "virtual:pii-guard/benchmarks-index";
 import type { HttpGuardClient } from "../api/http";
 import { UnreachableError } from "../api/http";
@@ -29,7 +29,7 @@ function resultsTable(panel: HTMLElement) {
   return within(section).getByRole("table");
 }
 
-const nameOf = (h: HTMLElement | null) => h?.textContent?.replace(/fast mode$/, "").trim();
+const nameOf = (h: HTMLElement | null) => h?.textContent?.replace(/ ?fast mode$/, "").replace(/ +([A-Z]{2}( \+ [A-Z]{2})* only)$/, "$1").trim();
 
 function rowNames(table: HTMLElement) {
   return within(table).getAllByRole("rowheader").map(nameOf);
@@ -80,10 +80,12 @@ describe("Benchmarks screen", () => {
     await within(panel).findByRole("region", { name: "Results" });
     const table = resultsTable(panel);
     const set = INDEX.headline_set!;
-    expect(within(panel).getByRole("radio", { name: new RegExp(`^${set}`) })).toBeChecked();
+    expect(within(panel).getByRole("combobox", { name: "Fixture set" })).toHaveValue(set);
     const featured = INDEX.featured.filter((k) => INDEX.snapshots.some((s) => s.fixture_set === set && s.system === k));
     expect(rowNames(table)).toHaveLength(featured.length);
-    const leaks = featured.map((k) => snap(set, k).all.leak ?? 1).sort((a, b) => a - b);
+    // Pooled, systems run on every language come first, safest first.
+    const full = featured.filter((k) => INDEX.fixture_sets[set]!.languages.every((l) => snap(set, k).languages[l]));
+    const leaks = full.map((k) => snap(set, k).all.leak ?? 1).sort((a, b) => a - b);
     expect(cell(table, rowNames(table)[0]!, "Leak")).toBe(pct(leaks[0]!));
     expect(cell(table, "rules", "Leak")).toBe(pct(snap(set, "rules").all.leak));
     expect(within(table).getByRole("columnheader", { name: "Leak" })).toHaveAttribute("aria-sort", "ascending");
@@ -96,7 +98,7 @@ describe("Benchmarks screen", () => {
     expect(cell(resultsTable(panel), "rules", "Leak")).toBe(pct(snap("smoke", "rules").languages.hu!.leak));
     expect(within(panel).queryByRole("note")).not.toBeInTheDocument();
 
-    await user.click(within(panel).getByRole("radio", { name: /^synth-sample/ }));
+    await user.selectOptions(within(panel).getByRole("combobox", { name: "Fixture set" }), "synth-sample");
     expect(within(panel).getByRole("note")).toHaveTextContent(/flatters\s+Muse-based detection/);
     expect(cell(resultsTable(panel), "rules", "Leak")).toBe(pct(snap("synth-sample", "rules").languages.hu!.leak));
   });
@@ -111,7 +113,11 @@ describe("Benchmarks screen", () => {
     await user.click(within(panel).getByRole("button", { name: "F1" }));
     const table = resultsTable(panel);
     expect(within(table).getByRole("columnheader", { name: "F1" })).toHaveAttribute("aria-sort", "descending");
-    const f1s = rowNames(table).map((n) => parseFloat(cell(table, n!, "F1")));
+    // Pooled, systems run on only some languages ("EN only") are listed after the rest.
+    const names = rowNames(table);
+    const partial = names.findIndex((n) => / only$/.test(n!));
+    if (partial >= 0) expect(names.slice(partial).every((n) => / only$/.test(n!))).toBe(true);
+    const f1s = names.filter((n) => !/ only$/.test(n!)).map((n) => parseFloat(cell(table, n!, "F1")));
     expect(f1s).toEqual([...f1s].sort((a, b) => b - a));
 
     for (const box of within(panel).getAllByRole("checkbox")) {
@@ -167,10 +173,49 @@ describe("Benchmarks screen, critique round", () => {
     await within(panel).findByRole("region", { name: "Results" });
     const caveats = () => within(panel).getByText("Where these ran, and caveats").closest("details")!;
     expect(caveats()).not.toHaveAttribute("open");
-    await user.click(within(panel).getByRole("radio", { name: /^synth-dev/ }));
+    await user.selectOptions(within(panel).getByRole("combobox", { name: "Fixture set" }), "synth-dev");
     await user.click(within(panel).getByRole("button", { name: "Select all" }));
     expect(caveats()).toHaveAttribute("open");
     expect(caveats()).toHaveTextContent(/trained on the seed-7 synthetic split/);
     expect(within(panel).getByText(/open-source tools weren’t run on this set/)).toBeInTheDocument();
+  });
+});
+
+describe("Benchmarks screen, round E1 (LAB-1493)", () => {
+  it("leads with fast mode against the best open-source tool, numbers from the index", async () => {
+    const { panel } = await openBenchmarks();
+    const head = await within(panel).findByTestId("bench-headline");
+    const set = INDEX.headline_set!;
+    const fast = snap(set, FAST_MODE_SYSTEM);
+    const tools = INDEX.snapshots.filter((s) => s.fixture_set === set && INDEX.systems[s.system]?.family === "comparison");
+    const best = Math.min(...tools.map((s) => s.all.leak ?? 1));
+    expect(head).toHaveTextContent(new RegExp(`fast mode lets ${pct(fast.all.leak).replace(".", "\\.")} of personal values through`));
+    expect(head).toHaveTextContent(new RegExp(`lets ${pct(best).replace(".", "\\.")} through`));
+    expect(head).toHaveTextContent(/hand-written German, English and Hungarian documents/);
+    expect(head).not.toHaveTextContent(/pii-guard/);
+    // The production row is marked in the table.
+    const row = within(resultsTable(panel)).getAllByRole("row").find((r) => within(r).queryByText("fast mode"));
+    expect(row).toBeDefined();
+  });
+
+  it("shows other organisations' models apart from PII Guard's own", async () => {
+    const { user, panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    expect(within(panel).queryByText("Other open models")).not.toBeInTheDocument(); // collapsed: featured only
+    await user.click(within(panel).getByRole("button", { name: /^More systems/ }));
+    expect(within(panel).getByText("Other open models")).toBeInTheDocument();
+    for (const [, info] of Object.entries(INDEX.systems)) {
+      if (/^(rules \+ )?(bardsai|tabularisai|Horizon-Labs|Wismut)\//.test(info.short_label)) expect(groupOf(info)).toBe("other-model");
+    }
+    expect(groupOf(INDEX.systems[FAST_MODE_SYSTEM])).toBe("ours");
+  });
+
+  it("never calls a mixed-origin set hand-written", async () => {
+    const { panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    const mixed = Object.entries(INDEX.fixture_sets).find(([, v]) => v.kind === "text" && v.origin === "mixed");
+    if (!mixed) return;
+    const group = within(panel).getByRole("group", { name: "Mixed origin" });
+    expect(within(group).getByRole("option", { name: new RegExp(`^${mixed[0]} ·`) })).toBeInTheDocument();
   });
 });

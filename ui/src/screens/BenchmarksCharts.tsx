@@ -391,7 +391,7 @@ export function LanguageBars({
       <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
         {panels.map((panel) => (
           <div key={panel.key}>
-            <h4 className="mb-2 text-xs font-medium text-muted">{panel.title}</h4>
+            <h3 className="mb-2 text-xs font-medium text-muted">{panel.title}</h3>
             <ul className="space-y-3">
               {snapshots.map((s) => (
                 <li key={s.system}>
