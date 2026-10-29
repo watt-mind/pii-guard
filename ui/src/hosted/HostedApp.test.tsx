@@ -104,6 +104,54 @@ describe("public hosted workflow", () => {
   });
 });
 
+describe("hero CTA (LAB-1479)", () => {
+  const spyScroll = () => vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+  it("scrolls to the demo, focuses its heading and starts the guest run in one press", async () => {
+    const call = requester((path) => path === "/v1/account" ? account : result);
+    const scroll = spyScroll();
+    const user = userEvent.setup(); render(<HostedApp call={call} />);
+    await screen.findByRole("button", { name: "Run live example" });
+    const cta = screen.getByRole("link", { name: "Run the live demo" });
+    expect(cta).toHaveAttribute("href", "#demo");
+    await user.click(cta);
+    await screen.findByText("Live result · answered by test-model");
+    expect(call).toHaveBeenCalledWith("/v1/demo", { sample_id: "en-support", language: "en" });
+    expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(scroll.mock.contexts[0]).toBe(document.getElementById("demo"));
+    const heading = screen.getByRole("heading", { name: "See exactly what the model sees." });
+    expect(heading).toHaveAttribute("tabindex", "-1");
+    expect(heading).toHaveFocus();
+    scroll.mockRestore();
+  });
+  it("jumps without smooth scrolling under prefers-reduced-motion", async () => {
+    const call = requester((path) => path === "/v1/account" ? account : result);
+    const scroll = spyScroll();
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false }) as MediaQueryList);
+    const user = userEvent.setup(); render(<HostedApp call={call} />);
+    await screen.findByRole("button", { name: "Run live example" });
+    await user.click(screen.getByRole("link", { name: "Run the live demo" }));
+    await screen.findByText("Live result · answered by test-model");
+    expect(scroll).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
+    vi.unstubAllGlobals(); scroll.mockRestore();
+  });
+  it("stays a plain anchor when runs are paused or the visitor is signed in", async () => {
+    const off: Account = { ...account, limits: { requests_per_day: 5, sponsored_enabled: false } };
+    for (const acct of [off, { ...account, authenticated: true }]) {
+      const call = requester((path) => path === "/v1/account" ? acct : path === "/v1/demo" ? result : []);
+      const user = userEvent.setup(); const { unmount } = render(<HostedApp call={call} />);
+      const cta = await screen.findByRole("link", { name: acct === off ? "See how it works" : "Run your own text" });
+      let prevented: boolean | null = null;
+      const listener = (e: Event) => { prevented = e.defaultPrevented; e.preventDefault(); };
+      document.addEventListener("click", listener);
+      await user.click(cta);
+      document.removeEventListener("click", listener);
+      expect(prevented).toBe(false);
+      expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
+      unmount();
+    }
+  });
+});
+
 describe("sponsorship off (zero budget until the provider authorises it)", () => {
   const off: Account = { ...account, limits: { requests_per_day: 5, images_per_day: 0, max_image_bytes: 0, sponsored_enabled: false } };
   it("offers no live run to guests, keeps the worked example and points to sign-in", async () => {
