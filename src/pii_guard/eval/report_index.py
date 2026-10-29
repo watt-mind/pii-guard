@@ -660,9 +660,21 @@ def build_index(
                 entry["generators"].add(f["generator"])
     for rec in text:  # sets whose files aren't committed: take document counts from metrics
         current = versions[rec["fixture_set"]]
+        entry = fixture_sets.setdefault(
+            rec["fixture_set"],
+            {
+                "origin": {f["origin"] for f in rec["fixtures"]},
+                "languages": {f["language"] for f in rec["fixtures"] if f["language"]},
+                "documents": {},
+                "generators": {
+                    f["generator"] for f in rec["fixtures"] if f["generator"]
+                },
+                "kind": rec["kind"],
+            },
+        )
         for lang, block in rec["metrics"]["languages"].items():
             if fixture_shas(rec)[lang] == current[lang]:
-                fixture_sets[rec["fixture_set"]]["documents"].setdefault(lang, block["documents"])
+                entry["documents"].setdefault(lang, block["documents"])
     fixture_sets = {
         name: {
             "origin": _origin(v["origin"]),
