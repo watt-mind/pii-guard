@@ -163,7 +163,7 @@ describe("console shell", () => {
     expect(menu).toHaveAttribute("aria-expanded", "false");
     expect(location.hash).toBe("#connect");
     expect(screen.getByRole("main")).toHaveFocus();
-    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "auto" });
     scroll.mockRestore();
     await user.click(menu);
     await user.keyboard("{Escape}");
