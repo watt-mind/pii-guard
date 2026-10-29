@@ -2,6 +2,8 @@ import type { BenchmarkIndex } from "./benchmarks";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   coverageTag,
+  FAST_MODE_SYSTEM,
+  groupOf,
   documentCount,
   headline,
   missingLanguages,
@@ -70,14 +72,16 @@ describe("benchmark index helpers", () => {
 });
 
 describe("headline", () => {
-  it("compares the lowest-leak pii-guard configuration with the lowest-leak tool", async () => {
+  it("compares fast mode (what ships) with the lowest-leak tool, not a best-of configurations", async () => {
     const { headline } = await import("./benchmarks");
     const index = (await import("virtual:pii-guard/benchmarks-index")).default as BenchmarkIndex;
     const set = index.headline_set ?? "smoke";
     const h = headline(index, set, "all");
     expect(h).not.toBeNull();
-    expect(index.systems[h!.ours.system]!.family).toBe("pii-guard");
+    expect(h!.fastMode).toBe(true);
+    expect(h!.ours.system).toBe(FAST_MODE_SYSTEM);
     expect(index.systems[h!.theirs.system]!.family).toBe("comparison");
+    if (h!.otherModel) expect(groupOf(index.systems[h!.otherModel.system])).toBe("other-model");
     expect(h!.ours.leak).toBeLessThanOrEqual(h!.theirs.leak);
   });
 
@@ -96,6 +100,10 @@ describe("headline", () => {
 
   it("spells detector names one way in labels", async () => {
     const index = tidyLabels(await loadBenchmarks());
-    expect(Object.values(index.systems).some((v) => /\bner\b/.test(v.label) || /\bner\b/.test(v.short_label ?? ""))).toBe(false);
+    const word = /(?<![\w/-])ner(?![\w-])/;
+    expect(Object.values(index.systems).some((v) => word.test(v.label) || word.test(v.short_label ?? ""))).toBe(false);
+    // The product reads PII Guard; a model id keeps its spelling (LAB-1493).
+    expect(Object.values(index.systems).some((v) => /(^|\s)pii-guard\s/.test(v.label))).toBe(false);
+    expect(index.systems["rules+ner:xlmr-base-v2-hn"]?.label).toContain("watt-mind/pii-guard-ner-xlmr-base");
   });
 });
