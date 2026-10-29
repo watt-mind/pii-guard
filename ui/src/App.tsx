@@ -1,5 +1,6 @@
+import type { ChatDraft } from "./screens/Chat";
+import type { TrafficProps } from "./screens/Traffic";
 import { useOwnerRevision } from "./api/localOwner";
-import { Workspace } from "./projects/Workspace";
 import { getSelectedEndpoint, getSelectedProject, setSelectedProject, useSelectedScope } from "./projects/selection";
 import { HostedApp } from "./hosted/HostedApp";
 import { AccountSummary, ProviderConnections } from "./hosted/AccountPanels";
@@ -8,7 +9,7 @@ import { ClientSetup } from "./hosted/ClientSetup";
 import { loadFirstRun } from "./hosted/firstRun";
 import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
 import { chatModesOf, offersDemoTraffic, offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
 import { endpointSnippets } from "./api/connect";
 import { engineReason } from "./api/engine";
@@ -28,20 +29,22 @@ import { useTheme } from "./hooks/useTheme";
 import { useTraffic } from "./hooks/useTraffic";
 import { initialAnswer, runGuard, toRunError, type RunError, type RunResult } from "./lib/run";
 import { DEFAULT_ROUTE, PLAYGROUND_TABS, SECTIONS, hashOf, parseHash, routeFromLocation, sameRoute, type PlaygroundTab, type Route, type Section } from "./lib/routes";
-import { Playground } from "./screens/Playground";
-import { Benchmarks } from "./screens/Benchmarks";
-import { Connect } from "./screens/Connect";
-import { Images } from "./screens/Images";
-import { Overview } from "./screens/Overview";
-import { OwnerPolicy, Policy } from "./screens/Policy";
-import { RoundTrip } from "./screens/RoundTrip";
-import { Chat, type ChatDraft } from "./screens/Chat";
-import { Logs, type TrafficProps } from "./screens/Traffic";
-import { Vault } from "./screens/Vault";
 import type { VaultClient } from "./api/vault";
 import type { KnownRow } from "./lib/knownRows";
 import { knownSignatureOf, type KnownSession } from "./lib/run";
 import { newKnownRow } from "./lib/knownRows";
+import { Benchmarks } from "./screens/Benchmarks";
+import { Overview } from "./screens/Overview";
+import { Logs } from "./screens/Traffic";
+const Workspace = lazy(() => import("./projects/Workspace").then((module) => ({ default: module.Workspace })));
+const Playground = lazy(() => import("./screens/Playground").then((module) => ({ default: module.Playground })));
+const Connect = lazy(() => import("./screens/Connect").then((module) => ({ default: module.Connect })));
+const Images = lazy(() => import("./screens/Images").then((module) => ({ default: module.Images })));
+const OwnerPolicy = lazy(() => import("./screens/Policy").then((module) => ({ default: module.OwnerPolicy })));
+const Policy = lazy(() => import("./screens/Policy").then((module) => ({ default: module.Policy })));
+const RoundTrip = lazy(() => import("./screens/RoundTrip").then((module) => ({ default: module.RoundTrip })));
+const Chat = lazy(() => import("./screens/Chat").then((module) => ({ default: module.Chat })));
+const Vault = lazy(() => import("./screens/Vault").then((module) => ({ default: module.Vault })));
 
 export interface AppProps {
   api?: HttpGuardClient;
@@ -138,14 +141,14 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   const [requestedRoute, setRouteState] = useState<Route>(routeFromLocation);
   // A section or tab the server doesn't offer opens the Overview (or the first offered tab).
   const route = allowedRoute(requestedRoute, caps);
-  // Evaluation loads its data lazily on first open, then stays mounted (filters survive).
-  const [evaluationOpened, setEvaluationOpened] = useState(() => route.section === "evaluation");
-  // The Images screen (and its sample PNGs, ~820 KB) mounts on first open, then stays mounted (LAB-1458).
-  const [imagesOpened, setImagesOpened] = useState(() => route.section === "playground" && route.tab === "images");
-  if (!imagesOpened && route.section === "playground" && route.tab === "images") setImagesOpened(true);
+  // Mount each route on its first visit, then retain its drafts/results until scope changes.
+  const routeKey = route.section === "playground" ? `playground/${route.tab}` : route.section;
+  const [visited, setVisited] = useState(() => new Set([routeKey]));
+  if (!visited.has(routeKey)) setVisited(new Set([...visited, routeKey]));
+  const opened = (key: string) => key === routeKey || visited.has(key);
+  const sectionOpened = (key: string) => key === route.section || [...visited].some((visitedKey) => visitedKey.split("/")[0] === key);
   const [textView, setTextView] = useState<"mask" | "roundtrip">("mask");
   const navigate = useCallback((next: Route, how: "push" | "replace" | "none" = "push") => {
-    if (next.section === "evaluation") setEvaluationOpened(true);
     setRouteState((prev) => (sameRoute(prev, next) ? prev : next));
     if (how !== "none") writeHash(next, how);
   }, []);
@@ -320,6 +323,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
 
         <main id="main" tabIndex={-1} className="mx-auto min-h-dvh max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
           <section id="section-overview" aria-label="Overview" hidden={section !== "overview"}>
+            {sectionOpened("overview") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading overview…</p>}>
             {trafficOpened && (
               <Overview
                 t={trafficHandle}
@@ -335,9 +339,11 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 }}
               />
             )}
+            </Suspense>}
           </section>
 
           <section id="section-playground" aria-label="Playground" hidden={section !== "playground"} className="space-y-6">
+            {sectionOpened("playground") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading playground…</p>}>
             <PageHeader
               title="Playground"
               lead={
@@ -358,7 +364,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 ]}
               />
               <div hidden={textView !== "mask"}>
-                <Playground
+                <Suspense fallback={<p role="status">Loading text…</p>}>{opened("playground/text") && <Playground
                   text={text}
                   onText={editText}
                   sampleId={sampleId}
@@ -389,10 +395,10 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                     openTab("chat");
                     window.scrollTo?.({ top: 0 });
                   }}
-                />
+                />}</Suspense>
               </div>
               {textView === "roundtrip" && (
-                <RoundTrip
+                <Suspense fallback={<p role="status">Loading round trip…</p>}><RoundTrip
                   key={result?.mask.session_id ?? "none"}
                   client={engine.client}
                   result={result}
@@ -400,21 +406,23 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                   onAnswer={setAnswer}
                   running={running}
                   onRun={() => void run()}
-                />
+                /></Suspense>
               )}
             </div>
             <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" hidden={tab !== "chat"}>
-              <Chat
+              <Suspense fallback={<p role="status">Loading chat…</p>}>{opened("playground/chat") && <Chat
                 client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={server?.upstream?.mock ?? false}
                 modes={chatModesOf(server, caps)}
-              />
+              />}</Suspense>
             </div>
             <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={tab !== "images"}>
-              {caps.images && imagesOpened && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}
+              <Suspense fallback={<p role="status">Loading images…</p>}>{caps.images && opened("playground/images") && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}</Suspense>
             </div>
+            </Suspense>}
           </section>
 
           <section id="section-logs" aria-label="Logs" hidden={section !== "logs"}>
+            {sectionOpened("logs") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading logs…</p>}>
             {trafficOpened && (
               <Logs
                 t={trafficHandle}
@@ -430,11 +438,15 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 }}
               />
             )}
+            </Suspense>}
           </section>
           <section id="section-vault" aria-label="Vault" hidden={section !== "vault"}>
+            {sectionOpened("vault") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading vault…</p>}>
             <Vault status={status} live={engine.engine === "api"} active={section === "vault"} client={vault} focus={vaultFocus} />
+            </Suspense>}
           </section>
           <section id="section-connect" aria-label="Connect" hidden={section !== "connect"}>
+            {sectionOpened("connect") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading connect…</p>}>
             <Connect
               status={status}
               serverSnippets={!caps.accounts || (server !== null && hostedSnippets !== undefined)}
@@ -452,15 +464,22 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 openSection("vault");
               }}
             />
+            </Suspense>}
           </section>
           <section id="section-projects" aria-label="Projects" hidden={section !== "projects"}>
-            {section === "projects" && <Workspace call={hosted?.call} hosted={caps.accounts} onProject={selectProject} projectId={getCurrentProject()} />}
+            {sectionOpened("projects") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading projects…</p>}>
+            {opened("projects") && <Workspace call={hosted?.call} hosted={caps.accounts} onProject={selectProject} projectId={getCurrentProject()} />}
+            </Suspense>}
           </section>
           <section id="section-policy" aria-label="Policy" hidden={section !== "policy"}>
+            {sectionOpened("policy") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading policy…</p>}>
             {caps.server_policy ? <Policy status={status} /> : section === "policy" && <OwnerPolicy call={hosted?.call} projectId={getCurrentProject()} />}
+            </Suspense>}
           </section>
           <section id="section-evaluation" aria-label="Evaluation" hidden={section !== "evaluation"}>
-            {evaluationOpened && <Benchmarks load={loadBenchmarks} />}
+            {sectionOpened("evaluation") && <Suspense fallback={<p role="status" className="text-sm text-muted">Loading evaluation…</p>}>
+            {opened("evaluation") && <Benchmarks load={loadBenchmarks} />}
+            </Suspense>}
           </section>
         </main>
 

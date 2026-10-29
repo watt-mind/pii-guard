@@ -150,7 +150,7 @@ describe("hosted console for a signed-in owner", () => {
     const tabs = await screen.findByRole("tablist", { name: "Playground" });
     expect(within(tabs).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Text", "Chat"]);
     await waitFor(() => expect(location.hash).toBe("#playground/text"));
-    await user.click(screen.getByRole("button", { name: /mask document/i }));
+    await user.click(await screen.findByRole("button", { name: /mask document/i }));
     const masked = await within(screen.getByRole("tabpanel", { name: "Text" })).findByTestId("masked-text");
     expect(masked).toHaveTextContent(/\[\[PERSON_[0-9a-f]{4,}\]\]/);
   });

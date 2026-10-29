@@ -37,7 +37,8 @@ function recorded(id: string, overrides: Partial<ImageMaskResponse> = {}): Image
 async function openImages(api: HttpGuardClient) {
   const user = userEvent.setup();
   render(<App api={api} mock={createMockClient()} loadImage={loadImage} />);
-  await user.click(screen.getByRole("tab", { name: /images/i }));
+  await user.click(await screen.findByRole("tab", { name: /images/i }));
+  await screen.findByRole("button", { name: /mask image/i });
   return { user, panel: screen.getByRole("tabpanel", { name: /images/i }) };
 }
 
