@@ -1,5 +1,5 @@
 import { MENU_OPENED } from "../hooks/useMenu";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { engineReason, type EngineDisplay, type EngineState, type ModePreference } from "../api/engine";
 import type { ThemePref } from "../hooks/useTheme";
 import { SECTIONS, hashOf, type Route, type Section } from "../lib/routes";
@@ -32,6 +32,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const menuButton = useRef<HTMLButtonElement>(null);
+  const focusDestination = useRef(false);
 
   // A route change from outside the menu (a link, Back, a chart) closes the phone menu.
   const routeKey = `${route.section}/${route.tab}`;
@@ -40,6 +41,15 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
     setShownFor(routeKey);
     setOpen(false);
   }
+  // Position the destination only after the expanded mobile menu has collapsed.
+  useLayoutEffect(() => {
+    if (open || !focusDestination.current) return;
+    focusDestination.current = false;
+    const main = document.getElementById("main");
+    main?.focus({ preventScroll: true });
+    main?.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [open, routeKey]);
+
   // So does another menu opening (the profile or project menu: useMenu announces it).
   useEffect(() => {
     if (!open) return;
@@ -98,7 +108,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
           </button>
         </div>
 
-        <div id={menuId} className={[open ? "block" : "hidden", "border-t border-line lg:flex lg:min-h-0 lg:flex-col lg:border-t-0"].join(" ")}>
+        <div id={menuId} className={[open ? "block" : "hidden", "max-h-[calc(100dvh-3.5rem)] overflow-y-auto border-t border-line lg:max-h-none lg:overflow-visible lg:flex lg:min-h-0 lg:flex-col lg:border-t-0"].join(" ")}>
           <nav aria-label="Console" className="px-2 py-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-2">
             {NAV_GROUPS.map((group, gi) => (
               <div key={group.label ?? "top"} className={group.label ? "mt-4" : undefined}>
@@ -120,6 +130,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                             // a modified click (new tab) is left to the browser.
                             if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                             e.preventDefault();
+                            focusDestination.current = open;
                             setOpen(false);
                             onSection(s.id);
                           }}

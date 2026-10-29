@@ -74,7 +74,7 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
             e.preventDefault();
             setConnected("");
             void action(async () => {
-              const secret = apiKey;
+              const secret = apiKey.trim();
               setApiKey("");
               const created = await call<Partial<Connection> | undefined>("/v1/account/connections", { provider, api_key: secret, ...(provider === "custom" ? { base_url: baseUrl } : {}) });
               await refresh();
@@ -100,7 +100,7 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
             <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
           </Field>
           <div className="sm:col-span-2">
-            <Button variant="primary" type="submit" busy={busy} disabled={!busy && !apiKey}>{busy ? "Working…" : "Connect provider"}</Button>
+            <Button variant="primary" type="submit" busy={busy} disabled={!busy && !apiKey.trim()}>{busy ? "Working…" : "Connect provider"}</Button>
           </div>
         </form>
         {connected && <Notice tone="success" live>{connected}</Notice>}
@@ -110,7 +110,7 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
         <h3 id={listTitle} tabIndex={-1} className="text-lg font-normal text-ink focus:outline-none">Your connections</h3>
         <Announcer message={announce} />
         {account.connections.length === 0 ? (
-          <p className="text-sm text-muted">No provider connections yet. Playground chat uses Meta Muse Spark.</p>
+          <p className="text-sm text-muted">No provider connections yet. {account.limits.sponsored_enabled === false ? "Free runs are paused. Connect your own model key to use Playground chat." : "Playground chat uses Meta Muse Spark."}</p>
         ) : (
           <ul className="divide-y divide-line" aria-labelledby={listTitle}>
             {account.connections.map((c) => (
@@ -185,12 +185,12 @@ export function ProviderConnections() {
     <section aria-labelledby="connections-title" className="space-y-4">
       <div>
         <h2 id="connections-title" className="text-lg font-normal text-ink">Model provider keys for the Playground</h2>
-        <p className="mt-0.5 text-sm text-muted">Connect your own model key for Playground chat. Your application doesn&apos;t use these: it uses an endpoint key from <a className="underline underline-offset-4" href="#projects">Projects</a>, as above.</p>
+        <p className="mt-0.5 text-sm text-muted">Connect your own model key for Playground chat. Your application doesn&apos;t use these: it uses an endpoint key from <a className="underline underline-offset-4" href="#projects">Projects</a>.</p>
       </div>
       <div className="space-y-6 rounded-xl border border-line bg-surface p-4 sm:p-5">
         <Field label="Playground chat sends through" className="sm:max-w-md">
           <Select value={active} onChange={(e) => setPlaygroundConnection(e.target.value)}>
-            <option value="">Meta Muse Spark (no key needed)</option>
+            <option value="">{account.limits.sponsored_enabled === false ? "Meta Muse Spark (free runs paused)" : "Meta Muse Spark (no key needed)"}</option>
             {account.connections.map((c) => <option key={c.id} value={c.id}>{connectionLabel(c)}</option>)}
           </Select>
         </Field>
