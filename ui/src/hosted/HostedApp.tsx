@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createHttpChat, pickDefaultModel, SYSTEM_PROMPT } from "../api/chat";
 import type { EntityType } from "../api/types";
 import { Boundary } from "../components/Boundary";
@@ -148,6 +148,17 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const masked = counts.reduce((sum, [, , n]) => sum + n, 0);
   const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: "Live run didn’t finish · showing the worked example" } : { tone: "neutral", text: "Worked example · not a live run" };
   const heroCta = signedIn ? "Run your own text" : guestLive ? "Run the live demo" : "See how it works";
+  // A guest with a live run gets it from the hero in one press (LAB-1479): the link still points
+  // at #demo, so without JS, signed in or paused it stays a plain anchor.
+  const startsRun = guestLive && !running && !quota;
+  function heroRun(e: MouseEvent<HTMLAnchorElement>) {
+    if (!startsRun || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    document.getElementById("demo")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    document.getElementById("demo-heading")?.focus({ preventScroll: true });
+    void run();
+  }
 
   return <div className="min-h-dvh bg-canvas text-sm text-ink">
     <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
@@ -177,7 +188,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <Differentiator href="#how" title="No LLM in the masking path">Rules and a small encoder NER run on the gateway itself.</Differentiator>
             <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
           </ul>
-          <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo">{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
+          <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
           <div className="space-y-2">
             <dl aria-label="Measured results" className="grid max-w-2xl grid-cols-3 gap-3 sm:gap-4">{PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
             <p className="text-xs text-muted">{MEASURED} · <a className={link} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
@@ -188,7 +199,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-6 space-y-4">
-        <SectionHead id="demo-heading" title="See exactly what the model sees." lead={`Your text, what pii-guard sends to ${modelOr("the model")}, its answer, and the answer with the real values put back.`} />
+        <SectionHead id="demo-heading" focusable title="See exactly what the model sees." lead={`Your text, what pii-guard sends to ${modelOr("the model")}, its answer, and the answer with the real values put back.`} />
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-end gap-3">
             <div className="basis-full sm:order-last sm:ml-auto sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
@@ -420,8 +431,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 }
 
 /** A landing section's heading: the console's 24/500 section title and a muted lead. */
-function SectionHead({ id, title, lead }: { id: string; title: string; lead?: string }) {
-  return <div className="max-w-3xl"><h2 id={id} className="text-2xl font-medium text-balance text-ink">{title}</h2>{lead && <p className="mt-2 text-sm text-pretty text-muted sm:text-base">{lead}</p>}</div>;
+function SectionHead({ id, title, lead, focusable }: { id: string; title: string; lead?: string; focusable?: boolean }) {
+  return <div className="max-w-3xl"><h2 id={id} tabIndex={focusable ? -1 : undefined} className="text-2xl font-medium text-balance text-ink focus:outline-none">{title}</h2>{lead && <p className="mt-2 text-sm text-pretty text-muted sm:text-base">{lead}</p>}</div>;
 }
 
 /** One of the hero's three differences: a short lead that links to the section that shows it. */
