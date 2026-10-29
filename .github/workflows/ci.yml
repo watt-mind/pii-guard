@@ -414,6 +414,10 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: Hosted deployment policy tests (offline; no cloud credentials)
         run: python3 -m unittest discover -s scripts/ci -p 'test_hosted_deploy.py'
+      - name: actionlint (workflow lint; shellcheck on run blocks)
+        run: scripts/ci/actionlint.sh
+      - name: shellcheck (CI shell scripts)
+        run: shellcheck scripts/ci/*.sh
       - name: zizmor (workflow security lint)
         env:
           GH_TOKEN: ${{ github.token }}
