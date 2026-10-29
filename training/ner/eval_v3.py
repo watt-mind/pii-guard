@@ -147,7 +147,12 @@ def _score(args: argparse.Namespace) -> int:
     analyzer.analyze("Warm-up text without personal data.", "en")
     detectors = [{"name": "rules"}, _detector(args.candidate, args.model)]
     if thresholds:
-        detectors[1]["settings"] = {"thresholds": thresholds}
+        from pii_guard.eval.stats import sha256_file
+
+        detectors[1]["settings"] = {
+            "thresholds_file": str(args.thresholds),
+            "thresholds_sha256": sha256_file(args.thresholds),
+        }
     summary: dict[str, Any] = {}
     for name in args.sets:
         paths = _paths(name)
