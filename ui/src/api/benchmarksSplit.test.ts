@@ -77,7 +77,7 @@ describe("split benchmark index (LAB-1454)", () => {
     const head = await src.set(full.headline_set!);
     expect(head.snapshots).toEqual(full.snapshots.filter((s) => s.fixture_set === full.headline_set));
     expect(head.history).toEqual(full.history.filter((h) => h.fixture_set === full.headline_set));
-    expect(fetched).toHaveLength(3); // the headline set's part was already on its way
+    expect(fetched).toHaveLength(3); // summary, headline set, run log: the set was already on its way
     expect(await src.set("no-such-set")).toEqual({ snapshots: [], history: [] });
   });
 

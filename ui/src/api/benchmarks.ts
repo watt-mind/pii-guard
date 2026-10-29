@@ -181,8 +181,8 @@ function fetchJson(url: string): Promise<Record<string, unknown>> {
 
 /**
  * The split index served next to the page. Each part is fetched once (a failed fetch is retried
- * on the next call); the headline set's results and the run log are fetched with the summary,
- * not after it, but the summary does not wait for the run log (LAB-1493).
+ * on the next call); the headline set's results are fetched with the summary, not after it. The
+ * run log is fetched after them, so it never holds up the first view (LAB-1493).
  */
 export function fetchedBenchmarks(
   manifest: BenchmarkManifest = manifestModule as BenchmarkManifest,
@@ -205,13 +205,16 @@ export function fetchedBenchmarks(
     manifest.parts[setPart(fixtureSet)] ? (part(setPart(fixtureSet)) as Promise<unknown> as Promise<SetResults>) : Promise.resolve(EMPTY_SET);
   return {
     summary() {
-      // In parallel: the headline set's results and the run log.
+      // In parallel: the headline set's results. The run log follows them (runs()).
       if (manifest.headline_set) set(manifest.headline_set).catch(() => undefined);
-      part(RUNS_PART).catch(() => undefined);
       return part(SUMMARY_PART).then((summary) => ({ ...summary, runs: [], ...EMPTY_SET }) as unknown as BenchmarkIndex);
     },
     set,
-    runs: () => part(RUNS_PART) as Promise<unknown> as Promise<Pick<BenchmarkIndex, "runs">>,
+    // After the headline set, so the first view gets the bandwidth (the run log is the larger part).
+    runs: () => {
+      const first = manifest.headline_set ? set(manifest.headline_set).catch(() => undefined) : Promise.resolve();
+      return first.then(() => part(RUNS_PART)) as Promise<unknown> as Promise<Pick<BenchmarkIndex, "runs">>;
+    },
     async full() {
       const names = [SUMMARY_PART, RUNS_PART, DETAIL_PART, ...manifest.sets.map(setPart)];
       const parts = await Promise.all(names.map(part));
