@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
-import { TEXT_ENTITY_TYPES, type TextEntityType } from "../api/types";
+import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type TextEntityType, type VisualEntityType } from "../api/types";
 import { ENTITY_META, type Policy } from "../lib/entities";
 import { ApiError } from "../api/http";
 import { Announcer, Button, Card, Checkbox, ConfirmAction, Field, Input, Notice, PageHeader, SecretReveal, Select } from "../components/ui";
@@ -7,7 +7,7 @@ import { localRequest } from "./request";
 import { request, recovery, type Requester } from "../hosted/api";
 import { useHostedSession } from "../hosted/session";
 import { setSelectedEndpoint } from "./selection";
-import { exampleModel, projectPath, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList } from "./api";
+import { exampleModel, projectPath, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
 
@@ -27,6 +27,7 @@ let carried: string | null = null;
 
 interface Props { call?: Requester; hosted?: boolean; projectId?: string; onProject?: (project: Project) => void }
 const defaults = Object.fromEntries(TEXT_ENTITY_TYPES.map((type) => [type, ENTITY_META[type].policy])) as Record<TextEntityType, Policy>;
+const visualDefaults = Object.fromEntries(VISUAL_ENTITY_TYPES.map((type) => [type, ENTITY_META[type].policy === "keep" ? "keep" : "mask"])) as Record<VisualEntityType, "mask" | "keep">;
 
 /* ---------- Words for codes ---------- */
 
@@ -152,7 +153,7 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
 
 type Notified = { area: "endpoints" | "policies"; text: string; endpointId?: string } | null;
 interface EndpointBody { name: string; provider: string; model: string | null; policy_version_id: string; enabled: boolean; base_url?: string; api_key?: string }
-interface PolicyBody { name: string; entity_policies: Record<TextEntityType, Policy>; language: string; mode: string }
+interface PolicyBody { name: string; entity_policies: Record<TextEntityType, Policy> & Record<VisualEntityType, "mask" | "keep">; language: string; mode: string; visual_detection: VisualDetection }
 
 function ProjectConfiguration({ project, call, hosted }: { project: Project; call: Requester; hosted: boolean }) {
   const [policies, setPolicies] = useState<PolicyVersion[]>([]);
@@ -528,12 +529,20 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
   const [entities, setEntities] = useState({ ...(policy?.entity_policies ?? template?.entity_policies ?? defaults) });
   const [language, setLanguage] = useState(policy?.language ?? template?.language ?? "hu");
   const [mode, setMode] = useState(hosted ? "fast" : policy?.mode ?? template?.mode ?? "fast");
+  const start = policy ?? template;
+  // A version saved before visual types existed shows the defaults (the server's, LAB-1444).
+  const [visual, setVisual] = useState(() => Object.fromEntries(VISUAL_ENTITY_TYPES.map((type) => {
+    const saved = start?.entity_policies[type];
+    return [type, saved === "keep" || saved === "mask" ? saved : visualDefaults[type]];
+  })) as Record<VisualEntityType, "mask" | "keep">);
+  // Hosted images are on-device only until SAM has its own spend reservation.
+  const [detection, setDetection] = useState<VisualDetection>(hosted ? "local" : start?.visual_detection ?? "local");
   const titleId = useId();
   useFocusOnOpen(titleId);
   const affected = endpoints.filter((e) => e.enabled && e.policy_id === policy?.policy_id);
   return (
     <Card title={policy ? `New version of ${policy.name}` : "Create policy"} titleId={titleId} subtitle="Mask replaces detected values with reversible placeholders. Keep sends them unchanged. Block refuses the entire request when that type is detected.">
-      <form aria-labelledby={titleId} className="space-y-4" onSubmit={(e) => { e.preventDefault(); void onSave({ name, entity_policies: entities, language, mode }); }}>
+      <form aria-labelledby={titleId} className="space-y-4" onSubmit={(e) => { e.preventDefault(); void onSave({ name, entity_policies: { ...entities, ...visual }, language, mode, visual_detection: detection }); }}>
         <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Policy name" required>
             <Input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
@@ -567,6 +576,35 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
               </Field>
             ))}
           </div>
+        </fieldset>
+        <fieldset disabled={busy} className="min-w-0">
+          <legend className="mb-3 text-sm font-medium text-ink">Images</legend>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Field
+              label="Detection"
+              hint={hosted
+                ? "The hosted service detects on its own CPU only; SAM 3.1 needs a self-hosted install."
+                : detection === "sam"
+                  ? "The original image is sent to Meta's API for signatures and stamps. Needs a SAM key on the server; a server set to on-device detection stays on-device."
+                  : "Faces, ID photos and signatures are found on the guard's CPU. Stamps cannot be detected on-device, so they can only be kept."}
+            >
+              <Select value={detection} onChange={(e) => setDetection(e.target.value as VisualDetection)}>
+                <option value="local">{VISUAL_DETECTION_LABEL.local}</option>
+                <option value="sam" disabled={hosted}>{VISUAL_DETECTION_LABEL.sam}</option>
+              </Select>
+            </Field>
+            {VISUAL_ENTITY_TYPES.map((type) => (
+              <Field key={type} label={ENTITY_META[type].label}>
+                <Select value={visual[type]} onChange={(e) => setVisual((prev) => ({ ...prev, [type]: e.target.value as "mask" | "keep" }))}>
+                  <option value="mask">Mask</option>
+                  <option value="keep">Keep</option>
+                </Select>
+              </Field>
+            ))}
+          </div>
+          {detection === "local" && visual.STAMP === "mask" && (
+            <p role="alert" className="mt-2 text-sm text-warn">On-device detection cannot find stamps, so every image would be refused. Keep stamps, or choose SAM 3.1.</p>
+          )}
         </fieldset>
         <div className={REVIEW}>
           <p>{policy ? "Saving creates a new version. No endpoint changes automatically." : "The new policy is available to endpoints in this project."}</p>

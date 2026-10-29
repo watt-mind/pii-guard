@@ -16,8 +16,9 @@ service has passed review. Start with internal ingress and zero sponsored budget
 | Self-hosted | Original input stays in the operator's chosen guard/detector infrastructure | Masked input to the operator's provider | The operator controls access and retention |
 
 Hosted images are processed on the replica only ([ADR 0014](decisions/0014-hosted-local-images.md)):
-no SAM, no remote detector, no image spend. The on-device segmenter cannot find signatures or
-stamps, so the deployment sets `SIGNATURE=keep` (they stay visible) or every image is refused.
+no SAM, no remote detector, no image spend. Faces and ID photos are found by YuNet and
+signatures by the pinned YOLOS-tiny detector, both on the CPU; the owner's project policy decides
+what is masked (LAB-1444). Nothing local finds stamps, so a policy that masks `STAMP` is refused.
 Document uploads (PDF/DOCX) and remote LLM detection are outside the initial scope. A remote detector
 is different from downstream generation: it receives originals. Never enable one without an
 explicitly approved trust boundary and terms review. See [models](models.md) and LAB-1139 for
@@ -192,7 +193,7 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID` | The environment runtime identity's client ID |
 | `PII_GUARD_HOSTED_IMAGES` | Default `true`: signed-in image masking; `/readyz` then requires Tesseract and the on-device segmenter |
 | `PII_GUARD_SEGMENTER` | `local` (image default); `hybrid`/`sam-api`/`off` refuse startup while hosted images are on |
-| `PII_GUARD_POLICY_OVERRIDES` | `SIGNATURE=keep`: the on-device segmenter cannot find signatures; without it images are refused and not offered |
+| `PII_GUARD_POLICY_OVERRIDES` | Unset: owners' project policies decide visual actions; an override set here wins when stricter |
 | `PII_GUARD_HOSTED_MAX_IMAGE_BYTES`, `PII_GUARD_HOSTED_IMAGE_MAX_PIXELS` | Defaults 4 MiB decoded and 8 MP, checked before OCR |
 | `PII_GUARD_HOSTED_IMAGE_TIMEOUT` | Default 60 s per image; one image job per replica, a busy replica answers `429` |
 | `PII_GUARD_HOSTED_USER_IMAGES_PER_DAY`, `PII_GUARD_HOSTED_GLOBAL_IMAGES_PER_DAY` | Defaults 20 and 500, reserved before work, never refunded |

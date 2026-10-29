@@ -228,7 +228,8 @@ describe("Images screen, hosted", () => {
     const note = screen.getByRole("note", { name: /how hosted images are processed/i });
     expect(note).toHaveTextContent(/processed in memory on our Azure server and is not stored/i);
     expect(note).toHaveTextContent(/not sent to any other service/i);
-    expect(note).toHaveTextContent(/signatures and stamps are not detected here/i);
+    expect(note).toHaveTextContent(/faces, ID photos and signatures are found on that server's CPU/i);
+    expect(note).toHaveTextContent(/stamps are not detected here/i);
     expect(screen.queryByText(/SAM 3\.1 segments signatures/i)).not.toBeInTheDocument();
   });
 

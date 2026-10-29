@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Hosted build: text plus local-only image masking (ADR 0014). Keep the self-hosted Dockerfile
-# independent. Images use Tesseract and the on-device YuNet segmenter only; never SAM.
+# independent. Images use Tesseract, the on-device YuNet segmenter and the pinned YOLOS-tiny
+# signature detector only; never SAM (ADR 0014, LAB-1444).
 # python-deps ends with the dependency-only venv. The runtime copies it as its own layer, which
 # keeps its digest across src-only changes; only the small project layer changes (LAB-1449).
 FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-trixie-slim@sha256:bf889bda77474aa50c351caf1538b855ef2b7a30add45f26ca50dcb6ade06402 AS python-deps
@@ -35,13 +36,18 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && .venv/bin/python -m pii_guard.eval.report_cli --print-index > /app/benchmarks-index.json
 # Loads the fetched checkpoint with this commit's detector and warms a CPU forward pass.
 RUN .venv/bin/python -c "from pii_guard.detect.ner import NerDetector; NerDetector(model='/app/models/ner', device='cpu')"
-# The YuNet face/ID-photo model (0.23 MB, MIT), fetched from its pinned URL and checked against
-# its pinned SHA-256 (pii_guard.visual.segment.YUNET); the build fails on a mismatch.
-# The runtime copies the NER checkpoint from ner-model and only the YuNet file from here, so this
+# The YuNet face/ID-photo model (0.23 MB, MIT) and the YOLOS-tiny signature detector (26 MB,
+# Apache-2.0, safetensors), each fetched from its pinned URL and checked against its pinned
+# SHA-256 (pii_guard.visual.segment.YUNET, pii_guard.visual.segmenters.SIGNATURE_DETECTOR); the
+# build fails on a mismatch. The detector is then loaded offline once, as readiness does.
+# The runtime copies the NER checkpoint from ner-model and only these files from here, so this
 # fails if a step above changed the checkpoint or left anything else in /app/models.
 RUN --mount=type=bind,from=ner-model,source=/app/models/ner,target=/tmp/ner-pinned \
     PII_GUARD_MODEL_DIR=/app/models .venv/bin/python -m pii_guard.visual.segment fetch \
-    && test "$(ls -A /app/models | tr '\n' ' ')" = "face_detection_yunet_2023mar.onnx ner " \
+    && PII_GUARD_MODEL_DIR=/app/models .venv/bin/python -m pii_guard.visual.segmenters fetch \
+    && PII_GUARD_MODEL_DIR=/app/models HF_HUB_OFFLINE=1 .venv/bin/python -c "from pii_guard.visual.segmenters import SignatureDetector; SignatureDetector()" \
+    && test "$(ls -A /app/models | tr '\n' ' ')" = "face_detection_yunet_2023mar.onnx ner yolos-tiny-signature " \
+    && test "$(ls -A /app/models/yolos-tiny-signature | tr '\n' ' ')" = "config.json model.safetensors preprocessor_config.json " \
     && diff -r --no-dereference /tmp/ner-pinned /app/models/ner
 
 FROM node:24-trixie-slim@sha256:89c5244bc22a9bc3287d89ebc7e49b9cb5bb84cd40e6175ac3421d5a9f68b95a AS ui-build
@@ -78,6 +84,7 @@ COPY --from=python-deps /app/.venv /app/.venv
 COPY --from=python-build /app/venv-project /app/.venv
 COPY --from=ner-model /app/models/ner /app/models/ner
 COPY --from=python-build /app/models/face_detection_yunet_2023mar.onnx /app/models/
+COPY --from=python-build /app/models/yolos-tiny-signature /app/models/yolos-tiny-signature
 COPY --from=ui-build /ui/dist /app/.venv/lib/python3.12/site-packages/pii_guard/_ui
 COPY deploy/azure/entrypoint.py /app/entrypoint.py
 ENV PATH=/app/.venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \

@@ -112,11 +112,10 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { name: 'PII_GUARD_ALLOWED_HOSTS', value: '${split(replace(publicOrigin, 'https://', ''), '/')[0]},${appName}.${environment.properties.defaultDomain}' }
           { name: 'PII_GUARD_NER_MODEL', value: '/app/models/ner' }
           { name: 'PII_GUARD_DETECTORS', value: 'rules,ner' }
-          // Hosted images (ADR 0014): local OCR + on-device segmenter only. It cannot find
-          // signatures, so they stay visible (keep); otherwise every image is refused.
+          // Hosted images (ADR 0014): local OCR + on-device faces and signatures only. The
+          // owner's project policy decides visual actions; no server override (LAB-1444).
           { name: 'PII_GUARD_HOSTED_IMAGES', value: 'true' }
           { name: 'PII_GUARD_SEGMENTER', value: 'local' }
-          { name: 'PII_GUARD_POLICY_OVERRIDES', value: 'SIGNATURE=keep' }
           { name: 'PII_GUARD_HOSTED_MODELS', value: 'muse-spark-1.3' }
           { name: 'PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS', value: string(admittedSponsoredMicrodollars) }
           { name: 'PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID', value: allocationId }
