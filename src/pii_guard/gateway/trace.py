@@ -202,6 +202,9 @@ def _entities(stats: RequestStats | None) -> dict[str, Any] | None:
     out: dict[str, Any] = {
         "detected": dict(sorted(stats.spans.items())),
         "masked": dict(sorted((k, v) for k, v in stats.masked.items() if v)),
+        # Fail-closed overrides the resolver forced over a keep type (LAB-1248, LAB-1228):
+        # counts by entity type only, never values or detector internals beyond the type.
+        "forced_masks": dict(sorted((k, v) for k, v in stats.forced.items() if v)),
         "texts": stats.texts,
     }
     if stats.images:
