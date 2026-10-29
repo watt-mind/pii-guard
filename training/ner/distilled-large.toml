@@ -1,0 +1,20 @@
+# Distilled student (LAB-1128): xlm-roberta-large on the Glimmer-labelled distillation corpus.
+# Corpus: training/distill/corpus.py --seed 11 (hu + en, 2,500 planned each), labels:
+# training/distill/label.py (planted gold + rules + Muse Glimmer low; disagreements excluded
+# from the loss via meta.loss_ignore). Fictional data only. Train on a GPU:
+#   modal run training/distill/modal_train.py --config training/ner/distilled-large.toml
+base_model = "FacebookAI/xlm-roberta-large"   # MIT licence
+train = ["eval/generated/distill-s11/labelled/hu-distill-train.jsonl", "eval/generated/distill-s11/labelled/en-distill-train.jsonl"]
+dev = ["eval/generated/distill-s11/labelled/hu-distill-dev.jsonl", "eval/generated/distill-s11/labelled/en-distill-dev.jsonl"]
+out = "models/ner/pii-guard-ner-xlmr-large-distilled"
+teacher = "none"   # the teacher's labels are already in the corpus
+epochs = 4
+batch_size = 16
+lr = 2e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Open-source privacy gateway for AI agents: personal data becomes placeholders before the prompt leaves, and comes back in the answer. OpenAI-compatible. Built on Meta models." />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="https://guard.watt-mind.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PII Guard" />
+    <meta property="og:title" content="PII Guard · privacy gateway for AI agents" />
+    <meta property="og:description" content="Send the work to the model. Keep the people out of it. Open-source, OpenAI-compatible, built on Meta models." />
+    <meta property="og:url" content="https://guard.watt-mind.com/" />
+    <meta property="og:image" content="https://guard.watt-mind.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="PII Guard: you send a name and an e-mail, the model sees only placeholders, you get the real values back." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PII Guard · privacy gateway for AI agents" />
+    <meta name="twitter:description" content="Send the work to the model. Keep the people out of it. Open-source, OpenAI-compatible, built on Meta models." />
+    <meta name="twitter:image" content="https://guard.watt-mind.com/og-image.png" />
+    <title>PII Guard · privacy gateway for AI agents</title>
+    <script>
+      // Apply the theme before first paint so dark mode doesn't flash. The local console's
+      // first look is light; the hosted build (public landing) follows the system setting.
+      (function () {
+        var fallback = "%VITE_PII_GUARD_HOSTED%" === "true" ? "system" : "light";
+        var pref = fallback;
+        try {
+          pref = localStorage.getItem("pii-guard:theme") || fallback;
+        } catch (e) {}
+        var dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

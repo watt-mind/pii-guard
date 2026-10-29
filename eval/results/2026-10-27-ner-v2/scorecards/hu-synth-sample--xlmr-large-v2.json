@@ -1,0 +1,1139 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "commit": "910a6a27f002b16de825d73c1607a8cb6aae6446",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "generated_at": "2026-10-27T16:42:29+00:00",
+    "detectors": [
+      "rules",
+      "ner"
+    ],
+    "skipped_detectors": [],
+    "languages": null,
+    "fixtures": [
+      {
+        "path": "eval/fixtures/hu-synth-sample.jsonl",
+        "sha256": "ed547228ddc329bb5ff33a33d4c7b82763c751d0828dab5979d2394d8d83ebe9"
+      }
+    ]
+  },
+  "overall": {
+    "documents": 20,
+    "gold_spans": 271,
+    "predicted_spans": 271,
+    "unscored_predictions": 0,
+    "detection": {
+      "exact": {
+        "per_type": {
+          "PERSON": {
+            "gold": 107,
+            "pred": 107,
+            "tp_pred": 106,
+            "tp_gold": 106,
+            "precision": 0.9906542056074766,
+            "recall": 0.9906542056074766,
+            "f1": 0.9906542056074766
+          },
+          "ADDRESS": {
+            "gold": 39,
+            "pred": 45,
+            "tp_pred": 39,
+            "tp_gold": 39,
+            "precision": 0.8666666666666667,
+            "recall": 1.0,
+            "f1": 0.9285714285714286
+          },
+          "EMAIL": {
+            "gold": 9,
+            "pred": 9,
+            "tp_pred": 9,
+            "tp_gold": 9,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "PHONE": {
+            "gold": 14,
+            "pred": 14,
+            "tp_pred": 14,
+            "tp_gold": 14,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 17,
+            "pred": 17,
+            "tp_pred": 17,
+            "tp_gold": 17,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 8,
+            "pred": 18,
+            "tp_pred": 8,
+            "tp_gold": 8,
+            "precision": 0.4444444444444444,
+            "recall": 1.0,
+            "f1": 0.6153846153846153
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "pred": 5,
+            "tp_pred": 5,
+            "tp_gold": 5,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "ID_DOCUMENT": {
+            "gold": 8,
+            "pred": 8,
+            "tp_pred": 8,
+            "tp_gold": 8,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "BANK_ACCOUNT": {
+            "gold": 17,
+            "pred": 17,
+            "tp_pred": 17,
+            "tp_gold": 17,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "COMPANY_ID_HU": {
+            "gold": 10,
+            "pred": 0,
+            "tp_pred": 0,
+            "tp_gold": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "ORGANIZATION": {
+            "gold": 22,
+            "pred": 22,
+            "tp_pred": 22,
+            "tp_gold": 22,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 7,
+            "pred": 1,
+            "tp_pred": 1,
+            "tp_gold": 1,
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "f1": 0.25
+          },
+          "VEHICLE_PLATE": {
+            "gold": 8,
+            "pred": 8,
+            "tp_pred": 8,
+            "tp_gold": 8,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "micro": {
+          "gold": 271,
+          "pred": 271,
+          "tp_pred": 254,
+          "tp_gold": 254,
+          "precision": 0.9372693726937269,
+          "recall": 0.9372693726937269,
+          "f1": 0.9372693726937269
+        },
+        "macro": {
+          "precision": 0.8693665628245066,
+          "recall": 0.8564239498818937,
+          "f1": 0.8295854038125785
+        }
+      },
+      "overlap": {
+        "per_type": {
+          "PERSON": {
+            "gold": 107,
+            "pred": 107,
+            "tp_pred": 107,
+            "tp_gold": 107,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "ADDRESS": {
+            "gold": 39,
+            "pred": 45,
+            "tp_pred": 39,
+            "tp_gold": 39,
+            "precision": 0.8666666666666667,
+            "recall": 1.0,
+            "f1": 0.9285714285714286
+          },
+          "EMAIL": {
+            "gold": 9,
+            "pred": 9,
+            "tp_pred": 9,
+            "tp_gold": 9,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "PHONE": {
+            "gold": 14,
+            "pred": 14,
+            "tp_pred": 14,
+            "tp_gold": 14,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "DATE_OF_BIRTH": {
+            "gold": 17,
+            "pred": 17,
+            "tp_pred": 17,
+            "tp_gold": 17,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "gold": 8,
+            "pred": 18,
+            "tp_pred": 8,
+            "tp_gold": 8,
+            "precision": 0.4444444444444444,
+            "recall": 1.0,
+            "f1": 0.6153846153846153
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "gold": 5,
+            "pred": 5,
+            "tp_pred": 5,
+            "tp_gold": 5,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "ID_DOCUMENT": {
+            "gold": 8,
+            "pred": 8,
+            "tp_pred": 8,
+            "tp_gold": 8,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "BANK_ACCOUNT": {
+            "gold": 17,
+            "pred": 17,
+            "tp_pred": 17,
+            "tp_gold": 17,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "COMPANY_ID_HU": {
+            "gold": 10,
+            "pred": 0,
+            "tp_pred": 0,
+            "tp_gold": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "ORGANIZATION": {
+            "gold": 22,
+            "pred": 22,
+            "tp_pred": 22,
+            "tp_gold": 22,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          },
+          "PARCEL_NUMBER_HU": {
+            "gold": 7,
+            "pred": 1,
+            "tp_pred": 1,
+            "tp_gold": 1,
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "f1": 0.25
+          },
+          "VEHICLE_PLATE": {
+            "gold": 8,
+            "pred": 8,
+            "tp_pred": 8,
+            "tp_gold": 8,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0
+          }
+        },
+        "micro": {
+          "gold": 271,
+          "pred": 271,
+          "tp_pred": 255,
+          "tp_gold": 255,
+          "precision": 0.940959409594096,
+          "recall": 0.940959409594096,
+          "f1": 0.940959409594096
+        },
+        "macro": {
+          "precision": 0.8700854700854701,
+          "recall": 0.8571428571428571,
+          "f1": 0.8303043110735419
+        }
+      }
+    },
+    "leak": {
+      "values": 173,
+      "leaked": 0,
+      "partial": 0,
+      "rate": 0.0,
+      "partial_rate": 0.0,
+      "per_type": {
+        "PERSON": {
+          "values": 55,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "ADDRESS": {
+          "values": 39,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "EMAIL": {
+          "values": 7,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "PHONE": {
+          "values": 11,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "DATE_OF_BIRTH": {
+          "values": 17,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "NATIONAL_ID_HU_TAX": {
+          "values": 8,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "NATIONAL_ID_HU_TAJ": {
+          "values": 5,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "ID_DOCUMENT": {
+          "values": 8,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "BANK_ACCOUNT": {
+          "values": 12,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "PARCEL_NUMBER_HU": {
+          "values": 7,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "VEHICLE_PLATE": {
+          "values": 4,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        }
+      }
+    },
+    "over_masking": {
+      "masked": 249,
+      "over_masked": 0,
+      "rate": 0.0,
+      "per_type": {
+        "PERSON": {
+          "masked": 107,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "ADDRESS": {
+          "masked": 45,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "EMAIL": {
+          "masked": 9,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "PHONE": {
+          "masked": 14,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "DATE_OF_BIRTH": {
+          "masked": 17,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "NATIONAL_ID_HU_TAX": {
+          "masked": 18,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "NATIONAL_ID_HU_TAJ": {
+          "masked": 5,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "ID_DOCUMENT": {
+          "masked": 8,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "BANK_ACCOUNT": {
+          "masked": 17,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "PARCEL_NUMBER_HU": {
+          "masked": 1,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "VEHICLE_PLATE": {
+          "masked": 8,
+          "over_masked": 0,
+          "rate": 0.0
+        }
+      }
+    },
+    "consistency": {
+      "entities": 172,
+      "consistent": 172,
+      "rate": 1.0,
+      "multi_occurrence": 33,
+      "multi_consistent": 33,
+      "multi_rate": 1.0,
+      "per_type": {
+        "PERSON": {
+          "entities": 54,
+          "consistent": 54,
+          "rate": 1.0,
+          "multi_occurrence": 21,
+          "multi_consistent": 21,
+          "multi_rate": 1.0
+        },
+        "ADDRESS": {
+          "entities": 39,
+          "consistent": 39,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "EMAIL": {
+          "entities": 7,
+          "consistent": 7,
+          "rate": 1.0,
+          "multi_occurrence": 2,
+          "multi_consistent": 2,
+          "multi_rate": 1.0
+        },
+        "PHONE": {
+          "entities": 11,
+          "consistent": 11,
+          "rate": 1.0,
+          "multi_occurrence": 3,
+          "multi_consistent": 3,
+          "multi_rate": 1.0
+        },
+        "DATE_OF_BIRTH": {
+          "entities": 17,
+          "consistent": 17,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "NATIONAL_ID_HU_TAX": {
+          "entities": 8,
+          "consistent": 8,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "NATIONAL_ID_HU_TAJ": {
+          "entities": 5,
+          "consistent": 5,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "ID_DOCUMENT": {
+          "entities": 8,
+          "consistent": 8,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "BANK_ACCOUNT": {
+          "entities": 12,
+          "consistent": 12,
+          "rate": 1.0,
+          "multi_occurrence": 5,
+          "multi_consistent": 5,
+          "multi_rate": 1.0
+        },
+        "PARCEL_NUMBER_HU": {
+          "entities": 7,
+          "consistent": 7,
+          "rate": 1.0,
+          "multi_occurrence": 0,
+          "multi_consistent": 0,
+          "multi_rate": null
+        },
+        "VEHICLE_PLATE": {
+          "entities": 4,
+          "consistent": 4,
+          "rate": 1.0,
+          "multi_occurrence": 2,
+          "multi_consistent": 2,
+          "multi_rate": 1.0
+        }
+      }
+    },
+    "roundtrip": {
+      "documents": 20,
+      "exact": 20,
+      "rate": 1.0
+    },
+    "latency_ms": {
+      "detect": {
+        "p50": 64.52712486498058,
+        "p95": 154.19912501238286
+      },
+      "mask": {
+        "p50": 4.602709086611867,
+        "p95": 32.6812919229269
+      }
+    }
+  },
+  "languages": {
+    "hu": {
+      "documents": 20,
+      "gold_spans": 271,
+      "predicted_spans": 271,
+      "unscored_predictions": 0,
+      "detection": {
+        "exact": {
+          "per_type": {
+            "PERSON": {
+              "gold": 107,
+              "pred": 107,
+              "tp_pred": 106,
+              "tp_gold": 106,
+              "precision": 0.9906542056074766,
+              "recall": 0.9906542056074766,
+              "f1": 0.9906542056074766
+            },
+            "ADDRESS": {
+              "gold": 39,
+              "pred": 45,
+              "tp_pred": 39,
+              "tp_gold": 39,
+              "precision": 0.8666666666666667,
+              "recall": 1.0,
+              "f1": 0.9285714285714286
+            },
+            "EMAIL": {
+              "gold": 9,
+              "pred": 9,
+              "tp_pred": 9,
+              "tp_gold": 9,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "PHONE": {
+              "gold": 14,
+              "pred": 14,
+              "tp_pred": 14,
+              "tp_gold": 14,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 17,
+              "pred": 17,
+              "tp_pred": 17,
+              "tp_gold": 17,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 8,
+              "pred": 18,
+              "tp_pred": 8,
+              "tp_gold": 8,
+              "precision": 0.4444444444444444,
+              "recall": 1.0,
+              "f1": 0.6153846153846153
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 5,
+              "pred": 5,
+              "tp_pred": 5,
+              "tp_gold": 5,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "ID_DOCUMENT": {
+              "gold": 8,
+              "pred": 8,
+              "tp_pred": 8,
+              "tp_gold": 8,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "BANK_ACCOUNT": {
+              "gold": 17,
+              "pred": 17,
+              "tp_pred": 17,
+              "tp_gold": 17,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "COMPANY_ID_HU": {
+              "gold": 10,
+              "pred": 0,
+              "tp_pred": 0,
+              "tp_gold": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "ORGANIZATION": {
+              "gold": 22,
+              "pred": 22,
+              "tp_pred": 22,
+              "tp_gold": 22,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "PARCEL_NUMBER_HU": {
+              "gold": 7,
+              "pred": 1,
+              "tp_pred": 1,
+              "tp_gold": 1,
+              "precision": 1.0,
+              "recall": 0.14285714285714285,
+              "f1": 0.25
+            },
+            "VEHICLE_PLATE": {
+              "gold": 8,
+              "pred": 8,
+              "tp_pred": 8,
+              "tp_gold": 8,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            }
+          },
+          "micro": {
+            "gold": 271,
+            "pred": 271,
+            "tp_pred": 254,
+            "tp_gold": 254,
+            "precision": 0.9372693726937269,
+            "recall": 0.9372693726937269,
+            "f1": 0.9372693726937269
+          },
+          "macro": {
+            "precision": 0.8693665628245066,
+            "recall": 0.8564239498818937,
+            "f1": 0.8295854038125785
+          }
+        },
+        "overlap": {
+          "per_type": {
+            "PERSON": {
+              "gold": 107,
+              "pred": 107,
+              "tp_pred": 107,
+              "tp_gold": 107,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "ADDRESS": {
+              "gold": 39,
+              "pred": 45,
+              "tp_pred": 39,
+              "tp_gold": 39,
+              "precision": 0.8666666666666667,
+              "recall": 1.0,
+              "f1": 0.9285714285714286
+            },
+            "EMAIL": {
+              "gold": 9,
+              "pred": 9,
+              "tp_pred": 9,
+              "tp_gold": 9,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "PHONE": {
+              "gold": 14,
+              "pred": 14,
+              "tp_pred": 14,
+              "tp_gold": 14,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "DATE_OF_BIRTH": {
+              "gold": 17,
+              "pred": 17,
+              "tp_pred": 17,
+              "tp_gold": 17,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "NATIONAL_ID_HU_TAX": {
+              "gold": 8,
+              "pred": 18,
+              "tp_pred": 8,
+              "tp_gold": 8,
+              "precision": 0.4444444444444444,
+              "recall": 1.0,
+              "f1": 0.6153846153846153
+            },
+            "NATIONAL_ID_HU_TAJ": {
+              "gold": 5,
+              "pred": 5,
+              "tp_pred": 5,
+              "tp_gold": 5,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "ID_DOCUMENT": {
+              "gold": 8,
+              "pred": 8,
+              "tp_pred": 8,
+              "tp_gold": 8,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "BANK_ACCOUNT": {
+              "gold": 17,
+              "pred": 17,
+              "tp_pred": 17,
+              "tp_gold": 17,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "COMPANY_ID_HU": {
+              "gold": 10,
+              "pred": 0,
+              "tp_pred": 0,
+              "tp_gold": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "ORGANIZATION": {
+              "gold": 22,
+              "pred": 22,
+              "tp_pred": 22,
+              "tp_gold": 22,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            },
+            "PARCEL_NUMBER_HU": {
+              "gold": 7,
+              "pred": 1,
+              "tp_pred": 1,
+              "tp_gold": 1,
+              "precision": 1.0,
+              "recall": 0.14285714285714285,
+              "f1": 0.25
+            },
+            "VEHICLE_PLATE": {
+              "gold": 8,
+              "pred": 8,
+              "tp_pred": 8,
+              "tp_gold": 8,
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0
+            }
+          },
+          "micro": {
+            "gold": 271,
+            "pred": 271,
+            "tp_pred": 255,
+            "tp_gold": 255,
+            "precision": 0.940959409594096,
+            "recall": 0.940959409594096,
+            "f1": 0.940959409594096
+          },
+          "macro": {
+            "precision": 0.8700854700854701,
+            "recall": 0.8571428571428571,
+            "f1": 0.8303043110735419
+          }
+        }
+      },
+      "leak": {
+        "values": 173,
+        "leaked": 0,
+        "partial": 0,
+        "rate": 0.0,
+        "partial_rate": 0.0,
+        "per_type": {
+          "PERSON": {
+            "values": 55,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "ADDRESS": {
+            "values": 39,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "EMAIL": {
+            "values": 7,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "PHONE": {
+            "values": 11,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "DATE_OF_BIRTH": {
+            "values": 17,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "values": 8,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "values": 5,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "ID_DOCUMENT": {
+            "values": 8,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "BANK_ACCOUNT": {
+            "values": 12,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "PARCEL_NUMBER_HU": {
+            "values": 7,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          },
+          "VEHICLE_PLATE": {
+            "values": 4,
+            "leaked": 0,
+            "partial": 0,
+            "rate": 0.0,
+            "partial_rate": 0.0
+          }
+        }
+      },
+      "over_masking": {
+        "masked": 249,
+        "over_masked": 0,
+        "rate": 0.0,
+        "per_type": {
+          "PERSON": {
+            "masked": 107,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "ADDRESS": {
+            "masked": 45,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "EMAIL": {
+            "masked": 9,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "PHONE": {
+            "masked": 14,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "DATE_OF_BIRTH": {
+            "masked": 17,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "masked": 18,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "masked": 5,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "ID_DOCUMENT": {
+            "masked": 8,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "BANK_ACCOUNT": {
+            "masked": 17,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "PARCEL_NUMBER_HU": {
+            "masked": 1,
+            "over_masked": 0,
+            "rate": 0.0
+          },
+          "VEHICLE_PLATE": {
+            "masked": 8,
+            "over_masked": 0,
+            "rate": 0.0
+          }
+        }
+      },
+      "consistency": {
+        "entities": 172,
+        "consistent": 172,
+        "rate": 1.0,
+        "multi_occurrence": 33,
+        "multi_consistent": 33,
+        "multi_rate": 1.0,
+        "per_type": {
+          "PERSON": {
+            "entities": 54,
+            "consistent": 54,
+            "rate": 1.0,
+            "multi_occurrence": 21,
+            "multi_consistent": 21,
+            "multi_rate": 1.0
+          },
+          "ADDRESS": {
+            "entities": 39,
+            "consistent": 39,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "EMAIL": {
+            "entities": 7,
+            "consistent": 7,
+            "rate": 1.0,
+            "multi_occurrence": 2,
+            "multi_consistent": 2,
+            "multi_rate": 1.0
+          },
+          "PHONE": {
+            "entities": 11,
+            "consistent": 11,
+            "rate": 1.0,
+            "multi_occurrence": 3,
+            "multi_consistent": 3,
+            "multi_rate": 1.0
+          },
+          "DATE_OF_BIRTH": {
+            "entities": 17,
+            "consistent": 17,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "NATIONAL_ID_HU_TAX": {
+            "entities": 8,
+            "consistent": 8,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "NATIONAL_ID_HU_TAJ": {
+            "entities": 5,
+            "consistent": 5,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "ID_DOCUMENT": {
+            "entities": 8,
+            "consistent": 8,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "BANK_ACCOUNT": {
+            "entities": 12,
+            "consistent": 12,
+            "rate": 1.0,
+            "multi_occurrence": 5,
+            "multi_consistent": 5,
+            "multi_rate": 1.0
+          },
+          "PARCEL_NUMBER_HU": {
+            "entities": 7,
+            "consistent": 7,
+            "rate": 1.0,
+            "multi_occurrence": 0,
+            "multi_consistent": 0,
+            "multi_rate": null
+          },
+          "VEHICLE_PLATE": {
+            "entities": 4,
+            "consistent": 4,
+            "rate": 1.0,
+            "multi_occurrence": 2,
+            "multi_consistent": 2,
+            "multi_rate": 1.0
+          }
+        }
+      },
+      "roundtrip": {
+        "documents": 20,
+        "exact": 20,
+        "rate": 1.0
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 64.52712486498058,
+          "p95": 154.19912501238286
+        },
+        "mask": {
+          "p50": 4.602709086611867,
+          "p95": 32.6812919229269
+        }
+      }
+    }
+  },
+  "run": {
+    "system": "pii-guard fast-xlmr-large-v2",
+    "detectors": [
+      "rules",
+      "ner"
+    ],
+    "documents": 20,
+    "wall_s": 1.9,
+    "load_average_start": [
+      12.74,
+      14.33,
+      16.47
+    ],
+    "load_average_end": [
+      12.74,
+      14.33,
+      16.47
+    ],
+    "host": {
+      "platform": "macOS-26.5.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "processor": "arm",
+      "cpu_count": 10,
+      "python": "3.12.15"
+    },
+    "warmup_calls": 1,
+    "blocked": 0,
+    "blocked_documents": [],
+    "ner": {
+      "model": "pii-guard-ner-xlmr-large-v2",
+      "safetensors_sha256": {
+        "model.safetensors": "6825c86b3bae8c91418c8e10b7cb0eaa8ae42a826550228638364eb5d0b7bbec"
+      },
+      "training_meta_sha256": "c48ba5d23a060708b9a0791d86683b35e26d05428ad3fac8562c2dd3f89aa4e8",
+      "device": "auto"
+    },
+    "candidate": "xlmr-large-v2"
+  }
+}

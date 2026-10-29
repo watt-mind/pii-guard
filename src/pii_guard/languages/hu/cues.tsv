@@ -1,0 +1,59 @@
+# Cue words for context-cued numbers (languages/cues.py, LAB-1170).
+# cue <TAB> entity type of the number right after it, or "-" for a cue that names something
+# that is not personal data, or a word that hands the window on ("and"): a "-" cue ends the
+# window, so the number after it is never masked by an earlier cue.
+# Case and accents are ignored; a space also matches a hyphen or nothing; a trailing "*"
+# lets the word take suffixes (kártyaszámát, telefonszámom). Every pack's cues run for every
+# text; the text's own language wins a cue two packs map differently.
+telefon*	PHONE
+tel.	PHONE
+mobil*	PHONE
+hívószám*	PHONE
+hívja*	PHONE
+hívjon*	PHONE
+hívd*	PHONE
+kártyaszám*	BANK_ACCOUNT
+bankkártya*	BANK_ACCOUNT
+hitelkártya*	BANK_ACCOUNT
+betéti kártya*	BANK_ACCOUNT
+számlaszám*	BANK_ACCOUNT
+bankszámla*	BANK_ACCOUNT
+IBAN	BANK_ACCOUNT
+adóazonosító*	NATIONAL_ID_HU_TAX
+adószám*	NATIONAL_ID_HU_TAX
+TAJ	NATIONAL_ID_HU_TAJ
+TAJ/VA	NATIONAL_ID_HU_TAJ
+társadalombiztosítási szám*	NATIONAL_ID_HU_TAJ
+társadalombiztosítási azonosító*	NATIONAL_ID_HU_TAJ
+social security	NATIONAL_ID_HU_TAJ
+tax ID	NATIONAL_ID_HU_TAX
+tax number	NATIONAL_ID_HU_TAX
+személyi igazolvány*	ID_DOCUMENT
+személyi szám*	ID_DOCUMENT
+személyazonosító*	ID_DOCUMENT
+személyi azonosító*	ID_DOCUMENT
+szig. szám*	ID_DOCUMENT
+igazolványszám*	ID_DOCUMENT
+okmányszám*	ID_DOCUMENT
+okmányazonosító*	ID_DOCUMENT
+útlevél*	ID_DOCUMENT
+jogosítvány*	ID_DOCUMENT
+vezetői engedély*	ID_DOCUMENT
+rendelésszám*	-
+megrendelésszám*	-
+rendelési szám*	-
+számla sorszám*	-
+számlasorszám*	-
+sorszám*	-
+ügyfélszám*	-
+ügyszám*	-
+iktatószám*	-
+hivatkozási szám*	-
+cikkszám*	-
+szerződésszám*	-
+irányítószám*	-
+összeg*	-
+és	-
+vagy	-
+illetve	-
+valamint	-

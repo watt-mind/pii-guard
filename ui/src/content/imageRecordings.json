@@ -1,0 +1,651 @@
+{
+  "recorded": "2026-10-27",
+  "note": "Responses of POST /v1/mask/image (SAM 3.1 on the Meta API, Tesseract OCR, detectors rules + llm with muse-spark-1.3) to ui/public/samples/*.png, without the image. Fictional samples only: Muse Image specimen-style documents from eval/fixtures/visual/ (LAB-1121).",
+  "samples": {
+    "id-card": {
+      "media_type": "image/png",
+      "width": 1012,
+      "height": 638,
+      "regions": [
+        {
+          "entity_type": "FACE",
+          "box": [
+            83,
+            114,
+            262,
+            407
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "ID_PHOTO",
+          "box": [
+            53,
+            150,
+            284,
+            431
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PERSON",
+          "box": [
+            321,
+            173,
+            391,
+            192
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "DATE_OF_BIRTH",
+          "box": [
+            322,
+            223,
+            434,
+            238
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "ID_DOCUMENT",
+          "box": [
+            321,
+            269,
+            425,
+            284
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.95,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAX",
+          "box": [
+            321,
+            315,
+            452,
+            351
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "SIGNATURE",
+          "box": [
+            74,
+            468,
+            302,
+            559
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        }
+      ],
+      "masked": [
+        {
+          "entity_type": "DATE_OF_BIRTH",
+          "count": 1
+        },
+        {
+          "entity_type": "FACE",
+          "count": 1
+        },
+        {
+          "entity_type": "ID_DOCUMENT",
+          "count": 1
+        },
+        {
+          "entity_type": "ID_PHOTO",
+          "count": 1
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAX",
+          "count": 1
+        },
+        {
+          "entity_type": "PERSON",
+          "count": 1
+        },
+        {
+          "entity_type": "SIGNATURE",
+          "count": 1
+        }
+      ],
+      "kept": [],
+      "analysis": {
+        "sam": {
+          "model": "sam-3.1",
+          "entity_types": [
+            "FACE",
+            "SIGNATURE",
+            "ID_PHOTO",
+            "STAMP"
+          ]
+        },
+        "ocr": {
+          "ran": true,
+          "engine": "tesseract",
+          "detectors": [
+            "rules",
+            "llm"
+          ],
+          "models": {
+            "llm": "muse-spark-1.3"
+          },
+          "reason": null
+        }
+      }
+    },
+    "health-card": {
+      "media_type": "image/png",
+      "width": 1012,
+      "height": 638,
+      "regions": [
+        {
+          "entity_type": "FACE",
+          "box": [
+            68,
+            116,
+            246,
+            346
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "ID_PHOTO",
+          "box": [
+            49,
+            125,
+            267,
+            399
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PERSON",
+          "box": [
+            301,
+            138,
+            433,
+            158
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "DATE_OF_BIRTH",
+          "box": [
+            302,
+            189,
+            414,
+            204
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAJ",
+          "box": [
+            300,
+            235,
+            419,
+            250
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.95,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "ADDRESS",
+          "box": [
+            300,
+            280,
+            605,
+            300
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.97,
+          "policy": "mask"
+        }
+      ],
+      "masked": [
+        {
+          "entity_type": "ADDRESS",
+          "count": 1
+        },
+        {
+          "entity_type": "DATE_OF_BIRTH",
+          "count": 1
+        },
+        {
+          "entity_type": "FACE",
+          "count": 1
+        },
+        {
+          "entity_type": "ID_PHOTO",
+          "count": 1
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAJ",
+          "count": 1
+        },
+        {
+          "entity_type": "PERSON",
+          "count": 1
+        }
+      ],
+      "kept": [],
+      "analysis": {
+        "sam": {
+          "model": "sam-3.1",
+          "entity_types": [
+            "FACE",
+            "SIGNATURE",
+            "ID_PHOTO",
+            "STAMP"
+          ]
+        },
+        "ocr": {
+          "ran": true,
+          "engine": "tesseract",
+          "detectors": [
+            "rules",
+            "llm"
+          ],
+          "models": {
+            "llm": "muse-spark-1.3"
+          },
+          "reason": null
+        }
+      }
+    },
+    "signed-letter": {
+      "media_type": "image/png",
+      "width": 1000,
+      "height": 1414,
+      "regions": [
+        {
+          "entity_type": "ORGANIZATION",
+          "box": [
+            82,
+            65,
+            347,
+            90
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "keep"
+        },
+        {
+          "entity_type": "ADDRESS",
+          "box": [
+            82,
+            110,
+            303,
+            124
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.97,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "EMAIL",
+          "box": [
+            329,
+            110,
+            471,
+            125
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.99,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PERSON",
+          "box": [
+            80,
+            194,
+            204,
+            210
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "ADDRESS",
+          "box": [
+            81,
+            226,
+            343,
+            247
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.97,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PERSON",
+          "box": [
+            150,
+            384,
+            268,
+            398
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "EMAIL",
+          "box": [
+            182,
+            516,
+            417,
+            534
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.99,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PHONE",
+          "box": [
+            189,
+            553,
+            334,
+            570
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.9,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAX",
+          "box": [
+            268,
+            589,
+            377,
+            606
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.95,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "STAMP",
+          "box": [
+            506,
+            669,
+            693,
+            856
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "keep"
+        },
+        {
+          "entity_type": "SIGNATURE",
+          "box": [
+            135,
+            704,
+            363,
+            814
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PERSON",
+          "box": [
+            75,
+            825,
+            191,
+            859
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        }
+      ],
+      "masked": [
+        {
+          "entity_type": "ADDRESS",
+          "count": 2
+        },
+        {
+          "entity_type": "EMAIL",
+          "count": 2
+        },
+        {
+          "entity_type": "NATIONAL_ID_HU_TAX",
+          "count": 1
+        },
+        {
+          "entity_type": "PERSON",
+          "count": 3
+        },
+        {
+          "entity_type": "PHONE",
+          "count": 1
+        },
+        {
+          "entity_type": "SIGNATURE",
+          "count": 1
+        }
+      ],
+      "kept": [
+        {
+          "entity_type": "ORGANIZATION",
+          "count": 1
+        },
+        {
+          "entity_type": "STAMP",
+          "count": 1
+        }
+      ],
+      "analysis": {
+        "sam": {
+          "model": "sam-3.1",
+          "entity_types": [
+            "FACE",
+            "SIGNATURE",
+            "ID_PHOTO",
+            "STAMP"
+          ]
+        },
+        "ocr": {
+          "ran": true,
+          "engine": "tesseract",
+          "detectors": [
+            "rules",
+            "llm"
+          ],
+          "models": {
+            "llm": "muse-spark-1.3"
+          },
+          "reason": null
+        }
+      }
+    },
+    "visitor-badge": {
+      "media_type": "image/png",
+      "width": 640,
+      "height": 960,
+      "regions": [
+        {
+          "entity_type": "ORGANIZATION",
+          "box": [
+            62,
+            84,
+            295,
+            107
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "keep"
+        },
+        {
+          "entity_type": "FACE",
+          "box": [
+            179,
+            154,
+            466,
+            563
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "ID_PHOTO",
+          "box": [
+            172,
+            186,
+            469,
+            549
+          ],
+          "source": "sam",
+          "detector": "sam",
+          "score": null,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PERSON",
+          "box": [
+            63,
+            593,
+            333,
+            621
+          ],
+          "source": "ocr",
+          "detector": "llm",
+          "score": 0.85,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "EMAIL",
+          "box": [
+            61,
+            655,
+            384,
+            678
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.99,
+          "policy": "mask"
+        },
+        {
+          "entity_type": "PHONE",
+          "box": [
+            61,
+            700,
+            253,
+            718
+          ],
+          "source": "ocr",
+          "detector": "rules",
+          "score": 0.9,
+          "policy": "mask"
+        }
+      ],
+      "masked": [
+        {
+          "entity_type": "EMAIL",
+          "count": 1
+        },
+        {
+          "entity_type": "FACE",
+          "count": 1
+        },
+        {
+          "entity_type": "ID_PHOTO",
+          "count": 1
+        },
+        {
+          "entity_type": "PERSON",
+          "count": 1
+        },
+        {
+          "entity_type": "PHONE",
+          "count": 1
+        }
+      ],
+      "kept": [
+        {
+          "entity_type": "ORGANIZATION",
+          "count": 1
+        }
+      ],
+      "analysis": {
+        "sam": {
+          "model": "sam-3.1",
+          "entity_types": [
+            "FACE",
+            "SIGNATURE",
+            "ID_PHOTO",
+            "STAMP"
+          ]
+        },
+        "ocr": {
+          "ran": true,
+          "engine": "tesseract",
+          "detectors": [
+            "rules",
+            "llm"
+          ],
+          "models": {
+            "llm": "muse-spark-1.3"
+          },
+          "reason": null
+        }
+      }
+    }
+  }
+}

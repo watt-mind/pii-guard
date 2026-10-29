@@ -1,0 +1,21 @@
+# public-space type	weight
+# source: pii-guard contributors (Apache-2.0), hand-curated
+Street	10
+Road	10
+Lane	6
+Avenue	4
+Close	4
+Drive	4
+Way	3
+Crescent	2
+Grove	2
+Court	2
+Place	2
+Square	1
+Terrace	2
+Gardens	1
+Row	1
+Hill	1
+Mews	1
+Parade	1
+Walk	1

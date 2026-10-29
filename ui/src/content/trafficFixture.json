@@ -1,0 +1,1841 @@
+{
+ "recorded": "make demo + make demo-traffic, mock upstream, fast mode (rules + session known values), LAB-1190",
+ "events": [
+  {
+   "id": "req_9acfd2837da58c37",
+   "time": "2026-10-27T12:45:10.972+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_4bc036c144b8ac19",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "NATIONAL_ID_HU_TAJ": 1,
+     "NATIONAL_ID_HU_TAX": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "NATIONAL_ID_HU_TAJ": 1,
+     "NATIONAL_ID_HU_TAX": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "texts": 2
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 2,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 88,
+    "completion_tokens": 60,
+    "total_tokens": 148
+   },
+   "timing": {
+    "total_ms": 7.928,
+    "upstream_ms": 1.914,
+    "overhead_ms": 6.014,
+    "stages_ms": {
+     "parse": 0.057,
+     "detect": 0.974,
+     "image": 0.0,
+     "mask": 0.439,
+     "forward": 4.398,
+     "upstream_ttfb": 1.702,
+     "upstream": 1.914,
+     "unmask": 0.0,
+     "response": 0.132
+    },
+    "detectors_ms": {
+     "known": 0.148,
+     "rules": 0.316
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "system",
+       "content": "Ügyfélszolgálati asszisztens vagy. Válaszolj röviden."
+      },
+      {
+       "role": "user",
+       "content": "Szia! [[PERSON_945bbf]] vagyok, e-mail: [[EMAIL_fac90e]], telefon: [[PHONE_83658a]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_620f4d]] számlára. TAJ számom [[NATIONAL_ID_HU_TAJ_705a96]], adóazonosító jelem [[NATIONAL_ID_HU_TAX_618e74]]."
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793105110,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": "Echo: Szia! [[PERSON_945bbf]] vagyok, e-mail: [[EMAIL_fac90e]], telefon: [[PHONE_83658a]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_620f4d]] számlára. TAJ számom [[NATIONAL_ID_HU_TAJ_705a96]], adóazonosító jelem [[NATIONAL_ID_HU_TAX_618e74]]."
+       },
+       "finish_reason": "stop"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 88,
+      "completion_tokens": 60,
+      "total_tokens": 148
+     }
+    }
+   },
+   "seq": 10
+  },
+  {
+   "id": "req_58490fe371f3d8e1",
+   "time": "2026-10-27T12:45:10.981+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_4bc036c144b8ac19",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 2,
+     "EMAIL": 3,
+     "NATIONAL_ID_HU_TAJ": 2,
+     "NATIONAL_ID_HU_TAX": 2,
+     "PERSON": 3,
+     "PHONE": 2
+    },
+    "masked": {
+     "BANK_ACCOUNT": 2,
+     "EMAIL": 3,
+     "NATIONAL_ID_HU_TAJ": 2,
+     "NATIONAL_ID_HU_TAX": 2,
+     "PERSON": 3,
+     "PHONE": 2
+    },
+    "texts": 4
+   },
+   "cache": {
+    "hits": 3,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 186,
+    "completion_tokens": 21,
+    "total_tokens": 207
+   },
+   "timing": {
+    "total_ms": 8.15,
+    "upstream_ms": 1.956,
+    "overhead_ms": 6.194,
+    "stages_ms": {
+     "parse": 0.061,
+     "detect": 1.322,
+     "image": 0.0,
+     "mask": 0.431,
+     "forward": 4.254,
+     "upstream_ttfb": 1.729,
+     "upstream": 1.956,
+     "unmask": 0.0,
+     "response": 0.113
+    },
+    "detectors_ms": {
+     "known": 0.173,
+     "rules": 0.802
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "system",
+       "content": "Ügyfélszolgálati asszisztens vagy. Válaszolj röviden."
+      },
+      {
+       "role": "user",
+       "content": "Szia! [[PERSON_945bbf]] vagyok, e-mail: [[EMAIL_fac90e]], telefon: [[PHONE_83658a]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_620f4d]] számlára. TAJ számom [[NATIONAL_ID_HU_TAJ_705a96]], adóazonosító jelem [[NATIONAL_ID_HU_TAX_618e74]]."
+      },
+      {
+       "role": "assistant",
+       "content": "Echo: Szia! [[PERSON_945bbf]] vagyok, e-mail: [[EMAIL_fac90e]], telefon: [[PHONE_83658a]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_620f4d]] számlára. TAJ számom [[NATIONAL_ID_HU_TAJ_705a96]], adóazonosító jelem [[NATIONAL_ID_HU_TAX_618e74]]."
+      },
+      {
+       "role": "user",
+       "content": "Köszönöm! A visszaigazolást [[PERSON_945bbf]]nek küldd, a [[EMAIL_fac90e]] címre."
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793105110,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": "Echo: Köszönöm! A visszaigazolást [[PERSON_945bbf]]nek küldd, a [[EMAIL_fac90e]] címre."
+       },
+       "finish_reason": "stop"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 186,
+      "completion_tokens": 21,
+      "total_tokens": 207
+     }
+    }
+   },
+   "seq": 11
+  },
+  {
+   "id": "req_ba7f94aad3d51b39",
+   "time": "2026-10-27T12:45:10.991+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_13deee9d432d1873",
+   "session_new": true,
+   "detectors": [
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "ADDRESS": 1
+    },
+    "masked": {
+     "ADDRESS": 1
+    },
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 18,
+    "total_tokens": 42
+   },
+   "timing": {
+    "total_ms": 8.39,
+    "upstream_ms": 2.303,
+    "overhead_ms": 6.087,
+    "stages_ms": {
+     "parse": 0.072,
+     "detect": 0.582,
+     "image": 0.0,
+     "mask": 0.093,
+     "forward": 4.428,
+     "upstream_ttfb": 1.694,
+     "upstream": 2.303,
+     "unmask": 0.248,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "rules": 0.167
+    },
+    "ttft_ms": 7.293,
+    "upstream_ttft_ms": 2.069,
+    "added_ttft_ms": 5.224
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Az új lakcímem [[ADDRESS_91deab]], kérlek frissítsd a szerződésen."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {
+      "0": "Echo: Az új lakcímem [[ADDRESS_91deab]], kérlek frissítsd a szerződésen."
+     }
+    },
+    "chunks": 14
+   },
+   "seq": 12
+  },
+  {
+   "id": "req_4e4017af530407a3",
+   "time": "2026-10-27T12:45:11.004+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "en",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_8021f7306eb0c354",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 2,
+     "EMAIL": 1,
+     "PERSON": 2,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 2,
+     "EMAIL": 1,
+     "PERSON": 2,
+     "PHONE": 1
+    },
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 53,
+    "completion_tokens": 46,
+    "total_tokens": 99
+   },
+   "timing": {
+    "total_ms": 9.832,
+    "upstream_ms": 2.88,
+    "overhead_ms": 6.952,
+    "stages_ms": {
+     "parse": 0.074,
+     "detect": 0.629,
+     "image": 0.0,
+     "mask": 0.159,
+     "forward": 4.777,
+     "upstream_ttfb": 2.154,
+     "upstream": 2.88,
+     "unmask": 0.428,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "known": 0.074,
+     "rules": 0.218
+    },
+    "ttft_ms": 8.203,
+    "upstream_ttft_ms": 2.512,
+    "added_ttft_ms": 5.691
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hi, this is [[PERSON_02878c]] ([[EMAIL_2cec80]], [[PHONE_095ae9]]). Please refund the deposit to [[BANK_ACCOUNT_4e26ab]] and void [[PERSON_02878c]]'s card [[BANK_ACCOUNT_6797ab]]."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {
+      "0": "Echo: Hi, this is [[PERSON_02878c]] ([[EMAIL_2cec80]], [[PHONE_095ae9]]). Please refund the deposit to [[BANK_ACCOUNT_4e26ab]] and void [[PERSON_02878c]]'s card [[BANK_ACCOUNT_6797ab]]."
+     }
+    },
+    "chunks": 30
+   },
+   "seq": 13
+  },
+  {
+   "id": "req_bd826a6bd5986345",
+   "time": "2026-10-27T12:45:11.015+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "de",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_ef27a219db70086e",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "texts": 5
+   },
+   "cache": {
+    "hits": 1,
+    "misses": 4,
+    "seeded": 0
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 61,
+    "total_tokens": 103
+   },
+   "timing": {
+    "total_ms": 8.957,
+    "upstream_ms": 1.992,
+    "overhead_ms": 6.965,
+    "stages_ms": {
+     "parse": 0.068,
+     "detect": 2.094,
+     "image": 0.0,
+     "mask": 0.285,
+     "forward": 4.322,
+     "upstream_ttfb": 1.688,
+     "upstream": 1.992,
+     "unmask": 0.0,
+     "response": 0.18
+    },
+    "detectors_ms": {
+     "known": 0.094,
+     "rules": 0.249
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hallo, hier ist [[PERSON_8e4b39]], E-Mail [[EMAIL_b22d27]], Telefon [[PHONE_bd0c69]]. Bitte überweisen Sie auf [[BANK_ACCOUNT_cc687d]]."
+      }
+     ],
+     "tools": [
+      {
+       "type": "function",
+       "function": {
+        "name": "send_email",
+        "description": "Send an e-mail on the user's behalf.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       }
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793105111,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+         {
+          "id": "call_mock_1",
+          "type": "function",
+          "function": {
+           "name": "send_email",
+           "arguments": "{\"text\": \"Hallo, hier ist [[PERSON_8e4b39]], E-Mail [[EMAIL_b22d27]], Telefon [[PHONE_bd0c69]]. Bitte überweisen Sie auf [[BANK_ACCOUNT_cc687d]].\"}"
+          }
+         }
+        ]
+       },
+       "finish_reason": "tool_calls"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 42,
+      "completion_tokens": 61,
+      "total_tokens": 103
+     }
+    }
+   },
+   "seq": 14
+  },
+  {
+   "id": "req_42e656b9616800d1",
+   "time": "2026-10-27T12:45:11.026+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "de",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_2f69d6f77a73da61",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "texts": 5
+   },
+   "cache": {
+    "hits": 1,
+    "misses": 4,
+    "seeded": 0
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 61,
+    "total_tokens": 103
+   },
+   "timing": {
+    "total_ms": 8.975,
+    "upstream_ms": 2.619,
+    "overhead_ms": 6.356,
+    "stages_ms": {
+     "parse": 0.074,
+     "detect": 0.817,
+     "image": 0.0,
+     "mask": 0.169,
+     "forward": 4.291,
+     "upstream_ttfb": 1.898,
+     "upstream": 2.619,
+     "unmask": 0.345,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "known": 0.072,
+     "rules": 0.213
+    },
+    "ttft_ms": 7.663,
+    "upstream_ttft_ms": 2.269,
+    "added_ttft_ms": 5.394
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hallo, hier ist [[PERSON_c76293]], E-Mail [[EMAIL_90d091]], Telefon [[PHONE_4ada0b]]. Bitte überweisen Sie auf [[BANK_ACCOUNT_cd94f5]]."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     },
+     "tools": [
+      {
+       "type": "function",
+       "function": {
+        "name": "send_email",
+        "description": "Send an e-mail on the user's behalf.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       }
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {}
+    },
+    "chunks": 25
+   },
+   "seq": 15
+  },
+  {
+   "id": "req_e1f1c1c7abe54ef4",
+   "time": "2026-10-27T12:45:11.039+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_8b1729f26ada4ac4",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "ORGANIZATION": 1,
+     "PERSON": 2
+    },
+    "masked": {
+     "ORGANIZATION": 1,
+     "PERSON": 2
+    },
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 45,
+    "completion_tokens": 38,
+    "total_tokens": 83
+   },
+   "timing": {
+    "total_ms": 9.867,
+    "upstream_ms": 2.7,
+    "overhead_ms": 7.167,
+    "stages_ms": {
+     "parse": 0.065,
+     "detect": 0.672,
+     "image": 0.0,
+     "mask": 0.301,
+     "forward": 4.44,
+     "upstream_ttfb": 1.929,
+     "upstream": 2.7,
+     "unmask": 0.337,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "known": 0.196,
+     "rules": 0.143
+    },
+    "ttft_ms": 8.458,
+    "upstream_ttft_ms": 2.93,
+    "added_ttft_ms": 5.528
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Kérlek, írj egy rövid levelet [[PERSON_50459e]]nak a [[ORGANIZATION_e4889b]]-vel kötött szerződésről, és egyeztesd a határidőt [[PERSON_90f6a8]]kel."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {
+      "0": "Echo: Kérlek, írj egy rövid levelet [[PERSON_50459e]]nak a [[ORGANIZATION_e4889b]]-vel kötött szerződésről, és egyeztesd a határidőt [[PERSON_90f6a8]]kel."
+     }
+    },
+    "chunks": 25
+   },
+   "seq": 16
+  },
+  {
+   "id": "req_a47dac9d77b234d5",
+   "time": "2026-10-27T12:45:11.043+00:00",
+   "level": "masked",
+   "outcome": "refused",
+   "error": {
+    "code": "detection_failed",
+    "status": 503
+   },
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_2171e803b3435800",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules",
+    "visual"
+   ],
+   "entities": {
+    "detected": {
+     "PERSON": 1
+    },
+    "masked": {},
+    "texts": 1,
+    "images": {
+     "count": 1,
+     "masked": {},
+     "kept": {},
+     "ocr": false
+    }
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 0
+   },
+   "upstream": {
+    "status": null,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": null,
+   "timing": {
+    "total_ms": 1.13,
+    "upstream_ms": 0.0,
+    "overhead_ms": 1.13,
+    "stages_ms": {
+     "parse": 0.12,
+     "detect": 0.562,
+     "image": 0.416,
+     "mask": 0.0,
+     "forward": 0.0,
+     "upstream_ttfb": 0.0,
+     "upstream": 0.0,
+     "unmask": 0.0,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "known": 0.143,
+     "rules": 0.069,
+     "visual": 0.384
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": null
+   },
+   "response": null,
+   "seq": 17
+  },
+  {
+   "id": "req_ba247186c13bfc37",
+   "time": "2026-10-27T12:45:11.052+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_d6d3d7d7ce318c4b",
+   "session_new": true,
+   "detectors": [
+    "rules"
+   ],
+   "entities": {
+    "detected": {},
+    "masked": {},
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 28,
+    "completion_tokens": 21,
+    "total_tokens": 49
+   },
+   "timing": {
+    "total_ms": 7.989,
+    "upstream_ms": 2.484,
+    "overhead_ms": 5.505,
+    "stages_ms": {
+     "parse": 0.077,
+     "detect": 0.509,
+     "image": 0.0,
+     "mask": 0.035,
+     "forward": 4.765,
+     "upstream_ttfb": 2.189,
+     "upstream": 2.484,
+     "unmask": 0.0,
+     "response": 0.107
+    },
+    "detectors_ms": {
+     "rules": 0.083
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Tegnap Gipsz Jakab telefonált, és azt kérte, hogy holnap délelőtt hívjam vissza."
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793105111,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": "Echo: Tegnap Gipsz Jakab telefonált, és azt kérte, hogy holnap délelőtt hívjam vissza."
+       },
+       "finish_reason": "stop"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 28,
+      "completion_tokens": 21,
+      "total_tokens": 49
+     }
+    }
+   },
+   "seq": 18
+  },
+  {
+   "id": "req_83d759b9ebbbcfa2",
+   "time": "2026-10-27T12:45:11.078+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_66ba144e41a21c37",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "NATIONAL_ID_HU_TAJ": 1,
+     "NATIONAL_ID_HU_TAX": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "NATIONAL_ID_HU_TAJ": 1,
+     "NATIONAL_ID_HU_TAX": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "texts": 2
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 2,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 88,
+    "completion_tokens": 60,
+    "total_tokens": 148
+   },
+   "timing": {
+    "total_ms": 10.083,
+    "upstream_ms": 3.537,
+    "overhead_ms": 6.546,
+    "stages_ms": {
+     "parse": 0.075,
+     "detect": 1.108,
+     "image": 0.0,
+     "mask": 0.433,
+     "forward": 4.788,
+     "upstream_ttfb": 3.298,
+     "upstream": 3.537,
+     "unmask": 0.0,
+     "response": 0.128
+    },
+    "detectors_ms": {
+     "known": 0.15,
+     "rules": 0.279
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "system",
+       "content": "Ügyfélszolgálati asszisztens vagy. Válaszolj röviden."
+      },
+      {
+       "role": "user",
+       "content": "Szia! [[PERSON_7ee227]] vagyok, e-mail: [[EMAIL_8ce67f]], telefon: [[PHONE_93f14a]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_75ce81]] számlára. TAJ számom [[NATIONAL_ID_HU_TAJ_8c81f3]], adóazonosító jelem [[NATIONAL_ID_HU_TAX_8fb4e6]]."
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793105111,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": "Echo: Szia! [[PERSON_7ee227]] vagyok, e-mail: [[EMAIL_8ce67f]], telefon: [[PHONE_93f14a]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_75ce81]] számlára. TAJ számom [[NATIONAL_ID_HU_TAJ_8c81f3]], adóazonosító jelem [[NATIONAL_ID_HU_TAX_8fb4e6]]."
+       },
+       "finish_reason": "stop"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 88,
+      "completion_tokens": 60,
+      "total_tokens": 148
+     }
+    }
+   },
+   "seq": 19
+  },
+  {
+   "id": "req_69907d9c7f005346",
+   "time": "2026-10-27T12:45:11.087+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_66ba144e41a21c37",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 2,
+     "EMAIL": 3,
+     "NATIONAL_ID_HU_TAJ": 2,
+     "NATIONAL_ID_HU_TAX": 2,
+     "PERSON": 3,
+     "PHONE": 2
+    },
+    "masked": {
+     "BANK_ACCOUNT": 2,
+     "EMAIL": 3,
+     "NATIONAL_ID_HU_TAJ": 2,
+     "NATIONAL_ID_HU_TAX": 2,
+     "PERSON": 3,
+     "PHONE": 2
+    },
+    "texts": 4
+   },
+   "cache": {
+    "hits": 3,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 186,
+    "completion_tokens": 21,
+    "total_tokens": 207
+   },
+   "timing": {
+    "total_ms": 7.787,
+    "upstream_ms": 2.182,
+    "overhead_ms": 5.605,
+    "stages_ms": {
+     "parse": 0.086,
+     "detect": 0.566,
+     "image": 0.0,
+     "mask": 0.444,
+     "forward": 4.369,
+     "upstream_ttfb": 1.876,
+     "upstream": 2.182,
+     "unmask": 0.0,
+     "response": 0.124
+    },
+    "detectors_ms": {
+     "known": 0.105,
+     "rules": 0.089
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "system",
+       "content": "Ügyfélszolgálati asszisztens vagy. Válaszolj röviden."
+      },
+      {
+       "role": "user",
+       "content": "Szia! [[PERSON_7ee227]] vagyok, e-mail: [[EMAIL_8ce67f]], telefon: [[PHONE_93f14a]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_75ce81]] számlára. TAJ számom [[NATIONAL_ID_HU_TAJ_8c81f3]], adóazonosító jelem [[NATIONAL_ID_HU_TAX_8fb4e6]]."
+      },
+      {
+       "role": "assistant",
+       "content": "Echo: Szia! [[PERSON_7ee227]] vagyok, e-mail: [[EMAIL_8ce67f]], telefon: [[PHONE_93f14a]]. Kérlek, utald a díjat a [[BANK_ACCOUNT_75ce81]] számlára. TAJ számom [[NATIONAL_ID_HU_TAJ_8c81f3]], adóazonosító jelem [[NATIONAL_ID_HU_TAX_8fb4e6]]."
+      },
+      {
+       "role": "user",
+       "content": "Köszönöm! A visszaigazolást [[PERSON_7ee227]]nek küldd, a [[EMAIL_8ce67f]] címre."
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793105111,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": "Echo: Köszönöm! A visszaigazolást [[PERSON_7ee227]]nek küldd, a [[EMAIL_8ce67f]] címre."
+       },
+       "finish_reason": "stop"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 186,
+      "completion_tokens": 21,
+      "total_tokens": 207
+     }
+    }
+   },
+   "seq": 20
+  },
+  {
+   "id": "req_378a2c719d8e43bb",
+   "time": "2026-10-27T12:45:11.097+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_7ef880a0878b21a2",
+   "session_new": true,
+   "detectors": [
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "ADDRESS": 1
+    },
+    "masked": {
+     "ADDRESS": 1
+    },
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 18,
+    "total_tokens": 42
+   },
+   "timing": {
+    "total_ms": 8.253,
+    "upstream_ms": 2.409,
+    "overhead_ms": 5.844,
+    "stages_ms": {
+     "parse": 0.065,
+     "detect": 0.424,
+     "image": 0.0,
+     "mask": 0.084,
+     "forward": 4.35,
+     "upstream_ttfb": 1.882,
+     "upstream": 2.409,
+     "unmask": 0.244,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "rules": 0.115
+    },
+    "ttft_ms": 7.215,
+    "upstream_ttft_ms": 2.244,
+    "added_ttft_ms": 4.971
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Az új lakcímem [[ADDRESS_e8606b]], kérlek frissítsd a szerződésen."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {
+      "0": "Echo: Az új lakcímem [[ADDRESS_e8606b]], kérlek frissítsd a szerződésen."
+     }
+    },
+    "chunks": 14
+   },
+   "seq": 21
+  },
+  {
+   "id": "req_e26ca00591617531",
+   "time": "2026-10-27T12:45:11.111+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "en",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_90cec0f91c295b6a",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 2,
+     "EMAIL": 1,
+     "PERSON": 2,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 2,
+     "EMAIL": 1,
+     "PERSON": 2,
+     "PHONE": 1
+    },
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 53,
+    "completion_tokens": 46,
+    "total_tokens": 99
+   },
+   "timing": {
+    "total_ms": 11.06,
+    "upstream_ms": 3.115,
+    "overhead_ms": 7.945,
+    "stages_ms": {
+     "parse": 0.303,
+     "detect": 1.584,
+     "image": 0.0,
+     "mask": 0.176,
+     "forward": 4.564,
+     "upstream_ttfb": 2.138,
+     "upstream": 3.115,
+     "unmask": 0.431,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "known": 0.096,
+     "rules": 0.26
+    },
+    "ttft_ms": 9.336,
+    "upstream_ttft_ms": 2.65,
+    "added_ttft_ms": 6.686
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hi, this is [[PERSON_1fa4fb]] ([[EMAIL_141ec0]], [[PHONE_d308c5]]). Please refund the deposit to [[BANK_ACCOUNT_0e1c45]] and void [[PERSON_1fa4fb]]'s card [[BANK_ACCOUNT_1c996a]]."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {
+      "0": "Echo: Hi, this is [[PERSON_1fa4fb]] ([[EMAIL_141ec0]], [[PHONE_d308c5]]). Please refund the deposit to [[BANK_ACCOUNT_0e1c45]] and void [[PERSON_1fa4fb]]'s card [[BANK_ACCOUNT_1c996a]]."
+     }
+    },
+    "chunks": 30
+   },
+   "seq": 22
+  },
+  {
+   "id": "req_06d2590942806d7c",
+   "time": "2026-10-27T12:45:11.124+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "de",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_446bbc6de9c8a993",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "texts": 5
+   },
+   "cache": {
+    "hits": 1,
+    "misses": 4,
+    "seeded": 0
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 61,
+    "total_tokens": 103
+   },
+   "timing": {
+    "total_ms": 9.752,
+    "upstream_ms": 1.915,
+    "overhead_ms": 7.837,
+    "stages_ms": {
+     "parse": 0.074,
+     "detect": 2.956,
+     "image": 0.0,
+     "mask": 0.198,
+     "forward": 4.498,
+     "upstream_ttfb": 1.695,
+     "upstream": 1.915,
+     "unmask": 0.0,
+     "response": 0.094
+    },
+    "detectors_ms": {
+     "known": 0.1,
+     "rules": 1.767
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hallo, hier ist [[PERSON_1497c7]], E-Mail [[EMAIL_0bd848]], Telefon [[PHONE_cb035f]]. Bitte überweisen Sie auf [[BANK_ACCOUNT_7c2cb4]]."
+      }
+     ],
+     "tools": [
+      {
+       "type": "function",
+       "function": {
+        "name": "send_email",
+        "description": "Send an e-mail on the user's behalf.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       }
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793105111,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+         {
+          "id": "call_mock_1",
+          "type": "function",
+          "function": {
+           "name": "send_email",
+           "arguments": "{\"text\": \"Hallo, hier ist [[PERSON_1497c7]], E-Mail [[EMAIL_0bd848]], Telefon [[PHONE_cb035f]]. Bitte überweisen Sie auf [[BANK_ACCOUNT_7c2cb4]].\"}"
+          }
+         }
+        ]
+       },
+       "finish_reason": "tool_calls"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 42,
+      "completion_tokens": 61,
+      "total_tokens": 103
+     }
+    }
+   },
+   "seq": 23
+  },
+  {
+   "id": "req_61a36820626a8db0",
+   "time": "2026-10-27T12:45:11.137+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "de",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_7287856ceb9dd358",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "masked": {
+     "BANK_ACCOUNT": 1,
+     "EMAIL": 1,
+     "PERSON": 1,
+     "PHONE": 1
+    },
+    "texts": 5
+   },
+   "cache": {
+    "hits": 1,
+    "misses": 4,
+    "seeded": 0
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 61,
+    "total_tokens": 103
+   },
+   "timing": {
+    "total_ms": 10.156,
+    "upstream_ms": 2.97,
+    "overhead_ms": 7.186,
+    "stages_ms": {
+     "parse": 0.075,
+     "detect": 1.174,
+     "image": 0.0,
+     "mask": 0.186,
+     "forward": 4.52,
+     "upstream_ttfb": 2.139,
+     "upstream": 2.97,
+     "unmask": 0.409,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "known": 0.088,
+     "rules": 0.28
+    },
+    "ttft_ms": 8.608,
+    "upstream_ttft_ms": 2.613,
+    "added_ttft_ms": 5.995
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Hallo, hier ist [[PERSON_e7588f]], E-Mail [[EMAIL_434d95]], Telefon [[PHONE_77a99e]]. Bitte überweisen Sie auf [[BANK_ACCOUNT_b60be2]]."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     },
+     "tools": [
+      {
+       "type": "function",
+       "function": {
+        "name": "send_email",
+        "description": "Send an e-mail on the user's behalf.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       }
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {}
+    },
+    "chunks": 25
+   },
+   "seq": 24
+  },
+  {
+   "id": "req_1cb12f3c25b92259",
+   "time": "2026-10-27T12:45:11.149+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": true,
+   "model": "pii-guard-mock",
+   "session_ref": "s_1b84eff69df604ac",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules"
+   ],
+   "entities": {
+    "detected": {
+     "ORGANIZATION": 1,
+     "PERSON": 2
+    },
+    "masked": {
+     "ORGANIZATION": 1,
+     "PERSON": 2
+    },
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 45,
+    "completion_tokens": 38,
+    "total_tokens": 83
+   },
+   "timing": {
+    "total_ms": 9.755,
+    "upstream_ms": 2.539,
+    "overhead_ms": 7.216,
+    "stages_ms": {
+     "parse": 0.083,
+     "detect": 0.873,
+     "image": 0.0,
+     "mask": 0.355,
+     "forward": 4.632,
+     "upstream_ttfb": 1.743,
+     "upstream": 2.539,
+     "unmask": 0.414,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "known": 0.27,
+     "rules": 0.187
+    },
+    "ttft_ms": 8.193,
+    "upstream_ttft_ms": 2.192,
+    "added_ttft_ms": 6.001
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Kérlek, írj egy rövid levelet [[PERSON_9e82c0]]nak a [[ORGANIZATION_bead55]]-vel kötött szerződésről, és egyeztesd a határidőt [[PERSON_b59f42]]kel."
+      }
+     ],
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   },
+   "response": {
+    "masked": {
+     "content": {
+      "0": "Echo: Kérlek, írj egy rövid levelet [[PERSON_9e82c0]]nak a [[ORGANIZATION_bead55]]-vel kötött szerződésről, és egyeztesd a határidőt [[PERSON_b59f42]]kel."
+     }
+    },
+    "chunks": 25
+   },
+   "seq": 25
+  },
+  {
+   "id": "req_700f9bfdd4a843ac",
+   "time": "2026-10-27T12:45:11.153+00:00",
+   "level": "masked",
+   "outcome": "refused",
+   "error": {
+    "code": "detection_failed",
+    "status": 503
+   },
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_32cd6df3acfab9a6",
+   "session_new": false,
+   "detectors": [
+    "known",
+    "rules",
+    "visual"
+   ],
+   "entities": {
+    "detected": {
+     "PERSON": 1
+    },
+    "masked": {},
+    "texts": 1,
+    "images": {
+     "count": 1,
+     "masked": {},
+     "kept": {},
+     "ocr": false
+    }
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 0
+   },
+   "upstream": {
+    "status": null,
+    "model": null,
+    "unresolved_placeholders": 0
+   },
+   "usage": null,
+   "timing": {
+    "total_ms": 0.813,
+    "upstream_ms": 0.0,
+    "overhead_ms": 0.813,
+    "stages_ms": {
+     "parse": 0.091,
+     "detect": 0.408,
+     "image": 0.293,
+     "mask": 0.0,
+     "forward": 0.0,
+     "upstream_ttfb": 0.0,
+     "upstream": 0.0,
+     "unmask": 0.0,
+     "response": 0.0
+    },
+    "detectors_ms": {
+     "known": 0.098,
+     "rules": 0.064,
+     "visual": 0.286
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": null
+   },
+   "response": null,
+   "seq": 26
+  },
+  {
+   "id": "req_4f5d10cef2a41349",
+   "time": "2026-10-27T12:45:11.161+00:00",
+   "level": "masked",
+   "outcome": "ok",
+   "error": null,
+   "mode": "fast",
+   "language": "hu",
+   "stream": false,
+   "model": "pii-guard-mock",
+   "session_ref": "s_3e56672cbe452aa6",
+   "session_new": true,
+   "detectors": [
+    "rules"
+   ],
+   "entities": {
+    "detected": {},
+    "masked": {},
+    "texts": 1
+   },
+   "cache": {
+    "hits": 0,
+    "misses": 1,
+    "seeded": 1
+   },
+   "upstream": {
+    "status": 200,
+    "model": "pii-guard-mock",
+    "unresolved_placeholders": 0
+   },
+   "usage": {
+    "prompt_tokens": 28,
+    "completion_tokens": 21,
+    "total_tokens": 49
+   },
+   "timing": {
+    "total_ms": 7.118,
+    "upstream_ms": 1.807,
+    "overhead_ms": 5.311,
+    "stages_ms": {
+     "parse": 0.068,
+     "detect": 0.382,
+     "image": 0.0,
+     "mask": 0.034,
+     "forward": 4.736,
+     "upstream_ttfb": 1.556,
+     "upstream": 1.807,
+     "unmask": 0.0,
+     "response": 0.08
+    },
+    "detectors_ms": {
+     "rules": 0.076
+    },
+    "ttft_ms": null,
+    "upstream_ttft_ms": null,
+    "added_ttft_ms": null
+   },
+   "request": {
+    "masked": {
+     "model": "pii-guard-mock",
+     "messages": [
+      {
+       "role": "user",
+       "content": "Tegnap Gipsz Jakab telefonált, és azt kérte, hogy holnap délelőtt hívjam vissza."
+      }
+     ]
+    }
+   },
+   "response": {
+    "masked": {
+     "id": "chatcmpl-mock",
+     "object": "chat.completion",
+     "created": 1793105111,
+     "model": "pii-guard-mock",
+     "choices": [
+      {
+       "index": 0,
+       "message": {
+        "role": "assistant",
+        "content": "Echo: Tegnap Gipsz Jakab telefonált, és azt kérte, hogy holnap délelőtt hívjam vissza."
+       },
+       "finish_reason": "stop"
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 28,
+      "completion_tokens": 21,
+      "total_tokens": 49
+     }
+    }
+   },
+   "seq": 27
+  }
+ ]
+}

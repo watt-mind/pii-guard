@@ -1,0 +1,39 @@
+# surname	common word	phrase using the word (not a name: a hard negative)
+# source: pii-guard contributors (Apache-2.0), hand-curated
+# see data/lexicons/MANIFEST.md
+Nagy	nagy	egy nagy doboz
+Kis	kis	a kis kert
+Fekete	fekete	a fekete kabát
+Fehér	fehér	a fehér kerítés
+Szabó	szabó	a szabó műhelye
+Kovács	kovács	a falu kovácsa
+Molnár	molnár	a molnár malma
+Takács	takács	a takács szövőszéke
+Juhász	juhász	a juhász nyája
+Fazekas	fazekas	a fazekas korsói
+Halász	halász	a halász hálója
+Vadász	vadász	a vadász puskája
+Bíró	bíró	a bíró ítélete
+Katona	katona	a katona egyenruhája
+Pásztor	pásztor	a pásztor kutyája
+Barna	barna	a barna asztal
+Vörös	vörös	a vörös zászló
+Szőke	szőke	a szőke kislány
+Magyar	magyar	a magyar nyelv
+Király	király	a király koronája
+Kerekes	kerekes	a kerekes kút
+Szép	szép	egy szép nap
+Virág	virág	a virág illata
+Medve	medve	a medve barlangja
+Szűcs	szűcs	a szűcs bundája
+Varga	varga	a varga csizmája
+Lakatos	lakatos	a lakatos szerszámai
+Major	major	a régi major
+Kertész	kertész	a kertész ásója
+Szekeres	szekeres	a szekeres lovai
+Rigó	rigó	egy rigó az ágon
+Holló	holló	a holló károgása
+Bárány	bárány	a bárány gyapja
+Farkas	farkas	a farkas üvöltése
+Sas	sas	a sas szárnya
+Tatár	tatár	a tatárjárás

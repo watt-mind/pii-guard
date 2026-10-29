@@ -1,0 +1,47 @@
+{
+  "about": "Quality regression gate (python -m pii_guard.eval.gate, make gate; CI job eval-gate). Each suite is scored now, rules only and offline, and compared with the newest committed run record of the same system on the same fixture files: leak and over-masking must not rise, round trip must not fall, beyond the tolerance (absolute rate, 0-1). The limits hold even when no record matches (fixtures changed). Lower a limit or a tolerance when quality improves; never raise one to make a PR pass without saying why in the PR.",
+  "suites": [
+    {
+      "name": "smoke",
+      "fixtures": ["eval/fixtures/hu-smoke.jsonl", "eval/fixtures/en-smoke.jsonl", "eval/fixtures/de-smoke.jsonl"],
+      "detectors": ["rules"],
+      "tolerance": {"leak_rate": 0.0, "roundtrip_rate": 0.0, "over_masking_rate": 0.0},
+      "limits": {"leak_rate_max": 0.42, "roundtrip_rate_min": 1.0, "over_masking_rate_max": 0.0}
+    },
+    {
+      "name": "synth-sample",
+      "fixtures": ["eval/fixtures/hu-synth-sample.jsonl", "eval/fixtures/en-synth-sample.jsonl"],
+      "detectors": ["rules"],
+      "tolerance": {"leak_rate": 0.0, "roundtrip_rate": 0.0, "over_masking_rate": 0.0},
+      "limits": {"leak_rate_max": 0.44, "roundtrip_rate_min": 1.0, "over_masking_rate_max": 0.0}
+    },
+    {
+      "name": "company-names",
+      "fixtures": ["eval/fixtures/hu-company-names.jsonl"],
+      "detectors": ["rules"],
+      "tolerance": {"leak_rate": 0.0, "roundtrip_rate": 0.0, "over_masking_rate": 0.0},
+      "limits": {"leak_rate_max": 0.03, "roundtrip_rate_min": 1.0, "over_masking_rate_max": 0.0}
+    },
+    {
+      "name": "injection",
+      "fixtures": ["eval/fixtures/hu-injection.jsonl", "eval/fixtures/en-injection.jsonl"],
+      "detectors": ["rules"],
+      "tolerance": {"leak_rate": 0.0, "roundtrip_rate": 0.0, "over_masking_rate": 0.0},
+      "limits": {"leak_rate_max": 0.55, "roundtrip_rate_min": 1.0, "over_masking_rate_max": 0.0}
+    },
+    {
+      "name": "ai4privacy",
+      "fixtures": ["eval/fixtures/public/hu-ai4privacy.jsonl", "eval/fixtures/public/en-ai4privacy.jsonl", "eval/fixtures/public/de-ai4privacy.jsonl"],
+      "detectors": ["rules"],
+      "tolerance": {"leak_rate": 0.0, "roundtrip_rate": 0.0, "over_masking_rate": 0.0},
+      "limits": {"leak_rate_max": 0.65, "roundtrip_rate_min": 1.0, "over_masking_rate_max": 0.003}
+    },
+    {
+      "name": "secrets",
+      "fixtures": ["eval/fixtures/secrets/en-secrets.jsonl"],
+      "detectors": ["rules"],
+      "tolerance": {"leak_rate": 0.0, "roundtrip_rate": 0.0, "over_masking_rate": 0.0},
+      "limits": {"leak_rate_max": 0.0, "roundtrip_rate_min": 1.0, "over_masking_rate_max": 0.0}
+    }
+  ]
+}

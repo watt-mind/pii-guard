@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-demo-which-parties-opaque-live",
+  "kind": "text",
+  "date": "2026-10-27",
+  "recorded_at": "2026-10-27T12:30:57+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "\"which parties have an ID?\" demo, opaque images, Muse Spark Open (Baseten)",
+  "notes": [
+    "One live call to Baseten (meta-models/muse-spark-open-1026, reasoning_effort low, max_tokens 1200), recorded OCR words, SAM off; the answer was scored after the call by score_demo_answer (statuses: present / expired / missing per party)."
+  ],
+  "code": {
+    "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "key": "demo-which-parties:opaque:live",
+    "label": "pii-guard gateway, opaque images, Muse Spark Open (Baseten)",
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": null,
+    "detectors": [
+      {
+        "name": "ocr",
+        "model": "tesseract",
+        "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+        "revision": null,
+        "settings": {
+          "cached": true,
+          "noise": 0.0
+        },
+        "serving": null
+      },
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "captions": true
+        },
+        "serving": null
+      },
+      {
+        "name": "upstream",
+        "model": "muse-spark-open",
+        "model_ref": "baseten:meta-models/muse-spark-open-1026",
+        "revision": null,
+        "settings": {
+          "render": "opaque"
+        },
+        "serving": "Baseten Model APIs"
+      }
+    ]
+  },
+  "fixture_set": "demo-which-parties",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/visual/manifest.json",
+      "sha256": null,
+      "set": "demo-which-parties",
+      "language": null,
+      "origin": "generated",
+      "generator": "muse-image",
+      "documents": 1
+    }
+  ],
+  "languages": [
+    "hu"
+  ],
+  "hardware": {
+    "description": "local CPU; OCR words from the cache",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": {
+    "usd": 0.0074,
+    "estimated": true,
+    "gpu_minutes": null,
+    "model_calls": 1,
+    "tokens": {
+      "prompt": 1982,
+      "cached": 128,
+      "completion": 1200,
+      "reasoning": 430
+    },
+    "shared_with": [],
+    "note": "From the token counts the endpoint reported, at list prices."
+  },
+  "metrics": {
+    "overall": {
+      "documents": 1,
+      "gold_spans": 3,
+      "predicted_spans": 3,
+      "exact": {
+        "gold": 3,
+        "pred": 3,
+        "tp_pred": 1,
+        "tp_gold": 1,
+        "precision": 0.3333,
+        "recall": 0.3333,
+        "f1": 0.3333
+      },
+      "overlap": {
+        "gold": 3,
+        "pred": 3,
+        "tp_pred": 1,
+        "tp_gold": 1,
+        "precision": 0.3333,
+        "recall": 0.3333,
+        "f1": 0.3333
+      },
+      "macro_f1_overlap": 0.3333,
+      "leak": {
+        "values": 3,
+        "leaked": 0,
+        "partial": 0,
+        "rate": 0.0,
+        "partial_rate": 0.0
+      },
+      "over_masking": {
+        "masked": 3,
+        "over_masked": 2,
+        "rate": null
+      },
+      "roundtrip": null,
+      "consistency": null,
+      "latency_ms": {
+        "detect": null,
+        "mask": {
+          "p50": 9400.0,
+          "p95": 9400.0
+        }
+      },
+      "per_type": {}
+    },
+    "languages": {
+      "hu": {
+        "documents": 1,
+        "gold_spans": 3,
+        "predicted_spans": 3,
+        "exact": {
+          "gold": 3,
+          "pred": 3,
+          "tp_pred": 1,
+          "tp_gold": 1,
+          "precision": 0.3333,
+          "recall": 0.3333,
+          "f1": 0.3333
+        },
+        "overlap": {
+          "gold": 3,
+          "pred": 3,
+          "tp_pred": 1,
+          "tp_gold": 1,
+          "precision": 0.3333,
+          "recall": 0.3333,
+          "f1": 0.3333
+        },
+        "macro_f1_overlap": 0.3333,
+        "leak": {
+          "values": 3,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "over_masking": {
+          "masked": 3,
+          "over_masked": 2,
+          "rate": null
+        },
+        "roundtrip": null,
+        "consistency": null,
+        "latency_ms": {
+          "detect": null,
+          "mask": {
+            "p50": 9400.0,
+            "p95": 9400.0
+          }
+        },
+        "per_type": {}
+      }
+    }
+  }
+}

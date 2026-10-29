@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-demo-which-parties-labels-mock",
+  "kind": "text",
+  "date": "2026-10-27",
+  "recorded_at": "2026-10-27T12:30:58+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "\"which parties have an ID?\" demo, labels images, mock upstream",
+  "notes": [],
+  "code": {
+    "commit": "8b57e158009ff64fd22b03f34fced9cf932e49c4",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "key": "demo-which-parties:labels:mock",
+    "label": "pii-guard gateway, labels images, mock upstream",
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": null,
+    "detectors": [
+      {
+        "name": "ocr",
+        "model": "tesseract",
+        "model_ref": "eval/fixtures/visual/ocr/tesseract.json",
+        "revision": null,
+        "settings": {
+          "cached": true,
+          "noise": 0.0
+        },
+        "serving": null
+      },
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "captions": true
+        },
+        "serving": null
+      },
+      {
+        "name": "upstream",
+        "model": null,
+        "model_ref": "mock",
+        "revision": null,
+        "settings": {
+          "render": "labels"
+        },
+        "serving": null
+      }
+    ]
+  },
+  "fixture_set": "demo-which-parties",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/visual/manifest.json",
+      "sha256": null,
+      "set": "demo-which-parties",
+      "language": null,
+      "origin": "generated",
+      "generator": "muse-image",
+      "documents": 1
+    }
+  ],
+  "languages": [
+    "hu"
+  ],
+  "hardware": {
+    "description": "local CPU; OCR words from the cache",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": {
+    "usd": 0.0,
+    "estimated": true,
+    "gpu_minutes": null,
+    "model_calls": 0,
+    "tokens": null,
+    "shared_with": [],
+    "note": null
+  },
+  "metrics": {
+    "overall": {
+      "documents": 1,
+      "gold_spans": 3,
+      "predicted_spans": 3,
+      "exact": {
+        "gold": 3,
+        "pred": 3,
+        "tp_pred": 3,
+        "tp_gold": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "overlap": {
+        "gold": 3,
+        "pred": 3,
+        "tp_pred": 3,
+        "tp_gold": 3,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "macro_f1_overlap": 1.0,
+      "leak": {
+        "values": 3,
+        "leaked": 0,
+        "partial": 0,
+        "rate": 0.0,
+        "partial_rate": 0.0
+      },
+      "over_masking": {
+        "masked": 3,
+        "over_masked": 0,
+        "rate": null
+      },
+      "roundtrip": null,
+      "consistency": null,
+      "latency_ms": {
+        "detect": null,
+        "mask": {
+          "p50": 200.0,
+          "p95": 200.0
+        }
+      },
+      "per_type": {}
+    },
+    "languages": {
+      "hu": {
+        "documents": 1,
+        "gold_spans": 3,
+        "predicted_spans": 3,
+        "exact": {
+          "gold": 3,
+          "pred": 3,
+          "tp_pred": 3,
+          "tp_gold": 3,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "overlap": {
+          "gold": 3,
+          "pred": 3,
+          "tp_pred": 3,
+          "tp_gold": 3,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "macro_f1_overlap": 1.0,
+        "leak": {
+          "values": 3,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "over_masking": {
+          "masked": 3,
+          "over_masked": 0,
+          "rate": null
+        },
+        "roundtrip": null,
+        "consistency": null,
+        "latency_ms": {
+          "detect": null,
+          "mask": {
+            "p50": 200.0,
+            "p95": 200.0
+          }
+        },
+        "per_type": {}
+      }
+    }
+  }
+}

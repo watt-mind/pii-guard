@@ -1,0 +1,123 @@
+# English (UK) document templates for the synthetic corpus (pii_guard.eval.generate).
+# Same schema as hu.toml.
+
+language = "en"
+language_name = "British English"
+inflection_rule = """You may add a possessive 's to names of people and companies (Amelia Carter's), \
+but the value itself must stay intact. Give the full name in its full form at least once; later \
+you may refer to people by surname with a title (Ms Carter) or by given name alone."""
+typos = " Make it feel real: a few typos, missing capitals or casual abbreviations in the surrounding text (never inside the values)."
+
+[field_labels]
+name = "name"
+date_of_birth = "date of birth"
+address = "address"
+email = "e-mail"
+phone = "phone"
+id_document = "passport number"
+bank_account = "bank account (IBAN)"
+plate = "vehicle registration"
+org_name = "name"
+given = "given name, for informal address"
+
+[[kinds]]
+id = "sale-contract"
+title = "Agreement for the sale of a used car"
+brief = "A private sale agreement for a used car between a seller and a buyer: parties' details, the vehicle with its registration, the price in pounds, payment by bank transfer to the seller's account, the condition and 'sold as seen' clauses, and signature lines with dates."
+register = "formal legal English"
+length = "250-400"
+weight = 2
+parties = [
+  { role = "seller", label = "Seller", kind = "person", fields = ["name", "date_of_birth", "address", "bank_account", "plate"] },
+  { role = "buyer", label = "Buyer", kind = "person", fields = ["name", "address", "id_document"] },
+]
+
+[[kinds]]
+id = "lease"
+title = "Assured shorthold tenancy agreement"
+brief = "An assured shorthold tenancy agreement between a letting company and a tenant: the parties, the property, the term, monthly rent paid to the landlord's account, the deposit protection clause, the tenant's obligations, and signature lines."
+register = "formal legal English"
+length = "300-450"
+weight = 2
+parties = [
+  { role = "landlord", label = "Landlord", kind = "company", fields = ["org_name", "address", "bank_account"] },
+  { role = "agent", label = "the landlord's lettings manager", kind = "person", fields = ["name"] },
+  { role = "tenant", label = "Tenant", kind = "person", fields = ["name", "date_of_birth", "phone", "email"] },
+  { role = "property", label = "the let property", kind = "property", fields = ["address"] },
+]
+
+[[kinds]]
+id = "power-of-attorney"
+title = "General power of attorney"
+brief = "A general power of attorney under which a donor appoints an attorney to manage their financial affairs, including their bank account, with both parties' details, the scope and duration, and a signature and witness block (the witness described only by role)."
+register = "formal legal English"
+length = "180-300"
+weight = 1
+parties = [
+  { role = "donor", label = "Donor", kind = "person", fields = ["name", "date_of_birth", "address", "bank_account"] },
+  { role = "attorney", label = "Attorney", kind = "person", fields = ["name", "address"] },
+]
+
+[[kinds]]
+id = "court-notice"
+title = "Notice of hearing (county court, small claims)"
+brief = "A county court notice of a small claims hearing: claim number, date, time and venue, addressed to the defendant, naming the claimant, what to bring, what happens if they do not attend, and the court's contact details."
+register = "formal official English"
+length = "180-300"
+weight = 1
+parties = [
+  { role = "court", label = "the court", kind = "court", fields = ["org_name", "address", "phone"] },
+  { role = "defendant", label = "Defendant (the addressee)", kind = "person", fields = ["name", "address"] },
+  { role = "claimant", label = "Claimant", kind = "person", fields = ["name"] },
+]
+
+[[kinds]]
+id = "invoice"
+title = "Invoice"
+brief = "A plain-text invoice from a small business to a private customer: supplier block, customer block, invoice number and dates, three or four line items with amounts in pounds and VAT, total, and payment details with the supplier's account."
+register = "business, terse"
+length = "120-220"
+weight = 1
+parties = [
+  { role = "supplier", label = "Supplier", kind = "company", fields = ["org_name", "address", "email", "bank_account"] },
+  { role = "customer", label = "Customer", kind = "person", fields = ["name", "address", "phone"] },
+]
+
+[[kinds]]
+id = "letter"
+title = "Formal letter"
+brief = "A formal letter from a city council to a resident about a parking permit for their car: the resident's details, the vehicle registration, what they need to do, and the council's contact details, signed by a named officer."
+register = "polite formal English"
+length = "180-300"
+weight = 1
+parties = [
+  { role = "council", label = "the council", kind = "office", fields = ["org_name", "address", "phone", "email"] },
+  { role = "officer", label = "the officer signing", kind = "person", fields = ["name"] },
+  { role = "resident", label = "the resident (addressee)", kind = "person", fields = ["name", "address", "plate"] },
+]
+
+[[kinds]]
+id = "email"
+title = "Informal e-mail"
+brief = "An informal e-mail between friends or family members sorting out paperwork (a flat, a car, a job application): the sender passes on personal details and asks for help. Subject line first, then the message."
+register = "informal, chatty English"
+length = "90-180"
+weight = 2
+typos = true
+parties = [
+  { role = "sender", label = "Sender", kind = "person", fields = ["name", "date_of_birth", "id_document", "phone", "email"], informal = true },
+  { role = "recipient", label = "Recipient", kind = "person", fields = ["name"], informal = true },
+]
+
+[[kinds]]
+id = "chat"
+title = "Chat conversation"
+brief = "A short instant-messaging conversation between two people arranging something practical (buying a used car, renting a room, paying someone back). Each line starts with the time and the speaker's given name, like '18:42 Amelia: ...'. Short messages, emoji-free. At some point both give their full name (for a transfer or a contract) and the other details."
+register = "very informal English chat"
+length = "80-160"
+weight = 2
+typos = true
+parties = [
+  { role = "a", label = "first speaker", kind = "person", fields = ["name", "phone", "bank_account"], informal = true },
+  { role = "b", label = "second speaker", kind = "person", fields = ["name", "address", "email"], informal = true },
+]

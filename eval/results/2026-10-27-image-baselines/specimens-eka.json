@@ -1,0 +1,1739 @@
+{
+  "title": "Image baseline eka on official specimen ID documents",
+  "suite": "visual-specimens",
+  "pipeline": {
+    "baseline": "eka",
+    "info": {
+      "tool": "eka-pii-redaction",
+      "versions": {
+        "eka-pii-redaction": "0.7.0",
+        "torch": "2.14.1",
+        "transformers": "5.21.0",
+        "ultralytics": "8.4.190"
+      },
+      "models": [
+        "ekacare/document-pii-redactor@c088fc4823f6 image/layoutlmv3 (text PII)",
+        "ekacare/document-pii-redactor@c088fc4823f6 image/yolo/best.pt (visual entities)"
+      ],
+      "config": {
+        "detector": "ImagePIIRedactor.detect, all categories, detect_visual=True",
+        "visual_score_threshold": 0.25,
+        "device": "cpu",
+        "ocr_lang": "tesseract default (eng)",
+        "upscale_to": null
+      },
+      "supports": [
+        "text",
+        "face",
+        "signature"
+      ]
+    },
+    "unsupported_region_types": [],
+    "max_side": 1600,
+    "iou_threshold": 0.5,
+    "coverage_threshold": 0.9
+  },
+  "specimens": 65,
+  "errors": {},
+  "overall": {
+    "regions": 406,
+    "recall_iou50": 0.3571,
+    "recall_cov90": 0.2438,
+    "mean_coverage": 0.4648
+  },
+  "by_region_type": {
+    "portrait": {
+      "regions": 65,
+      "recall_iou50": 0.5692,
+      "recall_cov90": 0.5231,
+      "mean_coverage": 0.554,
+      "matched_by": {
+        "FACE": 35,
+        "STAMP": 2
+      }
+    },
+    "signature": {
+      "regions": 37,
+      "recall_iou50": 0.4595,
+      "recall_cov90": 0.3784,
+      "mean_coverage": 0.457,
+      "matched_by": {
+        "ID_DOCUMENT": 2,
+        "SIGNATURE": 15
+      }
+    },
+    "mrz": {
+      "regions": 30,
+      "recall_iou50": 0.0667,
+      "recall_cov90": 0.1333,
+      "mean_coverage": 0.7034,
+      "matched_by": {
+        "ID_DOCUMENT": 2
+      }
+    },
+    "text": {
+      "regions": 274,
+      "recall_iou50": 0.3248,
+      "recall_cov90": 0.1715,
+      "mean_coverage": 0.4186,
+      "matched_by": {
+        "DATE_OF_BIRTH": 2,
+        "ID_DOCUMENT": 84,
+        "PERSON": 3
+      }
+    }
+  },
+  "by_country": {
+    "AT": {
+      "regions": 27,
+      "recall_iou50": 0.1852,
+      "recall_cov90": 0.1111,
+      "mean_coverage": 0.2911,
+      "specimens": 5,
+      "by_type": {
+        "portrait": {
+          "regions": 5,
+          "recall_iou50": 0.2,
+          "recall_cov90": 0.2,
+          "mean_coverage": 0.2
+        },
+        "signature": {
+          "regions": 2,
+          "recall_iou50": 1.0,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.8974
+        },
+        "mrz": {
+          "regions": 2,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.5224
+        },
+        "text": {
+          "regions": 18,
+          "recall_iou50": 0.1111,
+          "recall_cov90": 0.0556,
+          "mean_coverage": 0.2234
+        }
+      }
+    },
+    "BE": {
+      "regions": 9,
+      "recall_iou50": 0.5556,
+      "recall_cov90": 0.2222,
+      "mean_coverage": 0.4971,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 2,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9841
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.5665
+        },
+        "text": {
+          "regions": 5,
+          "recall_iou50": 0.6,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.3879
+        }
+      }
+    },
+    "BG": {
+      "regions": 19,
+      "recall_iou50": 0.5263,
+      "recall_cov90": 0.2105,
+      "mean_coverage": 0.643,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 2,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.5
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9563
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.6803
+        },
+        "text": {
+          "regions": 15,
+          "recall_iou50": 0.5333,
+          "recall_cov90": 0.1333,
+          "mean_coverage": 0.6388
+        }
+      }
+    },
+    "CY": {
+      "regions": 13,
+      "recall_iou50": 0.3077,
+      "recall_cov90": 0.3077,
+      "mean_coverage": 0.6886,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.7652
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.7143
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8719
+        },
+        "text": {
+          "regions": 10,
+          "recall_iou50": 0.2,
+          "recall_cov90": 0.4,
+          "mean_coverage": 0.66
+        }
+      }
+    },
+    "CZ": {
+      "regions": 12,
+      "recall_iou50": 0.75,
+      "recall_cov90": 0.25,
+      "mean_coverage": 0.8213,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9821
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9709
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.7822
+        },
+        "text": {
+          "regions": 9,
+          "recall_iou50": 0.7778,
+          "recall_cov90": 0.1111,
+          "mean_coverage": 0.7912
+        }
+      }
+    },
+    "DE": {
+      "regions": 33,
+      "recall_iou50": 0.4545,
+      "recall_cov90": 0.4848,
+      "mean_coverage": 0.593,
+      "specimens": 6,
+      "by_type": {
+        "portrait": {
+          "regions": 4,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0
+        },
+        "signature": {
+          "regions": 4,
+          "recall_iou50": 0.75,
+          "recall_cov90": 0.75,
+          "mean_coverage": 0.7416
+        },
+        "mrz": {
+          "regions": 2,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.8947
+        },
+        "text": {
+          "regions": 23,
+          "recall_iou50": 0.3043,
+          "recall_cov90": 0.3478,
+          "mean_coverage": 0.4702
+        }
+      }
+    },
+    "EE": {
+      "regions": 11,
+      "recall_iou50": 0.5455,
+      "recall_cov90": 0.3636,
+      "mean_coverage": 0.6164,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.961
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9925
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8186
+        },
+        "text": {
+          "regions": 8,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.25,
+          "mean_coverage": 0.501
+        }
+      }
+    },
+    "ES": {
+      "regions": 24,
+      "recall_iou50": 0.4167,
+      "recall_cov90": 0.4167,
+      "mean_coverage": 0.6756,
+      "specimens": 3,
+      "by_type": {
+        "portrait": {
+          "regions": 2,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0
+        },
+        "signature": {
+          "regions": 2,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.4788
+        },
+        "mrz": {
+          "regions": 2,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.7553
+        },
+        "text": {
+          "regions": 18,
+          "recall_iou50": 0.3889,
+          "recall_cov90": 0.3889,
+          "mean_coverage": 0.6526
+        }
+      }
+    },
+    "FI": {
+      "regions": 11,
+      "recall_iou50": 0.4545,
+      "recall_cov90": 0.2727,
+      "mean_coverage": 0.6035,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 3,
+          "recall_iou50": 0.6667,
+          "recall_cov90": 0.6667,
+          "mean_coverage": 0.6431
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.1934
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.461
+        },
+        "text": {
+          "regions": 6,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.1667,
+          "mean_coverage": 0.6757
+        }
+      }
+    },
+    "FR": {
+      "regions": 29,
+      "recall_iou50": 0.1034,
+      "recall_cov90": 0.069,
+      "mean_coverage": 0.1458,
+      "specimens": 4,
+      "by_type": {
+        "portrait": {
+          "regions": 6,
+          "recall_iou50": 0.3333,
+          "recall_cov90": 0.3333,
+          "mean_coverage": 0.3282
+        },
+        "signature": {
+          "regions": 2,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "mrz": {
+          "regions": 3,
+          "recall_iou50": 0.3333,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.7369
+        },
+        "text": {
+          "regions": 18,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0027
+        }
+      }
+    },
+    "GR": {
+      "regions": 13,
+      "recall_iou50": 0.3846,
+      "recall_cov90": 0.1538,
+      "mean_coverage": 0.6026,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 2,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.4766
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.1433
+        },
+        "text": {
+          "regions": 9,
+          "recall_iou50": 0.4444,
+          "recall_cov90": 0.1111,
+          "mean_coverage": 0.7487
+        }
+      }
+    },
+    "HR": {
+      "regions": 10,
+      "recall_iou50": 0.6,
+      "recall_cov90": 0.3,
+      "mean_coverage": 0.6629,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8392
+        },
+        "text": {
+          "regions": 7,
+          "recall_iou50": 0.5714,
+          "recall_cov90": 0.1429,
+          "mean_coverage": 0.5415
+        }
+      }
+    },
+    "HU": {
+      "regions": 42,
+      "recall_iou50": 0.1429,
+      "recall_cov90": 0.119,
+      "mean_coverage": 0.2454,
+      "specimens": 6,
+      "by_type": {
+        "portrait": {
+          "regions": 6,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "signature": {
+          "regions": 4,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.1562
+        },
+        "mrz": {
+          "regions": 3,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.6444
+        },
+        "text": {
+          "regions": 29,
+          "recall_iou50": 0.2069,
+          "recall_cov90": 0.1724,
+          "mean_coverage": 0.2672
+        }
+      }
+    },
+    "IT": {
+      "regions": 21,
+      "recall_iou50": 0.381,
+      "recall_cov90": 0.1905,
+      "mean_coverage": 0.4955,
+      "specimens": 4,
+      "by_type": {
+        "portrait": {
+          "regions": 3,
+          "recall_iou50": 0.3333,
+          "recall_cov90": 0.3333,
+          "mean_coverage": 0.3579
+        },
+        "signature": {
+          "regions": 2,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.5
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.4596
+        },
+        "text": {
+          "regions": 15,
+          "recall_iou50": 0.4,
+          "recall_cov90": 0.1333,
+          "mean_coverage": 0.5248
+        }
+      }
+    },
+    "LT": {
+      "regions": 11,
+      "recall_iou50": 0.0909,
+      "recall_cov90": 0.0909,
+      "mean_coverage": 0.1885,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 2,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8601
+        },
+        "text": {
+          "regions": 7,
+          "recall_iou50": 0.1429,
+          "recall_cov90": 0.1429,
+          "mean_coverage": 0.1733
+        }
+      }
+    },
+    "LU": {
+      "regions": 12,
+      "recall_iou50": 0.3333,
+      "recall_cov90": 0.3333,
+      "mean_coverage": 0.5272,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 3,
+          "recall_iou50": 0.3333,
+          "recall_cov90": 0.3333,
+          "mean_coverage": 0.3496
+        },
+        "signature": {
+          "regions": 2,
+          "recall_iou50": 0.5,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.4649
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8132
+        },
+        "text": {
+          "regions": 6,
+          "recall_iou50": 0.3333,
+          "recall_cov90": 0.3333,
+          "mean_coverage": 0.5891
+        }
+      }
+    },
+    "LV": {
+      "regions": 12,
+      "recall_iou50": 0.25,
+      "recall_cov90": 0.3333,
+      "mean_coverage": 0.3304,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 4,
+          "recall_iou50": 0.75,
+          "recall_cov90": 0.75,
+          "mean_coverage": 0.7203
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9733
+        },
+        "text": {
+          "regions": 6,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0184
+        }
+      }
+    },
+    "MT": {
+      "regions": 5,
+      "recall_iou50": 0.4,
+      "recall_cov90": 0.0,
+      "mean_coverage": 0.518,
+      "specimens": 1,
+      "by_type": {
+        "portrait": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8923
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8288
+        },
+        "text": {
+          "regions": 3,
+          "recall_iou50": 0.3333,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.2896
+        }
+      }
+    },
+    "NL": {
+      "regions": 11,
+      "recall_iou50": 0.7273,
+      "recall_cov90": 0.2727,
+      "mean_coverage": 0.6676,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 2,
+          "recall_iou50": 1.0,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.8807
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.7512
+        },
+        "text": {
+          "regions": 7,
+          "recall_iou50": 0.8571,
+          "recall_cov90": 0.2857,
+          "mean_coverage": 0.6901
+        }
+      }
+    },
+    "PL": {
+      "regions": 34,
+      "recall_iou50": 0.2647,
+      "recall_cov90": 0.3529,
+      "mean_coverage": 0.4134,
+      "specimens": 5,
+      "by_type": {
+        "portrait": {
+          "regions": 7,
+          "recall_iou50": 0.8571,
+          "recall_cov90": 0.8571,
+          "mean_coverage": 0.8357
+        },
+        "signature": {
+          "regions": 3,
+          "recall_iou50": 0.3333,
+          "recall_cov90": 0.3333,
+          "mean_coverage": 0.3333
+        },
+        "mrz": {
+          "regions": 2,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.5,
+          "mean_coverage": 0.474
+        },
+        "text": {
+          "regions": 22,
+          "recall_iou50": 0.0909,
+          "recall_cov90": 0.1818,
+          "mean_coverage": 0.2844
+        }
+      }
+    },
+    "RO": {
+      "regions": 8,
+      "recall_iou50": 0.875,
+      "recall_cov90": 0.25,
+      "mean_coverage": 0.8119,
+      "specimens": 1,
+      "by_type": {
+        "portrait": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 1.0
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 1.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8311
+        },
+        "text": {
+          "regions": 6,
+          "recall_iou50": 0.8333,
+          "recall_cov90": 0.1667,
+          "mean_coverage": 0.7774
+        }
+      }
+    },
+    "SE": {
+      "regions": 10,
+      "recall_iou50": 0.1,
+      "recall_cov90": 0.0,
+      "mean_coverage": 0.1567,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.8947
+        },
+        "text": {
+          "regions": 7,
+          "recall_iou50": 0.1429,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0961
+        }
+      }
+    },
+    "SI": {
+      "regions": 13,
+      "recall_iou50": 0.1538,
+      "recall_cov90": 0.1538,
+      "mean_coverage": 0.2082,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 3,
+          "recall_iou50": 0.3333,
+          "recall_cov90": 0.3333,
+          "mean_coverage": 0.3333
+        },
+        "signature": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "mrz": {
+          "regions": 1,
+          "recall_iou50": 0.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9213
+        },
+        "text": {
+          "regions": 8,
+          "recall_iou50": 0.125,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0981
+        }
+      }
+    },
+    "SK": {
+      "regions": 16,
+      "recall_iou50": 0.6875,
+      "recall_cov90": 0.375,
+      "mean_coverage": 0.601,
+      "specimens": 2,
+      "by_type": {
+        "portrait": {
+          "regions": 2,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9859
+        },
+        "signature": {
+          "regions": 2,
+          "recall_iou50": 1.0,
+          "recall_cov90": 1.0,
+          "mean_coverage": 0.9883
+        },
+        "text": {
+          "regions": 12,
+          "recall_iou50": 0.5833,
+          "recall_cov90": 0.1667,
+          "mean_coverage": 0.4723
+        }
+      }
+    }
+  },
+  "by_doc_type": {
+    "driving_licence": {
+      "regions": 46,
+      "recall_iou50": 0.3696,
+      "recall_cov90": 0.3043,
+      "mean_coverage": 0.4853,
+      "specimens": 10
+    },
+    "id_card": {
+      "regions": 304,
+      "recall_iou50": 0.3849,
+      "recall_cov90": 0.2401,
+      "mean_coverage": 0.4904,
+      "specimens": 49
+    },
+    "passport": {
+      "regions": 56,
+      "recall_iou50": 0.1964,
+      "recall_cov90": 0.2143,
+      "mean_coverage": 0.3089,
+      "specimens": 6
+    }
+  },
+  "over_masking_mean": 0.1077,
+  "latency_ms": {
+    "local_per_image_p50": 597.7,
+    "local_per_image_p95": 915.2,
+    "total_per_image_p50": 597.7,
+    "total_per_image_p95": 915.2
+  },
+  "per_specimen": [
+    {
+      "id": "at-id-card-front-13cb05",
+      "country": "AT",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 7,
+      "hits_iou50": 3,
+      "hits_cov90": 1,
+      "regions_masked": 15,
+      "over_masking": 0.1319,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "at-id-card-back-8bba0c",
+      "country": "AT",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 2,
+      "hits_iou50": 0,
+      "hits_cov90": 1,
+      "regions_masked": 13,
+      "over_masking": 0.2695,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "be-id-card-front-043993",
+      "country": "BE",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 7,
+      "hits_iou50": 4,
+      "hits_cov90": 1,
+      "regions_masked": 15,
+      "over_masking": 0.1178,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "be-id-card-back-1a7382",
+      "country": "BE",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 2,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 14,
+      "over_masking": 0.1058,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "bg-id-card-front-386e7f",
+      "country": "BG",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 12,
+      "hits_iou50": 7,
+      "hits_cov90": 2,
+      "regions_masked": 18,
+      "over_masking": 0.0893,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "bg-id-card-back-de9bb4",
+      "country": "BG",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 7,
+      "hits_iou50": 3,
+      "hits_cov90": 2,
+      "regions_masked": 17,
+      "over_masking": 0.0751,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hr-id-card-front-41158b",
+      "country": "HR",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 7,
+      "hits_iou50": 5,
+      "hits_cov90": 3,
+      "regions_masked": 20,
+      "over_masking": 0.2464,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hr-id-card-back-166040",
+      "country": "HR",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 3,
+      "hits_iou50": 1,
+      "hits_cov90": 0,
+      "regions_masked": 15,
+      "over_masking": 0.1156,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "cy-id-card-front-c5952b",
+      "country": "CY",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 7,
+      "hits_iou50": 4,
+      "hits_cov90": 2,
+      "regions_masked": 15,
+      "over_masking": 0.1746,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "cy-id-card-back-b0e29b",
+      "country": "CY",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 6,
+      "hits_iou50": 0,
+      "hits_cov90": 2,
+      "regions_masked": 23,
+      "over_masking": 0.3235,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "cz-id-card-front-4a204f",
+      "country": "CZ",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 7,
+      "hits_cov90": 2,
+      "regions_masked": 24,
+      "over_masking": 0.1431,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "cz-id-card-back-060495",
+      "country": "CZ",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 4,
+      "hits_iou50": 2,
+      "hits_cov90": 1,
+      "regions_masked": 18,
+      "over_masking": 0.0764,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "ee-id-card-front-9af458",
+      "country": "EE",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 5,
+      "hits_cov90": 4,
+      "regions_masked": 6,
+      "over_masking": 0.0231,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "ee-id-card-back-b4dd15",
+      "country": "EE",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 3,
+      "hits_iou50": 1,
+      "hits_cov90": 0,
+      "regions_masked": 9,
+      "over_masking": 0.0973,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "fi-id-card-front-e2d885",
+      "country": "FI",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 9,
+      "hits_iou50": 5,
+      "hits_cov90": 3,
+      "regions_masked": 23,
+      "over_masking": 0.1603,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "fi-id-card-back-345983",
+      "country": "FI",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 2,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 8,
+      "over_masking": 0.1407,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "fr-id-card-front-d187c1",
+      "country": "FR",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 9,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 2,
+      "over_masking": 0.0075,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "fr-id-card-back-c9be87",
+      "country": "FR",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 3,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 7,
+      "over_masking": 0.067,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-id-card-front-5fe73a",
+      "country": "DE",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 9,
+      "hits_iou50": 5,
+      "hits_cov90": 6,
+      "regions_masked": 13,
+      "over_masking": 0.1184,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-id-card-back-3b9c75",
+      "country": "DE",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 2,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 14,
+      "over_masking": 0.0679,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "gr-id-card-front-632b39",
+      "country": "GR",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 3,
+      "hits_cov90": 1,
+      "regions_masked": 23,
+      "over_masking": 0.0952,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "gr-id-card-back-33272a",
+      "country": "GR",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 5,
+      "hits_iou50": 2,
+      "hits_cov90": 1,
+      "regions_masked": 18,
+      "over_masking": 0.1946,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-id-card-front-8ca216",
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 2,
+      "hits_cov90": 3,
+      "regions_masked": 15,
+      "over_masking": 0.2431,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-id-card-back-f0c266",
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 6,
+      "hits_iou50": 3,
+      "hits_cov90": 1,
+      "regions_masked": 15,
+      "over_masking": 0.1249,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-id-card-front-2e3bf1",
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 3,
+      "over_masking": 0.1004,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-id-card-front-7ab675",
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 5,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 6,
+      "over_masking": 0.044,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-id-card-back-8fdcae",
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 6,
+      "hits_iou50": 1,
+      "hits_cov90": 0,
+      "regions_masked": 8,
+      "over_masking": 0.029,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "it-id-card-front-35bfa5",
+      "country": "IT",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 2,
+      "hits_cov90": 1,
+      "regions_masked": 17,
+      "over_masking": 0.1121,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "it-id-card-back-d9cb95",
+      "country": "IT",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 6,
+      "hits_iou50": 2,
+      "hits_cov90": 1,
+      "regions_masked": 8,
+      "over_masking": 0.297,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "lv-id-card-front-a8bee7",
+      "country": "LV",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 10,
+      "hits_iou50": 3,
+      "hits_cov90": 3,
+      "regions_masked": 7,
+      "over_masking": 0.1367,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "lv-id-card-back-3ee233",
+      "country": "LV",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 2,
+      "hits_iou50": 0,
+      "hits_cov90": 1,
+      "regions_masked": 6,
+      "over_masking": 0.0567,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "lt-id-card-front-020caf",
+      "country": "LT",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 11,
+      "over_masking": 0.1071,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "lt-id-card-back-5ebbbb",
+      "country": "LT",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 3,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 4,
+      "over_masking": 0.0467,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "lu-id-card-front-183e96",
+      "country": "LU",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 3,
+      "hits_cov90": 3,
+      "regions_masked": 11,
+      "over_masking": 0.2423,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "lu-id-card-back-043896",
+      "country": "LU",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 4,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 10,
+      "over_masking": 0.0553,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "mt-id-card-back-9578ed",
+      "country": "MT",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 5,
+      "hits_iou50": 2,
+      "hits_cov90": 0,
+      "regions_masked": 14,
+      "over_masking": 0.1258,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "nl-id-card-front-6ae1fb",
+      "country": "NL",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 7,
+      "hits_cov90": 3,
+      "regions_masked": 16,
+      "over_masking": 0.1489,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "nl-id-card-back-8ca6dd",
+      "country": "NL",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 3,
+      "hits_iou50": 1,
+      "hits_cov90": 0,
+      "regions_masked": 17,
+      "over_masking": 0.0431,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "pl-id-card-front-a9b33f",
+      "country": "PL",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 2,
+      "hits_cov90": 2,
+      "regions_masked": 2,
+      "over_masking": 0.0689,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "pl-id-card-back-d6608a",
+      "country": "PL",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 7,
+      "hits_iou50": 3,
+      "hits_cov90": 4,
+      "regions_masked": 12,
+      "over_masking": 0.0704,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "ro-id-card-front-528a23",
+      "country": "RO",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 7,
+      "hits_cov90": 2,
+      "regions_masked": 21,
+      "over_masking": 0.1122,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "sk-id-card-front-379ddc",
+      "country": "SK",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 4,
+      "hits_cov90": 4,
+      "regions_masked": 11,
+      "over_masking": 0.1285,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "sk-id-card-front-8ebbab",
+      "country": "SK",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 7,
+      "hits_cov90": 2,
+      "regions_masked": 15,
+      "over_masking": 0.1503,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "si-id-card-front-96d1f1",
+      "country": "SI",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 9,
+      "hits_iou50": 2,
+      "hits_cov90": 1,
+      "regions_masked": 8,
+      "over_masking": 0.0534,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "si-id-card-back-cb39a8",
+      "country": "SI",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 4,
+      "hits_iou50": 0,
+      "hits_cov90": 1,
+      "regions_masked": 4,
+      "over_masking": 0.0025,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "es-id-card-front-cd516b",
+      "country": "ES",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 9,
+      "hits_iou50": 4,
+      "hits_cov90": 6,
+      "regions_masked": 10,
+      "over_masking": 0.2873,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "es-id-card-back-236c5e",
+      "country": "ES",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 5,
+      "hits_iou50": 1,
+      "hits_cov90": 0,
+      "regions_masked": 6,
+      "over_masking": 0.0086,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "se-id-card-front-fba16b",
+      "country": "SE",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 9,
+      "hits_iou50": 1,
+      "hits_cov90": 0,
+      "regions_masked": 5,
+      "over_masking": 0.0333,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "se-id-card-back-e23369",
+      "country": "SE",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 1,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 8,
+      "over_masking": 0.0366,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "at-passport-data-page-cb0b38",
+      "country": "AT",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 9,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 2,
+      "over_masking": 0.0042,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "fr-passport-data-page-0dd7ee",
+      "country": "FR",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 9,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 10,
+      "over_masking": 0.0824,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-passport-data-page-044a2e",
+      "country": "DE",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 9,
+      "hits_iou50": 3,
+      "hits_cov90": 3,
+      "regions_masked": 6,
+      "over_masking": 0.0886,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-passport-data-page-5d03f3",
+      "country": "HU",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 9,
+      "hits_iou50": 0,
+      "hits_cov90": 1,
+      "regions_masked": 5,
+      "over_masking": 0.0483,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "es-passport-data-page-b2db7d",
+      "country": "ES",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 10,
+      "hits_iou50": 5,
+      "hits_cov90": 4,
+      "regions_masked": 22,
+      "over_masking": 0.2229,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "pl-passport-data-page-645e44",
+      "country": "PL",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 10,
+      "hits_iou50": 2,
+      "hits_cov90": 3,
+      "regions_masked": 5,
+      "over_masking": 0.0258,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "at-driving-licence-front-55478d",
+      "country": "AT",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 7,
+      "hits_iou50": 2,
+      "hits_cov90": 1,
+      "regions_masked": 5,
+      "over_masking": 0.1493,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "at-driving-licence-back-649382",
+      "country": "AT",
+      "doc_type": "driving_licence",
+      "side": "back",
+      "regions": 2,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 1,
+      "over_masking": 0.0456,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-driving-licence-front-e98bc6",
+      "country": "DE",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 6,
+      "hits_iou50": 4,
+      "hits_cov90": 4,
+      "regions_masked": 11,
+      "over_masking": 0.1339,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-driving-licence-back-a4c790",
+      "country": "DE",
+      "doc_type": "driving_licence",
+      "side": "back",
+      "regions": 1,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 0,
+      "over_masking": 0.0,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-driving-licence-front-010bfc",
+      "country": "DE",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 6,
+      "hits_iou50": 3,
+      "hits_cov90": 3,
+      "regions_masked": 11,
+      "over_masking": 0.1581,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "fr-driving-licence-front-0c98aa",
+      "country": "FR",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 2,
+      "hits_cov90": 1,
+      "regions_masked": 3,
+      "over_masking": 0.0284,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "it-driving-licence-front-a30bb0",
+      "country": "IT",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 6,
+      "hits_iou50": 4,
+      "hits_cov90": 2,
+      "regions_masked": 15,
+      "over_masking": 0.0748,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "it-driving-licence-back-fa1f3a",
+      "country": "IT",
+      "doc_type": "driving_licence",
+      "side": "back",
+      "regions": 1,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 0,
+      "over_masking": 0.0,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "pl-driving-licence-front-dfc5cc",
+      "country": "PL",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 8,
+      "hits_iou50": 2,
+      "hits_cov90": 3,
+      "regions_masked": 9,
+      "over_masking": 0.1617,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "pl-driving-licence-back-af4eec",
+      "country": "PL",
+      "doc_type": "driving_licence",
+      "side": "back",
+      "regions": 1,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 4,
+      "over_masking": 0.0715,
+      "sam_calls": 0,
+      "error": null
+    }
+  ]
+}

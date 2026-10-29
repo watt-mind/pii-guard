@@ -1,0 +1,804 @@
+{
+  "ticket": "LAB-1410",
+  "rows_committed": false,
+  "raw_manifest": "training/ner/v31-raw-data-manifest.json",
+  "openpii_manifest": "training/ner/v31-openpii-train-manifest.json",
+  "tokenizer": "FacebookAI/xlm-roberta-base",
+  "derivations": {
+    "openpii/hu-openpii-train.jsonl": "first 5000 rows of the 10k file (v3's)",
+    "openpii/hu-openpii-train-10k.jsonl": "OpenPII hu train, 10,000 rows, seed 1393",
+    "privy/en-privy-train-6k.jsonl": "first 6000 rows of the audited 12k file",
+    "s11/*-distill-train-x1.5.jsonl": "every s11 train document once plus a seeded half again (seed 1410)"
+  },
+  "excluded": {
+    "agent-traffic generator (seed 1393)": "left out of every v3.1 mix so agent-traffic-dev is an unseen selection set"
+  },
+  "files": {
+    "eval/generated/v31-final/openpii/hu-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/hu-openpii-train.jsonl",
+      "documents": 5000,
+      "pii_free_documents": 95,
+      "gold_spans": {
+        "ADDRESS": 3043,
+        "BANK_ACCOUNT": 1260,
+        "EMAIL": 2317,
+        "ID_DOCUMENT": 2729,
+        "NATIONAL_ID_HU_TAJ": 973,
+        "NATIONAL_ID_HU_TAX": 1005,
+        "PERSON": 4085,
+        "PHONE": 1636
+      },
+      "loss_ignore_regions": 2756,
+      "chars": 1475997,
+      "ids_sha256": "27454165ec85ba80aad6b1b80ace85f63bea4f054cd208bed5630e5bf193f576",
+      "tokens": 404987
+    },
+    "eval/generated/v31-final/openpii/en-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/en-openpii-train.jsonl",
+      "documents": 5000,
+      "pii_free_documents": 101,
+      "gold_spans": {
+        "ADDRESS": 3403,
+        "BANK_ACCOUNT": 1136,
+        "EMAIL": 2852,
+        "ID_DOCUMENT": 4766,
+        "PERSON": 5168,
+        "PHONE": 2111
+      },
+      "loss_ignore_regions": 4662,
+      "chars": 1804316,
+      "ids_sha256": "3c00e6767c2e4f61bb9d1b9d68f9737d9e820b0777098778855d1cc11f8e48c2",
+      "tokens": 469058
+    },
+    "eval/generated/v31-final/openpii/de-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/de-openpii-train.jsonl",
+      "documents": 5000,
+      "pii_free_documents": 139,
+      "gold_spans": {
+        "ADDRESS": 2791,
+        "BANK_ACCOUNT": 1090,
+        "EMAIL": 2542,
+        "ID_DOCUMENT": 4293,
+        "PERSON": 4593,
+        "PHONE": 1868
+      },
+      "loss_ignore_regions": 4295,
+      "chars": 1719869,
+      "ids_sha256": "0af425499226c7f86e3caaa90bcd6d746ba81b498bbff56f253cc092aeae8742",
+      "tokens": 437664
+    },
+    "eval/generated/v31-final/openpii/pl-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/pl-openpii-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 51,
+      "gold_spans": {
+        "ADDRESS": 1574,
+        "BANK_ACCOUNT": 592,
+        "EMAIL": 1411,
+        "ID_DOCUMENT": 2339,
+        "PERSON": 2426,
+        "PHONE": 1100
+      },
+      "loss_ignore_regions": 2047,
+      "chars": 864175,
+      "ids_sha256": "69b54e17fd8d7cf3ee95835ffcdeaf5237264aecec6e8634a4166e8d27aeb24a",
+      "tokens": 234272
+    },
+    "eval/generated/v31-final/openpii/cs-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/cs-openpii-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 74,
+      "gold_spans": {
+        "ADDRESS": 1727,
+        "BANK_ACCOUNT": 520,
+        "EMAIL": 1413,
+        "ID_DOCUMENT": 2381,
+        "PERSON": 2339,
+        "PHONE": 1045
+      },
+      "loss_ignore_regions": 2016,
+      "chars": 804844,
+      "ids_sha256": "f802bb492c84b2a5428be7baf7341e4e7afebf2e4d22180f428f1910bcec46fb",
+      "tokens": 231132
+    },
+    "eval/generated/v31-final/openpii/sk-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/sk-openpii-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 56,
+      "gold_spans": {
+        "ADDRESS": 1691,
+        "BANK_ACCOUNT": 558,
+        "EMAIL": 1408,
+        "ID_DOCUMENT": 2381,
+        "PERSON": 2344,
+        "PHONE": 1072
+      },
+      "loss_ignore_regions": 2086,
+      "chars": 838143,
+      "ids_sha256": "46c9a1bf4f168a8f7e46b9d3f29c705ee8ad5fb6c4cb1218d35477a62d6d63c1",
+      "tokens": 232274
+    },
+    "eval/generated/v31-final/openpii/ro-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/ro-openpii-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 60,
+      "gold_spans": {
+        "ADDRESS": 2142,
+        "BANK_ACCOUNT": 544,
+        "EMAIL": 1339,
+        "ID_DOCUMENT": 2206,
+        "PERSON": 2233,
+        "PHONE": 1040
+      },
+      "loss_ignore_regions": 2053,
+      "chars": 874668,
+      "ids_sha256": "95626e46780ec1fd8bf76a364177ba06a3f8917cb7d47bad565d4e618c51de81",
+      "tokens": 233921
+    },
+    "eval/generated/v31-final/openpii/hr-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/hr-openpii-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 62,
+      "gold_spans": {
+        "ADDRESS": 1456,
+        "BANK_ACCOUNT": 525,
+        "EMAIL": 1407,
+        "ID_DOCUMENT": 2222,
+        "PERSON": 2412,
+        "PHONE": 1048
+      },
+      "loss_ignore_regions": 2081,
+      "chars": 818978,
+      "ids_sha256": "61dc34ebe04d8ce754c51a535a65390f7355482b25b0d2dbb2131633fe11279f",
+      "tokens": 222325
+    },
+    "eval/generated/v31-final/openpii/sl-openpii-train.jsonl": {
+      "path": "eval/generated/v31-final/openpii/sl-openpii-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 54,
+      "gold_spans": {
+        "ADDRESS": 1383,
+        "BANK_ACCOUNT": 524,
+        "EMAIL": 1474,
+        "ID_DOCUMENT": 2297,
+        "PERSON": 2446,
+        "PHONE": 1055
+      },
+      "loss_ignore_regions": 2074,
+      "chars": 827117,
+      "ids_sha256": "f13c485061dd11de65a78d284a11a716eeed6892804f89c5a0c1afa8d80ee0d7",
+      "tokens": 225872
+    },
+    "eval/generated/v31-final/privy/en-privy-train.jsonl": {
+      "path": "eval/generated/v31-final/privy/en-privy-train.jsonl",
+      "documents": 12000,
+      "pii_free_documents": 7206,
+      "gold_spans": {
+        "BANK_ACCOUNT": 691,
+        "ID_DOCUMENT": 1018,
+        "ORGANIZATION": 666,
+        "PERSON": 3417,
+        "VEHICLE_PLATE": 338
+      },
+      "loss_ignore_regions": 64172,
+      "chars": 3078915,
+      "ids_sha256": "44c5a6d690e328b6e96ce39861c29d3925a55cf17f71f2b4c1155db3cc1b9fa9",
+      "tokens": 1393816
+    },
+    "eval/generated/v31-final/wismut/en-wismut-train.jsonl": {
+      "path": "eval/generated/v31-final/wismut/en-wismut-train.jsonl",
+      "documents": 3000,
+      "pii_free_documents": 1838,
+      "gold_spans": {
+        "ADDRESS": 281,
+        "BANK_ACCOUNT": 426,
+        "DATE_OF_BIRTH": 347,
+        "EMAIL": 305,
+        "ID_DOCUMENT": 522,
+        "ORGANIZATION": 284,
+        "PERSON": 950,
+        "PHONE": 507,
+        "VEHICLE_PLATE": 45
+      },
+      "loss_ignore_regions": 3326,
+      "chars": 517306,
+      "ids_sha256": "84a9883b0c6cc2752b4cb41138acf8049eca0873a1db04e3838c7c1327b4c963",
+      "tokens": 136937
+    },
+    "eval/generated/v31-final/wismut/de-wismut-train.jsonl": {
+      "path": "eval/generated/v31-final/wismut/de-wismut-train.jsonl",
+      "documents": 3000,
+      "pii_free_documents": 264,
+      "gold_spans": {
+        "ADDRESS": 645,
+        "BANK_ACCOUNT": 630,
+        "DATE_OF_BIRTH": 799,
+        "EMAIL": 863,
+        "ID_DOCUMENT": 1167,
+        "ORGANIZATION": 484,
+        "PERSON": 2028,
+        "PHONE": 889,
+        "VEHICLE_PLATE": 101
+      },
+      "loss_ignore_regions": 9177,
+      "chars": 813859,
+      "ids_sha256": "044abf9453465138879d408fc50e5909aa325f0e7d70105ec8f6bce0c4870753",
+      "tokens": 230889
+    },
+    "eval/generated/v31-final/wismut/pl-wismut-train.jsonl": {
+      "path": "eval/generated/v31-final/wismut/pl-wismut-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 123,
+      "gold_spans": {
+        "ADDRESS": 707,
+        "BANK_ACCOUNT": 1135,
+        "DATE_OF_BIRTH": 509,
+        "EMAIL": 605,
+        "ID_DOCUMENT": 1224,
+        "ORGANIZATION": 288,
+        "PERSON": 2250,
+        "PHONE": 929,
+        "VEHICLE_PLATE": 131
+      },
+      "loss_ignore_regions": 5187,
+      "chars": 813901,
+      "ids_sha256": "413dbf242c09df4f6986d20554e272f25fcbbd3942c406ff5af5f21e76e9f8bb",
+      "tokens": 245576
+    },
+    "eval/generated/v31-final/wismut/cs-wismut-train.jsonl": {
+      "path": "eval/generated/v31-final/wismut/cs-wismut-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 135,
+      "gold_spans": {
+        "ADDRESS": 525,
+        "BANK_ACCOUNT": 766,
+        "DATE_OF_BIRTH": 582,
+        "EMAIL": 714,
+        "ID_DOCUMENT": 1336,
+        "ORGANIZATION": 810,
+        "PERSON": 1837,
+        "PHONE": 963,
+        "VEHICLE_PLATE": 123
+      },
+      "loss_ignore_regions": 4727,
+      "chars": 668940,
+      "ids_sha256": "78b1184490f1de6d06a97dc9aa5fa9c35f70255c0580815797eafa82a1a55b59",
+      "tokens": 213538
+    },
+    "eval/generated/v31-final/wismut/ro-wismut-train.jsonl": {
+      "path": "eval/generated/v31-final/wismut/ro-wismut-train.jsonl",
+      "documents": 2000,
+      "pii_free_documents": 149,
+      "gold_spans": {
+        "ADDRESS": 342,
+        "BANK_ACCOUNT": 742,
+        "DATE_OF_BIRTH": 428,
+        "EMAIL": 441,
+        "ID_DOCUMENT": 1090,
+        "ORGANIZATION": 330,
+        "PERSON": 1339,
+        "PHONE": 565,
+        "VEHICLE_PLATE": 87
+      },
+      "loss_ignore_regions": 4314,
+      "chars": 640010,
+      "ids_sha256": "7aaa35b1c620e9afe2b712f0b0a9805bb600076dc33abeb2147ba612f25c3ed5",
+      "tokens": 177415
+    },
+    "eval/generated/v31-final/nemotron/en-nemotron-train.jsonl": {
+      "path": "eval/generated/v31-final/nemotron/en-nemotron-train.jsonl",
+      "documents": 1500,
+      "pii_free_documents": 105,
+      "gold_spans": {
+        "ADDRESS": 235,
+        "BANK_ACCOUNT": 314,
+        "DATE_OF_BIRTH": 194,
+        "EMAIL": 775,
+        "ID_DOCUMENT": 181,
+        "ORGANIZATION": 1266,
+        "PERSON": 964,
+        "PHONE": 490,
+        "VEHICLE_PLATE": 98
+      },
+      "loss_ignore_regions": 6941,
+      "chars": 1467568,
+      "ids_sha256": "2c521b0d772b801ca41cced832f0d85263c86056422dcbe7ec4db15f66c3348e",
+      "tokens": 357500
+    },
+    "eval/generated/v31-final/gretel/en-gretel-train.jsonl": {
+      "path": "eval/generated/v31-final/gretel/en-gretel-train.jsonl",
+      "documents": 2500,
+      "pii_free_documents": 401,
+      "gold_spans": {
+        "ADDRESS": 680,
+        "BANK_ACCOUNT": 395,
+        "DATE_OF_BIRTH": 1116,
+        "EMAIL": 492,
+        "ID_DOCUMENT": 837,
+        "ORGANIZATION": 100,
+        "PERSON": 1064,
+        "PHONE": 416,
+        "VEHICLE_PLATE": 292
+      },
+      "loss_ignore_regions": 4985,
+      "chars": 533245,
+      "ids_sha256": "485d301430839e7403e8144aee7e8e20bbddfd54b843762ceb449b2407e12737",
+      "tokens": 164380
+    },
+    "eval/generated/v31-final/s11/hu-distill-train.jsonl": {
+      "path": "eval/generated/v31-final/s11/hu-distill-train.jsonl",
+      "documents": 2104,
+      "pii_free_documents": 271,
+      "gold_spans": {
+        "ADDRESS": 2320,
+        "BANK_ACCOUNT": 656,
+        "COMPANY_ID_HU": 443,
+        "DATE_OF_BIRTH": 822,
+        "EMAIL": 1084,
+        "ID_DOCUMENT": 370,
+        "NATIONAL_ID_HU_TAJ": 446,
+        "NATIONAL_ID_HU_TAX": 459,
+        "ORGANIZATION": 991,
+        "PARCEL_NUMBER_HU": 272,
+        "PERSON": 7993,
+        "PHONE": 1750,
+        "VEHICLE_PLATE": 249
+      },
+      "loss_ignore_regions": 416,
+      "chars": 2196722,
+      "ids_sha256": "5542e8d49e8e7d821732aefbb761189b6855ba1713b170c45ce989864fc655ad",
+      "tokens": 671382
+    },
+    "eval/generated/v31-final/s11/en-distill-train.jsonl": {
+      "path": "eval/generated/v31-final/s11/en-distill-train.jsonl",
+      "documents": 2119,
+      "pii_free_documents": 282,
+      "gold_spans": {
+        "ADDRESS": 2077,
+        "BANK_ACCOUNT": 559,
+        "DATE_OF_BIRTH": 604,
+        "EMAIL": 1517,
+        "ID_DOCUMENT": 264,
+        "ORGANIZATION": 786,
+        "PERSON": 7482,
+        "PHONE": 1734,
+        "VEHICLE_PLATE": 255
+      },
+      "loss_ignore_regions": 25,
+      "chars": 1934457,
+      "ids_sha256": "2fc5280077d92c2fb3f5e8c0a40e97eaffe68de0709bec27a691699110ae2ee8",
+      "tokens": 535235
+    },
+    "eval/generated/v31-final/negatives/hu-negatives-train.jsonl": {
+      "path": "eval/generated/v31-final/negatives/hu-negatives-train.jsonl",
+      "documents": 2000,
+      "pii_free_documents": 2000,
+      "gold_spans": {},
+      "loss_ignore_regions": 0,
+      "chars": 297388,
+      "ids_sha256": "44036613dcdfb70402a02880a7ab103fa54b597d21a256e13aa1e41092bbb49b",
+      "tokens": 103139
+    },
+    "eval/generated/v31-final/negatives/en-negatives-train.jsonl": {
+      "path": "eval/generated/v31-final/negatives/en-negatives-train.jsonl",
+      "documents": 2000,
+      "pii_free_documents": 2000,
+      "gold_spans": {},
+      "loss_ignore_regions": 0,
+      "chars": 290493,
+      "ids_sha256": "97bed72afb4acf33f4c5232057e3f8e7259bb80848fde5d248fcd867b2d8aeaa",
+      "tokens": 92382
+    },
+    "eval/generated/v31-final/negatives/de-negatives-train.jsonl": {
+      "path": "eval/generated/v31-final/negatives/de-negatives-train.jsonl",
+      "documents": 2000,
+      "pii_free_documents": 2000,
+      "gold_spans": {},
+      "loss_ignore_regions": 0,
+      "chars": 327192,
+      "ids_sha256": "df068d5fb7acada996aceafe8eb96954298001460c659b41abb97cb5be6bd696",
+      "tokens": 99301
+    },
+    "eval/generated/v31-final/openpii/hu-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/hu-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 1,
+      "gold_spans": {
+        "ADDRESS": 76,
+        "BANK_ACCOUNT": 31,
+        "EMAIL": 44,
+        "ID_DOCUMENT": 63,
+        "NATIONAL_ID_HU_TAJ": 22,
+        "NATIONAL_ID_HU_TAX": 19,
+        "PERSON": 79,
+        "PHONE": 33
+      },
+      "loss_ignore_regions": 50,
+      "chars": 29333,
+      "ids_sha256": "9379130c4628a4c284b3b5a7d5466e4bb39bff13eab191956c0fccac7619d162",
+      "tokens": 8065
+    },
+    "eval/generated/v31-final/openpii/en-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/en-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 0,
+      "gold_spans": {
+        "ADDRESS": 75,
+        "BANK_ACCOUNT": 19,
+        "EMAIL": 64,
+        "ID_DOCUMENT": 108,
+        "PERSON": 114,
+        "PHONE": 45
+      },
+      "loss_ignore_regions": 100,
+      "chars": 36710,
+      "ids_sha256": "81e37cb2f77ab27d0af27e2fa015549645119529e7d73a219145123b89dde36f",
+      "tokens": 9616
+    },
+    "eval/generated/v31-final/openpii/de-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/de-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 2,
+      "gold_spans": {
+        "ADDRESS": 54,
+        "BANK_ACCOUNT": 18,
+        "EMAIL": 52,
+        "ID_DOCUMENT": 79,
+        "PERSON": 74,
+        "PHONE": 43
+      },
+      "loss_ignore_regions": 88,
+      "chars": 34778,
+      "ids_sha256": "96bd7b2392d9acca5084082f16d6091384df12ae22c18ec223cd556f013ff094",
+      "tokens": 8806
+    },
+    "eval/generated/v31-final/openpii/pl-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/pl-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 2,
+      "gold_spans": {
+        "ADDRESS": 57,
+        "BANK_ACCOUNT": 17,
+        "EMAIL": 63,
+        "ID_DOCUMENT": 86,
+        "PERSON": 101,
+        "PHONE": 54
+      },
+      "loss_ignore_regions": 85,
+      "chars": 35958,
+      "ids_sha256": "1a360ee9b409a2ecbb56fa0384857b36e8b7fb7501516fc3734286ea8b171375",
+      "tokens": 9638
+    },
+    "eval/generated/v31-final/openpii/cs-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/cs-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 5,
+      "gold_spans": {
+        "ADDRESS": 48,
+        "BANK_ACCOUNT": 24,
+        "EMAIL": 49,
+        "ID_DOCUMENT": 90,
+        "PERSON": 72,
+        "PHONE": 36
+      },
+      "loss_ignore_regions": 72,
+      "chars": 28340,
+      "ids_sha256": "71052070177061f07500de30aaceaa0e5f0c6d60e467728477210d1ad963b9d7",
+      "tokens": 8093
+    },
+    "eval/generated/v31-final/openpii/sk-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/sk-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 1,
+      "gold_spans": {
+        "ADDRESS": 69,
+        "BANK_ACCOUNT": 17,
+        "EMAIL": 56,
+        "ID_DOCUMENT": 75,
+        "PERSON": 97,
+        "PHONE": 42
+      },
+      "loss_ignore_regions": 81,
+      "chars": 31498,
+      "ids_sha256": "d67cf4eb5c6dbc00d0cf2e340915a6e998ea98354534b12f7771f51c76d94dac",
+      "tokens": 8718
+    },
+    "eval/generated/v31-final/openpii/ro-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/ro-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 1,
+      "gold_spans": {
+        "ADDRESS": 63,
+        "BANK_ACCOUNT": 19,
+        "EMAIL": 46,
+        "ID_DOCUMENT": 68,
+        "PERSON": 87,
+        "PHONE": 28
+      },
+      "loss_ignore_regions": 72,
+      "chars": 30287,
+      "ids_sha256": "8a909adeeee4f4f43ed89eff80108e6a2c8f9e68f9d523be5a41a50d7ef52fce",
+      "tokens": 8100
+    },
+    "eval/generated/v31-final/openpii/hr-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/hr-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 3,
+      "gold_spans": {
+        "ADDRESS": 72,
+        "BANK_ACCOUNT": 28,
+        "EMAIL": 55,
+        "ID_DOCUMENT": 87,
+        "PERSON": 110,
+        "PHONE": 42
+      },
+      "loss_ignore_regions": 87,
+      "chars": 32904,
+      "ids_sha256": "9d63547e2dd2d0f8840052095648b64dee59896c531d3355745036faba355212",
+      "tokens": 9110
+    },
+    "eval/generated/v31-final/openpii/sl-openpii-dev.jsonl": {
+      "path": "eval/generated/v31-final/openpii/sl-openpii-dev.jsonl",
+      "documents": 100,
+      "pii_free_documents": 2,
+      "gold_spans": {
+        "ADDRESS": 56,
+        "BANK_ACCOUNT": 21,
+        "EMAIL": 58,
+        "ID_DOCUMENT": 96,
+        "PERSON": 92,
+        "PHONE": 43
+      },
+      "loss_ignore_regions": 73,
+      "chars": 33860,
+      "ids_sha256": "291608b5e3a1b2e82a6227993f116b7504e806caea31dd25fe19a3f94fdaa514",
+      "tokens": 9102
+    },
+    "eval/generated/v31-final/s11/hu-distill-dev.jsonl": {
+      "path": "eval/generated/v31-final/s11/hu-distill-dev.jsonl",
+      "documents": 368,
+      "pii_free_documents": 40,
+      "gold_spans": {
+        "ADDRESS": 444,
+        "BANK_ACCOUNT": 122,
+        "COMPANY_ID_HU": 91,
+        "DATE_OF_BIRTH": 161,
+        "EMAIL": 194,
+        "ID_DOCUMENT": 70,
+        "NATIONAL_ID_HU_TAJ": 88,
+        "NATIONAL_ID_HU_TAX": 73,
+        "ORGANIZATION": 181,
+        "PARCEL_NUMBER_HU": 51,
+        "PERSON": 1503,
+        "PHONE": 326,
+        "VEHICLE_PLATE": 47
+      },
+      "loss_ignore_regions": 85,
+      "chars": 396079,
+      "ids_sha256": "457ee6afa3da44e943aa0e7a0aa9d3edb93cdedfc2bd2e8857e0aac2ed2f8f50",
+      "tokens": 119694
+    },
+    "eval/generated/v31-final/s11/en-distill-dev.jsonl": {
+      "path": "eval/generated/v31-final/s11/en-distill-dev.jsonl",
+      "documents": 373,
+      "pii_free_documents": 62,
+      "gold_spans": {
+        "ADDRESS": 361,
+        "BANK_ACCOUNT": 98,
+        "DATE_OF_BIRTH": 108,
+        "EMAIL": 283,
+        "ID_DOCUMENT": 47,
+        "ORGANIZATION": 135,
+        "PERSON": 1295,
+        "PHONE": 297,
+        "VEHICLE_PLATE": 53
+      },
+      "loss_ignore_regions": 6,
+      "chars": 337252,
+      "ids_sha256": "14a67d0237ae8dc3d961a72ebe29b77effba1254a71df9e0b13166b64c357fff",
+      "tokens": 93755
+    },
+    "eval/generated/v31-final/openpii/hu-openpii-train-10k.jsonl": {
+      "path": "eval/generated/v31-final/openpii/hu-openpii-train-10k.jsonl",
+      "documents": 10000,
+      "pii_free_documents": 208,
+      "gold_spans": {
+        "ADDRESS": 6060,
+        "BANK_ACCOUNT": 2514,
+        "EMAIL": 4623,
+        "ID_DOCUMENT": 5348,
+        "NATIONAL_ID_HU_TAJ": 1921,
+        "NATIONAL_ID_HU_TAX": 1983,
+        "PERSON": 8199,
+        "PHONE": 3371
+      },
+      "loss_ignore_regions": 5530,
+      "chars": 2948275,
+      "ids_sha256": "e5bdcc53f46fdec69430f41c5a338017989513a7842d668cedca098258d16ffd",
+      "tokens": 809722
+    },
+    "eval/generated/v31-final/privy/en-privy-train-6k.jsonl": {
+      "path": "eval/generated/v31-final/privy/en-privy-train-6k.jsonl",
+      "documents": 6000,
+      "pii_free_documents": 3573,
+      "gold_spans": {
+        "BANK_ACCOUNT": 334,
+        "ID_DOCUMENT": 542,
+        "ORGANIZATION": 349,
+        "PERSON": 1734,
+        "VEHICLE_PLATE": 182
+      },
+      "loss_ignore_regions": 31837,
+      "chars": 1537575,
+      "ids_sha256": "990a2ee129de7661e933b3574fd3988b1b5c71350ff5b48ed93e3f16b8cc89fa",
+      "tokens": 694801
+    },
+    "eval/generated/v31-final/s11/hu-distill-train-x1.5.jsonl": {
+      "path": "eval/generated/v31-final/s11/hu-distill-train-x1.5.jsonl",
+      "documents": 3156,
+      "pii_free_documents": 420,
+      "gold_spans": {
+        "ADDRESS": 3465,
+        "BANK_ACCOUNT": 977,
+        "COMPANY_ID_HU": 649,
+        "DATE_OF_BIRTH": 1241,
+        "EMAIL": 1617,
+        "ID_DOCUMENT": 562,
+        "NATIONAL_ID_HU_TAJ": 666,
+        "NATIONAL_ID_HU_TAX": 689,
+        "ORGANIZATION": 1450,
+        "PARCEL_NUMBER_HU": 411,
+        "PERSON": 11968,
+        "PHONE": 2607,
+        "VEHICLE_PLATE": 371
+      },
+      "loss_ignore_regions": 610,
+      "chars": 3287780,
+      "ids_sha256": "67e7b1275b979e29de4fabff1338dc54e60691d71023ab256c86e65733b6797f",
+      "tokens": 1005067
+    },
+    "eval/generated/v31-final/s11/en-distill-train-x1.5.jsonl": {
+      "path": "eval/generated/v31-final/s11/en-distill-train-x1.5.jsonl",
+      "documents": 3179,
+      "pii_free_documents": 430,
+      "gold_spans": {
+        "ADDRESS": 3111,
+        "BANK_ACCOUNT": 835,
+        "DATE_OF_BIRTH": 894,
+        "EMAIL": 2259,
+        "ID_DOCUMENT": 386,
+        "ORGANIZATION": 1178,
+        "PERSON": 11274,
+        "PHONE": 2600,
+        "VEHICLE_PLATE": 363
+      },
+      "loss_ignore_regions": 42,
+      "chars": 2888878,
+      "ids_sha256": "964c7e70af63d73ff2ab4f2470d7fc567f892f66dd69626e4e4d47ac1ac6cfe1",
+      "tokens": 799265
+    }
+  },
+  "candidates": {
+    "a": {
+      "config": "training/ner/v31-a.toml",
+      "train_documents": 69223,
+      "train_tokens": 7112995,
+      "by_source": {
+        "openpii": {
+          "documents": 30000,
+          "tokens": 2691505,
+          "share": 0.378
+        },
+        "privy": {
+          "documents": 12000,
+          "tokens": 1393816,
+          "share": 0.196
+        },
+        "s11": {
+          "documents": 4223,
+          "tokens": 1206617,
+          "share": 0.17
+        },
+        "wismut": {
+          "documents": 13000,
+          "tokens": 1004355,
+          "share": 0.141
+        },
+        "nemotron": {
+          "documents": 1500,
+          "tokens": 357500,
+          "share": 0.05
+        },
+        "negatives": {
+          "documents": 6000,
+          "tokens": 294822,
+          "share": 0.041
+        },
+        "gretel": {
+          "documents": 2500,
+          "tokens": 164380,
+          "share": 0.023
+        }
+      }
+    },
+    "b": {
+      "config": "training/ner/v31-b.toml",
+      "train_documents": 70335,
+      "train_tokens": 7416430,
+      "by_source": {
+        "openpii": {
+          "documents": 35000,
+          "tokens": 3096240,
+          "share": 0.417
+        },
+        "s11": {
+          "documents": 6335,
+          "tokens": 1804332,
+          "share": 0.243
+        },
+        "wismut": {
+          "documents": 13000,
+          "tokens": 1004355,
+          "share": 0.135
+        },
+        "privy": {
+          "documents": 6000,
+          "tokens": 694801,
+          "share": 0.094
+        },
+        "nemotron": {
+          "documents": 1500,
+          "tokens": 357500,
+          "share": 0.048
+        },
+        "negatives": {
+          "documents": 6000,
+          "tokens": 294822,
+          "share": 0.04
+        },
+        "gretel": {
+          "documents": 2500,
+          "tokens": 164380,
+          "share": 0.022
+        }
+      }
+    },
+    "c": {
+      "config": "training/ner/v31-c.toml",
+      "train_documents": 57335,
+      "train_tokens": 6412075,
+      "by_source": {
+        "openpii": {
+          "documents": 35000,
+          "tokens": 3096240,
+          "share": 0.483
+        },
+        "s11": {
+          "documents": 6335,
+          "tokens": 1804332,
+          "share": 0.281
+        },
+        "privy": {
+          "documents": 6000,
+          "tokens": 694801,
+          "share": 0.108
+        },
+        "nemotron": {
+          "documents": 1500,
+          "tokens": 357500,
+          "share": 0.056
+        },
+        "negatives": {
+          "documents": 6000,
+          "tokens": 294822,
+          "share": 0.046
+        },
+        "gretel": {
+          "documents": 2500,
+          "tokens": 164380,
+          "share": 0.026
+        }
+      }
+    }
+  }
+}

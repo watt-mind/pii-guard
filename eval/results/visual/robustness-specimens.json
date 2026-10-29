@@ -1,0 +1,150 @@
+{
+  "suite": "visual-ocr-robustness",
+  "set": "specimens",
+  "ticket": "LAB-1210",
+  "images": 65,
+  "scored_types": [
+    "text",
+    "mrz"
+  ],
+  "covered_at": 0.9,
+  "tool": "tests/visual/robustness.py (--before for the first run)",
+  "before": {
+    "ocr": "before LAB-1210 (no orientation, deskew or small-text pass)",
+    "transforms": {
+      "0": {
+        "regions": 304,
+        "covered": 43,
+        "covered_pct": 14.1,
+        "lost_vs_upright": 0,
+        "errors": 0,
+        "ms_p50": 1389,
+        "ms_p95": 2134
+      },
+      "90": {
+        "regions": 304,
+        "covered": 1,
+        "covered_pct": 0.3,
+        "lost_vs_upright": 43,
+        "errors": 0,
+        "ms_p50": 1730,
+        "ms_p95": 2692
+      },
+      "180": {
+        "regions": 304,
+        "covered": 0,
+        "covered_pct": 0.0,
+        "lost_vs_upright": 43,
+        "errors": 0,
+        "ms_p50": 1760,
+        "ms_p95": 2690
+      },
+      "270": {
+        "regions": 304,
+        "covered": 15,
+        "covered_pct": 4.9,
+        "lost_vs_upright": 36,
+        "errors": 0,
+        "ms_p50": 1979,
+        "ms_p95": 3502
+      },
+      "5": {
+        "regions": 304,
+        "covered": 23,
+        "covered_pct": 7.6,
+        "lost_vs_upright": 35,
+        "errors": 0,
+        "ms_p50": 1392,
+        "ms_p95": 2660
+      },
+      "-10": {
+        "regions": 304,
+        "covered": 0,
+        "covered_pct": 0.0,
+        "lost_vs_upright": 43,
+        "errors": 0,
+        "ms_p50": 813,
+        "ms_p95": 1533
+      },
+      "15": {
+        "regions": 304,
+        "covered": 0,
+        "covered_pct": 0.0,
+        "lost_vs_upright": 43,
+        "errors": 0,
+        "ms_p50": 700,
+        "ms_p95": 1344
+      }
+    },
+    "screenshots": []
+  },
+  "after": {
+    "ocr": "LAB-1210",
+    "transforms": {
+      "0": {
+        "regions": 304,
+        "covered": 43,
+        "covered_pct": 14.1,
+        "lost_vs_upright": 0,
+        "errors": 0,
+        "ms_p50": 2717,
+        "ms_p95": 5931
+      },
+      "90": {
+        "regions": 304,
+        "covered": 42,
+        "covered_pct": 13.8,
+        "lost_vs_upright": 1,
+        "errors": 0,
+        "ms_p50": 6219,
+        "ms_p95": 13828
+      },
+      "180": {
+        "regions": 304,
+        "covered": 42,
+        "covered_pct": 13.8,
+        "lost_vs_upright": 1,
+        "errors": 0,
+        "ms_p50": 3568,
+        "ms_p95": 5851
+      },
+      "270": {
+        "regions": 304,
+        "covered": 42,
+        "covered_pct": 13.8,
+        "lost_vs_upright": 1,
+        "errors": 0,
+        "ms_p50": 4591,
+        "ms_p95": 8001
+      },
+      "5": {
+        "regions": 304,
+        "covered": 46,
+        "covered_pct": 15.1,
+        "lost_vs_upright": 23,
+        "errors": 0,
+        "ms_p50": 4357,
+        "ms_p95": 10381
+      },
+      "-10": {
+        "regions": 304,
+        "covered": 41,
+        "covered_pct": 13.5,
+        "lost_vs_upright": 25,
+        "errors": 0,
+        "ms_p50": 3863,
+        "ms_p95": 7366
+      },
+      "15": {
+        "regions": 304,
+        "covered": 30,
+        "covered_pct": 9.9,
+        "lost_vs_upright": 28,
+        "errors": 0,
+        "ms_p50": 3517,
+        "ms_p95": 6931
+      }
+    },
+    "screenshots": []
+  }
+}

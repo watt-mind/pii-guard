@@ -1,0 +1,119 @@
+import { useId } from "react";
+import { TEXT_ENTITY_TYPES, type KnownValuesResponse, type TextEntityType } from "../api/types";
+import { metaFor } from "../lib/entities";
+import { buttonClass } from "./controls";
+import { Button, Input, Select } from "./ui";
+
+import type { KnownRow } from "../lib/knownRows";
+import { newKnownRow } from "../lib/knownRows";
+
+interface Props {
+  rows: KnownRow[];
+  onRows: (rows: KnownRow[]) => void;
+  counts: KnownValuesResponse | null;
+  /** The row the guard refused, with its message. */
+  error: { index: number; message: string } | null;
+  /** Loads a fictional example: a row plus a sentence using it in the document. */
+  onTry: () => void;
+  /** After a run: how many spans came from known values (null before a run). */
+  found: number | null;
+}
+
+
+/** Values the application already knows are sensitive, pre-loaded into the session. */
+export function KnownValues({ rows, onRows, counts, error, onTry, found }: Props) {
+  const base = useId();
+  const used = rows.filter((r) => r.value.trim() !== "");
+  const set = (id: number, patch: Partial<KnownRow>) => onRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  return (
+    <details className="group rounded-xl border border-line bg-surface" open={rows.length > 0 || undefined}>
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-x-4 gap-y-3 p-4 sm:p-5 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1 basis-[14rem]">
+          <span className="block text-lg font-normal text-ink">
+            Known values{used.length > 0 && <span className="ml-1.5 text-muted">({used.length})</span>}
+          </span>
+          <span className="mt-0.5 block text-sm text-muted">
+            Tell the guard about values you already know are sensitive (a customer record). They are masked in any inflected form, even when no detector finds them.
+          </span>
+        </span>
+        <span aria-hidden="true" className={buttonClass("secondary", "sm")}>
+          <svg viewBox="0 0 16 16" className="size-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+          <span className="group-open:hidden">Add values</span>
+          <span className="hidden group-open:inline">Hide</span>
+        </span>
+      </summary>
+      <div className="space-y-3 border-t border-line p-4 sm:p-5">
+        {rows.length > 0 && (
+          <ul className="space-y-2">
+            {rows.map((r, i) => {
+              const refused = error?.index === i;
+              const valueId = `${base}-v${r.id}`;
+              const errId = `${base}-e${r.id}`;
+              return (
+                <li key={r.id} className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label htmlFor={valueId} className="sr-only">
+                      Known value {i + 1}
+                    </label>
+                    <Input
+                      id={valueId}
+                      value={r.value}
+                      onChange={(e) => set(r.id, { value: e.target.value })}
+                      placeholder="e.g. a full name or an ID number"
+                      aria-invalid={refused || undefined}
+                      aria-describedby={refused ? errId : undefined}
+                      className="flex-1 basis-40"
+                    />
+                    <label className="sr-only" htmlFor={`${base}-t${r.id}`}>
+                      Type of known value {i + 1}
+                    </label>
+                    <div className="w-48 max-w-full">
+                      <Select id={`${base}-t${r.id}`} value={r.entity_type} onChange={(e) => set(r.id, { entity_type: e.target.value as TextEntityType })}>
+                        {TEXT_ENTITY_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {metaFor(t).label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <Button variant="ghost" aria-label={`Remove known value ${i + 1}`} onClick={() => onRows(rows.filter((x) => x.id !== r.id))}>
+                      Remove
+                    </Button>
+                  </div>
+                  {refused && (
+                    <p id={errId} className="text-xs text-danger">
+                      Refused: {error.message}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" onClick={() => onRows([...rows, newKnownRow()])}>
+            + Add a value
+          </Button>
+          {rows.length === 0 && (
+            <Button variant="ghost" onClick={onTry} title="Adds a fictional name here and a sentence using it, in an inflected form, to the document">
+              Try a fictional example
+            </Button>
+          )}
+          {counts && used.length > 0 && (
+            <p className="text-xs text-muted" data-testid="known-counts">
+              {counts.total} known {counts.total === 1 ? "value" : "values"} loaded in this session ({counts.added} new)
+            </p>
+          )}
+          {found === 0 && used.length > 0 && (
+            <p role="note" className="w-full text-xs text-warn">
+              None of your known values appear in this document, so nothing extra was masked. Add a sentence that uses one (in any inflected form) and run it again.
+            </p>
+          )}
+        </div>
+      </div>
+    </details>
+  );
+}

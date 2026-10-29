@@ -1,0 +1,118 @@
+# Extra document kinds for the distillation corpus (training/distill/corpus.py), added to the
+# generator's own templates (src/pii_guard/eval/templates/en.toml). Same schema. Fictional data
+# only. Kinds whose id starts with "negative-" have no parties: they contain no personal data
+# and teach the student what *not* to mask.
+
+[[kinds]]
+id = "tool-output"
+title = "JSON returned by a CRM tool call"
+brief = "The raw JSON an AI agent got back from a customer-relationship tool (lookup_customer or list_tickets): one customer record with nested contact details, a few ticket objects with ids, statuses, ISO timestamps and short free-text notes written by support staff. Pretty-printed JSON only."
+register = "machine output (JSON)"
+length = "60-150"
+weight = 2
+parties = [
+  { role = "customer", label = "Customer record", kind = "person", fields = ["name", "email", "phone", "address"] },
+  { role = "agent", label = "support agent who wrote a note", kind = "person", fields = ["name"] },
+]
+
+[[kinds]]
+id = "form"
+title = "Submitted online form"
+brief = "A plain-text export of a submitted online form (a gym membership, a school trip consent, an insurance claim): 'Field: value' lines, a few checkbox answers like [x] or [ ], a free-text comment box written casually by the applicant, and a submission timestamp."
+register = "form fields plus a casual comment"
+length = "80-160"
+weight = 2
+parties = [
+  { role = "applicant", label = "Applicant", kind = "person", fields = ["name", "date_of_birth", "address", "phone", "email"] },
+]
+
+[[kinds]]
+id = "log"
+title = "Application log excerpt"
+brief = "Ten to fifteen lines from a web application's log: ISO timestamps, log levels, module names, request ids, HTTP paths and status codes, latencies in ms, and a few lines where a user record leaks into the message (signup, password reset, failed payment). Most lines contain no personal data."
+register = "machine log"
+length = "80-180"
+weight = 2
+parties = [
+  { role = "user", label = "User whose data appears in the log", kind = "person", fields = ["name", "email", "phone"] },
+]
+
+[[kinds]]
+id = "csv"
+title = "Spreadsheet export (CSV)"
+brief = "A small CSV export from a membership or delivery spreadsheet: a header row and three data rows, one per person, with quoted fields where needed, a status column and a date column. The second and third people appear only in their rows."
+register = "CSV data"
+length = "40-100"
+weight = 1
+parties = [
+  { role = "row1", label = "Row 1", kind = "person", fields = ["name", "email", "address"] },
+  { role = "row2", label = "Row 2", kind = "person", fields = ["name", "phone"] },
+  { role = "row3", label = "Row 3", kind = "person", fields = ["name", "email"] },
+]
+
+[[kinds]]
+id = "support-chat"
+title = "Customer support chat transcript"
+brief = "A live-chat transcript between a support agent (introduced by given name only) and a customer about a delivery or a refund. Lines start with '[hh:mm] Agent:' or '[hh:mm] Customer:'. The customer gives their details when asked; the agent confirms them back, sometimes partly."
+register = "polite, casual chat"
+length = "100-200"
+weight = 2
+typos = true
+parties = [
+  { role = "customer", label = "Customer", kind = "person", fields = ["name", "address", "phone", "email"], informal = true },
+]
+
+[[kinds]]
+id = "sms"
+title = "Text message"
+brief = "One or two short text messages, lower case, abbreviations, no greeting, about meeting up, picking up keys or paying back money."
+register = "very informal texting"
+length = "15-45"
+weight = 2
+typos = true
+parties = [
+  { role = "sender", label = "the person writing", kind = "person", fields = ["name", "phone"], informal = true },
+  { role = "place", label = "the meeting place", kind = "property", fields = ["address"] },
+]
+
+[[kinds]]
+id = "meeting-notes"
+title = "Meeting notes"
+brief = "Bullet-point notes from a small team meeting at a company: attendees, decisions, action items with owners and due dates. Attendees are referred to by full name first, then by given name or initials."
+register = "terse internal notes"
+length = "100-200"
+weight = 1
+parties = [
+  { role = "company", label = "the company", kind = "company", fields = ["org_name"] },
+  { role = "chair", label = "Chair", kind = "person", fields = ["name"] },
+  { role = "member", label = "Team member", kind = "person", fields = ["name", "email"] },
+]
+
+[[kinds]]
+id = "mixed-confusables"
+title = "Message with look-alike words"
+brief = "A friendly message to a neighbour about a village fete or a pub quiz that mentions pub names (like 'the Fox and Hounds'), flowers, months, virtues and trades used as ordinary words (May, Grace, Hope, Rose, Lily, Mason, Baker, Cooper, Frank, Will), product names and room numbers, and also passes on the sender's own name and phone number once."
+register = "chatty British English"
+length = "80-150"
+weight = 2
+parties = [
+  { role = "sender", label = "Sender", kind = "person", fields = ["name", "phone"] },
+]
+
+[[kinds]]
+id = "negative-prose"
+title = "Short piece of everyday prose"
+brief = "A short paragraph (a diary entry, a local newsletter item, a recipe intro or a garden note) that uses words which are also first names or surnames, but only as ordinary words: months (April, June), virtues (Faith, Joy), flowers (Daisy, Ivy, Heather), trades (Smith, Fletcher, Turner, Shepherd), colours (Brown, White, Green) and adjectives (Frank, Rich, Young). Pub and shop names are fine. No people's names, no addresses, no contact details."
+register = "plain British English"
+length = "50-120"
+weight = 2
+parties = []
+
+[[kinds]]
+id = "negative-ops"
+title = "Operational text without personal data"
+brief = "A shipping notice, a release note, a server status report or an IT ticket that is full of numbers that are not personal data: order and tracking numbers, product codes, version numbers, room and building numbers, floor plans, prices, dates and times, opening hours and generic department names (Sales, Facilities). No people, no addresses of people, no contact details."
+register = "terse business English"
+length = "50-130"
+weight = 2
+parties = []

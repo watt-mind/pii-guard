@@ -1,0 +1,40 @@
+{
+  "model": "models/ner/pii-guard-ner-xlmr-large-distilled",
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "processor": "arm",
+  "torch": "2.14.1",
+  "fixtures": [
+    "eval/fixtures/hu-synth-sample.jsonl",
+    "eval/fixtures/en-synth-sample.jsonl"
+  ],
+  "results": [
+    {
+      "device": "mps",
+      "torch_threads": 8,
+      "messages": 122,
+      "mean_chars": 382.5,
+      "p50_ms": 30.5,
+      "p95_ms": 35.1,
+      "mean_ms": 30.6,
+      "load_average": [
+        9.43,
+        11.11,
+        12.56
+      ]
+    },
+    {
+      "device": "cpu",
+      "torch_threads": 8,
+      "messages": 122,
+      "mean_chars": 382.5,
+      "p50_ms": 129.5,
+      "p95_ms": 146.8,
+      "mean_ms": 128.8,
+      "load_average": [
+        9.8,
+        11.12,
+        12.54
+      ]
+    }
+  ]
+}

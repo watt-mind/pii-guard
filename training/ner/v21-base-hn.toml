@@ -1,0 +1,46 @@
+# NER v2.1 (LAB-1306): the v2 base + hard negatives recipe (v2-base-hn.toml, LAB-1150), with
+# 5 epochs instead of 3 (warmup 0.1, linear decay, as before) and the v2.1 hard negatives
+# (training/ner/negatives_v21.py: 1,500 documents per language of uncued reference / tracking /
+# order / invoice / ticket numbers, lone street names and family-firm names as ORGANIZATION).
+# Every epoch is kept (<out>/epoch-<n>) for selection on held-out sets; the dev split below is
+# only the training loop's own pick. No LAB-1226 test split is used. Fictional / public
+# synthetic data only.
+#   uv run --no-sync python training/ner/negatives_v21.py --n 1500 --seed 1306
+#   modal run training/distill/modal_train.py --config training/ner/v21-base-hn.toml --gpu A10G
+base_model = "FacebookAI/xlm-roberta-base"   # MIT licence
+train = [
+  "eval/generated/distill-s11/labelled/hu-distill-train.jsonl",
+  "eval/generated/distill-s11/labelled/en-distill-train.jsonl",
+  "eval/generated/distill-s13/labelled/hu-distill-train.jsonl",
+  "eval/generated/distill-s13/labelled/en-distill-train.jsonl",
+  "eval/generated/openpii-train/hu-openpii-train.jsonl",
+  "eval/generated/openpii-train/en-openpii-train.jsonl",
+  "eval/generated/openpii-train/de-openpii-train.jsonl",
+  "eval/generated/negatives/hu-negatives-train.jsonl",
+  "eval/generated/negatives/en-negatives-train.jsonl",
+  "eval/generated/negatives/de-negatives-train.jsonl",
+  "eval/generated/negatives-v21/hu-negatives-v21-train.jsonl",
+  "eval/generated/negatives-v21/en-negatives-v21-train.jsonl",
+  "eval/generated/negatives-v21/de-negatives-v21-train.jsonl",
+]
+dev = [
+  "eval/generated/distill-s13/labelled/hu-distill-dev.jsonl",
+  "eval/generated/distill-s13/labelled/en-distill-dev.jsonl",
+  "eval/generated/openpii-train/hu-openpii-dev.jsonl",
+  "eval/generated/openpii-train/en-openpii-dev.jsonl",
+  "eval/generated/openpii-train/de-openpii-dev.jsonl",
+]
+out = "models/ner/pii-guard-ner-xlmr-base-v21-hn"
+teacher = "none"
+epochs = 5
+batch_size = 16
+lr = 5e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"
+other_types = "ignore"
+save_epochs = true

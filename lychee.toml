@@ -1,0 +1,18 @@
+# Link check for README.md and docs/** (lychee 0.24). The CI job "links" runs it with --offline on
+# every PR and push (relative links to files in the repo); .github/workflows/links.yml checks
+# the external links weekly. Excluded: the demo stack's local endpoints, API base URLs that need
+# a key, the SVG namespace and <placeholder> URLs.
+exclude = [
+  '^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)',
+  '^https?://[^/]*mock',
+  '^https://inference\.baseten\.co',
+  '^https://api\.meta\.ai',
+  '^https?://www\.w3\.org/2000/svg',
+  '<',
+]
+exclude_path = ['ui/node_modules', 'node_modules', '.venv']
+max_retries = 3
+retry_wait_time = 5
+timeout = 20
+accept = ["100..=103", "200..=299", "429"]
+no_progress = true

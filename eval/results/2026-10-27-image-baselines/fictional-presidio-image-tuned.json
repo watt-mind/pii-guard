@@ -1,0 +1,511 @@
+{
+  "title": "Image baseline presidio-image-tuned on fictional specimen-style documents (Muse Image)",
+  "suite": "visual-specimens",
+  "pipeline": {
+    "baseline": "presidio-image-tuned",
+    "info": {
+      "tool": "presidio-image-redactor",
+      "versions": {
+        "presidio-image-redactor": "0.0.62",
+        "presidio-analyzer": "2.2.365",
+        "spacy": "3.8.18",
+        "pytesseract": "0.3.13"
+      },
+      "models": [
+        "en_core_web_lg 3.8.0 (en)",
+        "de_core_news_lg 3.8.0 (de)",
+        "hu_core_news_lg 3.8.1 (hu, huSpaCy)"
+      ],
+      "config": {
+        "engine": "ImageAnalyzerEngine(AnalyzerEngine, TesseractOCR), the analysis ImageRedactorEngine.redact fills",
+        "analyzer": "predefined recognizers, default score threshold",
+        "languages": [
+          "de",
+          "en",
+          "hu"
+        ],
+        "ocr_lang": "hun+eng",
+        "upscale_to": 2000
+      },
+      "supports": [
+        "text"
+      ]
+    },
+    "unsupported_region_types": [
+      "portrait",
+      "signature"
+    ],
+    "max_side": 1600,
+    "iou_threshold": 0.5,
+    "coverage_threshold": 0.9
+  },
+  "specimens": 24,
+  "errors": {},
+  "overall": {
+    "regions": 149,
+    "recall_iou50": 0.3826,
+    "recall_cov90": 0.3557,
+    "mean_coverage": 0.4091
+  },
+  "by_region_type": {
+    "mrz": {
+      "regions": 6,
+      "recall_iou50": 0.0,
+      "recall_cov90": 0.0,
+      "mean_coverage": 0.0102,
+      "matched_by": {}
+    },
+    "text": {
+      "regions": 110,
+      "recall_iou50": 0.5091,
+      "recall_cov90": 0.4727,
+      "mean_coverage": 0.5446,
+      "matched_by": {
+        "ADDRESS": 6,
+        "DATE_OF_BIRTH": 8,
+        "EMAIL": 7,
+        "ID_DOCUMENT": 3,
+        "ORGANIZATION": 6,
+        "PERSON": 17,
+        "PHONE": 9
+      }
+    }
+  },
+  "by_country": {
+    "DE": {
+      "regions": 50,
+      "recall_iou50": 0.38,
+      "recall_cov90": 0.36,
+      "mean_coverage": 0.3997,
+      "specimens": 8,
+      "by_type": {
+        "mrz": {
+          "regions": 2,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "text": {
+          "regions": 37,
+          "recall_iou50": 0.5135,
+          "recall_cov90": 0.4865,
+          "mean_coverage": 0.5401
+        }
+      }
+    },
+    "GB": {
+      "regions": 49,
+      "recall_iou50": 0.4082,
+      "recall_cov90": 0.4082,
+      "mean_coverage": 0.4307,
+      "specimens": 8,
+      "by_type": {
+        "mrz": {
+          "regions": 2,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0306
+        },
+        "text": {
+          "regions": 36,
+          "recall_iou50": 0.5278,
+          "recall_cov90": 0.5278,
+          "mean_coverage": 0.5572
+        }
+      }
+    },
+    "HU": {
+      "regions": 50,
+      "recall_iou50": 0.36,
+      "recall_cov90": 0.3,
+      "mean_coverage": 0.3973,
+      "specimens": 8,
+      "by_type": {
+        "mrz": {
+          "regions": 2,
+          "recall_iou50": 0.0,
+          "recall_cov90": 0.0,
+          "mean_coverage": 0.0
+        },
+        "text": {
+          "regions": 37,
+          "recall_iou50": 0.4865,
+          "recall_cov90": 0.4054,
+          "mean_coverage": 0.5368
+        }
+      }
+    }
+  },
+  "by_doc_type": {
+    "badge": {
+      "regions": 12,
+      "recall_iou50": 0.6667,
+      "recall_cov90": 0.6667,
+      "mean_coverage": 0.6552,
+      "specimens": 3
+    },
+    "driving_licence": {
+      "regions": 15,
+      "recall_iou50": 0.2667,
+      "recall_cov90": 0.2667,
+      "mean_coverage": 0.2944,
+      "specimens": 3
+    },
+    "form": {
+      "regions": 27,
+      "recall_iou50": 0.5185,
+      "recall_cov90": 0.4815,
+      "mean_coverage": 0.5328,
+      "specimens": 3
+    },
+    "id_card": {
+      "regions": 29,
+      "recall_iou50": 0.2069,
+      "recall_cov90": 0.2069,
+      "mean_coverage": 0.2544,
+      "specimens": 6
+    },
+    "letter": {
+      "regions": 24,
+      "recall_iou50": 0.5417,
+      "recall_cov90": 0.4583,
+      "mean_coverage": 0.5962,
+      "specimens": 3
+    },
+    "member_card": {
+      "regions": 15,
+      "recall_iou50": 0.2,
+      "recall_cov90": 0.2,
+      "mean_coverage": 0.2629,
+      "specimens": 3
+    },
+    "passport": {
+      "regions": 27,
+      "recall_iou50": 0.3333,
+      "recall_cov90": 0.2963,
+      "mean_coverage": 0.3207,
+      "specimens": 3
+    }
+  },
+  "over_masking_mean": 0.0108,
+  "latency_ms": {
+    "local_per_image_p50": 942.6,
+    "local_per_image_p95": 1163.7,
+    "total_per_image_p50": 942.6,
+    "total_per_image_p95": 1163.7
+  },
+  "per_specimen": [
+    {
+      "id": "hu-id_card-front",
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 7,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 5,
+      "over_masking": 0.0042,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-id_card-back",
+      "country": "HU",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 3,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 5,
+      "over_masking": 0.0028,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-passport-data_page",
+      "country": "HU",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 9,
+      "hits_iou50": 3,
+      "hits_cov90": 2,
+      "regions_masked": 13,
+      "over_masking": 0.0111,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-driving_licence-front",
+      "country": "HU",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 5,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 5,
+      "over_masking": 0.0034,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-badge-front",
+      "country": "HU",
+      "doc_type": "badge",
+      "side": "front",
+      "regions": 4,
+      "hits_iou50": 3,
+      "hits_cov90": 3,
+      "regions_masked": 7,
+      "over_masking": 0.0021,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-member_card-front",
+      "country": "HU",
+      "doc_type": "member_card",
+      "side": "front",
+      "regions": 5,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 1,
+      "over_masking": 0.0,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-form-page",
+      "country": "HU",
+      "doc_type": "form",
+      "side": "page",
+      "regions": 9,
+      "hits_iou50": 4,
+      "hits_cov90": 3,
+      "regions_masked": 9,
+      "over_masking": 0.0017,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "hu-letter-page",
+      "country": "HU",
+      "doc_type": "letter",
+      "side": "page",
+      "regions": 8,
+      "hits_iou50": 5,
+      "hits_cov90": 4,
+      "regions_masked": 15,
+      "over_masking": 0.008,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-id_card-front",
+      "country": "DE",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 6,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 12,
+      "over_masking": 0.0281,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-id_card-back",
+      "country": "DE",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 4,
+      "hits_iou50": 0,
+      "hits_cov90": 0,
+      "regions_masked": 9,
+      "over_masking": 0.0223,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-passport-data_page",
+      "country": "DE",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 9,
+      "hits_iou50": 3,
+      "hits_cov90": 3,
+      "regions_masked": 14,
+      "over_masking": 0.0256,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-driving_licence-front",
+      "country": "DE",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 5,
+      "hits_iou50": 2,
+      "hits_cov90": 2,
+      "regions_masked": 10,
+      "over_masking": 0.0192,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-badge-front",
+      "country": "DE",
+      "doc_type": "badge",
+      "side": "front",
+      "regions": 4,
+      "hits_iou50": 3,
+      "hits_cov90": 3,
+      "regions_masked": 11,
+      "over_masking": 0.0146,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-member_card-front",
+      "country": "DE",
+      "doc_type": "member_card",
+      "side": "front",
+      "regions": 5,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 8,
+      "over_masking": 0.0176,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-form-page",
+      "country": "DE",
+      "doc_type": "form",
+      "side": "page",
+      "regions": 9,
+      "hits_iou50": 5,
+      "hits_cov90": 5,
+      "regions_masked": 17,
+      "over_masking": 0.015,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "de-letter-page",
+      "country": "DE",
+      "doc_type": "letter",
+      "side": "page",
+      "regions": 8,
+      "hits_iou50": 4,
+      "hits_cov90": 3,
+      "regions_masked": 18,
+      "over_masking": 0.0235,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "en-id_card-front",
+      "country": "GB",
+      "doc_type": "id_card",
+      "side": "front",
+      "regions": 6,
+      "hits_iou50": 2,
+      "hits_cov90": 2,
+      "regions_masked": 5,
+      "over_masking": 0.0075,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "en-id_card-back",
+      "country": "GB",
+      "doc_type": "id_card",
+      "side": "back",
+      "regions": 3,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 4,
+      "over_masking": 0.0069,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "en-passport-data_page",
+      "country": "GB",
+      "doc_type": "passport",
+      "side": "data_page",
+      "regions": 9,
+      "hits_iou50": 3,
+      "hits_cov90": 3,
+      "regions_masked": 13,
+      "over_masking": 0.0097,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "en-driving_licence-front",
+      "country": "GB",
+      "doc_type": "driving_licence",
+      "side": "front",
+      "regions": 5,
+      "hits_iou50": 1,
+      "hits_cov90": 1,
+      "regions_masked": 5,
+      "over_masking": 0.0056,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "en-badge-front",
+      "country": "GB",
+      "doc_type": "badge",
+      "side": "front",
+      "regions": 4,
+      "hits_iou50": 2,
+      "hits_cov90": 2,
+      "regions_masked": 5,
+      "over_masking": 0.0,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "en-member_card-front",
+      "country": "GB",
+      "doc_type": "member_card",
+      "side": "front",
+      "regions": 5,
+      "hits_iou50": 2,
+      "hits_cov90": 2,
+      "regions_masked": 7,
+      "over_masking": 0.0134,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "en-form-page",
+      "country": "GB",
+      "doc_type": "form",
+      "side": "page",
+      "regions": 9,
+      "hits_iou50": 5,
+      "hits_cov90": 5,
+      "regions_masked": 12,
+      "over_masking": 0.0042,
+      "sam_calls": 0,
+      "error": null
+    },
+    {
+      "id": "en-letter-page",
+      "country": "GB",
+      "doc_type": "letter",
+      "side": "page",
+      "regions": 8,
+      "hits_iou50": 4,
+      "hits_cov90": 4,
+      "regions_masked": 17,
+      "over_masking": 0.0125,
+      "sam_calls": 0,
+      "error": null
+    }
+  ]
+}

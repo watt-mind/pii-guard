@@ -1,0 +1,120 @@
+{
+  "_comment": "All text is fictional (ADR 0005). Response bodies only (no request or response headers, no key), recorded 2026-10-27 from Baseten Model APIs (https://inference.baseten.co/v1), model meta-models/muse-spark-open-1026, reasoning_effort low, json_mode, the detector's own prompts.",
+  "contract_hu": {
+    "language": "hu",
+    "text": "Alulírott Teszt Elek (született: Szeged, 1985. április 12., anyja neve: Minta Mária) 6720 Szeged, Kárász utca 7. szám alatti lakos, mint eladó, valamint Példa Ágnes vevő (e-mail: pelda.agnes@example.com, telefon: +36 30 123 4567) megállapodnak abban, hogy Teszt Elek a tulajdonát képező, Szeged belterület 12345/6 helyrajzi számú ingatlant eladja Példa Ágnesnek. Teszt Eleknek a vételárat a HU42 1177 3016 1111 1018 0000 0000 számú bankszámlára kell átutalni.",
+    "model": "meta-models/muse-spark-open-1026",
+    "reasoning_effort": "low",
+    "latency_s": 2.61,
+    "response": {
+      "id": "chatcmpl-b85658c9f8a14fdbaa173ac423ed724d",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "content": "{\"entities\": [{\"type\": \"PERSON\", \"text\": \"Teszt Elek\"}, {\"type\": \"PERSON\", \"text\": \"Minta Mária\"}, {\"type\": \"PERSON\", \"text\": \"Példa Ágnes\"}, {\"type\": \"PERSON\", \"text\": \"Teszt Eleknek\"}, {\"type\": \"PERSON\", \"text\": \"Példa Ágnesnek\"}, {\"type\": \"ADDRESS\", \"text\": \"6720 Szeged, Kárász utca 7.\"}, {\"type\": \"EMAIL\", \"text\": \"pelda.agnes@example.com\"}, {\"type\": \"PHONE\", \"text\": \"+36 30 123 4567\"}, {\"type\": \"DATE_OF_BIRTH\", \"text\": \"1985. április 12.\"}, {\"type\": \"BANK_ACCOUNT\", \"text\": \"HU42 1177 3016 1111 1018 0000 0000\"}, {\"type\": \"PARCEL_NUMBER_HU\", \"text\": \"12345/6\"}]}",
+            "role": "assistant",
+            "reasoning_content": "<omitted: 2253 characters of reasoning about the fictional text>"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "created": 1793086557,
+      "model": "meta-models/muse-spark-open-1026",
+      "object": "chat.completion",
+      "usage": {
+        "prompt_tokens": 980,
+        "completion_tokens": 984,
+        "total_tokens": 1964,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 799,
+          "audio_tokens": 0,
+          "reasoning_tokens": 748,
+          "rejected_prediction_tokens": 496
+        }
+      }
+    }
+  },
+  "letter_en": {
+    "language": "en",
+    "text": "Dear Ms Riley, I am writing on behalf of my tenant, Dr Jonathan Fakename, born 14 March 1979, who lives at Flat 3, 27 Example Road, Testington TE5 7XY. Jonathan's passport number is 123456789 and his phone number is +44 7700 900123. Please reply to j.fakename@example.org or to his employer, Placeholder Widgets Ltd.",
+    "model": "meta-models/muse-spark-open-1026",
+    "reasoning_effort": "low",
+    "latency_s": 1.77,
+    "response": {
+      "id": "chatcmpl-add3d528c3954b13a1779f3efb0958dc",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "content": "{\"entities\": [{\"type\": \"PERSON\", \"text\": \"Riley\"}, {\"type\": \"PERSON\", \"text\": \"Jonathan Fakename\"}, {\"type\": \"PERSON\", \"text\": \"Jonathan\"}, {\"type\": \"DATE_OF_BIRTH\", \"text\": \"14 March 1979\"}, {\"type\": \"ADDRESS\", \"text\": \"Flat 3, 27 Example Road, Testington TE5 7XY\"}, {\"type\": \"ID_DOCUMENT\", \"text\": \"123456789\"}, {\"type\": \"PHONE\", \"text\": \"+44 7700 900123\"}, {\"type\": \"EMAIL\", \"text\": \"j.fakename@example.org\"}, {\"type\": \"ORGANIZATION\", \"text\": \"Placeholder Widgets Ltd\"}]}",
+            "role": "assistant",
+            "reasoning_content": "<omitted: 1638 characters of reasoning about the fictional text>"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "created": 1793086560,
+      "model": "meta-models/muse-spark-open-1026",
+      "object": "chat.completion",
+      "usage": {
+        "prompt_tokens": 775,
+        "completion_tokens": 617,
+        "total_tokens": 1392,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 493,
+          "audio_tokens": 0,
+          "reasoning_tokens": 449,
+          "rejected_prediction_tokens": 375
+        }
+      }
+    }
+  },
+  "prose_hu": {
+    "language": "hu",
+    "text": "Kedves Ügyfélszolgálat! Kovácsné Próba Zsuzsanna vagyok, a Budapest XIII. kerületében, a Váci út 199. második emeletén lakom. A személyi igazolványom száma 123456AB, az autóm rendszáma ABC-123. Kérem, a választ Próba Zsuzsannának címezzék, ne a cégnek (Próba Zsuzsanna e.v.).",
+    "model": "meta-models/muse-spark-open-1026",
+    "reasoning_effort": "low",
+    "latency_s": 3.16,
+    "response": {
+      "id": "chatcmpl-e9e8e09b42074af5baac6b2af9781020",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "content": "{\"entities\": [{\"type\": \"PERSON\", \"text\": \"Kovácsné Próba Zsuzsanna\"}, {\"type\": \"ADDRESS\", \"text\": \"Budapest XIII. kerületében\"}, {\"type\": \"ADDRESS\", \"text\": \"Váci út 199.\"}, {\"type\": \"ID_DOCUMENT\", \"text\": \"123456AB\"}, {\"type\": \"VEHICLE_PLATE\", \"text\": \"ABC-123\"}, {\"type\": \"PERSON\", \"text\": \"Próba Zsuzsanna\"}, {\"type\": \"PERSON\", \"text\": \"Próba Zsuzsannának\"}, {\"type\": \"ORGANIZATION\", \"text\": \"Próba Zsuzsanna e.v.\"}]}",
+            "role": "assistant",
+            "reasoning_content": "<omitted: 3376 characters of reasoning about the fictional text>"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "created": 1793086561,
+      "model": "meta-models/muse-spark-open-1026",
+      "object": "chat.completion",
+      "usage": {
+        "prompt_tokens": 901,
+        "completion_tokens": 1133,
+        "total_tokens": 2034,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 881,
+          "audio_tokens": 0,
+          "reasoning_tokens": 969,
+          "rejected_prediction_tokens": 883
+        }
+      }
+    }
+  }
+}

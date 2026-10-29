@@ -1,0 +1,198 @@
+[project]
+# The PyPI distribution (`pii-guard` there is an unrelated project). The command stays
+# `pii-guard` and the import package `pii_guard`; pii_guard.__version__ looks this name up.
+name = "wattmind-pii-guard"
+version = "0.1.0"
+description = "An open-source privacy firewall for AI agents: reversible PII masking for text, documents and images."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.12,<3.13"
+authors = [{ name = "pii-guard contributors" }]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Framework :: FastAPI",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = [
+    "cryptography>=46.0.0",
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "pillow>=13.0.0",
+    "pydantic>=2.14.1",
+    "pydantic-settings>=2.16.1",
+    "uvicorn>=0.54.0",
+]
+
+[project.urls]
+Repository = "https://github.com/watt-mind/pii-guard"
+
+[project.scripts]
+pii-guard = "pii_guard.cli:main"
+
+# Language packs (docs/languages.md). A separate distribution adds a language the same way.
+[project.entry-points."pii_guard.languages"]
+de = "pii_guard.languages.de:pack"
+en = "pii_guard.languages.en:pack"
+hu = "pii_guard.languages.hu:pack"
+
+[project.optional-dependencies]
+ocr = [
+    "pytesseract>=0.3.13",
+]
+# huSpaCy's hu_core_news_lg is not listed: Hugging Face serves it uncacheable for uv, so it is
+# fetched once with `pii-guard baselines download` (pii_guard.eval.baselines.models, LAB-1249).
+baselines = [
+    "en-core-web-lg",
+    "huggingface-hub>=0.30",
+    "presidio-analyzer==2.2.365",
+    "presidio-anonymizer==2.2.365",
+    "spacy>=3.8.7,<3.9",
+]
+# On-device face and ID-photo segmentation (pii_guard.visual.segment, LAB-1229): YuNet on
+# OpenCV's CPU DNN. The model file is fetched separately (python -m pii_guard.visual.segment fetch).
+local-vision = [
+    "opencv-python-headless>=4.10",
+]
+ner = [
+    "protobuf>=7.36.2",
+    "sentencepiece>=0.2.2",
+    "torch>=2.14.1",
+    "transformers>=5.21.0",
+]
+# GLiNER (LAB-1150 comparison, docs/models.md): gliner 0.2.29 needs transformers < 5.17, so
+# it conflicts with `ner`; use its own environment (UV_PROJECT_ENVIRONMENT=.venv-gliner).
+gliner = [
+    "gliner==0.2.29",
+    "protobuf>=7.36.2",
+    "sentencepiece>=0.2.2",
+    "torch>=2.14.1",
+    "transformers>=4.51.3,<5.17",
+]
+hosted-azure = [
+    "azure-identity>=1.27.0",
+    "azure-storage-blob>=12.31.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pii_guard"]
+# The built web UI (`make wheel` copies ui/dist here). Git ignores it, so it is an artifact:
+# shipped when present, and a wheel built without it still runs `pii-guard up` (LAB-1276).
+artifacts = ["src/pii_guard/_ui/**"]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.170.12",
+    "mypy>=2.4.0",
+    "openai>=3.39.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.17.2",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "SIM", # simplify
+    "RUF", # ruff-specific
+    "S",   # bandit (security)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--cov=pii_guard", "--cov-report=term-missing"]
+markers = [
+    "live: calls a real model endpoint; skipped unless its credentials are set",
+    "slow: heavy test (seconds each); pull-request and develop CI skip it, main/nightly/manual run it (make test-all)",
+]
+filterwarnings = [
+    "error",
+    # Starlette's TestClient nudges towards httpx2; httpx is still supported.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+
+[tool.coverage.run]
+source = ["pii_guard"]
+# Branch coverage, except in the fast pull-request suite (`make test` sets COVERAGE_BRANCH=false
+# and the faster sys.monitoring core, which on Python 3.12 measures lines only; LAB-1267).
+branch = "${COVERAGE_BRANCH-true}"
+omit = ["*/pytest-of-*/*"]
+
+[tool.coverage.report]
+# Floor: the total when the gate was added (92.25 % in CI, LAB-1232) minus about 1 point. Raise it as
+# coverage grows; never lower it to make a PR pass.
+fail_under = 91
+show_missing = true
+skip_covered = false
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
+
+[tool.mypy]
+# Type checking for src/ (CI job "types"). Errors that existed when it was introduced are in
+# scripts/ci/mypy-baseline.txt; scripts/ci/mypy_baseline.py fails on any error not listed there.
+python_version = "3.12"
+files = ["src"]
+# Baseline workers run in their own virtualenvs with sibling-module imports (ADR 0004).
+exclude = ["src/pii_guard/eval/baselines/workers/"]
+warn_unused_configs = true
+warn_redundant_casts = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+# Optional extras (ner, ocr, baselines, local segmentation) and comparison tools without stubs.
+module = [
+    "cv2.*",
+    "gliner.*",
+    "numpy.*",
+    "onnxruntime.*",
+    "presidio_analyzer.*",
+    "presidio_anonymizer.*",
+    "pytesseract.*",
+    "spacy.*",
+    "tldextract.*",
+    "torch.*",
+    "transformers.*",
+]
+ignore_missing_imports = true
+
+[tool.uv]
+# presidio-analyzer caps numpy below 2.5; resolve the baselines extra on its own so it never
+# holds back another extra's numpy.
+conflicts = [
+    [{ extra = "baselines" }, { extra = "ner" }],
+    [{ extra = "gliner" }, { extra = "ner" }],
+    [{ extra = "gliner" }, { extra = "baselines" }],
+]
+
+[tool.uv.sources]
+en-core-web-lg = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" }
+# torch from the PyTorch CPU index on Linux (the Docker images, CI): the PyPI Linux wheel pulls
+# the CUDA libraries (nvidia-*, triton, about 6 GB) although pii-guard runs the NER on CPU
+# (LAB-1308). macOS keeps the PyPI wheel, which has MPS.
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

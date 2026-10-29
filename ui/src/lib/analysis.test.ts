@@ -1,0 +1,75 @@
+import { describe, expect, it } from "vitest";
+import { createMockClient } from "../api/mock";
+import { SAMPLES } from "../content/samples";
+import { detectorsUsed, fillAnswerTemplate, genericAnswer, linkPlaceholders, toLocalSpans, type LocalSpan, type PlaceholderLink } from "./analysis";
+
+/** Every original value that was masked must be absent from the simulated answer. */
+function maskedValues(input: string, links: readonly PlaceholderLink[]): string[] {
+  return [...new Set(links.map((l) => input.slice(l.start, l.end)))];
+}
+
+describe("fillAnswerTemplate", () => {
+  it.each(SAMPLES.map((s) => [s.id, s] as const))("never echoes a masked value (%s, demo engine)", async (_id, sample) => {
+    const client = createMockClient();
+    const [{ spans }, masked] = await Promise.all([client.analyze({ text: sample.text }), client.mask({ text: sample.text })]);
+    const local = toLocalSpans(sample.text, spans);
+    const links = linkPlaceholders(sample.text, masked.masked_text, local)!;
+    expect(links).not.toBeNull();
+    const answer = fillAnswerTemplate(sample.answer, sample.text, links)!;
+    for (const value of maskedValues(sample.text, links)) expect(answer).not.toContain(value);
+    expect(answer).not.toContain("{{");
+  });
+
+  it("masks only the detected part of a value when a detector found a sub-span (postcode inside an address)", () => {
+    const sample = SAMPLES[0]!;
+    const postcode = sample.text.indexOf("1137");
+    const tax = sample.text.indexOf("8406144122");
+    // What a rules-only engine finds: the postcode, not the rest of the address.
+    const links: PlaceholderLink[] = [
+      { placeholder: "[[NATIONAL_ID_HU_TAX_0fb6]]", entityType: "NATIONAL_ID_HU_TAX", start: tax, end: tax + 10 },
+      { placeholder: "[[ADDRESS_b7ef]]", entityType: "ADDRESS", start: postcode, end: postcode + 4 },
+    ];
+    const answer = fillAnswerTemplate(sample.answer, sample.text, links)!;
+    expect(answer).toContain("living at [[ADDRESS_b7ef]] Budapest, Pozsonyi út 38. 2/5.");
+    expect(answer).not.toContain("1137");
+    expect(answer).not.toContain("8406144122");
+    // Unmasked values reached the model as written, so the model may repeat them.
+    expect(answer).toContain("Seller: Bárdos Kinga");
+  });
+
+  it("refuses to fill when the masked text couldn't be lined up with the input", () => {
+    expect(fillAnswerTemplate(SAMPLES[0]!.answer, SAMPLES[0]!.text, null)).toBeNull();
+  });
+});
+
+describe("genericAnswer", () => {
+  it("lists placeholders only, in neutral wording", () => {
+    const text = genericAnswer({
+      masked_text: "",
+      session_id: "s",
+      entities: [{ placeholder: "[[PERSON_7f3a]]", entity_type: "PERSON", count: 2 }],
+    });
+    expect(text).toContain("[[PERSON_7f3a]] (mentioned 2×)");
+    expect(text).toContain("Which of these should I look into?");
+  });
+});
+
+describe("attachPlaceholders with a trimmed title", () => {
+  it("links the placeholder by overlap and keeps a mask-policy span masked", async () => {
+    const { attachPlaceholders, isKept } = await import("./analysis");
+    const span = { start: 0, end: 17, entityType: "PERSON" as const, score: 0.9, detector: "llm", placeholder: null, policy: "mask" as const };
+    const [linked] = attachPlaceholders([span], [{ placeholder: "[[PERSON_ab12]]", entityType: "PERSON", start: 4, end: 17 }]);
+    expect(linked!.placeholder).toBe("[[PERSON_ab12]]");
+    expect(isKept({ ...span })).toBe(false);
+    expect(isKept({ ...span, policy: undefined })).toBe(true);
+  });
+});
+
+describe("detectorsUsed", () => {
+  const span = (entityType: LocalSpan["entityType"], detector = "rules"): LocalSpan => ({ start: 0, end: 1, entityType, score: 0.9, detector, placeholder: null });
+  it("says how many rule hits were checksum-validated instead of labelling them all", () => {
+    expect(detectorsUsed([span("EMAIL"), span("PHONE"), span("BANK_ACCOUNT")])).toEqual(["Rules (1 checksum-validated)"]);
+    expect(detectorsUsed([span("BANK_ACCOUNT"), span("NATIONAL_ID_HU_TAX")])).toEqual(["Rules + checksum"]);
+    expect(detectorsUsed([span("EMAIL"), span("PERSON", "ner")])).toEqual(["Rules", "Multilingual NER"]);
+  });
+});

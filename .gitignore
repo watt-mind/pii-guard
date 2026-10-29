@@ -8,8 +8,9 @@ build/
 dist/
 wheels/
 
-# Virtual environments (uv creates .venv/)
+# Virtual environments (uv creates .venv/; .venv-baselines etc. hold conflicting extras)
 .venv/
+.venv-*/
 venv/
 env/
 
@@ -40,6 +41,8 @@ node_modules/
 *.pem
 *.key
 secrets/
+# Fake secrets the SECRET eval suite scores (eval/fixtures/secrets/build_secrets.py).
+!/eval/fixtures/secrets/
 
 # --- Models & weights (download or serve them, never commit) -----------------
 models/
@@ -54,7 +57,11 @@ checkpoints/
 # --- Data -------------------------------------------------------------------
 # Only synthetic, generated data may ever be committed, and only under
 # eval/fixtures/. Everything below is local working data.
-data/
+# data/lexicons/ holds the lexicon fetcher and its manifest; downloads stay local.
+data/*
+!data/lexicons/
+data/lexicons/raw/
+# data/datasets/ holds dataset downloads and fetch-only fixtures (docs/datasets.md).
 eval/generated/
 eval/runs/
 # Real documents must never enter the repository, not even temporarily.
@@ -67,6 +74,10 @@ private/
 logs/
 tmp/
 *.sqlite
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
 *.db
 
 # --- Editors & OS -----------------------------------------------------------
@@ -79,3 +90,11 @@ Thumbs.db
 
 # --- Agent worktrees --------------------------------------------------------
 .worktrees/
+
+# --- Build outputs of `pii-guard eval report` (LAB-1269) ------------------------
+# The benchmark index: written locally, built into the UI by ui/vite.config.ts.
+eval/results/index.json
+ui/src/api/benchmarks.index.json
+
+# Built web UI bundled into the wheel by `make wheel` (LAB-1276)
+src/pii_guard/_ui/

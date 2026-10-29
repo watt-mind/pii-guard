@@ -1,0 +1,70 @@
+# Cue words for context-cued numbers (languages/cues.py, LAB-1170); format in hu/cues.tsv.
+# Polish nouns change their stem in some cases (dowód -> dowodu), so those forms are listed
+# one by one; a trailing "*" covers the endings that keep the stem.
+telefon*	PHONE
+tel.	PHONE
+nr tel.	PHONE
+komórk*	PHONE
+kom.	PHONE
+nr komórki	PHONE
+numer kart*	BANK_ACCOUNT
+nr kart*	BANK_ACCOUNT
+karta kredytowa	BANK_ACCOUNT
+karty kredytowej	BANK_ACCOUNT
+karta płatnicza	BANK_ACCOUNT
+karty płatniczej	BANK_ACCOUNT
+numer konta	BANK_ACCOUNT
+nr konta	BANK_ACCOUNT
+konto bankowe	BANK_ACCOUNT
+konta bankowego	BANK_ACCOUNT
+numer rachunku	BANK_ACCOUNT
+nr rachunku	BANK_ACCOUNT
+rachunek bankowy	BANK_ACCOUNT
+rachunku bankowego	BANK_ACCOUNT
+PESEL	ID_DOCUMENT
+NIP	ID_DOCUMENT
+REGON	ID_DOCUMENT
+nr dowodu	ID_DOCUMENT
+numer dowodu	ID_DOCUMENT
+dowód osobisty	ID_DOCUMENT
+dowodu osobistego	ID_DOCUMENT
+dowodem osobistym	ID_DOCUMENT
+dowodzie osobistym	ID_DOCUMENT
+seria i numer	ID_DOCUMENT
+seria i nr	ID_DOCUMENT
+nr dokumentu	ID_DOCUMENT
+numer dokumentu	ID_DOCUMENT
+paszport*	ID_DOCUMENT
+prawo jazdy	ID_DOCUMENT
+prawa jazdy	ID_DOCUMENT
+prawem jazdy	ID_DOCUMENT
+prawie jazdy	ID_DOCUMENT
+karta pobytu	ID_DOCUMENT
+karty pobytu	ID_DOCUMENT
+legitymacj*	ID_DOCUMENT
+numer zamówienia	-
+nr zamówienia	-
+zamówieni*	-
+faktur*	-
+nr faktury	-
+numer faktury	-
+paragon*	-
+numer klienta	-
+nr klienta	-
+numer referencyjny	-
+nr ref.	-
+sygnatur*	-
+sygn.	-
+KRS	-
+numer przesyłki	-
+nr przesyłki	-
+przesyłk*	-
+kod pocztowy	-
+kodu pocztowego	-
+kwot*	-
+suma	-
+razem	-
+saldo	-
+oraz	-
+lub	-
+albo	-

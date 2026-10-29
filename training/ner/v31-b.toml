@@ -1,0 +1,62 @@
+# NER v3.1 candidate B (LAB-1410): A, plus more Hungarian and agent-style gold, less Privy:
+# OpenPII hu 10,000 rows (v3: 5,000; new rows, a superset of v3's), s11 train x1.5 (every
+# document once plus a seeded half again) and Privy halved to 6,000 (first 6,000 of v3's order).
+# The candidate list (A, B, C) was fixed in the ticket before anything was scored. Selection is
+# on agent-traffic-dev only; no generator-family file is in any v3.1 mix (tests/training).
+# Fictional / synthetic data only (ADR 0005). Data: training/ner/v31_data.py.
+#   modal run training/distill/modal_train.py --config training/ner/v31-b.toml --gpu A10G
+base_model = "FacebookAI/xlm-roberta-base"   # MIT licence
+base_revision = "e73636d4f797dec63c3081bb6ed5c7b0bb3f2089"
+train = [
+  "eval/generated/v31-final/openpii/hu-openpii-train-10k.jsonl",
+  "eval/generated/v31-final/openpii/en-openpii-train.jsonl",
+  "eval/generated/v31-final/openpii/de-openpii-train.jsonl",
+  "eval/generated/v31-final/openpii/pl-openpii-train.jsonl",
+  "eval/generated/v31-final/openpii/cs-openpii-train.jsonl",
+  "eval/generated/v31-final/openpii/sk-openpii-train.jsonl",
+  "eval/generated/v31-final/openpii/ro-openpii-train.jsonl",
+  "eval/generated/v31-final/openpii/hr-openpii-train.jsonl",
+  "eval/generated/v31-final/openpii/sl-openpii-train.jsonl",
+  "eval/generated/v31-final/privy/en-privy-train-6k.jsonl",
+  "eval/generated/v31-final/wismut/en-wismut-train.jsonl",
+  "eval/generated/v31-final/wismut/de-wismut-train.jsonl",
+  "eval/generated/v31-final/wismut/pl-wismut-train.jsonl",
+  "eval/generated/v31-final/wismut/cs-wismut-train.jsonl",
+  "eval/generated/v31-final/wismut/ro-wismut-train.jsonl",
+  "eval/generated/v31-final/nemotron/en-nemotron-train.jsonl",
+  "eval/generated/v31-final/gretel/en-gretel-train.jsonl",
+  "eval/generated/v31-final/s11/hu-distill-train-x1.5.jsonl",
+  "eval/generated/v31-final/s11/en-distill-train-x1.5.jsonl",
+  "eval/generated/v31-final/negatives/hu-negatives-train.jsonl",
+  "eval/generated/v31-final/negatives/en-negatives-train.jsonl",
+  "eval/generated/v31-final/negatives/de-negatives-train.jsonl",
+]
+# Epoch choice (train.py: best dev F1) uses only this split: OpenPII dev + s11 dev, as in v3.
+dev = [
+  "eval/generated/v31-final/openpii/hu-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/en-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/de-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/pl-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/cs-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/sk-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/ro-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/hr-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/sl-openpii-dev.jsonl",
+  "eval/generated/v31-final/s11/hu-distill-dev.jsonl",
+  "eval/generated/v31-final/s11/en-distill-dev.jsonl",
+]
+out = "models/ner/pii-guard-ner-xlmr-base-v31-b"
+teacher = "none"
+epochs = 3
+batch_size = 16
+lr = 5e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"
+other_types = "ignore"
+# Only the best epoch is written (v3 kept every epoch, then deleted them); no effect on training.
+save_epochs = false

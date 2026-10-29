@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Personal data got past the guard (security)
+    url: https://github.com/watt-mind/pii-guard/security/advisories/new
+    about: A way to make personal data leak is a security issue. Report it privately, with a synthetic reproduction.
+  - name: Documentation
+    url: https://github.com/watt-mind/pii-guard/blob/develop/docs/INDEX.md
+    about: Architecture, privacy model, evaluation method and decision records.

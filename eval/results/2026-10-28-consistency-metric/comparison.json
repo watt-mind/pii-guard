@@ -1,0 +1,137 @@
+{
+  "smoke": {
+    "before": {
+      "entities": 173,
+      "consistent": 170,
+      "multi_occurrence": 1,
+      "multi_consistent": 1
+    },
+    "after": {
+      "entities": 173,
+      "consistent": 167,
+      "multi_occurrence": 1,
+      "multi_consistent": 1
+    },
+    "entities_changed": 3
+  },
+  "inflection": {
+    "before": {
+      "entities": 18,
+      "consistent": 16,
+      "multi_occurrence": 10,
+      "multi_consistent": 8
+    },
+    "after": {
+      "entities": 18,
+      "consistent": 13,
+      "multi_occurrence": 10,
+      "multi_consistent": 5
+    },
+    "entities_changed": 3
+  },
+  "company-names": {
+    "before": {
+      "entities": 40,
+      "consistent": 40,
+      "multi_occurrence": 21,
+      "multi_consistent": 21
+    },
+    "after": {
+      "entities": 40,
+      "consistent": 40,
+      "multi_occurrence": 21,
+      "multi_consistent": 21
+    },
+    "entities_changed": 0
+  },
+  "agent-traffic-dev": {
+    "before": {
+      "entities": 1555,
+      "consistent": 1522,
+      "multi_occurrence": 75,
+      "multi_consistent": 63
+    },
+    "after": {
+      "entities": 1555,
+      "consistent": 1514,
+      "multi_occurrence": 75,
+      "multi_consistent": 63
+    },
+    "entities_changed": 8
+  },
+  "agent-traffic": {
+    "before": {
+      "entities": 5155,
+      "consistent": 5028,
+      "multi_occurrence": 251,
+      "multi_consistent": 219
+    },
+    "after": {
+      "entities": 5155,
+      "consistent": 4991,
+      "multi_occurrence": 251,
+      "multi_consistent": 219
+    },
+    "entities_changed": 37
+  },
+  "ai4privacy": {
+    "before": {
+      "entities": 2185,
+      "consistent": 2171,
+      "multi_occurrence": 0,
+      "multi_consistent": 0
+    },
+    "after": {
+      "entities": 2185,
+      "consistent": 2170,
+      "multi_occurrence": 0,
+      "multi_consistent": 0
+    },
+    "entities_changed": 1
+  },
+  "cee-pii": {
+    "before": {
+      "entities": 504,
+      "consistent": 499,
+      "multi_occurrence": 0,
+      "multi_consistent": 0
+    },
+    "after": {
+      "entities": 504,
+      "consistent": 499,
+      "multi_occurrence": 0,
+      "multi_consistent": 0
+    },
+    "entities_changed": 0
+  },
+  "gretel-finance": {
+    "before": {
+      "entities": 944,
+      "consistent": 727,
+      "multi_occurrence": 172,
+      "multi_consistent": 147
+    },
+    "after": {
+      "entities": 944,
+      "consistent": 712,
+      "multi_occurrence": 172,
+      "multi_consistent": 144
+    },
+    "entities_changed": 15
+  },
+  "nemotron-pii": {
+    "before": {
+      "entities": 697,
+      "consistent": 682,
+      "multi_occurrence": 105,
+      "multi_consistent": 102
+    },
+    "after": {
+      "entities": 697,
+      "consistent": 680,
+      "multi_occurrence": 105,
+      "multi_consistent": 101
+    },
+    "entities_changed": 2
+  }
+}

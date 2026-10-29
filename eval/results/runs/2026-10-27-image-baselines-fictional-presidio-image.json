@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-image-baselines-fictional-presidio-image",
+  "kind": "visual",
+  "date": "2026-10-27",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "Presidio Image Redactor (defaults) on fictional-specimens",
+  "notes": [
+    "LAB-1164 image baseline. Region types the tool can't mask (portrait, signature) are left out of by_region_type and count as missed in overall.",
+    "Word boxes of one detected entity are merged per text line before scoring (the rule pii-guard applies to its own spans); every box the tool returns is counted as masked."
+  ],
+  "code": {
+    "commit": "b9b2b435d92362197e28028c78486a18b3cfc6ba",
+    "dirty": false,
+    "pii_guard_version": "0.1.0",
+    "note": "LAB-1164 branch; harness, workers and pinned envs at this commit"
+  },
+  "system": {
+    "family": "comparison",
+    "tool": "presidio-image-redactor",
+    "version": "0.0.62",
+    "detectors": [
+      {
+        "name": "presidio-image",
+        "model": "en_core_web_lg 3.8.0 (en); de_core_news_lg 3.8.0 (de); hu_core_news_lg 3.8.1 (hu, huSpaCy)",
+        "model_ref": null,
+        "revision": null,
+        "settings": {
+          "engine": "ImageAnalyzerEngine(AnalyzerEngine, TesseractOCR), the analysis ImageRedactorEngine.redact fills",
+          "analyzer": "predefined recognizers, default score threshold",
+          "languages": "[\"de\", \"en\", \"hu\"]",
+          "ocr_lang": "tesseract default (eng)",
+          "upscale_to": null
+        },
+        "serving": null
+      }
+    ],
+    "key": "visual:presidio-image",
+    "label": "Presidio Image Redactor (defaults)",
+    "info": {
+      "tool": "presidio-image-redactor",
+      "versions": {
+        "presidio-image-redactor": "0.0.62",
+        "presidio-analyzer": "2.2.365",
+        "spacy": "3.8.18",
+        "pytesseract": "0.3.13"
+      },
+      "models": [
+        "en_core_web_lg 3.8.0 (en)",
+        "de_core_news_lg 3.8.0 (de)",
+        "hu_core_news_lg 3.8.1 (hu, huSpaCy)"
+      ],
+      "config": {
+        "engine": "ImageAnalyzerEngine(AnalyzerEngine, TesseractOCR), the analysis ImageRedactorEngine.redact fills",
+        "analyzer": "predefined recognizers, default score threshold",
+        "languages": [
+          "de",
+          "en",
+          "hu"
+        ],
+        "ocr_lang": "tesseract default (eng)",
+        "upscale_to": null
+      },
+      "supports": [
+        "text"
+      ]
+    }
+  },
+  "fixture_set": "specimens",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/visual/manifest.json",
+      "sha256": null,
+      "set": "fictional-specimens",
+      "language": null,
+      "origin": "generated",
+      "generator": "muse-image",
+      "documents": 24
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows)",
+    "platform": "darwin",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12"
+  },
+  "cost": null,
+  "metrics": {
+    "specimens": 24,
+    "overall": {
+      "regions": 149,
+      "recall_iou50": 0.3758,
+      "recall_cov90": 0.3624,
+      "mean_coverage": 0.4057
+    },
+    "by_region_type": {
+      "mrz": {
+        "regions": 6,
+        "recall_iou50": 0.0,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.0
+      },
+      "text": {
+        "regions": 110,
+        "recall_iou50": 0.5091,
+        "recall_cov90": 0.4909,
+        "mean_coverage": 0.5496
+      }
+    },
+    "by_doc_type": {
+      "badge": {
+        "regions": 12,
+        "recall_iou50": 0.6667,
+        "recall_cov90": 0.6667,
+        "mean_coverage": 0.6583,
+        "specimens": 3
+      },
+      "driving_licence": {
+        "regions": 15,
+        "recall_iou50": 0.2667,
+        "recall_cov90": 0.2667,
+        "mean_coverage": 0.3256,
+        "specimens": 3
+      },
+      "form": {
+        "regions": 27,
+        "recall_iou50": 0.4815,
+        "recall_cov90": 0.4815,
+        "mean_coverage": 0.498,
+        "specimens": 3
+      },
+      "id_card": {
+        "regions": 29,
+        "recall_iou50": 0.1379,
+        "recall_cov90": 0.1034,
+        "mean_coverage": 0.1728,
+        "specimens": 6
+      },
+      "letter": {
+        "regions": 24,
+        "recall_iou50": 0.5833,
+        "recall_cov90": 0.5833,
+        "mean_coverage": 0.6348,
+        "specimens": 3
+      },
+      "member_card": {
+        "regions": 15,
+        "recall_iou50": 0.2,
+        "recall_cov90": 0.2,
+        "mean_coverage": 0.2957,
+        "specimens": 3
+      },
+      "passport": {
+        "regions": 27,
+        "recall_iou50": 0.3704,
+        "recall_cov90": 0.3333,
+        "mean_coverage": 0.3534,
+        "specimens": 3
+      }
+    },
+    "by_country": {
+      "DE": {
+        "regions": 50,
+        "recall_iou50": 0.4,
+        "recall_cov90": 0.4,
+        "mean_coverage": 0.4266,
+        "specimens": 8
+      },
+      "GB": {
+        "regions": 49,
+        "recall_iou50": 0.4082,
+        "recall_cov90": 0.3878,
+        "mean_coverage": 0.422,
+        "specimens": 8
+      },
+      "HU": {
+        "regions": 50,
+        "recall_iou50": 0.32,
+        "recall_cov90": 0.3,
+        "mean_coverage": 0.3689,
+        "specimens": 8
+      }
+    },
+    "over_masking_mean": 0.0111,
+    "errors": 0,
+    "latency_ms": {
+      "local_per_image_p50": 375.0,
+      "local_per_image_p95": 597.6,
+      "total_per_image_p50": 375.0,
+      "total_per_image_p95": 597.6
+    }
+  }
+}

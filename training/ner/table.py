@@ -1,0 +1,155 @@
+"""The LAB-1150 results table: candidates x fixtures (leak, F1, over-masking, p50/p95).
+
+Reads ``<dir>/<fixture>--<candidate>.json`` scorecards and prints Markdown: one row per
+fixture and candidate (overlap F1, leak, over-masking in %, detection p50/p95 in ms), then the
+**pooled ai4privacy leak** per candidate (leaked values / values over hu + en + de) and the
+smoke-set maximum leak and over-masking, the numbers the acceptance criteria name::
+
+    uv run --no-sync python training/ner/table.py eval/results/2026-10-27-ner-v2/scorecards \\
+        --out eval/results/2026-10-27-ner-v2/table.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from collections import defaultdict
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
+
+from pii_guard.eval.datasets.mapa import LANGUAGES as MAPA_LANGUAGES
+
+ORDER = (
+    "xlmr-large-v1",
+    "xlmr-base-v2",
+    "xlmr-large-v2",
+    "xlmr-large-v2-no-ai4privacy",
+    "xlmr-base-v2-no-ai4privacy",
+    "xlmr-base-v2-openpii-1k",
+    "xlmr-large-v2-openpii-1k",
+    "xlmr-base-v2-hn",
+    "xlmr-large-v2-hn",
+    "davlan-xlmr-base-zero-shot",
+    "gliner-multi-zero-shot",
+    "gliner-multi-v2",
+    "xlmr-base-v2-hn-gliner-union",
+    "xlmr-base-v21-hn-e1",
+    "xlmr-base-v21-hn-e2",
+    "xlmr-base-v21-hn-e3",
+    "xlmr-base-v21-hn-e4",
+    "xlmr-base-v21-hn-e5",
+)
+SMOKE = ("hu-smoke", "en-smoke", "de-smoke")
+PUBLIC = ("hu-ai4privacy", "en-ai4privacy", "de-ai4privacy")
+#: LAB-1306: pooled groups (leaked / values, over-masked / masked, over hu + en + de). The
+#: ``agent-traffic-dev`` split selects; the LAB-1226 test sets are reported, never selected on.
+GROUPS = {
+    "agent-traffic-dev": ("hu-agent-traffic-dev", "en-agent-traffic-dev", "de-agent-traffic-dev"),
+    "agent-traffic (test)": ("hu-agent-traffic", "en-agent-traffic", "de-agent-traffic"),
+    "cee-pii (test)": ("hu-cee-pii", "en-cee-pii"),
+    "nemotron-pii (test)": ("en-nemotron-pii",),
+    "gretel-finance (test)": ("en-gretel-finance", "de-gretel-finance"),
+    "pl-pii-bench (test)": ("pl-pl-pii-bench",),
+    "mapa-eur-lex (test)": tuple(f"{lang}-mapa-eur-lex" for lang in MAPA_LANGUAGES),
+}
+
+
+def _pct(x: float | None) -> str:
+    return "-" if x is None else f"{100 * x:.1f}"
+
+
+def _ms(x: float | None) -> str:
+    return "-" if x is None else (f"{x:.0f}" if x >= 100 else f"{x:.1f}")
+
+
+def load(directory: Path) -> dict[str, dict[str, dict[str, Any]]]:
+    cards: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+    for path in sorted(directory.glob("*--*.json")):
+        fixture, _, candidate = path.stem.partition("--")
+        cards[candidate][fixture] = json.loads(path.read_text(encoding="utf-8"))["overall"]
+    return cards
+
+
+def render(cards: dict[str, dict[str, dict[str, Any]]]) -> str:
+    candidates = [c for c in ORDER if c in cards] + sorted(set(cards) - set(ORDER))
+    fixtures: list[str] = []
+    for c in candidates:
+        fixtures += [f for f in cards[c] if f not in fixtures]
+    lines = [
+        "| Fixture | Candidate | F1 | Leak | Over-masking | p50 ms | p95 ms |",
+        "|---|---|---:|---:|---:|---:|---:|",
+    ]
+    for f in fixtures:
+        for c in candidates:
+            o = cards[c].get(f)
+            if o is None:
+                continue
+            lat = o.get("latency_ms", {}).get("detect", o.get("latency_ms", {}))
+            lines.append(
+                f"| `{f}` | {c} | {_pct(o['detection']['overlap']['micro']['f1'])} | "
+                f"{_pct(o['leak']['rate'])} | {_pct(o['over_masking']['rate'])} | "
+                f"{_ms(lat.get('p50'))} | {_ms(lat.get('p95'))} |"
+            )
+    lines += [
+        "",
+        "| Candidate | ai4privacy leak, pooled | ai4privacy F1 (mean) | smoke leak, max | "
+        "smoke over-masking, max |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for c in candidates:
+        pub = [cards[c][f] for f in PUBLIC if f in cards[c]]
+        smoke = [cards[c][f] for f in SMOKE if f in cards[c]]
+        pooled = (
+            sum(o["leak"]["leaked"] for o in pub) / sum(o["leak"]["values"] for o in pub)
+            if len(pub) == len(PUBLIC)
+            else None
+        )
+        f1 = sum(o["detection"]["overlap"]["micro"]["f1"] for o in pub) / len(pub) if pub else None
+        lines.append(
+            f"| {c} | {_pct(pooled)} | {_pct(f1)} | "
+            f"{_pct(max((o['leak']['rate'] for o in smoke), default=None))} | "
+            f"{_pct(max((o['over_masking']['rate'] for o in smoke), default=None))} |"
+        )
+    groups = [
+        g for g, names in GROUPS.items() if any(n in cards[c] for c in candidates for n in names)
+    ]
+    if groups:
+        lines += [
+            "",
+            "| Candidate | " + " | ".join(f"{g} leak / over-masking" for g in groups) + " |",
+            "|---|" + "---:|" * len(groups),
+        ]
+        for c in candidates:
+            cells = []
+            for g in groups:
+                cards_g = [cards[c][n] for n in GROUPS[g] if n in cards[c]]
+                if len(cards_g) != len(GROUPS[g]):
+                    cells.append("-")
+                    continue
+                leak = sum(o["leak"]["leaked"] for o in cards_g) / max(
+                    sum(o["leak"]["values"] for o in cards_g), 1
+                )
+                over = sum(o["over_masking"]["over_masked"] for o in cards_g) / max(
+                    sum(o["over_masking"]["masked"] for o in cards_g), 1
+                )
+                cells.append(f"{_pct(leak)} / {_pct(over)}")
+            lines.append(f"| {c} | " + " | ".join(cells) + " |")
+    return "\n".join(lines) + "\n"
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--out", type=Path)
+    args = parser.parse_args(argv)
+    text = render(load(args.directory))
+    if args.out:
+        args.out.write_text(text, encoding="utf-8")
+    sys.stdout.write(text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

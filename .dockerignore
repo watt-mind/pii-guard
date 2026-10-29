@@ -1,0 +1,27 @@
+.git
+.github
+.venv
+.worktrees
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.hypothesis
+.coverage
+htmlcov
+.env
+.env.*
+!.env.example
+data
+models
+checkpoints
+eval/generated
+eval/runs
+real
+private
+ui/node_modules
+# Hosted build must not copy local artifacts or deployment evidence into an image.
+ui/dist
+src/pii_guard/_ui
+deploy/azure/*.local.*
+deploy/azure/release-evidence*

@@ -1,0 +1,18 @@
+# Fine-tuning config for the `ner` detector (training/ner/train.py). Fictional data only.
+# Corpus: `pii-guard eval generate --language {hu,en} --n 160 --seed 7 --out eval/generated/ner-s7`
+base_model = "FacebookAI/xlm-roberta-base"   # MIT licence
+train = ["eval/generated/ner-s7/hu-synth-train.jsonl", "eval/generated/ner-s7/en-synth-train.jsonl"]
+dev = ["eval/generated/ner-s7/hu-synth-dev.jsonl", "eval/generated/ner-s7/en-synth-dev.jsonl"]
+out = "models/ner/pii-guard-ner-xlmr-base"
+# Unlabelled names the writing model added are kept out of the loss (see train.py).
+teacher = "Davlan/xlm-roberta-base-ner-hrl"
+teacher_threshold = 0.6
+epochs = 5
+batch_size = 8
+lr = 5e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "auto"   # cuda > mps > cpu

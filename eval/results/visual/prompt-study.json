@@ -1,0 +1,184 @@
+{
+  "suite": "visual-prompt-study",
+  "specimens": 65,
+  "rows": [
+    {
+      "entity_type": "FACE",
+      "prompt": "face",
+      "targets": [
+        "portrait"
+      ],
+      "images": 30,
+      "regions": 37,
+      "recall_iou50": 0.7568,
+      "recall_cov90": 0.1622,
+      "mean_coverage": 0.6595,
+      "regions_found": 40,
+      "stray_regions": 3,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "FACE",
+      "prompt": "portrait",
+      "targets": [
+        "portrait"
+      ],
+      "images": 30,
+      "regions": 37,
+      "recall_iou50": 0.6486,
+      "recall_cov90": 0.6757,
+      "mean_coverage": 0.7212,
+      "regions_found": 27,
+      "stray_regions": 0,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "FACE",
+      "prompt": "head",
+      "targets": [
+        "portrait"
+      ],
+      "images": 30,
+      "regions": 37,
+      "recall_iou50": 0.8649,
+      "recall_cov90": 0.5135,
+      "mean_coverage": 0.8504,
+      "regions_found": 40,
+      "stray_regions": 3,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "ID_PHOTO",
+      "prompt": "id photo",
+      "targets": [
+        "portrait"
+      ],
+      "images": 30,
+      "regions": 37,
+      "recall_iou50": 0.0,
+      "recall_cov90": 0.0,
+      "mean_coverage": 0.0,
+      "regions_found": 0,
+      "stray_regions": 0,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "ID_PHOTO",
+      "prompt": "photo of a person",
+      "targets": [
+        "portrait"
+      ],
+      "images": 30,
+      "regions": 37,
+      "recall_iou50": 0.8919,
+      "recall_cov90": 0.5135,
+      "mean_coverage": 0.8386,
+      "regions_found": 40,
+      "stray_regions": 3,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "ID_PHOTO",
+      "prompt": "passport photo",
+      "targets": [
+        "portrait"
+      ],
+      "images": 30,
+      "regions": 37,
+      "recall_iou50": 0.0,
+      "recall_cov90": 0.0,
+      "mean_coverage": 0.0,
+      "regions_found": 0,
+      "stray_regions": 0,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "SIGNATURE",
+      "prompt": "signature",
+      "targets": [
+        "signature"
+      ],
+      "images": 30,
+      "regions": 30,
+      "recall_iou50": 0.9,
+      "recall_cov90": 0.4,
+      "mean_coverage": 0.8101,
+      "regions_found": 29,
+      "stray_regions": 1,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "SIGNATURE",
+      "prompt": "squiggly line",
+      "targets": [
+        "signature"
+      ],
+      "images": 30,
+      "regions": 30,
+      "recall_iou50": 0.0,
+      "recall_cov90": 0.0,
+      "mean_coverage": 0.0,
+      "regions_found": 6,
+      "stray_regions": 6,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "SIGNATURE",
+      "prompt": "handwriting",
+      "targets": [
+        "signature"
+      ],
+      "images": 30,
+      "regions": 30,
+      "recall_iou50": 0.4,
+      "recall_cov90": 0.2333,
+      "mean_coverage": 0.3734,
+      "regions_found": 14,
+      "stray_regions": 0,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "SIGNATURE",
+      "prompt": "handwritten signature",
+      "targets": [
+        "signature"
+      ],
+      "images": 30,
+      "regions": 30,
+      "recall_iou50": 0.6333,
+      "recall_cov90": 0.3,
+      "mean_coverage": 0.5648,
+      "regions_found": 19,
+      "stray_regions": 0,
+      "errors": 0,
+      "calls": 30
+    },
+    {
+      "entity_type": "SIGNATURE",
+      "prompt": "scribble",
+      "targets": [
+        "signature"
+      ],
+      "images": 30,
+      "regions": 30,
+      "recall_iou50": 0.0,
+      "recall_cov90": 0.0,
+      "mean_coverage": 0.0,
+      "regions_found": 0,
+      "stray_regions": 0,
+      "errors": 0,
+      "calls": 30
+    }
+  ],
+  "sam_live_calls_this_run": 210,
+  "sam_cached_calls_this_run": 120
+}

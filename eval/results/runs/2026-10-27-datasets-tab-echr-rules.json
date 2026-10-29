@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-27-datasets-tab-echr-rules",
+  "kind": "text",
+  "date": "2026-10-27",
+  "recorded_at": "2026-10-27T20:16:31+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard rules on tab-echr",
+  "notes": [
+    "One warm-up call before timing; wall time 0.9 s.",
+    "Dataset tab-echr (MIT (annotations); texts are public ECHR judgments from HUDOC), test split; docs/datasets.md.",
+    "Fixture files are rebuilt locally by fetch, not committed."
+  ],
+  "code": {
+    "commit": "18b15fae38dfd23bde63312a9f0b96881f490ac0",
+    "dirty": true,
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "tool": "pii-guard",
+    "version": "0.1.0",
+    "detectors": [
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      }
+    ],
+    "key": "rules",
+    "label": "pii-guard rules"
+  },
+  "fixture_set": "tab-echr",
+  "fixtures": [
+    {
+      "path": "data/datasets/fixtures/tab-echr/en-tab-echr.jsonl",
+      "sha256": "dbb8e2ca1b9eb73701651cc0f1aebe6fb79083b81f17c63720e0d78caa1eb7e1",
+      "set": "tab-echr",
+      "language": "en",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 40
+    }
+  ],
+  "languages": [
+    "en"
+  ],
+  "hardware": {
+    "description": null,
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": null,
+  "metrics": {
+    "overall": {
+      "documents": 40,
+      "gold_spans": 1048,
+      "predicted_spans": 0,
+      "unscored_predictions": 0,
+      "exact": {
+        "gold": 1048,
+        "pred": 0,
+        "tp_pred": 0,
+        "tp_gold": 0,
+        "precision": null,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "overlap": {
+        "gold": 1048,
+        "pred": 0,
+        "tp_pred": 0,
+        "tp_gold": 0,
+        "precision": null,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "macro_f1_overlap": 0.0,
+      "leak": {
+        "values": 273,
+        "leaked": 273,
+        "partial": 0,
+        "rate": 1.0,
+        "partial_rate": 0.0
+      },
+      "over_masking": {
+        "masked": 0,
+        "over_masked": 0,
+        "rate": null
+      },
+      "roundtrip": {
+        "documents": 40,
+        "exact": 40,
+        "rate": 1.0
+      },
+      "consistency": {
+        "entities": 273,
+        "consistent": 0,
+        "multi_occurrence": 44,
+        "multi_consistent": 0,
+        "rate": 0.0,
+        "multi_rate": 0.0
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 12.768,
+          "p95": 39.303
+        },
+        "mask": {
+          "p50": 3.01,
+          "p95": 8.868
+        }
+      },
+      "per_type": {
+        "PERSON": {
+          "gold": 381,
+          "pred": 0,
+          "exact_tp_gold": 0,
+          "exact_tp_pred": 0,
+          "overlap_tp_gold": 0,
+          "overlap_tp_pred": 0,
+          "leak": {
+            "values": 273,
+            "leaked": 273,
+            "partial": 0
+          },
+          "over_masking": null
+        },
+        "ORGANIZATION": {
+          "gold": 667,
+          "pred": 0,
+          "exact_tp_gold": 0,
+          "exact_tp_pred": 0,
+          "overlap_tp_gold": 0,
+          "overlap_tp_pred": 0,
+          "leak": null,
+          "over_masking": null
+        }
+      },
+      "validity": {
+        "valid": {
+          "gold": 0,
+          "found": 0,
+          "values": 0,
+          "leaked": 0
+        },
+        "invalid": {
+          "gold": 0,
+          "found": 0,
+          "values": 0,
+          "leaked": 0
+        },
+        "excluding_number_types": {
+          "gold": 1048,
+          "found": 0,
+          "values": 273,
+          "leaked": 273
+        },
+        "per_type": {},
+        "source": null
+      }
+    },
+    "languages": {
+      "en": {
+        "documents": 40,
+        "gold_spans": 1048,
+        "predicted_spans": 0,
+        "unscored_predictions": 0,
+        "exact": {
+          "gold": 1048,
+          "pred": 0,
+          "tp_pred": 0,
+          "tp_gold": 0,
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "overlap": {
+          "gold": 1048,
+          "pred": 0,
+          "tp_pred": 0,
+          "tp_gold": 0,
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "macro_f1_overlap": 0.0,
+        "leak": {
+          "values": 273,
+          "leaked": 273,
+          "partial": 0,
+          "rate": 1.0,
+          "partial_rate": 0.0
+        },
+        "over_masking": {
+          "masked": 0,
+          "over_masked": 0,
+          "rate": null
+        },
+        "roundtrip": {
+          "documents": 40,
+          "exact": 40,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 273,
+          "consistent": 0,
+          "multi_occurrence": 44,
+          "multi_consistent": 0,
+          "rate": 0.0,
+          "multi_rate": 0.0
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 12.768,
+            "p95": 39.303
+          },
+          "mask": {
+            "p50": 3.01,
+            "p95": 8.868
+          }
+        },
+        "per_type": {
+          "PERSON": {
+            "gold": 381,
+            "pred": 0,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": {
+              "values": 273,
+              "leaked": 273,
+              "partial": 0
+            },
+            "over_masking": null
+          },
+          "ORGANIZATION": {
+            "gold": 667,
+            "pred": 0,
+            "exact_tp_gold": 0,
+            "exact_tp_pred": 0,
+            "overlap_tp_gold": 0,
+            "overlap_tp_pred": 0,
+            "leak": null,
+            "over_masking": null
+          }
+        },
+        "validity": {
+          "valid": {
+            "gold": 0,
+            "found": 0,
+            "values": 0,
+            "leaked": 0
+          },
+          "invalid": {
+            "gold": 0,
+            "found": 0,
+            "values": 0,
+            "leaked": 0
+          },
+          "excluding_number_types": {
+            "gold": 1048,
+            "found": 0,
+            "values": 273,
+            "leaked": 273
+          },
+          "per_type": {},
+          "source": null
+        }
+      }
+    }
+  }
+}

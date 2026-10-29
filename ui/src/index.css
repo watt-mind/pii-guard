@@ -1,0 +1,325 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Hallmark · design system: ui/DESIGN.md · genre: modern-minimal · theme: custom (warm console)
+ * paper: warm off-white canvas, white cards (light, primary) / warm near-black (dark) · primary: plum
+ * accent family: magenta-plum (badges, the header hairline) · protected: green
+ * interface: Geist · values and placeholders: Geist Mono
+ */
+
+:root {
+  /* Surfaces and ink: a warm off-white canvas under white cards, a warm neutral scale, warm
+     near-black ink. Every neutral is warm (LAB-1464). */
+  --canvas: #faf9f7;
+  --surface: #ffffff;
+  --surface-2: #f5f2ef;
+  --surface-3: #eeeae5;
+  --ink: #1e1d1b;
+  --muted: #57524d;
+  --faint: #6b6762;
+  /* The Select chevron (--muted), drawn by us so the arrow's room is reserved once. */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2357524d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  /* Hairlines are decorative (cards, dividers); --field outlines a control at 3:1. */
+  --line: #e6e1dc;
+  --line-strong: #d6cfc8;
+  --field: #8f8780;
+  /* The primary action: a visible plum with white text. The coral-to-plum gradient is for the
+     hero and the header hairline only, never a button. */
+  --primary: #5c0a3f;
+  --primary-hover: #741552;
+  --on-primary: #ffffff;
+  /* The magenta-plum family: badges and the header hairline. Never a state. */
+  --accent: #a71e7e;
+  --accent-soft: #fbeaf5;
+  --accent-ink: #7d1460;
+  --accent-gradient: linear-gradient(92deg, #ff7c57 0%, #a71e7e 29%, #610a45 100%);
+  --accent-wash: linear-gradient(90deg, #ffd9cc 0%, #f3c4e4 40%, #ead2e2 100%);
+  /* Protected: the boundary, a live connection, values put back. */
+  --guard: #047a56;
+  --guard-soft: #e3f6ef;
+  --guard-ink: #035c41;
+  --guard-dot: #05aa77;
+  /* The model's side of the boundary. */
+  --model: #005fc7;
+  --model-soft: #edf4ff;
+  --warn: #9a5300;
+  --warn-soft: #fff3e0;
+  --danger: #c8331c;
+  --danger-soft: #fdece8;
+  /* What happened to a value. Every highlight, chip and count uses one of these. */
+  --masked: var(--model);
+  --masked-soft: #dfeafe;
+  --restored: var(--guard);
+  --restored-soft: var(--guard-soft);
+  /* Kept: --kept outlines the value (3:1), --kept-ink is its text (4.5:1). */
+  --kept: #8f8780;
+  --kept-ink: #6f6862;
+  --blocked: var(--warn);
+  --blocked-soft: var(--warn-soft);
+  --leak: var(--danger);
+  --leak-soft: var(--danger-soft);
+  /* Region boxes drawn over an image (a light document in either theme). */
+  --region-mask: oklch(50% 0.16 255);
+  --region-kept: #6f6862;
+  /* Focus is neutral, so it never reads as a state. */
+  --focus: var(--ink);
+  /* Over an image (a light document in either theme): the demo mask fill and region tag text. */
+  --image-mask-fill: #000000;
+  --on-region: #ffffff;
+  /* Categorical chart slots 1-8, fixed order. Each is 3:1 or more on --surface, adjacent slots
+     stay apart under deutan, protan and tritan simulation, and slots 1-5 avoid the status hues
+     (green, red, amber), which stay reserved for what happened to a value (LAB-1464). */
+  --series-1: #2a78d6;
+  --series-2: #c7417f;
+  --series-3: #6a55d8;
+  --series-4: #8a6a58;
+  --series-5: #0e7f98;
+  --series-6: #e34948;
+  --series-7: #66717f;
+  --series-8: #008300;
+  /* Live traffic: pii-guard's own stages take slots 1-5 in order, then unmask (values put back)
+     takes the green slot and the response the slate one; the red slot is never a stage. The
+     upstream (the model's time, not pii-guard's) is a neutral. */
+  --stage-parse: var(--series-1);
+  --stage-detect: var(--series-2);
+  --stage-image: var(--series-3);
+  --stage-mask: var(--series-4);
+  --stage-forward: var(--series-5);
+  --stage-unmask: var(--series-8);
+  --stage-response: var(--series-7);
+  --stage-upstream: #c4bcb4;
+  /* The recall heatmap's ramp end: ink stays at 4.5:1 or more on every step. */
+  --heat: #4a8ade;
+  --stage-other: #8f8780;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: #121110;
+  --surface: #191816;
+  --surface-2: #211f1d;
+  --surface-3: #2a2725;
+  --ink: #f3f0ec;
+  --muted: #b3ada7;
+  --faint: #948e88;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b3ada7' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  --line: #33302d;
+  --line-strong: #45403c;
+  --field: #807973;
+  --primary: #b8468f;
+  --primary-hover: #a83d82;
+  --on-primary: #ffffff;
+  --accent: #ec7fc4;
+  --accent-soft: #3a1530;
+  --accent-ink: #f7b8df;
+  --accent-wash: linear-gradient(90deg, #5a2a22 0%, #5a1d47 40%, #3a1530 100%);
+  --guard: #3fd6a0;
+  --guard-soft: #0f2a20;
+  --guard-ink: #8eeac6;
+  --guard-dot: #3fd6a0;
+  --model: #7fb6ff;
+  --model-soft: #14213a;
+  --warn: #ffb547;
+  --warn-soft: #2f2210;
+  --danger: #ff8466;
+  --danger-soft: #3a1a12;
+  --masked-soft: rgb(127 182 255 / 0.16);
+  --kept: #78716b;
+  --kept-ink: #a39c95;
+  /* Benchmark system colours that are too dark on this canvas (LAB-1155). */
+  --sys-882255: #88ccee;
+  --sys-332288: #ddcc77;
+  --series-1: #3987e5;
+  --series-2: #dc6a9a;
+  --series-3: #9085e9;
+  --series-4: #b4927d;
+  --series-5: #1fa7b8;
+  --series-6: #e66767;
+  --series-7: #8c97a6;
+  --series-8: #008300;
+  --stage-upstream: #5f5852;
+  --heat: #2c66bd;
+  --stage-other: #78716b;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-field: var(--field);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-guard-dot: var(--guard-dot);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-guard: var(--guard);
+  --color-guard-soft: var(--guard-soft);
+  --color-guard-ink: var(--guard-ink);
+  --color-model: var(--model);
+  --color-model-soft: var(--model-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-masked: var(--masked);
+  --color-masked-soft: var(--masked-soft);
+  --color-restored: var(--restored);
+  --color-restored-soft: var(--restored-soft);
+  --color-kept: var(--kept);
+  --color-kept-ink: var(--kept-ink);
+  --color-blocked: var(--blocked);
+  --color-blocked-soft: var(--blocked-soft);
+  --color-leak: var(--leak);
+  --color-leak-soft: var(--leak-soft);
+  --color-focus: var(--focus);
+}
+
+/* Type, radius and motion scales. Radii: chips 4, badges 6, controls 10, quick actions and
+   popovers 12, cards 20. */
+@theme {
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-ui: 0.8125rem;
+  --text-ui--line-height: 1.25rem;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-control: 12px;
+  --radius-xl: 20px;
+  --radius-2xl: 20px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-duration: 120ms;
+}
+
+html {
+  overflow-x: clip;
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: clip;
+  min-height: 100dvh;
+  background: var(--canvas);
+  font-family: var(--font-sans);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Select: no native arrow; one chevron 10 px from the right edge (the control keeps pr-8). */
+.select-chevron {
+  appearance: none;
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  background-size: 1rem 1rem;
+  text-overflow: ellipsis;
+}
+
+/* Masked / restored document text. */
+.doc {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-variant-ligatures: none;
+}
+
+/* Subtle ruled background behind the guard boundary. */
+.boundary-rail {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--line-strong) 0 6px,
+    transparent 6px 12px
+  );
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+@media (max-width: 1023px) {
+  .boundary-rail {
+    background-image: repeating-linear-gradient(
+      to right,
+      var(--line-strong) 0 6px,
+      transparent 6px 12px
+    );
+    background-size: 100% 1px;
+  }
+}
+
+@keyframes restore-in {
+  from {
+    background-color: var(--restored);
+    color: var(--canvas);
+  }
+}
+
+@keyframes chunk-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.animate-restore {
+  animation: restore-in 700ms var(--ease-out);
+}
+
+.animate-chunk {
+  animation: chunk-in 160ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-restore,
+  .animate-chunk {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* In the base layer, so a component's own focus utilities (focus:outline-none on a heading or
+   <main> focused by script) win. One ring everywhere: 2 px neutral ink, 2 px offset. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+/* The accent hairline under the page header: a soft wash with the gradient over it. */
+.header-hairline {
+  height: 4px;
+  background: var(--accent-wash);
+  position: relative;
+}
+
+.header-hairline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent-gradient);
+  opacity: 0.35;
+}

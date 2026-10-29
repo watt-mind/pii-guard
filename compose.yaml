@@ -1,0 +1,159 @@
+# Local API on http://127.0.0.1:8787. Configuration comes from .env (see .env.example).
+#
+# Demo stack (docs/operations.md): docker compose --profile demo up --build
+#   UI http://localhost:5173, demo API + gateway http://127.0.0.1:8788 (traffic log on),
+#   mock upstream (offline). Set PII_GUARD_DEMO_UPSTREAM_URL / _API_KEY for a real upstream.
+#   Fast mode with the NER: the demo image adds the `ner` extra, and the first start downloads
+#   the public fallback NER model (about 1.1 GB, docs/models.md) into the pii-guard-models
+#   volume; demo-api turns healthy once it is loaded. Rules only, offline, no download:
+#   PII_GUARD_DEMO_NER_FALLBACK=off docker compose --profile demo up --build
+#   The local equivalent without Docker is `make demo` (`make demo MODE=rules`).
+# The image ships Tesseract (hun/eng/deu) for the text in images; without OCR, image parts are
+# refused with 503 ocr_unavailable unless PII_GUARD_IMAGE_REQUIRE_OCR=false.
+x-healthcheck: &healthcheck
+  interval: 5s
+  timeout: 3s
+  start_period: 10s
+  retries: 12
+
+# The demo services share one image with the `ner` extra (torch, transformers).
+x-demo-image: &demo-image
+  image: pii-guard:demo
+  build:
+    context: .
+    args:
+      PII_GUARD_EXTRAS: "ocr local-vision ner"
+
+services:
+  api:
+    build: .
+    image: pii-guard:dev
+    ports:
+      - "127.0.0.1:8787:8787"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PII_GUARD_HOST: 0.0.0.0
+      PII_GUARD_PORT: "8787"
+      PII_GUARD_PROJECT_STATE_PATH: /var/lib/pii-guard/projects/state.sqlite3
+    read_only: true
+    volumes:
+      - pii-guard-projects:/var/lib/pii-guard/projects
+    # pytesseract hands Tesseract the image through a temp file: OCR needs a writable /tmp.
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+  mock-upstream:
+    profiles: [demo]
+    <<: *demo-image
+    command: ["pii-guard", "bench", "mock-upstream", "--host", "0.0.0.0", "--port", "8790"]
+    read_only: true
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8790/healthz', timeout=2)"]
+
+  demo-api:
+    profiles: [demo]
+    <<: *demo-image
+    ports:
+      - "127.0.0.1:8788:8787"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PII_GUARD_HOST: 0.0.0.0
+      PII_GUARD_PORT: "8787"
+      PII_GUARD_GATEWAY_MODE: fast
+      # The demo's generated tenant key changes per container, so its configuration does too.
+      PII_GUARD_PROJECT_STATE_PATH: /tmp/pii-guard-projects/state.sqlite3
+      # The UI's Vite proxy reaches this service as demo-api:8787 (Host header guard).
+      PII_GUARD_ALLOWED_HOSTS: demo-api
+      # masked only: `full` is refused on a non-loopback bind, and a container binds 0.0.0.0.
+      PII_GUARD_TRAFFIC_LOG: masked
+      PII_GUARD_SERVER_TIMING: "true"
+      PII_GUARD_METRICS: "true"
+      PII_GUARD_UPSTREAM_BASE_URL: ${PII_GUARD_DEMO_UPSTREAM_URL:-http://mock-upstream:8790/v1}
+      PII_GUARD_UPSTREAM_API_KEY: ${PII_GUARD_DEMO_UPSTREAM_API_KEY:-}
+      # NER model resolution (docs/models.md): PII_GUARD_NER_MODEL from .env if set, else the
+      # public fallback, downloaded on the first start into the volume below. off: rules only.
+      PII_GUARD_NER_FALLBACK: ${PII_GUARD_DEMO_NER_FALLBACK:-download}
+      PII_GUARD_MODELS_DIR: /app/cache/models
+      HF_HOME: /app/cache/huggingface
+    # A fresh tenant key per container unless .env sets one (pseudonyms are per run). The NER
+    # model is fetched first (progress in the logs; a no-op once it is in the volume).
+    command:
+      - sh
+      - -c
+      - >-
+        export PII_GUARD_TENANT_KEY="$${PII_GUARD_TENANT_KEY:-$$(python -c 'import secrets; print(secrets.token_hex(32))')}"
+        && python -m pii_guard.detect.ner_resolve fetch
+        && exec pii-guard serve
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - pii-guard-models:/app/cache
+    depends_on:
+      mock-upstream:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      # The first start downloads the NER model before the server listens: allow for it.
+      start_period: 900s
+      # Healthy = /healthz answers and OCR is available (the image ships Tesseract); prints
+      # "ocr on|off". Images are refused (503 ocr_unavailable) without it (ADR 0006).
+      test: ["CMD", "python", "-c", "import os, sys, urllib.request; from pii_guard.visual.ocr import tesseract_available as t; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2); ok = t(); print('ocr', 'on' if ok else 'off'); sys.exit(0 if ok or os.environ.get('PII_GUARD_IMAGE_REQUIRE_OCR', 'true').lower() in ('false', '0', 'no', 'off') else 1)"]
+
+  # The Benchmarks view's index, built once per start from the committed run records (the Node
+  # image has no Python): the UI's Vite plugin reads it from the shared volume (LAB-1356).
+  benchmarks-index:
+    profiles: [demo]
+    <<: *demo-image
+    command:
+      - sh
+      - -c
+      - >-
+        python -m pii_guard.eval.report_cli --print-index > /app/cache/benchmarks-index.json.tmp
+        && mv /app/cache/benchmarks-index.json.tmp /app/cache/benchmarks-index.json
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./eval:/app/eval:ro
+      - ./docs:/app/docs:ro
+      # /app/cache is owned by the app user in the image, so a fresh volume here is too.
+      - pii-guard-benchmarks:/app/cache
+
+  ui:
+    profiles: [demo]
+    image: node:22-slim
+    working_dir: /app
+    command: ["sh", "-c", "corepack enable && pnpm install --frozen-lockfile && pnpm dev --host 0.0.0.0"]
+    environment:
+      PII_GUARD_API_URL: http://demo-api:8787
+      VITE_PII_GUARD_MODE: api
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      # Prebuilt by benchmarks-index: only ui/ is mounted here, and there is no Python.
+      PII_GUARD_BENCHMARKS_INDEX: /benchmarks/benchmarks-index.json
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+      - pii-guard-benchmarks:/benchmarks:ro
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      benchmarks-index:
+        condition: service_completed_successfully
+      demo-api:
+        condition: service_healthy
+
+volumes:
+  # Private configuration and locally generated encryption key. Keep this volume together
+  # with a stable PII_GUARD_TENANT_KEY when one is explicitly configured. down -v deletes it.
+  pii-guard-projects:
+  # Downloaded models (the NER fallback), kept across `docker compose down`; `down -v` drops it.
+  pii-guard-models:
+  # The demo UI's prebuilt benchmark index (rebuilt by benchmarks-index on every start).
+  pii-guard-benchmarks:
