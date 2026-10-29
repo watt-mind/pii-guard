@@ -30,6 +30,7 @@ from pii_guard.eval.stats import fmt_duration, fmt_pct
 
 __all__ = [
     "by_language",
+    "dark_variant",
     "latency",
     "leak_vs_latency",
     "number_validity",
@@ -45,6 +46,11 @@ MUTED = "#4A4A52"
 GRID = "#E3E3E8"
 AXIS = "#8A8A93"
 BG = "#FFFFFF"
+#: Dark-canvas counterparts of the light card, for the `*-dark.svg` variants (LAB-1238).
+DARK_BG = "#111318"
+DARK_INK = "#F2F2F5"
+DARK_MUTED = "#B8B8C0"
+DARK_GRID = "#33333A"
 #: Language colors (Paul Tol bright/muted, colour-blind safe), assigned in index order.
 LANG_COLORS = ["#332288", "#44AA99", "#DDCC77", "#CC6677", "#88CCEE", "#AA4499", "#117733"]
 
@@ -135,6 +141,20 @@ def _svg(title: str, desc: str, body: Sequence[str], caption: Sequence[str]) -> 
         y += 30
     out.append("</svg>")
     return "\n".join(out) + "\n"
+
+
+def dark_variant(svg: str) -> str:
+    """The `*-dark.svg` twin of a chart: the same drawing on a dark card (LAB-1238).
+
+    Only the card chrome is swapped (background, ink, muted caption/axis text, grid);
+    data colors stay as-is so a series keeps its color across themes.
+    """
+    return (
+        svg.replace(BG, DARK_BG)
+        .replace(INK, DARK_INK)
+        .replace(MUTED, DARK_MUTED)
+        .replace(GRID, DARK_GRID)
+    )
 
 
 def _short(commit: str) -> str:

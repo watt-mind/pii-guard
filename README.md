@@ -69,6 +69,11 @@ from the generated [docs/benchmarks.md](docs/benchmarks.md): the hand-written se
 (none of them trained on) from [results per dataset](docs/benchmarks.md#results-per-dataset),
 with 95 % intervals there.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks/leak-vs-latency-dark.svg">
+  <img src="docs/benchmarks/leak-vs-latency.svg" alt="Leak rate vs latency">
+</picture>
+
 | Leak | Hand-written (de+en+hu, 51 docs) | Agent traffic (990) | Nemotron-PII (300) | CEE-PII (451) | Gretel finance (400) | Ai4Privacy (600) |
 |---|---:|---:|---:|---:|---:|---:|
 | **PII Guard fast** (rules + NER, on-device, $0) | **0.0 %** | **0.2 %** | **0.7 %** | **0.4 %** | 19.0 % | 0.4 % † |

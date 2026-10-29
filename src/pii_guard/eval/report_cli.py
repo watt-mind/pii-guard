@@ -760,10 +760,16 @@ def build_outputs(
     for name, _, render in CHARTS:
         if not _drawn(index, name):
             continue
-        outputs[docs_dir / "benchmarks" / name] = render(index, headline, systems)
+        svg = render(index, headline, systems)
+        outputs[docs_dir / "benchmarks" / name] = svg
+        outputs[docs_dir / "benchmarks" / name.replace(".svg", "-dark.svg")] = charts.dark_variant(
+            svg
+        )
     for name in validity_sets(index):
-        outputs[docs_dir / "benchmarks" / validity_chart(name)] = charts.number_validity(
-            index, fixture_set=name
+        svg = charts.number_validity(index, fixture_set=name)
+        outputs[docs_dir / "benchmarks" / validity_chart(name)] = svg
+        outputs[docs_dir / "benchmarks" / validity_chart(name).replace(".svg", "-dark.svg")] = (
+            charts.dark_variant(svg)
         )
     outputs[docs_dir / "benchmarks.md"] = render_page(
         index, headline_set=headline, featured=systems, datasets_section=_datasets_section(runs_dir)
