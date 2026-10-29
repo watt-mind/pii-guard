@@ -1,0 +1,263 @@
+{
+  "corpus_version": 1,
+  "seed": 1525,
+  "model": "muse-spark-1.3-contributor",
+  "planned_per_language": 1200,
+  "languages": {
+    "lv": {
+      "accepted": 1197,
+      "discarded": {
+        "invented_person": 1,
+        "missing_value": 2
+      },
+      "train": {
+        "documents": 1077,
+        "gold_spans": {
+          "ADDRESS": 1401,
+          "BANK_ACCOUNT": 460,
+          "DATE_OF_BIRTH": 486,
+          "EMAIL": 395,
+          "ID_DOCUMENT": 353,
+          "ORGANIZATION": 884,
+          "PERSON": 6385,
+          "PHONE": 561,
+          "VEHICLE_PLATE": 117
+        },
+        "kinds": {
+          "bank-complaint": 65,
+          "court-judgment": 140,
+          "court-notice": 63,
+          "email": 133,
+          "employment-certificate": 65,
+          "invoice": 67,
+          "lease": 115,
+          "meeting-minutes": 69,
+          "negative-prose": 138,
+          "power-of-attorney": 51,
+          "sale-contract": 112,
+          "support-chat": 59
+        }
+      },
+      "dev": {
+        "documents": 120,
+        "gold_spans": {
+          "ADDRESS": 142,
+          "BANK_ACCOUNT": 54,
+          "DATE_OF_BIRTH": 47,
+          "EMAIL": 49,
+          "ID_DOCUMENT": 29,
+          "ORGANIZATION": 90,
+          "PERSON": 661,
+          "PHONE": 65,
+          "VEHICLE_PLATE": 9
+        },
+        "kinds": {
+          "bank-complaint": 12,
+          "court-judgment": 13,
+          "court-notice": 3,
+          "email": 20,
+          "employment-certificate": 5,
+          "invoice": 10,
+          "lease": 14,
+          "meeting-minutes": 10,
+          "negative-prose": 14,
+          "power-of-attorney": 6,
+          "sale-contract": 9,
+          "support-chat": 4
+        }
+      }
+    },
+    "lt": {
+      "accepted": 1199,
+      "discarded": {
+        "invented_person": 1
+      },
+      "train": {
+        "documents": 1079,
+        "gold_spans": {
+          "ADDRESS": 1445,
+          "BANK_ACCOUNT": 473,
+          "DATE_OF_BIRTH": 516,
+          "EMAIL": 387,
+          "ID_DOCUMENT": 389,
+          "ORGANIZATION": 846,
+          "PERSON": 6517,
+          "PHONE": 555,
+          "VEHICLE_PLATE": 141
+        },
+        "kinds": {
+          "bank-complaint": 79,
+          "court-judgment": 150,
+          "court-notice": 53,
+          "email": 134,
+          "employment-certificate": 64,
+          "invoice": 62,
+          "lease": 111,
+          "meeting-minutes": 68,
+          "negative-prose": 108,
+          "power-of-attorney": 55,
+          "sale-contract": 130,
+          "support-chat": 65
+        }
+      },
+      "dev": {
+        "documents": 120,
+        "gold_spans": {
+          "ADDRESS": 164,
+          "BANK_ACCOUNT": 56,
+          "DATE_OF_BIRTH": 57,
+          "EMAIL": 45,
+          "ID_DOCUMENT": 38,
+          "ORGANIZATION": 96,
+          "PERSON": 665,
+          "PHONE": 66,
+          "VEHICLE_PLATE": 11
+        },
+        "kinds": {
+          "bank-complaint": 9,
+          "court-judgment": 12,
+          "court-notice": 9,
+          "email": 11,
+          "employment-certificate": 6,
+          "invoice": 6,
+          "lease": 18,
+          "meeting-minutes": 3,
+          "negative-prose": 16,
+          "power-of-attorney": 10,
+          "sale-contract": 11,
+          "support-chat": 9
+        }
+      }
+    },
+    "hr": {
+      "accepted": 1197,
+      "discarded": {
+        "invented_person": 2,
+        "missing_value": 1
+      },
+      "train": {
+        "documents": 1079,
+        "gold_spans": {
+          "ADDRESS": 1484,
+          "BANK_ACCOUNT": 514,
+          "DATE_OF_BIRTH": 545,
+          "EMAIL": 385,
+          "ID_DOCUMENT": 403,
+          "ORGANIZATION": 745,
+          "PERSON": 5882,
+          "PHONE": 551,
+          "VEHICLE_PLATE": 144
+        },
+        "kinds": {
+          "bank-complaint": 69,
+          "court-judgment": 141,
+          "court-notice": 54,
+          "email": 108,
+          "employment-certificate": 58,
+          "invoice": 60,
+          "lease": 136,
+          "meeting-minutes": 63,
+          "negative-prose": 117,
+          "power-of-attorney": 75,
+          "sale-contract": 135,
+          "support-chat": 63
+        }
+      },
+      "dev": {
+        "documents": 118,
+        "gold_spans": {
+          "ADDRESS": 165,
+          "BANK_ACCOUNT": 56,
+          "DATE_OF_BIRTH": 60,
+          "EMAIL": 44,
+          "ID_DOCUMENT": 37,
+          "ORGANIZATION": 79,
+          "PERSON": 665,
+          "PHONE": 60,
+          "VEHICLE_PLATE": 11
+        },
+        "kinds": {
+          "bank-complaint": 6,
+          "court-judgment": 18,
+          "court-notice": 5,
+          "email": 12,
+          "employment-certificate": 3,
+          "invoice": 7,
+          "lease": 16,
+          "meeting-minutes": 9,
+          "negative-prose": 12,
+          "power-of-attorney": 12,
+          "sale-contract": 11,
+          "support-chat": 7
+        }
+      }
+    },
+    "sl": {
+      "accepted": 1199,
+      "discarded": {
+        "unsupplied_value": 1
+      },
+      "train": {
+        "documents": 1079,
+        "gold_spans": {
+          "ADDRESS": 1467,
+          "BANK_ACCOUNT": 594,
+          "DATE_OF_BIRTH": 499,
+          "EMAIL": 390,
+          "ID_DOCUMENT": 407,
+          "ORGANIZATION": 791,
+          "PERSON": 5650,
+          "PHONE": 583,
+          "VEHICLE_PLATE": 170
+        },
+        "kinds": {
+          "bank-complaint": 81,
+          "court-judgment": 110,
+          "court-notice": 64,
+          "email": 119,
+          "employment-certificate": 63,
+          "invoice": 75,
+          "lease": 123,
+          "meeting-minutes": 66,
+          "negative-prose": 124,
+          "power-of-attorney": 62,
+          "sale-contract": 141,
+          "support-chat": 51
+        }
+      },
+      "dev": {
+        "documents": 120,
+        "gold_spans": {
+          "ADDRESS": 165,
+          "BANK_ACCOUNT": 67,
+          "DATE_OF_BIRTH": 55,
+          "EMAIL": 40,
+          "ID_DOCUMENT": 50,
+          "ORGANIZATION": 88,
+          "PERSON": 673,
+          "PHONE": 71,
+          "VEHICLE_PLATE": 19
+        },
+        "kinds": {
+          "bank-complaint": 11,
+          "court-judgment": 11,
+          "court-notice": 7,
+          "email": 12,
+          "employment-certificate": 9,
+          "invoice": 8,
+          "lease": 12,
+          "meeting-minutes": 10,
+          "negative-prose": 10,
+          "power-of-attorney": 5,
+          "sale-contract": 18,
+          "support-chat": 7
+        }
+      }
+    }
+  },
+  "tokens_uncached": {
+    "prompt": 179394,
+    "completion": 739205
+  },
+  "cost_usd_uncached": 0.1658
+}

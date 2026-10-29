@@ -11,10 +11,14 @@ Upload: only the corpus files given (fictional Muse documents, checked by
 ``training/distill/modal_upload.check_payload``: no MAPA, TAB or other real text, LAB-1419),
 the ``pii_guard`` package and ``label.py``::
 
-    modal run training/ner/modal_eu_label.py --corpus eval/generated/distill-eu-s1525
+    EU_CORPUS=phase1b/distill-eu-1b-s1525 uv run --no-sync --with modal --with huggingface-hub \\
+        modal run training/ner/modal_eu_label.py
 
-Writes ``<corpus>/labelled/<lang>-distill-{train,dev}.jsonl``, ``label-stats.json`` and the
-teacher cache ``<corpus>/teacher-cache.jsonl`` (so a rerun is local: ``label.py --cache-only``).
+``EU_CORPUS`` is a folder under the data root (``PII_GUARD_DATA_DIR``, LAB-1542), or a
+repo-relative path such as the old ``eval/generated/distill-eu-s1525``. Writes
+``<corpus>/labelled/<lang>-distill-{train,dev}.jsonl``, ``label-stats.json`` and the teacher
+cache ``<corpus>/teacher-cache.jsonl`` (so a rerun is local: ``label.py --cache-only``), then
+pushes the corpus it lies in to the private HF dataset (``data_sync.py``; ``--no-push`` skips).
 """
 
 from __future__ import annotations
@@ -30,7 +34,9 @@ import modal
 REMOTE = "/root/repo"
 ROOT = Path(__file__).resolve().parents[2] if modal.is_local() else Path(REMOTE)
 if modal.is_local():
-    sys.path[:0] = [str(ROOT / "src"), str(ROOT / "training" / "distill")]
+    sys.path[:0] = [
+        str(ROOT / "src"), str(ROOT / "training" / "distill"), str(ROOT / "training" / "ner")
+    ]  # fmt: skip
 PORT = 8000
 #: As ``deploy/modal/glimmer.py`` (base model, no LoRA), bound to loopback only.
 VLLM = [
@@ -39,15 +45,32 @@ VLLM = [
     "--max-num-seqs", "128", "--generation-config", "auto", "--reasoning-parser", "muse_glimmer",
 ]  # fmt: skip
 
-CORPUS = os.environ.get("EU_CORPUS", "eval/generated/distill-eu-s1525")
+CORPUS = os.environ.get("EU_CORPUS", "phase1/distill-eu-s1525")
+
+
+def _local_corpus() -> Path:
+    """``EU_CORPUS``: absolute, repo-relative (``eval/generated/...``), else under the data root."""
+    import data_sync
+
+    p = Path(CORPUS).expanduser()
+    if p.is_absolute():
+        return p
+    if (ROOT / p).is_dir():
+        return ROOT / p
+    return data_sync.data_root() / p
+
+
+#: Where the corpus sits in the container, relative to ``REMOTE``.
+REMOTE_CORPUS = f"corpus/{Path(CORPUS).name}"
 
 
 def _corpus_files() -> list[str]:
     from modal_upload import check_payload
 
-    base = ROOT / CORPUS
-    rels = sorted(str(p.relative_to(ROOT)) for p in base.glob("*-distill-*.jsonl"))
-    return check_payload(rels)
+    base = _local_corpus()
+    names = sorted(p.name for p in base.glob("*-distill-*.jsonl"))
+    check_payload([f"corpora/{base.name}/{n}" for n in names])
+    return names
 
 
 image = (
@@ -67,8 +90,8 @@ image = (
     )
 )
 if modal.is_local():
-    for rel in _corpus_files():
-        image = image.add_local_file(ROOT / rel, f"{REMOTE}/{rel}")
+    for name in _corpus_files():
+        image = image.add_local_file(_local_corpus() / name, f"{REMOTE}/{REMOTE_CORPUS}/{name}")
 
 hf_cache = modal.Volume.from_name("pii-guard-hf-cache", create_if_missing=True)
 vllm_cache = modal.Volume.from_name("pii-guard-vllm-cache", create_if_missing=True)
@@ -123,13 +146,16 @@ def label(corpus: str, workers: int = 64) -> dict[str, bytes]:
 
 
 @app.local_entrypoint()
-def main(corpus: str = CORPUS, workers: int = 64) -> None:
+def main(corpus: str = CORPUS, workers: int = 64, no_push: bool = False) -> None:
+    import data_sync
+
     if corpus != CORPUS:
         raise SystemExit("set EU_CORPUS=<dir> in the environment: the image is built from it")
-    files = label.remote(corpus, workers)
-    base = ROOT / corpus
+    files = label.remote(REMOTE_CORPUS, workers)
+    base = _local_corpus()
     for name, data in files.items():
         target = base / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
         print(f"wrote {target}")
+    data_sync.push_after_run(base, enabled=not no_push, what="glimmer-label")

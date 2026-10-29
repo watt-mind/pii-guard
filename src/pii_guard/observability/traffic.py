@@ -60,17 +60,67 @@ SENSITIVE_KEYS = frozenset(
         "set_cookie",
     }
 )
-_CREDENTIAL_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}")
+_CREDENTIAL_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]+")
 _SUBSCRIBER_QUEUE = 256
+
+#: Words (splitting a key on separators and camelCase) that make it a credential by meaning
+#: (LAB-1565): ``auth_token``, ``accessToken`` and ``x-auth`` are credentials whatever their
+#: spelling. Plurals stay out on purpose: ``max_tokens`` / ``prompt_tokens`` are counts.
+_SENSITIVE_WORDS = frozenset(
+    {
+        "auth",
+        "authorization",
+        "bearer",
+        "cookie",
+        "cookies",
+        "credential",
+        "credentials",
+        "passwd",
+        "password",
+        "passphrase",
+        "pwd",
+        "secret",
+        "token",
+    }
+)
+#: Separator-free key fragments that are credential-shaped even as one word.
+_SENSITIVE_FRAGMENTS = (
+    "apikey",
+    "authorization",
+    "credential",
+    "passwd",
+    "passphrase",
+    "password",
+    "privatekey",
+    "secret",
+)
+#: A ``key`` word is a credential only next to one of these (``prompt_cache_key`` is not).
+_KEY_QUALIFIERS = frozenset(
+    {"access", "api", "auth", "encryption", "master", "private", "secret", "session", "signing"}
+)
 
 
 def _sensitive(key: str) -> bool:
-    return key.lower().replace("-", "_") in SENSITIVE_KEYS
+    normalized = key.lower().replace("-", "_")
+    if normalized in SENSITIVE_KEYS:
+        return True
+    # Split camelCase, then on any separator, e.g. ``accessToken`` / ``X-Api-Key``.
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_", key)
+    words = [w for w in re.split(r"[^a-z0-9]+", spaced.lower()) if w]
+    if any(w in _SENSITIVE_WORDS for w in words):
+        return True
+    if "key" in words and any(w in _KEY_QUALIFIERS for w in words):
+        return True
+    flat = "".join(words)
+    if any(fragment in flat for fragment in _SENSITIVE_FRAGMENTS):
+        return True
+    # ``authtoken`` / ``refreshtoken`` written as one word; ``tokenizer``/counts stay visible.
+    return flat.endswith("token") and flat != "tokenizer"
 
 
 def scrub(value: Any, secrets_: Iterable[str] = (), *, max_string: int = MAX_STRING) -> Any:
     """A JSON-safe copy of ``value`` with credentials, known secrets and images taken out."""
-    known = [s for s in secrets_ if s and len(s) >= 6]
+    known = [s for s in secrets_ if s and len(s) >= 3]
 
     def clean_str(text: str) -> str:
         if text.startswith("data:") and len(text) > 64:

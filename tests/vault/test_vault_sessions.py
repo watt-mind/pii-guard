@@ -11,8 +11,9 @@ import re
 import pytest
 from vault_helpers import TEST_KEY, FakeClock, span_of
 
+import pii_guard.vault.vault as vault_module
 from pii_guard.config import Settings
-from pii_guard.types import EntityType
+from pii_guard.types import EntityType, MaskingError
 from pii_guard.vault import DEFAULT_MAX_ENTRIES, SessionNotFoundError, Vault
 
 EMAILS = ("teszt.elek@example.com", "minta.maria@example.org", "jane.placeholder@example.net")
@@ -108,3 +109,43 @@ def test_max_entries_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     assert vault.session_or_create("box")[0].session_id != "box"
     with pytest.raises(ValueError, match="max_entries"):
         Vault(TEST_KEY, max_entries=0)
+
+
+def test_explicit_session_entry_limit_fails_closed_at_mask_time(clock: FakeClock) -> None:
+    # LAB-1565: an explicit (vault.session) session cannot rotate, so max_entries
+    # is enforced when masking into a full one instead of growing without bound.
+    vault = Vault(TEST_KEY, ttl_seconds=60.0, clock=clock, max_entries=2)
+    session = vault.session()
+    for email in EMAILS[:2]:
+        session.mask(email, [span_of(email, email, EntityType.EMAIL)])
+    assert session.entry_count == 2
+    with pytest.raises(MaskingError, match="entry limit") as raised:
+        session.mask(EMAILS[2], [span_of(EMAILS[2], EMAILS[2], EntityType.EMAIL)])
+    # Client-recoverable (start a new session), so not a 500.
+    assert (raised.value.code, raised.value.status_code) == ("session_entry_limit_reached", 409)
+
+
+def test_reserved_foreign_tokens_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    # LAB-1565: foreign placeholder-shaped tokens are reserved in an LRU, not forever.
+    monkeypatch.setattr(vault_module, "_MAX_RESERVED", 3)
+    vault = Vault(TEST_KEY)
+    session, _ = vault.session_or_create("box")
+    for i in range(6):
+        session.mask(f"token [[PERSON_{i:04x}]] here", [])
+    assert len(session._reserved) <= 3
+    assert "[[PERSON_0005]]" in session._reserved  # the newest stay
+
+
+def test_touched_generations_are_bounded_and_remasking_still_works(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # LAB-1565: _touched is pruned; a memo older than the kept generations re-masks
+    # from scratch with the same result.
+    monkeypatch.setattr(vault_module, "_MAX_TOUCHED", 4)
+    vault = Vault(TEST_KEY)
+    session, _ = vault.session_or_create("box")
+    emails = [f"user{i}.teszt@example.com" for i in range(10)]
+    first = [session.mask(e, [span_of(e, e, EntityType.EMAIL)]) for e in emails]
+    assert len(session._touched) <= 4
+    again = [session.mask(e, [span_of(e, e, EntityType.EMAIL)]) for e in emails]
+    assert again == first

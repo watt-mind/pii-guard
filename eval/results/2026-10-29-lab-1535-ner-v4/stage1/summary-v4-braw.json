@@ -1,0 +1,44 @@
+{
+  "smoke": {
+    "documents": 51,
+    "leak": 0.0,
+    "over_masking": 0.032258,
+    "f1": 0.919854
+  },
+  "inflection": {
+    "documents": 12,
+    "leak": 0.02,
+    "over_masking": 0.0,
+    "f1": 0.948276
+  },
+  "agent-traffic-dev": {
+    "documents": 300,
+    "leak": 0.0,
+    "over_masking": 0.054162,
+    "f1": 0.950655
+  },
+  "eu-smoke": {
+    "documents": 55,
+    "leak": 0.005525,
+    "over_masking": 0.024876,
+    "f1": 0.943123
+  },
+  "eu-inflection": {
+    "documents": 48,
+    "leak": 0.016529,
+    "over_masking": 0.0,
+    "f1": 0.983471
+  },
+  "en-court": {
+    "documents": 6,
+    "leak": 0.0,
+    "over_masking": 0.0,
+    "f1": 1.0
+  },
+  "mapa-eur-lex": {
+    "documents": 42,
+    "leak": 0.085135,
+    "over_masking": 0.541272,
+    "f1": 0.553229
+  }
+}

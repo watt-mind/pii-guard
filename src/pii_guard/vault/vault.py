@@ -22,7 +22,7 @@ import unicodedata
 from collections import Counter, OrderedDict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from pii_guard.detect.ner_context import sweep_vetoed
 from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
@@ -62,6 +62,7 @@ __all__ = [
     "MaskResult",
     "PlaceholderInInputError",
     "RestoreBudget",
+    "SessionEntryLimitError",
     "SessionNotFoundError",
     "UnmaskOutputTooLargeError",
     "UnmaskResult",
@@ -71,6 +72,8 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+_SessionMetadata = TypeVar("_SessionMetadata")
 
 
 class PlaceholderInInputError(MaskingError):
@@ -82,6 +85,17 @@ class PlaceholderInInputError(MaskingError):
 
     code = "placeholder_in_input"
     status_code = 422
+
+
+class SessionEntryLimitError(MaskingError):
+    """An explicit session holds ``max_entries`` placeholders (409, LAB-1565).
+
+    Nobody can rotate an explicit session for the client, so it fails closed; the client
+    recovers by starting a new session.
+    """
+
+    code = "session_entry_limit_reached"
+    status_code = 409
 
 
 DEFAULT_TTL_SECONDS = 3600.0
@@ -136,6 +150,13 @@ class SessionNotFoundError(PiiGuardError):
 
     code = "not_found"
     status_code = 404
+
+
+class VaultCapacityError(MaskingError):
+    """Every capacity slot is pinned by an active request; retry after one finishes."""
+
+    code = "vault_capacity_exhausted"
+    status_code = 503
 
 
 class UnmaskOutputTooLargeError(PiiGuardError):
@@ -468,6 +489,14 @@ _MASK_MEMO = True
 _MASK_MEMO_ENTRIES = 1024
 _MASK_MEMO_CHARS = 512_000
 
+#: Most foreign placeholder-shaped tokens a session reserves (LAB-1565): the oldest are
+#: forgotten (a forgotten token could in principle be derived later, as after a restart).
+_MAX_RESERVED = DEFAULT_MAX_ENTRIES
+
+#: Most ``_touched`` generations kept (LAB-1565); older ones are forgotten and a memo from
+#: before them is re-masked from scratch, which changes cost, never output.
+_MAX_TOUCHED = 8192
+
 
 @dataclass(frozen=True, slots=True)
 class _Masked:
@@ -554,10 +583,14 @@ class VaultSession:
         clock: Callable[[], float],
         case_sensitive_placeholders: bool = False,
         max_restored_chars: int = DEFAULT_MAX_RESTORED_CHARS,
+        entry_limit: int | None = None,
     ) -> None:
         self.session_id = session_id
         self._case_sensitive = case_sensitive_placeholders
         self._max_restored = max_restored_chars
+        #: Explicit-session placeholder cap enforced at mask time (LAB-1565); ``None``:
+        #: a get-or-create session, which the vault rotates instead (:meth:`Vault.session`).
+        self._entry_limit = entry_limit
         self._tenant_key = tenant_key
         self._ttl = ttl_seconds
         self._id_length = id_length
@@ -569,7 +602,8 @@ class VaultSession:
         self._identifiers: dict[str, _Entry] = {}
         # Placeholder-shaped tokens seen in input that this session did not issue. They are
         # never issued later, so a token the caller wrote can't turn into a masked value.
-        self._reserved: set[str] = set()
+        # Bounded (LAB-1565): at most _MAX_RESERVED, oldest forgotten first (see above).
+        self._reserved: OrderedDict[str, None] = OrderedDict()
         self._closed = False
         self._expires_at = clock() + ttl_seconds
         self._known = KnownValues()
@@ -586,7 +620,10 @@ class VaultSession:
         # (generation, language) -> folded initial -> entries (see :meth:`_starting_with`).
         self._initials: tuple[int, str, dict[str, list[_Entry]]] | None = None
         # The entry each generation was touched for: ``_touched[g:]`` changed after ``g``.
+        # Bounded (LAB-1565): ``_touched[0]`` is generation ``_touched_base + 1``; generations
+        # at or before ``_touched_base`` are forgotten.
         self._touched: list[_Entry] = []
+        self._touched_base = 0
         # (text, spans, language) -> its last mask from spans: the next request re-sends the
         # same history, so pass 1 scans only the entries changed since (LAB-1315). Bounded;
         # forgotten with the session; ``None`` in a fork.
@@ -624,6 +661,7 @@ class VaultSession:
                 self._masked.clear()
             self._masked_chars = 0
             self._touched.clear()
+            self._touched_base = self._generation
 
     @property
     def known_values(self) -> KnownValues:
@@ -662,12 +700,13 @@ class VaultSession:
                 clock=self._clock,
                 case_sensitive_placeholders=self._case_sensitive,
                 max_restored_chars=self._max_restored,
+                entry_limit=self._entry_limit,
             )
             memo: dict[int, Any] = {}
             fork._by_key = copy.deepcopy(self._by_key, memo)
             fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
             fork._identifiers = copy.deepcopy(self._identifiers, memo)
-            fork._reserved = set(self._reserved)
+            fork._reserved = OrderedDict(self._reserved)
             fork._generation = self._generation
             fork._masked = None  # its journal is replayed in full anyway
             fork._known = self._known
@@ -683,14 +722,27 @@ class VaultSession:
         this session so that the replay comes out differently, raises :class:`MaskingError`
         (fail closed: the caller must not use the fork's output).
         """
-        if fork._parent is not self or fork._journal is None:
-            raise ValueError("not a fork of this session")
-        journal, fork._journal = fork._journal, None
+        with fork._lock:
+            if fork._parent is not self or fork._journal is None:
+                raise ValueError("not a fork of this session")
+            journal, fork._journal = fork._journal, None
         with self._lock:
+            # Copy all mutable mask state together: entries, variants, memo references and
+            # generation indexes must continue to refer to the same copied objects.
+            excluded = {"_lock", "_clock", "_known", "_parent", "_journal"}
+            state = copy.deepcopy({k: v for k, v in vars(self).items() if k not in excluded})
+            staged = copy.copy(self)
+            staged.__dict__.update(state)
+            staged._lock = threading.RLock()
+            staged._journal = None
+            staged._check_alive()
             for text, spans, language, remask, expected in journal:
-                result = self.mask_with_report(text, spans, language=language, remask=remask)
+                result = staged.mask_with_report(text, spans, language=language, remask=remask)
                 if result.text != expected:
                     raise MaskingError("the session changed while an image was masked")
+            self.__dict__.update({k: v for k, v in vars(staged).items() if k not in excluded})
+            if self._journal is not None:
+                self._journal.extend(journal)
 
     # --- masking -------------------------------------------------------------------------
 
@@ -764,6 +816,12 @@ class VaultSession:
             since = None
         with self._lock:
             self._check_alive()
+            if self._entry_limit is not None and len(self._by_placeholder) >= self._entry_limit:
+                # An explicit session has nobody to rotate it for (LAB-1565): fail closed
+                # rather than grow without bound; the client starts a new session.
+                raise SessionEntryLimitError(
+                    "vault session entry limit reached; start a new session"
+                )
             if since is not None and not self._edges_unchanged(text, since, language):
                 since = None
             if since is not None and since >= self._generation:
@@ -774,14 +832,24 @@ class VaultSession:
             if _MASK_MEMO and self._masked is not None and not remask:
                 key = (text, tuple(spans), language)
             foreign = self._foreign_tokens(text, remask)
-            added = foreign - self._reserved
-            self._reserved |= added
+            added = [token for token in foreign if token not in self._reserved]
+            for token in foreign:
+                self._reserved[token] = None
+                self._reserved.move_to_end(token)
+            # Bound _reserved (LAB-1565), but never forget a token of the current text:
+            # it must not be issued as a placeholder by this very mask.
+            while len(self._reserved) > _MAX_RESERVED:
+                oldest = next(iter(self._reserved))
+                if oldest in foreign:
+                    break
+                del self._reserved[oldest]
             try:
                 result = self._mask_again(text, key, language) if key is not None else None
                 if result is None:
                     result = self._mask_validated(text, ordered, language, since, key)
             except BaseException:
-                self._reserved -= added
+                for token in added:
+                    self._reserved.pop(token, None)
                 raise
             # A fork's journal is replayed as a full remask: ``since`` is in the fork's
             # numbering, and the replay must come out the same either way (else it fails).
@@ -919,7 +987,9 @@ class VaultSession:
         if masked is None or any(k in self._by_key for k in masked.depends):
             return None
         generation = self._generation
-        changed = dict.fromkeys(self._touched[masked.generation :])
+        if masked.generation < self._touched_base:
+            return None  # older changes were forgotten (LAB-1565): mask from scratch
+        changed = dict.fromkeys(self._touched[masked.generation - self._touched_base :])
         entries = sorted(changed, key=lambda e: (-len(e.normalized), e.order))
         self.entries_scanned += len(entries)
         replacements = list(masked.replacements)
@@ -1217,6 +1287,10 @@ class VaultSession:
         entry.changed = self._generation
         if self._masked is not None:
             self._touched.append(entry)
+            if len(self._touched) > _MAX_TOUCHED:
+                drop = len(self._touched) // 2
+                del self._touched[:drop]
+                self._touched_base += drop
 
     def _form(self, value: str, entity_type: EntityType) -> str:
         """The variant key of ``value``: its casing class (case-sensitive mode) and layout.
@@ -1631,9 +1705,9 @@ class Vault:
 
     ``max_sessions`` caps the live sessions (every ``/v1/mask`` without a ``session_id``
     creates one): creating one more **evicts the least recently used** session (the one
-    whose sliding TTL ends first), which is closed like an expired one, so its later use is
-    ``404 session_not_found``. Eviction rather than 429 keeps the service up under a flood;
-    a client whose idle session was evicted starts a new one.
+    whose sliding TTL ends first) among unleased sessions. It is closed like an expired
+    one, so its later use is ``404 session_not_found``. When every session is leased,
+    creation fails with ``503 vault_capacity_exhausted`` without evicting an active session.
 
     ``max_entries`` caps a **get-or-create** session (:meth:`session_or_create`: the gateway's
     path, ``prompt_cache_key`` and default sessions, which can live as long as a client keeps
@@ -1642,7 +1716,9 @@ class Vault:
     generation is no longer handed out and expires with its TTL. A conversation that crosses
     a rotation is re-masked from its re-sent history under the new generation; only a
     placeholder it kept from before the rotation (and no longer sends the value of) stays
-    unrestored. Explicit sessions (:meth:`session`) have no cap: their client owns them.
+    unrestored. Explicit sessions (:meth:`session`) cannot rotate (the client addresses them
+    by id), so the same ``max_entries`` is enforced at mask time instead: a full explicit
+    session fails closed and its client starts a new one (LAB-1565).
 
     ``max_restored_chars`` caps the characters of original values one unmask call (or one
     :meth:`VaultSession.restore_budget`, a gateway response) restores: see
@@ -1685,7 +1761,8 @@ class Vault:
         self._id_length = id_length
         self._clock = clock
         self._case_sensitive = case_sensitive_placeholders
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._leases: Counter[VaultSession] = Counter()
         self._sessions: dict[str, VaultSession] = {}
 
     @classmethod
@@ -1725,11 +1802,16 @@ class Vault:
         with self._lock:
             self._purge_locked()
             if session_id is None:
-                return self._create_locked(f"s_{secrets.token_hex(16)}")
+                created = self._create_locked(f"s_{secrets.token_hex(16)}")
+                created._entry_limit = self._max_entries  # explicit: capped, not rotated
+                return created
             session = self._sessions.get(session_id)
             if session is None:
                 raise SessionNotFoundError("vault session not found or expired")
-            session._check_alive()
+            with session._lock:
+                session._check_alive()
+                if session._entry_limit is None:
+                    session._entry_limit = self._max_entries  # addressed explicitly now
             return session
 
     def session_or_create(self, session_id: str) -> tuple[VaultSession, bool]:
@@ -1748,10 +1830,10 @@ class Vault:
             session = self._sessions.get(current)
             if session is not None and not session.expired:
                 if session.entry_count < self._max_entries:
-                    session._check_alive()
+                    with session._lock:
+                        session._check_alive()
                     return session, False
                 generation += 1
-                self._generations[session_id] = generation
                 current = self._generation_id(session_id, generation)
                 logger.info(
                     "vault: a session reached %d placeholders; starting generation %d",
@@ -1762,7 +1844,38 @@ class Vault:
                 if existing is not None and not existing.expired:  # pragma: no cover - race
                     existing._check_alive()
                     return existing, False
-            return self._create_locked(current), True
+            session = self._create_locked(current)
+            if generation:
+                self._generations[session_id] = generation
+            return session, True
+
+    def acquire_session(
+        self, resolve: Callable[[], tuple[VaultSession, bool, _SessionMetadata]]
+    ) -> tuple[VaultSession, bool, _SessionMetadata]:
+        """Resolve and pin a session atomically against LRU eviction.
+
+        ``resolve`` must use this vault's session lookup methods. Each successful acquire
+        requires one :meth:`release_session`, including on failure or cancellation. Pins
+        protect against capacity eviction only; explicit deletion and TTL still apply.
+        """
+        with self._lock:
+            result = resolve()
+            session = result[0]
+            if self._sessions.get(session.session_id) is not session:
+                raise SessionNotFoundError("vault session not found or expired")
+            with session._lock:
+                session._check_alive()
+            self._leases[session] += 1
+            return result
+
+    def release_session(self, session: VaultSession) -> None:
+        """Release one pin, even if TTL or explicit deletion already removed the session."""
+        with self._lock:
+            if self._leases[session] <= 0:
+                raise ValueError("session has no lease")
+            self._leases[session] -= 1
+            if not self._leases[session]:
+                del self._leases[session]
 
     def derive_session_id(self, material: str) -> str:
         """A stable session id for ``material``, keyed with the tenant key: ``d_`` + 32 hex.
@@ -1812,8 +1925,16 @@ class Vault:
         if excess <= 0:
             return
         oldest = heapq.nsmallest(
-            excess, self._sessions.items(), key=lambda item: item[1]._expires_at
+            excess,
+            (
+                (sid, session)
+                for sid, session in self._sessions.items()
+                if not self._leases[session]
+            ),
+            key=lambda item: item[1]._expires_at,
         )
+        if len(oldest) < excess:
+            raise VaultCapacityError("vault session capacity is occupied by active requests")
         for sid, session in oldest:
             del self._sessions[sid]
             session.close()

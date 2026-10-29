@@ -376,3 +376,15 @@ describe("project workspace", () => {
     });
   });
 });
+
+it("creates the first project after a successful empty list", async () => {
+  const user = userEvent.setup();
+  const onProject = vi.fn();
+  const call = vi.fn(async (_path: string, body?: unknown) => body ? { id: "new", name: "Synthetic first", default_policy_id: "default" } : { projects: [], default_project_id: null }) as unknown as Requester;
+  render(<Workspace hosted call={call} onProject={onProject} />);
+  await screen.findByText(/No projects yet/);
+  expect(screen.queryByText(/Loading your default project/)).toBeNull();
+  await user.type(screen.getByLabelText(/New project name/), "Synthetic first");
+  await user.click(screen.getByRole("button", { name: "Create project" }));
+  await waitFor(() => expect(onProject).toHaveBeenCalledWith(expect.objectContaining({ id: "new" })));
+});

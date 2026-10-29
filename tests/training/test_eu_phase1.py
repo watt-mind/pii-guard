@@ -53,6 +53,14 @@ def test_every_gate_language_has_smoke_and_inflection(gates: types.ModuleType) -
         ("hr", "Horvat", "m", True, "Horvatom"),
         ("sl", "Peter", "m", False, "Petru"),
         ("sl", "Ana", "f", False, "Ani"),
+        ("ro", "Ioana", "f", False, "Ioanei"),
+        ("ro", "Maria", "f", False, "Mariei"),
+        ("ga", "Seán", "m", False, "Sheáin"),
+        ("ga", "Máire", "f", False, "Mháire"),
+        ("ga", "Ó Briain", "m", True, "Uí Bhriain"),
+        ("ga", "Mac Cárthaigh", "m", True, "Mhic Cárthaigh"),
+        ("nl", "de Vries", "m", True, "De Vries"),
+        ("es", "García López", "m", True, "García"),
     ],
 )
 def test_name_forms(
@@ -80,6 +88,44 @@ def test_checksummed_ids(ids: types.ModuleType) -> None:
     assert emso.startswith("1705990") and len(emso) == 13
     code = ids.lt_personal_code(rng, dt.date(1985, 1, 2), "m")
     assert code.startswith("3850102") and len(code) == 11
+
+
+def test_phase1b_checksummed_ids(ids: types.ModuleType) -> None:
+    import datetime as dt
+    import random
+
+    rng = random.Random(2)  # noqa: S311
+    nir = ids.fr_nir(rng, dt.date(1985, 5, 3), "f").replace(" ", "")
+    assert nir.startswith("28505") and 97 - int(nir[:13]) % 97 == int(nir[13:])
+    dni = ids.es_dni(rng)
+    assert dni[-1] == "TRWAGMYFPDXBNJZSQVHLCKE"[int(dni[:8]) % 23]
+    assert ids.it_codice_fiscale(rng, "Marco", "Rossi", dt.date(1980, 1, 1), "m")[:11] == (
+        "RSSMRC80A01"
+    )
+    bsn = ids.nl_bsn(rng)
+    weighted = sum(int(c) * w for c, w in zip(bsn[:8], range(9, 1, -1), strict=True))
+    assert (weighted - int(bsn[8])) % 11 == 0
+    cnp = ids.ro_cnp(rng, dt.date(2001, 2, 3), "m")
+    assert cnp.startswith("5010203") and len(cnp) == 13
+    pps = ids.ie_ppsn(rng)
+    assert len(pps) == 9 and pps[:7].isdigit() and pps.endswith("A")
+
+
+@pytest.mark.parametrize("lang", ["fr", "es", "it", "nl", "ro", "ga", "mt"])
+def test_phase1b_plans_plant_valid_ibans(lang: str) -> None:
+    corpus = load_script("training/ner/eu_corpus.py", "eu_corpus")
+    from pii_guard.eval.identities import iban_check_digits
+
+    seen = 0
+    for i in range(40):
+        plan = corpus.plan_document(corpus.LANGS[lang], 1525, i)
+        for v in plan.values:
+            if v.entity_type is EntityType.BANK_ACCOUNT:
+                compact = v.text.replace(" ", "")
+                assert compact[:2] == corpus.LANGS[lang].country
+                assert iban_check_digits(compact[:2], compact[4:]) == compact[2:4]
+                seen += 1
+    assert seen
 
 
 def test_court_surnames_spans_and_titles() -> None:
@@ -116,3 +162,12 @@ def test_manifests_are_marked_synthetic() -> None:
     m = json.loads((ROOT / "training/ner/eu-openpii-train-manifest.json").read_text())
     assert m["synthetic"] is True and m["rows_committed"] is False
     assert {"lv", "lt", "hr", "sl", "fr", "es", "it", "nl", "ro"} <= set(m["languages"])
+
+
+def test_phase1b_sources_in_manifest() -> None:
+    m = json.loads((ROOT / "training/ner/eu-phase1-data-manifest.json").read_text())
+    for name in ("muse-eu-1b", "muse-eu-1b-labelled"):
+        src = m["sources"][name]
+        assert src["synthetic"] is True
+        langs = {f.split("-")[0] for f in src["files"]}
+        assert langs == {"fr", "es", "it", "nl", "ro", "ga", "mt"}, name

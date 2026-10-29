@@ -71,6 +71,7 @@ const REVIEW = "rounded-lg bg-surface-2 p-3 text-sm text-ink sm:p-4";
 export function Workspace({ call: suppliedCall, hosted = false, projectId, onProject }: Props) {
   const call = suppliedCall ?? (hosted ? request : localRequest);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState(projectId ?? "");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -88,6 +89,7 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
       if (!Array.isArray(data.projects)) throw new Error("Invalid projects");
       if (!active) return;
       setProjects(data.projects);
+      setLoaded(true);
       const project = data.projects.find((p) => p.id === projectId) ?? data.projects.find((p) => p.id === data.default_project_id) ?? data.projects[0];
       if (project) { setSelected(project.id); if (project.id !== projectId) onProject?.(project); }
       setError("");
@@ -111,14 +113,15 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
           {error}
         </Notice>
       )}
-      {projects.length > 0 && (
+      {loaded && (
         <Card title="Project" subtitle="Endpoints, keys and policies below belong to the current project.">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Current project">
+            {projects.length > 0 && <Field label="Current project">
               <Select ref={projectSelect} value={selected} disabled={busy} onChange={(e) => { const next = projects.find((p) => p.id === e.target.value)!; setSelected(next.id); setCreated(""); onProject?.(next); }}>
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
-            </Field>
+            </Field>}
+            {!projects.length && <p className="text-sm text-muted">No projects yet. Create a project to configure policies and endpoints.</p>}
             <form
               className="flex flex-wrap items-end gap-2"
               onSubmit={(e) => {
@@ -145,7 +148,7 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
           {created && <Notice tone="success" live className="mt-4">{created}</Notice>}
         </Card>
       )}
-      {!projects.length && !error && <p role="status" className="text-sm text-muted">Loading your default project…</p>}
+      {!loaded && !error && <p role="status" className="text-sm text-muted">Loading your default project…</p>}
       {project && <ProjectConfiguration key={project.id} project={project} call={call} hosted={hosted} />}
     </div>
   );

@@ -105,7 +105,7 @@ def test_event_never_holds_keys_headers_or_the_raw_session_id() -> None:
         second = client.post(
             "/v1/chat/completions",
             json={"model": "m", "messages": conversation_turn_one()},
-            headers={"X-PII-Guard-Session": session},
+            headers={"X-PII-Guard-Session": session, "Authorization": f"Bearer {CLIENT_KEY}"},
         )
         assert second.status_code == 200
         first, follow = events(client)

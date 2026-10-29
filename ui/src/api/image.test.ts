@@ -1,3 +1,4 @@
+import { IMAGE_SAMPLES } from "../content/imageSamples";
 import { describe, expect, it, vi } from "vitest";
 import { createRoutingClient, type EngineState } from "./engine";
 import { ApiError, createHttpClient, UnreachableError } from "./http";
@@ -62,7 +63,9 @@ describe("demo image engine", () => {
   });
 
   it("has a recording for every sample, with values-free regions", () => {
-    for (const rec of Object.values(IMAGE_RECORDINGS.samples)) {
+    for (const sample of IMAGE_SAMPLES) {
+      const rec = IMAGE_RECORDINGS.samples[sample.id]!;
+      expect(rec).toBeDefined();
       for (const r of rec.regions) {
         expect(Object.keys(r).sort()).toEqual(["box", "detector", "entity_type", "policy", "score", "source"]);
         expect(r.box[2]).toBeLessThan(rec.width);

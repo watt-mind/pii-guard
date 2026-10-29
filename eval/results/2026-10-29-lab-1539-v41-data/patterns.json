@@ -1,0 +1,76 @@
+{
+  "ticket": "LAB-1539",
+  "model": "watt-mind/pii-guard-ner-xlmr-base v2.0 (95f612a9), fast mode (rules + NER)",
+  "pools": {
+    "agent-traffic-dev": 300,
+    "eu-dev": 406,
+    "openpii-dev": 2350
+  },
+  "groups": {
+    "variant-dates-not-birth": {
+      "mined_misses": 1039,
+      "patterns": {
+        "overmask:date_of_birth:digits-short": 616,
+        "overmask:date_of_birth:other": 388,
+        "overmask:id_document:other": 35
+      },
+      "variants_written": 120
+    },
+    "negative-capitalized-words": {
+      "mined_misses": 61,
+      "patterns": {
+        "overmask:person:single-capitalized-word": 45,
+        "overmask:person:sentence-initial-word": 6,
+        "overmask:address:multi-word": 4,
+        "overmask:address:all-caps-word": 3,
+        "overmask:address:single-capitalized-word": 3
+      },
+      "variants_written": 75
+    },
+    "variant-reference-numbers": {
+      "mined_misses": 52,
+      "patterns": {
+        "overmask:address:lowercase-word": 21,
+        "overmask:address:with-digits": 9,
+        "overmask:id_document:digits-short": 6,
+        "leak:id_document:digits-short": 6,
+        "overmask:bank_account:digits-short": 5,
+        "leak:id_document:alnum": 3,
+        "leak:id_document:digits-long": 2
+      },
+      "variants_written": 68
+    },
+    "variant-person-like-company": {
+      "mined_misses": 13,
+      "patterns": {
+        "overmask:person:multi-word": 13
+      },
+      "variants_written": 56
+    },
+    "variant-standalone-declined": {
+      "mined_misses": 12,
+      "patterns": {
+        "leak:person:single-token-case-rich": 8,
+        "leak:person:single-token": 4
+      },
+      "variants_written": 120
+    },
+    "variant-honorific": {
+      "mined_misses": 9,
+      "patterns": {
+        "overmask:person:honorific": 9
+      },
+      "variants_written": 83
+    }
+  },
+  "not_targeted": {
+    "overmask:secret:other": 33,
+    "leak:address:one-line": 31,
+    "overmask:email:other": 7,
+    "leak:phone:digits-short": 2,
+    "leak:bank_account:digits-long": 2,
+    "overmask:phone:other": 1,
+    "overmask:address:sentence-initial-word": 1,
+    "overmask:phone:digits-short": 1
+  }
+}

@@ -35,3 +35,11 @@ describe("hosted read-only policy view", () => {
     expect(await screen.findByText("On-device (fast)")).toBeInTheDocument();
   });
 });
+
+it("treats an empty project list as setup, not a connection failure", async () => {
+  const empty = vi.fn(async () => ({ projects: [], default_project_id: null })) as unknown as Requester;
+  render(<OwnerPolicy call={empty} />);
+  expect(await screen.findByRole("link", { name: "Create a project" })).toHaveAttribute("href", "#projects");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(empty).toHaveBeenCalledTimes(1);
+});

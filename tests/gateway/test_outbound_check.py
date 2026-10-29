@@ -393,7 +393,7 @@ def test_traffic_event_and_log_carry_the_result(
     assert passed["outcome"] == "ok"
     check = passed["outbound_check"]
     assert check["result"] == "passed" and check["hits"] == {} and check["short"] == 0
-    assert check["texts"] == 1 and check["ms"] >= 0
+    assert check["texts"] == 2 and check["ms"] >= 0  # the message and ``model`` (LAB-1563)
     assert blocked["outcome"] == "blocked"
     assert blocked["error"] == {
         "code": "outbound_check_failed",
@@ -423,3 +423,73 @@ def test_a_session_created_by_a_blocked_request_is_dropped(
         )
         assert_blocked(response, upstream)
         assert len(client.app.state.gateway.vault) == 0
+
+
+# --- beyond the walker's slots: the serialized-body scan (LAB-1563) --------------------------
+
+
+def _blind_spot_body() -> dict[str, Any]:
+    """A session value in a provider-signed blob: forwarded opaque, never a walker slot."""
+    return {
+        "model": "m",
+        "messages": [
+            {"role": "user", "content": "hello"},
+            {
+                "role": "assistant",
+                "content": "x",
+                "reasoning_details": [{"type": "reasoning.encrypted", "signature": PERSON}],
+            },
+        ],
+    }
+
+
+def test_serialized_scan_sees_what_the_walker_does_not() -> None:
+    from pii_guard.gateway.outbound import check_outbound
+    from pii_guard.gateway.request import collect_texts
+
+    session = Vault(bytes.fromhex(TEST_TENANT_KEY)).session()
+    text = f"Szia, {PERSON} vagyok."
+    session.mask(text, [Span(6, 16, EntityType.PERSON, PERSON, 0.9, "llm")])
+    body = _blind_spot_body()
+    slots = collect_texts(json.loads(json.dumps(body))).slots
+    assert check_slots(slots, session, "hu").result == "passed"  # the walker is blind here
+    check = check_outbound(body, collect_texts, session, "hu")
+    assert check.result == "blocked" and check.hits == {"PERSON": 1}
+
+
+def test_a_value_in_an_opaque_blob_blocks_the_request_end_to_end() -> None:
+    upstream = MockUpstream()
+    body = _blind_spot_body()
+    body["messages"][0]["content"] = f"Szia, {PERSON} vagyok."  # the session learns it here
+    with TestClient(make_app(upstream)) as client:
+        response = client.post("/v1/chat/completions", json=body)
+    assert_blocked(response, upstream, PERSON=1)
+
+
+def test_serialized_scan_exempts_an_issued_id_enclosing_a_value() -> None:
+    from pii_guard.gateway.outbound import check_outbound
+    from pii_guard.gateway.request import collect_texts
+
+    digits = "123456788"
+    issued = frozenset({f"call-{digits}"})
+    session = Vault(bytes.fromhex(TEST_TENANT_KEY)).session()
+    session.mask(digits, [Span(0, 9, EntityType.BANK_ACCOUNT, digits, 1.0, "rules")])
+    body = {
+        "model": "m",
+        "messages": [
+            {"role": "user", "content": "hello"},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": f"call-{digits}",
+                        "type": "function",
+                        "function": {"name": "send", "arguments": "{}"},
+                    }
+                ],
+            },
+        ],
+    }
+    assert check_outbound(body, collect_texts, session, "hu", issued=issued).result == "passed"
+    assert check_outbound(body, collect_texts, session, "hu").result == "blocked"
