@@ -302,8 +302,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <Card title="One line in your client" headingLevel={3} subtitle="Tested with Codex, OpenCode, Muse Code, pi and the OpenAI SDK.">
             <pre tabIndex={0} aria-label="Python client example" className="overflow-x-auto rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-ui text-ink"><code>{"from openai import OpenAI\n\nclient = OpenAI(\n    base_url=\"https://<your-pii-guard>/v1\",\n    api_key=\"…\",\n)"}</code></pre>
-            <dl className="mt-4"><Metric label={LATENCY.label} value={LATENCY.value} hint={LATENCY.hint} /></dl>
-            <p className="mt-3 text-xs text-muted"><a className={link} href={`${DOCS}/integrations/README.md`}>Integration guides ↗</a></p>
+            <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/integrations/README.md`}>Integration guides ↗</a></p>
           </Card>
           <Card title="Made for agents" headingLevel={3}>
             <ul className="space-y-3">
@@ -312,6 +311,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
               <Point title="Images.">Faces are blocked; each printed detail gets the same placeholder as in the text.</Point>
               <Point title="Fails closed.">If anything can’t be masked, the request isn’t sent.</Point>
             </ul>
+            <dl className="mt-5 border-t border-line pt-4"><Metric label={LATENCY.label} value={LATENCY.value} hint={LATENCY.hint} /></dl>
           </Card>
         </div>
       </section>
@@ -397,7 +397,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <div className="flex flex-wrap items-center gap-3">
           {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <><ButtonLink variant="primary" href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
         </div>
-        <Card as="div" aria-label="Your runs and the server limits">
+        <Card as="div" aria-label="Your runs and the server limits" className="max-w-3xl">
           <div className="space-y-4">
             {accountError ? <Notice tone="danger" live action={<Button size="sm" onClick={() => void refresh()}>Reconnect to API</Button>}>{accountError}</Notice> : !account ? <p className="text-muted">Checking live availability…</p> : <>
               {(!sponsoredOff || signedIn) && <dl className="grid max-w-md grid-cols-2 gap-4">
