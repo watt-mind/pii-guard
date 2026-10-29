@@ -72,7 +72,7 @@ describe("Benchmarks screen", () => {
     const { panel } = await openBenchmarks();
     expect(await screen.findByText(/Benchmarks are bundled with this page/)).toBeInTheDocument();
     await within(panel).findByRole("region", { name: "Results" });
-    expect(within(panel).getByText(String(INDEX.runs.length))).toBeInTheDocument();
+    expect(within(panel).getByText(new RegExp(`^${INDEX.runs.length} runs · `))).toBeInTheDocument();
   });
 
   it("opens on the headline set with the featured systems, safest first", async () => {
@@ -148,6 +148,8 @@ describe("Benchmarks screen", () => {
     expect(within(within(panel).getByRole("region", { name: "Recall per entity type" })).getByRole("table")).toBeInTheDocument();
     expect(within(panel).getByRole("region", { name: "Image masking" })).toBeInTheDocument();
     await user.click(within(panel).getByText(/Run log/));
+    // The latest runs first; the rest on request (LAB-1531).
+    await user.click(within(panel).getByRole("button", { name: `Show all ${INDEX.runs.length} runs` }));
     expect(within(panel).getAllByRole("listitem").length).toBeGreaterThanOrEqual(INDEX.runs.length);
   });
 
@@ -217,5 +219,34 @@ describe("Benchmarks screen, round E1 (LAB-1493)", () => {
     if (!mixed) return;
     const group = within(panel).getByRole("group", { name: "Mixed origin" });
     expect(within(group).getByRole("option", { name: new RegExp(`^${mixed[0]} ·`) })).toBeInTheDocument();
+  });
+});
+
+describe("Benchmarks screen, round E2 (LAB-1531)", () => {
+  it("compares fast mode with the best open-source tool on every set both ran on, and a row picks its set", async () => {
+    const { user, panel } = await openBenchmarks();
+    const section = await within(panel).findByRole("region", { name: "Every test set, at a glance" });
+    const fastSets = new Set(INDEX.snapshots.filter((s) => s.system === FAST_MODE_SYSTEM).map((s) => s.fixture_set));
+    const toolSets = new Set(INDEX.snapshots.filter((s) => INDEX.systems[s.system]?.family === "comparison").map((s) => s.fixture_set));
+    const expected = Object.keys(INDEX.fixture_sets).filter((k) => fastSets.has(k) && toolSets.has(k) && INDEX.fixture_sets[k]!.origin !== "generated");
+    const table = within(section).getByRole("table");
+    const names = within(table).getAllByRole("rowheader").map((h) => within(h).getByRole("button").textContent);
+    expect(names.sort()).toEqual([...expected].sort());
+    // Numbers come from the index: fast mode's pooled leak on a public set.
+    const other = expected.find((k) => k !== INDEX.headline_set)!;
+    const row = within(table).getAllByRole("row").find((r) => within(r).queryByRole("button", { name: other }))!;
+    expect(row).toHaveTextContent(pct(snap(other, FAST_MODE_SYSTEM).all.leak));
+    await user.click(within(row).getByRole("button", { name: other }));
+    expect(within(panel).getByRole("combobox", { name: "Fixture set" })).toHaveValue(other);
+  });
+
+  it("names the production system briefly and marks it in the chart", async () => {
+    const { panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    expect(rowNames(resultsTable(panel))).toContain("rules + NER v2.0");
+    const chart = within(panel).getByRole("region", { name: "Leak rate vs latency" });
+    const legend = within(chart).getAllByRole("listitem").find((li) => /^rules \+ NER v2\.0/.test(li.textContent ?? ""));
+    expect(legend).toHaveTextContent(/fast mode/);
+    expect(within(chart).getByText(/p50 to p95/)).toBeInTheDocument();
   });
 });

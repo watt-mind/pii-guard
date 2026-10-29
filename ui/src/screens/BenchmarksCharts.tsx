@@ -93,7 +93,7 @@ export interface ScatterPoint {
   note?: string | null;
 }
 
-export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
+export function LeakLatencyChart({ points, highlight }: { points: ScatterPoint[]; /** The production system: labeled first, drawn larger with a halo. */ highlight?: string }) {
   const [ref, width] = useWidth();
   const pts = points.filter((p) => p.metrics.detect_p50_ms);
   if (!pts.length) return <ChartEmpty>No latency was recorded for these runs.</ChartEmpty>;
@@ -110,6 +110,8 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
     (_, i, all) => all.length <= 6 || i % 2 === 0,
   );
   const decades = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+  // The axis names a p95 range only when one is drawn: the landing's points carry p50 alone (LAB-1504).
+  const ranges = pts.some((p) => (p.metrics.detect_p95_ms ?? 0) > p.metrics.detect_p50_ms!);
   const showEvery = width < 420 && decades.length > 4 ? 2 : 1;
 
   // Greedy label placement: above, below, right, left; skip a label that can't fit (the
@@ -118,13 +120,14 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
     const x = sx(p.metrics.detect_p50_ms!);
     const x95 = sx(p.metrics.detect_p95_ms ?? p.metrics.detect_p50_ms!);
     const y = sy(p.metrics.leak ?? 0);
-    return { x0: x - 8, y0: y - 8, x1: Math.max(x, x95) + 8, y1: y + 8 };
+    const r = p.key === highlight ? 14 : 8;
+    return { x0: x - r, y0: y - r, x1: Math.max(x, x95) + 8, y1: y + r };
   });
   // Labels may run into the y-axis gutter on a narrow chart, but not over its tick labels.
   for (const t of yTicks) taken.push({ x0: 0, y0: sy(t) - 9, x1: m.l - 4, y1: sy(t) + 7 });
   // Best (lowest leak) first, so it wins its label spot; drawn last, so it sits on top.
   // Ties (several systems at 0.0 %) go to the featured / default systems, then the faster one.
-  const rank = (p: ScatterPoint) => (p.info?.default ? 0 : p.info?.featured ? 1 : 2);
+  const rank = (p: ScatterPoint) => (p.key === highlight ? -1 : p.info?.default ? 0 : p.info?.featured ? 1 : 2);
   const byLeak = [...pts].sort(
     (a, b) =>
       (a.metrics.leak ?? 1) - (b.metrics.leak ?? 1) ||
@@ -135,21 +138,23 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
   const dense = pts.length > 7;
   const labels = byLeak.map((p) => {
     if (dense && !p.info?.featured && !p.info?.default) return null;
-    const text = `${p.info?.short_label ?? p.key}${p.note ? ` (${p.note})` : ""} ${formatPct(p.metrics.leak)}`;
+    const text = `${p.key === highlight ? "fast mode: " : ""}${p.info?.short_label ?? p.key}${p.note ? ` (${p.note})` : ""} ${formatPct(p.metrics.leak)}`;
     const x = sx(p.metrics.detect_p50_ms!);
     const y = sy(p.metrics.leak ?? 0);
-    // Nearest spots first; then the same spots nudged sideways, before moving further up.
+    // Nearest spots first; then the same spots nudged sideways, before moving further up. The
+    // highlighted point's halo is wider, so its first spots sit further out.
+    const g = p.key === highlight ? 6 : 0;
     const tries: [number, number, "start" | "end"][] = [
-      [x - 4, y - 12, "start"],
-      [x - 4, y + 22, "start"],
-      [x + 4, y - 12, "end"],
-      [x + 4, y + 22, "end"],
-      [x + 12, y + 4, "start"],
-      [x - 12, y + 4, "end"],
-      [x + 16, y - 12, "start"],
-      [x - 16, y - 12, "end"],
-      [x + 16, y + 22, "start"],
-      [x - 16, y + 22, "end"],
+      [x - 4, y - 12 - g, "start"],
+      [x - 4, y + 22 + g, "start"],
+      [x + 4, y - 12 - g, "end"],
+      [x + 4, y + 22 + g, "end"],
+      [x + 12 + g, y + 4, "start"],
+      [x - 12 - g, y + 4, "end"],
+      [x + 16, y - 12 - g, "start"],
+      [x - 16, y - 12 - g, "end"],
+      [x + 16, y + 22 + g, "start"],
+      [x - 16, y + 22 + g, "end"],
       [x - 4, y - 30, "end"],
       [x + 4, y - 30, "start"],
       [x - 4, y - 46, "end"],
@@ -177,9 +182,9 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
     // Crowded: the value alone, beside the marker (the legend below names every point).
     const value = formatPct(p.metrics.leak);
     for (const [lx, ly, anchor] of [
-      [x - 12, y + 4, "end"],
-      [x + 12, y + 4, "start"],
-      [x, y - 12, "start"],
+      [x - 12 - g, y + 4, "end"],
+      [x + 12 + g, y + 4, "start"],
+      [x, y - 12 - g, "start"],
     ] as const) {
       if (place(value, lx, ly, anchor)) return { text: value, x: lx, y: ly, anchor, px: x, py: y };
     }
@@ -187,7 +192,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
   });
 
   return (
-    <div ref={ref} className="w-full">
+    <div ref={ref} className="@container w-full">
       <svg
         width={width}
         height={height}
@@ -217,7 +222,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
         ))}
         <line x1={m.l} x2={width - m.r} y1={height - m.b} y2={height - m.b} stroke="var(--line-strong)" />
         <text x={(m.l + width - m.r) / 2} y={height - 4} textAnchor="middle" fontSize={FONT} fill="var(--muted)">
-          detection latency per document, p50 to p95 (log scale)
+          {ranges ? "detection latency per document, p50 to p95 (log scale)" : "detection latency per document, median (log scale)"}
         </text>
         {[...byLeak].reverse().map((p) => {
           const x = sx(p.metrics.detect_p50_ms!);
@@ -232,7 +237,8 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
                   <line x1={sx(p95)} x2={sx(p95)} y1={y - 5} y2={y + 5} />
                 </g>
               )}
-              <Marker info={p.info} x={x} y={y} r={7} />
+              {p.key === highlight && <circle cx={x} cy={y} r={13} fill={colorOf(p.info)} fillOpacity={0.18} stroke={colorOf(p.info)} strokeOpacity={0.6} strokeWidth={1.5} />}
+              <Marker info={p.info} x={x} y={y} r={p.key === highlight ? 8 : 7} />
             </g>
           );
         })}
@@ -241,7 +247,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
             l && (
               <g key={byLeak[i]!.key}>
                 {Math.hypot(l.x - l.px, l.y - l.py) > LEADER_MIN && <line x1={l.px} y1={l.py - 8} x2={l.x} y2={l.y + 3} stroke="var(--muted)" strokeWidth={1} />}
-                <text x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={500} fill="var(--ink)">
+                <text x={l.x} y={l.y} textAnchor={l.anchor} fontSize={FONT} fontWeight={byLeak[i]!.key === highlight ? 600 : 500} fill="var(--ink)">
                   {l.text}
                 </text>
               </g>
@@ -249,14 +255,17 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
         )}
       </svg>
       {dense && <p className="mt-2 text-xs text-muted">Many systems: only the featured ones are labeled in the chart. Hover a marker, or see the list below.</p>}
-      <ul className="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
+      {/* Columns follow the chart's own width, not the window's: in the landing's narrow card three
+          columns squeezed "LLM Guard" onto two lines (LAB-1504). */}
+      <ul className="mt-3 grid gap-x-6 gap-y-1 text-xs @lg:grid-cols-2 @4xl:grid-cols-3">
         {pts.map((p) => (
           <li key={p.key} className="flex items-start gap-1.5">
             <span className="mt-0.5">
               <MarkerIcon info={p.info} />
             </span>
-            <span className="min-w-0 flex-1 break-words text-ink">
+            <span className={["min-w-0 flex-1 break-words text-ink", p.key === highlight ? "font-medium" : ""].join(" ")}>
               {p.info?.short_label ?? p.key}
+              {p.key === highlight && <span className="ml-1 font-mono text-2xs text-guard-ink">fast mode</span>}
               {p.note && <span className="ml-1 font-mono text-2xs text-warn">{p.note}</span>}
             </span>
             <span className="shrink-0 tabular-nums text-muted">
