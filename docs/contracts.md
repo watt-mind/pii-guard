@@ -1100,29 +1100,47 @@ placeholder as written; other escape depths (`\\[\\[` in freeform input, an esca
 backslash) are left; an unknown or other session's placeholder stays as written and is counted as
 unresolved; the restored value is charged to the response's restore budget.
 
-**Shell quoting in command arguments** (both APIs, whole and streamed; LAB-1483). A restored value
-is byte-exact, except in one context the gateway reads for sure: the string value of a top-level
+**Shell quoting in command arguments** (both APIs, whole and streamed; LAB-1483, LAB-1564). A restored
+value is byte-exact, except in one context the gateway reads for sure: the string value of a top-level
 `command` or `cmd` key in JSON `arguments` (or the script after `-c`/`-lc` in a `command` array),
 read by a small shell lexer. There a value restored inside a single-quoted string gets `'` written
 as `'\''`; inside the single-quoted script word of a `sed` command, in an `s` replacement, `\`, `&`,
 the delimiter and a newline also get a backslash (an escaped placeholder in an `s` pattern also gets a
-delimiter backslashed that the regex literal leaves as is). Then it is JSON-escaped as usual. So
-`echo '[[PERSON_x]]'` with `O'Brien Teszt` and `sed 's/x/[[ADDRESS_x]]/'` with `Fő utca 1/A` run
-as meant. **Limitation:** everywhere else the value stays byte-exact, so a `$`, backtick, `"` or `\`
-in a double-quoted string, an unquoted value, a heredoc, `$'...'`, a comment, a nested or argv-array
-command, another `sed` command or a bracket expression, and custom tool `input` (it may be a patch,
-not a command) are not escaped. Other keys, message text and file content are never touched.
+delimiter backslashed that the regex literal leaves as is); inside a double-quoted string, `$`,
+backtick, `"` and `\` get a backslash (a newline is already literal there); unquoted, every shell
+metacharacter and whitespace gets a backslash (a newline goes in as a single-quoted segment). So a
+restored value can never act as shell syntax — no command or parameter substitution, word splitting
+or extra commands. Then it is JSON-escaped as usual. So `echo '[[PERSON_x]]'` with `O'Brien Teszt`
+and `sed 's/x/[[ADDRESS_x]]/'` with `Fő utca 1/A` run as meant. Custom tool `input` gets the same
+escaping **inside quotes only**: freeform input may be a patch or program text, so an unquoted
+placeholder there stays byte-exact, while one inside single or double quotes (or a single-quoted
+`sed` script) is escaped for that quoting. **Limitation:** everywhere else the value stays byte-exact:
+a heredoc, `$'...'`, a comment, command substitution inside double quotes, a nested or argv-array
+command, another `sed` command or a bracket expression are not modelled by the lexer. Other keys,
+message text and file content are never touched.
+
+**Encoded placeholder brackets in tool input** (both APIs, whole and streamed; LAB-1564). In
+`arguments` and custom tool `input` a placeholder whose brackets are `\uXXXX`-escaped
+(`\u005b\u005bEMAIL_x\u005d\u005d`) or `%XX`-encoded (`%5B%5BEMAIL_x%5D%5D`), with each bracket in
+either form or literal, is also restored to the plain value (through the same shell/JSON escaping
+as a plain placeholder); an unknown one stays as written and counts as unresolved. Message text
+keeps encoded forms as written.
 
 **Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
 stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
 `summary_index`: `response.output_text.delta`, `response.refusal.delta`,
 `response.function_call_arguments.delta` (JSON-escaped), `response.reasoning_summary_text.delta`,
-`response.reasoning_text.delta` and `response.custom_tool_call_input.delta`. A placeholder split
-across deltas is held back until it is complete. When the stream's `.done` event arrives (or the
-stream ends), what is held back goes out as one more delta event just before it, so the joined
-deltas equal the restored `.done` text. Every other event (`response.created`,
-`response.output_item.added`/`.done`, `response.content_part.*`, `response.completed`, ...) is
-restored whole. `sequence_number` is renumbered so it stays strictly increasing. An upstream
+`response.reasoning_text.delta` and `response.custom_tool_call_input.delta`; an unmodelled event
+type ending in `.delta` with a string `delta` gets the same treatment, keyed by its own type and
+indexes (LAB-1564). A placeholder split across deltas is held back until it is complete. When the
+stream's `.done` event arrives (or the stream ends), what is held back goes out as one more delta
+event just before it, so the joined deltas equal the restored `.done` text. Every other event
+(`response.created`, `response.output_item.added`/`.done`, `response.content_part.*`,
+`response.completed`, ...) is restored whole. The shared restore budget is charged once per logical
+text: a whole copy of text already charged as deltas (the `.done`, item-done and
+`response.completed` repetitions) does not charge again, while any new text charges normally
+(LAB-1564). A chat chunk with `error: null` streams normally; only a truthy `error` is fatal.
+`sequence_number` is renumbered so it stays strictly increasing. An upstream
 `error` event becomes `{"type": "error", "code": "upstream_error", ...}`, and
 `response.failed` keeps its status with a generic `error`. `data: [DONE]` is passed on.
 

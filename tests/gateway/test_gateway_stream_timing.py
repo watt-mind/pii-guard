@@ -222,3 +222,29 @@ def test_disconnect_while_waiting_on_the_upstream_is_recorded_and_not_seeded() -
     stream = _Stream(1000, delay=0.2)
     app = _run_disconnect(stream, spec_version="2.3", after=2)
     _assert_disconnected(app, stream)
+
+
+def test_a_chunk_with_error_null_streams_normally() -> None:
+    """``error: null`` is a normal chunk; only a truthy ``error`` is the sanitised fatal
+    upstream error, and it never carries the upstream's message (LAB-1564)."""
+    from pii_guard.gateway.stream import SseRestorer
+    from pii_guard.vault import Vault
+
+    session = Vault(bytes.fromhex(TEST_TENANT_KEY)).session()
+    restorer = SseRestorer(session)
+    chunk = {
+        "id": "c",
+        "object": "chat.completion.chunk",
+        "error": None,
+        "choices": [{"index": 0, "delta": {"content": "tok "}, "finish_reason": None}],
+    }
+    (out,) = restorer.process(json.dumps(chunk))
+    assert json.loads(out)["choices"][0]["delta"]["content"] == "tok "
+
+    (failed,) = restorer.process(json.dumps({"error": {"message": "quota for Teszt Elek"}}))
+    assert json.loads(failed)["error"] == {
+        "code": "upstream_error",
+        "message": "upstream stream error",
+        "type": "upstream_error",
+    }
+    assert "Teszt" not in failed

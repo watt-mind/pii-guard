@@ -679,3 +679,54 @@ def test_a_pii_shaped_model_is_refused_on_responses() -> None:
     assert response.json()["error"]["code"] == "unsupported_content"
     assert email not in response.text
     assert upstream.requests == []
+
+
+def test_unknown_delta_types_hold_back_a_split_placeholder() -> None:
+    """An unmodelled ``*.delta`` event type with a string ``delta`` streams through the same
+    holdback as a known one, so a split placeholder is never emitted in fragments, and its
+    ``.done`` flushes it before the whole text (LAB-1564)."""
+
+    class Session:
+        def restore_budget(self) -> Any:
+            from pii_guard.vault import RestoreBudget
+
+            return RestoreBudget(1000)
+
+        def unmask_with_report(self, text: str, *, budget: Any = None) -> Any:
+            from pii_guard.vault import UnmaskResult
+
+            return UnmaskResult(text.replace("[[EMAIL_abcd12]]", "a@example.com"), ())
+
+    restorer = ResponsesSseRestorer(Session())  # type: ignore[arg-type]
+    kind = "response.future_text"
+    out: list[tuple[str | None, str]] = []
+    for piece in ("to [[EM", "AIL_abcd12]] !"):
+        event = {"type": f"{kind}.delta", "output_index": 1, "delta": piece}
+        out += restorer.process(event["type"], json.dumps(event))
+        assert "[[EM" not in out[-1][1]
+    done = {"type": f"{kind}.done", "output_index": 1, "text": "to [[EMAIL_abcd12]] !"}
+    out += restorer.process(done["type"], json.dumps(done))
+    events = [json.loads(data) for _, data in out]
+    deltas = "".join(e["delta"] for e in events if e["type"].endswith(".delta"))
+    assert deltas == events[-1]["text"] == "to a@example.com !"
+
+
+def test_unknown_delta_without_a_string_delta_is_restored_whole() -> None:
+    """Other unmodelled events keep the existing whole-event restore (LAB-1564)."""
+
+    class Session:
+        def restore_budget(self) -> Any:
+            from pii_guard.vault import RestoreBudget
+
+            return RestoreBudget(1000)
+
+        def unmask_with_report(self, text: str, *, budget: Any = None) -> Any:
+            from pii_guard.vault import UnmaskResult
+
+            return UnmaskResult(text.replace("[[EMAIL_abcd12]]", "a@example.com"), ())
+
+    restorer = ResponsesSseRestorer(Session())  # type: ignore[arg-type]
+    event = {"type": "response.future.delta", "delta": {"text": "to [[EMAIL_abcd12]]"}}
+    [(name, data)] = restorer.process(event["type"], json.dumps(event))
+    assert name == "response.future.delta"
+    assert json.loads(data)["delta"] == {"text": "to a@example.com"}

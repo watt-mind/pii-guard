@@ -26,7 +26,7 @@ You need [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 for you if ne
 ```bash
 git clone https://github.com/watt-mind/pii-guard.git
 cd pii-guard
-make setup                 # uv sync + pre-commit hook (ruff)
+make setup                 # uv sync + git hooks (ruff, commit message)
 cp .env.example .env       # optional; nothing is required to run the tests
 ```
 
@@ -105,13 +105,16 @@ custom merge drivers, so the pull request still shows the conflict.
 
 ## What CI checks
 
-Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Its last job,
-**`ci-ok`**, passes only when every other job passed or was skipped on purpose, so it is the
-one check to require. All jobs run in parallel on GitHub-hosted runners, cost nothing and need
-no secret.
+Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml). **`ci-ok`**
+passes only when every job it needs passed or was skipped on purpose, so it is the one check
+to require. Most jobs run in parallel on GitHub-hosted runners and need no secret. Two
+delivery jobs sit outside `ci-ok`: `hosted-image-push` (develop pushes only, OIDC to the dev
+registry) and `hosted-deployment` (called after `ci-ok`, off unless explicitly enabled).
 
-Pull requests, the merge queue and pushes to `develop` run a **fast** suite so CI answers in
-about two minutes; pushes to `main`, the nightly run and manual runs run **everything**:
+Pull requests, the merge queue and pushes to `develop` run a **fast** suite; pushes to `main`,
+the nightly run and manual runs run **everything**. The fast test step itself recently took
+roughly 1.5-2.5 minutes, while a complete PR that also selects the hosted image took about
+4-5 minutes end to end (measured 2026-10-29; runner load moves this by tens of percent):
 
 | | Pull request, merge queue, `develop` | `main`, nightly, manual |
 |---|---|---|
@@ -151,31 +154,42 @@ Measurement modes do not change `make test` or `make test-all`.
 
 Only packaging jobs are path-filtered, using [`scripts/ci/changes.py`](scripts/ci/changes.py).
 The UI and wheel include benchmark records, dataset counts and colour configuration; Python
-source and package metadata changes select all three packaging jobs. Unknown paths also select
-all three. Removed and renamed inputs are checked, and an unreadable PR diff fails CI. Prose-only
-changes still run Python, report, security and PII checks. Smoke, evaluation and PII jobs install
-only runtime dependencies; the test and type-check jobs keep their development dependencies.
+source and package metadata changes select all five filtered jobs (`ui`, `docker`, `wheel`,
+`hosted`, `hosted-image`). Unknown paths also select all five. `hosted-image` is narrower
+than `hosted`: Azure policy files that cannot reach `Dockerfile.hosted` run only the fast
+`hosted-infra` checks, while anything copied into the image still builds it. Removed and
+renamed inputs are checked, and an unreadable PR diff fails CI. Prose-only changes still run
+Python, report, security and PII checks. Smoke, evaluation and PII jobs install only runtime
+dependencies; the test and type-check jobs keep their development dependencies.
 
 | Job | What fails it | Locally |
 |---|---|---|
+| `changes` | an unreadable PR diff (packaging selection refuses to guess) | `EVENT=pull_request BASE=<sha> python3 scripts/ci/changes.py` |
 | `lint` | ruff lint or format | `make lint` |
 | `types` | a mypy error on `src/` not listed in `scripts/ci/mypy-baseline.txt` | `make types` |
 | `test` | a failing test, or total coverage under the floor (see above) | `make test` or `make test-all` |
 | `smoke` | the demo stack leaking on the mock upstream (`make smoke`), or a stale benchmark report (an invalid run record or journey entry when `RENDER_DOCS_ON_MERGE` is on; [Generated files](#generated-files)) | `make smoke` |
 | `eval-gate` | leak or over-masking rising, or round trip falling, against the newest committed run record on the same fixtures, or past a limit in [`eval/gates.json`](eval/gates.json) | `make gate` |
-| `docker` | the image over its size budget (`IMAGE_BUDGET_MB` in `scripts/ci/docker_smoke.sh`), an unhealthy container, or a masked request that leaks to the mock upstream | `make docker-smoke` |
-| `audit` | a known vulnerability in `uv.lock` (`uv audit`), or a GPL/AGPL runtime dependency | `make audit licences` |
-| `ui` | UI lint, typecheck, tests, build, `pnpm audit --prod` (high or critical), GPL/AGPL production dependency; runs when `ui/` changed | `cd ui && pnpm lint && pnpm typecheck && pnpm test --run` |
-| `workflows` | a [zizmor](https://docs.zizmor.sh/) finding in `.github/workflows/` (unpinned actions, injection, excessive permissions) | `uvx zizmor .github/workflows` |
+| `docker` | the image over its size budget (`IMAGE_BUDGET_MB` in `scripts/ci/docker_smoke.sh`), an unhealthy container, or a masked request that leaks to the mock upstream; a fixable HIGH/CRITICAL vulnerability in the built image | `make docker-smoke` |
+| `hosted-infra` | a Bicep compile error, a shellcheck finding in `deploy/azure/` scripts, or a failing deployment/TLS-proxy regression test | `az bicep build --file deploy/azure/main.bicep` + `python3 -m unittest discover -s deploy/azure -p 'test_*.py'` |
+| `hosted-image` | the hosted image failing to build, or its offline bundled-UI/NER smoke failing; a fixable HIGH/CRITICAL vulnerability in the built image | `docker build -f Dockerfile.hosted .` |
+| `audit` | a known vulnerability in `uv.lock` (`uv audit`), or a GPL/AGPL runtime dependency (the UI halves run in the `ui` job) | `make audit licences` |
+| `ui` | UI lint, typecheck, tests, build, `pnpm audit --prod` (high or critical), GPL/AGPL production dependency; path-filtered like the other packaging jobs | `cd ui && pnpm lint && pnpm typecheck && pnpm test --run && pnpm build` |
+| `wheel` | the bundled-UI wheel over its size budget, missing the UI, or failing the throwaway-install smoke | `make wheel && make wheel-smoke` |
+| `workflows` | a failing CI-helper/hosted-deploy test, an actionlint or shellcheck finding, or a [zizmor](https://docs.zizmor.sh/) finding (unpinned actions, injection, excessive permissions) | `scripts/ci/actionlint.sh && shellcheck scripts/ci/*.sh && uvx zizmor@1.31.1 --min-severity=low .github/workflows` |
 | `gitleaks` | a secret in the commits the change adds ([`.gitleaks.toml`](.gitleaks.toml)) | `make gitleaks` |
 | `links` | a broken relative link in `README.md` or `docs/` ([`lychee.toml`](lychee.toml)) | `make links` |
+| `ci-ok` | any job it needs failing or being cancelled (skipped-on-purpose jobs pass) | — (aggregator only) |
 | `pii-in-diff` | **report-only for now.** pii-guard's own rules find a real-looking value on a line the PR adds: an e-mail outside the reserved example domains, or a validated identifier (tax, TAJ, IBAN, card, ID document, company number) not in `scripts/ci/pii-allowlist.txt` | `make pii-diff` |
 
 Separately, [`codeql.yml`](.github/workflows/codeql.yml) runs CodeQL on Python,
 JavaScript/TypeScript and the workflows (results under Security, code scanning),
 [`links.yml`](.github/workflows/links.yml) checks external links weekly, and
 [`release.yml`](.github/workflows/release.yml) publishes the image to GHCR and the wheel to the
-GitHub release on a `v*` tag.
+GitHub release (and to PyPI when enabled) on a `v*` tag — but only after its `gate` job proves
+the tagged commit passed `ci-ok` as a `main`/`develop` push. `hosted-deploy.yml` has no
+standalone trigger; only `ci.yml` may call it, after `ci-ok`, and only when hosted deployments
+are explicitly enabled. A failing `test` job uploads its JUnit/coverage reports for one day.
 
 When a gate fails:
 
