@@ -15,6 +15,7 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
+import { COMPARISON, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, SETS } from "./proof";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -44,25 +45,6 @@ const EXAMPLES = {
 };
 type Language = keyof typeof EXAMPLES;
 const LANGUAGES = [{ value: "en", label: "English" }, { value: "hu", label: "Hungarian" }] as const;
-
-// The dated proof points, copied from docs/benchmarks.md (fictional data, runs of 27–28 Oct 2026).
-const MEASURED = "Fictional German, English and Hungarian data · measured 27–28 Oct 2026";
-const PROOF = [
-  { value: "0.0 %", label: "Leak, hand-written set (51 docs)" },
-  { value: "94.3 %", label: "F1, same set" },
-  { value: "0.4 %", label: "Leak, CEE-PII public set (451 docs)" },
-] as const;
-const LATENCY = { value: "~34 ms", label: "Gateway overhead per request (p50, CPU)" } as const;
-// Leak and F1 (%), from docs/benchmarks.md: hand-written `smoke` (51 docs; pii-guard 2026-10-28,
-// the others 2026-10-27) and the public test splits CEE-PII (451) and Nemotron-PII (300) (pii-guard
-// 2026-10-28, the others 2026-10-27).
-const COMPARISON = [
-  { system: "pii-guard fast", leak: ["0.0", "0.4", "0.7"], f1: ["94.3", "82.6", "89.4"], ours: true },
-  { system: "PrivAiTe", leak: ["12.7", "4.4", "4.0"], f1: ["55.2", "34.2", "80.8"] },
-  { system: "Presidio", leak: ["24.3", "36.5", "12.8"], f1: ["64.9", "41.4", "66.4"] },
-  { system: "LLM Guard", leak: ["45.1", "75.8", "28.8"], f1: ["53.2", "24.7", "72.9"] },
-];
-const SETS = ["Hand-written de + en + hu (51)", "CEE-PII (451)", "Nemotron-PII (300)"];
 
 const initialLanguage = (): Language => (globalThis.navigator?.language ?? "").toLowerCase().startsWith("hu") ? "hu" : "en";
 const link = "underline underline-offset-4 hover:text-ink";
@@ -187,10 +169,15 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <div className="min-w-0 space-y-6">
           <p className="font-mono text-2xs text-muted">Open source · OpenAI-compatible · Built on Meta models</p>
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
-          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">An OpenAI-compatible privacy gateway for AI agents. Names, emails and IDs become placeholders before the request leaves; the real values come back in the answer.</p>
+          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">An OpenAI-compatible privacy gateway for AI agents. Names, emails and IDs in text, and faces in images, become placeholders before the request leaves; the real values come back in the answer.</p>
+          <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 sm:grid-cols-3">
+            <Differentiator href="#images" title="Images too">Faces, ID photos and printed details are covered before an image is sent.</Differentiator>
+            <Differentiator href="#how" title="No LLM in the masking path">Rules and a small encoder NER run on the gateway itself.</Differentiator>
+            <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
+          </ul>
           <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo">{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
           <div className="space-y-2">
-            <dl className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">{PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} />)}</dl>
+            <dl aria-label="Measured results" className="grid max-w-2xl grid-cols-3 gap-3 sm:gap-4">{PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
             <p className="text-xs text-muted">{MEASURED} · <a className={link} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
           </div>
           <p className="max-w-2xl text-sm text-muted">Answers by Meta’s <span className="font-medium text-ink">{modelOr("model")}</span>. Detection by our <a className={link} href={NER_MODEL}>open NER on Hugging Face ↗</a>, fine-tuned from Meta’s <span className="font-medium text-ink">XLM-RoBERTa</span>.</p>
@@ -423,6 +410,11 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 /** A landing section's heading: the console's 24/500 section title and a muted lead. */
 function SectionHead({ id, title, lead }: { id: string; title: string; lead?: string }) {
   return <div className="max-w-3xl"><h2 id={id} className="text-2xl font-medium text-balance text-ink">{title}</h2>{lead && <p className="mt-2 text-sm text-pretty text-muted sm:text-base">{lead}</p>}</div>;
+}
+
+/** One of the hero's three differences: a short lead that links to the section that shows it. */
+function Differentiator({ href, title, children }: { href: string; title: string; children: ReactNode }) {
+  return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink hover:underline">{title}</a><span className="mt-0.5 block">{children}</span></li>;
 }
 
 /** One list item with its lead in ink. */
