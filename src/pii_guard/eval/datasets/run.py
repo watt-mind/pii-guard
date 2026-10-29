@@ -241,9 +241,7 @@ def run_dataset(
             import re as _re
 
             if not _re.match(r"^[a-z0-9][a-z0-9.-]*$", tag):
-                raise ValueError(
-                    f"--tag {tag!r} must be lower-case letters, digits, '.' and '-'"
-                )
+                raise ValueError(f"--tag {tag!r} must be lower-case letters, digits, '.' and '-'")
             slug_system = f"{slug_system}-{tag}"
         if system in PII_GUARD_SYSTEMS:
             results, info = _run_pii_guard(system, documents)

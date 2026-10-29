@@ -666,9 +666,7 @@ def build_index(
                 "origin": {f["origin"] for f in rec["fixtures"]},
                 "languages": {f["language"] for f in rec["fixtures"] if f["language"]},
                 "documents": {},
-                "generators": {
-                    f["generator"] for f in rec["fixtures"] if f["generator"]
-                },
+                "generators": {f["generator"] for f in rec["fixtures"] if f["generator"]},
                 "kind": rec["kind"],
             },
         )
