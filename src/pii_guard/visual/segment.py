@@ -235,8 +235,7 @@ class LocalSegmenter:
         path = Path(model_path) if model_path else model_dir() / YUNET.filename
         if not path.is_file():
             raise DetectionError(
-                f"local segmenter model {path.name} is missing "
-                "(uv run python -m pii_guard.visual.segment fetch)"
+                f"local segmenter model {path.name} is missing (pii-guard models fetch yunet)"
             )
         if verify and _sha256(path) != YUNET.sha256:
             raise DetectionError(f"local segmenter model {path.name}: SHA-256 mismatch")

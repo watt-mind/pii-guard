@@ -103,6 +103,10 @@ def build_parser() -> argparse.ArgumentParser:
         "download",
         help="fetch, verify and unpack the pinned huSpaCy model once (needs --extra baselines)",
     )
+    models = sub.add_parser("models", help="fetch the pinned on-device models (YuNet faces)")
+    models_sub = models.add_subparsers(dest="models_command", metavar="<command>")
+    fetch = models_sub.add_parser("fetch", help="download a pinned model (SHA-256 checked)")
+    fetch.add_argument("model", nargs="?", default="yunet", choices=["yunet"])
     return parser
 
 
@@ -214,6 +218,24 @@ def _connect(args: argparse.Namespace) -> int:
     return connect_main(args.args)
 
 
+def _models(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    if args.models_command != "fetch":
+        parser.parse_args(["models", "--help"])
+        return 2  # pragma: no cover - --help exits
+    from pii_guard.visual.segment import YUNET, fetch_model
+
+    if args.model != "yunet":
+        print(f"pii-guard models fetch: unknown model {args.model!r}", file=sys.stderr)
+        return 2
+    try:
+        path = fetch_model()
+    except Exception as exc:  # network or SHA-256 mismatch: message carries no image content
+        print(f"pii-guard models fetch yunet: {type(exc).__name__}", file=sys.stderr)
+        return 1
+    print(f"{path} ({YUNET.licence}, SHA-256 verified)")
+    return 0
+
+
 def _baselines(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     if args.baselines_command != "download":
         parser.parse_args(["baselines", "--help"])
@@ -249,6 +271,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _up(args)
     if args.command == "baselines":
         return _baselines(args, parser)
+    if args.command == "models":
+        return _models(args, parser)
     parser.print_help()
     return 0
 
