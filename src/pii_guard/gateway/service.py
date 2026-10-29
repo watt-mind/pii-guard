@@ -925,11 +925,13 @@ class Gateway:
         max_text_chars: int | None = None,
         received_at: float | None = None,
         path_session: str | None = None,
+        request_id: str | None = None,
     ) -> tuple[Response, RequestStats]:
         """Mask, forward, restore. ``received_at`` (``perf_counter``) starts the timer;
-        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL."""
+        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL. ``request_id``
+        is the id the route assigned up front (LAB-1179); generated here when absent."""
         timer = RequestTimer(received_at)
-        trace = CallTrace(self.observability, timer, body)
+        trace = CallTrace(self.observability, timer, body, request_id=request_id)
         try:
             response, stats = await self._with_session_lease(
                 self._chat_completions(

@@ -49,10 +49,13 @@ class CallTrace:
         observability: Observability | None,
         timer: RequestTimer,
         body: object,
+        request_id: str | None = None,
     ) -> None:
         self.observability = observability
         self.timer = timer
-        self.request_id = new_request_id()
+        # The route may assign the id up front (LAB-1179) so the error handler can stamp
+        # even refused calls with the id of the traffic event recorded for them.
+        self.request_id = request_id or new_request_id()
         self.recording = observability is not None and observability.recording
         self.payloads = observability is not None and observability.traffic.enabled
         self.full = observability is not None and observability.traffic.full

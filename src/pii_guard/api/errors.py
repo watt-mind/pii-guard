@@ -220,8 +220,14 @@ def error_headers(exc: PiiGuardError) -> Mapping[str, str] | None:
     return headers if isinstance(headers, Mapping) else None
 
 
-async def _pii_guard_error(_: Request, exc: PiiGuardError) -> JSONResponse:
-    return error_response(exc.status_code, exc.code, exc.message, error_headers(exc))
+async def _pii_guard_error(request: Request, exc: PiiGuardError) -> JSONResponse:
+    # A gateway route stamps the traffic event id it assigned up front (LAB-1179), so a
+    # refused call joins its `refused`/`blocked` traffic event; other routes set no id.
+    headers = dict(error_headers(exc) or {})
+    request_id = getattr(request.state, "pii_guard_request_id", None)
+    if request_id:
+        headers.setdefault("X-PII-Guard-Request-Id", request_id)
+    return error_response(exc.status_code, exc.code, exc.message, headers or None)
 
 
 async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
