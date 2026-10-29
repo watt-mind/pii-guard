@@ -76,7 +76,7 @@ describe("Live traffic", () => {
     const list = await screen.findByTestId("call-list");
     expect(within(list).getAllByText(/needs NER/)).toHaveLength(2); // the tag and the row summary
     expect(within(list).getByText("1 name reached the model: expected, needs NER")).toBeInTheDocument();
-    expect(within(list).getByTitle(/labelled “needs fast mode \(NER\)”: in rules-only mode its name is an expected miss/)).toBeInTheDocument();
+    expect(within(list).getByTitle(/labeled “needs fast mode \(NER\)”: in rules-only mode its name is an expected miss/)).toBeInTheDocument();
     const note = within(screen.getByRole("region", { name: /Call at/ })).getByRole("note");
     expect(note).toHaveTextContent("Demo scenario hu-needs-ner: needs fast mode (NER). Expected miss in rules-only mode.");
     expect(note).toHaveTextContent("Gipsz Jakab");

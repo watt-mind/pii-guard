@@ -265,7 +265,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <Announcer message={announce} />
         <div data-flow className={["space-y-4 transition-opacity", running ? "opacity-55" : ""].join(" ")}>
           <div className="flex flex-col lg:flex-row lg:items-stretch">
-            <Pane headingLevel={3} id="demo-input" side="you" eyebrow="Stays with PII Guard" title="Your text" className="lg:flex-1" footer={result ? "A real guard and model produced this. Check the masked request: detection can miss values, and this is pseudonymisation, not anonymisation." : shown ? `Recorded ${RECORDED_ON} on this hosted preview: the real gateway masked the server’s fictional sample and ${model ? modelName(shown.model) : "Meta’s model"} answered. A live run sends the same sample again.` : "Runs through the real gateway and model when you press Run your text."}>
+            <Pane headingLevel={3} id="demo-input" side="you" eyebrow="Stays with PII Guard" title="Your text" className="lg:flex-1" footer={result ? "A real guard and model produced this. Check the masked request: detection can miss values, and this is pseudonymization, not anonymization." : shown ? `Recorded ${RECORDED_ON} on this hosted preview: the real gateway masked the server’s fictional sample and ${model ? modelName(shown.model) : "Meta’s model"} answered. A live run sends the same sample again.` : "Runs through the real gateway and model when you press Run your text."}>
               {shown ? <YourText text={shown.original} masked={shown.masked} entities={shown.entities.length ? shown.entities : undefined} /> : <Field label="Your text" hint="PII Guard receives this text in full on Azure in Sweden Central. Use fictional data while you evaluate."><Textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field>}
             </Pane>
             <Boundary direction="outbound" label="PII Guard boundary: only this crosses to the model">
@@ -292,7 +292,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <SectionHead id="meta-heading" eyebrow="Built on Meta models" title="Open weights wherever real data goes. Hosted models see placeholders." lead="Anything that sees real personal data is an open-weight model you can run yourself." />
         <ul aria-label="Meta models and what each does" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
           <MetaModel name="XLM-RoBERTa" where="Inside PII Guard, CPU" role={<>The base of our NER, fine-tuned for personal data. Runs on every request. <a className={link} href={NER_MODEL}>Published ↗</a></>} />
-          <MetaModel name="Muse Glimmer 30B" where="Open weights, served on Modal" role="The teacher: it labelled 4,964 fictional documents, and our NER was distilled from its labels." />
+          <MetaModel name="Muse Glimmer 30B" where="Open weights, served on Modal" role="The teacher: it labeled 4,964 fictional documents, and our NER was distilled from its labels." />
           <MetaModel name="Muse Spark Open" where="Open weights, on Baseten" role="The opt-in audit detector, and the red team that tries to re-identify masked text." />
           <MetaModel name="SAM 3.1" where="Self-hosted installs" role="Finds signatures on scans, so they’re masked along with faces and ID photos." />
           <MetaModel name={modelOr("Muse Spark")} where="Meta Model API" role="Answers in this demo. It only ever sees placeholders." />
@@ -303,7 +303,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <SectionHead id="for-heading" eyebrow="Who it’s for" title="Built for agents that work on people’s files." />
         <Card as="div">
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-3 md:gap-0 md:divide-x md:divide-line">
-            <Audience title="Legal" task="Summarise the case file and draft the reply to opposing counsel.">Parties, addresses and case-file IDs are masked; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client, and the draft comes back with the name.</Audience>
+            <Audience title="Legal" task="Summarize the case file and draft the reply to opposing counsel.">Parties, addresses and case-file IDs are masked; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client, and the draft comes back with the name.</Audience>
             <Audience title="HR" task="Answer this employee’s leave request from their folder.">Names, ID numbers, addresses and dates of birth are masked on the way out, in tool results as well as in the prompt.</Audience>
             <Audience title="Finance and back office" task="Match these invoices to the account letters and flag the gaps.">IBANs and tax IDs are caught by validated rules with checksums; names and companies by the NER.</Audience>
           </ul>
@@ -336,7 +336,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
             <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
           </Card>
-          <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labelled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better)." className="flex flex-col">
+          <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labeled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better)." className="flex flex-col">
             <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">
               <table className="w-full min-w-[28rem] border-collapse text-sm">
                 <caption className="sr-only">Leak rate and F1 in percent, by dataset, for PII Guard and three comparison tools</caption>
@@ -395,8 +395,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Card title="Detection can miss" headingLevel={3}><p className="text-muted">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</p></Card>
           <Card title="Context can identify" headingLevel={3}><p className="text-muted">Even with names removed, surrounding detail can point to a person.</p></Card>
-          <Card title="It pseudonymises; it doesn’t anonymise" headingLevel={3}><p className="text-muted">The data is still personal data, and PII Guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</p></Card>
-          <Card title="Remote detectors join your trust boundary" headingLevel={3}><p className="text-muted">If you enable one, it sees originals. Don’t submit highly sensitive data, or content you aren’t authorised to process.</p></Card>
+          <Card title="It pseudonymizes; it doesn’t anonymize" headingLevel={3}><p className="text-muted">The data is still personal data, and PII Guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</p></Card>
+          <Card title="Remote detectors join your trust boundary" headingLevel={3}><p className="text-muted">If you enable one, it sees originals. Don’t submit highly sensitive data, or content you aren’t authorized to process.</p></Card>
           <Card title="Weaker on some text" headingLevel={3}>
             <ul className="grid gap-2">
               <Point title="Finance text.">{WEAKER.gretel}&nbsp;% leak on Gretel finance, level with Presidio ({WEAKER.gretelPresidio}&nbsp;%).</Point>
@@ -404,7 +404,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
               <Point title="Other EU languages.">Trained on Hungarian, German and English; on EU legal text in 21 languages it leaks {WEAKER.mapaLeak}&nbsp;%.</Point>
             </ul>
           </Card>
-          <Card title="Printed text on ID scans" headingLevel={3}><p className="text-muted">On {IMAGE_LIMITS.ids} official specimen IDs, {IMAGE_LIMITS.all}&nbsp;% of all labelled regions are covered (Presidio Image Redactor: {IMAGE_LIMITS.presidio}&nbsp;%). Printed text alone: {IMAGE_LIMITS.text}&nbsp;%. Faces and ID photos are the strong part; read the masked transcript before you rely on it.</p></Card>
+          <Card title="Printed text on ID scans" headingLevel={3}><p className="text-muted">On {IMAGE_LIMITS.ids} official specimen IDs, {IMAGE_LIMITS.all}&nbsp;% of all labeled regions are covered (Presidio Image Redactor: {IMAGE_LIMITS.presidio}&nbsp;%). Printed text alone: {IMAGE_LIMITS.text}&nbsp;%. Faces and ID photos are the strong part; read the masked transcript before you rely on it.</p></Card>
         </div>
         <p className="text-xs text-muted"><a className={link} href={`${DOCS}/privacy-model.md`}>Read the privacy model ↗</a></p>
       </section>

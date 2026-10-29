@@ -139,7 +139,7 @@ function Showcase({ card }: { card: ShowcaseCard }) {
         <Pane headingLevel={3} id="image-sent" side="model" eyebrow="Placeholders only" title="What the model gets" className="lg:flex-1" footer={`Recorded ${day} by the real masker with the hosted preview's setup; the covers are drawn in your browser from the recorded boxes.`}>
           <div className="space-y-3">
             <MaskedText text={message.masked} />
-            <Figure card={card} alt={`The same card as the model gets it: the photo and face covered, labelled PHOTO with the holder's placeholder; the ${[...new Set(types)].join(", ")} each covered by a box printed with its placeholder. The expiry date, sex and nationality are not personal data and stay readable.${card.maskedNote ?? ""}`}>
+            <Figure card={card} alt={`The same card as the model gets it: the photo and face covered, labeled PHOTO with the holder's placeholder; the ${[...new Set(types)].join(", ")} each covered by a box printed with its placeholder. The expiry date, sex and nationality are not personal data and stay readable.${card.maskedNote ?? ""}`}>
               <LabelledCovers regions={regions} width={image.width} height={image.height} />
             </Figure>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">

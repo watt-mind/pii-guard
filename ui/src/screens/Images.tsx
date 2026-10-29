@@ -415,7 +415,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
               <h2 id="regions-title" className="text-lg font-normal text-ink">
                 Detected regions
               </h2>
-              <p className="mt-0.5 text-sm text-muted">Blue regions were masked. Dashed grey regions were found but kept visible by policy (company stamps, by default). No region carries the text or pixels it covers.</p>
+              <p className="mt-0.5 text-sm text-muted">Blue regions were masked. Dashed gray regions were found but kept visible by policy (company stamps, by default). No region carries the text or pixels it covers.</p>
             </div>
             <ImageLegend regions={data.regions} activeType={active !== null ? (data.regions[active]?.entity_type ?? null) : null} />
             <KeyValues

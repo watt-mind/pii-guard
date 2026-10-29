@@ -248,7 +248,7 @@ export function LeakLatencyChart({ points }: { points: ScatterPoint[] }) {
             ),
         )}
       </svg>
-      {dense && <p className="mt-2 text-xs text-muted">Many systems: only the featured ones are labelled in the chart. Hover a marker, or see the list below.</p>}
+      {dense && <p className="mt-2 text-xs text-muted">Many systems: only the featured ones are labeled in the chart. Hover a marker, or see the list below.</p>}
       <ul className="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
         {pts.map((p) => (
           <li key={p.key} className="flex items-start gap-1.5">

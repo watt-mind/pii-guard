@@ -286,7 +286,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
         <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">Pick at least one system to compare.</p>
       ) : (
         <>
-          <Section id="bench-table" title="Results" note="Latest run of each system. Leak = labelled values still readable after masking. Underlined: the best value among systems run on every language.">
+          <Section id="bench-table" title="Results" note="Latest run of each system. Leak = labeled values still readable after masking. Underlined: the best value among systems run on every language.">
             <ResultsTable snapshots={snapshots} index={index} lang={lang} />
             <RunNotes key={set} snapshots={snapshots} index={index} open={info?.origin === "generated"} loading={!runsReady} />
           </Section>
@@ -310,14 +310,14 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
               ))}
             </ul>
           </Section>
-          <Section id="bench-types" title="Recall per entity type" note="Share of labelled values of each type found with the right type (overlap), in %. Leak doesn't look at types: a value masked under another type is protected, so it costs recall here but not leak.">
+          <Section id="bench-types" title="Recall per entity type" note="Share of labeled values of each type found with the right type (overlap), in %. Leak doesn't look at types: a value masked under another type is protected, so it costs recall here but not leak.">
             <TypeHeatmap snapshots={snapshots} systems={index.systems} types={index.entity_types} lang={lang} />
           </Section>
         </>
       )}
 
       {index.visual.length > 0 && (
-        <Section id="bench-visual" title="Image masking" note="Share of labelled image regions masked (IoU ≥ 0.5). Official specimen IDs and fictional Muse Image documents are different sets: compare runs within a set.">
+        <Section id="bench-visual" title="Image masking" note="Share of labeled image regions masked (IoU ≥ 0.5). Official specimen IDs and fictional Muse Image documents are different sets: compare runs within a set.">
           <VisualTable index={index} />
         </Section>
       )}
@@ -440,7 +440,7 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
             Best other open NER model with the same rules (switch it on under More systems): {h.otherModel.label}, {formatPct(h.otherModel.leak)}.{" "}
           </>
         )}
-        Leak = labelled personal values still readable after masking. Runs of {dateSpan(h.ours.dates)} (PII Guard) and {dateSpan(h.theirs.dates)} ({h.theirs.label}); speed was measured where each ran, so see the
+        Leak = labeled personal values still readable after masking. Runs of {dateSpan(h.ours.dates)} (PII Guard) and {dateSpan(h.theirs.dates)} ({h.theirs.label}); speed was measured where each ran, so see the
         table and “Where these ran” before comparing it.
       </p>
     </div>

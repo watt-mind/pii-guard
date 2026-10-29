@@ -24,7 +24,7 @@ export const SAMPLES: Sample[] = [
     title: "Property sale contract",
     subtitle: "Hungarian · Adásvételi szerződés",
     language: "hu",
-    task: "Summarise the parties and the payment terms in English.",
+    task: "Summarize the parties and the payment terms in English.",
     text: `ADÁSVÉTELI SZERZŐDÉS
 
 amely létrejött egyrészről Bárdos Kinga (születési idő: 1978. március 14., adóazonosító jel: 8406144122, lakcím: 1137 Budapest, Pozsonyi út 38. 2/5.) mint eladó,
