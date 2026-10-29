@@ -232,7 +232,7 @@ describe("positioning and copy (LAB-1466)", () => {
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/sponsor|Llama|GDPR[- ]compliant|compliant with GDPR|anonymi[sz]ed data|privacy firewall|Hungarian first|coming soon/i);
     // The differentiators come right after the hero, and only tools the integration docs test (LAB-1478, LAB-1499).
-    expect(screen.getByRole("list", { name: "What makes it different" })).toHaveTextContent(/Agents, not just chat.*the coding agents Codex, OpenCode, Muse Code and pi: 115 requests, 0 values leaked, 0 of 10 turns refused.*No LLM, no GPU to mask.*EU languages, grammar-aware.*One person, one placeholder.*Measured in the open/);
+    expect(screen.getByRole("list", { name: "What makes it different" })).toHaveTextContent(/Agents, not just chat.*the coding agents Codex, OpenCode, Muse Code and pi: 115 requests, 0 values leaked, 0 of 10 turns refused.*No LLM, no GPU to mask.*Inflected EU languages.*One person, one placeholder.*Measured in the open/);
     // The problem in one line, and the proof signals under the call to action (LAB-1499).
     expect(text).toMatch(/Legal, HR and finance teams in the EU often can’t send case files to a hosted model/);
     expect(screen.getByRole("list", { name: "Proof" })).toHaveTextContent(/Tested with 4 real coding agents.*700\+ committed benchmark runs.*Published open NER model.*Apache-2\.0.*CI and tests/);
