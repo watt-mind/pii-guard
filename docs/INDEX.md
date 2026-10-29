@@ -9,6 +9,7 @@
 | [hosted.md](hosted.md) | Hosted deployment, trust boundary, actual retention, release gates and rollback |
 | [projects.md](projects.md) | Projects, immutable policy versions, endpoint configuration and persistence boundaries |
 | [privacy-model.md](privacy-model.md) | Threat model, what PII Guard guarantees and what it does not |
+| [eu-regulation.md](eu-regulation.md) | Why it matters in the EU: GDPR, transfers, sector rules and the AI Act, mapped to primary sources, and what we don't claim |
 | [entities.md](entities.md) | The entity taxonomy: what counts as personal data, per language |
 | [evaluation.md](evaluation.md) | Synthetic benchmark, metrics, baselines, how results are reported |
 | [languages.md](languages.md) | Adding a language: the language pack, the conformance suite, what "done" means |

@@ -22,6 +22,13 @@ your network, then restored in the answer, even mid-stream and inside tool calls
 
 **Try it live: https://guard.watt-mind.com**. Run the guest demo with no sign-up and no key, or sign in with Google for your own gateway endpoint. Use fictional data only; it is a hackathon demo with a capped sponsored allowance.
 
+**Why it matters in the EU.** The GDPR requires data minimization (Art. 5) and lists
+pseudonymization among example by-design and security measures (Art. 25, 32). Placeholders
+reduce the personal data that reaches a model provider outside the EU, though they don't by
+themselves settle Chapter V transfer obligations. Pseudonymized data stay personal data for
+whoever holds the mapping: a technical measure, not a compliance certificate. Sources, the 2025
+CJEU ruling, DORA and the AI Act: [docs/eu-regulation.md](docs/eu-regulation.md).
+
 **Try it offline** (no key; needs [uv](https://docs.astral.sh/uv/) and
 [pnpm](https://pnpm.io/)): `git clone https://github.com/watt-mind/pii-guard.git && cd pii-guard && make demo`,
 then open http://localhost:5173. Once the package is on PyPI (it is not yet), one command
