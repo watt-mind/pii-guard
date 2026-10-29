@@ -104,6 +104,122 @@ Modal ≤ $8 in total (free tier); no Muse or other model calls are planned (the
 templated). Every Modal app is stopped after use. If nothing wins by 2026-11-01, v2.0 stays and
 this README says so.
 
-## Result
+## Result: v2.0 stays
 
-To be filled in after the runs; the protocol above is not edited.
+No candidate passes every gate, so the selection set doesn't choose anything. **Nothing was
+published, and no threshold config ships. The production pin
+(`watt-mind/pii-guard-ner-xlmr-base@95f612a9`) is unchanged.**
+
+## Gates and selection (v2.0 re-scored on this commit)
+
+Leak % / over-masking %. Smoke = hu + en + de smoke (51 docs, 173 values), inflection =
+hu-inflection (12 docs, 50 values), agent-traffic-dev = 300 docs. Summaries in
+[`stage1/`](stage1/), run records `eval/results/runs/2026-10-29-lab-1512-<set>-<candidate>.json`
+(v2.0's carry the re-score key `rules+ner:xlmr-base-v2-hn@rescore=lab-1512`).
+
+| Candidate | smoke leak ≤ 0.00 | smoke over-mask ≤ 1.59 | inflection leak ≤ 2.0 | CPU p95 ≤ 1.2× | **agent-traffic-dev** leak / over-mask | Selected |
+|---|--:|--:|--:|--:|--:|---|
+| v2.0 (published) | 0.00 | 1.09 | 2.0 | 1.00× | 0.13 / 1.84 | **stays** |
+| T1 (S30 + add-on, 1 ep, lr 1e-5) | **0.58 fail** | 1.11 pass | 0.0 pass | not run | 0.51 / 1.49 | no |
+| T2 (S30 + add-on, 2 ep, lr 2e-5) | 0.00 pass | **2.19 fail** | 0.0 pass | not run | 0.90 / 1.62 | no |
+| H (v2.0, dev thresholds) | **0.58 fail** | 0.56 pass | **4.0 fail** | not run | 0.84 / 0.96 | no |
+
+- **T1 still leaks the LAB-1494 value** (`hu-poa-0015`, one `PERSON`). One epoch at 1e-5 on
+  1,650 Hungarian/Polish/German name documents wasn't enough to move it.
+- **T2 finds it, but over-masks smoke** (2.19 % vs the 1.59 % ceiling), the trade every
+  v3.x candidate made. 
+- **Neither would have won the selection set anyway.** Both over-mask less on
+  agent-traffic-dev than v2.0 (1.49 and 1.62 % vs 1.84 %: the payload and agent-text hard
+  negatives did what they were for), but both leak more (0.51 and 0.90 % vs 0.13 %). S30
+  itself leaked 0.00 % there (LAB-1494), so the fine-tune gave back leak for over-masking.
+- **H trades leak for over-masking, as raising thresholds must.** The dev splits are
+  in-distribution and v2.0 leaks almost nothing on them, so the calibration rule
+  (highest threshold with no extra dev leak) pushed most types to 0.8–0.9
+  ([`thresholds-h.json`](thresholds-h.json)). Out of distribution that loses values: one
+  smoke name, a second inflection name, and 0.84 % on the selection set.
+- **Latency was not run.** No candidate passed the accuracy gates, so latency couldn't change
+  the outcome, and running it would have spent Modal credit to no purpose.
+  `training/ner/modal_latency.py` (an idle Modal CPU container) is committed for the next round.
+
+## Report-only sets (rules + NER, fast mode, CPU), scored once after the choice
+
+Leak % / over-masking % / overlap F1. Summaries in [`stage2/`](stage2/).
+
+| set (docs) | v2.0 | T1 | T2 | H |
+|---|--:|--:|--:|--:|
+| agent-traffic test (990) | **0.25** / 1.7 / 0.966 | 0.62 / 2.0 / 0.959 | 1.40 / 2.0 / 0.956 | 1.38 / **1.1** / **0.971** |
+| ai4privacy (600) | 0.37 / 1.3 / 0.985 | **0.27** / **0.5** / **0.990** | 0.32 / 0.5 / 0.990 | 0.60 / 0.6 / 0.987 |
+| nemotron-pii (300) | 0.72 / 1.4 / 0.894 | **0.43** / 0.9 / 0.958 | 1.15 / **0.7** / **0.964** | 1.43 / 1.2 / 0.886 |
+| cee-pii (451) | 0.40 / 26.4 / 0.826 | **0.20** / 24.8 / 0.829 | 0.20 / 27.5 / 0.808 | 1.79 / **23.5** / **0.844** |
+| gretel-finance (400) | **19.1** / 21.8 / 0.717 | 20.4 / 20.5 / **0.772** | 20.8 / 20.0 / 0.757 | 20.0 / **19.0** / 0.694 |
+| pl-pii-bench (346) | 3.52 / 11.2 / **0.893** | **0.48** / **10.1** / 0.878 | 0.85 / 11.1 / 0.882 | 3.52 / 11.2 / 0.893 |
+| mapa-eur-lex (42) | **8.5** / 55.6 / 0.543 | 14.1 / **40.6** / **0.590** | 15.4 / 41.8 / 0.572 | 9.1 / 55.5 / 0.544 |
+
+- **The fine-tune loses MAPA** (8.5 → 14–15 %), which S30 alone had improved (6.8 %). The add-on
+  teaches names as given name + surname or as an inflected full name, and the replay holds no
+  legal text. LAB-1511 found (after this training had started) that most of v2.0's MAPA test
+  leaks are standalone surnames in court register, a context the add-on doesn't have and may
+  have taught away. See *Next*.
+- T1 keeps S30's Polish gain (3.5 → 0.48 %) and improves nemotron and cee-pii. These are
+  test numbers read after the choice; they can't overrule a gate.
+- H changes nothing on pl-pii-bench (the rules find those values) and loses values on most
+  other sets.
+
+## Data, decontamination and disjointness
+
+- Add-on: [`addon.json`](addon.json): 3,300 train + 330 dev documents, 5,000+ `PERSON` spans,
+  0 generated full names that occur in any evaluation text.
+- Replay: [`replay.json`](replay.json): 6,800 documents sampled from the v3.1-B mix
+  (`eval/generated/v31-final`, rebuilt with `v31_data.py derive` from the `v31-data` volume
+  copy; every file's `ids_sha256` and count match `training/ner/v31-data-manifest.json`).
+- [`decontam.json`](decontam.json): 10,430 add-on + replay documents against every
+  evaluation set: **0 exact, 0 near-duplicates (J ≥ 0.8)**. Closest add-on pair: J = 0.000
+  against agent-traffic-dev, smoke and inflection, 0.017 against the agent-text fixture. The
+  TAB fixture text isn't on disk; it was compared by its manifest hashes. `train.py`'s own
+  gate also dropped 0 of 11,471 train + dev documents on Modal.
+- Licences as LAB-1494 (v2.0 Apache-2.0; v3.1-B's mix: OpenPII-1M CC-BY-4.0 Ai4Privacy / Ai
+  Suisse SA, plus the audited Privy, Wismut, Nemotron and Gretel files). The add-on is
+  written for this ticket and fictional (ADR 0005). No GDPR special-category data.
+
+## Compute and cost
+
+- **Modal: $0.095** (`modal billing report --for today`): T1 1.4 min and T2 2.6 min of
+  training on an A10G, plus image and data upload. Both apps were ephemeral (`modal run`)
+  and stopped; `modal app list` shows none running. S30, T1 and T2 stay on the
+  `pii-guard-ner-runs` volume.
+- **Meta credits: $0.00.** The add-on is templated; no Muse call was made.
+- **Local CPU (Mac, loaded):** soup rebuild, add-on generation, decontamination, threshold
+  calibration (5 × 1,341 dev docs) and scoring of 4 candidates × 10 sets. Accuracy doesn't
+  depend on load; no latency number here was measured on the Mac.
+
+## Reproduce
+
+```
+modal volume get pii-guard-ner-runs pii-guard-ner-xlmr-base-v31-b models/ner/
+uv run --no-sync python training/ner/soup.py --a <v2.0 dir> \
+    --b models/ner/pii-guard-ner-xlmr-base-v31-b --alpha 0.3 \
+    --out models/ner/pii-guard-ner-xlmr-base-v32-s30          # sha256 e5c31d12…
+modal volume put pii-guard-ner-runs models/ner/pii-guard-ner-xlmr-base-v32-s30 \
+    pii-guard-ner-xlmr-base-v32-s30
+uv run --no-sync python training/ner/v31_data.py derive --raw <v31-data volume copy>
+uv run --no-sync python training/ner/targeted_v33.py addon --json eval/results/2026-10-29-ner-v33/addon.json
+uv run --no-sync python training/ner/targeted_v33.py replay --json eval/results/2026-10-29-ner-v33/replay.json
+uv run --no-sync python training/ner/targeted_v33.py decontam --json eval/results/2026-10-29-ner-v33/decontam.json
+modal run training/distill/modal_train.py --config training/ner/v33-t1.toml --gpu A10G   # and t2
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python training/ner/thresholds_v33.py \
+    --json eval/results/2026-10-29-ner-v33/thresholds-h.json
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python training/ner/eval_v3.py score --ticket LAB-1512 \
+    --candidate v33-t1 --model models/ner/pii-guard-ner-xlmr-base-v33-t1 \
+    --sets smoke inflection agent-traffic-dev --record      # v20: no --model; H: --thresholds
+```
+
+## Next
+
+- **This is the last NER round before the 2026-11-01 freeze.** v2.0 ships.
+- **Standalone surnames in legal register** (LAB-1511: most of v2.0's MAPA test leaks): a
+  fictional add-on of court-style contexts ("X stated…", "according to X", "X's counsel"),
+  never MAPA text. It arrived after T1/T2 had started training, so per the coordinator's note
+  it was not added post hoc; it is future work with its own protocol.
+- **The smoke gate keeps deciding on one Hungarian value.** S30, T1 and H each fail it by
+  `hu-poa-0015` alone. If the owner wants a tolerance or a per-type rule, that is a protocol
+  change for a new ticket, decided before anything is scored.
