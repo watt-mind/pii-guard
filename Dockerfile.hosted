@@ -56,6 +56,8 @@ RUN npm install --global pnpm@12.10.1
 COPY ui/package.json ui/pnpm-lock.yaml ui/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY ui ./
+# The #api reference bundles the generated spec from ../docs (LAB-1586).
+COPY docs/openapi.json /docs/openapi.json
 COPY --from=python-build /app/benchmarks-index.json /app/benchmarks-index.json
 # robots.txt: "allow" only for the public production build; the default keeps crawlers out (docs/hosted.md).
 ARG VITE_PII_GUARD_ROBOTS=disallow
