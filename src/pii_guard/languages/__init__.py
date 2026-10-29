@@ -172,6 +172,12 @@ class LanguagePack:
         NER ``PERSON`` span that is only such a name (``OTP Bank``, ``Deutsche Bahn``) becomes
         ``ORGANIZATION``, which policy keeps; ``None``: only the shared list
         (``languages/brands.tsv``) and the other packs' names.
+
+    Reference words (``languages/references.py``)
+        ``references``: a ``references.tsv`` resource (one business-reference word per line:
+        order, invoice, tracking ...), so a validated number right after such a label is a
+        business number in the rules check and an NER number right after one is dropped;
+        ``None``: the built-in fallback lists (``_REFERENCE_WORD``/``_NEGATIVE``) apply.
     """
 
     code: str
@@ -189,6 +195,7 @@ class LanguagePack:
     captions: Traversable | None = None
     cues: Traversable | None = None
     brands: Traversable | None = None
+    references: Traversable | None = None
 
     def __repr__(self) -> str:
         return (

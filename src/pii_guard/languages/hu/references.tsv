@@ -1,0 +1,26 @@
+# Reference words: labels that make a number a business number, not personal data
+# (order, invoice, tracking ...). One entry per line, `#` comments, blank lines ignored.
+# A trailing `*` lets the word take suffixes (`*rendelés*`: `rendelések`, `rendelésszám`);
+# a leading `*` lets it follow word characters (`megrendelés`, `előrendelés`).
+# Entries are written without accents; both spellings match (`rendeles*` matches
+# `rendelés` and `rendeles`).
+# Optional second column: `both` (the default: the rules check and the NER check read it),
+# `rules` (the rules check only) or `ner` (the NER check only), `weak` (LAB-1293: a poor
+# negative cue such as an amount word, honored by the rules check only; the NER check
+# ignores it, as before).
+*rendeles*
+szamla*	rules
+nyugta*
+hivatkozas*	rules
+sorszam*
+ügyszám*	rules
+ugyszam*	ner
+iktatoszam*
+cikkszam*
+megrendeles*	ner
+csomag*	ner
+kuldemeny*	ner
+jegy	ner
+jegyszam*	ner
+összeg*	weak
+végösszeg*	weak

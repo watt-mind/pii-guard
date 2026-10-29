@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Iterator
+from functools import lru_cache
 from typing import NamedTuple
 
+from pii_guard.languages import on_change
 from pii_guard.types import EntityType
 
 
@@ -53,6 +55,11 @@ def context_before(text: str, start: int, keywords: tuple[str, ...], window: int
 # "Faktura nr", "numer zamówienia:"), an
 # identifier prefix ("INV-", "SZ-", "#") or a currency ("$", "EUR"). Only the label's last
 # word and a little punctuation may stand between it and the number.
+#
+# The labels are language-pack data (``references.tsv``, :mod:`pii_guard.languages.references`),
+# so a new pack's reference words reach this check (LAB-1345, ADR 0008). The pattern below
+# is the fallback for deployments without language packs; the active one is built from the
+# packs (see :func:`_reference_word`).
 _REFERENCE_WORD = (
     r"order|invoice|inv|receipt|reference|ref|booking|tracking|shipment|ticket|item|sku"
     r"|article|case|total|amount|price|balance"
@@ -64,19 +71,51 @@ _REFERENCE_WORD = (
     r"|zleceni\w*|rezerwacj\w*|paczk\w*|zg[łl]oszeni\w*|transakcj\w*|kwot\w*|suma|saldo"
     r"|uchwa[łl]\w*|referencyjn\w*|klienta"
 )
-_REFERENCE_BEFORE_RE = re.compile(
-    rf"(?:(?i:(?<!\w)(?:{_REFERENCE_WORD})"
+
+
+def _reference_word() -> str:
+    """The reference-label alternation: every pack's ``rules``-scoped entries, or the fallback.
+
+    Pack entries match their accented and unaccented spellings
+    (:func:`pii_guard.languages.references.accent_pattern`); a ``*`` entry takes word
+    suffixes. With no pack providing ``references.tsv`` the built-in :data:`_REFERENCE_WORD`
+    applies, so a language without a pack keeps its behavior (LAB-1345).
+    """
+    from pii_guard.languages.references import pack_references, reference_alternation
+
+    sets = [
+        (code, [e for e in es if e.scope in ("both", "rules")]) for code, es in pack_references()
+    ]
+    sets = [(code, es) for code, es in sets if es]
+    if not sets:
+        return _REFERENCE_WORD
+    return "|".join(reference_alternation(es, code) for code, es in sets)
+
+
+_REFERENCE_BEFORE_TEMPLATE = (
+    r"(?:(?i:(?<!\w)(?:{words})"
     r"(?:[ \t]*(?:number|no|nr|num|id|sz[áa]m|sz[áa]ma|nummer|numer)(?!\w)\.?)?)"
-    r"[ \t:#=()\-]*(?:[A-Z]{1,6}[-/#][ \t]?)?"
-    r"|(?<![\w-])[A-Z]{1,6}-|#[ \t]?"
+    r"[ \t:#=()\-]*(?:[A-Z]{{1,6}}[-/#][ \t]?)?"
+    r"|(?<![\w-])[A-Z]{{1,6}}-|#[ \t]?"
     r"|(?:[$€£¥]|(?<!\w)(?:USD|EUR|GBP|CHF|HUF|Ft|forint|PLN|zł)(?!\w)\.?)[ \t]?)$"
 )
+
+
+@lru_cache(maxsize=1)
+def _reference_before_re() -> re.Pattern[str]:
+    """The compiled reference/amount/invoice-prefix lookbehind (LAB-1345: pack-sourced)."""
+    return re.compile(_REFERENCE_BEFORE_TEMPLATE.format(words=_reference_word()))
+
+
+# Rebuild the pattern when the set of packs changes (a registered pack's reference words
+# apply to detectors created afterwards, like the packs' cue words).
+on_change(_reference_before_re.cache_clear)
 _REFERENCE_WINDOW = 40
 
 
 def reference_or_amount_before(text: str, start: int) -> bool:
     """True if an order/invoice/reference label, an ID prefix or a currency ends at ``start``."""
-    return _REFERENCE_BEFORE_RE.search(text, max(0, start - _REFERENCE_WINDOW), start) is not None
+    return _reference_before_re().search(text, max(0, start - _REFERENCE_WINDOW), start) is not None
 
 
 # A legal-form word after a settlement makes it part of a company name ("1999 Budapest Kft.",
