@@ -44,7 +44,7 @@ upstream's prompt cache missed.
 
 Fast mode (rules + NER v2.0, `watt-mind/pii-guard-ner-xlmr-base@95f612a9ad65`), local CPU.
 Each row compares a run before the change (develop `0be220a` plus the new fixture cases, commit
-`540d4d6`) with a run on this branch (`10c53ad`).
+`540d4d6`) with a run on this branch (`10c53ad`). Both commits are from before the branch was rebased on PR #221, which only touches gateway restore code.
 
 | set | leak (values) | over-masking (spans) | recall | precision |
 | -- | -- | -- | -- | -- |
