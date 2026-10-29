@@ -8,14 +8,21 @@ There, a value restored
 - inside a single-quoted string gets ``'`` written as ``'\\''``;
 - inside the single-quoted script of a ``sed`` command, in an ``s`` replacement, also gets
   ``\\``, ``&``, the delimiter and a newline backslashed (and in an ``s`` pattern, a delimiter
-  that :func:`~pii_guard.gateway.restore.regex_literal` leaves as is).
+  that :func:`~pii_guard.gateway.restore.regex_literal` leaves as is);
+- inside a double-quoted string gets ``$``, backtick, ``"`` and ``\\`` backslashed, so command
+  and parameter substitution cannot run and the value arrives literal (a newline is already
+  literal inside double quotes, so it stays as is) (LAB-1564);
+- unquoted gets every shell metacharacter and whitespace backslash-escaped, so it stays one
+  literal word (a newline goes in as a single-quoted segment, since backslash-newline is a
+  line continuation) (LAB-1564).
 
-Anything the lexer does not model (double quotes, ``$'...'``, heredocs, comments, command
-substitution in double quotes, a sed bracket expression or another sed command) makes the rest
-of that string unknown, so values there stay byte-exact.
+Anything the lexer does not model (``$'...'``, heredocs, comments, command substitution in
+double quotes, a sed bracket expression or another sed command) makes the rest of that string
+unknown, so values there stay byte-exact.
 
 :class:`ArgumentsContext` reads the raw JSON text in order, in as many pieces as it arrives, so
-a streamed restore escapes exactly as the whole one does.
+a streamed restore escapes exactly as the whole one does. :class:`ShellText` is the same lexer
+over a raw (already decoded) command string, for freeform tool input.
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-__all__ = ["ArgumentsContext", "ShellContext", "shell_escape"]
+__all__ = ["BYTE_EXACT", "ArgumentsContext", "ShellContext", "ShellText", "shell_escape"]
 
 #: Top-level argument keys whose string value is a shell command.
 COMMAND_KEYS = frozenset({"command", "cmd"})
@@ -44,16 +51,37 @@ class ShellContext:
     single_quoted: bool = False
     sed_replacement: str | None = None
     sed_pattern: str | None = None
+    double_quoted: bool = False
+    unquoted: bool = False
 
 
 BYTE_EXACT = ShellContext()
+
+#: Characters a shell reads as themselves in an unquoted word (as in ``shlex.quote``).
+_UNQUOTED_SAFE = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-"
+)
+#: Characters a shell still acts on inside double quotes.
+_DOUBLE_ACTIVE = frozenset('$`"\\')
 
 
 def shell_escape(value: str, context: ShellContext, *, regex: bool = False) -> str:
     """``value`` as it must be written at ``context`` to mean itself.
 
     ``regex``: ``value`` is already a regex literal (an escaped placeholder in a pattern).
+    Security (LAB-1564): in double-quoted and unquoted command contexts the escaping below is
+    what keeps a restored value inert — a value holding ``$(...)``, backticks, ``;`` or a space
+    must arrive as literal argument text, never as shell syntax.
     """
+    if context.double_quoted:
+        # A newline needs no escape: inside double quotes it is literal, and backslash-newline
+        # would be a line continuation that drops it.
+        return "".join("\\" + char if char in _DOUBLE_ACTIVE else char for char in value)
+    if context.unquoted:
+        return "".join(
+            "'\n'" if char == "\n" else char if char in _UNQUOTED_SAFE else "\\" + char
+            for char in value
+        )
     if not context.single_quoted:
         return value
     if context.sed_replacement is not None and not regex:
@@ -135,9 +163,13 @@ class _Shell:
         self.sed: _Sed | None = None
 
     def context(self) -> ShellContext:
-        if self.mode != "single":
-            return BYTE_EXACT
-        return self.sed.context() if self.sed is not None else ShellContext(True)
+        if self.mode == "single":
+            return self.sed.context() if self.sed is not None else ShellContext(True)
+        if self.mode == "double":
+            return ShellContext(double_quoted=True)
+        if self.mode == "normal":
+            return ShellContext(unquoted=True)
+        return BYTE_EXACT
 
     def feed(self, char: str) -> None:
         mode = self.mode
@@ -226,6 +258,20 @@ class _Shell:
             return  # an option, or an empty '' (BSD ``sed -i ''``)
         else:
             self.sed_script_seen = True
+
+
+class ShellText:
+    """The shell lexer over one raw command string (freeform tool input, already decoded)."""
+
+    def __init__(self) -> None:
+        self._shell = _Shell()
+
+    def context(self) -> ShellContext:
+        return self._shell.context()
+
+    def feed(self, text: str) -> None:
+        for char in text:
+            self._shell.feed(char)
 
 
 class ArgumentsContext:
