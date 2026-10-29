@@ -39,9 +39,9 @@ export function nextBest(metric: "leak" | "f1", set: number) {
 const ours = COMPARISON[0]!;
 /** The hero's three numbers, each with the best of the other tools on the same set. */
 export const PROOF = [
-  { value: `${ours.leak[1]} %`, label: "Leak, CEE-PII public test set", hint: `Next best: ${nextBest("leak", 1)}` },
-  { value: `${ours.leak[0]} %`, label: "Leak, 51 hand-written docs", hint: `Next best: ${nextBest("leak", 0)}` },
-  { value: `${ours.f1[0]} %`, label: "F1, same docs", hint: `Next best: ${nextBest("f1", 0)}` },
+  { value: `${ours.leak[1]} %`, label: "Values leaked, CEE-PII public set", hint: `Next best: ${nextBest("leak", 1)}` },
+  { value: `${ours.leak[0]} %`, label: "Values leaked, 51 hand-written docs", hint: `Next best: ${nextBest("leak", 0)}` },
+  { value: `${ours.f1[0]} %`, label: "Detection F1, same docs", hint: `Next best: ${nextBest("f1", 0)}` },
 ] as const;
 
 export const LATENCY = { value: "~34 ms", label: "Gateway overhead per request", hint: "p50 on CPU, rules + NER, one request at a time" } as const;

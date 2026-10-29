@@ -180,20 +180,19 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-24 lg:px-10">
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
-          <p className="font-mono text-2xs text-muted">Open source · OpenAI-compatible · Built on Meta models</p>
+          <p className="font-mono text-xs text-muted">Open source · OpenAI-compatible · Built on Meta models</p>
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
-          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">An OpenAI-compatible privacy gateway for AI agents. Names, emails and IDs in text, and faces in images, become placeholders before the request leaves; the real values come back in the answer.</p>
+          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">A privacy gateway for AI agents. Personal data in text and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
           <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 sm:grid-cols-3">
             <Differentiator href="#images" title="Images too">Faces are blocked and printed ID details become placeholders before an image is sent.</Differentiator>
-            <Differentiator href="#how" title="No LLM in the masking path">Rules and a small encoder NER run on the gateway itself.</Differentiator>
+            <Differentiator href="#how" title="No LLM in the masking path">Rules and our open encoder NER, fine-tuned from Meta’s XLM-RoBERTa, run on the gateway.</Differentiator>
             <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
           </ul>
           <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
-          <div className="space-y-2">
-            <dl aria-label="Measured results" className="grid max-w-2xl grid-cols-3 gap-3 sm:gap-4">{PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
-            <p className="text-xs text-muted">{MEASURED} · <a className={link} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
+          <div className="max-w-2xl space-y-3 border-t border-line pt-5">
+            <dl aria-label="Measured results" className="grid grid-cols-3 gap-3 sm:gap-6">{PROOF.map((p) => <Metric key={p.label} size="hero" label={p.label} value={p.value} hint={p.hint} />)}</dl>
+            <p className="text-xs text-muted">{MEASURED} · <a className={link} href={`${DOCS}/benchmarks.md`}>All results ↗</a> · <a className={link} href={NER_MODEL}>Open NER on Hugging Face ↗</a></p>
           </div>
-          <p className="max-w-2xl text-sm text-muted">Answers by Meta’s <span className="font-medium text-ink">{modelOr("model")}</span>. Detection by our <a className={link} href={NER_MODEL}>open NER on Hugging Face ↗</a>, fine-tuned from Meta’s <span className="font-medium text-ink">XLM-RoBERTa</span>.</p>
         </div>
         <MiniFlow model={model} name={language === "hu" ? "Minta Réka" : "Robin Example"} />
       </section>
