@@ -44,10 +44,19 @@ NONE = dict.fromkeys(ALL, False)
         ("scripts/ci/docker_smoke.sh", {**NONE, "docker": True}),
         ("scripts/ci/wheel_smoke.sh", {**NONE, "wheel": True}),
         (".github/workflows/release.yml", {**NONE, "wheel": True}),
-        ("ui/src/App.tsx", {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True}),
-        ("eval/results/runs/run.json", {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True}),
+        (
+            "ui/src/App.tsx",
+            {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True},
+        ),
+        (
+            "eval/results/runs/run.json",
+            {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True},
+        ),
         ("eval/datasets/results/counts.json", {**NONE, "ui": True, "wheel": True, "hosted": True}),
-        ("docs/benchmarks/config.json", {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True}),
+        (
+            "docs/benchmarks/config.json",
+            {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True},
+        ),
         ("docs/benchmarks/colours.json", {**NONE, "ui": True, "wheel": True, "hosted": True}),
     ],
 )
