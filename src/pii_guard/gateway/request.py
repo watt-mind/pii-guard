@@ -152,6 +152,50 @@ class TextSlot:
         return f"TextSlot(kind={self.kind!r}, length={len(self.text)})"
 
 
+#: A line-number gutter, as Muse Code's ``read_file`` prints file lines (``12|Jane ...``),
+#: after the line's leading spaces/tabs (stripped first: no backtracking over them).
+_GUTTER_RE = re.compile(r"\d{1,7}\|")
+
+
+def _gutter(line: str) -> str:
+    """The line's gutter (indentation, number and ``|``), or ``""``."""
+    indent = len(line) - len(line.lstrip(" \t"))
+    match = _GUTTER_RE.match(line, indent)
+    return line[: match.end()] if match else ""
+
+
+def _text_slot(holder: dict[str, Any], key: str, kind: str) -> TextSlot:
+    """A message text or tool output; a line-number gutter (``12|``) is hidden from detection.
+
+    Muse Code's ``read_file`` prints each file line after its number (``12|Jane Placeholder``),
+    in tool outputs and again in the conversation its reminder observers get as a message.
+    Glued to the first word, the gutter makes a name detector see ``12|Jane`` as one token and
+    mask only the surname. The detectors get each gutter as spaces of the same length (offsets
+    don't move); the masked text gets the gutters back.
+    """
+    text: str = holder[key]
+    lines = text.split("\n")
+    gutters = {i: g for i, line in enumerate(lines) if (g := _gutter(line))}
+    if not gutters:
+        return TextSlot(text, _setter(holder, key), kind)
+    hidden = "\n".join(
+        " " * len(gutters[i]) + line[len(gutters[i]) :] if i in gutters else line
+        for i, line in enumerate(lines)
+    )
+
+    def write(masked: str) -> None:
+        out = masked.split("\n")
+        if len(out) == len(lines):
+            for i, gutter in gutters.items():
+                if out[i].startswith(" " * len(gutter)):
+                    out[i] = gutter + out[i][len(gutter) :]
+        # A masked value that spanned lines changes the line count: the gutters are dropped
+        # (line numbers only; nothing unmasked is written back).
+        holder[key] = "\n".join(out)
+
+    return TextSlot(hidden, write, kind)
+
+
 @dataclass(slots=True)
 class ImageSlot:
     """One inline image to mask, and how to write the masked PNG back as a data URL."""
@@ -494,7 +538,7 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
         raise InvalidChatRequestError(f"{where}.role must be one of {', '.join(sorted(_ROLES))}")
     content = message.get("content")
     if isinstance(content, str):
-        out.slots.append(TextSlot(content, _setter(message, "content")))
+        out.slots.append(_text_slot(message, "content", "content"))
     elif isinstance(content, list):
         for part_index, part in enumerate(content):
             _collect_part(part, f"{where}.content.{part_index}", out, content)
@@ -504,7 +548,7 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
     for name in _TEXT_FIELDS:
         value = message.get(name)
         if isinstance(value, str):
-            out.slots.append(TextSlot(value, _setter(message, name), name))
+            out.slots.append(_text_slot(message, name, name))
         elif value is not None:
             _collect_json(message, name, out, name)
     for name in _REASONING_LISTS:
@@ -644,7 +688,7 @@ def _collect_part(
     value = part.get(key)
     if not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
-    out.slots.append(TextSlot(value, _setter(part, key)))
+    out.slots.append(_text_slot(part, key, "content"))
 
 
 def _collect_image(

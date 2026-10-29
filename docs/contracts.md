@@ -1020,6 +1020,13 @@ Treatments:
   Numbers with at least six digits in a checked value, and JSON-Schema keyword numbers
   (`maximum`, `minLength`, ...), are checked the same way.
 
+**Chat line-number gutters.** Message content, text/refusal content parts and the string
+fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter handling:
+a leading line number and pipe (e.g. `12|`, including indentation) become same-length spaces
+for detection, preserving offsets. Gutters are restored in masked text when line counts
+match and the replacement spaces survive; when masking spans lines and changes the line
+count, gutters are dropped rather than writing any original text back.
+
 **Declared tool names.** A tool or namespace name the request declares (`tools[].name`,
 `tools[].function.name`, `functions[].name`, ...) is the client's vocabulary: a `PERSON`,
 `ORGANIZATION` or `ADDRESS` detection whose whole value is a declared name is dropped **in
@@ -1047,8 +1054,8 @@ pre-loaded (`known`) are never exempt.
 | body | `tools`, `functions` | definitions: `name` and other keys check; `parameters`/`schema` walked as JSON Schema (free text masked, `properties` keys and `required` entries checked, `type`/`$ref`/`format`/... **values** checked, LAB-1563); a custom tool's `format.grammar.definition` mask, its other `format` leaves check; every other string, array or direct numeric leaf mask JSON (e.g. an MCP tool's `server_description`); entries must be objects |
 | body | `response_format` | `type` check; `json_schema` as a definition |
 | message | `role` | one of `system`, `developer`, `user`, `assistant`, `tool`, `function` |
-| message | `content` | string mask; array of content parts, below |
-| message | `refusal`, `reasoning_content`, `reasoning` | mask (a non-string value: mask JSON) |
+| message | `content` | string mask (line-number gutters hidden during detection, restored when forwarding); array of content parts, below; applies to every role, including tool/function output |
+| message | `refusal`, `reasoning_content`, `reasoning` | mask (strings use the same gutter treatment; a non-string value: mask JSON) |
 | message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass (opaque, provider-signed) |
 | message | `audio` | `transcript` mask; `id` check; `expires_at` pass |
 | message | `annotations` | mask JSON |
