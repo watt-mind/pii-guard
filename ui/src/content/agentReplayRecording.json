@@ -1,0 +1,81 @@
+{
+ "recorded": "2026-10-29",
+ "how": "scripts/record_agent_replay.py: the gateway in fast mode (rules + published NER), a scripted stand-in upstream, fictional data",
+ "task": "Refund ticket 4471 is approved. Look up the customer in crm.json and email them.",
+ "upstream_requests": 3,
+ "values_reaching_upstream": 0,
+ "read_call": {
+  "name": "read_file",
+  "arguments": "{\"path\": \"crm.json\"}"
+ },
+ "masked_record": "{\"customer\": \"[[PERSON_32dda1]]\", \"email\": \"[[EMAIL_677092]]\", \"iban\": \"[[BANK_ACCOUNT_031339]]\"}",
+ "send_call": {
+  "name": "send_email",
+  "upstream": [
+   "{\"to\": \"[",
+   "[EMAI",
+   "L_67",
+   "7092]]\", ",
+   "\"subject\"",
+   ": \"Your r",
+   "efund\", \"",
+   "body\": \"D",
+   "ear [[PER",
+   "S",
+   "ON_32dda",
+   "1]], your",
+   " refund f",
+   "or ticket",
+   " 4471 is ",
+   "on its wa",
+   "y to [[BA",
+   "NK",
+   "_ACCOUN",
+   "T_031339]",
+   "].\"}"
+  ],
+  "agent": [
+   "{\"to\": \"",
+   "[[EMAIL_677092]]\", ",
+   "\"subject\"",
+   ": \"Your r",
+   "efund\", \"",
+   "body\": \"D",
+   "ear ",
+   "[[PERSON_32dda1]], your",
+   " refund f",
+   "or ticket",
+   " 4471 is ",
+   "on its wa",
+   "y to ",
+   "[[BANK_ACCOUNT_031339]].\"}"
+  ]
+ },
+ "answer": {
+  "upstream": [
+   "Done. I e",
+   "mailed [[",
+   "PERS",
+   "ON_32",
+   "dda1]] at",
+   " [[EMAI",
+   "L_",
+   "677092]] ",
+   "that the ",
+   "refund is",
+   " on its w",
+   "ay."
+  ],
+  "agent": [
+   "Done. I e",
+   "mailed ",
+   "[[PERSON_32dda1]] at",
+   " ",
+   "[[EMAIL_677092]] ",
+   "that the ",
+   "refund is",
+   " on its w",
+   "ay."
+  ]
+ }
+}
