@@ -319,11 +319,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
       <section id="for" aria-labelledby="for-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="for-heading" eyebrow="Who it’s for" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. PII Guard lets the agent use the model without handing over the person." />
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
-          <Card title="Legal" headingLevel={3}><p className="text-muted">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</p></Card>
-          <Card title="HR" headingLevel={3}><p className="text-muted">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</p></Card>
-          <Card title="Finance and back office" headingLevel={3}><p className="text-muted">Work through invoices and account correspondence. Bank accounts and tax IDs are caught by validated rules.</p></Card>
-        </div>
+        <Card as="div">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-3 md:gap-0 md:divide-x md:divide-line">
+            <Audience title="Legal">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</Audience>
+            <Audience title="HR">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</Audience>
+            <Audience title="Finance and back office">Work through invoices and account correspondence. Bank accounts and tax IDs are caught by validated rules.</Audience>
+          </ul>
+        </Card>
       </section>
 
       <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-20 space-y-6">
@@ -364,14 +366,18 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="data" aria-labelledby="data-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="data-heading" eyebrow="Your data" title="What happens to your data here." lead="This covers the hosted preview. If you self-host, all of it stays on your own servers." />
         <Card>
-          <KeyValues items={[
-            { label: "Where", value: "Microsoft Azure, Sweden Central (EU). Processed in memory. No content archive, and no backup of the mappings. Azure operators can access process memory." },
-            { label: "As a guest", value: `You can’t type anything. A fixed, fictional sample is masked here, and only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` },
-            { label: "Signed in", value: `Google receives your sign-in (name, email, profile). PII Guard receives your text in full; only the masked text goes to ${modelOr("Meta’s model")} or to the provider you connect.` },
-            { label: "Images", value: "Signed in only. Read and masked inside the service: faces and ID photos are covered, and signatures and stamps stay visible. Images are never stored or sent to a model." },
-            { label: "How long", value: "Placeholder mappings expire after 1 hour without use. Your last 50 masked requests are kept in memory for your activity log. A restart clears both. Expiry makes them unavailable; it doesn’t prove the memory is erased." },
-            { label: "What Meta receives", value: "Masked text only. Meta’s standard terms exclude training on it but allow retention as needed, and processing there isn’t guaranteed to stay in the EU." },
-          ]} />
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-2 lg:grid-cols-2">
+            <KeyValues items={[
+              { label: "Where", value: "Microsoft Azure, Sweden Central (EU). Processed in memory. No content archive, and no backup of the mappings. Azure operators can access process memory." },
+              { label: "As a guest", value: `You can’t type anything. A fixed, fictional sample is masked here, and only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` },
+              { label: "Signed in", value: `Google receives your sign-in (name, email, profile). PII Guard receives your text in full; only the masked text goes to ${modelOr("Meta’s model")} or to the provider you connect.` },
+            ]} />
+            <KeyValues items={[
+              { label: "Images", value: "Signed in only. Read and masked inside the service: faces and ID photos are covered, and signatures and stamps stay visible. Images are never stored or sent to a model." },
+              { label: "How long", value: "Placeholder mappings expire after 1 hour without use. Your last 50 masked requests are kept in memory for your activity log. A restart clears both. Expiry makes them unavailable; it doesn’t prove the memory is erased." },
+              { label: "What Meta receives", value: "Masked text only. Meta’s standard terms exclude training on it but allow retention as needed, and processing there isn’t guaranteed to stay in the EU." },
+            ]} />
+          </div>
           <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/hosted.md`}>Full processing and retention details ↗</a></p>
         </Card>
       </section>
@@ -454,6 +460,11 @@ function ResultTable({ caption, hideCaption = false, columns, rows }: { caption:
     <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-1.5 pr-3 text-left font-normal">System</th>{columns.map((c) => <th key={c} scope="col" className="py-1.5 pl-2 text-right font-normal">{c}</th>)}</tr></thead>
     <tbody>{rows.map((row) => <tr key={row.name} className="border-b border-line last:border-0"><th scope="row" title={row.title} className={["py-1.5 pr-3 text-left", row.ours ? "font-medium text-ink" : "font-normal text-ink"].join(" ")}>{row.name}</th>{row.values.map((v, i) => <td key={i} className={["py-1.5 pl-2 text-right whitespace-nowrap tabular-nums", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;%</td>)}</tr>)}</tbody>
   </table>;
+}
+
+/** One audience in the "Who it's for" card: columns split by hairlines from md up. */
+function Audience({ title, children }: { title: string; children: ReactNode }) {
+  return <li className="min-w-0 md:px-5 md:first:pl-0 md:last:pr-0"><h3 className="text-sm font-medium text-ink">{title}</h3><p className="mt-1 text-muted">{children}</p></li>;
 }
 
 /** One list item with its lead in ink. */
