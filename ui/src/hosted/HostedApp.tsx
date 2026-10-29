@@ -162,8 +162,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
   return <div className="min-h-dvh bg-canvas text-sm text-ink">
     <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
-    <header className="bg-canvas">
-      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-12">
+    <header className="sticky top-0 z-30 bg-canvas">
+      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-12 lg:px-10">
         <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
         <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
           <a className="hidden text-muted hover:text-ink md:inline" href="#demo">Demo</a>
@@ -177,7 +177,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </div>
       <div aria-hidden="true" className="header-hairline" />
     </header>
-    <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-24">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-24 lg:px-10">
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
           <p className="font-mono text-2xs text-muted">Open source · OpenAI-compatible · Built on Meta models</p>
@@ -198,7 +198,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <MiniFlow model={model} name={language === "hu" ? "Minta Réka" : "Robin Example"} />
       </section>
 
-      <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-6 space-y-4">
+      <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-20 space-y-4">
         <SectionHead id="demo-heading" focusable title="See exactly what the model sees." lead={`Your text, what PII Guard sends to ${modelOr("the model")}, its answer, and the answer with the real values put back.`} />
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-end gap-3">
@@ -247,7 +247,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
 
-      <section id="images" aria-labelledby="images-heading" className="scroll-mt-6 space-y-6">
+      <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" title="Images too: faces blocked, ID details tokenized." lead="A gateway that only reads text passes screenshots and scans on untouched. PII Guard reads the image itself: faces and ID photos are covered, and each printed name and number is covered by a box with its placeholder. The same person gets the same placeholder in your text and in the image, so the model can still answer, and the answer comes back to you with the real values." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
         <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway, the masked image goes to the model in place of the original, followed by its masked transcript and summary. On 24 fictional documents, 98&nbsp;% of the values on an image got the same placeholder as in the text, with no false merges (<a className={link} href={`${DOCS}/benchmarks.md#visual-placeholders`}>benchmark</a>).</p>
@@ -258,7 +258,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </Card>
       </section>
 
-      <section id="results" aria-labelledby="results-heading" className="scroll-mt-6 space-y-6">
+      <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="results-heading" title="Among the best at keeping personal data out." lead="The lowest leak rate of the tools we compared on every set in the table below. It is not the lowest everywhere: on Gretel finance, Presidio leaks slightly less (18.8 % against 19.0 %). Fictional data only, from committed run records of 27–28 October 2026. The sets are small: a few points’ difference is noise." />
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
@@ -294,7 +294,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
 
-      <section id="how" aria-labelledby="how-heading" className="scroll-mt-6 space-y-6">
+      <section id="how" aria-labelledby="how-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="how-heading" title="Change one base URL. The model gets placeholders." lead="PII Guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
         <ol className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
           <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted"><span className="font-medium text-ink">No LLM in the masking path.</span> Validated rules for identifiers, plus our open multilingual NER, a small encoder model, for names, addresses and dates. Both run inside PII Guard, with no API call. An LLM detector is an opt-in audit mode, off by default.</p></Card></li>
@@ -319,7 +319,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
 
-      <section id="for" aria-labelledby="for-heading" className="scroll-mt-6 space-y-6">
+      <section id="for" aria-labelledby="for-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="for-heading" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. PII Guard lets the agent use the model without handing over the person." />
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
           <Card title="Legal" headingLevel={3}><p className="text-muted">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</p></Card>
@@ -328,7 +328,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
 
-      <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-6 space-y-6">
+      <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="meta-heading" title="Built on Meta models, each where it fits." lead="Anything that sees real personal data is an open-weight model you can run yourself. Hosted models only see fictional or masked text." />
         <Card>
           <KeyValues className="sm:grid-cols-[12rem_minmax(0,1fr)]" items={[
@@ -341,7 +341,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </Card>
       </section>
 
-      <section id="run" aria-labelledby="run-heading" className="scroll-mt-6 space-y-6">
+      <section id="run" aria-labelledby="run-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="run-heading" title="Two ways to run it." />
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
           <Card title="Self-hosted" subtitle="Open source" headingLevel={3} className="flex flex-col">
@@ -363,7 +363,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
 
-      <section id="data" aria-labelledby="data-heading" className="scroll-mt-6 space-y-6">
+      <section id="data" aria-labelledby="data-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="data-heading" title="What happens to your data here." lead="This covers the hosted preview. If you self-host, all of it stays on your own servers." />
         <Card>
           <KeyValues items={[
@@ -378,7 +378,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </Card>
       </section>
 
-      <section id="account" aria-labelledby="account-heading" className="scroll-mt-6">
+      <section id="account" aria-labelledby="account-heading" className="scroll-mt-20">
         <Card as="div" title="Try it now. Connect your app when you’re ready." titleId="account-heading" actions={account && (signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account.logout_url || LOGOUT}>Sign out</ButtonLink></> : <ButtonLink variant="primary" href={loginUrl}>Sign in with Google</ButtonLink>)}>
           <div className="space-y-4">
             {!signedIn && <p className="max-w-3xl text-muted">{sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live example. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."}</p>}
@@ -397,7 +397,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </Card>
       </section>
 
-      <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-6 space-y-6">
+      <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="privacy-heading" title="What PII Guard doesn’t promise." />
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2">
           <Card title="Detection can miss" headingLevel={3}><p className="text-muted">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</p></Card>
@@ -409,7 +409,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
     </main>
     <footer className="border-t border-line">
-      <div className="mx-auto grid max-w-[1280px] gap-4 px-4 py-8 sm:px-6">
+      <div className="mx-auto grid max-w-[1280px] gap-4 px-4 py-8 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <a href="#" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
           <ThemeToggle theme={theme} onTheme={setTheme} />
