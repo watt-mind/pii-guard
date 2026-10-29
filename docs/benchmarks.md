@@ -945,6 +945,10 @@ hand-written; documents: bg 2 + cs 2 + da 2 + de 2 + el 2 + en 2 + es 2 + et 2 +
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 42 | 0.0% | 0.0% | 0.0% | 99.3% | 0.4% | 100.0% | 100.0% | 190 ms | 2026-10-28 | `57ab2ed` |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 3.5 s | 2026-10-28 | `72026a5` |
+| bardsai/eu-pii-anonimization-multilang v1 alone (MAPA baseline, LAB-1516) | 42 | 10.6% | 71.7% | 18.5% | 29.5% | 1.1% | 60.8% | 21.4% | — | 2026-10-29 | `d3ac82e` |
+| tabularisai/eu-pii-safeguard alone (MAPA baseline, LAB-1516) | 42 | 49.7% | 53.9% | 51.7% | 21.9% | 7.3% | 33.7% | 92.9% | — | 2026-10-29 | `d3ac82e` |
+| pii-guard NER v2.0 alone (MAPA baseline, LAB-1516) | 42 | 41.9% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | — | 2026-10-29 | `d3ac82e` |
+| rules + bardsai/eu-pii-anonimization-multilang v1 (MAPA baseline, LAB-1516) | 42 | 10.6% | 71.7% | 18.5% | 29.5% | 1.1% | 60.8% | 21.4% | — | 2026-10-29 | `d3ac82e` |
 | pii-guard fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393) | 42 | 16.5% | 32.5% | 21.9% | 47.7% | 7.8% | 79.3% | 7.1% | 5.1 s | 2026-10-28 | `da9883e` |
 | pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393) | 42 | 38.5% | 72.5% | 50.3% | 15.0% | 0.3% | 46.8% | 71.4% | 2.6 s | 2026-10-28 | `da9883e` |
 | pii-guard fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410) | 42 | 44.4% | 72.6% | 55.1% | 16.5% | 0.0% | 49.8% | 88.1% | 2.9 s | 2026-10-28 | `72026a5` |
@@ -953,7 +957,9 @@ hand-written; documents: bg 2 + cs 2 + da 2 + de 2 + el 2 + en 2 + es 2 + et 2 +
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 42 | 48.2% | 78.0% | 59.6% | 6.8% | 0.0% | 49.3% | 73.8% | 5.9 s | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 42 | 52.1% | 77.8% | 62.4% | 6.9% | 0.3% | 44.8% | 69.0% | 4.6 s | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 42 | 53.0% | 76.8% | 62.8% | 8.5% | 0.0% | 43.4% | 81.0% | 5.3 s | 2026-10-29 | `2b3c7ba` |
+| pii-guard fast, NER v2.0 (MAPA 21-language baseline, LAB-1516) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | — | 2026-10-29 | `d3ac82e` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 4.8 s | 2026-10-29 | `2b3c7ba` |
+| pii-guard rules alone (MAPA baseline, LAB-1516) | 42 | 0.0% | 0.0% | 0.0% | 99.3% | 0.4% | 100.0% | 100.0% | — | 2026-10-29 | `d3ac82e` |
 
 
 By language:
@@ -962,6 +968,10 @@ By language:
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 100.0% | 94.3% | 100.0% | 100.0% | 100.0% | 100.0% | 97.2% | 93.9% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
+| bardsai/eu-pii-anonimization-multilang v1 alone (MAPA baseline, LAB-1516) | 14.8% | 16.2% | 23.4% | 16.3% | 18.6% | 21.5% | 16.8% | 16.8% | 18.7% | 21.1% | 19.1% | 19.7% | 20.1% | 14.2% | 20.1% | 18.2% | 24.9% | 17.8% | 21.6% | 13.7% | 21.7% | 33.3% | 32.4% | 22.9% | 52.9% | 38.9% | 32.4% | 32.4% | 25.0% | 15.2% | 20.6% | 32.4% | 17.1% | 35.3% | 45.7% | 18.4% | 42.9% | 12.1% | 24.3% | 26.5% | 22.9% | 34.3% |
+| tabularisai/eu-pii-safeguard alone (MAPA baseline, LAB-1516) | 50.4% | 45.7% | 54.4% | 58.6% | 51.7% | 46.8% | 55.7% | 52.1% | 48.6% | 46.0% | 52.6% | 54.8% | 50.4% | 50.4% | 49.6% | 43.4% | 52.1% | 55.7% | 57.9% | 56.3% | 53.0% | 25.0% | 35.1% | 20.0% | 20.6% | 25.0% | 27.0% | 14.7% | 16.7% | 15.2% | 26.5% | 21.6% | 22.9% | 23.5% | 20.0% | 28.9% | 28.6% | 21.2% | 18.9% | 14.7% | 11.4% | 20.0% |
+| pii-guard NER v2.0 alone (MAPA baseline, LAB-1516) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 59.3% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
+| rules + bardsai/eu-pii-anonimization-multilang v1 (MAPA baseline, LAB-1516) | 14.8% | 16.2% | 23.4% | 16.3% | 18.6% | 21.5% | 16.8% | 16.8% | 18.7% | 21.1% | 19.1% | 19.6% | 20.1% | 14.2% | 20.1% | 18.2% | 24.9% | 17.8% | 21.6% | 13.7% | 21.7% | 33.3% | 32.4% | 22.9% | 52.9% | 38.9% | 32.4% | 32.4% | 25.0% | 15.2% | 20.6% | 32.4% | 17.1% | 35.3% | 45.7% | 18.4% | 42.9% | 12.1% | 24.3% | 26.5% | 22.9% | 34.3% |
 | pii-guard fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393) | 22.2% | 28.3% | 33.1% | 41.1% | 7.8% | 36.5% | 25.6% | 26.9% | 21.9% | 20.5% | 4.4% | 36.7% | 16.1% | 15.8% | 15.2% | 10.6% | 26.8% | 22.5% | 36.2% | 29.1% | 16.2% | 66.7% | 37.8% | 45.7% | 41.2% | 58.3% | 48.6% | 61.8% | 36.1% | 48.5% | 55.9% | 32.4% | 42.9% | 55.9% | 28.6% | 50.0% | 51.4% | 48.5% | 56.8% | 35.3% | 48.6% | 51.4% |
 | pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393) | 50.4% | 58.8% | 56.8% | 61.1% | 57.4% | 56.0% | 56.7% | 31.4% | 44.3% | 50.5% | 55.4% | 52.4% | 52.6% | 41.6% | 52.8% | 36.7% | 51.4% | 52.0% | 47.7% | 53.7% | 57.8% | 5.6% | 5.4% | 8.6% | 17.6% | 8.3% | 29.7% | 14.7% | 25.0% | 21.2% | 20.6% | 16.2% | 8.6% | 14.7% | 22.9% | 21.1% | 17.1% | 15.2% | 13.5% | 5.9% | 5.7% | 17.1% |
 | pii-guard fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410) | 62.3% | 57.4% | 62.4% | 66.8% | 58.2% | 62.2% | 59.1% | 44.1% | 47.0% | 53.2% | 56.7% | 49.8% | 54.7% | 55.0% | 57.5% | 38.2% | 52.1% | 58.5% | 64.2% | 55.9% | 56.2% | 8.3% | 5.4% | 20.0% | 14.7% | 8.3% | 32.4% | 14.7% | 19.4% | 18.2% | 14.7% | 16.2% | 14.3% | 20.6% | 22.9% | 18.4% | 20.0% | 21.2% | 24.3% | 5.9% | 2.9% | 22.9% |
@@ -970,7 +980,9 @@ By language:
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 64.5% | 64.4% | 73.6% | 63.8% | 62.7% | 70.7% | 73.7% | 62.2% | 55.2% | 60.5% | 66.2% | 58.8% | 65.0% | 59.2% | 61.9% | 22.7% | 63.7% | 70.2% | 65.4% | 62.4% | 65.0% | 2.8% | 0.0% | 0.0% | 11.8% | 2.8% | 21.6% | 5.9% | 5.6% | 12.1% | 0.0% | 13.5% | 5.7% | 2.9% | 11.4% | 13.2% | 14.3% | 6.1% | 5.4% | 0.0% | 0.0% | 5.7% |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 64.5% | 66.8% | 73.4% | 65.7% | 63.1% | 68.6% | 73.4% | 63.5% | 54.9% | 59.0% | 69.0% | 60.3% | 65.5% | 60.0% | 62.0% | 36.2% | 59.5% | 69.9% | 64.0% | 63.6% | 67.5% | 5.6% | 0.0% | 0.0% | 11.8% | 2.8% | 13.5% | 5.9% | 5.6% | 15.2% | 8.8% | 13.5% | 5.7% | 5.9% | 11.4% | 10.5% | 11.4% | 6.1% | 5.4% | 5.9% | 0.0% | 0.0% |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 66.9% | 66.4% | 72.2% | 64.3% | 61.7% | 67.7% | 71.6% | 62.6% | 57.0% | 58.8% | 65.3% | 60.7% | 64.1% | 60.8% | 59.4% | 44.2% | 59.1% | 70.2% | 63.6% | 63.7% | 67.2% | 2.8% | 0.0% | 2.9% | 11.8% | 8.3% | 18.9% | 8.8% | 8.3% | 15.2% | 11.8% | 16.2% | 5.7% | 2.9% | 11.4% | 15.8% | 17.1% | 6.1% | 8.1% | 5.9% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.0 (MAPA 21-language baseline, LAB-1516) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
+| pii-guard rules alone (MAPA baseline, LAB-1516) | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 100.0% | 94.3% | 100.0% | 100.0% | 100.0% | 100.0% | 97.2% | 93.9% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
 
 
 **Number validity.** The headline leak above, split by whether a structured identifier passes the language packs' own validators (card Luhn, IBAN, TAJ and tax-ID check digits, phone numbering plans, ID-document checksums and formats). Invalid numbers stay in the headline: a mistyped real identifier is still personal data ([evaluation.md](evaluation.md#number-validity)). Valid values per type: .
@@ -981,6 +993,10 @@ By language:
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 99.3% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 99.3% (735/740) |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
+| bardsai/eu-pii-anonimization-multilang v1 alone (MAPA baseline, LAB-1516) | 29.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 29.5% (218/740) |
+| tabularisai/eu-pii-safeguard alone (MAPA baseline, LAB-1516) | 21.9% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 21.9% (162/740) |
+| pii-guard NER v2.0 alone (MAPA baseline, LAB-1516) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
+| rules + bardsai/eu-pii-anonimization-multilang v1 (MAPA baseline, LAB-1516) | 29.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 29.5% (218/740) |
 | pii-guard fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393) | 47.7% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 47.7% (353/740) |
 | pii-guard fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393) | 15.0% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 15.0% (111/740) |
 | pii-guard fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410) | 16.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 16.5% (122/740) |
@@ -989,7 +1005,9 @@ By language:
 | pii-guard fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) | 6.8% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 6.8% (50/740) |
 | pii-guard fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) | 6.9% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 6.9% (51/740) |
 | pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
+| pii-guard fast, NER v2.0 (MAPA 21-language baseline, LAB-1516) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
+| pii-guard rules alone (MAPA baseline, LAB-1516) | 99.3% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 99.3% (735/740) |
 
 ### `nemotron-pii`
 
@@ -1563,6 +1581,12 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-eu-pii-safeguard` | tabularisai/eu-pii-safeguard alone (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-ner-v20` | pii-guard NER v2.0 alone (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-ner-fallback-v1` | bardsai/eu-pii-anonimization-multilang v1 alone (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-fast-v20` | pii-guard fast, NER v2.0 (MAPA 21-language baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-fast-fallback-v1` | rules + bardsai/eu-pii-anonimization-multilang v1 (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
+| 2026-10-29 | `2026-10-29-lab-1516-mapa-eur-lex-rules` | pii-guard rules alone (MAPA baseline, LAB-1516) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `d3ac82e` | — | — |
 | 2026-10-29 | `2026-10-29-lab-1500-synth-sample` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | synth-sample | en, hu | recorded | `6d02b8d` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1500-agent-text` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-text | de, en, hu | recorded | `6d02b8d` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1500-agent-traffic-dev` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic-dev | de, en, hu | recorded | `6d02b8d` (dirty) | — | — |
