@@ -4,6 +4,14 @@ The mapping (placeholder -> original value) lives only in this process and expir
 TTL of inactivity. Nothing in this module logs, reprs or raises with an original value: logs
 and errors carry entity types, counts and placeholder ids only (AGENTS.md, ADR 0006).
 
+Compiled patterns (the ``re`` module cache, at most 512 entries process-wide) may briefly
+outlive a dropped session: the vault and the detectors build patterns from folded values,
+and CPython keeps them until LRU eviction or a restart. This is accepted residual risk
+(LAB-1364): the cache is bounded and memory-only, in the same trust boundary as the
+running vault, and it never reaches logs, traces or error messages. Wiring ``re.purge()``
+into the delete path would force every live session to recompile its patterns, so it is
+deliberately not done.
+
 Doubled case suffixes are out of scope (LAB-1142): a case ending stacked on a case ending
 is not Hungarian (``Hajnának`` + ``nak``), so the vault does not split the surface to its
 lemma first. Both occurrences share one placeholder keyed on the labelled value's lemma
@@ -1936,14 +1944,22 @@ class Vault:
         return session
 
     def drop(self, session_id: str) -> None:
-        """Close and forget a session now (no error if it is already gone)."""
+        """Close and forget a session now (no error if it is already gone).
+
+        Compiled patterns built from its values may stay in the process-wide ``re`` cache
+        until eviction: accepted residual risk, see the module docstring (LAB-1364).
+        """
         with self._lock:
             session = self._sessions.pop(session_id, None)
         if session is not None:
             session.close()
 
     def purge_expired(self) -> int:
-        """Drop every expired session; returns how many were dropped."""
+        """Drop every expired session; returns how many were dropped.
+
+        Like :meth:`drop`, this leaves compiled patterns in the process-wide ``re`` cache
+        until eviction (LAB-1364).
+        """
         with self._lock:
             return self._purge_locked()
 
