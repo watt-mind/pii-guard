@@ -210,7 +210,7 @@ homoglyphs, base64, spoofed placeholders, long padding and more).
   detector sees normalized text and all 175 injection values are masked whole: partial leak
   1.7 % → **0.0 %**
   ([run record](../eval/results/runs/2026-10-27-injection-spark-open-after-normalise.json),
-  [journey.md, milestone 20](journey.md#20-every-detector-sees-normalised-text-2026-10-27)).
+  [journey.md, milestone 20](journey.md#20-every-detector-sees-normalized-text-2026-10-27)).
 - **Status:** shipped (LAB-1107, LAB-1146).
 
 ## 7. Honest about re-identification
