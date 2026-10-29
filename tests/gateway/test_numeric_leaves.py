@@ -149,3 +149,34 @@ def test_a_checked_number_with_personal_data_raises() -> None:
     slot = next(s for s in collected.slots if s.text == str(TAX_ID))
     with pytest.raises(UnsupportedContentError):
         slot.write("[[NATIONAL_ID_HU_TAX_abcd]]")
+
+
+# --- direct numeric leaves in tool definitions (LAB-1563) -----------------------------------
+
+
+def test_a_direct_number_in_a_function_definition_is_masked() -> None:
+    """A numeric leaf directly on a function definition was dropped (not str/list/dict)."""
+    body = chat("{}")
+    body["tools"] = [
+        {"type": "function", "function": {"name": "lookup", "parameters": {}, "tax_id": TAX_ID}}
+    ]
+    upstream = MockUpstream()
+    with TestClient(make_app(upstream)) as http:
+        response = http.post("/v1/chat/completions", json=body)
+    assert response.status_code == 200, response.text
+    sent = upstream.bodies[0]["tools"][0]["function"]["tax_id"]
+    assert isinstance(sent, str) and PLACEHOLDER_RE.fullmatch(sent)
+    assert str(TAX_ID) not in upstream.requests[0].content.decode()
+
+
+def test_a_direct_number_on_a_tool_object_is_masked() -> None:
+    """Same for a numeric leaf directly on a (non-flat) tool object."""
+    body = chat("{}")
+    body["tools"] = [{"type": "custom", "custom": {"name": "grep"}, "tax_id": TAX_ID}]
+    upstream = MockUpstream()
+    with TestClient(make_app(upstream)) as http:
+        response = http.post("/v1/chat/completions", json=body)
+    assert response.status_code == 200, response.text
+    sent = upstream.bodies[0]["tools"][0]["tax_id"]
+    assert isinstance(sent, str) and PLACEHOLDER_RE.fullmatch(sent)
+    assert str(TAX_ID) not in upstream.requests[0].content.decode()

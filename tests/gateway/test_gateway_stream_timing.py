@@ -197,7 +197,9 @@ def _assert_disconnected(app: FastAPI, stream: _Stream) -> None:
     # The partial answer is not what the client will send back as history: no seeding.
     assert event["cache"]["seeded"] == 0
     gateway = app.state.gateway
-    assert len(gateway.cache) == 1  # only the request's own message, detected before forwarding
+    # The request's own message and its identifier-checked ``model`` (LAB-1563), detected
+    # before forwarding; nothing seeded from the partial answer.
+    assert len(gateway.cache) == 2
     assert stream.closed and stream.pulled < stream.count
     # The disconnect closed the upstream *response*; the shared client stays open (LAB-1176).
     assert gateway._client is not None and not gateway._client.is_closed

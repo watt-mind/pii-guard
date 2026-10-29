@@ -7,8 +7,9 @@ Order of operations (fail closed at every step, ADR 0006):
 2. detect every text (cache first; misses run concurrently, under one per-request timeout),
    then add the session's pre-loaded known values (:mod:`pii_guard.detect.known`), which win
    their conflicts and are masked even for a ``keep`` type (a ``block`` type still refuses),
-   and drop the detections that are exactly a tool name the request declares
-   (:func:`~pii_guard.gateway.tool_names.without_tool_names`, LAB-1317); an identifier whose
+   and drop the detections in identifier slots that are exactly a tool name the request
+   declares (:func:`~pii_guard.gateway.tool_names.without_tool_names`, LAB-1317/LAB-1563);
+   an identifier whose
    only rewrites are those names is written back as sent, whatever the session holds
    (:func:`~pii_guard.gateway.tool_names.identifier_keeps_tool_names`, LAB-1324);
 3. widen a name detected only in part to a full name known from this request or the session
@@ -897,7 +898,12 @@ class Gateway:
             with timer.span("detect"):
                 spans = await self._detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
-                spans = without_tool_names([slot.text for slot in collected.slots], spans, names)
+                spans = without_tool_names(
+                    [slot.text for slot in collected.slots],
+                    spans,
+                    names,
+                    [slot.kind for slot in collected.slots],
+                )
                 issued = self.issued_ids.of(session.session_id)
                 spans = without_opaque_ids(collected.slots, spans, issued)
             # Every older entry has scanned every text by the end of _mask: an image's remask
