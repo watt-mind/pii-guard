@@ -589,13 +589,18 @@ function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, lan
         className="doc block"
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <SegmentedControl
-          label="Detection mode"
-          name="chat-mode"
+        <span className="flex items-center gap-2">
+          <span aria-hidden="true" className="text-sm text-muted">
+            Detection
+          </span>
+          <SegmentedControl
+            label="Detection mode"
+            name="chat-mode"
           value={mode}
           onChange={onMode}
           options={MODES.filter((m) => modes.includes(m.id)).map((m) => ({ value: m.id, label: m.label, title: m.hint }))}
-        />
+          />
+        </span>
         <label className="flex items-center gap-2 text-sm text-muted">
           Language
           <span className="w-32">
