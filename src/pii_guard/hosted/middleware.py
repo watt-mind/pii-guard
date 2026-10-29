@@ -13,6 +13,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pii_guard.api.errors import error_headers, error_response
+from pii_guard.api.routes._common import ClientDisconnectedError
 from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT
 from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
@@ -306,7 +307,12 @@ class HostedMiddleware:
                     while True:
                         message = await receive()
                         if message["type"] == "http.disconnect":
-                            return
+                            # The client is gone: stop reading without sending anything.
+                            # Raised, not returned, so uvicorn does not log "ASGI callable
+                            # returned without completing response" (LAB-1468); the
+                            # PiiGuardError handler answers 499 and the finally block
+                            # still releases the reservation and leaves ingress.
+                            raise ClientDisconnectedError("client disconnected during body read")
                         raw.extend(message.get("body", b""))
                         if len(raw) > body_limit:
                             raise HostedRequestError("Hosted request body is too large")
