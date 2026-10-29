@@ -245,9 +245,14 @@ merged.
   masked blue (`meta.mark`, `<Placeholder>`), a value put back is restored green. The image
   showcase draws regions like the Images screen. Layout is Tailwind only (`max-w-[1280px] px-4
   sm:px-6`, `gap-6` between cards, `space-y-16 lg:space-y-24` between sections); there is no
-  landing stylesheet. Section titles are the console's 24/500; the one landing-only size is the
-  hero `h1`, `text-3xl sm:text-5xl font-medium leading-tight` (30→48 / 1.25 / 500, no tracking,
-  all ink). One primary button per card or hero; the header's sign-in is secondary. Below 1024 px
+  landing stylesheet. Three sizes are landing-only: the hero `h1`, `text-3xl sm:text-5xl
+  font-medium leading-tight` (30→48 / 1.25 / 500, no tracking, all ink); section titles,
+  `text-2xl sm:text-3xl font-medium` (24→30 / 500), each under a `font-mono text-xs text-guard`
+  eyebrow that names the section in the nav's words; and the hero's proof numbers,
+  `Metric size="hero"` (24→30 / 500). The header is sticky (sections use `scroll-mt-20`), and the
+  containers widen their gutter to 40 px from 1024 px (`lg:px-10`). One primary button per card
+  or hero; the header's sign-in is secondary. The page ends on the "Get started" call to action,
+  after the data and limits sections. Below 1024 px
   the hero's mini flow is hidden (the demo follows). Below-the-fold modules that weigh more (the
   image showcase, the comparison chart) are lazy-loaded. The hosted build follows the system
   theme until a visitor picks one in the footer (the local console starts light).
