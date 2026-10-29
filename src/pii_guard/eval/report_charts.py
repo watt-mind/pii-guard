@@ -926,6 +926,20 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
         )
     for g, name in enumerate(groups):
         gx = px0 + g * gw + (gw - bw * slots) / 2
+        # Narrow bars (many systems) cannot carry a value label each: the labels
+        # overlap (LAB-1193). Label every bar only when they fit; otherwise label just
+        # the group's best bar, whose value the legend cannot show.
+        cand: list[tuple[float, float]] = []
+        for k, r in enumerate(runs):
+            block = r["overall"] if name == "all" else r["by_region_type"].get(name)
+            if not block:
+                continue
+            v = block["recall_iou50"] or 0
+            set_index = set_order.index(str(r.get("fixture_set") or "specimens"))
+            x = gx + (k + gap * set_index) * bw
+            cand.append((x, v))
+        label_all = bw >= 30 or not cand
+        best_x = max(cand, key=lambda t: t[1])[0] if cand else 0.0
         ns: list[int] = []
         for k, r in enumerate(runs):
             block = r["overall"] if name == "all" else r["by_region_type"].get(name)
@@ -940,15 +954,16 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
                 f'<rect x="{_n(x + 3)}" y="{_n(sy(v))}" width="{_n(bw - 6)}" '
                 f'height="{_n(max(py1 - sy(v), 1))}" fill="{color[str(r["system"])]}"/>'
             )
-            body.append(
-                _text(
-                    x + bw / 2,
-                    sy(v) - 10,
-                    fmt_pct(v, 0),
-                    size=19 if bw >= 34 else 18,
-                    anchor="middle",
+            if label_all or x == best_x:
+                body.append(
+                    _text(
+                        x + bw / 2,
+                        sy(v) - 10,
+                        fmt_pct(v, 0),
+                        size=19 if bw >= 34 else 18,
+                        anchor="middle",
+                    )
                 )
-            )
         body.append(
             _text(px0 + (g + 0.5) * gw, py1 + 34, name, size=21, anchor="middle", weight="600")
         )
