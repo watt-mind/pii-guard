@@ -1592,7 +1592,7 @@ single-owner routes keep their default namespace.
 |---|---|---|
 | `GET /v1/projects` | — | `{projects:[...],default_project_id}`; creates the default if needed |
 | `POST /v1/projects` | `{name}` | 201 project metadata; maximum 32 projects per owner |
-| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` |
+| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` (the default policy's latest version) |
 | `GET /v1/projects/{project_id}/policies` | — | `{policies:[...]}`; every immutable version |
 | `POST /v1/projects/{project_id}/policies` | `{name,entity_policies?,language?,mode?,detection_profile?,visual_detection?}` | 201 first version in a new policy family |
 | `PUT /v1/projects/{project_id}/policies/{policy_id}` | Same policy fields | 201 next immutable version; existing endpoints remain pinned |

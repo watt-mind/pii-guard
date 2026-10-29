@@ -307,9 +307,11 @@ class ProjectStore:
         return row
 
     def _project_metadata(self, row: sqlite3.Row) -> dict[str, Any]:
+        # The default policy is its family's latest version: what the Policy view shows and
+        # what requests without an endpoint apply. Endpoints pin their own version (LAB-1537).
         version = self._db.execute(
             "SELECT policy_version_id FROM policy_versions "
-            "WHERE project_id = ? AND policy_id = ? AND version = 1",
+            "WHERE project_id = ? AND policy_id = ? ORDER BY version DESC LIMIT 1",
             (row["id"], row["default_policy_id"]),
         ).fetchone()
         if version is None:
