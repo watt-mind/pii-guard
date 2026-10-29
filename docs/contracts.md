@@ -1034,7 +1034,12 @@ fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter
 a leading line number and pipe (e.g. `12|`, including indentation) become same-length spaces
 for detection, preserving offsets. Gutters are restored in masked text when line counts
 match and the replacement spaces survive; when masking spans lines and changes the line
-count, gutters are dropped rather than writing any original text back.
+count, gutters are dropped rather than writing any original text back. A prefix counts as a gutter
+only inside a run of at least two adjacent lines whose numbers go up by exactly one (`11|`,
+`12|`), as `read_file` and `cat -n` print them; a lone `1234567|...` line (a pipe-delimited
+table row with an id), decreasing numbers or numbered lines that aren't adjacent stay visible
+to detection and to the outbound re-check (LAB-1583). Residual: a table whose row ids are
+themselves consecutive integers is still read as numbered lines.
 
 **Declared tool names.** A tool or namespace name the request declares (`tools[].name`,
 `tools[].function.name`, `functions[].name`, ...) is the client's vocabulary: a `PERSON`,
@@ -1118,7 +1123,10 @@ with the treatments of the table above. Any other key, item type or part type is
 
 A **line-number gutter** at the start of a line of message text or tool output (`12|`, as Muse
 Code's `read_file` prints files) is shown to the detectors as spaces of the same length and
-kept in the forwarded text, so the first word of the line is detected on its own.
+kept in the forwarded text, so the first word of the line is detected on its own. The same
+handling, and the same rule for what counts as a gutter (only runs of consecutive line
+numbers, see "Chat line-number gutters"), applies to `instructions` and to reasoning
+`summary_text`/`reasoning_text` parts (LAB-1583).
 
 **Restore.** In a whole `response` object, every string the upstream returns is restored
 (output text, refusals, reasoning summaries, and the request fields it echoes back).

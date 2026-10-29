@@ -373,7 +373,7 @@ def test_chat_gutter_whole_name_is_masked_upstream(role: str, parts: bool) -> No
     app.state.gateway_detectors = build_mode_detectors(
         settings, app.state.gateway_config, base=[TokenNames()]
     )
-    content: Any = "12|Jane Placeholder"
+    content: Any = "11|Dear team,\n12|Jane Placeholder"
     if parts:
         content = [{"type": "text", "text": content}]
     message = {"role": role, "content": content}
@@ -388,5 +388,44 @@ def test_chat_gutter_whole_name_is_masked_upstream(role: str, parts: bool) -> No
     result = forwarded["messages"][-1]["content"]
     if parts:
         result = result[0]["text"]
-    assert result.startswith("12|[[PERSON_") and result.endswith("]]")
+    assert result.startswith("11|Dear team,\n12|[[PERSON_") and result.endswith("]]")
     assert "Jane" not in result and "Placeholder" not in result
+
+
+class _IdsAndNames(FakeLlm):
+    """Also finds the fictional seven-digit document id."""
+
+    def detect(self, text: str, language: str = "hu") -> list[Any]:
+        from pii_guard.types import EntityType, Span
+
+        spans = super().detect(text, language)
+        start = text.find("1234567")
+        while start != -1:
+            spans.append(Span(start, start + 7, EntityType.ID_DOCUMENT, "1234567", 0.9, "llm"))
+            start = text.find("1234567", start + 1)
+        return spans
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "1234567|Teszt Elek|Budapest",
+        "id|name|city\n1234567|Teszt Elek|Budapest\n7654320|Jane Placeholder|Pecs",
+    ],
+)
+def test_pipe_table_row_id_is_masked_upstream(content: str) -> None:
+    """LAB-1583: a row id before ``|`` is not a line-number gutter: detected and masked."""
+    upstream = MockUpstream()
+    app = _app(upstream)
+    settings = Settings(tenant_key=TEST_TENANT_KEY)
+    app.state.gateway_detectors = build_mode_detectors(
+        settings, app.state.gateway_config, base=[_IdsAndNames()]
+    )
+    messages = [{"role": "user", "content": content}]
+    with TestClient(app) as client:
+        response = client.post("/v1/chat/completions", json={"model": "m", "messages": messages})
+    assert response.status_code == 200, response.text
+    forwarded = b"".join(req.content for req in upstream.requests).decode()
+    assert "1234567" not in forwarded
+    assert NAME not in forwarded
+    assert "[[ID_DOCUMENT_" in forwarded
