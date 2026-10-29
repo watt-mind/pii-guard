@@ -3,6 +3,14 @@
 Sends about 25 low-volume, unauthenticated requests with forged Easy Auth identity, proxy
 and duplicate security headers, and checks that none is accepted as a signed-in identity.
 Synthetic values only; nothing is signed in. Prints one JSON line per check, then a verdict.
+Output is content-free: statuses, key names and booleans, never bodies or cookie values.
+
+``forged-demo`` (LAB-1521) asserts anonymous guest semantics rather than a status code: the
+demo is either refused (401/403/429/503, for example sponsorship off) or answered as a guest,
+with the guest-demo shape and a fresh guest cookie, and the forged identity is never reflected.
+Two follow-up ``GET /v1/account`` reads, with only that guest cookie and then with the forged
+headers added, must both report ``authenticated: false`` and ``tier: anonymous``. When
+sponsorship is on, that check costs one sponsored guest demo; nothing else spends or writes.
 Re-run it against each image that release evidence is bound to:
 
     uv run --no-sync python scripts/probe_dev_boundary.py https://guard-dev.watt-mind.com
@@ -15,6 +23,8 @@ import http.client
 import json
 import sys
 import urllib.parse
+from collections.abc import Callable
+from typing import Any, NamedTuple
 
 
 def principal(subject: str) -> str:
@@ -47,8 +57,106 @@ FORGED = [
 ]
 
 
-def main() -> int:
-    base = urllib.parse.urlsplit(sys.argv[1] if len(sys.argv) > 1 else "")
+FORGED_MARKER = b"synthetic-forged"
+GUEST_COOKIE = "__Host-pii-guard-guest"
+DEMO_KEYS = frozenset(
+    {"sample_id", "language", "original", "masked", "answer", "restored", "entities", "session_id"}
+)
+IDENTITY_KEYS = frozenset({"authenticated", "principal", "tier", "user", "email"})
+
+
+class Reply(NamedTuple):
+    status: int
+    set_cookies: list[str]
+    location: str
+    raw: bytes
+
+
+Send = Callable[[str, str, list[tuple[str, str]], bytes | None], Reply]
+
+
+def https_sender(host: str, port: int) -> Send:
+    def send(method: str, path: str, headers: list[tuple[str, str]], body: bytes | None) -> Reply:
+        conn = http.client.HTTPSConnection(host, port, timeout=60)
+        try:
+            conn.putrequest(method, path, skip_accept_encoding=True)
+            for key, value in headers:
+                conn.putheader(key, value)
+            if body is not None:
+                conn.putheader("Content-Length", str(len(body)))
+            conn.endheaders(body)
+            response = conn.getresponse()
+            raw = response.read(65536)
+            cookies = response.msg.get_all("Set-Cookie") or []
+            return Reply(response.status, cookies, response.getheader("Location") or "", raw)
+        finally:
+            conn.close()
+
+    return send
+
+
+def as_json(raw: bytes) -> dict[str, Any]:
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def guest_cookie(set_cookies: list[str]) -> str | None:
+    for header in set_cookies:
+        pair = header.split(";", 1)[0].strip()
+        name, _, value = pair.partition("=")
+        if name == GUEST_COOKIE and value:
+            return pair
+    return None
+
+
+def anonymous_account(reply: Reply) -> bool:
+    data = as_json(reply.raw)
+    return (
+        reply.status == 200
+        and data.get("authenticated") is False
+        and data.get("tier") == "anonymous"
+        and data.get("principal") is None
+        and FORGED_MARKER not in reply.raw
+    )
+
+
+def guest_demo(send: Send, reply: Reply, forged: list[tuple[str, str]]) -> dict[str, Any]:
+    """Anonymous guest semantics for a demo sent with a forged identity (LAB-1521)."""
+    if reply.status in {401, 403, 429, 503}:
+        return {"path": "refused", "ok": True}
+    data = as_json(reply.raw)
+    cookie = guest_cookie(reply.set_cookies)
+    facts: dict[str, Any] = {
+        "path": "guest",
+        "shape": reply.status == 200 and data.keys() >= DEMO_KEYS,
+        "identity_keys": sorted(IDENTITY_KEYS & data.keys()),
+        "guest_cookie": cookie is not None,
+        "reflected": FORGED_MARKER in reply.raw
+        or any(FORGED_MARKER in c.encode() for c in reply.set_cookies),
+    }
+    accounts: list[bool] = []
+    if cookie is not None:
+        for extra in ([], forged):
+            accounts.append(
+                anonymous_account(send("GET", "/v1/account", [*extra, ("Cookie", cookie)], None))
+            )
+    facts["account_anonymous"] = accounts
+    facts["ok"] = (
+        facts["shape"]
+        and not facts["identity_keys"]
+        and facts["guest_cookie"]
+        and not facts["reflected"]
+        and accounts == [True, True]
+    )
+    return facts
+
+
+def main(argv: list[str] | None = None, send: Send | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    base = urllib.parse.urlsplit(argv[0] if argv else "")
     if base.scheme != "https" or not base.hostname:
         print("usage: probe_dev_boundary.py https://<host>", file=sys.stderr)
         return 2
@@ -76,7 +184,7 @@ def main() -> int:
             "refused",
         ),
         ("forged-chat", "POST", "/v1/chat/completions", FORGED + same, chat, "refused"),
-        ("forged-demo", "POST", "/v1/demo", FORGED + same, demo, "not-signed-in"),
+        ("forged-demo", "POST", "/v1/demo", FORGED + same, demo, "guest-demo"),
         (
             "forged-guard-key",
             "GET",
@@ -159,42 +267,36 @@ def main() -> int:
         ),
         ("login-forged-host", "GET", "/.auth/login/google", FORGED[6:9], None, "own-redirect"),
     ]
+    send = send or https_sender(base.hostname, base.port or 443)
     failures = 0
     for name, method, path, headers, body, expect in checks:
-        conn = http.client.HTTPSConnection(base.hostname, base.port or 443, timeout=60)
-        conn.putrequest(method, path, skip_accept_encoding=True)
-        for key, value in headers:
-            conn.putheader(key, value)
-        if body is not None:
-            conn.putheader("Content-Length", str(len(body)))
-        conn.endheaders(body)
-        response = conn.getresponse()
-        raw = response.read(65536)
-        location = response.getheader("Location") or ""
-        conn.close()
-        try:
-            data = json.loads(raw)
-        except ValueError:
-            data = {}
-        authenticated = data.get("authenticated") if isinstance(data, dict) else None
+        reply = send(method, path, headers, body)
+        data = as_json(reply.raw)
+        authenticated = data.get("authenticated")
         error = data.get("error", {}).get("code") if isinstance(data.get("error"), dict) else None
-        redirect = urllib.parse.parse_qs(urllib.parse.urlsplit(location).query).get("redirect_uri")
+        query = urllib.parse.urlsplit(reply.location).query
+        redirect = urllib.parse.parse_qs(query).get("redirect_uri")
         redirect_host = urllib.parse.urlsplit(redirect[0]).hostname if redirect else None
-        ok = {
-            "anonymous": response.status == 200 and authenticated is False,
-            "refused": response.status in {400, 401, 403, 404},
-            "not-signed-in": response.status in {401, 403, 429, 503},
-            "own-redirect": response.status == 302 and redirect_host == base.hostname,
-        }[expect]
+        extra: dict[str, Any] = {}
+        if expect == "guest-demo":
+            extra = guest_demo(send, reply, FORGED)
+            ok = extra.pop("ok")
+        else:
+            ok = {
+                "anonymous": reply.status == 200 and authenticated is False,
+                "refused": reply.status in {400, 401, 403, 404},
+                "own-redirect": reply.status == 302 and redirect_host == base.hostname,
+            }[expect]
         failures += not ok
         print(
             json.dumps(
                 {
                     "check": name,
-                    "status": response.status,
+                    "status": reply.status,
                     "authenticated": authenticated,
                     "error": error,
                     "redirect_uri_host": redirect_host,
+                    **extra,
                     "ok": ok,
                 }
             )
