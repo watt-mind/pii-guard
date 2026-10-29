@@ -11,6 +11,14 @@ the checkpoint is written to the Modal volume ``pii-guard-ner-runs`` and fetched
     modal app stop pii-guard-ner-train --yes   # if a run was interrupted
 
 ``--gpu`` picks the card (default ``A10G``; ``L40S`` or ``A100`` for xlm-roberta-large).
+
+**Data on the volume (LAB-1542).** Config paths ``data:<corpus>/<file>`` are read from the data
+root (``PII_GUARD_DATA_DIR``, ``training/ner/data_sync.py``) and uploaded with the call, unless
+``--data <corpus>@<rev>[,...]`` names that corpus: then the job reads it from the volume copy
+``data/<corpus>@<rev>`` (made once with ``data_sync.py volume <corpus> --revision <rev>``) and
+nothing of it is uploaded::
+
+    modal run training/distill/modal_train.py --config <toml> --data phase1b@6fbb52b62d99
 The app is ephemeral (``modal run``): it stops when the function returns.
 """
 
@@ -26,6 +34,9 @@ REMOTE = "/root/pii-guard"
 # Inside the container this file is /root/modal_train.py; the repo root only exists locally.
 ROOT = Path(__file__).resolve().parents[2] if modal.is_local() else Path(REMOTE)
 RUNS = "/runs"
+#: ``PII_GUARD_DATA_DIR`` inside the container: ``data:`` config paths resolve here.
+DATA = "/root/data"
+DATA_PREFIX = "data:"
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
@@ -60,15 +71,26 @@ runs = modal.Volume.from_name("pii-guard-ner-runs", create_if_missing=True)
 app = modal.App("pii-guard-ner-train", image=image)
 
 
-def _train(config_text: str, files: dict[str, bytes]) -> str:
+def _train(config_text: str, files: dict[str, bytes], data: tuple[str, ...] = ()) -> str:
     import os
     import subprocess
 
     os.chdir(REMOTE)
-    for rel, data in files.items():
-        path = Path(REMOTE) / rel
+    Path(DATA).mkdir(parents=True, exist_ok=True)
+    for spec in data:  # corpus@rev on the volume, linked where data:<corpus>/ resolves
+        source = Path(RUNS) / "data" / spec
+        if not source.is_dir():
+            raise FileNotFoundError(
+                f"{source}: run data_sync.py volume {spec.replace('@', ' --revision ')}"
+            )
+        (Path(DATA) / spec.split("@", 1)[0]).symlink_to(source)
+    for rel, blob in files.items():
+        if rel.startswith(DATA_PREFIX):
+            path = Path(DATA) / rel[len(DATA_PREFIX) :]
+        else:
+            path = Path(REMOTE) / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
+        path.write_bytes(blob)
     cfg = tomllib.loads(config_text)
     name = Path(cfg["out"]).name
     out = f"{RUNS}/{name}"
@@ -85,6 +107,7 @@ def _train(config_text: str, files: dict[str, bytes]) -> str:
             "cuda",
         ],
         check=True,
+        env={**os.environ, "PII_GUARD_DATA_DIR": DATA},
     )
     runs.commit()
     return name
@@ -97,29 +120,43 @@ _kwargs = {
 
 
 @app.function(gpu="A10G", **_kwargs)
-def train_a10g(config_text: str, files: dict[str, bytes]) -> str:
-    return _train(config_text, files)
+def train_a10g(config_text: str, files: dict[str, bytes], data: tuple[str, ...] = ()) -> str:
+    return _train(config_text, files, data)
 
 
 @app.function(gpu="L40S", **_kwargs)
-def train_l40s(config_text: str, files: dict[str, bytes]) -> str:
-    return _train(config_text, files)
+def train_l40s(config_text: str, files: dict[str, bytes], data: tuple[str, ...] = ()) -> str:
+    return _train(config_text, files, data)
 
 
 @app.function(gpu="A100", **_kwargs)
-def train_a100(config_text: str, files: dict[str, bytes]) -> str:
-    return _train(config_text, files)
+def train_a100(config_text: str, files: dict[str, bytes], data: tuple[str, ...] = ()) -> str:
+    return _train(config_text, files, data)
 
 
 @app.local_entrypoint()
-def main(config: str, gpu: str = "A10G") -> None:
+def main(config: str, gpu: str = "A10G", data: str = "") -> None:
     text = (ROOT / config).read_text(encoding="utf-8")
     cfg = tomllib.loads(text)
     # The config's train/dev files go with the call; refuse any that could be real text.
+    sys.path.insert(0, str(ROOT / "training" / "ner"))
+    import data_sync
     from modal_upload import check_payload
 
-    paths = check_payload([*cfg["train"], *cfg["dev"]])
-    files = {rel: (ROOT / rel).read_bytes() for rel in paths}
+    mounted = tuple(s for s in data.split(",") if s)
+    if any("@" not in s for s in mounted):
+        raise SystemExit("--data takes <corpus>@<rev>[,...]")
+    on_volume = {s.split("@", 1)[0] for s in mounted}
+    files: dict[str, bytes] = {}
+    for rel in dict.fromkeys([*cfg["train"], *cfg["dev"]]):
+        if not rel.startswith(DATA_PREFIX):
+            check_payload([rel])
+            files[rel] = (ROOT / rel).read_bytes()
+            continue
+        inner = rel[len(DATA_PREFIX) :]
+        check_payload([f"corpora/{inner}"])
+        if inner.split("/", 1)[0] not in on_volume:
+            files[rel] = data_sync.resolve(rel).read_bytes()
     fn = {"A10G": train_a10g, "L40S": train_l40s, "A100": train_a100}[gpu.upper()]
-    name = fn.remote(text, files)
+    name = fn.remote(text, files, mounted)
     print(f"checkpoint on volume pii-guard-ner-runs: {name}")
