@@ -53,6 +53,10 @@ Sign-in returns to `#overview`.
 
 ## Screens
 
+Fresh Text, Chat, Images and public demo views use the existing English synthetic samples.
+Language controls and Hungarian samples remain selectable; choosing a sample uses its language.
+This presentation default does not change server defaults or saved project policy languages.
+
 A console with a sidebar (a **Menu** button below 1024 px). Every section has its own hash, so
 links, new tabs and the back button work; the old tab links (`#mask`, `#chat`, `#images`,
 `#benchmarks`, `#traffic`) redirect to their new place.

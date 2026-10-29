@@ -15,13 +15,36 @@ on:
 permissions:
   contents: read
 
+env:
+  # Keep in step with the uv image pinned in Dockerfile/Dockerfile.hosted.
+  UV_VERSION: "0.13.6"
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  # Fail closed: a tag creates no ci.yml run, so prove the tagged commit already passed
+  # ci-ok as a main/develop push before anything is published (LAB-1553).
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require successful ci-ok for the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/release_gate.py
+
   image:
     name: image
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -48,6 +71,9 @@ jobs:
       # No build cache: a release image is built from scratch.
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: "false"
+          DOCKER_BUILD_SUMMARY: "false"
         with:
           context: .
           push: true
@@ -58,6 +84,7 @@ jobs:
 
   wheel:
     name: wheel
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -75,6 +102,7 @@ jobs:
           package-manager-cache: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: false
       # No pnpm or uv cache: a release is built from scratch.
       - name: Wheel with the web UI bundled (size budget, UI present)
@@ -111,6 +139,7 @@ jobs:
     steps:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: false
       - name: Download the release's wheel and sdist
         env:

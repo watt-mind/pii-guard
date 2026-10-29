@@ -23,14 +23,30 @@ from pii_guard.observability import is_loopback
 
 __all__ = [
     "DEFAULT_ALLOWED_HOSTS",
+    "ENDPOINT_KEY_PREFIX",
     "TOKEN_HEADER",
     "BearerTokenMiddleware",
     "LoopbackOnlyMiddleware",
     "allowed_hosts",
+    "looks_like_endpoint_key",
 ]
 
 DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = ("localhost", "127.0.0.1", "[::1]")
 TOKEN_HEADER = "x-pii-guard-token"  # noqa: S105 - a header name
+ENDPOINT_KEY_PREFIX = "pg_ep_"
+
+
+def looks_like_endpoint_key(credential: str) -> bool:
+    """Whether a credential claims to be an endpoint key, in any letter case.
+
+    One predicate for every layer (LAB-1562): a credential the token middleware
+    treats as an endpoint key must be resolved as one by ``ProjectMiddleware``,
+    never fall through to another admission path. Real keys are issued with the
+    exact lowercase prefix; a differently cased one simply fails resolution.
+    """
+    return credential.strip().lower().startswith(ENDPOINT_KEY_PREFIX)
+
+
 _WILDCARD_BINDS = {"0.0.0.0", "::", "[::]", ""}  # noqa: S104 - names, not a bind
 _PUBLIC_PATHS = frozenset({"/healthz"})
 
@@ -117,28 +133,35 @@ class BearerTokenMiddleware:
             await self.app(scope, receive, send)
             return
         headers: list[tuple[bytes, bytes]] = list(scope.get("headers") or [])
-        # Endpoint authentication is confined and checked by ProjectMiddleware.
+
+        # Endpoint authentication is confined and checked by ProjectMiddleware,
+        # which recognizes endpoint keys with this same predicate (LAB-1562).
+        def bearer_credential(value: bytes) -> bytes | None:
+            scheme, _, credential = value.partition(b" ")
+            return credential.strip() if scheme.lower() == b"bearer" else None
+
         if scope.get("path", "").startswith("/e/") and any(
-            name.lower() == b"authorization" and value.lower().startswith(b"bearer pg_ep_")
+            name.lower() == b"authorization"
+            and (credential := bearer_credential(value)) is not None
+            and looks_like_endpoint_key(credential.decode("utf-8", "replace"))
             for name, value in headers
         ):
             await self.app(scope, receive, send)
             return
-        ok = False
+        ok = any(
+            name.lower() == TOKEN_HEADER.encode() and self._matches(value)
+            for name, value in headers
+        )
+        # Strip every Authorization carrying the token, whichever header
+        # authenticated, so the gateway never forwards it upstream (LAB-1562).
+        kept: list[tuple[bytes, bytes]] = []
         for name, value in headers:
-            if name.lower() == TOKEN_HEADER.encode() and self._matches(value):
+            credential = bearer_credential(value) if name.lower() == b"authorization" else None
+            if credential is not None and self._matches(credential):
                 ok = True
-        if not ok:
-            for i, (name, value) in enumerate(headers):
-                scheme, _, credential = value.partition(b" ")
-                if (
-                    name.lower() == b"authorization"
-                    and scheme.lower() == b"bearer"
-                    and self._matches(credential)
-                ):
-                    ok = True
-                    del headers[i]  # never forwarded upstream as a "bring your own key"
-                    break
+                continue  # never forwarded upstream as a "bring your own key"
+            kept.append((name, value))
+        headers = kept
         if not ok:
             await _send_error(
                 send,

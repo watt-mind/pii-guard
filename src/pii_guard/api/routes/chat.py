@@ -19,7 +19,13 @@ from starlette.responses import Response
 
 from pii_guard.api.deps import get_max_text_chars, get_vault
 from pii_guard.api.errors import error_responses
-from pii_guard.api.routes._common import LoggedRoute, log_extra, text_body_limit, v1_router
+from pii_guard.api.routes._common import (
+    LoggedRoute,
+    ensure_connected,
+    log_extra,
+    text_body_limit,
+    v1_router,
+)
 from pii_guard.gateway import Gateway, InvalidChatRequestError
 from pii_guard.gateway.sessions import path_session
 from pii_guard.visual.masking import image_workers_for
@@ -82,6 +88,7 @@ def get_gateway(request: Request) -> Gateway:
     responses=error_responses("detection_profile_denied", "outbound_check_failed"),
 )
 async def chat_completions(request: Request) -> Response:
+    await ensure_connected(request)
     gateway = get_gateway(request)
     raw = await request.body()
     received_at = time.perf_counter()  # timing starts once the body is in

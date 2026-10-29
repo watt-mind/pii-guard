@@ -45,19 +45,19 @@ file an issue in `Triage` (do not expand the current ticket's scope). PR body:
 
 ```bash
 uv sync                          # install dependencies (Python 3.12, from uv.lock)
-uv run pytest                    # tests + coverage
+uv run pytest                    # every test, serial, branch coverage (make test = fast CI suite)
 uv run ruff check .              # lint
 uv run ruff format .             # format (CI runs --check)
 uv run pii-guard serve           # REST API on http://127.0.0.1:8787 (GET /healthz)
 uv run pii-guard eval            # evaluation scorecard (eval/fixtures, rules detector)
-make check                       # lint + format check + tests, same as CI
+make check                       # lint + types + fast tests + eval gate (subset of CI)
 docker compose up --build        # the API in a container on 127.0.0.1:8787
 ```
 
 Full verification before a PR:
 
 ```bash
-uv sync && uv run ruff check . && uv run ruff format --check . && uv run pytest && uv run pii-guard --help
+uv sync && make check && uv run pii-guard --help
 ```
 
 Shared interfaces (core types, detector registry, config, REST, vault, eval fixtures) are

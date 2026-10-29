@@ -7,6 +7,7 @@ help: ## list targets
 setup: ## install dependencies and the pre-commit hook
 	uv sync
 	uv run --with pre-commit pre-commit install
+	uv run --with pre-commit pre-commit install --hook-type commit-msg
 
 lint: ## ruff lint + format check
 	uv run ruff check .

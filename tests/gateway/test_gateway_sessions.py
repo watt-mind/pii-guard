@@ -64,8 +64,12 @@ def test_path_session_is_created_on_first_use_and_wins_over_the_cache_key() -> N
         vault, BEARER_1, {"prompt_cache_key": "conv-1"}, "client-chosen_1"
     )
     assert (first.session_id, created, source) == ("client-chosen_1", True, SessionSource.PATH)
-    again, created, _ = resolve_session(vault, BEARER_2, {}, "client-chosen_1")
+    again, created, _ = resolve_session(vault, BEARER_1, {}, "client-chosen_1")
     assert again is first and not created
+    # LAB-1565: an explicit session is bound to its creating identity; another bearer
+    # presenting the same id is refused like a missing session (this used to return it).
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, BEARER_2, {}, "client-chosen_1")
     with pytest.raises(InvalidChatRequestError):
         resolve_session(vault, {}, {}, "bad id!")
 
@@ -217,9 +221,9 @@ def test_path_url_errors() -> None:
         bad = chat(http, "/s/bad.id/v1/chat/completions")
         assert bad.status_code == 400
         assert bad.json()["error"]["code"] == "invalid_request"
-        assert chat(http, "/s/x/healthz").status_code == 404  # only /v1 and /muse-code
+        assert chat(http, "/s/xxx/healthz").status_code == 404  # only /v1 and /muse-code
         # A header session still has to exist, whatever the path says.
-        gone = chat(http, "/s/x/v1/chat/completions", **{"X-PII-Guard-Session": "s_gone"})
+        gone = chat(http, "/s/xxx/v1/chat/completions", **{"X-PII-Guard-Session": "s_gone"})
         assert gone.status_code == 404
 
 
@@ -231,9 +235,9 @@ def test_path_url_still_needs_the_api_token() -> None:
         api_token=GATEWAY_TOKEN,
     )
     with TestClient(make_app(MockUpstream(), settings=settings)) as http:
-        assert chat(http, "/s/x/v1/chat/completions").status_code == 401
-        ok = chat(http, "/s/x/v1/chat/completions", **{"X-PII-Guard-Token": GATEWAY_TOKEN})
-        assert ok.status_code == 200 and ok.headers["x-pii-guard-session"] == "x"
+        assert chat(http, "/s/xxx/v1/chat/completions").status_code == 401
+        ok = chat(http, "/s/xxx/v1/chat/completions", **{"X-PII-Guard-Token": GATEWAY_TOKEN})
+        assert ok.status_code == 200 and ok.headers["x-pii-guard-session"] == "xxx"
 
 
 def test_two_bearers_get_two_default_sessions() -> None:
@@ -386,3 +390,83 @@ def test_full_session_rotates_to_a_new_generation() -> None:
     assert third.headers["x-pii-guard-session"] != rotated  # full again: the next generation
     assert {r.status_code for r in (first, second, third)} == {200}
     assert all(leaked_values(r.content) == [] for r in upstream.requests)
+
+
+# --- LAB-1565: identity binding, short ids, clean re-incarnation ---------------------------
+
+
+def test_header_session_is_bound_to_its_first_gateway_identity() -> None:
+    vault = Vault(KEY_A)
+    known = vault.session()
+    headers = {"X-PII-Guard-Session": known.session_id, **BEARER_1}
+    assert resolve_session(vault, headers, {}, None)[0] is known
+    assert resolve_session(vault, headers, {}, None)[0] is known  # same identity: fine
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, {"X-PII-Guard-Session": known.session_id, **BEARER_2}, {}, None)
+    # Dropping Authorization is not a way around the binding: a credential-less caller
+    # can't use a credentialed session.
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, {"X-PII-Guard-Session": known.session_id}, {}, None)
+
+
+def test_anonymous_sessions_stay_shared_and_a_credential_takes_them_over() -> None:
+    vault = Vault(KEY_A)
+    known = vault.session()
+    header = {"X-PII-Guard-Session": known.session_id}
+    assert resolve_session(vault, header, {}, None)[0] is known
+    assert resolve_session(vault, header, {}, None)[0] is known  # the one local principal
+    assert resolve_session(vault, {**header, **BEARER_1}, {}, None)[0] is known  # takes over
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, header, {}, None)
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, {**header, **BEARER_2}, {}, None)
+
+
+def test_one_and_two_character_session_ids_are_refused() -> None:
+    vault = Vault(KEY_A)
+    for short in ("a", "ab"):
+        with pytest.raises(InvalidChatRequestError):
+            resolve_session(vault, BEARER_1, {}, short)
+        assert not SESSION_RE.match(short)
+    with TestClient(make_app(MockUpstream())) as http:
+        assert chat(http, "/s/ab/v1/chat/completions").status_code == 400
+
+
+def test_distinct_bearers_never_share_derived_sessions() -> None:
+    # LAB-1565 item 2: derived default and prompt_cache_key sessions are per identity;
+    # the credential-less anonymous identity is one (local) principal of its own.
+    vault = Vault(KEY_A)
+    for body in ({}, {"prompt_cache_key": "same-key"}):
+        one = resolve_session(vault, BEARER_1, body, None)[0]
+        two = resolve_session(vault, BEARER_2, body, None)[0]
+        anon = resolve_session(vault, {}, body, None)[0]
+        assert len({one.session_id, two.session_id, anon.session_id}) == 3
+        assert resolve_session(vault, {}, body, None)[0] is anon  # anonymous is stable
+
+
+def test_cross_bearer_path_session_is_refused_over_http() -> None:
+    with TestClient(make_app(MockUpstream())) as http:
+        mine = chat(http, "/s/bound-box/v1/chat/completions", **BEARER_1)
+        stranger = chat(http, "/s/bound-box/v1/chat/completions", **BEARER_2)
+        mine_again = chat(http, "/s/bound-box/v1/chat/completions", **BEARER_1)
+    assert mine.status_code == mine_again.status_code == 200
+    assert stranger.status_code == 404
+
+
+def test_recreated_session_id_starts_with_clean_cache_and_issued_ids() -> None:
+    # LAB-1565 item 3: after vault.drop, the same id re-created gets no cached
+    # detections and no issued-id exemptions from the previous incarnation.
+    upstream = MockUpstream()
+    app = make_app(upstream)
+    with TestClient(app) as http:
+        first = chat(http, "/s/clean-box/v1/chat/completions")
+        second = chat(http, "/s/clean-box/v1/chat/completions")
+        gateway = app.state.gateway
+        gateway.issued_ids.add("clean-box", ["call_synthetic_old"])
+        assert "call_synthetic_old" in gateway.issued_ids.of("clean-box")
+        gateway.vault.drop("clean-box")
+        third = chat(http, "/s/clean-box/v1/chat/completions")
+    assert first.status_code == second.status_code == third.status_code == 200
+    assert second.headers["x-pii-guard-cache-misses"] == "0"  # served from cache
+    assert int(third.headers["x-pii-guard-cache-misses"]) > 0  # clean incarnation: a miss
+    assert "call_synthetic_old" not in gateway.issued_ids.of("clean-box")

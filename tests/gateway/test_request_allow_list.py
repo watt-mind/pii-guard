@@ -327,3 +327,29 @@ def test_structural_fields_pass_through_untouched() -> None:
 def test_malformed_fields_are_rejected(body: dict[str, Any], error: type[Exception]) -> None:
     with pytest.raises(error):
         collect_texts({"model": "m", "messages": HELLO, **body})
+
+
+# --- ``model`` is identifier-checked (LAB-1563) ---------------------------------------------
+
+
+def test_model_is_a_checked_identifier_slot() -> None:
+    slots = collect_texts({"model": EMAIL, "messages": HELLO}).slots
+    slot = next(s for s in slots if s.text == EMAIL)
+    assert slot.kind == "identifier"
+    with pytest.raises(UnsupportedContentError, match=r"^model:"):
+        slot.write("[[EMAIL_aaaa]]")
+
+
+@pytest.mark.parametrize("model", [EMAIL, NAME, "8123456786"])
+def test_a_pii_shaped_model_is_refused_before_forwarding(model: str) -> None:
+    upstream = MockUpstream()
+    client = TestClient(_app(upstream))
+    response = client.post(
+        "/v1/chat/completions",
+        json={"model": model, "messages": HELLO},
+        headers={"X-PII-Guard-Mode": "audit"},
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "unsupported_content"
+    assert model not in response.text
+    assert upstream.requests == []
