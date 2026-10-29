@@ -19,7 +19,7 @@ pull requests that each add a milestone don't conflict (LAB-1269).
 
 **pii-guard cuts the share of personal data that reaches the model from about 40 % to under
 1 %, in Hungarian and English, with no refusals.** On the hand-written smoke sets, rules alone
-leak 39.6 % (Hungarian) and 46.7 % (English) of labelled values (41.6 % over all 51 documents,
+leak 39.6 % (Hungarian) and 46.7 % (English) of labeled values (41.6 % over all 51 documents,
 German included). Rules plus Muse Spark Open on Baseten leak 0.9 % and 0.0 %, at a median
 1.2–1.8 s and about $2–2.50 per 1,000 messages. The default fast mode, with no LLM call (rules
 plus pii-guard's own NER, v2, trained on data distilled from Muse Glimmer), leaks 0.0 % in both
@@ -48,7 +48,7 @@ on these sets, at a CPU p95 of 147 ms. The v2 weights are published as
 and hash-checks them on first use, so nothing needs training
 ([models.md](models.md#ner-v2-wider-labels-openpii-train-split-hard-negatives)).
 
-Leak = share of labelled values that still appear, in any surface form, in the text the
+Leak = share of labeled values that still appear, in any surface form, in the text the
 model would receive ([evaluation.md](evaluation.md#leak-rate-in-practice)). The smoke sets
 are small (31 + 10 + 10 documents): one leaked value is about 1 point on Hungarian and 3 on
 English.
@@ -175,7 +175,7 @@ PRs [#8](https://github.com/watt-mind/pii-guard/pull/8) (demo UI),
   and only new messages are detected each turn.
 - **Images:** SAM 3.1 finds faces and signatures from a text prompt; regions are filled and
   metadata stripped.
-- **Decision:** organisations default to `keep`, so the model can still reason about who
+- **Decision:** organizations default to `keep`, so the model can still reason about who
   is who without seeing the people.
 
 ### 6. Baselines: Presidio, LLM Guard, PrivAiTe (2026-10-26, 23:14)
@@ -295,8 +295,8 @@ full-address rule that checks the postcode belongs to the settlement.
 
 PR [#21](https://github.com/watt-mind/pii-guard/pull/21), LAB-1127.
 
-The personal identification number (date plus checksum), labelled ID card, passport and
-licence numbers, TD1/TD3 MRZ zones with ICAO check digits, and land-registry parcel numbers.
+The personal identification number (date plus checksum), labeled ID card, passport and
+license numbers, TD1/TD3 MRZ zones with ICAO check digits, and land-registry parcel numbers.
 These were the Hungarian leak left over once names were handled.
 
 - **Before → after (rules only, hu-smoke, 31 docs):** `ID_DOCUMENT` leaked 10 → **0**,
@@ -322,7 +322,7 @@ in every form, deterministically, with no model.
 PR [#23](https://github.com/watt-mind/pii-guard/pull/23), LAB-1128.
 
 A 4,964-document fictional corpus (the generator's document kinds plus ten more per language:
-logs, forms, CSV, support chat and hard negatives with no personal data, among others), labelled by Glimmer as teacher, used to train
+logs, forms, CSV, support chat and hard negatives with no personal data, among others), labeled by Glimmer as teacher, used to train
 XLM-RoBERTa base and large students. Where Glimmer disagreed with planted gold, those
 characters were left out of the loss rather than guessed (499 cases).
 
@@ -383,9 +383,9 @@ published checkpoint). Source:
 [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md).
 
 - **Decision:** publish exposure next to the leak rate, and describe masking as
-  pseudonymisation: placeholders hold against reconstruction, but someone holding a short
+  pseudonymization: placeholders hold against reconstruction, but someone holding a short
   candidate list links a masked document to the right person about twice as often as chance.
-  Reducing that would take generalising the context (roles, dates, places) rather than better
+  Reducing that would take generalizing the context (roles, dates, places) rather than better
   detection; filed as a follow-up (LAB-1152).
 
 ### 17. Fictional specimen documents with Muse Image (2026-10-27)
@@ -393,7 +393,7 @@ published checkpoint). Source:
 LAB-1121.
 
 24 fictional specimen-style documents (ID card front and back, passport data page, driving
-licence, visitor badge, health/member card, filled-in form, signed letter; Hungarian, German
+license, visitor badge, health/member card, filled-in form, signed letter; Hungarian, German
 and English variants), committed under `eval/fixtures/visual/` with exact labels and a
 `NOTICE`. Muse Image painted the 18 portraits of people who don't exist, 6 signatures, 2 stamps
 and 6 textures; every word and number is ours, laid out with Pillow, so each label box is
@@ -443,7 +443,7 @@ committed; reproduce with the commands in [evaluation.md](evaluation.md).
 
 - **Still missed (7/30):** zones where Tesseract returns too little to work with (a
   hologram-covered French card, a Polish passport with three words read), single surviving
-  lines (one line of a 2- or 3-line zone covers under half the labelled box), and a one-line
+  lines (one line of a 2- or 3-line zone covers under half the labeled box), and a one-line
   driving-licence MRZ with a single filler.
 
 ### 19. Person names inside company names (2026-10-27)
@@ -451,7 +451,7 @@ committed; reproduce with the commands in [evaluation.md](evaluation.md).
 LAB-1149.
 
 In fast mode a Hungarian business name that carries a person's name (`Tóth és Társa Bt.`,
-`Kiss-Lukács Kft.`, `Molnár Péter Bt.`) was one `ORGANIZATION` to the NER, and organisations
+`Kiss-Lukács Kft.`, `Molnár Péter Bt.`) was one `ORGANIZATION` to the NER, and organizations
 are kept, so the name reached the model. A rule in the Hungarian pack now finds the name part
 before a legal form with the surname and given-name lexicons and masks only it
 (`[[PERSON_x]] és Társa Bt.`); sole traders (`e.v.`, `egyéni vállalkozó`) are masked even when
@@ -468,19 +468,19 @@ the surname is not in the lexicon.
   bare `Bt.`), so `Fekete Kavics Kft.` stays intact and `Fekete Kft.` is accepted as a possible
   miss.
 
-### 20. Every detector sees normalised text (2026-10-27)
+### 20. Every detector sees normalized text (2026-10-27)
 
 LAB-1146.
 
 The prompt-injection red team (LAB-1107) showed that only the LLM detector cleaned invisible
 characters and lookalike letters. A zero-width space inside a phone number hid it from the
-rules, and a zero-width joiner inside an e-mail address made the rules match only the part
+rules, and a zero-width joiner inside an email address made the rules match only the part
 after it; that validated rule span then kept its boundaries over the LLM's whole-address span,
-so the local part leaked. The pipeline now normalises once, before any detector runs, and maps
+so the local part leaked. The pipeline now normalizes once, before any detector runs, and maps
 every span back to the original text, invisible characters included.
 
 - **Before → after**, `pii-guard eval injection`, `zero-width` class (14 values): rules alone
-  **9 leaked / 5 partial → 6 / 3**, e-mail and phone exact recall 0 → 100 %; the rest are
+  **9 leaked / 5 partial → 6 / 3**, email and phone exact recall 0 → 100 %; the rest are
   names, addresses and a birth date only a language model finds. Rules + Muse Spark Open
   (Baseten, `reasoning_effort: low`) **3 partial → 0**, so all 175 injection values are now
   masked whole (partial leak 1.7 % → 0.0 %). Source: run records
@@ -519,7 +519,7 @@ timing breakdown; `full` mode with the originals is refused off localhost
   cell).
 - **What the breakdown showed:** in rules-only fast mode detection and masking take about
   0.7 ms; **4.4 of the 5.2 ms** are the `forward` stage, a new HTTP client (and TLS context)
-  built for every upstream call. Under concurrency the NER is serialised behind one lock (p50
+  built for every upstream call. Under concurrency the NER is serialized behind one lock (p50
   36 → 166 ms at c=8), and strict mode queues behind the gateway's detection limit
   (`PII_GUARD_GATEWAY_CONCURRENCY`, 4). Each is now a follow-up with a number to beat.
 - **Cost:** 44 Muse Spark Open calls on Baseten for the strict cells, about $0.10; everything
@@ -650,7 +650,7 @@ The text comparison (milestones 6 and 24) had no image counterpart. Now the visu
 open-source image redactors with the same scorer: Presidio Image Redactor (Tesseract +
 Presidio analyzer, spaCy en/de/hu) and Eka PII Redaction (LayoutLMv3 text PII + YOLO faces and
 signatures, CPU). Each ran with its defaults and once more with pii-guard's own OCR input.
-Recall@IoU ≥ 0.5 over every labelled region, best configuration of each tool:
+Recall@IoU ≥ 0.5 over every labeled region, best configuration of each tool:
 
 | Set | pii-guard rules | pii-guard rules + LLM | Eka | Presidio | Over-masking (pii-guard LLM / Eka / Presidio) |
 |---|---:|---:|---:|---:|---:|
@@ -703,16 +703,16 @@ document number one character off). OCR words recorded from Tesseract, SAM off:
 
 - **The demo question** "which parties have an ID?" (one card valid, one expired, one party
   without a card), answered by Muse Spark Open on Baseten: **3 / 3 parties right** with
-  labelled images, **1 / 3** with opaque boxes (the model called every party "missing";
+  labeled images, **1 / 3** with opaque boxes (the model called every party "missing";
   only the party with no card was). The mocked upstream gives the same 3 / 3 vs 1 / 3, and
   that run is the end-to-end test in CI. No party name or document number was forwarded raw.
 - **Coverage doesn't depend on the mode:** text and MRZ region recall 87.9 % @ IoU ≥ 0.5 in
-  both, 88.7 % of labelled pixels overwritten in both; a narrow box grows to the right, into
+  both, 88.7 % of labeled pixels overwritten in both; a narrow box grows to the right, into
   free space only, so its label stays legible.
 - **Uncertain matches:** 2 on clean OCR, 4 with noise, each a new placeholder and listed in
   the summary's `fields_uncertain`. The one clean miss is a document number only readable
   from a garbled MRZ.
-- **Latency:** 65 ms p50 per image for matching, labelling and rendering (recorded OCR words).
+- **Latency:** 65 ms p50 per image for matching, labeling and rendering (recorded OCR words).
 - **Cost:** two live Baseten calls for the committed demo runs, about **$0.014** (≈ $0.03
   with the two exploratory calls); no SAM or GPU. Source: run records
   `2026-10-27-visual-placeholders-{exact,fuzzy}-{clean,noisy}` and
@@ -753,7 +753,7 @@ Fast mode on Ai4Privacy per language: `hu` 40.4 → 33.8 %, `en` 34.8 → 26.0 %
 | `ID_DOCUMENT` | 51.0 → 44.2 | 83.4 → 61.5 | 94.9 → 55.8 |
 
 - **No new over-masking:** every smoke, synth and company-names scorecard is identical, and
-  on the public set every new span lands on a labelled value of the same type (over-masking
+  on the public set every new span lands on a labeled value of the same type (over-masking
   falls because the masked total grows). The 1-point budget the ticket set was not touched,
   so `PII_GUARD_RULES_CUED_NUMBERS` defaults **on**.
 - **What is left is mostly uncued.** Most remaining misses stand in running text with
@@ -781,7 +781,7 @@ no-break or thin space, an en dash, a non-breaking hyphen or a minus sign inside
 card, IBAN, giro or Steuer-ID number hid it completely. So did a phone or IBAN wrapped over a
 line break, Arabic-Indic digits and an identifier written only in Cyrillic or Greek lookalike
 letters (`АВС-123`, `ΒΕ68 5390 ...`). Decomposed accents (NFD, as macOS and some keyboards
-produce) cut e-mail addresses down to the part after the last accent, a combining mark inside
+produce) cut email addresses down to the part after the last accent, a combining mark inside
 a phone number left its last digits unmasked, and an Arabic-Indic Versicherungsnummer made a
 German checksum helper raise, so the rules detector failed and the request was refused.
 
@@ -882,7 +882,7 @@ rule span dropped every other detector's same-type span that overlapped it, so w
 a value short (`user@example.xn` out of `user@example.xn--p1ai`, a phone number without its
 `/ 123` extension) the rest leaked; a span of another type already kept its rest. The IBAN
 length table missed eleven countries of the SWIFT registry (Russia, Oman, Nicaragua, Mongolia,
-Yemen ...), and the e-mail rule stopped at a punycode TLD and missed a quoted local part
+Yemen ...), and the email rule stopped at a punycode TLD and missed a quoted local part
 (`"john doe"@example.com`).
 
 A context-free TAJ right after an order, invoice or reference label, an ID prefix (`INV-`,
@@ -890,12 +890,12 @@ A context-free TAJ right after an order, invoice or reference label, an ID prefi
 resolver keeps the rest of a same-type span when it can be the rest of the value (it holds a
 digit, or continues the validated span without a space); a label word the other detector took
 along (`(mobil)`, `E-mail:`) and an inflectional suffix (`-ra`) stay unmasked. The IBAN table
-follows the registry, and the e-mail rule accepts `xn--` TLDs and quoted local parts.
+follows the registry, and the email rule accepts `xn--` TLDs and quoted local parts.
 
 - **Probes:** every input of the reviewers' four probe scripts in the ticket's scope now comes
-  out right: the 7 TAJ over-masking cases, the same-type e-mail and phone remainders, 6 of the
+  out right: the 7 TAJ over-masking cases, the same-type email and phone remainders, 6 of the
   7 IBAN countries (the probe's Sudanese IBAN has 16 characters; the registry says 18, and an
-  18-character one is found) and both e-mail forms.
+  18-character one is found) and both email forms.
 - **Negative set:** 6 new hand-written documents of order numbers and amounts that pass the TAJ
   check (en, hu, de). The rules masked 11 values in them as TAJ before and mask none now; the
   38 documents of the set come out clean.
@@ -922,7 +922,7 @@ still personal data; the split only shows where the gap comes from. Of the set's
 | pii-guard strict | 3.9 % | 0 of 166 | 6.5 % | 2.8 % |
 | PrivAiTe | 9.5 % | 7 of 166 | 3.0 % | 14.0 % |
 
-- **Fast mode masks every valid number and leaks 10.4 % of names, addresses and e-mail**
+- **Fast mode masks every valid number and leaks 10.4 % of names, addresses and email**
   (PrivAiTe 14.0 %). Its gap on this set is invalid numbers, which the rules skip on purpose.
 - The runs kept no per-document predictions, so each system was run again to classify them,
   with the run's own code. Every local re-run reproduced its record exactly. Strict mode
@@ -947,7 +947,7 @@ or the gateway changes.
 - **YuNet** (OpenCV model zoo, MIT) passes the face half of the "close enough" rule on both
   sets: as much recall as SAM, a lower leak (a region under 95 % covered; 0.0 % on the
   fictional set for both), under 500 ms on a busy laptop CPU. It over-masks around the photo
-  (61 % of its portrait boxes hit a labelled portrait, SAM's 90 %), which is the safe side.
+  (61 % of its portrait boxes hit a labeled portrait, SAM's 90 %), which is the safe side.
 - **No small signature detector comes close.** The permissively licensed ones on Hugging Face
   are trained on scanned pages and find 16-32 % of ID-card signatures (51 % on image tiles, at
   9 % precision); the YOLOv8 ones are AGPL. EfficientSAM as a photo refiner added nothing
@@ -965,7 +965,7 @@ or the gateway changes.
 LAB-1245. LAB-1229 showed YuNet finds faces and ID photos as well as SAM 3.1 but no signatures.
 The owner's call: make it the default for faces and keep SAM 3.1 for signatures only.
 `PII_GUARD_SEGMENTER=hybrid` (new default) runs YuNet on the CPU alongside two SAM 3.1 calls
-(`signature`, `squiggly line`); `sam-api` keeps the old behaviour, `local` and `off` never call
+(`signature`, `squiggly line`); `sam-api` keeps the old behavior, `local` and `off` never call
 the API and refuse images they can't fully check.
 
 | `POST /v1/mask/image` with OCR | SAM calls / image | p50 | p95 | Portrait leak | Signature recall |
@@ -1006,7 +1006,7 @@ client's contact details.
 | Meta Model API, `muse-spark-1.3` | 3 | 0 | 0 of 13 | 5 (all the task asked for) |
 
 - **Tool-call arguments come back restored**, so the agent's `write` lands the real IBAN,
-  e-mail and phone on disk. pi's requests needed no new allow-list keys.
+  email and phone on disk. pi's requests needed no new allow-list keys.
 - **Code survives:** 0 of 23 masked spans in the mini-repo and repository code were
   identifiers, paths or URLs.
 - **Gaps found:** secrets (all 3 fake keys from `.env` reached the model) and names inside CSV
@@ -1056,7 +1056,7 @@ at all.
 
 NER v2 widens the label set from 4 to 10 types: it adds `EMAIL`, `PHONE`, `ID_DOCUMENT`,
 `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ` and `BANK_ACCOUNT`. It trains on three sources:
-- the two distillation corpora: s11, and s13, written from the lexicon packs and labelled by
+- the two distillation corpora: s11, and s13, written from the lexicon packs and labeled by
   Muse Glimmer on Modal;
 - 5,000 rows per language from the OpenPII **train** split. The build script asserts these are
   disjoint from the evaluated validation rows;
@@ -1114,7 +1114,7 @@ Now each value carries a few literal needles, the longest piece of a word of eac
 pattern matches. A text that holds none of them can't match and isn't scanned
 (`needle in text` is a C-speed search). The vault also keeps each session's folded views of
 recent texts, so the history isn't folded again on every turn. Output is unchanged: a new
-test masks a multi-turn session (smoke and inflection fixtures with gold spans, e-mail and
+test masks a multi-turn session (smoke and inflection fixtures with gold spans, email and
 phone turns, later mentions in other casings, NFD, zero-width and dotless i) with both
 changes on and off, and compares the masked and unmasked text.
 
@@ -1335,7 +1335,7 @@ the tenant key, and `X-PII-Guard-Session-Source` reports which step matched.
 
 Same fictional mini-repo and task as milestones 35 and 39, fast mode (rules + NER), Muse Code
 1.4.14 (the installer's current release; the harness pin is still 1.4.13, LAB-1299).
-"Before" is the harness's `--session per-request`, which reproduces the old behaviour. The
+"Before" is the harness's `--session per-request`, which reproduces the old behavior. The
 scripted runs are after the `SECRET` type (milestone 40), so they check 16 gold values; the two
 live runs were made just before it, with 13:
 
@@ -1417,7 +1417,7 @@ data** ([models.md](models.md)).
 | **SAM 3.1** | Meta Model API | Faces, ID photos, signatures in images | Finds regions from a text prompt; 90.8 % portrait recall on specimen IDs (milestone 8) |
 
 The pattern we would reuse: use the big model where its cost doesn't matter (writing fictional
-data, labelling it, judging), and ship a small, fast, self-hostable model distilled from it.
+data, labeling it, judging), and ship a small, fast, self-hostable model distilled from it.
 
 ## Process numbers
 
@@ -1433,7 +1433,7 @@ As of 2026-10-28, `develop` at `5581013`.
 - **Evaluation runs:** 499 run records in [`eval/results/runs/`](../eval/results/runs/), all
   listed in the [run log](benchmarks.md#run-log); `pii-guard eval report --check` fails CI when
   [benchmarks.md](benchmarks.md) is out of date.
-- **Spend:** [the table above](#spend-so-far) itemises about $22 as of 2026-10-27. The NER
+- **Spend:** [the table above](#spend-so-far) itemizes about $22 as of 2026-10-27. The NER
   v2.1 retrain (LAB-1306, its entry is in [journey/](journey/)) added $2.92 of Modal free credits.
 
 ## What's next

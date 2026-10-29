@@ -15,12 +15,12 @@ different task.
   before they leave the detector, so a rejected hit never becomes a session value. Each check
   looks at the shape of the text around the hit:
   - an `EMAIL` needs an `@` in its token (bracketed `[at]` is already `@` after
-    normalisation; a spelled-out `at … dot` also counts). An npm scope (`@scope/pkg`) is not an
+    normalization; a spelled-out `at … dot` also counts). An npm scope (`@scope/pkg`) is not an
     address;
   - a hit on a file extension (`json` in `contacts.json`) or on a code-fence language tag
     (```` ```json ````) goes;
   - in a file name or a path, an unvalidated number-like hit (ID, account, phone, tax number,
-    e-mail, birth date) goes. The checksum and format rules don't go through these guards, so
+    email, birth date) goes. The checksum and format rules don't go through these guards, so
     a valid IBAN in `/exports/<IBAN>.csv` is still masked. A name-like hit in a path goes only
     when its segment also holds a digit (`claude-501`, `opencode-3f2b…`). `/Users/anna.kovacs/`
     stays masked;
@@ -74,7 +74,7 @@ Run records:
 
 - **The agent-text set is in-sample.** I wrote its 39 documents
   ([builder](../../eval/fixtures/build_agent_text.py)) from the harness requests while building
-  the guards. The 0 % shows that the guards work on those shapes, not how far they generalise.
+  the guards. The 0 % shows that the guards work on those shapes, not how far they generalize.
   Half the set is positives (a `cat` of a JSON file, a CSV in a code fence, a name in a file
   name, an IBAN in an export path): all 60 values stay masked, and a test checks that every
   gold value survives the guards or is found by the rules.

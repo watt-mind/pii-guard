@@ -1,0 +1,70 @@
+# NER v3.3 candidate T1: 1 epoch, lr 1e-5 (LAB-1512). Continued fine-tune of the LAB-1494 soup S30
+# (0.7 v2.0 + 0.3 v3.1-B, weights sha256 e5c31d12..., rebuilt with soup.py and uploaded to the
+# pii-guard-ner-runs volume) on the targeted add-on (training/ner/targeted_v33.py) plus a replay
+# slice of the v3.1-B mix. Candidates and gates were fixed in
+# eval/results/2026-10-29-ner-v33/README.md before any run. Fictional / synthetic data only.
+#   modal run training/distill/modal_train.py --config training/ner/v33-t1.toml --gpu A10G
+base_model = "/runs/pii-guard-ner-xlmr-base-v32-s30"
+train = [
+  "eval/generated/v33-addon/hu-v33-names-train.jsonl",
+  "eval/generated/v33-addon/pl-v33-names-train.jsonl",
+  "eval/generated/v33-addon/de-v33-names-train.jsonl",
+  "eval/generated/v33-addon/hu-v33-payload-train.jsonl",
+  "eval/generated/v33-addon/en-v33-payload-train.jsonl",
+  "eval/generated/v33-addon/de-v33-payload-train.jsonl",
+  "eval/generated/v33-addon/hu-v33-agent-train.jsonl",
+  "eval/generated/v33-addon/en-v33-agent-train.jsonl",
+  "eval/generated/v33-addon/de-v33-agent-train.jsonl",
+  "eval/generated/v33-replay/openpii/hu-openpii-train-10k.jsonl",
+  "eval/generated/v33-replay/openpii/en-openpii-train.jsonl",
+  "eval/generated/v33-replay/openpii/de-openpii-train.jsonl",
+  "eval/generated/v33-replay/openpii/pl-openpii-train.jsonl",
+  "eval/generated/v33-replay/openpii/cs-openpii-train.jsonl",
+  "eval/generated/v33-replay/openpii/sk-openpii-train.jsonl",
+  "eval/generated/v33-replay/openpii/ro-openpii-train.jsonl",
+  "eval/generated/v33-replay/openpii/hr-openpii-train.jsonl",
+  "eval/generated/v33-replay/openpii/sl-openpii-train.jsonl",
+  "eval/generated/v33-replay/s11/hu-distill-train.jsonl",
+  "eval/generated/v33-replay/s11/en-distill-train.jsonl",
+  "eval/generated/v33-replay/negatives/hu-negatives-train.jsonl",
+  "eval/generated/v33-replay/negatives/en-negatives-train.jsonl",
+  "eval/generated/v33-replay/negatives/de-negatives-train.jsonl",
+  "eval/generated/v33-replay/privy/en-privy-train-6k.jsonl",
+  "eval/generated/v33-replay/wismut/en-wismut-train.jsonl",
+  "eval/generated/v33-replay/wismut/de-wismut-train.jsonl",
+  "eval/generated/v33-replay/wismut/pl-wismut-train.jsonl",
+  "eval/generated/v33-replay/wismut/cs-wismut-train.jsonl",
+  "eval/generated/v33-replay/wismut/ro-wismut-train.jsonl",
+  "eval/generated/v33-replay/nemotron/en-nemotron-train.jsonl",
+  "eval/generated/v33-replay/gretel/en-gretel-train.jsonl",
+]
+dev = [
+  "eval/generated/v33-addon/hu-v33-names-dev.jsonl",
+  "eval/generated/v33-addon/pl-v33-names-dev.jsonl",
+  "eval/generated/v33-addon/de-v33-names-dev.jsonl",
+  "eval/generated/v33-addon/hu-v33-payload-dev.jsonl",
+  "eval/generated/v33-addon/en-v33-payload-dev.jsonl",
+  "eval/generated/v33-addon/de-v33-payload-dev.jsonl",
+  "eval/generated/v33-addon/hu-v33-agent-dev.jsonl",
+  "eval/generated/v33-addon/en-v33-agent-dev.jsonl",
+  "eval/generated/v33-addon/de-v33-agent-dev.jsonl",
+  "eval/generated/v31-final/s11/hu-distill-dev.jsonl",
+  "eval/generated/v31-final/s11/en-distill-dev.jsonl",
+  "eval/generated/v31-final/openpii/hu-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/en-openpii-dev.jsonl",
+  "eval/generated/v31-final/openpii/de-openpii-dev.jsonl",
+]
+out = "models/ner/pii-guard-ner-xlmr-base-v33-t1"
+teacher = "none"
+epochs = 1
+batch_size = 16
+lr = 1e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"
+other_types = "ignore"
+save_epochs = false

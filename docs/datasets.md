@@ -1,7 +1,7 @@
 # Evaluation datasets
 
 PII Guard is scored on more than its own hand-written fixtures. This page lists every
-registered dataset: where it comes from, its licence, what is committed, how its labels map to
+registered dataset: where it comes from, its license, what is committed, how its labels map to
 PII Guard types, and which split it belongs to. The registry lives in
 [`src/pii_guard/eval/datasets/`](../src/pii_guard/eval/datasets/), one module per dataset.
 Results, with bootstrap confidence intervals, are in
@@ -37,10 +37,11 @@ set here and every `dev` set, which NER candidates are selected on, by text wher
 
 ## Datasets
 
-| Set | Source | Licence | Languages | Docs | Split | Text committed |
+| Set | Source | License | Languages | Docs | Split | Text committed |
 |---|---|---|---|---:|---|---|
 | `ai4privacy` | [Ai4Privacy OpenPII 1M](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m), `validation` @ `ecfdc54` | CC-BY-4.0 | hu, en, de | 600 | test | yes (synthetic) |
 | `gretel-finance` | [gretelai/synthetic_pii_finance_multilingual](https://huggingface.co/datasets/gretelai/synthetic_pii_finance_multilingual), `test` @ `7b844d1` | Apache-2.0 | en, de | 400 | test | yes (synthetic) |
+| `gretel-finance-corrected` | `gretel-finance` with [committed label corrections](#corrected-labels) | Apache-2.0 | en, de | 400 | test (variant) | rebuilt locally from the committed rows |
 | `nemotron-pii` | [nvidia/Nemotron-PII](https://huggingface.co/datasets/nvidia/Nemotron-PII), `test` @ `b70ffaf` | CC-BY-4.0 | en | 300 | test | yes (synthetic) |
 | `cee-pii` | [flowxai/cee-pii-bench](https://huggingface.co/datasets/flowxai/cee-pii-bench) v0.2 @ `84ee883` | Apache-2.0 | hu, en | 451 | test | yes (synthetic) |
 | `pl-pii-bench` | [pl-pii-bench/pl-pii-bench](https://huggingface.co/datasets/pl-pii-bench/pl-pii-bench) v1.0.0 @ `bef947d` | CC-BY-4.0 | pl | 346 | test | yes (synthetic) |
@@ -49,7 +50,7 @@ set here and every `dev` set, which NER candidates are selected on, by text wher
 | `agent-traffic` | PII Guard's seeded generator ([below](#synthetic-agent-traffic)) | Apache-2.0 | hu, en, de | 990 | test | yes (generated) |
 | `agent-traffic-dev` | the same generator, another seed | Apache-2.0 | hu, en, de | 300 | dev | yes (generated) |
 
-Attribution, as the licences require:
+Attribution, as the licenses require:
 
 - Ai4Privacy / Ai Suisse SA (CC-BY-4.0).
 - Gretel.ai (Apache-2.0).
@@ -68,7 +69,7 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
 `eval/fixtures/public/ai4privacy-openpii-1m.json`. A manifest holds:
 
 - the source URL, the pinned revision and the SHA-256 of each file;
-- the licence and attribution;
+- the license and attribution;
 - the split;
 - the seed and the sample rule (per language, rows ordered by `sha256("<seed>:<uid>")`, the
   first *n* that convert);
@@ -80,7 +81,10 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
 
 - **`gretel-finance`**: long financial documents (EDI messages, loan agreements, statements)
   and German text. Its labels were made during generation and checked with GLiNER, so some
-  values are unlabelled or mislabelled. This shows up as over-masking for every system. A few
+  values are unlabeled or mislabeled. This shows up as over-masking for every system. Many
+  of its `PERSON` labels aren't names (`Damen`, `Saldo`, `[Borrower Name]`), which shows up as leaks
+  for every system; [`gretel-finance-corrected`](#corrected-labels) scores the same documents
+  with those corrected. A few
   generated documents contain credentials: a Slack-style token, a JWT, or an API key after
   `API key:`. These rows are skipped (`skipped_unconvertible`). Secret scanning (GitHub push
   protection and gitleaks) rejects them, a public dataset's token can't be shown to be fake,
@@ -90,7 +94,7 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
   span text doesn't match the offsets, or that hold a credential, are skipped and counted (22
   of the first ones drawn).
 - **`cee-pii`**: the only public set we found with Hungarian identifiers (checksum-valid TAJ
-  numbers). It adds deliberate noise (stripped diacritics, OCR confusions) and unlabelled
+  numbers). It adds deliberate noise (stripped diacritics, OCR confusions) and unlabeled
   order and tracking numbers. Another detector's authors wrote it as their benchmark, so it
   is a fair third-party set for PII Guard.
 - **`pl-pii-bench`**: the first Polish set. It was scored before the `pl` language pack existed
@@ -99,7 +103,7 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
   same-shape values that fail their check digits. An inflection lane puts names in all seven
   Polish cases. Five of its seven public lanes are used; the `robustness` and `pdf` lanes
   are re-renderings of `core` and are left out. Its card asks that nobody train on it. PESEL,
-  ID card, passport, driving licence and NIP are `ID_DOCUMENT`; REGON (a business number)
+  ID card, passport, driving license and NIP are `ID_DOCUMENT`; REGON (a business number)
   and VIN have no PII Guard type. Its maintainer also maintains one of the systems it
   scores.
 - **`mapa-eur-lex`**: two long Advocate General opinions in 21 EU languages, including
@@ -114,9 +118,9 @@ Each set's manifest is `eval/datasets/<set>/manifest.json`; for Ai4Privacy it is
 
 **Rejected candidates**
 
-- **WikiANN** (hu/de/en). Its card lists the licence as *unknown*, and its names are real
-  people. The licence can't be verified, so the set is dropped.
-- **The other Ai4Privacy releases** (300k/400k, PII-Masking-2M). Their licences don't allow
+- **WikiANN** (hu/de/en). Its card lists the license as *unknown*, and its names are real
+  people. The license can't be verified, so the set is dropped.
+- **The other Ai4Privacy releases** (300k/400k, PII-Masking-2M). Their licenses don't allow
   this use, which is also why only OpenPII is used.
 - **An OpenPII `test` split.** OpenPII publishes only `train` and `validation`. The
   evaluation sample comes from `validation`, which NER v2 never trained on, so `validation`
@@ -155,15 +159,15 @@ rebuilds them and compares.
   where they went. No model labels anything.
 - **The values are fictional.** Hungarian and English people and companies come from
   `pii_guard.eval.identities`; German ones come from common first and last names combined at
-  random. E-mail domains are the reserved `example.*` ones.
+  random. Email domains are the reserved `example.*` ones.
 - **Shapes** (`meta.shape`):
   - an OpenAI tool call, whose `arguments` is a JSON string inside JSON;
   - a nested JSON record;
   - YAML;
   - CSV;
   - log lines;
-  - Python code with an e-mail address and an API key;
-  - an e-mail thread with a quoted reply;
+  - Python code with an email address and an API key;
+  - an email thread with a quoted reply;
   - a multi-turn chat, as JSON messages or a transcript;
   - Hungarian prose with inflected names (`Kovács Annának`, `Nagy Péterrel`); English and
     German get a free-text call note instead.
@@ -179,13 +183,85 @@ rebuilds them and compares.
   - a Cyrillic look-alike letter;
   - a zero-width space;
   - a name broken over two lines, only where a newline doesn't break the format;
-  - a leetspeak e-mail (`4nn4 [at] example [dot] com`).
-- **Hard negatives** are never labelled: order and invoice numbers, SKUs, request ids,
+  - a leetspeak email (`4nn4 [at] example [dot] com`).
+- **Hard negatives** are never labeled: order and invoice numbers, SKUs, request ids,
   amounts, dates that aren't birth dates, and large public companies in context (`OTP Bank`,
   `Siemens`, `Microsoft`). Masking one is over-masking. API keys in code are ignore regions,
   because the text policy has no secret type.
 - **No LLM-written prose.** The ticket allowed it within free credits, but template text keeps
   the gold exact.
+
+## Corrected labels
+
+Some gold labels in a public set are plainly wrong, and every system pays for them as leaks.
+We never edit an upstream set because of that. Instead, a committed corrections file lists
+each class of error, why it is an error, and the exact span texts it covers. A **separate**
+set is built from it, so every system has two numbers side by side: on the set as published
+upstream, and on the corrected set.
+
+| Corrected set | Built from | Corrections | Spans corrected | Text committed |
+|---|---|---|---:|---|
+| `gretel-finance-corrected` | `gretel-finance` (same 400 documents) | [`gretel-finance/corrections.json`](../eval/datasets/gretel-finance/corrections.json) | 178 of 1,710 | no: rebuilt locally from the committed rows |
+
+```bash
+python -m pii_guard.eval.datasets fetch gretel-finance-corrected   # data/ + manifest
+python -m pii_guard.eval.datasets check gretel-finance-corrected   # rebuild, compare
+```
+
+**The rule.** A correction matches a gold span of one of its entity types whose text (whitespace
+runs collapsed) equals one of its listed values exactly. It reads the span's own text and never
+any system's output. A matched span stops being gold and becomes an ignore region
+(`corrected:<rule>`): unmasked it is not a leak, masked it is not over-masking. So no system
+is credited or charged for it, and every system is scored on the same corrected files. The
+values were picked by reading every distinct gold value of the sample (275 de and 159 en
+`PERSON` values; the other types in full), not from any model's misses.
+
+**What was corrected in `gretel-finance`** (counts from
+[`gretel-finance-corrected/manifest.json`](../eval/datasets/gretel-finance-corrected/manifest.json)):
+
+| Rule | What it covers | Spans (de + en) |
+|---|---|---:|
+| `greeting-or-phrase` | salutations and set phrases labeled as names: `Damen`, `Herren` (from "Sehr geehrte Damen und Herren"), `Vielen Dank`, `Guten Morgen`, `Im Rahmen`, `Ihnen` | 74 + 0 |
+| `common-noun` | dictionary words: `Saldo`, `Betrag`, `Sitz`, `Recht`, `Stahl`, `Seife`, `Engineering`, … | 45 + 1 |
+| `possessive-noun-phrase` | German "Ihr/Ihre/Ihren + noun": `Ihr Vertrauen`, `Ihren Warenkorb`, … | 26 + 0 |
+| `template-slot` | template fields, not values: `[Buyer's Name]`, `BORROWER NAME]`, `[Address]`, `phone number`, `[contact email]` | 10 + 7 |
+| `role-word` | roles, not names: `Schuldner`, `Arbeitnehmer 1`, `Valued Customer`, `Data Protection Officer` | 9 + 2 |
+| `code-not-a-name` | numbers and codes labeled as names or emails: `123456789`, `MD123456`, `BALI15`, an EDI segment | 1 + 3 |
+
+`PERSON` gold goes from 694 to 524 spans. **Kept as gold on purpose:** placeholder names used
+as a person's name (`Max Mustermann`, `John Doe`); spans holding a name next to a greeting
+(`Hallo Lola`); name-like user names (`Carina20`); address parts labeled `PERSON` (`Mettmann`,
+`An der Wupper`), which still say where someone lives or works. Missing labels (values the
+generator never labeled) aren't added; they still count as over-masking for every system.
+
+**Before and after** (leak; every system on the same corrected files; the full table and the
+records are in the [audit](../eval/results/2026-10-29-lab-1497-label-audit/README.md) and
+[benchmarks.md](benchmarks.md)). For PII Guard fast (NER v2.0) one run is scored against both
+label sets, so the change is label noise only: **19.07 % → 2.44 %** (German 29.1 → 2.3 %,
+English 5.1 → 2.6 %); 161 of its 180 upstream leaks are corrected values.
+
+| System | Upstream | Corrected |
+|---|--:|--:|
+| PII Guard fast (rules + NER v2.0) | 19.0 % | **2.4 %** |
+| PII Guard NER v2.0 alone | 20.3 % | 4.1 % |
+| rules + Wismut/nym-pii-multilingual | 21.8 % | 5.8 % |
+| rules + bardsai v3 | 23.3 % | 7.5 % |
+| PrivAiTe | 27.7 % | 13.2 % |
+| Presidio | 18.8 % | 14.8 % |
+| LLM Guard | 59.3 % | 51.3 % |
+| PII Guard rules | 80.8 % | 77.1 % |
+
+Every system gains, and on the corrected labels PII Guard fast has the lowest leak of the 17
+systems; on the upstream labels Presidio (18.8 %) edged it. Presidio gains least because it
+masks almost everything (76.7 % over-masking). The upstream rows stay the published ones.
+
+**MAPA EUR-Lex was audited and needs no correction** (LAB-1511). LAB-1494 found role words
+labeled `PERSON` ("Rapporteur", "Registrar", "agentes") in the MAPA project's *validation*
+split. The test set scored here doesn't have them: none of its 1,028 gold `PERSON` spans is one
+of 79 role words in the MAPA languages, and of the 63 values NER v2.0 leaks, 41 are the same
+string, gold-labelled `PERSON`, in 6 or more of the 21 language versions. A name isn't
+translated; a role word is. Its 8.5 % leak is model error, mostly lone surnames
+([audit](../eval/results/2026-10-29-lab-1497-label-audit/README.md)).
 
 ## Commands
 
@@ -217,15 +293,15 @@ UV_PROJECT_ENVIRONMENT=.venv-baselines uv run --no-sync \
 
 ## Adding a dataset
 
-1. **Check the licence.** It must allow evaluation use without a data-use agreement. Commit
-   rows only when the licence allows redistribution and the text is synthetic. Real text is
+1. **Check the license.** It must allow evaluation use without a data-use agreement. Commit
+   rows only when the license allows redistribution and the text is synthetic. Real text is
    fetch-only.
 2. **Add a module** to `src/pii_guard/eval/datasets/`. Its `rows()` turns the source files into
    `Row`s: id, language, text, and `(start, end, label)` spans, plus the source's own span
    text when it has one, so mismatched offsets are caught. Its `Dataset` declares:
    - the URL;
    - the pinned revision, and the files with their SHA-256;
-   - the licence and attribution;
+   - the license and attribution;
    - the languages and sample sizes;
    - the split;
    - `synthetic` and `commit_rows`;

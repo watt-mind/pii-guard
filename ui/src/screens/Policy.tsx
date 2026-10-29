@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { isFullStatus, type FullServerStatus } from "../api/status";
 import { recovery, request, type Requester } from "../hosted/api";
-import { projectPath, type PolicyVersion, type Project, type ProjectList } from "../projects/api";
+import { projectPath, VISUAL_DETECTION_LABEL, type PolicyVersion, type Project, type ProjectList } from "../projects/api";
 import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type EntityType } from "../api/types";
 import { NerHint } from "../components/NerHint";
 import { Button, ButtonLink, Card, KeyValues, Notice, PageHeader } from "../components/ui";
@@ -225,6 +225,7 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
                   ),
                 },
                 { label: "Detection mode", value: <span className="capitalize">{policy.mode}</span> },
+                { label: "Image detection", value: VISUAL_DETECTION_LABEL[policy.visual_detection ?? "local"] },
                 { label: "Language", value: mono(policy.language) },
               ]}
             />
@@ -232,6 +233,7 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
           <Card title="Entity policies" titleId="policies-title" subtitle={`As ${policy.name} v${policy.version} applies them. An endpoint pinned to another policy or version applies that one.`}>
             <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
               <PolicyTable title="Text" types={TEXT_ENTITY_TYPES} policies={policy.entity_policies} />
+              <PolicyTable title="Images" types={VISUAL_ENTITY_TYPES} policies={policy.entity_policies} />
             </div>
           </Card>
         </>

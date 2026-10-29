@@ -1,0 +1,17 @@
+{
+  "teacher": {
+    "model": "muse-glimmer",
+    "reasoning_strength": "low"
+  },
+  "counts": {
+    "adopted_organization": 8,
+    "adopted_person": 37,
+    "agree": 41147,
+    "disagree": 76,
+    "documents": 4793,
+    "gold_found_by_teacher": 37614,
+    "gold_missed_by_teacher": 1950,
+    "new_address_ignored": 3,
+    "teacher_overlap_ignored": 4
+  }
+}

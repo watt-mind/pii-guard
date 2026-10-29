@@ -5,7 +5,7 @@ high.** The scorer counted an occurrence of a name as masked as soon as any plac
 overlapped it, so `[[PERSON_x]]inta Anna`, or `Próba [[PERSON_x]]` with the surname in clear
 text, in every mention made the entity "consistent". A synthetic repro: `Teszt Elek` twice,
 with only the first letter of each mention replaced by the same placeholder, scored
-`consistent=True`. No detector or vault behaviour changed here. This entry corrects a
+`consistent=True`. No detector or vault behavior changed here. This entry corrects a
 measurement.
 
 - **Fix.** `consistency_report` (`src/pii_guard/eval/scorer.py`) now needs every occurrence

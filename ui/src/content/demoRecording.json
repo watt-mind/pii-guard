@@ -1,0 +1,45 @@
+{
+  "recorded_at": "2026-10-29",
+  "source": "https://guard-dev.watt-mind.com",
+  "note": "Recorded by scripts/record_demo_run.py: /v1/demo on the hosted preview, fast mode, the included Meta model. Fictional sample data only.",
+  "runs": {
+    "hu": {
+      "original": "Kérlek, írj rövid választ erre az ügyfélszolgálati kérésre: Teszt Elek vagyok, az e-mail-címem teszt.elek@example.com. Szeretném módosítani a szállítás időpontját.",
+      "masked": "Kérlek, írj rövid választ erre az ügyfélszolgálati kérésre: [[PERSON_f10f89]] vagyok, az e-mail-címem [[EMAIL_2b23d3]]. Szeretném módosítani a szállítás időpontját.",
+      "answer": "Tisztelt [[PERSON_f10f89]]!\n\nKöszönjük megkeresését. A szállítási időpont módosításával kapcsolatban visszajelzést küldünk a [[EMAIL_2b23d3]] e-mail címre.\n\nÜdvözlettel,\nÜgyfélszolgálat",
+      "restored": "Tisztelt Teszt Elek!\n\nKöszönjük megkeresését. A szállítási időpont módosításával kapcsolatban visszajelzést küldünk a teszt.elek@example.com e-mail címre.\n\nÜdvözlettel,\nÜgyfélszolgálat",
+      "entities": [
+        {
+          "start": 60,
+          "end": 70,
+          "type": "PERSON"
+        },
+        {
+          "start": 95,
+          "end": 117,
+          "type": "EMAIL"
+        }
+      ],
+      "model": "muse-spark-1.3"
+    },
+    "en": {
+      "original": "Please write a short reply to this support request: I am Jane Placeholder, my email is jane.placeholder@example.com. I would like to change the delivery date.",
+      "masked": "Please write a short reply to this support request: I am [[PERSON_6f7ec5]], my email is [[EMAIL_0877ed]]. I would like to change the delivery date.",
+      "answer": "Hi [[PERSON_6f7ec5]],\n\nThanks for your message! We can help you change the delivery date. We'll send a confirmation to [[EMAIL_0877ed]] once it's updated.\n\nBest regards,\nSupport Team",
+      "restored": "Hi Jane Placeholder,\n\nThanks for your message! We can help you change the delivery date. We'll send a confirmation to jane.placeholder@example.com once it's updated.\n\nBest regards,\nSupport Team",
+      "entities": [
+        {
+          "start": 57,
+          "end": 73,
+          "type": "PERSON"
+        },
+        {
+          "start": 87,
+          "end": 115,
+          "type": "EMAIL"
+        }
+      ],
+      "model": "muse-spark-1.3"
+    }
+  }
+}

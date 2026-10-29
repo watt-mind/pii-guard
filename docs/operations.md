@@ -310,7 +310,7 @@ tab's **Send demo traffic** sends the same ones (`ui/src/content/demoScenarios.j
 by `scripts/demo_traffic.py --export-ui` and kept in sync by a test).
 
 **What it shows in rules-only mode** (the default: no `PII_GUARD_NER_MODEL`). Nothing reaches
-the model except in the one labelled scenario:
+the model except in the one labeled scenario:
 
 - **Names** are pre-loaded as session **known values** (`POST /v1/sessions`), the way an
   application that knows its parties would (a CRM record, a case file). The `known` detector
@@ -321,15 +321,15 @@ the model except in the one labelled scenario:
   one when the stack runs `uv run python scripts/demo.py --traffic-log full` (localhost only;
   the recorded replay is `masked`, so it shows the placeholders and their count).
 - **Numbers** are checksum-valid fictional identifiers the rules find on their own: TAJ,
-  adóazonosító jel, HU / GB / DE IBANs, a Luhn test card, phone numbers, e-mail addresses and
+  adóazonosító jel, HU / GB / DE IBANs, a Luhn test card, phone numbers, email addresses and
   a postal address.
-- **`hu-needs-ner`, labelled "needs fast mode (NER)"**: a free-text name with no known value
+- **`hu-needs-ner`, labeled "needs fast mode (NER)"**: a free-text name with no known value
   and no rule cue (`Tegnap Gipsz Jakab telefonált…`). In rules-only mode it reaches the mock
   model as written: an **expected miss**, kept on purpose to show what the NER adds.
   `make demo-traffic` prints it as such, and the Live traffic tab marks the call
   "needs fast mode (NER) · expected miss" with the reason.
 
-**In fast mode with the NER** (`make demo`, the default) the labelled name is masked too, and
+**In fast mode with the NER** (`make demo`, the default) the labeled name is masked too, and
 the tab says the NER ran. With `make demo MODE=rules` it is the expected miss described above.
 
 ### Smoke test
@@ -341,7 +341,7 @@ the tab says the NER ran. With `make demo MODE=rules` it is the expected miss de
    arguments equal to `{"text": <the original message>}`);
 2. no gold value of any scenario reached the upstream, raw, JSON-escaped or without spaces
    (the mock keeps what it received, `GET /_mock/received`). In rules-only mode that covers
-   every scenario except the one labelled "needs fast mode (NER)": its name is printed as an
+   every scenario except the one labeled "needs fast mode (NER)": its name is printed as an
    expected miss, not a failure;
 3. every call has a traffic event with a timing breakdown, and the log holds no raw session
    id and no credentials.
@@ -351,7 +351,7 @@ same checks run in-process in `tests/bench/test_bench.py`.
 
 `make smoke-fast` (`scripts/smoke.py --mode fast`, local) runs the same traffic in fast mode
 with the resolved NER model (downloaded once on the first run, as for `make demo`). It also
-fails unless the NER ran on the call labelled "needs fast mode (NER)" (its traffic event lists
+fails unless the NER ran on the call labeled "needs fast mode (NER)" (its traffic event lists
 `ner`) and that call's name was masked: no expected misses. A fresh cache
 (`PII_GUARD_MODELS_DIR=$(mktemp -d) make smoke-fast`) checks the clean-checkout path.
 
@@ -612,7 +612,7 @@ received until the answer is built (non-streamed) or the stream has ended:
 | `detect` | Every detector on every text (concurrent), then the session's known values; wall time |
 | `image` | The visual pipeline (SAM, OCR) for inline images |
 | `mask` | Vault masking of every text |
-| `forward` | Serialising the masked body and opening the upstream client |
+| `forward` | Serializing the masked body and opening the upstream client |
 | `upstream_ttfb` | Send until the upstream's response headers |
 | `upstream` | All time spent waiting on the upstream: headers, body or each stream read |
 | `unmask` | Restoring a stream, summed over its chunks |

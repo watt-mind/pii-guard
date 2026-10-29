@@ -99,7 +99,7 @@ read real secrets through PII Guard.
 
 `examples/coding-agents/mini-repo` is a fictional support-desk project: a client letter, a
 customer CSV, a `.env` and some code. pi gets one task: read them, then write `reply.md` with
-the client's IBAN, e-mail and phone and every customer's e-mail.
+the client's IBAN, email and phone and every customer's email.
 
 ```bash
 uv run pytest tests/integrations/test_pi_e2e.py        # CI: scripted mock model; needs node + npm

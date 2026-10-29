@@ -173,4 +173,4 @@ def test_decontam_train_py_runs_the_gate_by_default() -> None:
     assert re.search(r'"decontam": True', source)
     assert "load_fixtures(train_paths)" not in source  # no path around the gate
     modal = (ROOT / "training/distill/modal_train.py").read_text(encoding="utf-8")
-    assert '"eval" / "fixtures"' in modal and '"eval" / "datasets"' in modal
+    assert "eval_upload_files(ROOT)" in modal  # the gate's texts go, by allowlist (LAB-1527)

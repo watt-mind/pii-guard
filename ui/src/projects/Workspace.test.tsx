@@ -72,11 +72,30 @@ describe("project workspace", () => {
     expect(screen.getByText(/Synthetic support \(v1\)/)).toBeInTheDocument();
     expect(screen.getByText(/No endpoint changes automatically/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Detection mode")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Face")).not.toBeInTheDocument();
+    // Images: on-device only on hosted; a version saved before visual types shows the defaults.
+    expect(screen.getByRole("combobox", { name: "Detection" })).toHaveValue("local");
+    expect(screen.getByRole("option", { name: /SAM 3\.1/ })).toBeDisabled();
+    expect(screen.getByLabelText("Signature")).toHaveValue("mask");
+    expect(screen.getByLabelText("Stamp")).toHaveValue("keep");
     await user.selectOptions(screen.getByLabelText("Email"), "block");
     await user.click(screen.getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/policies/policy-family", { name: first.name, language: "hu", mode: "fast", entity_policies: { ...first.entity_policies, EMAIL: "block" } }, "PUT"));
+    await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/policies/policy-family", { name: first.name, language: "hu", mode: "fast", visual_detection: "local", entity_policies: { ...first.entity_policies, EMAIL: "block", FACE: "mask", SIGNATURE: "mask", ID_PHOTO: "mask", STAMP: "keep" } }, "PUT"));
     expect(vi.mocked(call).mock.calls.filter(([path, body]) => path.includes("/endpoints/") && body)).toHaveLength(0);
+  });
+
+  it("sets image actions and SAM 3.1 detection, and warns that on-device detection cannot mask stamps", async () => {
+    const call = fixture(); const user = userEvent.setup(); render(<Workspace call={call} />);
+    await user.click(await screen.findByRole("button", { name: "New version of Default protection v1" }));
+    const form = screen.getByRole("form", { name: "New version of Default protection" });
+    expect(within(form).getByText(/found on the guard's CPU/)).toBeInTheDocument();
+    await user.selectOptions(within(form).getByLabelText("Stamp"), "mask");
+    expect(within(form).getByRole("alert")).toHaveTextContent(/cannot find stamps/);
+    await user.selectOptions(within(form).getByRole("combobox", { name: "Detection" }), "sam");
+    expect(within(form).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(form).getByText(/original image is sent to Meta's API/)).toBeInTheDocument();
+    await user.selectOptions(within(form).getByLabelText("Signature"), "keep");
+    await user.click(within(form).getByRole("button", { name: "Save new version" }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/policies/policy-family", expect.objectContaining({ visual_detection: "sam", entity_policies: expect.objectContaining({ SIGNATURE: "keep", STAMP: "mask", FACE: "mask" }) }), "PUT"));
   });
 
   it("reveals endpoint keys once, keeps the snippet secret-free, and revokes by endpoint scope", async () => {

@@ -30,7 +30,7 @@ downloads a public Apache-2.0 PII model once (1.1 GB, pinned revision, SHA-256 c
   no second environment, which GLiNER did. It is a **stop-gap**: it over-masks (23.1 % on
   en-smoke), and the trained checkpoint replaces it once LAB-1306 publishes it.
 - **Checks.** `make smoke-fast` runs the demo traffic in fast mode and fails unless the NER ran
-  on the labelled call and its name was masked; it passes from an empty model cache too.
+  on the labeled call and its name was masked; it passes from an empty model cache too.
   `make smoke` stays rules only, so CI installs no torch.
 - **Docker.** The demo services build `pii-guard:demo` with the `ner` extra and download the
   model into a volume on the first start; `demo-api` turns healthy once it is loaded.

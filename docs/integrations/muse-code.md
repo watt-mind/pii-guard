@@ -171,7 +171,7 @@ The 1.4.13 rows are older (13 gold values, before `SECRET` and LAB-1286's path s
   words did. The 1.4.13 cases were a first name glued to a CSV comma (`1,Jane [[PERSON_…]]`,
   LAB-1258, LAB-1284) and, in the mock run, a name split inside the model's own list; with one
   path session the whole name is known from the first turn, so none are left.
-- The live model wrote the client's details and some customer e-mails (6 values). It chose
+- The live model wrote the client's details and some customer emails (6 values). It chose
   what to include; everything it wrote came back restored.
 - Known gaps, as for pi: the three fake secrets in `.env` reach the model (they aren't
   personal data types).

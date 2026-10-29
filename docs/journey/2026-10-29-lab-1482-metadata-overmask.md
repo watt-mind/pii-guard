@@ -26,7 +26,7 @@ upstream's prompt cache missed.
   - a name-like hit that is a whole lower-case executable name at command position goes. That
     means after `&&`, `||`, `|`, `;`, `$(`, a `$` prompt, `sudo`/`env`/`exec`/`xargs`, or first
     in a `"command"` value. A name in an argument (`--to "Kovács Réka"`, `echo Teszt Elek`) is
-    not at command position and stays masked, and so is a capitalised word after `&&`;
+    not at command position and stays masked, and so is a capitalized word after `&&`;
   - a `PERSON` or `ORGANIZATION` hit with no letter in it goes;
   - in a path, a name-like hit in the package segment right after `node_modules/` (or in its
     `@scope` and the package after it) goes. `/Users/anna.kovacs/…/node_modules/…` keeps the

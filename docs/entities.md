@@ -21,12 +21,12 @@ keeps the two in sync. See [contracts.md](contracts.md#entity-policies-implement
 | `DATE_OF_BIRTH` | Dates in a birth-date context | LLM (context), rules (format) | mask |
 | `NATIONAL_ID_HU_TAX` | Hungarian personal tax ID (adóazonosító jel), 10 digits with checksum | rules, NER (v2) | mask |
 | `NATIONAL_ID_HU_TAJ` | Hungarian social security (TAJ) number, 9 digits with checksum | rules, NER (v2) | mask |
-| `ID_DOCUMENT` | ID card, passport, driving licence and residence permit numbers; machine-readable zones (MRZ) of ID documents; national numbers without their own type (Hungarian személyi azonosító, US SSN, UK NINO) | rules, NER (v2), LLM (context) | mask |
+| `ID_DOCUMENT` | ID card, passport, driving license and residence permit numbers; machine-readable zones (MRZ) of ID documents; national numbers without their own type (Hungarian személyi azonosító, US SSN, UK NINO) | rules, NER (v2), LLM (context) | mask |
 | `BANK_ACCOUNT` | IBAN (with checksum), Hungarian giro account numbers, payment card numbers (Luhn) | rules, NER (v2) | mask |
 | `COMPANY_ID_HU` | Company registration number (cégjegyzékszám), company tax number | rules | keep |
 | `ORGANIZATION` | Company and institution names | NER, LLM | keep |
 | `PARCEL_NUMBER_HU` | Land registry parcel number (helyrajzi szám) | rules, LLM (context) | mask |
-| `VEHICLE_PLATE` | Licence plates | rules | mask |
+| `VEHICLE_PLATE` | License plates | rules | mask |
 | `SECRET` | API keys and tokens (AWS, GitHub, Slack, Stripe, `sk-` style, Google, JWT), PEM private keys, passwords in URLs, values assigned to a secret-ish key (`API_KEY=`, `password:`, `Authorization: Bearer`) | rules (language-independent) | mask |
 
 `ORGANIZATION` and company identifiers default to `keep` because they're usually not personal
@@ -90,7 +90,7 @@ change), and neither training source labels them. Tracked as a follow-up.
 
 Rules run in one of three scopes: **all** (language-independent, every text), **everywhere**
 (a language pack's validated identifiers, run whatever the text's language) and **language**
-(only when the request's `language` is that pack's). Names, organisations, prose addresses and
+(only when the request's `language` is that pack's). Names, organizations, prose addresses and
 dates of birth come from the NER and LLM passes in every language.
 
 ### Language-independent
@@ -137,7 +137,7 @@ numbers after an order, invoice or reference cue are never masked
 | Postcode before a settlement name or in context | `ADDRESS` | 4 digits, not an amount | language |
 | Vehicle plate (`ABC-123`, `AA BC-123`) | `VEHICLE_PLATE` | format | language |
 | Personal identification number (személyi azonosító, `1-710304-1237`) | `ID_DOCUMENT` | sex/century digit, date of birth, mod 11 (weights reversed from 1997) | everywhere |
-| ID card (`123456AB`), passport (`AB1234567`), driving licence (`AB123456`) number next to its label, before (`személyi igazolvány száma:`) or after (`… számú személyi igazolvány`) | `ID_DOCUMENT` | format + label, also unaccented (`szemelyi`, `szigszam`) | everywhere |
+| ID card (`123456AB`), passport (`AB1234567`), driving license (`AB123456`) number next to its label, before (`személyi igazolvány száma:`) or after (`… számú személyi igazolvány`) | `ID_DOCUMENT` | format + label, also unaccented (`szemelyi`, `szigszam`) | everywhere |
 | Other document number (residence permit, foreign ID) after its label | `ID_DOCUMENT` | 6–12 letters and digits, at least one of each + label (scores lower) | everywhere |
 | ID card number `123456AB` without a label | `ID_DOCUMENT` | format only (scores lowest) | language |
 | Machine-readable zone, TD1 (ID card, 3 × 30) and TD3 (passport, 2 × 44) | `ID_DOCUMENT` | ICAO 9303 check digits (a zone whose digits fail, e.g. after OCR, scores lower) | everywhere |
@@ -151,7 +151,7 @@ numbers (`3/5. oldal`) and court case numbers (`12.P.21.345/2025/7.`) stay unmas
 
 #### Person names in company names
 
-`pii_guard.languages.hu.companies` looks at the capitalised words right before a legal form
+`pii_guard.languages.hu.companies` looks at the capitalized words right before a legal form
 and masks the person's name only:
 
 | Company name | Masked | Why |
@@ -191,7 +191,7 @@ and consonant or digraph doubling (`Teszt Elekkel` → `[[PERSON_7f3a]]kel`, `Ko
 | UK postcode (`SW1A 1AA`) | `ADDRESS` | outward/inward letter rules | language |
 | US ZIP code after a state abbreviation or a "ZIP" label | `ADDRESS` | 5 or 5+4 digits + context | language |
 | UK vehicle registration (`AB12 CDE`) | `VEHICLE_PLATE` | age identifier, no I/Q | language |
-| Passport or driving licence number after its label | `ID_DOCUMENT` | 6–18 letters/digits, one digit + label | language |
+| Passport or driving license number after its label | `ID_DOCUMENT` | 6–18 letters/digits, one digit + label | language |
 
 Vault inflection: possessives kept outside the placeholder (`Smith's` → `[[PERSON_7f3a]]'s`,
 `James'`); plurals are not matched.
@@ -228,7 +228,7 @@ business number, but a sole trader's identifies a person, as a NIP does.
 | PESEL, NIP, ID card, passport without a label | `ID_DOCUMENT` | as above, not after an order, invoice or amount label (scores lower) | language |
 | National phone number (`555 123 456`, `(22) 555 12 34`) | `PHONE` | mobile 3-3-3 starting 4–8, landline 2-3-2-2, not an amount | language |
 | Street address (`ul. Kwiatowa 12/5[, 00-950 Warszawa]`, `al.`, `os.`, `pl.`) | `ADDRESS` | street-type word + name + house number | language |
-| Postcode and place (`31-008 Kraków`) | `ADDRESS` | `NN-NNN` + capitalised place | language |
+| Postcode and place (`31-008 Kraków`) | `ADDRESS` | `NN-NNN` + capitalized place | language |
 | Driving-licence number (`00123/16/1234`, `05936/42/00`) after `prawo jazdy`; any number above with a bad check digit after its cue | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
 
 Vault inflection: case endings that leave the written name intact are kept outside the
@@ -244,18 +244,18 @@ whose stem changes (`Annie`, `Kowalskiej`) are matched as written.
 | `ID_PHOTO` | The photo area of an ID document | SAM 3.1 | mask |
 | `STAMP` | Official stamps and seals | SAM 3.1 | keep |
 | *(text types above)* | Text found in an image by OCR | OCR + `detect` | per type |
-| *(text types above)* | The value printed next to a known field caption (`Név`, `Date of birth`, EU licence field `1.`) | OCR + caption lexicon (`visual/captions.py`) | per type |
+| *(text types above)* | The value printed next to a known field caption (`Név`, `Date of birth`, EU license field `1.`) | OCR + caption lexicon (`visual/captions.py`) | per type |
 
 On ID cards a value sits under or beside a small caption (`Családi név / Surname` above
 `FIKTÍV`), and a text detector reading the value alone often misses it: a surname on its own
 line, a foreign date format, a document number with no checksum. Image masking therefore also
-pairs every recognised caption with its value and masks the value with the caption's type.
+pairs every recognized caption with its value and masks the value with the caption's type.
 The captions come from the language packs (`captions.tsv`, [languages.md](languages.md)),
 plus French, Italian, Spanish, Polish and Dutch captions until those languages have packs,
-and the EU driving licence field numbers (`1.` surname, `2.` given names, `3.` date and
-place of birth, `5.` licence number, `8.` address) on a page where at least three of them
+and the EU driving license field numbers (`1.` surname, `2.` given names, `3.` date and
+place of birth, `5.` license number, `8.` address) on a page where at least three of them
 start a line. Captions of values that are not personal data (`Sex`, `Nationality`, `Expiry`)
-are recognised too, so they bound the columns, but their values stay visible. A word is
+are recognized too, so they bound the columns, but their values stay visible. A word is
 masked only as the value of a personal-data caption, never because it is printed on a card.
 
 ## Adding a language
@@ -263,5 +263,5 @@ masked only as the value of a personal-data caption, never because it is printed
 See [languages.md](languages.md) and [ADR 0010](decisions/0010-language-pack-plugins.md).
 A language pack (`src/pii_guard/languages/<code>/`) contributes rules, a vault inflection
 matcher if the language inflects names, LLM prompt notes, eval surface forms if it has stem
-changes, a smoke fixture set, and a table in this file. Every piece is optional and falls back to language-independent behaviour; the
+changes, a smoke fixture set, and a table in this file. Every piece is optional and falls back to language-independent behavior; the
 NER and LLM passes are multilingual and are re-measured, not rewritten.

@@ -98,10 +98,25 @@ def document_counts(r: DocumentResult) -> dict[str, Any]:
 
 
 def _ner_detector() -> dict[str, Any]:
+    from pii_guard.detect import ner_resolve
     from pii_guard.eval.baselines.suite import ner_identity
 
     ident = ner_identity()
     weights = ident.get("safetensors_sha256") or {}
+    published = ner_resolve.PUBLISHED
+    # The published v2.0: fast mode's default choice, or a local copy of the same weights.
+    if (
+        weights.get("model.safetensors") == published.weights_sha256
+        or ner_resolve.resolve().source == "published"
+    ):
+        return {
+            "name": "ner",
+            "model": "xlmr-base-v2-hn",
+            "model_ref": f"{published.repo_id} v2.0, revision {published.revision[:12]}",
+            "revision": f"sha256:{published.weights_sha256}",
+            "settings": {},
+            "serving": "local PyTorch",
+        }
     model = str(ident.get("model"))
     short = model.removeprefix("pii-guard-ner-")
     return {
@@ -133,7 +148,8 @@ def _llm_detector(analyzer: Any) -> dict[str, Any]:
 
 _LABELS = {
     "rules": "pii-guard rules",
-    "fast": "pii-guard fast, NER v2 base + hard negatives (LAB-1150)",
+    # The published v2.0 (LAB-1150's checkpoint): the label its other records carry.
+    "fast": "pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)",
     "audit": "pii-guard audit (rules + NER v2 + LLM)",
 }
 

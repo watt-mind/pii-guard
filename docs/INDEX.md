@@ -9,9 +9,12 @@
 | [hosted.md](hosted.md) | Hosted deployment, trust boundary, actual retention, release gates and rollback |
 | [projects.md](projects.md) | Projects, immutable policy versions, endpoint configuration and persistence boundaries |
 | [privacy-model.md](privacy-model.md) | Threat model, what PII Guard guarantees and what it does not |
+| [eu-regulation.md](eu-regulation.md) | Why it matters in the EU: GDPR, transfers, sector rules and the AI Act, mapped to primary sources, and what we don't claim |
 | [entities.md](entities.md) | The entity taxonomy: what counts as personal data, per language |
 | [evaluation.md](evaluation.md) | Synthetic benchmark, metrics, baselines, how results are reported |
 | [languages.md](languages.md) | Adding a language: the language pack, the conformance suite, what "done" means |
+| [data-sources-eu24.md](data-sources-eu24.md) | Research: license and coverage audit of NER/PII data and national identifiers for the 24 EU languages |
+| [training-data-eu-phase1.md](training-data-eu-phase1.md) | Multilingual NER phase 1 (LAB-1525): training sources, licenses, per-language counts and the fictional gate sets |
 | [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [journey.md](journey.md) | The project's story so far: dated milestones with before/after metrics, cost and the decisions made |

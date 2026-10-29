@@ -1,8 +1,9 @@
 """Record the landing's labels-mode image showcase (LAB-1484).
 
-The landing (``ui/src/hosted/ImageShowcase.tsx``, ``HeroImage.tsx``) shows what the default
-``render="labels"`` does to the fictional specimen ID card ``ui/public/samples/id-card.png``
-(``eval/fixtures/visual/images/hu-id_card-front.png``): each text value covered by a box with
+The landing (``ui/src/hosted/ImageShowcase.tsx``) shows what the default ``render="labels"``
+does to two fictional specimen ID cards, ``ui/public/samples/id-card-en.png``
+(``eval/fixtures/visual/images/en-id_card-front.png``, the default since LAB-1509) and
+``ui/public/samples/id-card.png`` (``hu-id_card-front.png``): each text value covered by a box with
 its vault placeholder printed in it, the face and ID photo covered, and the masked transcript
 and document summary that go to the model with the image. This script makes that recording
 with the real API, configured like the hosted preview (ADR 0014): the on-device ``local``
@@ -22,8 +23,9 @@ fails if any printed value of the card (``eval/fixtures/visual/generation.json``
 message's name would be written. Needs the ``ocr`` and ``local-vision`` extras and the
 ``tesseract`` binary::
 
-    uv run --no-sync python scripts/record_image_labels.py            # writes the recording
-    uv run --no-sync python scripts/record_image_labels.py --check    # compares, writes nothing
+    uv run --no-sync python scripts/record_image_labels.py              # writes both recordings
+    uv run --no-sync python scripts/record_image_labels.py --sample en  # one of them
+    uv run --no-sync python scripts/record_image_labels.py --check      # compares, writes nothing
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ import json
 import secrets
 import sys
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -48,13 +51,44 @@ from pii_guard.vault import PLACEHOLDER_RE
 from pii_guard.visual.render import fit_label
 
 ROOT = Path(__file__).resolve().parent.parent
-SAMPLE = ROOT / "ui" / "public" / "samples" / "id-card.png"
-FIXTURE_ID = "hu-id_card-front"
-OUT = ROOT / "ui" / "src" / "content" / "imageLabelsRecording.json"
-#: The fictional holder printed on the card, pre-loaded as the application's known party.
-HOLDER = "Fiktív Mária"
-#: The user's message. Keep in step with MESSAGE in ui/src/hosted/ImageShowcase.tsx.
-MESSAGE = f"{HOLDER} is the seller. Is her ID card attached, and is it still valid?"
+CONTENT = ROOT / "ui" / "src" / "content"
+
+
+@dataclass(frozen=True)
+class Sample:
+    """One showcase card: the public image, its fixture (for the gold values), the language of
+    its printed text, the fictional holder pre-loaded as the application's known party, and
+    where the recording goes. Keep the messages in step with ui/src/content/imageLabels.ts."""
+
+    image: Path
+    fixture_id: str
+    language: str
+    holder: str
+    out: Path
+
+    @property
+    def message(self) -> str:
+        return f"{self.holder} is the seller. Is her ID card attached, and is it still valid?"
+
+
+SAMPLES = {
+    # LAB-1509: the English specimen (eval/fixtures/visual/images/en-id_card-front.png),
+    # the landing's default.
+    "en": Sample(
+        ROOT / "ui" / "public" / "samples" / "id-card-en.png",
+        "en-id_card-front",
+        "en",
+        "Jane Placeholder",
+        CONTENT / "imageLabelsRecording.en.json",
+    ),
+    "hu": Sample(
+        ROOT / "ui" / "public" / "samples" / "id-card.png",
+        "hu-id_card-front",
+        "hu",
+        "Fiktív Mária",
+        CONTENT / "imageLabelsRecording.json",
+    ),
+}
 
 
 def stand_in_answer(summary: dict[str, Any]) -> str:
@@ -71,17 +105,19 @@ def _fold(text: str) -> str:
     return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
-#: Words of a value that the card also prints as ordinary text: its footer reads "MI által
-#: generált fiktív minta" (AI-generated fictional specimen), and the surname is "Fiktív".
-BOILERPLATE = frozenset({"fiktiv"})
+#: Words of a value that the recording also holds as ordinary text: the Hungarian card's footer
+#: reads "MI által generált fiktív minta" (AI-generated fictional specimen) and its surname is
+#: "Fiktív"; the English card's surname is "Placeholder", which is also a key of every region.
+#: The whole name is still checked.
+BOILERPLATE = frozenset({"fiktiv", "placeholder"})
 
 
-def assert_value_free(recording: dict[str, Any]) -> None:
+def assert_value_free(recording: dict[str, Any], sample: Sample) -> None:
     """Fail if a printed value of the card (whole, digits only, or a word of it) is in the
     recording. Prints counts only, never the value."""
     blob = _fold(json.dumps(recording, ensure_ascii=False))
     digits = "".join(c for c in blob if c.isdigit())
-    values = [*load_gold()[FIXTURE_ID].values(), HOLDER]
+    values = [*load_gold()[sample.fixture_id].values(), sample.holder]
     needles = {_fold(v) for v in values}
     needles |= {_fold(w) for v in values for w in v.split() if len(w) >= 4} - BOILERPLATE
     found = [n for n in needles if n in blob]
@@ -106,7 +142,7 @@ def _label_fit(region: dict[str, Any]) -> dict[str, Any]:
     return {"label_lines": lines, "label_px": size}
 
 
-def record() -> dict[str, Any]:
+def record(sample: Sample) -> dict[str, Any]:
     settings = Settings(
         tenant_key=secrets.token_hex(32),
         segmenter="local",
@@ -115,22 +151,23 @@ def record() -> dict[str, Any]:
         policy_overrides={"SIGNATURE": "keep", "STAMP": "keep"},
     )
     app = create_app(settings)
-    png = SAMPLE.read_bytes()
+    png = sample.image.read_bytes()
     with TestClient(app, base_url="http://127.0.0.1") as http:
         created = http.post(
-            "/v1/sessions", json={"known_values": [{"value": HOLDER, "entity_type": "PERSON"}]}
+            "/v1/sessions",
+            json={"known_values": [{"value": sample.holder, "entity_type": "PERSON"}]},
         )
         created.raise_for_status()
         session = created.json()["session_id"]
         text = http.post(
-            "/v1/mask", json={"text": MESSAGE, "language": "en", "session_id": session}
+            "/v1/mask", json={"text": sample.message, "language": "en", "session_id": session}
         )
         text.raise_for_status()
         image = http.post(
             "/v1/mask/image",
             json={
                 "image": base64.b64encode(png).decode("ascii"),
-                "language": "hu",
+                "language": sample.language,
                 "session_id": session,
                 "render": "labels",
             },
@@ -142,7 +179,7 @@ def record() -> dict[str, Any]:
         restored.raise_for_status()
     back = restored.json()
     back_text = back.get("text") or back.get("unmasked_text") or ""
-    if PLACEHOLDER_RE.search(back_text) or HOLDER not in back_text:
+    if PLACEHOLDER_RE.search(back_text) or sample.holder not in back_text:
         raise SystemExit("the answer did not restore")
     if body["analysis"]["ocr"]["engine"] != "tesseract" or body["render"] != "labels":
         raise SystemExit("needs Tesseract and labels rendering")
@@ -151,9 +188,10 @@ def record() -> dict[str, Any]:
         "recorded": dt.date.today().isoformat(),
         "note": (
             "scripts/record_image_labels.py: POST /v1/mask/image with render=labels on "
-            "ui/public/samples/id-card.png (fictional specimen), configured like the hosted "
-            "preview (segmenter local/YuNet, Tesseract, rules; signatures and stamps kept), in "
-            "the session that masked the message. Value-free: placeholders only, no image."
+            f"ui/public/samples/{sample.image.name} (fictional specimen), configured like the "
+            "hosted preview (segmenter local/YuNet, Tesseract, rules; signatures and stamps "
+            "kept), in the session that masked the message. Value-free: placeholders only, "
+            "no image."
         ),
         "message": {"masked": text.json()["masked_text"]},
         "image": {
@@ -186,21 +224,28 @@ def _comparable(recording: dict[str, Any]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--check", action="store_true", help="compare with the committed file")
-    parser.add_argument("--out", type=Path, default=OUT)
+    parser.add_argument("--sample", choices=[*SAMPLES, "all"], default="all")
     args = parser.parse_args(argv)
-    recording = record()
-    assert_value_free(recording)
-    if args.check:
-        committed = json.loads(args.out.read_text(encoding="utf-8"))
-        same = _comparable(committed) == _comparable(recording)
-        print("recording matches" if same else "recording differs (placeholder ids aside)")
-        return 0 if same else 1
-    args.out.write_text(
-        json.dumps(recording, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    image = recording["image"]
-    print(f"wrote {args.out.name}: {len(image['regions'])} regions, {image['matches']}")
-    return 0
+    status = 0
+    for key in SAMPLES if args.sample == "all" else [args.sample]:
+        sample = SAMPLES[key]
+        recording = record(sample)
+        assert_value_free(recording, sample)
+        if args.check:
+            committed = json.loads(sample.out.read_text(encoding="utf-8"))
+            same = _comparable(committed) == _comparable(recording)
+            print(
+                f"{key}: "
+                + ("recording matches" if same else "recording differs (placeholder ids aside)")
+            )
+            status |= 0 if same else 1
+            continue
+        sample.out.write_text(
+            json.dumps(recording, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        image = recording["image"]
+        print(f"wrote {sample.out.name}: {len(image['regions'])} regions, {image['matches']}")
+    return status
 
 
 if __name__ == "__main__":

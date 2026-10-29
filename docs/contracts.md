@@ -144,7 +144,7 @@ rule_packs() -> dict[str, RulePack]          # the language packs' rules, with o
 - **Scopes.** The language-independent rules (`pii_guard.detect.rules.common` and
   `pii_guard.detect.rules.secrets`) run for every text. A language pack ([ADR 0008](decisions/0008-language-packs.md), `languages/<lang>/rules.py`)
   contributes `everywhere` rules (identifiers with a checksum or a distinctive validated format,
-  run whatever the text's language: a Hungarian tax ID in an English e-mail is still personal
+  run whatever the text's language: a Hungarian tax ID in an English email is still personal
   data) and `rules` (formats that are only unambiguous in that language, such as postcodes,
   plates and national phone formats, run only when `language` matches, `en-GB` counting as
   `en`). A language without a pack gets the language-independent rules and every pack's
@@ -162,14 +162,14 @@ label, a consistent postcode and settlement, or valid check digits:
 |---|---|---|
 | all | `BANK_ACCOUNT` (IBAN, mod 97; payment card, issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
 | all | `SECRET` (provider key shapes, PEM private keys, `scheme://user:password@host`, values assigned to a secret-ish key, `Authorization: Bearer/Basic`; [entities.md](entities.md#language-independent)) | provider shape 0.9-0.97, private key 0.99, URL password 0.9 / user 0.85, bearer 0.9, assignment 0.85 |
-| `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labelled ID card / passport / licence / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
+| `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labeled ID card / passport / license / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
 | `hu`, language | `ADDRESS` (postcode, address with settlement and street), `VEHICLE_PLATE`, bare `ID_DOCUMENT` card number, `PERSON` inside a company name with a legal form | postcode 0.75-0.9, address 0.75 / 0.85 / 0.97 (postcode and settlement agree), plate 0.85 / 0.8, bare ID card 0.7, company-name person 0.7-0.9 (`languages/hu/companies.py`) |
 | `en`, everywhere | `ID_DOCUMENT` (US SSN, UK NINO) | SSN 0.95 / 0.85, NINO 0.95 / 0.9 |
-| `en`, language | `PHONE` (UK, US/NANP), `ADDRESS` (UK postcode, US ZIP), `VEHICLE_PLATE` (UK), `ID_DOCUMENT` (labelled passport / licence, SSN after a label) | phone 0.8-0.85, postcode 0.75-0.85, ZIP 0.8 / 0.85, plate 0.8, labelled ID 0.85, SSN after a label 0.9 |
-| `de`, everywhere | `ID_DOCUMENT` (Sozialversicherungsnummer, labelled Steuer-ID) | 0.9 / 0.97 |
+| `en`, language | `PHONE` (UK, US/NANP), `ADDRESS` (UK postcode, US ZIP), `VEHICLE_PLATE` (UK), `ID_DOCUMENT` (labeled passport / license, SSN after a label) | phone 0.8-0.85, postcode 0.75-0.85, ZIP 0.8 / 0.85, plate 0.8, labeled ID 0.85, SSN after a label 0.9 |
+| `de`, everywhere | `ID_DOCUMENT` (Sozialversicherungsnummer, labeled Steuer-ID) | 0.9 / 0.97 |
 | `de`, language | `ID_DOCUMENT` (Steuer-ID without a label), `PHONE`, `ADDRESS` (street + house number, postcode line) | Steuer-ID 0.85, phone 0.8, address 0.75 / 0.85, postcode line 0.7 |
 
-Names, organisations, prose addresses and dates of birth are not rule territory; they come
+Names, organizations, prose addresses and dates of birth are not rule territory; they come
 from the NER and LLM detectors. Scores are heuristics for the resolver, not probabilities;
 the code is the source of truth for the exact values.
 
@@ -250,7 +250,7 @@ REST API. `PII_GUARD_POLICY_OVERRIDES` is parsed and validated when the
 settings load: an unknown type or policy stops startup. `LlmDetector` resolves its model,
 reasoning effort, max tokens and timeout as the constructor argument, then the setting
 (environment or `.env`), then its built-in default, so the registry and `pii-guard eval`
-honour them too (Muse Spark Open on Baseten needs `REASONING_EFFORT=low`; contract-length
+honor them too (Muse Spark Open on Baseten needs `REASONING_EFFORT=low`; contract-length
 documents need a larger `MAX_TOKENS` and `TIMEOUT`). Folding the text size limit and the
 gateway settings into `Settings` is LAB-1095.
 
@@ -614,7 +614,7 @@ With `render: "labels"` (the default) the response also carries:
   letter↔digit confusions only (`XJXK89KU4` is not `XJXK89KV4`, `HU-ABE-123` is not
   `HU-ABC-123`).
 - Session values printed where no detector found them (a visitor badge's name) are also
-  covered and labelled (`detector: "vault"`), for accepted matches only.
+  covered and labeled (`detector: "vault"`), for accepted matches only.
 - `cover_box` is the area actually painted: the box grown by 2 px and, when the label would
   not fit legibly, extended to the right into free space (never over visible words or another
   box). `box` stays the detected area in both render modes, so coverage is identical.
@@ -637,7 +637,7 @@ With `render: "labels"` (the default) the response also carries:
 - Regions never carry the covered text or pixels. Overlapping regions of the same type and
   source are merged into their union (SAM's `signature` and `squiggly line` prompts).
 - Policies apply per region: `mask` regions are covered (plus 2 px; solid black with `opaque`,
-  a neutral labelled box with `labels`), `keep` regions
+  a neutral labeled box with `labels`), `keep` regions
   (`STAMP` by default) are reported and left visible (`STAMP` is only segmented with
   `sam-api`, or when its policy is not `keep`), any `block` region is
   `422 blocked_entity` with no image.
@@ -1096,6 +1096,19 @@ placeholder as written; other escape depths (`\\[\\[` in freeform input, an esca
 backslash) are left; an unknown or other session's placeholder stays as written and is counted as
 unresolved; the restored value is charged to the response's restore budget.
 
+**Shell quoting in command arguments** (both APIs, whole and streamed; LAB-1483). A restored value
+is byte-exact, except in one context the gateway reads for sure: the string value of a top-level
+`command` or `cmd` key in JSON `arguments` (or the script after `-c`/`-lc` in a `command` array),
+read by a small shell lexer. There a value restored inside a single-quoted string gets `'` written
+as `'\''`; inside the single-quoted script word of a `sed` command, in an `s` replacement, `\`, `&`,
+the delimiter and a newline also get a backslash (an escaped placeholder in an `s` pattern also gets a
+delimiter backslashed that the regex literal leaves as is). Then it is JSON-escaped as usual. So
+`echo '[[PERSON_x]]'` with `O'Brien Teszt` and `sed 's/x/[[ADDRESS_x]]/'` with `Fő utca 1/A` run
+as meant. **Limitation:** everywhere else the value stays byte-exact, so a `$`, backtick, `"` or `\`
+in a double-quoted string, an unquoted value, a heredoc, `$'...'`, a comment, a nested or argv-array
+command, another `sed` command or a bracket expression, and custom tool `input` (it may be a patch,
+not a command) are not escaped. Other keys, message text and file content are never touched.
+
 **Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
 stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
 `summary_index`: `response.output_text.delta`, `response.refusal.delta`,
@@ -1310,7 +1323,7 @@ built on it.
   occurrence in another case is not masked with the confirmed secret's placeholder (the
   detector decides about it on its own). Every other type is case-insensitive as below:
   names and other natural-language values (with their inflection), and IBANs, plates, ID
-  numbers and e-mail addresses, which are case-insensitive by their own rules.
+  numbers and email addresses, which are case-insensitive by their own rules.
 - **Casing:** occurrences match case-insensitively, so `TESZT ELEK` and `teszt elek` are
   masked along with a `Teszt Elek` span. By default they share its placeholder and `unmask`
   restores the value as first written (`TESZT ELEK és Teszt Elek.` → `Teszt Elek és Teszt
@@ -1372,7 +1385,7 @@ MAX_SUFFIX_LENGTH = 12   # a longer run is never a suffix; it bounds what the st
   follow them (occurrence expansion in the vault and `LlmDetector.align`).
 - `splits` reads a detected surface form as `lemma + suffix` (`Próba Zsuzsannának` → `Próba
   Zsuzsanna` + `nak`), so the placeholder covers the stem. `restore` re-inflects on unmask.
-- A matcher that only has `suffix_pattern` keeps exact-stem behaviour; call the module
+- A matcher that only has `suffix_pattern` keeps exact-stem behavior; call the module
   functions, which provide the fallbacks. A hook registered with `register_inflection` applies
   to new masking calls of that primary language.
 
@@ -1406,7 +1419,7 @@ Lines, one document per line, UTF-8, **one file per language and set**:
 
 Gold spans don't overlap, aren't blank and don't start or end with whitespace. A Hungarian
 suffix that leaves the value intact stays outside the span (`Teszt Elek|nek`); a
-stem-changing form is labelled as the whole word (`Minta Annának`). Every value is fictional
+stem-changing form is labeled as the whole word (`Minta Annának`). Every value is fictional
 ([ADR 0005](decisions/0005-synthetic-data-only.md)). `load_fixtures` rejects anything else with
 file, line and field, never the value.
 
@@ -1443,7 +1456,7 @@ The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag, version,
 skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
 (one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
 `leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
-contains document text or labelled values.
+contains document text or labeled values.
 
 ## Hosted boundary (implemented, opt-in)
 
@@ -1579,9 +1592,9 @@ single-owner routes keep their default namespace.
 |---|---|---|
 | `GET /v1/projects` | — | `{projects:[...],default_project_id}`; creates the default if needed |
 | `POST /v1/projects` | `{name}` | 201 project metadata; maximum 32 projects per owner |
-| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` |
+| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` (the default policy's latest version) |
 | `GET /v1/projects/{project_id}/policies` | — | `{policies:[...]}`; every immutable version |
-| `POST /v1/projects/{project_id}/policies` | `{name,entity_policies?,language?,mode?,detection_profile?}` | 201 first version in a new policy family |
+| `POST /v1/projects/{project_id}/policies` | `{name,entity_policies?,language?,mode?,detection_profile?,visual_detection?}` | 201 first version in a new policy family |
 | `PUT /v1/projects/{project_id}/policies/{policy_id}` | Same policy fields | 201 next immutable version; existing endpoints remain pinned |
 | `GET /v1/projects/{project_id}/policies/versions/{version_id}` | — | Exact policy-version snapshot |
 | `GET /v1/projects/{project_id}/endpoints` | — | `{endpoints:[...]}`; credentials are never returned |
@@ -1593,12 +1606,33 @@ single-owner routes keep their default namespace.
 | `POST /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | `{name}` | 201 key metadata plus raw `key`, returned once; maximum 32 active and 128 retained records per endpoint |
 | `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}/keys/{key_id}` | — | 204; revokes future admissions |
 
-Policy versions capture a complete text-entity action map, language and detection mode. Omitted
-entity actions use deployment defaults. Only text entities accept `mask`, `keep` or `block`;
-unknown entities and extra fields are rejected with sanitized validation messages. Hosted
-policies require `fast`; self-hosted policies must use the deployment's detection profile, and
-`local-only` refuses `audit`. A policy revision appends a version and never mutates a prior
-version or silently changes endpoint pins. A project can contain up to 256 policy versions.
+Policy versions capture a complete text- and visual-entity action map, language, detection mode
+and image detection. Omitted entity actions use deployment defaults. Text entities accept
+`mask`, `keep` or `block`; visual entities (`FACE`, `ID_PHOTO`, `SIGNATURE`, `STAMP`) accept
+`mask` or `keep` (LAB-1444). Unknown entities and extra fields are rejected with sanitized
+validation messages. Hosted policies require `fast`; self-hosted policies must use the
+deployment's detection profile, and `local-only` refuses `audit`. A policy revision appends a
+version and never mutates a prior version or silently changes endpoint pins. A project can
+contain up to 256 policy versions.
+
+`visual_detection` chooses who finds visual regions for a selected project policy's images:
+
+- `local` (default): on the CPU only. YuNet finds faces and ID photos, and the pinned YOLOS-tiny
+  signature detector (`mdefrance/yolos-tiny-signature-detection` at a fixed revision,
+  Apache-2.0, safetensors, every file SHA-256 checked; `python -m pii_guard.visual.segmenters
+  fetch`) finds signatures, on the whole image and 2x2 overlapping tiles. No SAM request is
+  made. Stamps cannot be found locally: a `local` policy that masks `STAMP` refuses images.
+  `analysis.sam.model` is `yunet-2023mar+yolos-tiny-signature` once signatures were asked for.
+- `sam`: the server's segmenter (`PII_GUARD_SEGMENTER`, `hybrid` by default: SAM 3.1 on the Meta
+  API for signatures and stamps, so the original image leaves the machine). A server set to
+  `local` or `off` is stricter and wins. `local-only` deployments and the hosted service accept
+  `local` only (`422 invalid_project_config`).
+
+Versions saved before LAB-1444 have no visual actions and no `visual_detection`: they read as
+`local` with the server's visual actions. For visual types, an explicit
+`PII_GUARD_POLICY_OVERRIDES` entry wins over the policy when it is stricter (`keep` < `mask` <
+`block`). Requests without a selected project use the server's policies and segmenter, as
+before.
 
 An endpoint pins one policy version and one provider/upstream/credential tuple, and optionally
 one model (LAB-1451). Providers

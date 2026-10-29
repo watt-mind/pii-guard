@@ -58,7 +58,7 @@ it off. The placeholder grammar and the type label stay as decided above.
 
 **Why not (b).** It barely helped: the field names around a value (`IBAN:`, `TAJ szám:`) tell
 the model what a neutral token stands for. It would also cost what the type label gives: the
-model can't tell an e-mail from an IBAN and so writes worse answers about them, and every
+model can't tell an email from an IBAN and so writes worse answers about them, and every
 reader of `PLACEHOLDER_RE`'s type group (the mask API, the eval scorer, the red-team and e2e
 reports, the visual labeller) would have to look the type up instead. Restore never depended on
 the type: it is keyed by the whole placeholder string.

@@ -1,0 +1,141 @@
+{
+  "dataset": "gretel-finance-corrected",
+  "title": "Gretel synthetic PII finance (multilingual), corrected labels",
+  "derived_from": "gretel-finance",
+  "corrections": "eval/datasets/gretel-finance/corrections.json",
+  "corrections_sha256": "bdc1ee2576ce07172c5b11c454ae1850801a2e5b4dfe424e0e2b375591efc9c2",
+  "license": "Apache-2.0",
+  "synthetic": true,
+  "rows_committed": false,
+  "split": "test",
+  "rule": "a gold span of a rule's entity type whose whitespace-normalised text equals one of its values becomes an ignore region labelled corrected:<rule id>",
+  "rules": [
+    {
+      "id": "template-slot",
+      "entity_types": [
+        "PERSON",
+        "ADDRESS",
+        "PHONE",
+        "EMAIL"
+      ],
+      "values": 15,
+      "spans_corrected": 17
+    },
+    {
+      "id": "greeting-or-phrase",
+      "entity_types": [
+        "PERSON"
+      ],
+      "values": 32,
+      "spans_corrected": 74
+    },
+    {
+      "id": "possessive-noun-phrase",
+      "entity_types": [
+        "PERSON"
+      ],
+      "values": 21,
+      "spans_corrected": 26
+    },
+    {
+      "id": "common-noun",
+      "entity_types": [
+        "PERSON"
+      ],
+      "values": 36,
+      "spans_corrected": 46
+    },
+    {
+      "id": "role-word",
+      "entity_types": [
+        "PERSON"
+      ],
+      "values": 7,
+      "spans_corrected": 11
+    },
+    {
+      "id": "code-not-a-name",
+      "entity_types": [
+        "PERSON",
+        "EMAIL"
+      ],
+      "values": 4,
+      "spans_corrected": 4
+    }
+  ],
+  "unused_rules": [],
+  "corrected": {
+    "code-not-a-name:EMAIL": 1,
+    "code-not-a-name:PERSON": 3,
+    "common-noun:PERSON": 46,
+    "greeting-or-phrase:PERSON": 74,
+    "possessive-noun-phrase:PERSON": 26,
+    "role-word:PERSON": 11,
+    "template-slot:ADDRESS": 4,
+    "template-slot:EMAIL": 2,
+    "template-slot:PERSON": 10,
+    "template-slot:PHONE": 1
+  },
+  "notes": [
+    "Derived from gretel-finance: the same documents, with the gold corrections in eval/datasets/gretel-finance/corrections.json (LAB-1497). gretel-finance keeps the upstream labels.",
+    "Spans were labelled during generation and validated with GLiNER (dataset card): some labels are missing or wrong, which shows up as over-masking or leaks for every system."
+  ],
+  "languages": {
+    "en": {
+      "documents": 200,
+      "base_file": "eval/datasets/gretel-finance/en-gretel-finance.jsonl",
+      "base_sha256": "12967fcd1a89b5704f25dfa628465c9fe566a71e962e703333c1056199db896c",
+      "file": "data/datasets/fixtures/gretel-finance-corrected/en-gretel-finance-corrected.jsonl",
+      "sha256": "7b4a4cfa3ae313e2ccf2854c90e4f99a0a7a10b9fa60ff948b24e724045da33b",
+      "gold_spans": {
+        "ADDRESS": 152,
+        "BANK_ACCOUNT": 14,
+        "DATE_OF_BIRTH": 11,
+        "EMAIL": 38,
+        "ID_DOCUMENT": 15,
+        "ORGANIZATION": 291,
+        "PERSON": 233,
+        "PHONE": 31
+      },
+      "corrected": {
+        "code-not-a-name:EMAIL": 1,
+        "code-not-a-name:PERSON": 2,
+        "common-noun:PERSON": 1,
+        "role-word:PERSON": 2,
+        "template-slot:ADDRESS": 2,
+        "template-slot:EMAIL": 1,
+        "template-slot:PERSON": 4
+      },
+      "documents_changed": 11
+    },
+    "de": {
+      "documents": 200,
+      "base_file": "eval/datasets/gretel-finance/de-gretel-finance.jsonl",
+      "base_sha256": "2401233fa20513d765a023706bf7e7a8f28b301b7901a948070121992b2953a5",
+      "file": "data/datasets/fixtures/gretel-finance-corrected/de-gretel-finance-corrected.jsonl",
+      "sha256": "4d7ef4343233cba153a8c25184e74616c3a25d43783ba878dab3e867deb6fd02",
+      "gold_spans": {
+        "ADDRESS": 140,
+        "BANK_ACCOUNT": 19,
+        "DATE_OF_BIRTH": 12,
+        "EMAIL": 27,
+        "ID_DOCUMENT": 18,
+        "ORGANIZATION": 221,
+        "PERSON": 291,
+        "PHONE": 19
+      },
+      "corrected": {
+        "code-not-a-name:PERSON": 1,
+        "common-noun:PERSON": 45,
+        "greeting-or-phrase:PERSON": 74,
+        "possessive-noun-phrase:PERSON": 26,
+        "role-word:PERSON": 9,
+        "template-slot:ADDRESS": 2,
+        "template-slot:EMAIL": 1,
+        "template-slot:PERSON": 6,
+        "template-slot:PHONE": 1
+      },
+      "documents_changed": 72
+    }
+  }
+}

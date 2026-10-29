@@ -77,6 +77,10 @@ describe("labels render (LAB-1484)", () => {
     expect(covers.map((c) => c.lines)).toEqual([["PHOTO · [[PERSON_ab12cd]]"], [], ["PERSON", "ab12cd"]]);
     expect(covers[0]).toMatchObject({ visual: true, fontCqw: 10, box: { left: "0.000%", width: "41.000%" } });
     expect(covers[2]?.visual).toBe(false);
+    // The photo's label sits in the strip below the face, not across its border (LAB-1488).
+    expect(covers[0]?.labelBox).toEqual(percentBox([0, 62, 81, 91], 200, 100));
+    expect(covers[1]?.labelBox).toBeUndefined();
+    expect(covers[2]?.labelBox).toBeUndefined();
   });
 
   it("ships a value-free labels recording whose placeholders tie the image to the text", () => {

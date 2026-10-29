@@ -1,10 +1,10 @@
 """Hosted image masking (LAB-1390, ADR 0014) through the real ASGI app.
 
 Signed-in Google owners only; local processing only (the built-in Tesseract and on-device
-segmenter types, with their model work replaced by in-process fakes); bounded bytes, pixels,
-media types, capacity and a daily image count reserved before work; owner-scoped sessions
-shared with text. Every image is drawn here and every identity and value is synthetic
-(ADR 0005). Nothing may leave the process: the HTTP transports are blocked.
+segmenter types, faces and signatures, with their model work replaced by in-process fakes);
+bounded bytes, pixels, media types, capacity and a daily image count reserved before work;
+owner-scoped sessions shared with text. Every image is drawn here and every identity and
+value is synthetic (ADR 0005). Nothing may leave the process: the HTTP transports are blocked.
 """
 
 from __future__ import annotations
@@ -27,19 +27,26 @@ from PIL import Image, ImageDraw
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
-from pii_guard.hosted.images import image_body_limit
+from pii_guard.hosted.images import (
+    hosted_visual_policies,
+    image_body_limit,
+    require_local_visual_policies,
+)
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits
+from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import EntityType
 from pii_guard.visual import OcrWord, SamClient
 from pii_guard.visual.ocr import TesseractOcr
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.segment import LocalSegmenter
+from pii_guard.visual.segmenters import LocalSignatureSegmenter, SignatureDetector
 
 ORIGIN = "https://guard.example"
 TAJ_VALUE = "123 456 788"  # fictional, passes the checksum
 NAME_VALUE = "Teszt Elek"  # the conventional fictional Hungarian name
 W, H = 400, 260
 FACE = Box(30, 40, 129, 169)
+SIGNATURE = Box(220, 190, 330, 230)
 WORDS = [
     OcrWord("TAJ:", Box(160, 60, 199, 79), (0,)),
     OcrWord("123", Box(205, 60, 239, 79), (0,)),
@@ -80,9 +87,6 @@ def settings(**overrides: Any) -> Settings:
             "detectors": ("rules",),
             "ner_fallback": "off",
             "upstream_api_key": "synthetic-sponsored-key",
-            # The deployment's explicit choice (release.bicep): the on-device segmenter
-            # cannot find signatures, so they are left visible rather than every image refused.
-            "policy_overrides": "SIGNATURE=keep",
             **overrides,
         },
     )
@@ -102,21 +106,32 @@ class Calls:
     def __init__(self) -> None:
         self.ocr = 0
         self.segment = 0
+        self.signature = 0
 
 
 def local_pipeline(app: FastAPI, calls: Calls) -> None:
     """The real hosted component types, with their model work replaced in-process."""
-    segmenter = LocalSegmenter(detector=object())
+    faces = LocalSegmenter(detector=object())
 
     def segment(image: bytes, entity_types: Any = None) -> list[Region]:
         calls.segment += 1
         return [Region(EntityType.FACE, FACE, 0.9, "yunet")]
 
+    def signatures() -> SignatureDetector:
+        def boxes(image: Image.Image) -> list[tuple[float, float, float, float, float]]:
+            if image.size != (W, H):
+                return []  # the 2x2 tiles: the whole-image pass already found it
+            calls.signature += 1
+            return [(*map(float, SIGNATURE.to_list()), 0.8)]
+
+        return SignatureDetector(boxes=boxes)
+
     def words(image: Image.Image) -> list[OcrWord]:
         calls.ocr += 1
         return list(WORDS)
 
-    segmenter.segment = segment  # type: ignore[method-assign]
+    faces.segment = segment  # type: ignore[method-assign]
+    segmenter = LocalSignatureSegmenter(faces, signatures=signatures)
     ocr = TesseractOcr()
     ocr.read = None  # type: ignore[assignment,method-assign]
     ocr.words = words  # type: ignore[method-assign]
@@ -164,11 +179,12 @@ def test_signed_in_owner_masks_in_memory_and_shares_placeholders_with_text(
     body = response.json()
     assert body["session_id"] == session
     assert placeholder in body["transcript"] and TAJ_VALUE not in body["transcript"]
-    assert body["analysis"]["sam"]["model"] == LocalSegmenter.model
+    assert body["analysis"]["sam"]["model"].startswith(LocalSegmenter.model)
     assert body["analysis"]["ocr"]["ran"] is True
-    assert {r["entity_type"] for r in body["regions"]} >= {"FACE"}
+    # Signatures are masked on-device by default (LAB-1444): no SAM, no override.
+    assert {r["entity_type"] for r in body["regions"]} >= {"FACE", "SIGNATURE"}
     assert TAJ_VALUE not in response.text
-    assert calls.ocr == calls.segment == 1
+    assert calls.ocr == calls.segment == calls.signature == 1
     # The image's value restores like the text's: one owner, one session.
     restored = client.post(
         "/v1/unmask", json={"session_id": session, "text": body["transcript"]}, headers=auth()
@@ -295,8 +311,9 @@ def test_one_image_job_per_replica(hosted: tuple[TestClient, Calls]) -> None:
     assert calls.ocr == 0
 
 
-def test_masked_signature_policy_refuses_and_hides_images() -> None:
-    app = create_app(settings(policy_overrides=None))
+def test_masked_stamp_policy_refuses_and_hides_images() -> None:
+    # Nothing on the replica finds stamps: a server that masks them refuses every image.
+    app = create_app(settings(policy_overrides="STAMP=mask"))
     calls = Calls()
     local_pipeline(app, calls)
     with TestClient(app, base_url=ORIGIN) as client:
@@ -305,8 +322,54 @@ def test_masked_signature_policy_refuses_and_hides_images() -> None:
         response = post_image(client, auth())
         assert response.status_code == 503
         assert response.json()["error"]["code"] == "detection_profile_denied"
-        assert "SIGNATURE" in response.json()["error"]["message"]
-        assert calls.ocr == calls.segment == 0
+        assert "STAMP" in response.json()["error"]["message"]
+        assert calls.ocr == calls.segment == calls.signature == 0
+
+
+def test_kept_signatures_skip_the_signature_detector() -> None:
+    app = create_app(settings(policy_overrides="SIGNATURE=keep"))
+    calls = Calls()
+    local_pipeline(app, calls)
+    with TestClient(app, base_url=ORIGIN) as client:
+        # A new project policy starts from the server's visual actions.
+        store = app.state.projects.store
+        project = store.default_project("synthetic-one")
+        policy_id = project["default_policy_version_id"]
+        assert (
+            store.get_policy("synthetic-one", project["id"], policy_id)["entity_policies"][
+                "SIGNATURE"
+            ]
+            == "keep"
+        )
+        response = post_image(client, auth())
+        assert response.status_code == 200, response.text
+        assert "SIGNATURE" not in {r["entity_type"] for r in response.json()["regions"]}
+        assert calls.signature == 0
+
+
+def test_owner_visual_policy_and_stricter_operator_overrides() -> None:
+    owner = PolicySet({EntityType.SIGNATURE: Policy.KEEP, EntityType.FACE: Policy.KEEP})
+    stored = {"entity_policies": {"SIGNATURE": "keep", "FACE": "keep"}}
+    server = PolicySet()
+    loose = settings()
+    effective = hosted_visual_policies(stored, owner, loose, server)
+    assert effective.of(EntityType.SIGNATURE) is Policy.KEEP  # the owner's choice stands
+    strict = settings(policy_overrides="SIGNATURE=mask,FACE=keep")
+    effective = hosted_visual_policies(stored, owner, strict, server)
+    assert effective.of(EntityType.SIGNATURE) is Policy.MASK  # the stricter operator wins
+    assert effective.of(EntityType.FACE) is Policy.KEEP
+    # A version saved before visual types existed: the server's actions, as before.
+    legacy = hosted_visual_policies({"entity_policies": {}}, owner, loose, server)
+    assert legacy.of(EntityType.SIGNATURE) is Policy.MASK
+
+
+def test_sam_detection_policy_is_refused_on_hosted() -> None:
+    import pii_guard.detection_profile as profile
+
+    with pytest.raises(profile.DetectionProfileError, match=r"SAM 3\.1"):
+        require_local_visual_policies(PolicySet(), {"visual_detection": "sam"})
+    require_local_visual_policies(PolicySet(), {"visual_detection": "local"})
+    require_local_visual_policies(PolicySet(), {})  # saved before the field: local
 
 
 def test_images_capability_follows_the_operator(hosted: tuple[TestClient, Calls]) -> None:
@@ -413,3 +476,24 @@ def test_deadline_refuses_and_a_still_running_job_keeps_the_slot(
     while client.app.state.image_workers.running and time.monotonic() < deadline:
         time.sleep(0.05)
     assert post_image(client, auth("synthetic-two")).status_code == 200
+
+
+def test_a_bare_or_missing_local_segmenter_is_paired_with_signatures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pii_guard.hosted.images as images
+
+    bare = LocalSegmenter(detector=object())
+    state = SimpleNamespace(settings=settings(), sam_client=bare)
+    paired = images.local_segmenter(state)
+    assert isinstance(paired, LocalSignatureSegmenter) and paired.local is bare
+    assert images.local_segmenter(state) is paired  # stored, built once
+    monkeypatch.setattr(
+        images, "build_segmenter", lambda *a, **k: LocalSegmenter(detector=object())
+    )
+    built = images.local_segmenter(SimpleNamespace(settings=settings(), sam_client=None))
+    assert isinstance(built, LocalSignatureSegmenter)
+    # A pairing around anything but the built-in on-device segmenter is refused.
+    impostor = LocalSignatureSegmenter(SamClient(api_key="test-key-not-a-secret"))
+    with pytest.raises(Exception, match="on-device segmenter"):
+        images.local_segmenter(SimpleNamespace(settings=settings(), sam_client=impostor))

@@ -1,11 +1,11 @@
 # A Polish language pack: pl-pii-bench leak 17.5 → 3.5 % (2026-10-28)
 
-LAB-1400, found in LAB-1392. Fast mode leaked 17.5 % of the labelled values on
+LAB-1400, found in LAB-1392. Fast mode leaked 17.5 % of the labeled values on
 pl-pii-bench, and 141 of the 144 leaks were Polish identifiers that no rule knew. So we built
 a `pl` pack by following [languages.md](../languages.md), with the German pack as the worked
 example. It adds validators for PESEL (including the date of birth and its century offset),
 NIP (compact and in both dashed layouts), REGON 9 and 14, the ID card (dowód osobisty) and the
-passport. It also adds cue words (a labelled number is masked even when its check digit fails,
+passport. It also adds cue words (a labeled number is masked even when its check digit fails,
 and a driving-licence number after `prawo jazdy`), national phone numbers, addresses (`ul.`,
 `al.`, `os.`, `pl.`, `NN-NNN Miasto`), the case endings that leave a name intact (`Nowaka`,
 `Kowalskiego`), prompt notes, ID-card captions and brand names.
@@ -28,7 +28,7 @@ pack ([before](../../eval/results/runs/2026-10-28-lab-1400-pl-pii-bench-before.j
   the pack knows. No checksum-valid value leaks (0 of 192).
 - **Over-masking on the `negative` lane rose from 88 to 117 spans.** The validators reject
   every value there. The extra masks come from the cue rule: the lane labels numbers with a bad
-  check digit (`PESEL …`), and pii-guard masks a labelled identifier whatever its check digit,
+  check digit (`PESEL …`), and pii-guard masks a labeled identifier whatever its check digit,
   since a mistyped real one is still personal data. The benchmark counts them as not personal
   data, so this target and the cue requirement conflict. We kept the policy.
 - **Nothing else moved.** The hu/en/de smoke, synth-sample, ai4privacy and negative sets give

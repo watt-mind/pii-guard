@@ -63,6 +63,11 @@ export interface LabelCover {
   fontCqw: number;
   /** A photo or face (segmenter) rather than a text value (OCR). */
   visual: boolean;
+  /**
+   * Where to print the label when a nested cover (the face inside its ID photo) would cross it:
+   * the taller free strip above or below that cover (LAB-1488). Absent: centered in `box`.
+   */
+  labelBox?: PercentBox;
 }
 
 const inside = (a: ImageRegion["box"], b: ImageRegion["box"]) => a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3];
@@ -74,15 +79,30 @@ const inside = (a: ImageRegion["box"], b: ImageRegion["box"]) => a[0] >= b[0] &&
  */
 export function labelCovers(regions: readonly LabelledRegion[], width: number, height: number): LabelCover[] {
   const masked = regions.filter((r) => r.policy === "mask");
+  const coverOf = (r: LabelledRegion) => r.cover_box ?? r.box;
+  const isNestedIn = (r: LabelledRegion, o: LabelledRegion) => o !== r && !!o.label && o.label === r.label && inside(coverOf(r), coverOf(o)) && !inside(coverOf(o), coverOf(r));
   return masked.map((r) => {
-    const cover = r.cover_box ?? r.box;
-    const nested = masked.some((o) => o !== r && o.label && o.label === r.label && inside(cover, o.cover_box ?? o.box) && !inside(o.cover_box ?? o.box, cover));
+    const cover = coverOf(r);
+    const nested = masked.some((o) => isNestedIn(r, o));
     const lines = nested ? [] : (r.label_lines ?? (r.label ? [r.label] : []));
+    const fontPx = r.label_px ?? 0;
+    // A label centered on the outer cover runs across the inner cover's border: print it in the
+    // taller strip beside the inner cover instead, when one line block fits there.
+    let labelBox: PercentBox | undefined;
+    const inner = lines.length && fontPx ? masked.find((o) => isNestedIn(o, r)) : undefined;
+    if (inner) {
+      const [, iy1, , iy2] = coverOf(inner);
+      const above = iy1 - cover[1];
+      const below = cover[3] - iy2;
+      const need = lines.length * fontPx * 1.15;
+      if (Math.max(above, below) >= need) labelBox = percentBox(below >= above ? [cover[0], iy2 + 1, cover[2], cover[3]] : [cover[0], cover[1], cover[2], iy1 - 1], width, height);
+    }
     return {
       box: percentBox(cover, width, height, r.cover_box ? 0 : MASK_PADDING),
       lines,
-      fontCqw: r.label_px ? (r.label_px / width) * 100 : 0,
+      fontCqw: fontPx ? (fontPx / width) * 100 : 0,
       visual: r.source !== "ocr",
+      ...(labelBox ? { labelBox } : {}),
     };
   });
 }
@@ -244,4 +264,20 @@ export function tagPlacements(
     used.push({ x: pick[1], y: pick[2] });
     return pick[0];
   });
+}
+
+/**
+ * The landing's enlarged crop of a card's text column (x1, y1, x2, y2 in image pixels): the text
+ * covers plus a margin, starting right of a photo cover that ends before the text (L2 carryover 2).
+ */
+export function zoomBox(regions: readonly LabelledRegion[], width: number, height: number, pad = 14): [number, number, number, number] | null {
+  const text = regions.filter((r) => r.policy === "mask" && r.source === "ocr" && r.cover_box);
+  if (!text.length) return null;
+  const left = Math.min(...text.map((r) => r.cover_box![0]));
+  const visualEdge = Math.max(0, ...regions.filter((r) => r.policy === "mask" && r.source !== "ocr" && r.cover_box && r.cover_box[2] < left).map((r) => r.cover_box![2] + 1));
+  const x1 = Math.max(0, visualEdge, left - pad);
+  const y1 = Math.max(0, Math.min(...text.map((r) => r.cover_box![1])) - pad);
+  const x2 = Math.min(width, Math.max(...text.map((r) => r.cover_box![2])) + pad);
+  const y2 = Math.min(height, Math.max(...text.map((r) => r.cover_box![3])) + pad);
+  return [x1, y1, x2, y2];
 }
