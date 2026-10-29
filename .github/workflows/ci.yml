@@ -227,6 +227,7 @@ jobs:
       # gitleaks (Trivy secret scanning false-positives on model blobs).
       - name: Vulnerability scan (advisory; OS and library packages)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        continue-on-error: true
         with:
           image-ref: pii-guard:ci
           scanners: vuln
@@ -296,6 +297,7 @@ jobs:
         run: docker run --rm --interactive --network none --entrypoint python pii-guard:hosted-ci - < deploy/azure/ci_hosted_smoke.py
       - name: Vulnerability scan (advisory; OS and library packages)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        continue-on-error: true
         with:
           image-ref: pii-guard:hosted-ci
           scanners: vuln
