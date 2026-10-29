@@ -631,7 +631,14 @@ def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[st
         body.append(
             _text(px0 - 16, sy(t) + 7, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="end")
         )
+    # Thin the x labels so dates never overlap at 1600 px (LAB-1224): keep at most
+    # ~6 labeled categories, always including the first and the last.
+    keep = {0, len(cats) - 1}
+    step = max(1, math.ceil(len(cats) / 6))
+    keep.update(range(0, len(cats), step))
     for i, (day, commit) in enumerate(cats):
+        if i not in keep:
+            continue
         body.append(_text(sx(i), py1 + 34, day, size=20, fill=MUTED, anchor="middle"))
         body.append(_text(sx(i), py1 + 60, _short(commit), size=20, fill=MUTED, anchor="middle"))
     body.append(
@@ -682,7 +689,10 @@ def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[st
             continue
         body.append(_marker("circle", 1230, ly, 10, st["color"]))
         name = st["short_label"] + (" (default)" if st.get("default") else "")
-        body.append(_text(1250, ly + 7, name, size=20, weight="600"))
+        # Wrap long legend names so they stay inside the 1600 px card (LAB-1224).
+        for k, line in enumerate(_wrap(name, 20, 330)):
+            body.append(_text(1250, ly + 7 + k * 26, line, size=20, weight="600"))
+        ly += 26 * max(len(_wrap(name, 20, 330)) - 1, 0)
         body.append(
             _text(
                 1250,
