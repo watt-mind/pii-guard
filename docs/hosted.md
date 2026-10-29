@@ -179,7 +179,7 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_MODELS` | `muse-spark-1.3` allowlist |
 | `PII_GUARD_HOSTED_SOURCE_TAG` | Default `pii-guard-hosted-demo`, `[A-Za-z0-9._-]{1,64}`; sent as `X-PII-Guard-Source` on sponsored Meta calls only ([attribution](#sponsored-upstream-attribution)) |
 | `PII_GUARD_NER_MODEL`, `PII_GUARD_DETECTORS` | `/app/models/ner`, `rules,ner`; cannot silently drop NER |
-| `PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS` | Default `0`; approved cumulative ceiling, max USD 10 |
+| `PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS` | Default `0`; approved cumulative ceiling, max USD 50 on prod and USD 10 on dev |
 | `PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID` | Exact operator-approved ID; reused across Blob-backed restarts |
 | `PII_GUARD_HOSTED_SPEND_STORE` | `azure_blob`; requires LAB-1398 and the image SDK extra |
 | `PII_GUARD_HOSTED_SPEND_ACCOUNT_URL` | Environment-specific identity-only Blob account |
@@ -451,11 +451,20 @@ named key; never record `meta_proxy_authorized: true` on the strength of it:
 `deploy.sh` accepts exactly these four keys with these values (`date` a real, non-future
 `YYYY-MM-DD`), refuses any other shape even next to `meta_proxy_authorized`, and prints that the
 allocation is admitted under risk acceptance. It replaces no other gate: LAB-1372, image
-binding, the dev network keys, the USD 10 ceiling and the operator's allocation pins all still
-apply. Its conditions: hosted demo only (dev now, prod for judges), a finite allocation of at
-most USD 10 per environment with a fixed expiry after the hackathon, and attribution headers on
+binding, the dev network keys, the per-environment ceiling and the operator's allocation pins all still
+apply. Its conditions: hosted demo only (dev now, prod for judges), a finite allocation with a fixed expiry after the hackathon, and attribution headers on
 every sponsored call. **Before any general-availability launch, sponsored Meta stops being the
 default route unless written authorization arrives**; delete the waiver from new evidence then.
+
+The allocation cap is per environment and enforced in both `deploy.sh` and `release.bicep`:
+
+| Environment | Cap | Approved pins | Owner decision |
+|---|---|---|---|
+| dev | USD 10 (`10000000` µ$) | `dev-hackathon-20261029` | LAB-1389, 2026-10-28 |
+| prod | USD 50 (`50000000` µ$) | `prod-hackathon-20261029`, expires `1796083200` (2026-12-01T00:00Z) | 2026-10-29, in chat: "do with $50 please." (LAB-1508, recorded on LAB-1389) |
+
+The prod extension widens only the amount and expiry. The evidence key above is unchanged and is
+still a risk acceptance, not authorization.
 
 ### Sponsored upstream attribution
 
@@ -480,8 +489,8 @@ The app scales to zero when idle and runs at most one 2-vCPU/4-GiB replica. Each
 loads the local NER model before readiness and can delay the first request. Scale-to-zero
 discards owner state. The Blob store resumes the same finite total/daily authority; it never
 reopens credit automatically.
-ACR Basic, Key Vault, Azure Files, networking and alerting cost extra. The USD 10 limit is an
-application sponsored allocation ceiling, not an Azure hard cap or a verified price estimate.
+ACR Basic, Key Vault, Azure Files, networking and alerting cost extra. The USD 50 (prod) and USD 10 (dev) limits are
+application sponsored allocation ceilings, not Azure hard caps or verified price estimates.
 Bootstrap creates the owner-approved EUR 25/month resource-group budget with 50/80/100%
 notifications routed to the existing selected action group. `stage` and `enable` refuse to run
 without that budget and preserve its start date/recipients. Azure budgets alert; they do not

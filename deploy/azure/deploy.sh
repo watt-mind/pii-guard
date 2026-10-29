@@ -185,7 +185,9 @@ PYPRIVATE
   fi
   sponsored=${HOSTED_SPONSORED_MICRODOLLARS:-0}
   [[ "$sponsored" =~ ^[0-9]+$ && ${#sponsored} -le 8 ]] || { echo 'Invalid cumulative allowance ceiling' >&2; exit 2; }
-  ((10#$sponsored <= 10000000)) || { echo 'Invalid cumulative allowance ceiling (maximum USD 10)' >&2; exit 2; }
+  # Per-environment cap (LAB-1508): prod USD 50 (owner, 2026-10-29), dev stays USD 10.
+  if [[ "$AZURE_ENVIRONMENT" == prod ]]; then ceiling=50000000 ceiling_usd=50; else ceiling=10000000 ceiling_usd=10; fi
+  ((10#$sponsored <= ceiling)) || { echo "Invalid cumulative allowance ceiling (maximum USD $ceiling_usd for $AZURE_ENVIRONMENT)" >&2; exit 2; }
   if [[ "$technical_stage" != true ]] && { [[ "$mode" == enable || "$AZURE_ENVIRONMENT" == dev ]] || ((sponsored > 0)); }; then
     : "${HOSTED_RELEASE_EVIDENCE:?Provide reviewed image-bound release evidence}"
     python3 - "$HOSTED_RELEASE_EVIDENCE" "$HOSTED_IMAGE" "$mode" "$sponsored" "$AZURE_ENVIRONMENT" <<'PYEVIDENCE'

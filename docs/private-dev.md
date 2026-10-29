@@ -120,7 +120,7 @@ dev. Use the same immutable image digest and normal versioned app key references
 Keep sponsorship zero until provider authorization (or the owner's recorded LAB-1389 risk
 acceptance, `meta_proxy_owner_risk_accepted`) and approved durable authority exist. That
 waiver is a risk acceptance, not Meta authorization: it is scoped to the hackathon demo, capped
-at USD 10 with a fixed expiry, and sponsored Meta stops being the default before general
+at USD 10 on dev (prod: USD 50) with a fixed expiry, and sponsored Meta stops being the default before general
 availability unless written authorization arrives
 ([hosted.md](hosted.md#owner-risk-acceptance-is-not-authorization)).
 
