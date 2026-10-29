@@ -1,0 +1,272 @@
+{
+  "ticket": "LAB-1494",
+  "model": "watt-mind/pii-guard-ner-xlmr-base v2.0 (95f612a9), fast mode (rules + NER)",
+  "seed": 1494,
+  "pools": {
+    "mapa-dev": {
+      "documents": 21,
+      "languages": {
+        "bg": {
+          "ADDRESS:leaked": 7,
+          "ADDRESS:values": 9,
+          "PERSON:values": 9,
+          "family:address": 7
+        },
+        "cs": {
+          "ADDRESS:leaked": 8,
+          "ADDRESS:values": 9,
+          "PERSON:leaked": 1,
+          "PERSON:values": 10,
+          "family:address": 8,
+          "family:person:single-token": 1
+        },
+        "da": {
+          "ADDRESS:leaked": 6,
+          "ADDRESS:values": 8,
+          "PERSON:values": 9,
+          "family:address": 6
+        },
+        "de": {
+          "ADDRESS:leaked": 8,
+          "ADDRESS:values": 8,
+          "PERSON:values": 9,
+          "family:address": 8
+        },
+        "el": {
+          "ADDRESS:leaked": 8,
+          "ADDRESS:values": 8,
+          "PERSON:values": 8,
+          "family:address": 8
+        },
+        "en": {
+          "ADDRESS:leaked": 7,
+          "ADDRESS:values": 8,
+          "PERSON:leaked": 2,
+          "PERSON:values": 13,
+          "family:address": 7,
+          "family:person:single-token": 2
+        },
+        "es": {
+          "ADDRESS:leaked": 2,
+          "ADDRESS:values": 2,
+          "PERSON:leaked": 1,
+          "PERSON:values": 18,
+          "family:address": 2,
+          "family:person:all-caps": 1
+        },
+        "et": {
+          "ADDRESS:leaked": 6,
+          "ADDRESS:values": 7,
+          "PERSON:values": 8,
+          "family:address": 6
+        },
+        "fi": {
+          "ADDRESS:leaked": 7,
+          "ADDRESS:values": 9,
+          "PERSON:leaked": 1,
+          "PERSON:values": 10,
+          "family:address": 7,
+          "family:person:single-token": 1
+        },
+        "fr": {
+          "ADDRESS:leaked": 8,
+          "ADDRESS:values": 8,
+          "PERSON:leaked": 1,
+          "PERSON:values": 9,
+          "family:address": 8,
+          "family:person:single-token": 1
+        },
+        "ga": {
+          "ADDRESS:leaked": 5,
+          "ADDRESS:values": 8,
+          "PERSON:values": 9,
+          "family:address": 5
+        },
+        "hu": {
+          "ADDRESS:leaked": 5,
+          "ADDRESS:values": 7,
+          "PERSON:values": 9,
+          "family:address": 5
+        },
+        "it": {
+          "ADDRESS:leaked": 7,
+          "ADDRESS:values": 7,
+          "PERSON:values": 9,
+          "family:address": 7
+        },
+        "lt": {
+          "ADDRESS:leaked": 3,
+          "ADDRESS:values": 4,
+          "PERSON:values": 8,
+          "family:address": 3
+        },
+        "lv": {
+          "ADDRESS:leaked": 7,
+          "ADDRESS:values": 9,
+          "PERSON:leaked": 3,
+          "PERSON:values": 12,
+          "family:address": 7,
+          "family:person:single-token": 3
+        },
+        "mt": {
+          "ADDRESS:leaked": 3,
+          "ADDRESS:values": 5,
+          "PERSON:leaked": 2,
+          "PERSON:values": 11,
+          "family:address": 3,
+          "family:person:single-token": 2
+        },
+        "nl": {
+          "ADDRESS:leaked": 3,
+          "ADDRESS:values": 3,
+          "PERSON:values": 8,
+          "family:address": 3
+        },
+        "pt": {
+          "ADDRESS:leaked": 7,
+          "ADDRESS:values": 7,
+          "PERSON:leaked": 1,
+          "PERSON:values": 9,
+          "family:address": 7,
+          "family:person:single-token": 1
+        },
+        "ro": {
+          "ADDRESS:leaked": 5,
+          "ADDRESS:values": 7,
+          "PERSON:values": 2,
+          "family:address": 5
+        },
+        "sk": {
+          "ADDRESS:leaked": 4,
+          "ADDRESS:values": 4,
+          "PERSON:values": 10,
+          "family:address": 4
+        },
+        "sv": {
+          "ADDRESS:leaked": 6,
+          "ADDRESS:values": 8,
+          "PERSON:values": 11,
+          "family:address": 6
+        }
+      }
+    },
+    "gretel-dev": {
+      "documents": 600,
+      "languages": {
+        "de": {
+          "ADDRESS:leaked": 10,
+          "ADDRESS:values": 177,
+          "BANK_ACCOUNT:values": 21,
+          "DATE_OF_BIRTH:leaked": 2,
+          "DATE_OF_BIRTH:values": 13,
+          "EMAIL:values": 42,
+          "ID_DOCUMENT:leaked": 2,
+          "ID_DOCUMENT:values": 18,
+          "PERSON:leaked": 203,
+          "PERSON:values": 468,
+          "PHONE:leaked": 3,
+          "PHONE:values": 34,
+          "family:address": 10,
+          "family:date_of_birth": 2,
+          "family:id_document:alnum": 1,
+          "family:id_document:digits-short": 1,
+          "family:person:all-caps": 1,
+          "family:person:full-name": 57,
+          "family:person:single-token": 145,
+          "family:phone:alnum": 3
+        },
+        "en": {
+          "ADDRESS:leaked": 10,
+          "ADDRESS:values": 225,
+          "BANK_ACCOUNT:values": 26,
+          "DATE_OF_BIRTH:leaked": 1,
+          "DATE_OF_BIRTH:values": 16,
+          "EMAIL:leaked": 2,
+          "EMAIL:values": 88,
+          "ID_DOCUMENT:values": 16,
+          "PERSON:leaked": 12,
+          "PERSON:values": 285,
+          "PHONE:leaked": 1,
+          "PHONE:values": 66,
+          "family:address": 10,
+          "family:date_of_birth": 1,
+          "family:email": 2,
+          "family:person:all-caps": 1,
+          "family:person:full-name": 7,
+          "family:person:single-token": 4,
+          "family:phone:alnum": 1
+        }
+      }
+    },
+    "openpii-dev": {
+      "documents": 1300,
+      "languages": {
+        "de": {
+          "ADDRESS:leaked": 2,
+          "ADDRESS:values": 169,
+          "BANK_ACCOUNT:values": 52,
+          "EMAIL:values": 132,
+          "ID_DOCUMENT:leaked": 1,
+          "ID_DOCUMENT:values": 265,
+          "PERSON:leaked": 1,
+          "PERSON:values": 252,
+          "PHONE:values": 103,
+          "family:address": 2,
+          "family:id_document:alnum": 1,
+          "family:person:single-token": 1
+        },
+        "en": {
+          "ADDRESS:leaked": 2,
+          "ADDRESS:values": 181,
+          "BANK_ACCOUNT:leaked": 1,
+          "BANK_ACCOUNT:values": 60,
+          "EMAIL:values": 158,
+          "ID_DOCUMENT:leaked": 2,
+          "ID_DOCUMENT:values": 268,
+          "PERSON:leaked": 2,
+          "PERSON:values": 287,
+          "PHONE:values": 109,
+          "family:address": 2,
+          "family:bank_account:digits-long": 1,
+          "family:id_document:alnum": 2,
+          "family:person:single-token": 2
+        },
+        "hu": {
+          "ADDRESS:leaked": 1,
+          "ADDRESS:values": 169,
+          "BANK_ACCOUNT:values": 80,
+          "EMAIL:values": 133,
+          "ID_DOCUMENT:values": 159,
+          "NATIONAL_ID_HU_TAJ:values": 58,
+          "NATIONAL_ID_HU_TAX:leaked": 1,
+          "NATIONAL_ID_HU_TAX:values": 56,
+          "PERSON:values": 237,
+          "PHONE:values": 96,
+          "family:address": 1,
+          "family:national_id_hu_tax": 1
+        },
+        "pl": {
+          "ADDRESS:leaked": 7,
+          "ADDRESS:values": 228,
+          "BANK_ACCOUNT:leaked": 1,
+          "BANK_ACCOUNT:values": 88,
+          "EMAIL:values": 204,
+          "ID_DOCUMENT:leaked": 5,
+          "ID_DOCUMENT:values": 337,
+          "PERSON:leaked": 4,
+          "PERSON:values": 358,
+          "PHONE:values": 156,
+          "family:address": 7,
+          "family:bank_account:digits-long": 1,
+          "family:id_document:alnum": 4,
+          "family:id_document:digits-short": 1,
+          "family:person:single-token": 4
+        }
+      }
+    }
+  },
+  "notes": [
+    "mapa-dev is from a second run (--pools mapa-dev) after sentences were joined with a space instead of a newline: the newline cut every initial off its surname and made 27 artefact misses.",
+    "Counts only: no value or text. Families are the coarse value-shape heuristic in mine_errors.family(); the README says which misses are label noise on reading."
+  ]
+}
