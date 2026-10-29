@@ -784,6 +784,10 @@ class VaultSession:
         Every form of one value shares one placeholder keyed on its lemma: a span that ends
         in a suffix is narrowed to the stem (``Próba Zsuzsannának`` -> ``[[PERSON_x]]nak``)
         and stem-changed forms (``Próba Zsuzsannát``, ``Kováccsal``) are found as occurrences.
+        A single-word value that is also a common word (``Bor``/``bor``) masks that word's
+        inflected forms too (``bort``): accepted over-masking (LAB-1343). Telling the surname
+        from the common word would need a capitalisation or lexicon gate, and either would
+        leak a lower-case name in chat text; the guard stays biased toward masking.
 
         Casing: by default every casing of a value shares its placeholder too, and
         :meth:`unmask` restores the value as first written (``TESZT ELEK és Teszt Elek`` with
