@@ -386,6 +386,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `blocked_entity` | `/v1/mask` (or the gateway) found an entity type whose policy is `block`. The message lists types and counts only; nothing is masked, stored or forwarded. |
 | 422 | `invalid_project_config` | A project, policy, endpoint or endpoint-key configuration is invalid. |
 | 422 | `upstream_destination_not_allowed` | Hosted endpoint destination does not satisfy the public HTTPS/port policy. |
+| 422 | `outbound_check_failed` | Gateway: after masking, the request still held a value its vault session knows (the [outbound re-check](architecture-gateway.md#outbound-re-check), LAB-1500); nothing was sent. The message lists entity types and counts only; the response has `X-PII-Guard-Outbound-Check: blocked`. |
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
 | 502 | `upstream_credential_rejected` | Listing a provider's models (`POST /v1/projects/{project_id}/endpoints/models`, a pass-through `/e/{endpoint_id}/v1/models`): the provider answered 401 or 403, so the API key is wrong or lacks access. The message is fixed; the provider's own status text and body are never passed on. |
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
@@ -963,6 +964,11 @@ call on the same session (Muse Code sends its main turn and reminder observers t
 the entries the refused call added. A refused call never drops a session it did not create
 (as before), and a lone refused call still drops the one it created.
 
+Every gateway response that reached the upstream carries `X-PII-Guard-Outbound-Check: passed`;
+a request refused by the re-check gets `422 outbound_check_failed` with
+`X-PII-Guard-Outbound-Check: blocked` (policy and short-value rules:
+[architecture-gateway.md](architecture-gateway.md#outbound-re-check)).
+
 ## Gateway request fields (implemented)
 
 `POST /v1/chat/completions` walks the whole body against an allow-list
@@ -1233,6 +1239,14 @@ doesn't inflate them).
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
 
 Messages and `repr()`s carry types, counts and placeholder ids, never an original value.
+
+`VaultSession.unmasked(texts, language)` (LAB-1500) lists every occurrence of a value the
+session holds (its entries, their surfaces and aliases, and its known values) that is still
+written out in `texts`, with the sweep's own patterns and guards; occurrences inside a
+placeholder never count and overlapping ones count once. Each `Unmasked` has the text index,
+offsets, entity type, the value's letter-and-digit count, `digits_only`, `model_only` and
+`known`, never the value. Read-only: nothing is recorded. The gateway's outbound re-check is
+built on it.
 
 ### Lifetime
 

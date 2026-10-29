@@ -79,7 +79,7 @@ def get_gateway(request: Request) -> Gateway:
 @router.post(
     "/v1/chat/completions",
     tags=["gateway"],
-    responses=error_responses("detection_profile_denied"),
+    responses=error_responses("detection_profile_denied", "outbound_check_failed"),
 )
 async def chat_completions(request: Request) -> Response:
     gateway = get_gateway(request)

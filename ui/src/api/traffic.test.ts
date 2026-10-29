@@ -3,7 +3,7 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { DEMO_SCENARIOS } from "./demoTraffic";
 import { ApiError, UnreachableError } from "./http";
-import { DEDUP_WINDOW, MAX_BACKOFF_MS, SSE_MAX_ERRORS, TrafficRateLimitedError, connectTraffic, fetchTraffic, parseRetryAfter, parseTrafficEvent, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
+import { DEDUP_WINDOW, MAX_BACKOFF_MS, SSE_MAX_ERRORS, TrafficRateLimitedError, connectTraffic, fetchTraffic, outboundCheckLabel, parseRetryAfter, parseTrafficEvent, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
 
 const events = (full.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -484,5 +484,23 @@ describe("parseTrafficEvent endpoint (LAB-1492)", () => {
     expect(parseTrafficEvent({ ...base, endpoint: { id: "ep_a" } })?.endpoint).toEqual({ id: "ep_a", name: "ep_a" });
     expect(parseTrafficEvent(base)?.endpoint).toBeNull();
     expect(parseTrafficEvent({ ...base, endpoint: "ep_a" })?.endpoint).toBeNull();
+  });
+});
+
+describe("outbound re-check field (LAB-1500)", () => {
+  const base = { id: "req_1", seq: 1, timing: {} };
+
+  it("parses the counts and labels a pass and a block", () => {
+    const passed = parseTrafficEvent({ ...base, outbound_check: { result: "passed", texts: 3, hits: {}, short: 1, ms: 0.4 } });
+    expect(passed?.outbound_check).toEqual({ result: "passed", texts: 3, hits: {}, short: 1, ms: 0.4 });
+    expect(outboundCheckLabel(passed!.outbound_check)).toBe("passed · 3 texts");
+    const blocked = parseTrafficEvent({ ...base, outbound_check: { result: "blocked", texts: 1, hits: { PERSON: 1 }, short: 0, ms: 0.2 } });
+    expect(outboundCheckLabel(blocked!.outbound_check)).toBe("blocked · 1 value left");
+  });
+
+  it("is null for events from servers without it, or refused before it", () => {
+    const old = parseTrafficEvent(base);
+    expect(old?.outbound_check).toBeNull();
+    expect(outboundCheckLabel(null)).toBe("not reached");
   });
 });

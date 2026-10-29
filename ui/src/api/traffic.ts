@@ -67,6 +67,8 @@ export interface TrafficEvent {
   session_new: boolean;
   /** How the gateway picked the vault session (LAB-1286): `header`, `path`, `prompt_cache_key` or `default`. */
   session_source: string | null;
+  /** The outbound re-check of the masked request (LAB-1500); `null` when the call was refused before it. */
+  outbound_check: TrafficOutboundCheck | null;
   detectors: string[];
   entities: TrafficEntities | null;
   cache: { hits: number; misses: number; seeded: number } | null;
@@ -79,6 +81,16 @@ export interface TrafficEvent {
   response: { masked?: unknown; unmasked?: unknown; chunks?: number } | null;
   /** Hosted: the endpoint the call went through (LAB-1492); `null` for a call on the project itself. */
   endpoint?: { id: string; name: string } | null;
+}
+
+export interface TrafficOutboundCheck {
+  result: "passed" | "blocked" | string;
+  texts: number;
+  /** Blocking occurrences per entity type: counts only, never values. */
+  hits: Partial<Record<EntityType, number>>;
+  /** Occurrences too short to block. */
+  short: number;
+  ms: number;
 }
 
 export interface TrafficPage {
@@ -95,6 +107,23 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 const numOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+function parseOutboundCheck(raw: unknown): TrafficOutboundCheck | null {
+  if (!isRecord(raw) || typeof raw.result !== "string") return null;
+  const hits: Partial<Record<EntityType, number>> = {};
+  if (isRecord(raw.hits)) for (const [k, v] of Object.entries(raw.hits)) hits[k as EntityType] = num(v);
+  return { result: raw.result, texts: num(raw.texts), hits, short: num(raw.short), ms: num(raw.ms) };
+}
+
+/** What the Logs detail says about the outbound re-check. */
+export function outboundCheckLabel(check: TrafficOutboundCheck | null): string {
+  if (!check) return "not reached";
+  if (check.result === "blocked") {
+    const n = Object.values(check.hits).reduce((sum, v) => sum + (v ?? 0), 0);
+    return `blocked · ${n} value${n === 1 ? "" : "s"} left`;
+  }
+  return `passed · ${check.texts} text${check.texts === 1 ? "" : "s"}`;
+}
 
 /** A traffic event from the wire, or null when it doesn't have the fields the screen needs. */
 export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
@@ -118,6 +147,7 @@ export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
     session_ref: typeof raw.session_ref === "string" ? raw.session_ref : null,
     session_new: raw.session_new === true,
     session_source: typeof raw.session_source === "string" ? raw.session_source : null,
+    outbound_check: parseOutboundCheck(raw.outbound_check),
     detectors: Array.isArray(raw.detectors) ? raw.detectors.filter((d): d is string => typeof d === "string") : [],
     entities: isRecord(raw.entities) ? (raw.entities as unknown as TrafficEntities) : null,
     cache: isRecord(raw.cache) ? (raw.cache as TrafficEvent["cache"]) : null,

@@ -91,11 +91,16 @@ class CallTrace:
                 self.usage = usage
 
     def fail(self, exc: BaseException) -> None:
+        from pii_guard.gateway.outbound import OutboundCheckFailedError
+
         if isinstance(exc, PiiGuardError):
-            outcome = "blocked" if isinstance(exc, BlockedEntityError) else "refused"
+            blocked = isinstance(exc, BlockedEntityError | OutboundCheckFailedError)
+            outcome = "blocked" if blocked else "refused"
             error = {"code": exc.code, "status": exc.status_code}
             if isinstance(exc, BlockedEntityError):
                 error["entity_types"] = {t.value: n for t, n in sorted(exc.counts.items())}
+            elif isinstance(exc, OutboundCheckFailedError):
+                error["entity_types"] = dict(exc.counts)
         else:
             outcome = "error"
             error = {"code": type(exc).__name__, "status": 500}
@@ -136,6 +141,9 @@ class CallTrace:
             "session_source": self.session_source,
             "detectors": detectors,
             "entities": _entities(stats),
+            "outbound_check": (
+                stats.outbound.event() if stats is not None and stats.outbound else None
+            ),
             "cache": (
                 {"hits": stats.cache_hits, "misses": stats.cache_misses, "seeded": stats.seeded}
                 if stats

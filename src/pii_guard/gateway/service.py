@@ -57,8 +57,15 @@ from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
 from pii_guard.gateway.opaque_ids import IssuedIds, upstream_ids, without_opaque_ids
+from pii_guard.gateway.outbound import (
+    OUTBOUND_CHECK_HEADER,
+    OutboundCheck,
+    OutboundCheckFailedError,
+    check_outbound,
+)
 from pii_guard.gateway.placeholder_note import NOTE_HEADER, add_chat_note, needs_note
 from pii_guard.gateway.request import (
+    CollectedTexts,
     ImageSlot,
     InvalidChatRequestError,
     TextSlot,
@@ -174,6 +181,8 @@ class RequestStats:
     session_source: SessionSource | None = None
     #: The placeholder note went upstream with the request (LAB-1471).
     note: bool = False
+    #: The outbound re-check of the masked request (LAB-1500); ``None``: not reached.
+    outbound: OutboundCheck | None = None
 
     def headers(self, session_id: str) -> dict[str, str]:
         out = {
@@ -187,6 +196,8 @@ class RequestStats:
             out[SESSION_SOURCE_HEADER] = self.session_source.value
         if self.note:
             out[NOTE_HEADER] = "added"
+        if self.outbound is not None:
+            out[OUTBOUND_CHECK_HEADER] = self.outbound.result
         if self.mode_alias:
             out["Deprecation"] = "true"
             out["Warning"] = (
@@ -208,6 +219,8 @@ class RequestStats:
             "masked": _counts(self.masked),
             "detect_ms": f"{self.detect_ms:.0f}",
         }
+        if self.outbound is not None:
+            fields["outbound_check"] = self.outbound.result
         if self.images:
             fields["images"] = self.images
             fields["image_masked"] = _counts(self.image_masked)
@@ -218,7 +231,8 @@ class RequestStats:
         logger.info(
             "chat.completions %s mode=%s stream=%s texts=%d cache_hits=%d cache_misses=%d "
             "seeded=%d spans=%s masked=%s detect_ms=%.0f detectors=%s upstream=%s "
-            "upstream_ms=%.0f unresolved=%d images=%d image_masked=%s image_ms=%.0f",
+            "upstream_ms=%.0f unresolved=%d images=%d image_masked=%s image_ms=%.0f "
+            "outbound=%s outbound_hits=%s outbound_ms=%.1f",
             outcome,
             self.mode.value,
             self.stream,
@@ -236,6 +250,9 @@ class RequestStats:
             self.images,
             _counts(self.image_masked),
             self.image_ms,
+            self.outbound.result if self.outbound is not None else "-",
+            _counts(self.outbound.hits) if self.outbound is not None else "-",
+            self.outbound.ms if self.outbound is not None else 0.0,
         )
 
 
@@ -722,6 +739,24 @@ class Gateway:
                 text = slot.text
             slot.write(text)
 
+    @staticmethod
+    def _recheck(
+        body: Mapping[str, Any],
+        collect: Callable[[object], CollectedTexts],
+        session: VaultSession,
+        language: str,
+        stats: RequestStats,
+        names: frozenset[str],
+        issued: frozenset[str],
+    ) -> None:
+        """The outbound re-check (:mod:`pii_guard.gateway.outbound`, LAB-1500): read the masked
+        ``body`` again and refuse it if a value the session knows is still in it."""
+        stats.outbound = check_outbound(
+            body, collect, session, language, tool_names=names, issued=issued
+        )
+        if stats.outbound.hits:
+            raise OutboundCheckFailedError(stats.outbound.hits)
+
     def _seed_cache(
         self,
         session: VaultSession,
@@ -883,6 +918,8 @@ class Gateway:
                 )
                 collected.finalize()
             _count_masked(stats, before, session)
+            with timer.span("mask"):
+                self._recheck(body, collect_texts, session, language, stats, names, issued)
         except BaseException:
             stats.log("blocked")
             self._release_session(session, created, masked=False)
