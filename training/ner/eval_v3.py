@@ -128,6 +128,13 @@ def _detector(candidate: str, model: str | None) -> dict[str, Any]:
 def _score(args: argparse.Namespace) -> int:
     if args.model:
         os.environ["PII_GUARD_NER_MODEL"] = args.model
+    thresholds: dict[str, Any] = {}
+    if args.thresholds:  # LAB-1512 path 4: a dev-calibrated table (thresholds_v33.py)
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import thresholds_v33
+
+        thresholds = json.loads(args.thresholds.read_text(encoding="utf-8"))["thresholds"]
+        thresholds_v33.apply(thresholds)
     from pii_guard.eval.fixtures import load_fixtures
     from pii_guard.eval.record import build_records, host_info, write_records
     from pii_guard.eval.report import build_scorecard
@@ -139,6 +146,8 @@ def _score(args: argparse.Namespace) -> int:
         return 2
     analyzer.analyze("Warm-up text without personal data.", "en")
     detectors = [{"name": "rules"}, _detector(args.candidate, args.model)]
+    if thresholds:
+        detectors[1]["settings"] = {"thresholds": thresholds}
     summary: dict[str, Any] = {}
     for name in args.sets:
         paths = _paths(name)
@@ -273,6 +282,7 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument("--runs-dir", type=Path, default=Path("eval/results/runs"))
     score.add_argument("--scorecards", type=Path)
     score.add_argument("--summary", type=Path)
+    score.add_argument("--thresholds", type=Path, help="thresholds_v33.py JSON (candidate H)")
     lat = sub.add_parser("latency")
     lat.add_argument("--model", action="append", required=True, help="name=dir (empty: v2.0)")
     lat.add_argument("--n", type=int, default=150)

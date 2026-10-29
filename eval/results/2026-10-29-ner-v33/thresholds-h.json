@@ -1,0 +1,117 @@
+{
+  "grid": [
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9
+  ],
+  "dev_files": [
+    "eval/generated/v31-final/s11/hu-distill-dev.jsonl",
+    "eval/generated/v31-final/s11/en-distill-dev.jsonl",
+    "eval/generated/v31-final/openpii/hu-openpii-dev.jsonl",
+    "eval/generated/v31-final/openpii/en-openpii-dev.jsonl",
+    "eval/generated/v31-final/openpii/de-openpii-dev.jsonl",
+    "eval/generated/v33-addon/hu-v33-names-dev.jsonl",
+    "eval/generated/v33-addon/de-v33-names-dev.jsonl",
+    "eval/generated/v33-addon/hu-v33-payload-dev.jsonl",
+    "eval/generated/v33-addon/en-v33-payload-dev.jsonl",
+    "eval/generated/v33-addon/de-v33-payload-dev.jsonl",
+    "eval/generated/v33-addon/hu-v33-agent-dev.jsonl",
+    "eval/generated/v33-addon/en-v33-agent-dev.jsonl",
+    "eval/generated/v33-addon/de-v33-agent-dev.jsonl"
+  ],
+  "dev_documents": 1341,
+  "leaked_by_threshold": {
+    "0.5": {
+      "hu/ADDRESS": 2,
+      "hu/ID_DOCUMENT": 1,
+      "hu/ORGANIZATION": 181,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 3,
+      "en/PHONE": 1,
+      "de/ADDRESS": 1
+    },
+    "0.6": {
+      "hu/ADDRESS": 3,
+      "hu/ID_DOCUMENT": 1,
+      "hu/NATIONAL_ID_HU_TAX": 1,
+      "hu/ORGANIZATION": 181,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 3,
+      "en/PHONE": 1,
+      "de/ADDRESS": 1
+    },
+    "0.7": {
+      "hu/ADDRESS": 4,
+      "hu/ID_DOCUMENT": 1,
+      "hu/NATIONAL_ID_HU_TAX": 1,
+      "hu/ORGANIZATION": 181,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 5,
+      "en/PHONE": 1,
+      "de/ADDRESS": 1
+    },
+    "0.8": {
+      "hu/ADDRESS": 3,
+      "hu/ID_DOCUMENT": 1,
+      "hu/NATIONAL_ID_HU_TAX": 1,
+      "hu/ORGANIZATION": 181,
+      "en/ID_DOCUMENT": 1,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 8,
+      "en/PHONE": 1,
+      "de/PERSON": 1
+    },
+    "0.9": {
+      "hu/ADDRESS": 4,
+      "hu/ID_DOCUMENT": 1,
+      "hu/NATIONAL_ID_HU_TAX": 1,
+      "hu/ORGANIZATION": 181,
+      "hu/PERSON": 2,
+      "en/ADDRESS": 2,
+      "en/ID_DOCUMENT": 2,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 8,
+      "en/PHONE": 1,
+      "de/ADDRESS": 1,
+      "de/PERSON": 1
+    }
+  },
+  "thresholds": {
+    "hu": {
+      "BANK_ACCOUNT": 0.9,
+      "DATE_OF_BIRTH": 0.9,
+      "EMAIL": 0.9,
+      "ID_DOCUMENT": 0.9,
+      "NATIONAL_ID_HU_TAJ": 0.9,
+      "ORGANIZATION": 0.9,
+      "PERSON": 0.8,
+      "PHONE": 0.9
+    },
+    "en": {
+      "ADDRESS": 0.8,
+      "BANK_ACCOUNT": 0.9,
+      "DATE_OF_BIRTH": 0.9,
+      "EMAIL": 0.9,
+      "ID_DOCUMENT": 0.7,
+      "NATIONAL_ID_HU_TAJ": 0.9,
+      "NATIONAL_ID_HU_TAX": 0.9,
+      "ORGANIZATION": 0.9,
+      "PERSON": 0.6,
+      "PHONE": 0.9
+    },
+    "de": {
+      "ADDRESS": 0.9,
+      "BANK_ACCOUNT": 0.9,
+      "DATE_OF_BIRTH": 0.9,
+      "EMAIL": 0.9,
+      "ID_DOCUMENT": 0.9,
+      "NATIONAL_ID_HU_TAJ": 0.9,
+      "NATIONAL_ID_HU_TAX": 0.9,
+      "ORGANIZATION": 0.9,
+      "PERSON": 0.7,
+      "PHONE": 0.9
+    }
+  }
+}
