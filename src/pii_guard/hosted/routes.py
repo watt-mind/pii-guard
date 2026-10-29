@@ -121,6 +121,11 @@ def account(request: Request) -> dict[str, Any]:
         "logout_url": LOGOUT_URL,
         "tier": "standard" if authenticated else "anonymous",
         "providers": list(PROVIDERS),
+        # The model the free runs answer with, so the public page names it rather than
+        # hard-coding it (LAB-1466).
+        "included_model": (
+            hosted.settings.hosted_models[0] if hosted.settings.hosted_models else None
+        ),
         "limits": {
             "requests_per_day": limits.user_requests if authenticated else limits.guest_requests,
             "tokens_per_day": limits.user_tokens if authenticated else limits.guest_tokens,

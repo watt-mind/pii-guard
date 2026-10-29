@@ -139,6 +139,25 @@ function robots(): Plugin {
   };
 }
 
+/**
+ * Preload the two Latin Geist files (sans and mono) that the first screen uses. Without it the
+ * page paints in the fallback font and reflows when Geist arrives, which Lighthouse counts as
+ * layout shift on the landing (LAB-1466). The other subsets still load on demand.
+ */
+function preloadFonts(): Plugin {
+  return {
+    name: "pii-guard-preload-fonts",
+    apply: "build",
+    transformIndexHtml: {
+      order: "post",
+      handler(_html, ctx) {
+        const files = Object.keys(ctx.bundle ?? {}).filter((f) => /\/geist(-mono)?-latin-wght-normal-[^/]+\.woff2$/.test(f));
+        return files.map((f) => ({ tag: "link", injectTo: "head", attrs: { rel: "preload", href: `/${f}`, as: "font", type: "font/woff2", crossorigin: "" } }));
+      },
+    },
+  };
+}
+
 // The UI never talks to model providers. It only reaches the pii-guard API,
 // through this proxy, so the browser stays same-origin.
 const API_TARGET = process.env.PII_GUARD_API_URL ?? "http://127.0.0.1:8787";
@@ -151,7 +170,7 @@ const proxy = {
 };
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), benchmarksIndex(), robots()],
+  plugins: [react(), tailwindcss(), benchmarksIndex(), robots(), preloadFonts()],
   server: { port: 5173, strictPort: true, proxy },
   preview: { port: 4173, proxy },
   test: {

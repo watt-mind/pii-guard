@@ -1496,10 +1496,12 @@ connections and guard API keys. Durable multi-replica state is deferred to LAB-1
 `GET /v1/account` returns:
 
 ```json
-{"mode":"hosted","authenticated":false,"principal":null,"login_url":"/.auth/login/google","logout_url":"/.auth/logout","tier":"anonymous","providers":["meta","openai","fireworks","openrouter","custom"],"limits":{"requests_per_day":5,"tokens_per_day":100000,"concurrent_requests":2,"max_output_tokens":8192,"sponsored_enabled":false},"usage":{"requests_today":0,"tokens_today":0,"resets_at":"2026-10-29T00:00:00+00:00"},"state":{"persistence":"ephemeral","restart_loses_sessions":true},"connections":[]}
+{"mode":"hosted","authenticated":false,"principal":null,"login_url":"/.auth/login/google","logout_url":"/.auth/logout","tier":"anonymous","providers":["meta","openai","fireworks","openrouter","custom"],"included_model":"muse-spark-1.3","limits":{"requests_per_day":5,"tokens_per_day":100000,"concurrent_requests":2,"max_output_tokens":8192,"sponsored_enabled":false},"usage":{"requests_today":0,"tokens_today":0,"resets_at":"2026-10-29T00:00:00+00:00"},"state":{"persistence":"ephemeral","restart_loses_sessions":true},"connections":[]}
 ```
 
-Authenticated `principal` is `{id,provider:"google"}` with an opaque ID; tier is `standard`.
+`included_model` is the model free runs answer with (the first of `PII_GUARD_HOSTED_MODELS`), so
+the public page names it from the API. Authenticated `principal` is `{id,provider:"google"}` with an
+opaque ID; tier is `standard`.
 The account remains readable when quota is exhausted. Key and connection management
 (`/v1/account/api-keys*`, `/v1/account/connections*`) requires a signed-in Google session:
 a guard API key gets `401 unauthorized`, so a leaked key cannot mint successors that

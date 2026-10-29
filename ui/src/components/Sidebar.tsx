@@ -4,7 +4,7 @@ import { engineReason, type EngineDisplay, type EngineState, type ModePreference
 import type { ThemePref } from "../hooks/useTheme";
 import { SECTIONS, hashOf, type Route, type Section } from "../lib/routes";
 import { offersSection, playgroundHint, type Capabilities } from "../lib/capabilities";
-import { Select, SegmentedControl } from "./ui";
+import { Logo, Select, ThemeToggle } from "./ui";
 import { buttonClass } from "./controls";
 
 interface Props {
@@ -242,42 +242,5 @@ export function EngineStatus({ state, engine, detail, onRecheck }: { state: Engi
         {sub && <span className="truncate tabular-nums">{sub}</span>}
       </button>
     </div>
-  );
-}
-
-function ThemeToggle({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) => void }) {
-  const options: { id: ThemePref; label: string; icon: string }[] = [
-    { id: "light", label: "Light theme", icon: "M8 3.5V2m0 12v-1.5M3.5 8H2m12 0h-1.5M4.8 4.8 3.8 3.8m8.4 8.4-1-1m0-6.4 1-1M3.8 12.2l1-1M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z" },
-    { id: "system", label: "System theme", icon: "M2.5 3.5h11v7h-11zM6 13.5h4M8 10.5v3" },
-    { id: "dark", label: "Dark theme", icon: "M13 9.6A5.5 5.5 0 0 1 6.4 3a5.5 5.5 0 1 0 6.6 6.6Z" },
-  ];
-  return (
-    <SegmentedControl
-      label="Theme"
-      size="sm"
-      square
-      className="shrink-0"
-      value={theme}
-      onChange={onTheme}
-      options={options.map((o) => ({
-        value: o.id,
-        ariaLabel: o.label,
-        title: o.label,
-        label: (
-          <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d={o.icon} />
-          </svg>
-        ),
-      }))}
-    />
-  );
-}
-
-function Logo() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6 shrink-0 text-ink" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-      <path d="M12 3 5 6v5.2c0 4.3 2.9 8 7 9.3 4.1-1.3 7-5 7-9.3V6l-7-3Z" />
-      <path d="M8.6 12h6.8" strokeLinecap="round" />
-    </svg>
   );
 }

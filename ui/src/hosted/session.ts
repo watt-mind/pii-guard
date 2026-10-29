@@ -9,8 +9,8 @@ export const useHostedSession = () => useContext(HostedSessionContext);
 /** The project's source repository: the public page's and the console's GitHub and docs links. */
 export const SOURCE = "https://github.com/watt-mind/pii-guard";
 
-/** The public page's anchors, plus #site for the console's "Visit site"; every other hash is the console's. */
-export const SITE_HASHES: ReadonlySet<string> = new Set(["#site", "#demo", "#privacy"]);
+/** The public page's section anchors, plus #site for the console's "Visit site"; every other hash is the console's. */
+export const SITE_HASHES: ReadonlySet<string> = new Set(["#site", "#demo", "#for", "#how", "#images", "#meta", "#results", "#run", "#data", "#privacy"]);
 
 /** `/v1/account`, kept on a failed refresh so a signed-in owner stays in the console. */
 export function useAccount(call: Requester) {
@@ -70,5 +70,6 @@ export const hostedChatFetch: typeof fetch = (input, init) => {
 export function time(value: string | undefined) {
   if (!value) return "not available";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "not available" : date.toLocaleString();
+  // EU English ("29 Oct 2026, 04:49"), not the browser's US default (LAB-1466).
+  return Number.isNaN(date.getTime()) ? "not available" : date.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
