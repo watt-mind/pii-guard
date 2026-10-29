@@ -33,9 +33,11 @@ import type { VaultClient } from "./api/vault";
 import type { KnownRow } from "./lib/knownRows";
 import { knownSignatureOf, type KnownSession } from "./lib/run";
 import { newKnownRow } from "./lib/knownRows";
-import { Benchmarks } from "./screens/Benchmarks";
 import { Overview } from "./screens/Overview";
 import { Logs } from "./screens/Traffic";
+// Keep Evaluation and its charts out of the console entry: first-visit mounting alone
+// defers its data requests, but an eager import still downloads that code on every route.
+const Benchmarks = lazy(() => import("./screens/Benchmarks").then((module) => ({ default: module.Benchmarks })));
 const Workspace = lazy(() => import("./projects/Workspace").then((module) => ({ default: module.Workspace })));
 const Playground = lazy(() => import("./screens/Playground").then((module) => ({ default: module.Playground })));
 const Connect = lazy(() => import("./screens/Connect").then((module) => ({ default: module.Connect })));

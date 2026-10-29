@@ -300,9 +300,12 @@ describe("hosted console for a signed-in owner", () => {
   it("asks for one endpoint's snippets on Connect when an endpoint is picked", async () => {
     setSelectedProject("project-one");
     setSelectedEndpoint("ep-one");
-    history.replaceState(null, "", "#connect");
+    history.replaceState(null, "", "#overview");
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { code: "unavailable" } }), { status: 503 }));
-    renderHosted(requester(true, withEndpoints), withStatus);
+    renderHosted(requester(true, withEndpoints), withStatus, liveEmptyLog);
+    await screen.findByText("Mode and detectors");
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/v1/connect/snippets"))).toBe(false);
+    await userEvent.setup().click(within(menu()).getByRole("link", { name: /^Connect/ }));
     await waitFor(() => expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/v1/connect/snippets?endpoint=ep-one"))).toBe(true));
     expect(fetchSpy.mock.calls.some(([url]) => /snippets\?.*session=/.test(String(url)))).toBe(false);
     expect(screen.queryByTestId("gateway-url")).not.toBeInTheDocument();
