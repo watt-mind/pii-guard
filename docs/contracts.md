@@ -233,6 +233,8 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_LLM_DETECTOR_MAX_TOKENS` | `llm_detector_max_tokens` | `int \| None` (>= 256) | unset (detector default `4096`) |
 | `PII_GUARD_LLM_DETECTOR_TIMEOUT` | `llm_detector_timeout` | `float \| None` (> 0, seconds) | unset (detector default `60`) |
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
+| `PII_GUARD_SAM_API_KEY` | `sam_api_key` | `SecretStr \| None` | unset (falls back to `META_API_KEY`) |
+| `PII_GUARD_SAM_MODEL` | `sam_model` | `str \| None` | unset (SamClient default `sam-3.1`) |
 | `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `hybrid` |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
