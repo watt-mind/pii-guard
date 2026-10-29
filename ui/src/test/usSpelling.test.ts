@@ -96,7 +96,7 @@ describe("UI copy uses US spelling (LAB-1523)", () => {
   });
 
   it("ui/index.html is not British", () => {
-    const html = readFileSync(join(UI, "index.html"), "utf8").replace(/<!--[\s\S]*?-->/g, "");
+    const html = readFileSync(join(UI, "index.html"), "utf8");
     expect(BRITISH.flatMap((pattern) => pattern.exec(html)?.[0] ?? [])).toEqual([]);
   });
 });
