@@ -304,6 +304,33 @@ describe("connectTraffic resilience", () => {
     conn.close();
   });
 
+  it("reports a boot change through onRestart, once per restart", async () => {
+    vi.useFakeTimers();
+    const pages = [
+      () => page("boot_a", full.events.slice(0, 2)),
+      () => page("boot_b", []),
+      () => page("boot_b", afterRestart),
+      () => page("boot_b", []),
+    ];
+    const boots: string[] = [];
+    const urls: string[] = [];
+    const conn2 = connectTraffic({
+      fetch: (async (url: RequestInfo | URL) => (urls.push(String(url)), pages[Math.min(urls.length - 1, pages.length - 1)]!())) as typeof fetch,
+      EventSource: null,
+      pollMs: 1000,
+      onEvents: () => {},
+      onStatus: () => {},
+      onRestart: (boot) => boots.push(boot),
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(urls).toHaveLength(3);
+    });
+    expect(boots).toEqual(["boot_b"]);
+    conn2.close();
+  });
+
   it("resets the cursor when the SSE stream sends a new event with a lower seq (server without boot)", async () => {
     vi.useFakeTimers();
     const urls: string[] = [];
