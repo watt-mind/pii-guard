@@ -171,7 +171,9 @@ const proxy = {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), benchmarksIndex(), robots(), preloadFonts()],
-  server: { port: 5173, strictPort: true, proxy },
+  // ui/pnpm-workspace.yaml makes ui/ the workspace root; the #api page imports docs/openapi.json
+  // from the repository root (LAB-1586).
+  server: { port: 5173, strictPort: true, proxy, fs: { allow: [REPO_ROOT] } },
   preview: { port: 4173, proxy },
   test: {
     environment: "jsdom",

@@ -366,6 +366,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 
 | Status | `code` | When |
 |---|---|---|
+| 400 | `unsupported_content` | Gateway: the body holds a key or content part outside the [request allow-list](#gateway-request-fields-implemented) (an unknown field, a remote image URL, an audio part). Nothing is forwarded or stored. A malformed gateway body (not JSON, a wrong value type) is `400 invalid_request`. |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
@@ -390,6 +391,11 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
 | 409 | `session_entry_limit_reached` | An explicit vault session (`X-PII-Guard-Session`, or a path or `prompt_cache_key` id) already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders. Explicit sessions are never rotated, so nothing is masked or sent; start a new session (LAB-1565). |
 | 502 | `upstream_credential_rejected` | Listing a provider's models (`POST /v1/projects/{project_id}/endpoints/models`, a pass-through `/e/{endpoint_id}/v1/models`): the provider answered 401 or 403, so the API key is wrong or lacks access. The message is fixed; the provider's own status text and body are never passed on. |
+| 501 | `responses_unsupported` | `POST /v1/responses`: the upstream answered 404 or 405, so it has no native Responses API. Nothing is translated or retried. |
+| 502 | `upstream_unavailable` | Gateway: the upstream could not be reached or answered with something unusable. The provider's own error text is never passed on. |
+| 502 | `upstream_did_not_stream` | `POST /v1/chat/completions` with `stream: true`: the upstream answered without `text/event-stream`. The body is not read or forwarded; retry without `stream` (see [Gateway chat streaming](#gateway-chat-streaming-implemented)). |
+| 503 | `upstream_not_configured` | Gateway: the server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). |
+| 503 | `vault_capacity_exhausted` | A new vault session is needed while every session slot is held by an active request; nothing is masked or sent. Retry once a request finishes. |
 | 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
@@ -403,7 +409,10 @@ Every non-2xx response, including validation errors and unknown routes, has this
 Fail closed: on any error the response carries no masked or partially masked text.
 
 The OpenAPI schema (`/openapi.json`, `/docs`) declares the codes each route can return, with
-the `ErrorResponse` body (`pii_guard.api.errors.ERROR_CODES`).
+the `ErrorResponse` body (`pii_guard.api.errors.ERROR_CODES`). The public subset, with the gateway's
+codes added, is committed as [openapi.json](openapi.json) and rendered at
+[guard.watt-mind.com/#api](https://guard.watt-mind.com/#api); the runtime pages stay off on
+the hosted service. See [api.md](api.md).
 
 ### `POST /v1/analyze`
 
@@ -1025,7 +1034,12 @@ fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter
 a leading line number and pipe (e.g. `12|`, including indentation) become same-length spaces
 for detection, preserving offsets. Gutters are restored in masked text when line counts
 match and the replacement spaces survive; when masking spans lines and changes the line
-count, gutters are dropped rather than writing any original text back.
+count, gutters are dropped rather than writing any original text back. A prefix counts as a gutter
+only inside a run of at least two adjacent lines whose numbers go up by exactly one (`11|`,
+`12|`), as `read_file` and `cat -n` print them; a lone `1234567|...` line (a pipe-delimited
+table row with an id), decreasing numbers or numbered lines that aren't adjacent stay visible
+to detection and to the outbound re-check (LAB-1583). Residual: a table whose row ids are
+themselves consecutive integers is still read as numbered lines.
 
 **Declared tool names.** A tool or namespace name the request declares (`tools[].name`,
 `tools[].function.name`, `functions[].name`, ...) is the client's vocabulary: a `PERSON`,
@@ -1109,7 +1123,10 @@ with the treatments of the table above. Any other key, item type or part type is
 
 A **line-number gutter** at the start of a line of message text or tool output (`12|`, as Muse
 Code's `read_file` prints files) is shown to the detectors as spaces of the same length and
-kept in the forwarded text, so the first word of the line is detected on its own.
+kept in the forwarded text, so the first word of the line is detected on its own. The same
+handling, and the same rule for what counts as a gutter (only runs of consecutive line
+numbers, see "Chat line-number gutters"), applies to `instructions` and to reasoning
+`summary_text`/`reasoning_text` parts (LAB-1583).
 
 **Restore.** In a whole `response` object, every string the upstream returns is restored
 (output text, refusals, reasoning summaries, and the request fields it echoes back).

@@ -1,0 +1,3580 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PII Guard",
+    "version": "0.1.0",
+    "description": "Privacy firewall for AI agents: reversible PII masking. This is the public, read-only reference for the OpenAI-compatible gateway and the native masking routes. Guide, authentication and examples: https://github.com/watt-mind/pii-guard/blob/develop/docs/api.md. Every example is fictional.",
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8787",
+      "description": "Self-hosted (`pii-guard serve`)"
+    },
+    {
+      "url": "https://guard.watt-mind.com",
+      "description": "Hosted preview"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Gateway",
+      "description": "OpenAI-compatible routes. Point an OpenAI SDK at the guard's `/v1` base URL: the guard masks the request, calls the configured upstream and restores the placeholders in the answer, streamed or not. A hosted project endpoint serves the same routes under `/e/{endpoint_id}/v1` with an endpoint key."
+    },
+    {
+      "name": "Masking",
+      "description": "Native routes: detect, mask with reversible placeholders, and restore. Not available to endpoint keys."
+    },
+    {
+      "name": "Sessions",
+      "description": "Vault sessions hold the placeholder mapping (sliding TTL, process memory). Pre-load values the application already knows are sensitive."
+    },
+    {
+      "name": "Endpoint keys",
+      "description": "Issue, list and revoke the `pg_ep_` keys of a project endpoint. Owner only: on the hosted service a signed-in Google session, self-hosted the API token. An endpoint key cannot call these routes."
+    }
+  ],
+  "paths": {
+    "/v1/chat/completions": {
+      "post": {
+        "tags": [
+          "Gateway"
+        ],
+        "summary": "Create a chat completion",
+        "operationId": "chat_completions_v1_chat_completions_post",
+        "responses": {
+          "200": {
+            "description": "The upstream's answer with placeholders restored. With `stream: true`, server-sent events.",
+            "headers": {
+              "X-PII-Guard-Session": {
+                "description": "The vault session the call used (an explicit id, or a derived `d_...` one). Send it back as a request header to keep placeholders stable across calls.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "s_teszt_elek_demo"
+              },
+              "X-PII-Guard-Session-Source": {
+                "description": "How the session was chosen: `header`, `path`, `prompt_cache_key` or `default`.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "header",
+                    "path",
+                    "prompt_cache_key",
+                    "default"
+                  ]
+                }
+              },
+              "X-PII-Guard-Masked": {
+                "description": "Counts of masked values by entity type (`PERSON:1,EMAIL:1`), never values.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "EMAIL:1,PERSON:1"
+              },
+              "X-PII-Guard-Outbound-Check": {
+                "description": "`passed` when the masked request was re-checked before it left; `blocked` on a 422 `outbound_check_failed`.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "passed",
+                    "blocked"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "id": "chatcmpl-example",
+                  "object": "chat.completion",
+                  "model": "your-upstream-model",
+                  "choices": [
+                    {
+                      "index": 0,
+                      "message": {
+                        "role": "assistant",
+                        "content": "Dear Teszt Elek, Tuesday's meeting is confirmed. A copy goes to teszt.elek@example.com."
+                      },
+                      "finish_reason": "stop"
+                    }
+                  ]
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "data: {\"choices\":[{\"delta\":{\"content\":\"Dear Teszt Elek\"}}]}\n\ndata: [DONE]\n\n"
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`outbound_check_failed`: After masking, the request still held a value its session knows; nothing was sent. `blocked_entity`: An entity type whose policy is `block` was found; nothing is masked or stored. `placeholder_in_input`: The text to mask contains a placeholder this session already issued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "outbound_check_failed": {
+                    "summary": "After masking, the request still held a value its session knows; nothing was sent.",
+                    "value": {
+                      "error": {
+                        "code": "outbound_check_failed",
+                        "message": "outbound_check_failed"
+                      }
+                    }
+                  },
+                  "blocked_entity": {
+                    "summary": "An entity type whose policy is `block` was found; nothing is masked or stored.",
+                    "value": {
+                      "error": {
+                        "code": "blocked_entity",
+                        "message": "blocked_entity"
+                      }
+                    }
+                  },
+                  "placeholder_in_input": {
+                    "summary": "The text to mask contains a placeholder this session already issued.",
+                    "value": {
+                      "error": {
+                        "code": "placeholder_in_input",
+                        "message": "placeholder_in_input"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`internal_error`: Anything unexpected. No exception text is returned. `vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  },
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request; retry. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "detection_profile_denied": {
+                    "summary": "The selected or cached processing component is not permitted by the detection profile.",
+                    "value": {
+                      "error": {
+                        "code": "detection_profile_denied",
+                        "message": "detection_profile_denied"
+                      }
+                    }
+                  },
+                  "upstream_not_configured": {
+                    "summary": "The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`).",
+                    "value": {
+                      "error": {
+                        "code": "upstream_not_configured",
+                        "message": "upstream_not_configured"
+                      }
+                    }
+                  },
+                  "vault_capacity_exhausted": {
+                    "summary": "A new session is needed while every vault slot is held by an active request; retry.",
+                    "value": {
+                      "error": {
+                        "code": "vault_capacity_exhausted",
+                        "message": "vault_capacity_exhausted"
+                      }
+                    }
+                  },
+                  "detection_failed": {
+                    "summary": "A detector (or SAM, or OCR) failed or timed out.",
+                    "value": {
+                      "error": {
+                        "code": "detection_failed",
+                        "message": "detection_failed"
+                      }
+                    }
+                  },
+                  "detector_loading": {
+                    "summary": "The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
+                    "value": {
+                      "error": {
+                        "code": "detector_loading",
+                        "message": "detector_loading"
+                      }
+                    }
+                  },
+                  "detection_unavailable": {
+                    "summary": "A configured detector can't run safely (the LLM detector without a key).",
+                    "value": {
+                      "error": {
+                        "code": "detection_unavailable",
+                        "message": "detection_unavailable"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`unsupported_content`: The body holds a field or content part the gateway can't mask yet (allow-list); nothing is forwarded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unsupported_content": {
+                    "summary": "The body holds a field or content part the gateway can't mask yet (allow-list); nothing is forwarded.",
+                    "value": {
+                      "error": {
+                        "code": "unsupported_content",
+                        "message": "unsupported_content"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: Unknown route, or an unknown or expired `session_id`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Unknown route, or an unknown or expired `session_id`.",
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "not_found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`session_entry_limit_reached`: An explicit session already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders; it is never rotated, so start a new session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "session_entry_limit_reached": {
+                    "summary": "An explicit session already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders; it is never rotated, so start a new session.",
+                    "value": {
+                      "error": {
+                        "code": "session_entry_limit_reached",
+                        "message": "session_entry_limit_reached"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit. `unmask_output_too_large`: Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (one `/v1/unmask` text, or one gateway response).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  },
+                  "unmask_output_too_large": {
+                    "summary": "Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (one `/v1/unmask` text, or one gateway response).",
+                    "value": {
+                      "error": {
+                        "code": "unmask_output_too_large",
+                        "message": "unmask_output_too_large"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`upstream_unavailable`: The upstream could not be reached or answered with something unusable. `upstream_did_not_stream`: `stream: true`, but the upstream answered without an event stream; retry without `stream`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_unavailable": {
+                    "summary": "The upstream could not be reached or answered with something unusable.",
+                    "value": {
+                      "error": {
+                        "code": "upstream_unavailable",
+                        "message": "upstream_unavailable"
+                      }
+                    }
+                  },
+                  "upstream_did_not_stream": {
+                    "summary": "`stream: true`, but the upstream answered without an event stream; retry without `stream`.",
+                    "value": {
+                      "error": {
+                        "code": "upstream_did_not_stream",
+                        "message": "upstream_did_not_stream"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Mask the request, send it to the upstream, restore the placeholders in the answer. Text the guard finds is replaced with keyed placeholders (`[[PERSON_7f3a]]`); the upstream only ever sees those. Fail closed: on any error nothing is forwarded and no partially masked text is returned. A 200 stream can still end with an `error` event; a complete one ends with `data: [DONE]`.",
+        "parameters": [
+          {
+            "name": "X-PII-Guard-Session",
+            "in": "header",
+            "required": false,
+            "description": "Use this vault session (3-128 characters). Unknown or expired: 404 `not_found`. Without it the gateway uses the `/s/{session}/v1` path id, then `prompt_cache_key`, then a per-credential default session.",
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "ChatCompletionRequest",
+                "description": "An OpenAI Chat Completions body. The gateway walks it against an allow-list (docs/contracts.md, \"Gateway request fields\"): known fields are masked, checked or passed through, any other key is 400 `unsupported_content`.",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "A model the upstream (or the endpoint) accepts. A pinned endpoint refuses any other."
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "description": "An OpenAI chat message. Text content (a string or `text` parts), tool calls and tool results are masked; image parts only on a self-hosted root gateway.",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "system",
+                            "developer",
+                            "user",
+                            "assistant",
+                            "tool"
+                          ]
+                        },
+                        "content": {
+                          "description": "A string, or an array of content parts.",
+                          "oneOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "role"
+                      ]
+                    }
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Server-sent events; placeholders are restored across chunk boundaries."
+                  },
+                  "prompt_cache_key": {
+                    "type": "string",
+                    "description": "Also picks the vault session when no header or path session is given."
+                  }
+                },
+                "required": [
+                  "model",
+                  "messages"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "model": "your-upstream-model",
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": "Write a short reply to Teszt Elek (teszt.elek@example.com) confirming Tuesday's meeting."
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "endpointKey": []
+          },
+          {}
+        ],
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8787",
+            "description": "Self-hosted root gateway"
+          },
+          {
+            "url": "https://guard.watt-mind.com/e/{endpoint_id}",
+            "description": "Hosted project endpoint (copy the URL from Connect)",
+            "variables": {
+              "endpoint_id": {
+                "default": "your-endpoint-id"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/v1/responses": {
+      "post": {
+        "tags": [
+          "Gateway"
+        ],
+        "summary": "Create a response",
+        "operationId": "responses_v1_responses_post",
+        "responses": {
+          "200": {
+            "description": "The upstream's answer with placeholders restored. With `stream: true`, server-sent events.",
+            "headers": {
+              "X-PII-Guard-Session": {
+                "description": "The vault session the call used (an explicit id, or a derived `d_...` one). Send it back as a request header to keep placeholders stable across calls.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "s_teszt_elek_demo"
+              },
+              "X-PII-Guard-Session-Source": {
+                "description": "How the session was chosen: `header`, `path`, `prompt_cache_key` or `default`.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "header",
+                    "path",
+                    "prompt_cache_key",
+                    "default"
+                  ]
+                }
+              },
+              "X-PII-Guard-Masked": {
+                "description": "Counts of masked values by entity type (`PERSON:1,EMAIL:1`), never values.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "EMAIL:1,PERSON:1"
+              },
+              "X-PII-Guard-Outbound-Check": {
+                "description": "`passed` when the masked request was re-checked before it left; `blocked` on a 422 `outbound_check_failed`.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "passed",
+                    "blocked"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "id": "resp_example",
+                  "object": "response",
+                  "model": "your-upstream-model",
+                  "output": [
+                    {
+                      "type": "message",
+                      "role": "assistant",
+                      "content": [
+                        {
+                          "type": "output_text",
+                          "text": "Teszt Elek confirms Tuesday."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "data: {\"choices\":[{\"delta\":{\"content\":\"Dear Teszt Elek\"}}]}\n\ndata: [DONE]\n\n"
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`outbound_check_failed`: After masking, the request still held a value its session knows; nothing was sent. `blocked_entity`: An entity type whose policy is `block` was found; nothing is masked or stored. `placeholder_in_input`: The text to mask contains a placeholder this session already issued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "outbound_check_failed": {
+                    "summary": "After masking, the request still held a value its session knows; nothing was sent.",
+                    "value": {
+                      "error": {
+                        "code": "outbound_check_failed",
+                        "message": "outbound_check_failed"
+                      }
+                    }
+                  },
+                  "blocked_entity": {
+                    "summary": "An entity type whose policy is `block` was found; nothing is masked or stored.",
+                    "value": {
+                      "error": {
+                        "code": "blocked_entity",
+                        "message": "blocked_entity"
+                      }
+                    }
+                  },
+                  "placeholder_in_input": {
+                    "summary": "The text to mask contains a placeholder this session already issued.",
+                    "value": {
+                      "error": {
+                        "code": "placeholder_in_input",
+                        "message": "placeholder_in_input"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`internal_error`: Anything unexpected. No exception text is returned. `vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  },
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request; retry. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "detection_profile_denied": {
+                    "summary": "The selected or cached processing component is not permitted by the detection profile.",
+                    "value": {
+                      "error": {
+                        "code": "detection_profile_denied",
+                        "message": "detection_profile_denied"
+                      }
+                    }
+                  },
+                  "upstream_not_configured": {
+                    "summary": "The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`).",
+                    "value": {
+                      "error": {
+                        "code": "upstream_not_configured",
+                        "message": "upstream_not_configured"
+                      }
+                    }
+                  },
+                  "vault_capacity_exhausted": {
+                    "summary": "A new session is needed while every vault slot is held by an active request; retry.",
+                    "value": {
+                      "error": {
+                        "code": "vault_capacity_exhausted",
+                        "message": "vault_capacity_exhausted"
+                      }
+                    }
+                  },
+                  "detection_failed": {
+                    "summary": "A detector (or SAM, or OCR) failed or timed out.",
+                    "value": {
+                      "error": {
+                        "code": "detection_failed",
+                        "message": "detection_failed"
+                      }
+                    }
+                  },
+                  "detector_loading": {
+                    "summary": "The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
+                    "value": {
+                      "error": {
+                        "code": "detector_loading",
+                        "message": "detector_loading"
+                      }
+                    }
+                  },
+                  "detection_unavailable": {
+                    "summary": "A configured detector can't run safely (the LLM detector without a key).",
+                    "value": {
+                      "error": {
+                        "code": "detection_unavailable",
+                        "message": "detection_unavailable"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`unsupported_content`: The body holds a field or content part the gateway can't mask yet (allow-list); nothing is forwarded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unsupported_content": {
+                    "summary": "The body holds a field or content part the gateway can't mask yet (allow-list); nothing is forwarded.",
+                    "value": {
+                      "error": {
+                        "code": "unsupported_content",
+                        "message": "unsupported_content"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: Unknown route, or an unknown or expired `session_id`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Unknown route, or an unknown or expired `session_id`.",
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "not_found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`session_entry_limit_reached`: An explicit session already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders; it is never rotated, so start a new session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "session_entry_limit_reached": {
+                    "summary": "An explicit session already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders; it is never rotated, so start a new session.",
+                    "value": {
+                      "error": {
+                        "code": "session_entry_limit_reached",
+                        "message": "session_entry_limit_reached"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit. `unmask_output_too_large`: Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (one `/v1/unmask` text, or one gateway response).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  },
+                  "unmask_output_too_large": {
+                    "summary": "Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (one `/v1/unmask` text, or one gateway response).",
+                    "value": {
+                      "error": {
+                        "code": "unmask_output_too_large",
+                        "message": "unmask_output_too_large"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "`responses_unsupported`: The upstream has no Responses API (it answered 404 or 405).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "responses_unsupported": {
+                    "summary": "The upstream has no Responses API (it answered 404 or 405).",
+                    "value": {
+                      "error": {
+                        "code": "responses_unsupported",
+                        "message": "responses_unsupported"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`upstream_unavailable`: The upstream could not be reached or answered with something unusable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_unavailable": {
+                    "summary": "The upstream could not be reached or answered with something unusable.",
+                    "value": {
+                      "error": {
+                        "code": "upstream_unavailable",
+                        "message": "upstream_unavailable"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Mask the request, send it to the upstream, restore the placeholders in the answer. Text the guard finds is replaced with keyed placeholders (`[[PERSON_7f3a]]`); the upstream only ever sees those. Fail closed: on any error nothing is forwarded and no partially masked text is returned. A 200 stream can still end with an `error` event; a complete one ends with `data: [DONE]`.",
+        "parameters": [
+          {
+            "name": "X-PII-Guard-Session",
+            "in": "header",
+            "required": false,
+            "description": "Use this vault session (3-128 characters). Unknown or expired: 404 `not_found`. Without it the gateway uses the `/s/{session}/v1` path id, then `prompt_cache_key`, then a per-credential default session.",
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "ResponsesRequest",
+                "description": "An OpenAI Responses body, masked like Chat Completions and forwarded to the upstream's native `/responses` route (docs/contracts.md, \"Responses API\").",
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "input": {
+                    "description": "A string, or an array of input items.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object"
+                        }
+                      }
+                    ]
+                  },
+                  "instructions": {
+                    "type": "string"
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "model",
+                  "input"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "model": "your-upstream-model",
+                "input": "Summarize this note from Teszt Elek <teszt.elek@example.com>: see you Tuesday."
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "endpointKey": []
+          },
+          {}
+        ],
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8787",
+            "description": "Self-hosted root gateway"
+          },
+          {
+            "url": "https://guard.watt-mind.com/e/{endpoint_id}",
+            "description": "Hosted project endpoint (copy the URL from Connect)",
+            "variables": {
+              "endpoint_id": {
+                "default": "your-endpoint-id"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "tags": [
+          "Gateway"
+        ],
+        "summary": "List the upstream's models",
+        "operationId": "list_models_v1_models_get",
+        "responses": {
+          "200": {
+            "description": "OpenAI-style model list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "id": "your-upstream-model",
+                      "object": "model"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`upstream_unavailable`: The upstream could not be reached or answered with something unusable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_unavailable": {
+                    "summary": "The upstream could not be reached or answered with something unusable.",
+                    "value": {
+                      "error": {
+                        "code": "upstream_unavailable",
+                        "message": "upstream_unavailable"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "upstream_not_configured": {
+                    "summary": "The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`).",
+                    "value": {
+                      "error": {
+                        "code": "upstream_not_configured",
+                        "message": "upstream_not_configured"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "The upstream's model list, passed through. On a pinned project endpoint: only the endpoint's model; on a pass-through endpoint, the provider's list.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "endpointKey": []
+          },
+          {}
+        ],
+        "servers": [
+          {
+            "url": "http://127.0.0.1:8787",
+            "description": "Self-hosted root gateway"
+          },
+          {
+            "url": "https://guard.watt-mind.com/e/{endpoint_id}",
+            "description": "Hosted project endpoint (copy the URL from Connect)",
+            "variables": {
+              "endpoint_id": {
+                "default": "your-endpoint-id"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/v1/mask": {
+      "post": {
+        "tags": [
+          "Masking"
+        ],
+        "summary": "Replace personal data with reversible placeholders",
+        "description": "Detect personal data and replace each ``mask``-policy span with a vault placeholder.\n\n``keep`` spans stay in place and are counted in ``kept``; any ``block`` span refuses the\nrequest (422 ``blocked_entity``). The session's known values are masked on top of the\nconfigured detectors, even for a ``keep`` type. Fail closed: on any error the body carries\nno text, and a session this request created is dropped again.",
+        "operationId": "mask_v1_mask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: Unknown route, or an unknown or expired `session_id`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Unknown route, or an unknown or expired `session_id`.",
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "not_found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request`: The request fails validation. The message lists field locations only, never values. `blocked_entity`: An entity type whose policy is `block` was found; nothing is masked or stored. `placeholder_in_input`: The text to mask contains a placeholder this session already issued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "The request fails validation. The message lists field locations only, never values.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "invalid_request"
+                      }
+                    }
+                  },
+                  "blocked_entity": {
+                    "summary": "An entity type whose policy is `block` was found; nothing is masked or stored.",
+                    "value": {
+                      "error": {
+                        "code": "blocked_entity",
+                        "message": "blocked_entity"
+                      }
+                    }
+                  },
+                  "placeholder_in_input": {
+                    "summary": "The text to mask contains a placeholder this session already issued.",
+                    "value": {
+                      "error": {
+                        "code": "placeholder_in_input",
+                        "message": "placeholder_in_input"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `masking_failed`: Masking or re-identification could not complete. `internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
+                      }
+                    }
+                  },
+                  "masking_failed": {
+                    "summary": "Masking or re-identification could not complete.",
+                    "value": {
+                      "error": {
+                        "code": "masking_failed",
+                        "message": "masking_failed"
+                      }
+                    }
+                  },
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key). `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "detection_failed": {
+                    "summary": "A detector (or SAM, or OCR) failed or timed out.",
+                    "value": {
+                      "error": {
+                        "code": "detection_failed",
+                        "message": "detection_failed"
+                      }
+                    }
+                  },
+                  "detection_profile_denied": {
+                    "summary": "The selected or cached processing component is not permitted by the detection profile.",
+                    "value": {
+                      "error": {
+                        "code": "detection_profile_denied",
+                        "message": "detection_profile_denied"
+                      }
+                    }
+                  },
+                  "detection_unavailable": {
+                    "summary": "A configured detector can't run safely (the LLM detector without a key).",
+                    "value": {
+                      "error": {
+                        "code": "detection_unavailable",
+                        "message": "detection_unavailable"
+                      }
+                    }
+                  },
+                  "detector_loading": {
+                    "summary": "The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
+                    "value": {
+                      "error": {
+                        "code": "detector_loading",
+                        "message": "detector_loading"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {}
+        ]
+      }
+    },
+    "/v1/unmask": {
+      "post": {
+        "tags": [
+          "Masking"
+        ],
+        "summary": "Restore the original values behind placeholders",
+        "description": "Replace every placeholder the session issued with its original value.\n\nTokens shaped like a placeholder but unknown to the session are reported in\n``unresolved`` and left in place. Unknown or expired session: 404 ``not_found``.\nRestoring more than ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of original values:\n413 ``unmask_output_too_large``, nothing returned (LAB-1350).",
+        "operationId": "unmask_v1_unmask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnmaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnmaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: Unknown route, or an unknown or expired `session_id`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Unknown route, or an unknown or expired `session_id`.",
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "not_found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit. `unmask_output_too_large`: Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (one `/v1/unmask` text, or one gateway response).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  },
+                  "unmask_output_too_large": {
+                    "summary": "Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (one `/v1/unmask` text, or one gateway response).",
+                    "value": {
+                      "error": {
+                        "code": "unmask_output_too_large",
+                        "message": "unmask_output_too_large"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request`: The request fails validation. The message lists field locations only, never values.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "The request fails validation. The message lists field locations only, never values.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "invalid_request"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `masking_failed`: Masking or re-identification could not complete. `internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
+                      }
+                    }
+                  },
+                  "masking_failed": {
+                    "summary": "Masking or re-identification could not complete.",
+                    "value": {
+                      "error": {
+                        "code": "masking_failed",
+                        "message": "masking_failed"
+                      }
+                    }
+                  },
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {}
+        ]
+      }
+    },
+    "/v1/analyze": {
+      "post": {
+        "tags": [
+          "Masking"
+        ],
+        "summary": "Detect personal data without masking it",
+        "description": "Detect without masking. Every span carries its type's policy; ``block`` spans are\nreported here, not refused (nothing leaves the guard).\n\nWith ``session_id`` the session's known values are merged in as ``/v1/mask`` does\n(``detector: \"known\"``). The vault is only resolved then, so analyze without a session\nneeds no tenant key. Nothing is stored and no session is created; an unknown or expired\nsession is a 404. Known spans of a ``keep`` type report ``mask``: ``/v1/mask`` masks them.",
+        "operationId": "analyze_v1_analyze_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: Unknown route, or an unknown or expired `session_id`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Unknown route, or an unknown or expired `session_id`.",
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "not_found"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request`: The request fails validation. The message lists field locations only, never values.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "The request fails validation. The message lists field locations only, never values.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "invalid_request"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
+                      }
+                    }
+                  },
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key). `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "detection_failed": {
+                    "summary": "A detector (or SAM, or OCR) failed or timed out.",
+                    "value": {
+                      "error": {
+                        "code": "detection_failed",
+                        "message": "detection_failed"
+                      }
+                    }
+                  },
+                  "detection_profile_denied": {
+                    "summary": "The selected or cached processing component is not permitted by the detection profile.",
+                    "value": {
+                      "error": {
+                        "code": "detection_profile_denied",
+                        "message": "detection_profile_denied"
+                      }
+                    }
+                  },
+                  "detection_unavailable": {
+                    "summary": "A configured detector can't run safely (the LLM detector without a key).",
+                    "value": {
+                      "error": {
+                        "code": "detection_unavailable",
+                        "message": "detection_unavailable"
+                      }
+                    }
+                  },
+                  "detector_loading": {
+                    "summary": "The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
+                    "value": {
+                      "error": {
+                        "code": "detector_loading",
+                        "message": "detector_loading"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {}
+        ]
+      }
+    },
+    "/v1/sessions": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Create a vault session, optionally with known values",
+        "description": "A new vault session, optionally pre-loaded with known values.\n\nPass its ``session_id`` to ``/v1/mask``, ``/v1/unmask`` or the gateway's session header.",
+        "operationId": "create_session_v1_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CreateSessionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnownValuesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request`: The request fails validation. The message lists field locations only, never values. `invalid_known_value`: A pre-loaded known value is too short, too long, or has an unknown or visual type. `too_many_known_values`: The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalid_request": {
+                    "summary": "The request fails validation. The message lists field locations only, never values.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "invalid_request"
+                      }
+                    }
+                  },
+                  "invalid_known_value": {
+                    "summary": "A pre-loaded known value is too short, too long, or has an unknown or visual type.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_known_value",
+                        "message": "invalid_known_value"
+                      }
+                    }
+                  },
+                  "too_many_known_values": {
+                    "summary": "The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values.",
+                    "value": {
+                      "error": {
+                        "code": "too_many_known_values",
+                        "message": "too_many_known_values"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
+                      }
+                    }
+                  },
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {}
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}/known-values": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Add known values to a session",
+        "description": "Add known values to an existing session (404 if it is unknown or expired).\n\nA refused request (an invalid value, or more than the session may hold) adds nothing.",
+        "operationId": "add_known_values_v1_sessions__session_id__known_values_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The vault session to add values to.",
+              "title": "Session Id"
+            },
+            "description": "The vault session to add values to."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnownValuesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnownValuesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: Unknown route, or an unknown or expired `session_id`.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "not_found": {
+                    "summary": "Unknown route, or an unknown or expired `session_id`.",
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "not_found"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request`: The request fails validation. The message lists field locations only, never values. `invalid_known_value`: A pre-loaded known value is too short, too long, or has an unknown or visual type. `too_many_known_values`: The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_request": {
+                    "summary": "The request fails validation. The message lists field locations only, never values.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "invalid_request"
+                      }
+                    }
+                  },
+                  "invalid_known_value": {
+                    "summary": "A pre-loaded known value is too short, too long, or has an unknown or visual type.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_known_value",
+                        "message": "invalid_known_value"
+                      }
+                    }
+                  },
+                  "too_many_known_values": {
+                    "summary": "The session would hold more than `PII_GUARD_KNOWN_VALUES_MAX` known values.",
+                    "value": {
+                      "error": {
+                        "code": "too_many_known_values",
+                        "message": "too_many_known_values"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
+                      }
+                    }
+                  },
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {}
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/endpoints/{endpoint_id}/keys": {
+      "get": {
+        "tags": [
+          "Endpoint keys"
+        ],
+        "summary": "List endpoint keys",
+        "description": "List endpoint key metadata; raw bearer keys cannot be recovered.",
+        "operationId": "list_keys_v1_projects__project_id__endpoints__endpoint_id__keys_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Opaque identifier of an owner-authorized project resource.",
+              "title": "Project Id"
+            },
+            "description": "Opaque identifier of an owner-authorized project resource."
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Opaque identifier of an owner-authorized project resource.",
+              "title": "Endpoint Id"
+            },
+            "description": "Opaque identifier of an owner-authorized project resource."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every key of the endpoint, newest last; no raw keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EndpointKey"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "keys": [
+                    {
+                      "id": "key_example",
+                      "name": "ci-runner",
+                      "created_at": "2026-01-01T00:00:00+00:00",
+                      "revoked_at": null
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`project_access_denied`: Project owner authorization or selection is denied. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_access_denied": {
+                    "summary": "Project owner authorization or selection is denied.",
+                    "value": {
+                      "error": {
+                        "code": "project_access_denied",
+                        "message": "project_access_denied"
+                      }
+                    }
+                  },
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`project_not_found`: The project resource is unknown or belongs to another owner.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_not_found": {
+                    "summary": "The project resource is unknown or belongs to another owner.",
+                    "value": {
+                      "error": {
+                        "code": "project_not_found",
+                        "message": "project_not_found"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request`: The request fails validation. The message lists field locations only, never values. `invalid_project_config`: A policy or endpoint configuration is invalid. `upstream_destination_not_allowed`: Hosted upstream destinations must use public HTTPS on port 443.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_request": {
+                    "summary": "The request fails validation. The message lists field locations only, never values.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "invalid_request"
+                      }
+                    }
+                  },
+                  "invalid_project_config": {
+                    "summary": "A policy or endpoint configuration is invalid.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_project_config",
+                        "message": "invalid_project_config"
+                      }
+                    }
+                  },
+                  "upstream_destination_not_allowed": {
+                    "summary": "Hosted upstream destinations must use public HTTPS on port 443.",
+                    "value": {
+                      "error": {
+                        "code": "upstream_destination_not_allowed",
+                        "message": "upstream_destination_not_allowed"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`upstream_credential_rejected`: The provider refused the API key while listing its models (HTTP 401/403).",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "upstream_credential_rejected": {
+                    "summary": "The provider refused the API key while listing its models (HTTP 401/403).",
+                    "value": {
+                      "error": {
+                        "code": "upstream_credential_rejected",
+                        "message": "upstream_credential_rejected"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`project_storage_unavailable`: The project configuration store is unavailable.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_storage_unavailable": {
+                    "summary": "The project configuration store is unavailable.",
+                    "value": {
+                      "error": {
+                        "code": "project_storage_unavailable",
+                        "message": "project_storage_unavailable"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {}
+        ]
+      },
+      "post": {
+        "tags": [
+          "Endpoint keys"
+        ],
+        "summary": "Issue an endpoint key",
+        "description": "Issue a revocable endpoint key, revealing its raw value only in this response.",
+        "operationId": "issue_key_v1_projects__project_id__endpoints__endpoint_id__keys_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Opaque identifier of an owner-authorized project resource.",
+              "title": "Project Id"
+            },
+            "description": "Opaque identifier of an owner-authorized project resource."
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Opaque identifier of an owner-authorized project resource.",
+              "title": "Endpoint Id"
+            },
+            "description": "Opaque identifier of an owner-authorized project resource."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NameRequest"
+              },
+              "example": {
+                "name": "ci-runner"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Key metadata plus the raw key, returned once. At most 32 active keys per endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/EndpointKey"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "description": "The raw `pg_ep_` key, returned only here."
+                        }
+                      },
+                      "required": [
+                        "key"
+                      ]
+                    }
+                  ]
+                },
+                "example": {
+                  "id": "key_example",
+                  "name": "ci-runner",
+                  "created_at": "2026-01-01T00:00:00+00:00",
+                  "revoked_at": null,
+                  "key": "pg_ep_EXAMPLE_ONLY_not_a_real_key"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`project_access_denied`: Project owner authorization or selection is denied. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_access_denied": {
+                    "summary": "Project owner authorization or selection is denied.",
+                    "value": {
+                      "error": {
+                        "code": "project_access_denied",
+                        "message": "project_access_denied"
+                      }
+                    }
+                  },
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`project_not_found`: The project resource is unknown or belongs to another owner.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_not_found": {
+                    "summary": "The project resource is unknown or belongs to another owner.",
+                    "value": {
+                      "error": {
+                        "code": "project_not_found",
+                        "message": "project_not_found"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request`: The request fails validation. The message lists field locations only, never values. `invalid_project_config`: A policy or endpoint configuration is invalid. `upstream_destination_not_allowed`: Hosted upstream destinations must use public HTTPS on port 443.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_request": {
+                    "summary": "The request fails validation. The message lists field locations only, never values.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "invalid_request"
+                      }
+                    }
+                  },
+                  "invalid_project_config": {
+                    "summary": "A policy or endpoint configuration is invalid.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_project_config",
+                        "message": "invalid_project_config"
+                      }
+                    }
+                  },
+                  "upstream_destination_not_allowed": {
+                    "summary": "Hosted upstream destinations must use public HTTPS on port 443.",
+                    "value": {
+                      "error": {
+                        "code": "upstream_destination_not_allowed",
+                        "message": "upstream_destination_not_allowed"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`upstream_credential_rejected`: The provider refused the API key while listing its models (HTTP 401/403).",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "upstream_credential_rejected": {
+                    "summary": "The provider refused the API key while listing its models (HTTP 401/403).",
+                    "value": {
+                      "error": {
+                        "code": "upstream_credential_rejected",
+                        "message": "upstream_credential_rejected"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`project_storage_unavailable`: The project configuration store is unavailable.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_storage_unavailable": {
+                    "summary": "The project configuration store is unavailable.",
+                    "value": {
+                      "error": {
+                        "code": "project_storage_unavailable",
+                        "message": "project_storage_unavailable"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {}
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/endpoints/{endpoint_id}/keys/{key_id}": {
+      "delete": {
+        "tags": [
+          "Endpoint keys"
+        ],
+        "summary": "Revoke an endpoint key",
+        "description": "Revoke an endpoint key for subsequent gateway admissions.",
+        "operationId": "revoke_key_v1_projects__project_id__endpoints__endpoint_id__keys__key_id__delete",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Opaque identifier of an owner-authorized project resource.",
+              "title": "Project Id"
+            },
+            "description": "Opaque identifier of an owner-authorized project resource."
+          },
+          {
+            "name": "endpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Opaque identifier of an owner-authorized project resource.",
+              "title": "Endpoint Id"
+            },
+            "description": "Opaque identifier of an owner-authorized project resource."
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "Opaque identifier of an owner-authorized project resource.",
+              "title": "Key Id"
+            },
+            "description": "Opaque identifier of an owner-authorized project resource."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "`unauthorized`: `PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unauthorized": {
+                    "summary": "`PII_GUARD_API_TOKEN` is set and the request has no valid token.",
+                    "value": {
+                      "error": {
+                        "code": "unauthorized",
+                        "message": "unauthorized"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`project_access_denied`: Project owner authorization or selection is denied. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_access_denied": {
+                    "summary": "Project owner authorization or selection is denied.",
+                    "value": {
+                      "error": {
+                        "code": "project_access_denied",
+                        "message": "project_access_denied"
+                      }
+                    }
+                  },
+                  "traffic_log_not_local": {
+                    "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+                    "value": {
+                      "error": {
+                        "code": "traffic_log_not_local",
+                        "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`project_not_found`: The project resource is unknown or belongs to another owner.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_not_found": {
+                    "summary": "The project resource is unknown or belongs to another owner.",
+                    "value": {
+                      "error": {
+                        "code": "project_not_found",
+                        "message": "project_not_found"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`payload_too_large`: The body, text or image is larger than the configured limit.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "payload_too_large": {
+                    "summary": "The body, text or image is larger than the configured limit.",
+                    "value": {
+                      "error": {
+                        "code": "payload_too_large",
+                        "message": "payload_too_large"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_request`: The request fails validation. The message lists field locations only, never values. `invalid_project_config`: A policy or endpoint configuration is invalid. `upstream_destination_not_allowed`: Hosted upstream destinations must use public HTTPS on port 443.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_request": {
+                    "summary": "The request fails validation. The message lists field locations only, never values.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_request",
+                        "message": "invalid_request"
+                      }
+                    }
+                  },
+                  "invalid_project_config": {
+                    "summary": "A policy or endpoint configuration is invalid.",
+                    "value": {
+                      "error": {
+                        "code": "invalid_project_config",
+                        "message": "invalid_project_config"
+                      }
+                    }
+                  },
+                  "upstream_destination_not_allowed": {
+                    "summary": "Hosted upstream destinations must use public HTTPS on port 443.",
+                    "value": {
+                      "error": {
+                        "code": "upstream_destination_not_allowed",
+                        "message": "upstream_destination_not_allowed"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`upstream_credential_rejected`: The provider refused the API key while listing its models (HTTP 401/403).",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "upstream_credential_rejected": {
+                    "summary": "The provider refused the API key while listing its models (HTTP 401/403).",
+                    "value": {
+                      "error": {
+                        "code": "upstream_credential_rejected",
+                        "message": "upstream_credential_rejected"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`project_storage_unavailable`: The project configuration store is unavailable.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "project_storage_unavailable": {
+                    "summary": "The project configuration store is unavailable.",
+                    "value": {
+                      "error": {
+                        "code": "project_storage_unavailable",
+                        "message": "project_storage_unavailable"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          },
+          {}
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalyzeRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The text to analyse. Offsets in the response are code-point indices into it.",
+            "examples": [
+              "Teszt Elek, teszt.elek@example.com"
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "description": "ISO 639-1 language of the text (`hu`, `en`, `de`, ...). Defaults to `PII_GUARD_DEFAULT_LANGUAGE` (`hu`).",
+            "examples": [
+              "hu"
+            ]
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Optional vault session (1-128 characters, as on `/v1/mask`) whose pre-loaded known values are merged in (`detector: \"known\"`). Unknown or expired: 404 `not_found`. Never creates a session."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "AnalyzeRequest",
+        "description": "Text to scan for personal data. Nothing is masked or stored."
+      },
+      "AnalyzeResponse": {
+        "properties": {
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSpan"
+            },
+            "type": "array",
+            "title": "Spans",
+            "description": "Spans sorted by `start`, after the resolver merged overlaps. The raw text of a span is not returned: slice `text` with `start`/`end`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "spans"
+        ],
+        "title": "AnalyzeResponse",
+        "description": "Every detected span, `keep` and `block` ones included: analyze never refuses."
+      },
+      "CreateSessionRequest": {
+        "properties": {
+          "known_values": {
+            "items": {
+              "$ref": "#/components/schemas/KnownValueIn"
+            },
+            "type": "array",
+            "maxItems": 100000,
+            "title": "Known Values",
+            "description": "Values to pre-load. At most `PII_GUARD_KNOWN_VALUES_MAX` (1000) per session; duplicates are ignored.",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "CreateSessionRequest",
+        "description": "Optional body of ``POST /v1/sessions``: known values to pre-load."
+      },
+      "EndpointKey": {
+        "type": "object",
+        "title": "EndpointKey",
+        "description": "Endpoint key metadata. The raw key is never stored or returned again.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "revoked_at"
+        ]
+      },
+      "ErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Stable, machine-readable error code (see the response's examples).",
+            "examples": [
+              "invalid_request"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable explanation. Never echoes request text, values, keys or session ids: it names field locations, entity types or counts instead.",
+            "examples": [
+              "invalid request body: body.text"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail",
+        "description": "What went wrong: a stable code and a message that never contains request content."
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail",
+            "description": "The error code and message."
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "description": "The body of every non-2xx response, including validation errors and unknown routes.\n\nFail closed: an error body never carries masked, partially masked or input text."
+      },
+      "KeptEntity": {
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "description": "The kept entity type.",
+            "examples": [
+              "ORGANIZATION"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "How many spans of that type were left in place."
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type",
+          "count"
+        ],
+        "title": "KeptEntity",
+        "description": "Detected but left in place by a ``keep`` policy. Type and count only, never values."
+      },
+      "KnownValueIn": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "maxLength": 10000,
+            "title": "Value",
+            "description": "The value, at least 3 non-space characters and at most `PII_GUARD_KNOWN_VALUES_MAX_LENGTH` (256). Matched case- and whitespace-insensitively, whole words, inflected forms included. Never logged or echoed.",
+            "examples": [
+              "Gyakorló Tihamér"
+            ]
+          },
+          "entity_type": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Entity Type",
+            "description": "A text entity type (`PERSON`, `ID_DOCUMENT`, ...); visual types are refused.",
+            "examples": [
+              "PERSON"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "entity_type"
+        ],
+        "title": "KnownValueIn",
+        "description": "A value the application already knows is sensitive, with its entity type."
+      },
+      "KnownValuesRequest": {
+        "properties": {
+          "known_values": {
+            "items": {
+              "$ref": "#/components/schemas/KnownValueIn"
+            },
+            "type": "array",
+            "maxItems": 100000,
+            "title": "Known Values",
+            "description": "Values to pre-load. At most `PII_GUARD_KNOWN_VALUES_MAX` (1000) per session; duplicates are ignored."
+          }
+        },
+        "type": "object",
+        "required": [
+          "known_values"
+        ],
+        "title": "KnownValuesRequest",
+        "description": "Known values to add to an existing session."
+      },
+      "KnownValuesResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "The vault session the values are stored on."
+          },
+          "added": {
+            "type": "integer",
+            "title": "Added",
+            "description": "New values this request added (duplicates excluded)."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Known values the session now holds."
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "added",
+          "total"
+        ],
+        "title": "KnownValuesResponse",
+        "description": "Counts only: ``added`` new values (duplicates are ignored), ``total`` in the session."
+      },
+      "MaskEntity": {
+        "properties": {
+          "placeholder": {
+            "type": "string",
+            "title": "Placeholder",
+            "description": "The placeholder in `masked_text` (`[[TYPE_id]]`).",
+            "examples": [
+              "[[PERSON_7f3a]]"
+            ]
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "description": "The entity type it stands for.",
+            "examples": [
+              "PERSON"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "How many occurrences this call replaced with it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "placeholder",
+          "entity_type",
+          "count"
+        ],
+        "title": "MaskEntity",
+        "description": "One distinct placeholder this call issued or reused. Never the original value."
+      },
+      "MaskRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The text to mask.",
+            "examples": [
+              "Teszt Elek írt Teszt Eleknek."
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "description": "ISO 639-1 language of the text (`hu`, `en`, `de`, ...). Defaults to `PII_GUARD_DEFAULT_LANGUAGE` (`hu`).",
+            "examples": [
+              "hu"
+            ]
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Vault session to mask in (1-128 characters). Omitted or `null`: a new session is created and returned. An existing id reuses its mapping, so the same value keeps the same placeholder across calls. Unknown or expired: 404 `not_found`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "MaskRequest",
+        "description": "Text to mask, and the vault session whose placeholders to use."
+      },
+      "MaskResponse": {
+        "properties": {
+          "masked_text": {
+            "type": "string",
+            "title": "Masked Text",
+            "description": "The text with every `mask`-policy span replaced by its placeholder.",
+            "examples": [
+              "[[PERSON_7f3a]] írt [[PERSON_7f3a]]nek."
+            ]
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "The vault session holding the mapping: the one sent, or a new one."
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/MaskEntity"
+            },
+            "type": "array",
+            "title": "Entities",
+            "description": "Each distinct placeholder once, with its replacement count."
+          },
+          "kept": {
+            "items": {
+              "$ref": "#/components/schemas/KeptEntity"
+            },
+            "type": "array",
+            "title": "Kept",
+            "description": "Spans of `keep` types left in place, by type and count, sorted by type: no values, no offsets.",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "masked_text",
+          "session_id",
+          "entities"
+        ],
+        "title": "MaskResponse",
+        "description": "The masked text and the session that can restore it (``/v1/unmask``)."
+      },
+      "NameRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Owner-visible display name."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "NameRequest",
+        "description": "A display name visible only to the configuration owner."
+      },
+      "Policy": {
+        "type": "string",
+        "enum": [
+          "mask",
+          "keep",
+          "block"
+        ],
+        "title": "Policy",
+        "description": "What happens to an entity type: ``mask`` it, ``keep`` it in place, or ``block`` the\nrequest."
+      },
+      "PublicSpan": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "title": "Start",
+            "description": "Code-point offset of the span in `text`, inclusive."
+          },
+          "end": {
+            "type": "integer",
+            "title": "End",
+            "description": "Code-point offset of the span in `text`, exclusive."
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "description": "The entity type (`PERSON`, `EMAIL`, ...; see docs/entities.md).",
+            "examples": [
+              "PERSON"
+            ]
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Detector confidence in `[0, 1]`.",
+            "examples": [
+              0.97
+            ]
+          },
+          "detector": {
+            "type": "string",
+            "title": "Detector",
+            "description": "Registry name of the detector that found it (`rules`, `ner`, `llm`, `known`).",
+            "examples": [
+              "ner"
+            ]
+          },
+          "subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtype",
+            "description": "Which shape of the type the rule matched, e.g. `github_token`, `url_password` or `assignment` for `SECRET` (docs/contracts.md). Left out when the detector sets none. Names a rule, never a value.",
+            "examples": [
+              "github_token"
+            ]
+          },
+          "policy": {
+            "$ref": "#/components/schemas/Policy",
+            "description": "The type's effective policy. Known values report `mask` even for a `keep` type, because `/v1/mask` masks them."
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "entity_type",
+          "score",
+          "detector",
+          "policy"
+        ],
+        "title": "PublicSpan",
+        "description": "A span without its raw value (``Span.to_public_dict()``) plus its type's policy."
+      },
+      "UnmaskRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Text with placeholders (`[[TYPE_id]]`), e.g. a model's answer.",
+            "examples": [
+              "Kedves [[PERSON_7f3a]]!"
+            ]
+          },
+          "session_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Session Id",
+            "description": "The vault session the placeholders belong to (1-128 characters). Unknown or expired: 404 `not_found`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "session_id"
+        ],
+        "title": "UnmaskRequest",
+        "description": "Text carrying placeholders, and the session that issued them."
+      },
+      "UnmaskResponse": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The re-identified text. Unresolved tokens are left in it as they are.",
+            "examples": [
+              "Kedves Teszt Elek!"
+            ]
+          },
+          "unresolved": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unresolved",
+            "description": "Placeholder-shaped tokens that aren't in the session mapping (invented or mangled by the model), once each, in order of first appearance."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "unresolved"
+        ],
+        "title": "UnmaskResponse",
+        "description": "The text with every placeholder of the session restored."
+      }
+    },
+    "securitySchemes": {
+      "apiToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Self-hosted: the server's `PII_GUARD_API_TOKEN` (no authentication when it is unset; keep that server on loopback). Hosted: a 24-hour guard API key (`pg_...`) from the console. Also accepted as `X-PII-Guard-Token`. Never an upstream provider key."
+      },
+      "endpointKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A project endpoint key (`pg_ep_...`), shown once when issued. Valid only on its own `/e/{endpoint_id}/v1/chat/completions`, `/responses` and `/models`."
+      }
+    }
+  }
+}
