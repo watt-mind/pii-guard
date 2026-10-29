@@ -147,6 +147,23 @@ describe("hero CTA (LAB-1479)", () => {
       expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
     } finally { scroll.mockRestore(); }
   });
+  it("preserves a custom draft when the hero CTA is activated again", async () => {
+    const call = requester((path) => path === "/v1/account" ? { ...account, authenticated: true } : result);
+    const scroll = spyScroll();
+    try {
+      const user = userEvent.setup(); render(<HostedApp call={call} />);
+      const cta = await screen.findByRole("link", { name: "Run your own text" });
+      await user.click(cta);
+      const editor = screen.getByRole("textbox", { name: "Your text" });
+      await user.clear(editor);
+      await user.type(editor, "Synthetic draft for testing.");
+      await user.click(cta);
+      expect(editor).toHaveValue("Synthetic draft for testing.");
+      expect(screen.getByRole("combobox", { name: "Input" })).toHaveValue("custom");
+      expect(screen.getByRole("heading", { name: "See exactly what the model sees." })).toHaveFocus();
+      expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
+    } finally { scroll.mockRestore(); }
+  });
   it("stays a plain anchor when guest runs are paused or a signed-in visitor needs a key", async () => {
     const off: Account = { ...account, limits: { requests_per_day: 5, sponsored_enabled: false } };
     for (const acct of [off, { ...off, authenticated: true }]) {
