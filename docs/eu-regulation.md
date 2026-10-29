@@ -4,6 +4,7 @@
 > protection officer (DPO) will ask about. It says what each rule requires, with a link to the
 > primary text, and what PII Guard does that is relevant. Whether your processing is lawful is
 > your assessment, with your own counsel. Checked against the primary sources on 2026-10-29.
+> Quotations and official titles keep the EU's British spelling ("pseudonymisation").
 
 European teams building AI agents run into the same question: the useful data (a case file, an
 HR folder, a loan application) is personal data, and the best models are often run by providers
@@ -30,9 +31,9 @@ All from the GDPR, [Regulation (EU) 2016/679][gdpr]:
 | Rule | What it says (paraphrased; quoted terms are the Regulation's own) | Why it is relevant |
 |---|---|---|
 | **Art. 5(1)(c)**, data minimization | Personal data shall be "adequate, relevant and limited to what is necessary" for the purposes. | A model drafting a letter rarely needs the real name, IBAN or ID number to do it. |
-| **Art. 25(1)**, data protection by design | The controller implements appropriate technical and organizational measures, "such as pseudonymisation", designed to implement principles "such as data minimisation". | Pseudonymization is the Regulation's own example of a by-design measure. |
+| **Art. 25(1)**, data protection by design | The controller implements appropriate technical and organizational measures, "such as pseudonymisation", designed to implement principles "such as data minimisation". | Pseudonymization is given as an example of an appropriate measure, not required as such; what is appropriate depends on the risk. |
 | **Art. 25(2)**, by default | By default, only personal data necessary for each specific purpose are processed, including as to their "accessibility". | Masking by default limits who can read the values: the model provider gets placeholders. |
-| **Art. 32(1)(a)**, security of processing | Appropriate measures include "the pseudonymisation and encryption of personal data". | Pseudonymization is also named as a security measure. |
+| **Art. 32(1)(a)**, security of processing | Appropriate measures include "the pseudonymisation and encryption of personal data". | Pseudonymization is listed among example security measures, again subject to the risk. |
 | **Recital 78** | By-design measures could consist of "pseudonymising personal data as soon as possible". | PII Guard pseudonymizes at the point the request leaves your application. |
 | **Art. 4(5)**, definition | Pseudonymization: data "can no longer be attributed to a specific data subject without the use of additional information", provided that information "is kept separately" under technical and organizational measures. | The placeholder mapping is that additional information, and it is kept apart from what the model receives (see [below](#what-pii-guard-does-as-a-technical-measure)). |
 | **Recital 26** | Pseudonymized data that could be attributed to a person with additional information "should be considered to be information on an identifiable natural person"; the GDPR does not apply to anonymous information. | **Pseudonymized is not anonymous.** For whoever holds the mapping, the data stay personal data. |
@@ -67,7 +68,7 @@ What this means for PII Guard, stated carefully:
   assessment, not a property PII Guard can guarantee. A value detection misses, or context such
   as "the only female judge at the regional court", can identify someone without a name
   ([privacy model](privacy-model.md#explicit-non-guarantees)).
-- The EDPB's [Guidelines 01/2025 on pseudonymisation][edpb] (adopted 16 January 2025, version
+- The EDPB's [Guidelines 01/2025 on Pseudonymisation][edpb] (adopted 16 January 2025, version
   for public consultation) predate the judgment and take a broader view: pseudonymized data
   remain personal "if pseudonymised data and additional information are not in the hands of the
   same person". Read both.
@@ -84,10 +85,12 @@ Framework** ([Implementing Decision (EU) 2023/1795][dpf], 10 July 2023); it cove
 that participate in the Framework. Whether a given provider is covered, and whether your
 transfer is lawful, is not something this page decides.
 
-PII Guard's part is narrower: it reduces what crosses the border. The provider receives
-placeholders instead of names, IDs and faces, and the mapping does not travel with them. Whether
-the masked request is still a transfer of personal data turns on the recipient's means to
-re-identify ([above](#pseudonymized-data-and-the-recipient-cjeu-edps-v-srb)).
+PII Guard's part is narrower: it reduces the personal data that reaches a non-EU provider. The
+provider receives placeholders instead of names, IDs and faces, and the mapping does not travel
+with them. That does not by itself settle your Chapter V obligations: whether the masked request
+is still a transfer of personal data turns on the recipient's means to re-identify
+([above](#pseudonymized-data-and-the-recipient-cjeu-edps-v-srb)), and missed values or context
+can still identify someone.
 
 ## Sector rules
 
@@ -150,6 +153,8 @@ detection never found; the published leak rates measure how often that happens
   assessment.
 - **It is not anonymization.** Pseudonymized data remain personal data for whoever can
   re-identify them (Recital 26), and detection is not perfect.
+- **Logs and the outbound re-check are product features**, not DORA, GDPR or AI Act
+  conformity controls.
 - **GDPR Art. 9 special categories are out of scope.** PII Guard has no entity types for health
   data, ethnic origin, religion, political opinions or sexual orientation, so such content in free
   text passes through as written ([evaluation](evaluation.md)). Do not rely on it for them.
@@ -193,19 +198,19 @@ Vetted short copy for the landing page's "Why Europe" section. Keep the wording;
 to its section here.
 
 **Minimize before you send** ([section](#minimization-and-pseudonymization))
-GDPR asks for data minimization and names pseudonymization as a design and security measure
-(Art. 5, 25, 32). PII Guard swaps names and IDs for placeholders before the prompt leaves.
+GDPR requires data minimization (Art. 5) and lists pseudonymization among example design and
+security measures (Art. 25, 32). PII Guard swaps names and IDs for placeholders before the prompt leaves.
 
 **Less personal data crossing borders** ([section](#international-transfers))
-Non-EU model providers raise Chapter V transfer questions. The model receives placeholders; the
-mapping back to real values stays with your guard, self-hosted or in our EU-hosted preview.
+Non-EU model providers raise Chapter V transfer questions. PII Guard reduces the personal data
+that reaches them: placeholders go out, the mapping stays with your guard. Your transfer obligations remain.
 
 **Built for regulated work** ([section](#sector-rules))
-Lawyers' secrecy, employee data (GDPR Art. 88) and DORA's ICT third-party rules for finance all
-bear on what reaches an outside vendor. Every call is logged and re-checked.
+Lawyers' secrecy, employee data (GDPR Art. 88) and DORA's ICT third-party rules all bear on
+what reaches an outside vendor. PII Guard lists every call in Logs, outbound check included.
 
-**Disclaimer:** A technical measure, not legal advice: pseudonymized data can still be personal
-data, and you still need your own DPIA and agreements. [What we don't claim](#what-we-dont-claim).
+**Disclaimer:** A technical measure, not legal advice or a compliance feature: pseudonymized data
+can still be personal data, and you still need your own DPIA, agreements and transfer assessment. [What we don't claim](#what-we-dont-claim).
 
 **3-step strip:** Change one base URL. → Masking and restoring happen automatically: streaming,
 tool calls, images. → See every request in Logs, with its outbound check result.

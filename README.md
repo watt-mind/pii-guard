@@ -19,12 +19,12 @@ agent can't do the job. PII Guard is a drop-in proxy in between: change one base
 name, address, ID and face is swapped for a reversible placeholder before the request leaves
 your network, then restored in the answer, even mid-stream and inside tool calls.
 
-**Why it matters in the EU.** The GDPR names pseudonymization as a data-protection-by-design
-and security measure (Art. 25, 32) and asks for data minimization (Art. 5). Placeholders instead
-of names also reduce what reaches a model provider outside the EU (Chapter V transfers). Pseudonymized data
-stay personal data for whoever holds the mapping, so this is a technical measure, not a
-compliance certificate. Articles, the 2025 CJEU ruling on pseudonymized data, DORA and the
-AI Act, with primary sources: [docs/eu-regulation.md](docs/eu-regulation.md).
+**Why it matters in the EU.** The GDPR requires data minimization (Art. 5) and lists
+pseudonymization among example by-design and security measures (Art. 25, 32). Placeholders
+reduce the personal data that reaches a model provider outside the EU, though they don't by
+themselves settle Chapter V transfer obligations. Pseudonymized data stay personal data for
+whoever holds the mapping: a technical measure, not a compliance certificate. Sources, the 2025
+CJEU ruling, DORA and the AI Act: [docs/eu-regulation.md](docs/eu-regulation.md).
 
 **Try it offline** (no key; needs [uv](https://docs.astral.sh/uv/) and
 [pnpm](https://pnpm.io/)): `git clone https://github.com/watt-mind/pii-guard.git && cd pii-guard && make demo`,
