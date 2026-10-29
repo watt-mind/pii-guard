@@ -203,7 +203,7 @@
 <rect x="1035.3" y="593.6" width="6" height="-1.6" fill="#332288"/>
 <text x="1049.3" y="588" font-size="19" fill="#1B1B1F">1.4</text>
 <circle cx="66" cy="610.8" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="618.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published hdkiller/pii-guard-ner-xlmr-base, LAB-1306)</text>
+<text x="84" y="618.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
 <rect x="1035.3" y="608" width="3.1" height="-1.6" fill="#4A4A52"/>
 <text x="1046.4" y="602.4" font-size="19" fill="#1B1B1F">0.7</text>
 <rect x="1035.3" y="610.4" width="2" height="-1.6" fill="#117733"/>
