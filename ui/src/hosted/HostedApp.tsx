@@ -183,16 +183,16 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <p className="font-mono text-xs text-muted">Open source · OpenAI-compatible · Built on Meta models</p>
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
           <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">A privacy gateway for AI agents. Personal data in text and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
-          <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 sm:grid-cols-3">
+          <div className="max-w-2xl space-y-3">
+            <dl aria-label="Measured results" className="grid grid-cols-3 gap-3 sm:gap-6">{PROOF.map((p) => <Metric key={p.label} size="hero" label={p.label} value={p.value} hint={p.hint} />)}</dl>
+            <p className="text-xs text-muted">{MEASURED} · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a> · <a className={[link, "whitespace-nowrap"].join(" ")} href={NER_MODEL}>Our NER on Hugging Face ↗</a></p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
+          <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 border-t border-line pt-5 sm:grid-cols-3">
             <Differentiator href="#images" title="Images too">Faces are blocked and printed ID details become placeholders before an image is sent.</Differentiator>
             <Differentiator href="#how" title="No LLM in the masking path">Rules and an open NER fine-tuned from Meta’s XLM-RoBERTa, run on the gateway.</Differentiator>
             <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
           </ul>
-          <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
-          <div className="max-w-2xl space-y-3 border-t border-line pt-5">
-            <dl aria-label="Measured results" className="grid grid-cols-3 gap-3 sm:gap-6">{PROOF.map((p) => <Metric key={p.label} size="hero" label={p.label} value={p.value} hint={p.hint} />)}</dl>
-            <p className="text-xs text-muted">{MEASURED} · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a> · <a className={[link, "whitespace-nowrap"].join(" ")} href={NER_MODEL}>Our NER on Hugging Face ↗</a></p>
-          </div>
         </div>
         <MiniFlow model={model} name={language === "hu" ? "Minta Réka" : "Robin Example"} />
       </section>
@@ -257,7 +257,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on every set below." lead={`Not everywhere: on Gretel finance Presidio leaks ${WEAKER.gretelPresidio} % against our ${WEAKER.gretel} %. Fictional data, committed run records of 27–28 Oct 2026; the sets are small, so a few points is noise.`} />
+        <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on all three test sets below." lead="Fictional and public test data, from committed run records of 27–28 Oct 2026. The sets are small, so a few points is noise; where it’s weaker is listed beside the chart." />
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
             <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better; each tool’s time was measured where it ran.">
@@ -395,7 +395,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="account" aria-labelledby="account-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live example. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."} />
         <div className="flex flex-wrap items-center gap-3">
-          {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <><ButtonLink variant="primary" href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
+          {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <>{startsRun && <ButtonLink variant="primary" href="#demo" onClick={heroRun}>Run the live demo ↑</ButtonLink>}<ButtonLink variant={startsRun ? "secondary" : "primary"} href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
         </div>
         <Card as="div" aria-label="Your runs and the server limits" className="max-w-3xl">
           <div className="space-y-4">
@@ -451,7 +451,7 @@ function SectionHead({ id, eyebrow, title, lead, focusable }: { id: string; eyeb
 
 /** One of the hero's three differences: a short lead that links to the section that shows it. */
 function Differentiator({ href, title, children }: { href: string; title: string; children: ReactNode }) {
-  return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink hover:underline">{title}</a><span className="mt-0.5 block">{children}</span></li>;
+  return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink underline-offset-4 hover:underline">{title} <span aria-hidden="true" className="text-muted">↓</span></a><span className="mt-0.5 block">{children}</span></li>;
 }
 
 /** A small results table: one row per system, values in percent; ours in ink. Fits a phone. */

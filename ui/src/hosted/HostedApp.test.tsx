@@ -234,7 +234,7 @@ describe("positioning and copy (LAB-1466)", () => {
     // The differentiators are named in the hero, and only tools the integration docs test (LAB-1478).
     expect(screen.getByRole("list", { name: "What makes it different" })).toHaveTextContent(/Images too.*No LLM in the masking path.*Your agent keeps working/);
     expect(text).not.toMatch(/Claude Code/);
-    expect(screen.getByText("Next best: PrivAiTe 12.7 %")).toBeInTheDocument();
+    expect(screen.getByText(/^Next best: PrivAiTe 12\.7\s%$/)).toBeInTheDocument();
   });
   it("doesn't name a model the server didn't report", async () => {
     const call = requester((path) => path === "/v1/account" ? { ...account, included_model: undefined } : result);
