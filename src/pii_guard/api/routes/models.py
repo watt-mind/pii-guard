@@ -20,6 +20,7 @@ The upstream transport is ``app.state.gateway_transport`` when set (tests), like
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any
 
 import httpx
@@ -141,28 +142,34 @@ async def list_models(request: Request) -> JSONResponse:
         headers["Authorization"] = request.headers["authorization"]
 
     transport = getattr(state, "gateway_transport", None)
+    content = bytearray()
     async with httpx.AsyncClient(timeout=_TIMEOUT, transport=transport) as client:
         try:
-            response = await client.get(models_url(settings.upstream_base_url), headers=headers)
+            async with client.stream(
+                "GET", models_url(settings.upstream_base_url), headers=headers
+            ) as response:
+                if response.status_code >= 400:
+                    # Preserve the status, never read or expose the upstream's error body.
+                    return JSONResponse(
+                        {
+                            "error": {
+                                "code": "upstream_error",
+                                "message": f"upstream returned HTTP {response.status_code} "
+                                "for /models; "
+                                "set PII_GUARD_UPSTREAM_MODELS for a static list",
+                                "type": "upstream_error",
+                            }
+                        },
+                        status_code=response.status_code if response.status_code < 500 else 502,
+                    )
+                async for chunk in response.aiter_bytes():
+                    if len(content) + len(chunk) > _MAX_BODY:
+                        raise UpstreamError("upstream model list is too large")
+                    content.extend(chunk)
         except httpx.HTTPError as exc:
             raise UpstreamError(f"upstream model list failed ({type(exc).__name__})") from None
-    if response.status_code >= 400:
-        # The upstream's status (401 for a bad key, 404 for no /models route), not its message.
-        return JSONResponse(
-            {
-                "error": {
-                    "code": "upstream_error",
-                    "message": f"upstream returned HTTP {response.status_code} for /models; "
-                    "set PII_GUARD_UPSTREAM_MODELS for a static list",
-                    "type": "upstream_error",
-                }
-            },
-            status_code=response.status_code if response.status_code < 500 else 502,
-        )
-    if len(response.content) > _MAX_BODY:
-        raise UpstreamError("upstream model list is too large")
     try:
-        data = response.json().get("data")
+        data = json.loads(content).get("data")
     except (ValueError, AttributeError):
         raise UpstreamError("upstream model list is not a JSON object") from None
     if not isinstance(data, list):
