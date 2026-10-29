@@ -1096,6 +1096,19 @@ placeholder as written; other escape depths (`\\[\\[` in freeform input, an esca
 backslash) are left; an unknown or other session's placeholder stays as written and is counted as
 unresolved; the restored value is charged to the response's restore budget.
 
+**Shell quoting in command arguments** (both APIs, whole and streamed; LAB-1483). A restored value
+is byte-exact, except in one context the gateway reads for sure: the string value of a top-level
+`command` or `cmd` key in JSON `arguments` (or the script after `-c`/`-lc` in a `command` array),
+read by a small shell lexer. There a value restored inside a single-quoted string gets `'` written
+as `'\''`; inside the single-quoted script word of a `sed` command, in an `s` replacement, `\`, `&`,
+the delimiter and a newline also get a backslash (an escaped placeholder in an `s` pattern also gets a
+delimiter backslashed that the regex literal leaves as is). Then it is JSON-escaped as usual. So
+`echo '[[PERSON_x]]'` with `O'Brien Teszt` and `sed 's/x/[[ADDRESS_x]]/'` with `Fő utca 1/A` run
+as meant. **Limitation:** everywhere else the value stays byte-exact, so a `$`, backtick, `"` or `\`
+in a double-quoted string, an unquoted value, a heredoc, `$'...'`, a comment, a nested or argv-array
+command, another `sed` command or a bracket expression, and custom tool `input` (it may be a patch,
+not a command) are not escaped. Other keys, message text and file content are never touched.
+
 **Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
 stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
 `summary_index`: `response.output_text.delta`, `response.refusal.delta`,
