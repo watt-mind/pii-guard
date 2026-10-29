@@ -66,7 +66,7 @@ async def iter_sse_data(lines: AsyncIterator[str]) -> AsyncIterator[str]:
 
 
 def sse_event(data: str) -> bytes:
-    return f"data: {data}\n\n".encode()
+    return ("".join(f"data: {line}\n" for line in data.split("\n")) + "\n").encode()
 
 
 def error_event(code: str, message: str) -> str:
@@ -142,6 +142,8 @@ class SseRestorer:
 
     def process(self, data: str) -> list[str]:
         """The payloads to emit for one upstream payload."""
+        if self._done:
+            return []
         if data.strip() == DONE:
             out = self.finish()
             self._done = True
@@ -153,7 +155,11 @@ class SseRestorer:
         if not isinstance(chunk, dict):
             return [data]
         if chunk.get("error"):  # ``error: null`` is a normal chunk, not a failure (LAB-1564)
-            return [error_event("upstream_error", "upstream stream error")]
+            return [
+                *self.finish(),
+                error_event("upstream_error", "upstream stream error"),
+                DONE,
+            ]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(chunk))
         choices = chunk.get("choices")
@@ -169,7 +175,9 @@ class SseRestorer:
         return [json.dumps(chunk, ensure_ascii=False)]
 
     def _process_choice(self, choice: dict[str, Any], position: int) -> None:
-        index = choice.get("index", position)
+        index = choice.get("index")
+        if type(index) is not int:
+            index = position
         delta = choice.get("delta")
         if not isinstance(delta, dict):
             delta = {}
@@ -177,8 +185,19 @@ class SseRestorer:
                 choice["delta"] = delta
         for name in MESSAGE_TEXT_FIELDS:
             value = delta.get(name)
-            if isinstance(value, str):
-                if name == "content" and isinstance(index, int):
+            if name == "content" and isinstance(value, list):
+                for part in value:
+                    if (
+                        not isinstance(part, dict)
+                        or part.get("type") != "text"
+                        or not isinstance(part.get("text"), str)
+                    ):
+                        raise ValueError("unsupported upstream content part")
+                    text = part["text"]
+                    self._retain_masked(index, text)
+                    part["text"] = self._unmasker((index, name)).feed(text)
+            elif isinstance(value, str):
+                if name == "content":
                     self._retain_masked(index, value)
                 delta[name] = self._unmasker((index, name)).feed(value)
         for position_in_delta, call in enumerate(delta.get("tool_calls") or []):
@@ -201,7 +220,7 @@ class SseRestorer:
             function_call["arguments"] = self._unmasker((index, "function_call"), "json").feed(
                 function_call["arguments"]
             )
-        if choice.get("finish_reason") and isinstance(index, int):
+        if choice.get("finish_reason"):
             self._flush_choice(index, delta)
 
     def _flush_choice(self, index: int, delta: dict[str, Any]) -> None:
@@ -244,7 +263,14 @@ def _append_rest(delta: dict[str, Any], key: tuple[Any, ...], rest: str) -> None
     if kind in _TOOL_FIELDS:
         container, name = _TOOL_FIELDS[kind]
         calls = delta.setdefault("tool_calls", [])
-        target = next((c for c in calls if isinstance(c, dict) and c.get("index") == key[2]), None)
+        target = next(
+            (
+                c
+                for position, c in enumerate(calls)
+                if isinstance(c, dict) and c.get("index", position) == key[2]
+            ),
+            None,
+        )
         if target is None:
             target = {"index": key[2]}
             calls.append(target)
@@ -253,4 +279,11 @@ def _append_rest(delta: dict[str, Any], key: tuple[Any, ...], rest: str) -> None
         holder, name = delta.setdefault("function_call", {}), "arguments"
     else:
         holder, name = delta, kind
-    holder[name] = (holder.get(name) or "") + rest
+    if name == "content" and isinstance(holder.get(name), list):
+        parts = holder[name]
+        if parts:
+            parts[-1]["text"] += rest
+        else:
+            parts.append({"type": "text", "text": rest})
+    else:
+        holder[name] = (holder.get(name) or "") + rest

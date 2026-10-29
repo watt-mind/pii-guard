@@ -1203,6 +1203,8 @@ class Gateway:
                         echoed_answer = True
                         yield answer_event()
                     yield sse_event(out)
+                    if out == DONE:
+                        return
             unmasking = time.perf_counter()
             outs = restorer.finish()
             timer.add("unmask", time.perf_counter() - unmasking)
@@ -1235,6 +1237,7 @@ class Gateway:
                         else:
                             failed = error_event("stream_failed", "the response stream failed")
                         yield sse_event(failed)
+                        yield sse_event(DONE)
                     finally:
                         timer.add("client", time.perf_counter() - sending)
             except (GeneratorExit, asyncio.CancelledError):
@@ -1267,6 +1270,7 @@ class Gateway:
                 else:
                     trace.finish(outcome="stream_error", error={"code": "stream_failed"})
 
+        out_headers["Cache-Control"] = "no-cache"
         return (
             StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),
             stats,
