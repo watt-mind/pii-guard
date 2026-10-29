@@ -479,9 +479,40 @@ class DeploymentAdmissionTests(unittest.TestCase):
         )
 
     def test_budget_over_ceiling_is_refused(self) -> None:
+        # LAB-1508: the cap is per environment; prod USD 50, dev stays USD 10.
         self.assert_refused(
-            self.run_deploy("stage", HOSTED_SPONSORED_MICRODOLLARS="10000001"),
-            "maximum USD 10",
+            self.run_deploy("stage", HOSTED_SPONSORED_MICRODOLLARS="50000001"),
+            "maximum USD 50 for prod",
+        )
+        self.assert_refused(
+            self.run_deploy(
+                "stage",
+                HOSTED_SPONSORED_MICRODOLLARS="10000001",
+                AZURE_ENVIRONMENT="dev",
+                AZURE_RESOURCE_GROUP="rg-pii-guard-dev",
+                AZURE_DEV_NETWORK_APPROVED="true",
+                HOSTED_PUBLIC_ORIGIN="https://guard-dev.watt-mind.com",
+            ),
+            "maximum USD 10 for dev",
+        )
+
+    def test_prod_ceiling_admits_exactly_usd_50_and_dev_exactly_usd_10(self) -> None:
+        base = {
+            "image": IMAGE,
+            "lab_1372_done": True,
+            "meta_proxy_owner_risk_accepted": self.WAIVER,
+        }
+        prod = self.run_sponsored_stage(base, budget="50000000")
+        self.assertEqual(prod.returncode, 0, prod.stderr)
+        self.assertIn("sponsoredMicrodollars=50000000", self.calls)
+        dev_keys = ("private_dev_reviewed", "tailnet_acl", "proxy_tls", "proxy_headers")
+        dev_evidence = {**base, **dict.fromkeys(dev_keys, True)}
+        dev = self.run_sponsored_stage(dev_evidence, dev=True, budget="10000000")
+        self.assertEqual(dev.returncode, 0, dev.stderr)
+        self.assertIn("sponsoredMicrodollars=10000000", self.calls)
+        self.assert_refused(
+            self.run_sponsored_stage(dev_evidence, dev=True, budget="10000001"),
+            "maximum USD 10 for dev",
         )
 
     def test_enable_and_positive_budget_require_lab_gate(self) -> None:

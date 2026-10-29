@@ -167,13 +167,30 @@ class ReleaseTemplateTests(unittest.TestCase):
             "parameters('clientIpSource'))]",
         )
 
+    def test_sponsored_ceiling_is_per_environment(self) -> None:
+        # LAB-1508: prod USD 50 (owner, 2026-10-29); dev stays USD 10. An over-cap release
+        # fails template evaluation (int() of a non-numeric string) before any write.
+        variables = self.template["variables"]
+        self.assertEqual(
+            variables["sponsoredCeilingMicrodollars"],
+            "[if(equals(parameters('environmentName'), 'prod'), 50000000, 10000000)]",
+        )
+        self.assertEqual(
+            variables["admittedSponsoredMicrodollars"],
+            "[if(lessOrEquals(parameters('sponsoredMicrodollars'), "
+            "variables('sponsoredCeilingMicrodollars')), parameters('sponsoredMicrodollars'), "
+            "int('sponsoredMicrodollars-exceeds-environment-ceiling'))]",
+        )
+        self.assertNotIn("[string(parameters('sponsoredMicrodollars'))]", json.dumps(self.env()))
+
     def test_blob_ledger_is_existing_separate_and_never_automatically_funded(self) -> None:
         parameters = self.template["parameters"]
         self.assertNotIn("defaultValue", parameters["ledgerAccountUrl"])
         ceiling = parameters["sponsoredMicrodollars"]
         self.assertEqual(ceiling["defaultValue"], 0)
         self.assertEqual(ceiling["minValue"], 0)
-        self.assertEqual(ceiling["maxValue"], 10_000_000)
+        # @maxValue holds the larger prod cap; the per-environment cap is a template variable.
+        self.assertEqual(ceiling["maxValue"], 50_000_000)
         self.assertEqual(parameters["allocationId"]["defaultValue"], "")
         self.assertEqual(parameters["allocationExpiresAt"]["defaultValue"], 0)
         env = self.env()
@@ -183,7 +200,7 @@ class ReleaseTemplateTests(unittest.TestCase):
             "PII_GUARD_HOSTED_SPEND_CONTAINER": "sponsored-allowance",
             "PII_GUARD_HOSTED_SPEND_ENVIRONMENT": "[parameters('environmentName')]",
             "PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS": (
-                "[string(parameters('sponsoredMicrodollars'))]"
+                "[string(variables('admittedSponsoredMicrodollars'))]"
             ),
             "PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID": "[parameters('allocationId')]",
             "PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT": (
