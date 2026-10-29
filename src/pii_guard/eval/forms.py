@@ -190,9 +190,7 @@ def _word_alternatives(value: str, entity_type: EntityType, forms: LanguageForms
     else:
         right = ""
     alternatives = [left + body + right]
-    alternatives.extend(
-        left + v + r"(?![^\W_])" for v in forms.stem_variants(value, entity_type)
-    )
+    alternatives.extend(left + v + r"(?![^\W_])" for v in forms.stem_variants(value, entity_type))
     return alternatives
 
 

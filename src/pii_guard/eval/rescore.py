@@ -176,9 +176,7 @@ def rescore_record(record: Mapping[str, Any]) -> dict[str, Any] | None:
             " policy-excluded title or bare city are still counted: the run kept no"
             " per-document predictions, so ignore regions can't be applied."
         )
-        out["notes"] = [
-            _NEW_NOTE if n in (_OLD_NOTE, _PREV_NEW_NOTE) else n for n in out["notes"]
-        ]
+        out["notes"] = [_NEW_NOTE if n in (_OLD_NOTE, _PREV_NEW_NOTE) else n for n in out["notes"]]
     if record["system"]["family"] == "comparison":
         blocks = [out["metrics"]["overall"], *out["metrics"]["languages"].values()]
         if any(b.get("consistency") is not None for b in blocks):

@@ -102,13 +102,15 @@ DEFAULT_POLICY: Mapping[EntityType, str] = {t: DEFAULT_POLICIES[t] for t in TEXT
 #: Ai4Privacy labels every date ``DATE``, which pii-guard's policy excludes, so a
 #: ``DATE_OF_BIRTH`` prediction there can be neither confirmed nor refuted.
 LEGACY_UNSCORED_TYPES: Mapping[str, frozenset[EntityType]] = {
-    "public-ai4privacy": frozenset({
-        EntityType.DATE_OF_BIRTH,
-        EntityType.ORGANIZATION,
-        EntityType.VEHICLE_PLATE,
-        EntityType.PARCEL_NUMBER_HU,
-        EntityType.COMPANY_ID_HU,
-    }),
+    "public-ai4privacy": frozenset(
+        {
+            EntityType.DATE_OF_BIRTH,
+            EntityType.ORGANIZATION,
+            EntityType.VEHICLE_PLATE,
+            EntityType.PARCEL_NUMBER_HU,
+            EntityType.COMPANY_ID_HU,
+        }
+    ),
 }
 
 #: Fixed, public key for evaluation runs only, so placeholders are reproducible.
