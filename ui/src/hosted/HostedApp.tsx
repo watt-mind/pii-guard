@@ -180,7 +180,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-24 lg:px-10">
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
-          <p className="font-mono text-xs text-muted">Open source · OpenAI-compatible · Built on Meta models</p>
+          <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible · Built on Meta models</p>
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
           <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">A privacy gateway for AI agents. Personal data in text and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
           <div className="max-w-2xl space-y-3">
@@ -451,7 +451,7 @@ function SectionHead({ id, eyebrow, title, lead, focusable }: { id: string; eyeb
 
 /** One of the hero's three differences: a short lead that links to the section that shows it. */
 function Differentiator({ href, title, children }: { href: string; title: string; children: ReactNode }) {
-  return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink underline-offset-4 hover:underline">{title} <span aria-hidden="true" className="text-muted">↓</span></a><span className="mt-0.5 block">{children}</span></li>;
+  return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink underline-offset-4 hover:underline">{title}{"\u00a0"}<span aria-hidden="true" className="text-muted">↓</span></a><span className="mt-0.5 block">{children}</span></li>;
 }
 
 /** A small results table: one row per system, values in percent; ours in ink. Fits a phone. */
