@@ -273,10 +273,13 @@ class _Entry:
         "casing",
         "changed",
         "count",
+        "detector",
         "entity_type",
         "exact",
+        "first_seen",
         "initials",
         "language",
+        "last_seen",
         "model_only",
         "needles",
         "normalized",
@@ -304,6 +307,13 @@ class _Entry:
         self.normalized = normalized
         self.language = language
         self.count = 0
+        # The detector of the first span that created the entry (LAB-1332): provenance for
+        # the vault inspector. Never overwritten; a neutral re-mask (``gateway``) leaves it.
+        self.detector: str | None = None
+        # Vault-clock times of the first and latest masked occurrence (LAB-1332). ``None``
+        # until the entry's first occurrence is assembled.
+        self.first_seen: float | None = None
+        self.last_seen: float | None = None
         # The session generation at which this entry was created or its patterns last
         # changed (a new surface or alias): see :attr:`VaultSession.generation`.
         self.changed = 0
@@ -1121,6 +1131,10 @@ class VaultSession:
             parts.append(entry.placeholder)
             entry.remember(following_suffix(text, end), text[start:end])
             entry.count += 1
+            now = self._clock()
+            if entry.first_seen is None:
+                entry.first_seen = now
+            entry.last_seen = now
             per_type[entry.entity_type.value] += 1
             cursor = end
         parts.append(text[cursor:])
@@ -1280,6 +1294,8 @@ class VaultSession:
         placeholder = self._new_placeholder(entity_type, normalized)
         entry = _Entry(placeholder, entity_type, value, normalized, language)
         entry.model_only = detector in MODEL_DETECTORS
+        if detector not in NEUTRAL_DETECTORS:
+            entry.detector = detector
         entry.order = len(self._by_key)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
@@ -1333,6 +1349,7 @@ class VaultSession:
             variant = _Entry(
                 placeholder, entry.entity_type, original, entry.normalized, entry.language
             )
+            variant.detector = entry.detector
             entry.variants[form] = variant
             self._by_placeholder[placeholder] = variant
         return variant

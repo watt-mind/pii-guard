@@ -924,7 +924,9 @@ row links to its session.
   variants after their value, with `variant_of`), then the known values nothing matched yet
   (`placeholder: null`). Each item has `placeholder`, `entity_type`, `origin` (`detected`, or
   `known` for a pre-loaded value), `count` (occurrences masked), `forms` (how many other written
-  forms matched: inflected stems, split surfaces), `hint`, and on a revealed read `original`
+  forms matched: inflected stems, split surfaces), `hint`, `detector` (the detector of the
+  first span that created the entry), `first_seen` and `last_seen` (vault-clock seconds of
+  the first and latest masked occurrence), and on a revealed read `original`
   and `known_forms`. Every revealed read is logged at `WARNING` with the ref and the counts,
   never a value or the session id.
 

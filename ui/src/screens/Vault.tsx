@@ -422,8 +422,14 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                   <th scope="col" className="hidden px-2 py-2 font-medium md:table-cell">
                     Origin
                   </th>
+                  <th scope="col" className="hidden px-2 py-2 font-medium lg:table-cell">
+                    Detector
+                  </th>
                   <th scope="col" className="hidden px-2 py-2 text-right font-medium sm:table-cell">
                     Masked
+                  </th>
+                  <th scope="col" className="hidden px-2 py-2 text-right font-medium lg:table-cell">
+                    Seen
                   </th>
                   <th scope="col" className="hidden py-2 pl-2 text-right font-medium md:table-cell">
                     Forms
@@ -454,7 +460,11 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                     </td>
                     <td className="hidden px-2 py-2 text-xs whitespace-nowrap sm:table-cell">{typeLabel(item.entity_type)}</td>
                     <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted md:table-cell">{item.origin === "known" ? "Known value" : "Detected"}</td>
+                    <td className="hidden px-2 py-2 font-mono text-xs whitespace-nowrap text-muted lg:table-cell">{item.detector ?? "—"}</td>
                     <td className="hidden px-2 py-2 text-right text-xs tabular-nums sm:table-cell">{item.count}</td>
+                    <td className="hidden px-2 py-2 text-right text-xs whitespace-nowrap tabular-nums text-muted lg:table-cell" title="Vault-clock seconds of the first and latest masked occurrence">
+                      {item.first_seen == null ? "—" : `${item.first_seen.toFixed(1)} → ${(item.last_seen ?? item.first_seen).toFixed(1)}`}
+                    </td>
                     <td className="hidden py-2 pl-2 text-right text-xs tabular-nums md:table-cell">{item.forms}</td>
                   </tr>
                 ))}
@@ -464,7 +474,9 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
             <p className="mt-3 text-xs text-pretty text-muted">
               <span className="text-ink">Hint</span>: a redacted shape of the value (a word's first letter and length, a number's last two digits, nothing of a secret).{" "}
               <span className="text-ink">Masked</span>: occurrences replaced by the placeholder so far. <span className="text-ink">Forms</span>: other written forms matched onto
-              the same value, such as inflections. <span className="text-ink">Known value</span>: pre-loaded with {mono("POST /v1/sessions")} rather than detected.
+              the same value, such as inflections. <span className="text-ink">Detector</span>: the detector
+              of the first span that created the entry. <span className="text-ink">Seen</span>: vault-clock seconds
+              of the first → latest masked occurrence. <span className="text-ink">Known value</span>: pre-loaded with {mono("POST /v1/sessions")} rather than detected.
             </p>
           </>
         )}
