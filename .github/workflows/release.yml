@@ -24,8 +24,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Fail closed: a tag creates no ci.yml run, so prove the tagged commit already passed
+  # ci-ok as a main/develop push before anything is published (LAB-1553).
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require successful ci-ok for the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/release_gate.py
+
   image:
     name: image
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -65,6 +84,7 @@ jobs:
 
   wheel:
     name: wheel
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
