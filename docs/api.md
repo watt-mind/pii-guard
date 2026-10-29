@@ -52,12 +52,18 @@ address back in place. The response headers say what happened: `X-PII-Guard-Mask
 import os
 from openai import OpenAI
 
-client = OpenAI(base_url=os.environ["GUARD_BASE_URL"], api_key=os.environ["GUARD_API_KEY"],
-                max_retries=0)
+client = OpenAI(
+    base_url=os.environ["GUARD_BASE_URL"], api_key=os.environ["GUARD_API_KEY"], max_retries=0
+)
 reply = client.chat.completions.create(
     model=os.environ["GUARD_MODEL"],
-    messages=[{"role": "user", "content": "Write a short reply to Teszt Elek "
-               "(teszt.elek@example.com) confirming Tuesday."}],
+    messages=[
+        {
+            "role": "user",
+            "content": "Write a short reply to Teszt Elek "
+            "(teszt.elek@example.com) confirming Tuesday.",
+        }
+    ],
 )
 print(reply.choices[0].message.content)
 ```
