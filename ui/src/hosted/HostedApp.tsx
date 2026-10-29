@@ -15,7 +15,9 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
-import { COMPARISON, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, SETS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
+import { COMPARED, COMPARISON, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, RUNS, SETS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
+import AgentReplay from "./AgentReplay";
+import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -26,15 +28,18 @@ const NER_MODEL = "https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base";
 const DOCS = `${SOURCE}/blob/develop/docs`;
 const SELF_HOST = `${SOURCE}#try-it`;
 const MODEL_CARD = `${NER_MODEL}#model-card`;
+const CI = `${SOURCE}/actions/workflows/ci.yml`;
+const HARNESS_REPORT = `${DOCS}/integrations/harness-matrix-2026-10-29.md`;
+// The 3-minute demo video: the slot stays hidden until a URL is configured at build time.
+const DEMO_VIDEO_URL = import.meta.env.VITE_PII_GUARD_DEMO_VIDEO_URL || null;
 
 // Below the fold and heavier than the rest of the page: loaded on demand, so the first paint
 // stays small (Lighthouse, LAB-1466).
 const ImageShowcase = lazy(() => import("./ImageShowcase"));
 const ResultsChart = lazy(() => import("./ResultsChart"));
-const HeroImage = lazy(() => import("./HeroImage"));
 
-// TODO(owner): operator name, privacy notice URL and contact address. Until they are set the
-// footer says they are being finalised; never invent a legal entity here.
+// TODO(owner, LAB-1474): operator name, privacy notice URL and contact address. Until they are
+// set the footer points at the repository's issues; never invent a legal entity here.
 const OPERATOR: string | null = null;
 const PRIVACY_NOTICE_URL: string | null = null;
 const CONTACT_URL: string | null = null;
@@ -146,7 +151,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const counts = shown ? placeholderCounts(shown.masked) : [];
   const legend = new Map<EntityType, number>(counts.filter((c): c is [EntityType, string, number] => c[0] !== null).map(([type, , n]) => [type, n]));
   const masked = counts.reduce((sum, [, , n]) => sum + n, 0);
-  const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: "Live run didn’t finish · showing the worked example" } : { tone: "neutral", text: "Worked example · not a live run" };
+  const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: "Live run didn’t finish · showing the worked example" } : { tone: "neutral", text: "Worked example · written by hand" };
   const heroCta = signedIn ? "Run your own text" : guestLive ? "Run the live demo" : "See how it works";
   // A guest with a live run gets it from the hero in one press (LAB-1479): the link still points
   // at #demo, so without JS, signed in or paused it stays a plain anchor.
@@ -182,30 +187,44 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <div className="min-w-0 space-y-6">
           <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible · Built on Meta models</p>
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
-          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">A privacy gateway for AI agents. Personal data in text and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
+          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base"><span className="text-ink">Legal, HR and finance teams in the EU can’t send case files to a hosted model, so their agents stay off the useful work.</span> PII Guard is a privacy gateway: personal data in text, tool calls and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
           <div className="max-w-2xl space-y-3">
             <dl aria-label="Measured results" className="grid grid-cols-3 gap-3 sm:gap-6">{PROOF.map((p) => <Metric key={p.label} size="hero" label={p.label} value={p.value} hint={p.hint} />)}</dl>
-            <p className="text-xs text-muted">{MEASURED} · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a> · <a className={[link, "whitespace-nowrap"].join(" ")} href={NER_MODEL}>Our NER on Hugging Face ↗</a></p>
+            <p className="text-xs text-muted">{MEASURED} · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
           </div>
           <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
-          <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 border-t border-line pt-5 sm:grid-cols-3">
-            <Differentiator href="#images" title="Images too">Faces are blocked and printed ID details become placeholders before an image is sent.</Differentiator>
-            <Differentiator href="#how" title="No LLM in the masking path">Rules and an open NER fine-tuned from Meta’s XLM-RoBERTa, run on the gateway.</Differentiator>
-            <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
+          <ul aria-label="Proof" className="flex max-w-2xl flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-4 text-xs text-muted">
+            <ProofItem href={HARNESS_REPORT}>Tested with {HARNESS.agents.length} real coding agents</ProofItem>
+            <ProofItem href={`${DOCS}/benchmarks.md#run-log`}>{RUNS.label} committed benchmark runs</ProofItem>
+            <ProofItem href={NER_MODEL}>Published open NER model</ProofItem>
+            <ProofItem href={`${SOURCE}/blob/develop/LICENSE`}>Apache-2.0</ProofItem>
+            <ProofItem href={CI}>CI and tests</ProofItem>
           </ul>
         </div>
-        <MiniFlow model={model} name={language === "hu" ? "Minta Réka" : "Robin Example"} />
+        <AgentReplay />
+      </section>
+
+      <section id="why" aria-labelledby="why-heading" className="scroll-mt-20 space-y-6">
+        <SectionHead id="why-heading" eyebrow="Why PII Guard" title="Made for agents, measured in the open." />
+        <ul aria-label="What makes it different" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 sm:grid-cols-2 lg:grid-cols-5">
+          <Differentiator href="#how" title="Agents, not just chat">Prompts, tool calls and streamed answers. Tested on {HARNESS.agents.join(", ").replace(/, (?=[^,]*$)/, " and ")}: {HARNESS.requests} requests, {HARNESS.leaked} values leaked, {HARNESS.refused} turns refused.</Differentiator>
+          <Differentiator href="#how" title="No LLM, no GPU to mask">Validated rules and our open NER on the CPU: {LATENCY.value} p50 per request. Nothing is sent out to find personal data.</Differentiator>
+          <Differentiator href="#how" title="EU languages, grammar-aware">Hungarian names change with every case; the ending stays outside the placeholder, so the model still writes correct sentences.</Differentiator>
+          <Differentiator href="#images" title="One person, one placeholder">The same placeholder in the text and on a scanned ID: {VISUAL_PLACEHOLDERS.recall}&nbsp;% of image values matched, no false merges.</Differentiator>
+          <Differentiator href="#results" title="Measured in the open">Public test sets, {COMPARED.tools} other tools and {COMPARED.openModels} other open NER models, {RUNS.label} committed runs. Our NER is published.</Differentiator>
+        </ul>
       </section>
 
       <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-20 space-y-4">
         <SectionHead id="demo-heading" eyebrow="Demo" focusable title="See exactly what the model sees." lead={`One request, four steps: your text, what ${modelOr("the model")} sees, its answer, and that answer with the real values back.`} />
+        {DEMO_VIDEO_URL && <DemoVideo url={DEMO_VIDEO_URL} />}
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-end gap-3">
             <div className="basis-full sm:order-last sm:ml-auto sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
             <div className="grid gap-1.5"><p aria-hidden="true" className="text-sm font-medium text-ink">Sample language</p><SegmentedControl label="Sample language" options={LANGUAGES.map((l) => ({ ...l, disabled: running }))} value={language} onChange={(v) => reset(v as Language)} /></div>
             {signedIn && !needsKey && <Field label="Input" className="min-w-36 max-w-56 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">Worked example</option><option value="custom">Your text</option></Select></Field>}
             {canRun && !quota && <Button variant="primary" busy={running} disabled={!running && editable && !text.trim()} onClick={() => void run()}>{running ? "Running…" : failed ? "Try again" : editable ? "Run your text" : "Run live example"}</Button>}
-            {!account && <Button variant="primary" disabled>{accountError ? "Run live example" : "Checking availability…"}</Button>}
+            {!account && accountError && <Button variant="primary" disabled>Run live example</Button>}
             {result && !running && <Button onClick={() => reset()}>Back to the worked example</Button>}
             {canRun && !running && !quota && <p className="w-full text-xs text-muted sm:w-auto sm:self-center">{ownConnection ? <>Runs through your {providerLabel(ownConnection.provider)} connection.{hasConsole && <> <a className={link} href="#connect">Change it in Connect</a></>}</> : <>Runs on {modelOr("Meta’s model")} · no key needed{account && runsLeft(account) && <> · <span className="tabular-nums">{runsLeft(account)}</span></>}</>}</p>}
           </div>
@@ -449,7 +468,7 @@ function SectionHead({ id, eyebrow, title, lead, focusable }: { id: string; eyeb
   </div>;
 }
 
-/** One of the hero's three differences: a short lead that links to the section that shows it. */
+/** One of the five differences: a short lead that links to the section that shows it. */
 function Differentiator({ href, title, children }: { href: string; title: string; children: ReactNode }) {
   return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink underline-offset-4 hover:underline">{title}{"\u00a0"}<span aria-hidden="true" className="text-muted">↓</span></a><span className="mt-0.5 block">{children}</span></li>;
 }
@@ -473,19 +492,12 @@ function Point({ title, children }: { title: string; children: ReactNode }) {
   return <li className="text-muted"><span className="font-medium text-ink">{title}</span> {children}</li>;
 }
 
-/** The hero's picture of the product: one value, there and back. Fictional. Desktop only: phones go straight to the demo. */
-function MiniFlow({ model, name }: { model: string | null; name: string }) {
-  const masked = metaFor("PERSON");
-  return <figure className="hidden min-w-0 space-y-2 lg:block" aria-labelledby="mini-flow-caption">
-    <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back. Below it, a fictional ID card before and after masking: the face is blocked and each ID detail is covered by a box printed with its placeholder.</figcaption>
-    <div aria-hidden="true" className="space-y-2">
-      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You send</p><p className="doc mt-1">Name: <mark className={["rounded-md px-0.5 -mx-0.5 ring-1 ring-inset", masked.mark].join(" ")}>{name}</mark></p></div>
-      <p className="text-center font-mono text-2xs text-guard">↓ PII Guard masks</p>
-      <div className="rounded-xl border border-model/25 bg-model-soft/60 px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-model">{model ?? "The model"} sees</p><p className="doc mt-1">Name: <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" /></p></div>
-      <p className="text-center font-mono text-2xs text-guard">↓ PII Guard restores</p>
-      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You get back</p><p className="doc mt-1">Dear <mark className="rounded-md bg-restored-soft px-0.5 -mx-0.5 text-ink ring-1 ring-restored/45 ring-inset">{name}</mark>, …</p></div>
-      <p className="text-center font-mono text-2xs text-guard">↓ and in images</p>
-      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">Faces blocked · ID details tokenized</p><div className="mt-2"><Suspense fallback={<div className="aspect-[3/1] rounded-md bg-surface-2" />}><HeroImage /></Suspense></div></div>
-    </div>
-  </figure>;
+/** One proof signal under the hero's call to action: a short claim that links to its evidence. */
+function ProofItem({ href, children }: { href: string; children: ReactNode }) {
+  return <li><a className="inline-flex items-center gap-1.5 rounded-sm underline-offset-4 hover:text-ink hover:underline" href={href}><span aria-hidden="true" className="size-1.5 rounded-full bg-guard-dot" />{children}</a></li>;
+}
+
+/** One model in the Meta strip: what it does and where it runs. */
+function MetaModel({ name, where, role }: { name: string; where: string; role: ReactNode }) {
+  return <li className="min-w-0 bg-surface p-4"><h3 className="text-sm font-medium text-ink">{name}</h3><p className="mt-0.5 font-mono text-2xs text-guard">{where}</p><p className="mt-2 text-muted">{role}</p></li>;
 }

@@ -28,7 +28,7 @@ describe("public hosted workflow", () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     const user = userEvent.setup();
     render(<HostedApp call={call} />);
-    expect(screen.getByText("Worked example · not a live run")).toBeInTheDocument();
+    expect(screen.getByText("Worked example · written by hand")).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "Run live example" }));
     await screen.findByText("Live result · answered by test-model");
     expect(call).toHaveBeenCalledWith("/v1/demo", { sample_id: "en-support", language: "en" });
@@ -88,7 +88,7 @@ describe("public hosted workflow", () => {
     render(<HostedApp call={call} />);
     await screen.findByRole("alert");
     expect(screen.getByRole("button", { name: "Run live example" })).toBeDisabled();
-    expect(screen.getByText("Worked example · not a live run")).toBeInTheDocument();
+    expect(screen.getByText("Worked example · written by hand")).toBeInTheDocument();
     expect(screen.getByText("The live service isn’t reachable")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reconnect to API" })).toBeInTheDocument();
   });
@@ -159,7 +159,7 @@ describe("sponsorship off (zero budget until the provider authorises it)", () =>
     render(<HostedApp call={call} />);
     expect(await screen.findByRole("link", { name: "Sign in to run your own text" })).toHaveAttribute("href", account.login_url);
     expect(screen.queryByRole("button", { name: "Run live example" })).not.toBeInTheDocument();
-    expect(screen.getByText("Worked example · not a live run")).toBeInTheDocument();
+    expect(screen.getByText("Worked example · written by hand")).toBeInTheDocument();
     expect(document.querySelector("#demo [data-flow] [data-placeholder]")).toHaveTextContent("[[PERSON_3f9a1c]]");
     expect(screen.queryByText(/No login needed/)).not.toBeInTheDocument();
     expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
@@ -231,8 +231,14 @@ describe("positioning and copy (LAB-1466)", () => {
     expect(screen.getByRole("link", { name: "Run the live demo" })).toHaveAttribute("href", "#demo");
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/sponsor|Llama|GDPR|privacy firewall|Hungarian first|coming soon/i);
-    // The differentiators are named in the hero, and only tools the integration docs test (LAB-1478).
-    expect(screen.getByRole("list", { name: "What makes it different" })).toHaveTextContent(/Images too.*No LLM in the masking path.*Your agent keeps working/);
+    // The differentiators come right after the hero, and only tools the integration docs test (LAB-1478, LAB-1499).
+    expect(screen.getByRole("list", { name: "What makes it different" })).toHaveTextContent(/Agents, not just chat.*Codex, OpenCode, Muse Code and pi: 115 requests, 0 values leaked, 0 of 10 turns refused.*No LLM, no GPU to mask.*EU languages, grammar-aware.*One person, one placeholder.*Measured in the open/);
+    // The problem in one line, and the proof signals under the call to action (LAB-1499).
+    expect(text).toMatch(/Legal, HR and finance teams in the EU can’t send case files to a hosted model/);
+    expect(screen.getByRole("list", { name: "Proof" })).toHaveTextContent(/Tested with 4 real coding agents.*700\+ committed benchmark runs.*Published open NER model.*Apache-2\.0.*CI and tests/);
+    // The Meta strip says what each model does, and Glimmer was the teacher, not a fine-tune.
+    expect(screen.getByRole("list", { name: "Meta models and what each does" })).toHaveTextContent(/XLM-RoBERTa.*Muse Glimmer 30B.*served on Modal.*The teacher.*Muse Spark Open.*on Baseten.*SAM 3\.1.*Muse Spark 1\.3/);
+    expect(text).not.toMatch(/LoRA|being finalised|not a live run|Checking availability/);
     expect(text).not.toMatch(/Claude Code/);
     expect(screen.getByText(/^Next best: PrivAiTe 12\.7\s%$/)).toBeInTheDocument();
   });
