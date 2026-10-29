@@ -12,6 +12,13 @@ an ``ID_DOCUMENT``. This set rebuilds those requests from scratch, in two kinds:
   a tool result or a user prompt does: a ``cat`` of a JSON file, a CSV in a code fence, a name
   in a file name, an IBAN in an export path. These must stay masked (fail closed).
 
+LAB-1482 adds what the real-harness re-run (LAB-1475,
+``docs/integrations/harness-matrix-2026-10-29.md``) still found masked after LAB-1470: Codex's
+``prompt_cache_key`` and ``client_metadata`` (bare UUIDs, a ``*_unix_ms`` timestamp, a JSON
+``false`` inside a JSON string), an OpenCode ``bash`` command (``python3`` at command position)
+and its debug output (``len 89``), and pi's install path (an ``@scope`` under ``node_modules/``).
+Its positives put a phone number, an account number and a name right next to those shapes.
+
 Every value is **fictional** (ADR 0005): names from the language packs' test names, ``example``
 e-mail domains, textbook IBANs, test phone numbers. No tool or company here is a client.
 
@@ -103,9 +110,47 @@ CODE = (
     "  return { name: row.fullName, email: row.emailAddress };\n}\n```"
 )
 
+# LAB-1482: request metadata and commands (Codex 0.163, OpenCode 1.18, pi 1.3). The UUIDs are
+# random v7-shaped ids, the timestamp a 2026 one; the npm scope is made up.
+CODEX_CACHE_KEY = (
+    "prompt_cache_key: 019a3f2e-7b1c-7d40-abc6-3e9f1a2b4c5d\n"
+    "x-codex-window-id: 01934872-5512-7a0c-9e3d-2f4b6a8c0d1e"
+)
+CODEX_TURN_METADATA = (
+    '{"root_turn_id":"01934872-6620-7b1d-8f4e-3a5c7b9d1e2f",'
+    '"turn_id":"01934872-6621-7c2e-9a5f-4b6d8c0e2f3a",'
+    '"turn_started_at_unix_ms":1793228461234,"sandbox":"workspace-write",'
+    '"analytics_enabled":false,"approval_policy":null,"git_dirty":true}'
+)
+CODEX_CLIENT_METADATA = (
+    '{"x-codex-window-id": "019a3f2e-7b1c-7d40-abc6-3e9f1a2b4c5d", '
+    '"x-codex-turn-metadata": "{\\"turn_id\\":\\"01934872-6621-7c2e-9a5f-4b6d8c0e2f3a\\",'
+    '\\"turn_started_at_unix_ms\\":1793228461234,\\"analytics_enabled\\":false}", '
+    '"created_at": 1793228461, "elapsed_ms": 48213}'
+)
+OPENCODE_BASH = (
+    '{"command": "cd /private/tmp/harness-501/opencode-3f2b8c1e/repo && python3 -c '
+    "\\\"import json; d = json.load(open('contacts.json')); print('len', len(d))\\\" "
+    '| head -n 5; node scripts/check.mjs && jq length contacts.json", '
+    '"description": "Count the records"}'
+)
+OPENCODE_DEBUG = (
+    "$ python3 scripts/check.py --verbose\n"
+    "rows len 89\nchecked 89 of 89 (len 89, 0 dropped)\nbuffer len 4096, offset 512\nok"
+)
+PI_INSTALL_PATH = (
+    "Documentation: /opt/homebrew/lib/node_modules/@quillstone-works/pi-coding-agent/"
+    "README.md (examples in /opt/homebrew/lib/node_modules/@quillstone-works/pi-coding-agent/"
+    "examples/extensions/)"
+)
+
 
 def _negatives(prompt: str, edit: str) -> list[str]:
-    return [SYSTEM_OPENCODE, prompt, edit, SKILLS_MUSE, SKILLS_XML, LS_OUTPUT, TOOL_SUMMARY, CODE]
+    return [
+        SYSTEM_OPENCODE, prompt, edit, SKILLS_MUSE, SKILLS_XML, LS_OUTPUT, TOOL_SUMMARY, CODE,
+        CODEX_CACHE_KEY, CODEX_TURN_METADATA, CODEX_CLIENT_METADATA, OPENCODE_BASH,
+        OPENCODE_DEBUG, PI_INSTALL_PATH,
+    ]  # fmt: skip
 
 
 def _positives(lang: str) -> list[str]:
@@ -148,7 +193,28 @@ def _positives(lang: str) -> list[str]:
         "edit_file contacts.json: replace "
         f'`"email": "{E(de_mail)}"` with `"email": "{E(de_mail)}", "verified": true`.'
     )
-    return [prompts[lang], cat_json, csv_fence, export_path, edit_with_value]
+    # LAB-1482: personal values right next to the shapes the new guards rule out.
+    metadata_values = (
+        '{"turn_id":"01934872-6621-7c2e-9a5f-4b6d8c0e2f3a",'
+        '"created_at_unix_ms":1793228461234,"notify":false,'
+        f'"owner":"{P(hu_name)}","callback":"{PH("+36 30 123 4567")}"}}'
+    )
+    uuid_prose = (
+        f"Ticket 019a3f2e-7b1c-7d40-abc6-3e9f1a2b4c5d: call {P(de_name)} on "
+        f"{PH('+49 30 901820')} and refund to {B(IBAN_DE)}."
+    )
+    command_with_name = (
+        f'$ cd repo && python3 send_invoice.py --to "{P(hu_name)}" --phone '
+        f'{PH("+36 30 123 4567")} && git commit --author "{P(de_name)} <{E(de_mail)}>"'
+    )
+    path_with_name = (
+        f"{P(hu_name)} reported a crash in /opt/homebrew/lib/node_modules/@quillstone-works/"
+        f"pi-coding-agent/dist/cli.js; reply to {E(hu_mail)}."
+    )
+    return [
+        prompts[lang], cat_json, csv_fence, export_path, edit_with_value, metadata_values,
+        uuid_prose, command_with_name, path_with_name,
+    ]  # fmt: skip
 
 
 PROMPTS = {

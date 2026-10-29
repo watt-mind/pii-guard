@@ -20,6 +20,14 @@ calls and Codex on its first request. It also reads JavaScript's ``Number.MAX_SA
    number (a schema bound such as ``-9007199254740991``), has no room for a name or an address.
    Hits from the model-based detectors (NER) are dropped there; the rules (phone formats,
    checksummed ids), the LLM detector and known values still apply.
+3. **Whole-id values in masked fields (LAB-1482).** ``prompt_cache_key`` (and ``user``,
+   ``safety_identifier``) and ``metadata`` / ``client_metadata`` values are masked like free
+   text, so a client can put anything there. A value that is exactly a prefixed UUID or hex run
+   (Codex's ``prompt_cache_key`` and ``x-codex-window-id``) gets the same treatment as rule 2:
+   model hits dropped, rules kept. A bare number there is not exempt (a phone number fits), and
+   masking such a key would also change it per session and break the upstream's prompt cache.
+   Bare UUIDs inside longer text are handled by the NER guards
+   (:mod:`pii_guard.detect.ner_context`).
 """
 
 from __future__ import annotations
@@ -34,7 +42,14 @@ if TYPE_CHECKING:
     from pii_guard.gateway.request import TextSlot
     from pii_guard.types import Span
 
-__all__ = ["ID_KEYS", "IssuedIds", "is_opaque_token", "upstream_ids", "without_opaque_ids"]
+__all__ = [
+    "ID_KEYS",
+    "IssuedIds",
+    "is_id_value",
+    "is_opaque_token",
+    "upstream_ids",
+    "without_opaque_ids",
+]
 
 #: The keys whose string values in an upstream answer are ids the client may send back.
 ID_KEYS = frozenset({"id", "call_id"})
@@ -47,6 +62,13 @@ _OPAQUE_TOKEN_RE = re.compile(
     r"|[0-9a-fA-F]{16,128})"
     r"|-?[0-9]{1,40}(?:\.[0-9]{1,40})?(?:[eE][+-]?[0-9]{1,4})?"
 )
+_ID_TOKEN_RE = re.compile(
+    r"(?:[A-Za-z]{1,24}[_-])?"
+    r"(?:(?P<uuid>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+    r"|(?P<hex>[0-9a-fA-F]{16,128}))"
+)
+#: Masked (not identifier) slots whose whole-id values get rule 3.
+ID_VALUE_KINDS = frozenset({"user", "metadata"})
 #: Detectors whose hits in an opaque token are dropped: learned models, which read digit runs as
 #: phone numbers. Rules (checksums, formats) and the LLM detector keep theirs.
 MODEL_DETECTORS = frozenset({"ner", "ner_gliner"})
@@ -128,10 +150,20 @@ def is_opaque_token(text: str) -> bool:
     return _OPAQUE_TOKEN_RE.fullmatch(text) is not None
 
 
+def is_id_value(text: str) -> bool:
+    """``text`` is exactly a prefixed UUID, or a hex run with a hex letter in it (rule 3: a
+    digit-only run may be a card or account number, so it is not exempt)."""
+    match = _ID_TOKEN_RE.fullmatch(text)
+    if match is None:
+        return False
+    return match.group("uuid") is not None or any(ch.isalpha() for ch in match.group("hex"))
+
+
 def without_opaque_ids(
     slots: Sequence[TextSlot], spans: list[list[Span]], issued: frozenset[str]
 ) -> list[list[Span]]:
-    """``spans`` without the hits in identifier slots that are opaque ids (both rules)."""
+    """``spans`` without the hits in identifier slots that are opaque ids (rules 1 and 2), and
+    the model hits in masked user/metadata values that are whole ids (rule 3)."""
     out = []
     for slot, found in zip(slots, spans, strict=True):
         if slot.kind == "identifier" and found:
@@ -139,5 +171,7 @@ def without_opaque_ids(
                 found = []
             elif is_opaque_token(slot.text):
                 found = [s for s in found if s.detector not in MODEL_DETECTORS]
+        elif slot.kind in ID_VALUE_KINDS and found and is_id_value(slot.text):
+            found = [s for s in found if s.detector not in MODEL_DETECTORS]
         out.append(found)
     return out

@@ -1,0 +1,33 @@
+{
+  "detectors": "fast:rules;ner",
+  "files": [
+    "client-letter.md",
+    "customers.csv",
+    "env.fake",
+    "notify.py",
+    "AGENTS.md",
+    "codex.md",
+    "opencode.md",
+    "pi.md",
+    "muse-code.md",
+    "harness-matrix-2026-10-28.md",
+    "operations.md",
+    "service.py",
+    "pi.py"
+  ],
+  "chars": 154494,
+  "masked": 58,
+  "by_kind": {
+    "value": 58
+  },
+  "by_kind_and_type": {
+    "value:ADDRESS": 6,
+    "value:BANK_ACCOUNT": 8,
+    "value:EMAIL": 12,
+    "value:PERSON": 18,
+    "value:PHONE": 8,
+    "value:SECRET": 4,
+    "value:VEHICLE_PLATE": 2
+  },
+  "code_spans": []
+}

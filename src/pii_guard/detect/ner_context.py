@@ -43,6 +43,25 @@ about the words of a language, and drops a hit only when that shape rules person
    hit with an honorific or another name next to it (:func:`pii_guard.detect.ner_orgs`'s
    rules for brands).
 
+6. **Machine tokens (LAB-1482).** Request metadata and commands that coding agents send
+   (``docs/integrations/harness-matrix-2026-10-29.md``):
+
+   - a hit inside a bare UUID (``8-4-4-4-12`` hex, anywhere: Codex's ``prompt_cache_key`` and
+     ``client_metadata`` ids) goes, whatever its type: hex digits and dashes hold no name, and a
+     phone number or an account in one is not the model's to find;
+   - a hit that is exactly a JSON literal (``true``, ``false``, ``null``) in value position
+     (after ``:``, ``=``, ``,`` or ``[``) goes;
+   - a number-like hit that is a whole epoch timestamp (10 digits for seconds, 13 for
+     milliseconds) and the value of a time field (``*_ms``, ``*_at``, ``*_ts``, ``*unix*``,
+     ``*time*``, ``*timestamp*``, ``*epoch*``) goes;
+   - a name-like hit that is a whole lower-case executable name at command position (after
+     ``&&``, ``||``, ``|``, ``;``, ``$(``, a ``$`` prompt, ``sudo``/``env``/``exec``/``xargs``,
+     or first in a ``"command"`` value: ``python3``, ``node``) goes; a name in an argument
+     (``--to "Kovács Réka"``) is not at command position and stays;
+   - a ``PERSON`` or ``ORGANIZATION`` hit with no letter in it (``89`` in ``len 89``) goes;
+   - in a path, a name-like hit in the package segment right after ``node_modules/`` (or in its
+     ``@scope`` segment and the package after it) goes: those are npm package names.
+
 Fail closed: anything else passes untouched. The rules, the LLM detector and the values a
 client pre-loaded (known values) are not checked here: they are validated or explicit.
 
@@ -125,6 +144,30 @@ _SNAKE_RE = re.compile(r"^_*[a-z0-9]+(?:_+[a-z0-9]+)+_*$")
 _CAMEL_RE = re.compile(r"[a-z0-9][A-Z]")
 _FENCE_RE = re.compile(r"^[ \t]*(?:`{3,}|~{3,})[ \t]*([^\s`]+)", re.MULTILINE)
 _PACKAGE_SCOPE_RE = re.compile(r"^@[\w.-]+/[\w.-]")
+_UUID_RE = re.compile(
+    r"(?<![0-9A-Fa-f])[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"
+    r"(?![0-9A-Fa-f])"
+)
+_JSON_LITERALS = frozenset({"true", "false", "null"})
+# Before a JSON value: ``:``, ``=``, ``,`` or ``[`` (and spaces); after it: an end of value.
+_LITERAL_BEFORE = frozenset(":=,[")
+_LITERAL_AFTER = frozenset(",}]\\\"' \t\r\n")
+# The key of the value the text ends in: ``"turn_started_at_unix_ms":`` or ``created_at=``
+# (quotes may be JSON-escaped).
+_KEY_BEFORE_RE = re.compile(r"([A-Za-z0-9_.-]{1,64})[\\\"']*[ \t]*[:=][ \t]*[\\\"']*$")
+_TIME_KEY_RE = re.compile(
+    r"(?:^|[_.-])(?:ms|millis|at|ts|time|timestamp|epoch)$|unix|timestamp|epoch", re.IGNORECASE
+)
+# Epoch seconds (2001-09 .. 2286) and milliseconds over the same range.
+_EPOCH_RE = re.compile(r"^(?:[1-9][0-9]{9}|[1-9][0-9]{12})$")
+_EXECUTABLE_RE = re.compile(r"^[a-z][a-z0-9._+-]{0,39}$")
+# What puts the next word at command position in a shell command.
+_COMMAND_BEFORE_RE = re.compile(
+    r"(?:&&|\|\||[|;]|\$\(|(?:^|\n)[ \t]*\$)[ \t]*$"
+    r"|(?<![\w-])(?:sudo|env|exec|xargs|nohup)[ \t]+$"
+    r"|[\\\"']?(?:command|cmd)[\\\"']?[ \t]*:[ \t]*[\\]?[\"'][ \t]*$"
+)
+_NODE_MODULES_RE = re.compile(r"(?:^|[/\\])node_modules[/\\](?:@[^/\\]+[/\\])?$")
 _SPELLED_AT_RE = re.compile(r"(?<!\w)(?:at|ät|kukac)(?!\w)", re.IGNORECASE)
 _SPELLED_DOT_RE = re.compile(r"(?<!\w)(?:dot|pont|punkt)(?!\w)", re.IGNORECASE)
 # A list separator between two names: punctuation, or one coordinating conjunction of the
@@ -358,6 +401,50 @@ def _software_context(
     )
 
 
+def _in_uuid(text: str, start: int, end: int) -> bool:
+    """``[start, end)`` lies inside a bare UUID."""
+    lo = max(0, start - 36)
+    for match in _UUID_RE.finditer(text, lo, min(len(text), end + 36)):
+        if match.start() <= start and end <= match.end():
+            return True
+    return False
+
+
+def _json_literal(text: str, start: int, end: int) -> bool:
+    """The hit is exactly ``true``/``false``/``null`` in a JSON (or ``key=value``) value slot."""
+    if text[start:end] not in _JSON_LITERALS:
+        return False
+    before = text[:start].rstrip(" \t\\\"'")
+    if not before or before[-1] not in _LITERAL_BEFORE:
+        return False
+    return end == len(text) or text[end] in _LITERAL_AFTER
+
+
+def _epoch_in_time_field(text: str, start: int, end: int) -> bool:
+    """The hit is a whole epoch timestamp and the value of a time-named field."""
+    value = text[start:end]
+    if not _EPOCH_RE.match(value):
+        return False
+    if (start > 0 and text[start - 1].isdigit()) or (end < len(text) and text[end].isdigit()):
+        return False
+    key = _KEY_BEFORE_RE.search(text[max(0, start - 80) : start])
+    return key is not None and _TIME_KEY_RE.search(key.group(1)) is not None
+
+
+def _executable_at_command_position(text: str, start: int, end: int) -> bool:
+    """A whole lower-case word in command position of a shell command (``&& python3 -c``)."""
+    if not _EXECUTABLE_RE.match(text[start:end]):
+        return False
+    if end < len(text) and not (text[end].isspace() or text[end] in "\"'\\);&|"):
+        return False
+    return _COMMAND_BEFORE_RE.search(text[max(0, start - 40) : start]) is not None
+
+
+def _npm_package_segment(text: str, ts: int, ss: int) -> bool:
+    """The path segment starting at ``ss`` is a package (or its scope) under node_modules."""
+    return _NODE_MODULES_RE.search(text[ts:ss]) is not None
+
+
 def _vetoed(
     text: str,
     start: int,
@@ -369,6 +456,16 @@ def _vetoed(
     if entity_type is EntityType.EMAIL and not _email_ok(text, start, end):
         return True
     if _fence_info(text, start, end):
+        return True
+    if _in_uuid(text, start, end) or _json_literal(text, start, end):
+        return True
+    if entity_type in _NUMBER_LIKE and _epoch_in_time_field(text, start, end):
+        return True
+    if entity_type in _NAME_LIKE and _executable_at_command_position(text, start, end):
+        return True
+    if entity_type in (EntityType.PERSON, EntityType.ORGANIZATION) and not any(
+        ch.isalpha() for ch in text[start:end]
+    ):
         return True
     ts, te = _token(text, start, end)
     token = text[ts:te]
@@ -382,7 +479,7 @@ def _vetoed(
             return True
         if entity_type in _NAME_LIKE and path:
             ss, se = _segment(text, ts, te, start, end)
-            if any(ch.isdigit() for ch in text[ss:se]):
+            if any(ch.isdigit() for ch in text[ss:se]) or _npm_package_segment(text, ts, ss):
                 return True
     if entity_type in _NAME_LIKE or entity_type is EntityType.EMAIL:
         if _code_identifier(text, start, end):
