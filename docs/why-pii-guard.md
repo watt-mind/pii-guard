@@ -32,7 +32,7 @@ README's "Why PII Guard" section, in [submission.md](submission.md) and in
 | 10 | [Hungarian depth as a showcase for hard languages](#10-hungarian-depth-as-a-showcase-for-hard-languages) | names inside company names 61.1 % → 0 % leaked | shipped |
 | 11 | [Add a language with a checklist](#11-add-a-language-with-a-checklist) | German pack: every structured identifier found, other languages unchanged | shipped |
 | 12 | [Known values and per-type policies](#12-known-values-and-per-type-policies) | pre-loaded values: leak 93.3 % → 0 % | shipped |
-| 13 | [Benchmarking in the open](#13-benchmarking-in-the-open) | every run a committed record, report checked in CI, spend itemised | shipped |
+| 13 | [Benchmarking in the open](#13-benchmarking-in-the-open) | every run a committed record, report checked in CI, spend itemized | shipped |
 
 ## 1. Reversible placeholders, consistent for a whole session
 
@@ -78,7 +78,7 @@ so every detector benefits.
   ([run record](../eval/results/runs/2026-10-28-lab-1355-inflection-fast.json)). Of the 5
   misses, 3 are names whose surname the NER left unmasked in every form
   (`Próba [[PERSON_x]]nak`), 1 is a name not masked at all, and 1 is an all-caps mention
-  (`PRÓBA [[PERSON_y]]`) that got a different placeholder from the inflected one. The behaviour is pinned by property tests
+  (`PRÓBA [[PERSON_y]]`) that got a different placeholder from the inflected one. The behavior is pinned by property tests
   ([tests/vault/test_vault_inflection_hu.py](../tests/vault/test_vault_inflection_hu.py)).
 - **Status:** shipped (LAB-1115). Old-orthography names with `th` and `cz` (`Kiss Tóthtal`,
   `Gipsz Kováczcal`) and long vowels the model writes on its own are masked and restored too (LAB-1131,
@@ -103,7 +103,7 @@ masked data** ([models.md](models.md)).
 | Downstream model in the demo | **Muse Spark 1.3** | Only ever sees placeholders | [gateway usage](architecture-gateway.md#from-python) | shipped |
 
 The pattern: use the big model where its cost doesn't matter (writing fictional data,
-labelling it, attacking the guard) and ship a small, fast model distilled from it.
+labeling it, attacking the guard) and ship a small, fast model distilled from it.
 
 - **Status:** shipped (LAB-1086, LAB-1087, LAB-1089, LAB-1108, LAB-1121, LAB-1128, LAB-1306);
   the Glimmer LoRA fine-tune is blocked (LAB-1109) and is not part of the shipped path.
@@ -205,12 +205,12 @@ homoglyphs, base64, spoofed placeholders, long padding and more).
   ([eval/results/2026-10-27-injection](../eval/results/2026-10-27-injection/README.md),
   run records [run 1](../eval/results/runs/2026-10-27-injection-spark-open-run1.json),
   [run 2](../eval/results/runs/2026-10-27-injection-spark-open-run2.json)).
-- **Then the partial leaks:** 3 values (zero-width characters inside e-mail addresses) were
+- **Then the partial leaks:** 3 values (zero-width characters inside email addresses) were
   masked only in part, because only the LLM detector cleaned invisible characters. Now every
-  detector sees normalised text and all 175 injection values are masked whole: partial leak
+  detector sees normalized text and all 175 injection values are masked whole: partial leak
   1.7 % → **0.0 %**
   ([run record](../eval/results/runs/2026-10-27-injection-spark-open-after-normalise.json),
-  [journey.md, milestone 20](journey.md#20-every-detector-sees-normalised-text-2026-10-27)).
+  [journey.md, milestone 20](journey.md#20-every-detector-sees-normalized-text-2026-10-27)).
 - **Status:** shipped (LAB-1107, LAB-1146).
 
 ## 7. Honest about re-identification
@@ -227,8 +227,8 @@ value and four decoys), on 81 fictional documents in Hungarian, English and Germ
 - **Evidence:** [eval/results/2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md).
 - **What we conclude:** placeholders hold against reconstruction from the text alone, but
   someone who already holds a short candidate list links a document to the right person about
-  twice as often as chance. PII Guard is **pseudonymisation, not anonymisation**, and the docs
-  say so ([privacy-model.md](privacy-model.md)). Generalising the remaining context is filed
+  twice as often as chance. PII Guard is **pseudonymization, not anonymization**, and the docs
+  say so ([privacy-model.md](privacy-model.md)). Generalizing the remaining context is filed
   (LAB-1152, triage).
 - **Status:** shipped (LAB-1088).
 
@@ -263,7 +263,7 @@ regions and strips metadata before the image goes anywhere.
 | 65 official specimen ID documents, 24 countries | **90.8 %** | 83.8 % | 0 % → **76.7 %** (80.0 % with the LLM detector) | 1.5 % → **15.0 %** (29.2 % with the LLM detector) | [specimens.md](../eval/results/visual/specimens.md), [captions](../eval/results/visual/specimens-captions.md), [benchmarks.md](benchmarks.md#image-masking) |
 | 24 fictional specimens painted with Muse Image | **100 %** | **100 %** | 0 % → **100 %** | 34.5 % → **87.3 %** (99.1 % with the LLM detector) | [fictional.md](../eval/results/visual/fictional.md), [captions](../eval/results/visual/fictional-captions.md), same page |
 
-Recall is the share of labelled regions masked with IoU ≥ 0.5. MRZ: [tests/visual/test_mrz.py](../tests/visual/test_mrz.py),
+Recall is the share of labeled regions masked with IoU ≥ 0.5. MRZ: [tests/visual/test_mrz.py](../tests/visual/test_mrz.py),
 [journey.md, milestone 18](journey.md#18-machine-readable-zones-masked-by-their-layout-2026-10-27).
 
 - **Text on IDs (LAB-1125, shipped):** a value next to a known caption (`Családi név /
@@ -279,11 +279,11 @@ Recall is the share of labelled regions masked with IoU ≥ 0.5. MRZ: [tests/vis
   the over-masking. All systems, with run conditions:
   [image baselines](../eval/results/2026-10-27-image-baselines/README.md),
   [journey.md, milestone 26](journey.md#26-image-masking-against-presidio-image-redactor-and-eka-2026-10-27).
-- **Labelled images (LAB-1156, shipped):** each masked region carries the session's own
+- **Labeled images (LAB-1156, shipped):** each masked region carries the session's own
   placeholder (`PHOTO · [[PERSON_a1b2]]`) and the image comes back with a masked transcript
   that shares the text vault, so an assistant can answer "which parties have an ID on file?"
   without seeing a real value. The demo question was answered right for 3 of 3 parties with
-  labelled images and 1 of 3 with black boxes; fuzzy matching puts the text's placeholder on
+  labeled images and 1 of 3 with black boxes; fuzzy matching puts the text's placeholder on
   50 of 51 printed values with clean OCR (96.1 % with simulated OCR noise;
   [journey.md, milestone 27](journey.md#27-images-that-say-whose-data-they-hid-2026-10-27)).
   As far as we found in a survey on 2026-10-27, no open-source tool shares placeholders
@@ -297,7 +297,7 @@ Hungarian is a hard case: rich morphology, family name first, and identifiers th
 ordinary numbers. Getting it right shows what a language pack can carry.
 
 - **Checksum-validated identifiers:** tax and TAJ numbers, the personal identification number,
-  ID card, passport and licence numbers, TD1/TD3 MRZ with ICAO check digits, IBAN and giro
+  ID card, passport and license numbers, TD1/TD3 MRZ with ICAO check digits, IBAN and giro
   accounts, company registration numbers. `ID_DOCUMENT` leaks 10 → 0 and land-registry parcel
   numbers 6 → 0 on `hu-smoke`, rules only, no new false positives
   ([evaluation.md](evaluation.md#id-documents-and-parcel-numbers)).
@@ -319,7 +319,7 @@ forms, lexicons), discovered through an entry point, so it can ship as a separat
 conformance suite that says what is missing and gates round trip and precision.
 
 - **Evidence:** the German pack, added through this path: every structured identifier on the
-  German smoke set found (addresses, e-mails, phones, Steuer-IDs, social security numbers,
+  German smoke set found (addresses, emails, phones, Steuer-IDs, social security numbers,
   IBANs), rules precision 100 %, round trip 100 %, Hungarian and English scorecards unchanged
   ([languages.md, "German smoke results"](languages.md#german-smoke-results),
   [tests/languages/test_conformance.py](../tests/languages/test_conformance.py),
@@ -330,7 +330,7 @@ conformance suite that says what is missing and gates round trip and precision.
 
 An application that already knows the client's name or an internal case number can pre-load
 it into the session; it is then masked in every inflected form, with no model. Each entity type
-has a policy: **mask**, **keep** (organisations stay readable by default, so the model can still
+has a policy: **mask**, **keep** (organizations stay readable by default, so the model can still
 reason about who is who) or **block** (refuse the request).
 
 - **Evidence:** on the known-values fixtures with rules only, leak 93.3 % → **0 %**, overlap
@@ -353,7 +353,7 @@ hand-written ones because the generated ones flatter a Muse-based detector.
   [benchmarks.md](benchmarks.md) generated by `pii-guard eval report`; `pii-guard eval report
   --check` runs on every pull request ([ci.yml](../.github/workflows/ci.yml)). How the numbers
   moved, milestone by milestone, with what each step cost:
-  [journey.md](journey.md). Its [spend table](journey.md#spend-so-far) itemises about $22 of
+  [journey.md](journey.md). Its [spend table](journey.md#spend-so-far) itemizes about $22 of
   compute as of 2026-10-27, not counting the $2.92 of the NER v2.1 retrain (LAB-1306) or
   early unmetered calls.
 - **Status:** shipped (LAB-1129, LAB-1141).

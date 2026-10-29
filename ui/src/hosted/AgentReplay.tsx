@@ -67,9 +67,12 @@ function Sized({ final, children }: { final: ReactNode; children: ReactNode }) {
   </div>;
 }
 
-/** One line of the transcript: who, then what, on your side (plain) or the model's (tinted). */
+/**
+ * One line of the transcript: who, then what, on your side (plain) or the model's (tinted). A line
+ * slides in rather than fading: text never sits at a partial opacity that fails contrast (L4 carryover 9).
+ */
 function Line({ side, label, shown, children }: { side: "you" | "model"; label: string; shown: boolean; children: ReactNode }) {
-  return <li className={["grid grid-cols-[5.25rem_minmax(0,1fr)] gap-3 rounded-md px-2.5 py-1.5 transition-opacity duration-300", side === "model" ? "bg-model-soft/60" : "", shown ? "opacity-100" : "opacity-0"].join(" ")}>
+  return <li className={["grid grid-cols-[5.25rem_minmax(0,1fr)] gap-3 rounded-md px-2.5 py-1.5 transition-transform duration-300 ease-out", side === "model" ? "bg-model-soft/60" : "", shown ? "visible translate-y-0" : "invisible translate-y-1"].join(" ")}>
     <span className={["pt-px font-mono text-2xs", side === "model" ? "text-model" : "text-guard"].join(" ")}>{label}</span>
     {children}
   </li>;
@@ -121,13 +124,13 @@ export default function AgentReplay() {
   return <figure ref={root} aria-labelledby="replay-title" className="min-w-0 rounded-xl border border-line bg-surface p-4 sm:p-5">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="font-mono text-2xs text-guard">Real gateway · stand-in model · fictional data</p>
+        <p className="font-mono text-2xs text-guard">Real gateway · scripted model · fictional data</p>
         <p id="replay-title" className="mt-0.5 text-sm font-medium text-ink">Tool calls masked, answers restored mid-stream</p>
       </div>
       {!reduce && <Button size="sm" onClick={onControl} aria-label={`${control} the replay`}>{control}</Button>}
     </div>
     <figcaption className="sr-only">
-      {`A recorded agent turn through the PII Guard gateway, with a scripted stand-in model and fictional data. The agent is asked: ${recording.task} The model calls read_file on crm.json. The file holds a fictional customer's name, e-mail and IBAN; the model receives placeholders instead. The model streams a send_email tool call addressed to placeholders, and PII Guard restores the real e-mail and name in the arguments before the agent runs the tool. The model's closing message streams back with placeholders split across chunks; PII Guard holds each split placeholder back until it is complete, then restores it. ${recording.upstream_requests} model requests, no fictional value reached the model.`}
+      {`A recorded agent turn through the PII Guard gateway, with a scripted model and fictional data. The agent is asked: ${recording.task} The model calls read_file on crm.json. The file holds a fictional customer's name, email and IBAN; the model receives placeholders instead. The model streams a send_email tool call addressed to placeholders, and PII Guard restores the real email and name in the arguments before the agent runs the tool. The model's closing message streams back with placeholders split across chunks; PII Guard holds each split placeholder back until it is complete, then restores it. ${recording.upstream_requests} model requests, no fictional value reached the model.`}
     </figcaption>
     <ol aria-hidden="true" className="mt-4 space-y-1">
       <Line side="you" label="task" shown={step >= 1}><Sized final={recording.task}>{recording.task}</Sized></Line>
@@ -140,7 +143,7 @@ export default function AgentReplay() {
       <Line side="you" label="agent sees" shown={step >= ANSWER_FROM}><Sized final={<Valued text={answerFinal} values={values} />}><Valued text={answer.agent} values={values} /></Sized></Line>
     </ol>
     <div className="mt-3 flex min-h-5 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-2xs text-muted sm:text-xs">
-      <p aria-hidden="true" className={["inline-flex items-center gap-1.5 transition-opacity", holding ? "opacity-100" : "opacity-0"].join(" ")}><span className="size-1.5 rounded-full bg-guard-dot motion-safe:animate-pulse" />Holding a split placeholder until it’s complete</p>
+      <p aria-hidden="true" className={["inline-flex items-center gap-1.5", holding ? "visible" : "invisible"].join(" ")}><span className="size-1.5 rounded-full bg-guard-dot motion-safe:animate-pulse" />Holding a split placeholder until it’s complete</p>
       <p className="tabular-nums">{recording.upstream_requests} model requests · 0 values reached the model</p>
     </div>
   </figure>;

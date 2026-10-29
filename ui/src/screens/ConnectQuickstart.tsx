@@ -256,7 +256,7 @@ function FirstRequestStep({
   const noNames =
     ner === false ? (
       <p role="note" className="text-xs text-warn">
-        This server runs rules only: e-mail addresses, phone numbers and IBANs are masked, free-text names are not (they reach the model as written). Install the ner extra to mask names.
+        This server runs rules only: email addresses, phone numbers and IBANs are masked, free-text names are not (they reach the model as written). Install the ner extra to mask names.
       </p>
     ) : null;
   if (!snippets.session_ref || !traffic || traffic.source !== "api" || traffic.status.state === "disabled") {
@@ -308,7 +308,7 @@ function FirstRequestStep({
         )}
       </p>
       <p className="text-xs text-muted">
-        {ok && masked === 0 ? "Nothing personal in that one: try a prompt with a fictional name or e-mail address. " : null}
+        {ok && masked === 0 ? "Nothing personal in that one: try a prompt with a fictional name or email address. " : null}
         Every later call in this session shows up in Logs too.
       </p>
       {noNames}

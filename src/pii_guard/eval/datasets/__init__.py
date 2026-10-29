@@ -11,13 +11,16 @@ pii-guard eval datasets ...                            # the same
 
 One module per dataset declares its source (URL, pinned revision, file SHA-256), licence,
 languages, label mapping and split (:class:`~pii_guard.eval.datasets.spec.Dataset`). How to add
-one, the licence table and the split policy are in ``docs/datasets.md``.
+one, the licence table and the split policy are in ``docs/datasets.md``. A ``<set>-corrected``
+entry is the same documents with committed gold corrections
+(:mod:`~pii_guard.eval.datasets.corrections`); the base set keeps the upstream labels.
 """
 
 from __future__ import annotations
 
 from pii_guard.eval.datasets import (
     cee,
+    corrections,
     gretel,
     mapa,
     nemotron,
@@ -36,6 +39,7 @@ REGISTRY: dict[str, Dataset] = {
     for ds in (
         openpii.DATASET,
         gretel.DATASET,
+        corrections.corrected(gretel.DATASET, "eval/datasets/gretel-finance/corrections.json"),
         nemotron.DATASET,
         cee.DATASET,
         tab.DATASET,
@@ -55,8 +59,12 @@ def get(name: str) -> Dataset:
 
 
 def test_datasets() -> list[Dataset]:
-    """The held-out sets: what the headline numbers may come from."""
-    return [ds for ds in REGISTRY.values() if ds.split == "test"]
+    """The held-out sets: what the headline numbers may come from.
+
+    A corrected-label variant (``derived_from``) has the same documents as its base set, so it
+    is not listed again.
+    """
+    return [ds for ds in REGISTRY.values() if ds.split == "test" and ds.derived_from is None]
 
 
 test_datasets.__test__ = False  # type: ignore[attr-defined]  # not a pytest test

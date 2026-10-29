@@ -13,11 +13,14 @@ interface Props {
   className?: string;
   /** Cap the body's height and scroll it (Logs' request and response panes). */
   scroll?: boolean;
+  /** 3 inside a page section that has its own h2 (the landing); 2 on a console screen. */
+  headingLevel?: 2 | 3;
 }
 
 /** A document pane. `side` says which side of the guard boundary its content lives on. */
-export function Pane({ side, eyebrow, title, id, actions, footer, children, className = "", scroll = false }: Props) {
+export function Pane({ side, eyebrow, title, id, actions, footer, children, className = "", scroll = false, headingLevel = 2 }: Props) {
   const headingId = id ? `${id}-title` : undefined;
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   return (
     <section
       aria-labelledby={headingId}
@@ -44,9 +47,9 @@ export function Pane({ side, eyebrow, title, id, actions, footer, children, clas
             <SideIcon side={side} />
             {eyebrow}
           </p>
-          <h2 id={headingId} className="mt-0.5 text-lg font-normal text-balance text-ink">
+          <Heading id={headingId} className="mt-0.5 text-lg font-normal text-balance text-ink">
             {title}
-          </h2>
+          </Heading>
         </div>
         {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
       </header>

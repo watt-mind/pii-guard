@@ -174,7 +174,6 @@ class ResponsesSseRestorer:
         self._on_ids = on_ids
         # One budget for every event of the stream (LAB-1350).
         self._budget = session.restore_budget()
-        self._json_session = JsonEscapingSession(session, self._budget)
         self._tool_session = ToolInputSession(session, self._budget)
         self._unmaskers: dict[tuple[Any, ...], StreamUnmasker] = {}
         #: The last delta event of each stream: the template for a flushed remainder.
@@ -204,9 +203,11 @@ class ResponsesSseRestorer:
     def _unmasker(self, key: tuple[Any, ...], kind: str) -> StreamUnmasker:
         unmasker = self._unmaskers.get(key)
         if unmasker is None:
-            session: Any = {"json": self._json_session, "tool": self._tool_session}.get(
-                kind, self._session
-            )
+            # A JSON adapter tracks where it is in the arguments, so one per stream (LAB-1483).
+            session: Any = {
+                "json": JsonEscapingSession(self._session, self._budget),
+                "tool": self._tool_session,
+            }.get(kind, self._session)
             unmasker = StreamUnmasker(session, self._budget)
             self._unmaskers[key] = unmasker
         return unmasker

@@ -30,7 +30,7 @@ lands twice or once.
 *projection* (which fields an owner may see) or a *scope* (whose runtime and whose projects),
 never a second handler. A projection is an explicit allow-list of fields next to the route, so
 a new field is hidden from hosted owners until someone decides otherwise. Hosted-only
-behaviour that is not a projection (identity, admission, quotas, runtimes) stays in
+behavior that is not a projection (identity, admission, quotas, runtimes) stays in
 `pii_guard.hosted`.
 
 **Server-declared capabilities.** `GET /v1/status` returns `capabilities` in both modes: a

@@ -6,6 +6,7 @@ import fixture from "../content/trafficFixture.json";
 import { parseTrafficEvent, type TrafficConnectOptions, type TrafficEvent, type TrafficStatus } from "../api/traffic";
 import { Traffic } from "./Traffic";
 import { setSelectedEndpoint, setSelectedProject } from "../projects/selection";
+import { HostedSessionContext, type HostedSession } from "../hosted/session";
 
 const recorded = (full.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
 const [huChat, huStream, deTools, refused] = recorded as [TrafficEvent, TrafficEvent, TrafficEvent, TrafficEvent];
@@ -75,7 +76,7 @@ describe("Live traffic", () => {
     const list = await screen.findByTestId("call-list");
     expect(within(list).getAllByText(/needs NER/)).toHaveLength(2); // the tag and the row summary
     expect(within(list).getByText("1 name reached the model: expected, needs NER")).toBeInTheDocument();
-    expect(within(list).getByTitle(/labelled “needs fast mode \(NER\)”: in rules-only mode its name is an expected miss/)).toBeInTheDocument();
+    expect(within(list).getByTitle(/labeled “needs fast mode \(NER\)”: in rules-only mode its name is an expected miss/)).toBeInTheDocument();
     const note = within(screen.getByRole("region", { name: /Call at/ })).getByRole("note");
     expect(note).toHaveTextContent("Demo scenario hu-needs-ner: needs fast mode (NER). Expected miss in rules-only mode.");
     expect(note).toHaveTextContent("Gipsz Jakab");
@@ -235,6 +236,16 @@ describe("Live traffic", () => {
     f.status({ state: "denied", reason: "forbidden", message: "denied" });
     expect(await screen.findByText("This account can't read this traffic log.")).toBeInTheDocument();
     expect(screen.queryByText(/isn't reachable|Lost the connection/)).toBeNull();
+  });
+
+  it("hosted: a 401 in the console says the session ended (LAB-1519)", async () => {
+    const f = fakeConnect();
+    const session = { account: {}, error: "", refresh: async () => {}, call: vi.fn() } as unknown as HostedSession;
+    render(<HostedSessionContext.Provider value={session}><Traffic connect={f.connect} pageHost="guard.example" fixtureIntervalMs={60_000} /></HostedSessionContext.Provider>);
+    f.status({ state: "denied", reason: "signed_out", message: "Sign in" });
+    expect(await screen.findByText("Your session ended.")).toBeInTheDocument();
+    expect(screen.queryByText("You're signed out.")).toBeNull();
+    expect(screen.queryByText(/answered 401/)).toBeNull();
   });
 
   it("plays the recorded traffic once, and Replay again never inflates the counters (LAB-1200)", async () => {

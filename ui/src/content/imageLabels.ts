@@ -5,8 +5,10 @@
 // placeholders, regions, the masked transcript and summary, and the masked answer.
 
 import recording from "./imageLabelsRecording.json";
+import recordingEn from "./imageLabelsRecording.en.json";
 import type { ImageAnalysis, TypeCount } from "../api/types";
 import type { LabelledRegion } from "../lib/imageRegions";
+import { LANDING_IMAGE_SAMPLES, type ImageSample } from "./imageSamples";
 
 export interface ImageLabelsRecording {
   recorded: string;
@@ -33,3 +35,24 @@ export const IMAGE_LABELS = recording as unknown as ImageLabelsRecording;
  * the sample's alt text); keep it in step with MESSAGE in scripts/record_image_labels.py.
  */
 export const IMAGE_LABELS_MESSAGE = "Fiktív Mária is the seller. Is her ID card attached, and is it still valid?";
+
+/** The English specimen's recording (LAB-1509), the landing's default; same script, `--sample en`. */
+export const IMAGE_LABELS_EN = recordingEn as unknown as ImageLabelsRecording;
+/** Its message; keep in step with SAMPLES["en"] in scripts/record_image_labels.py. */
+export const IMAGE_LABELS_MESSAGE_EN = "Jane Placeholder is the seller. Is her ID card attached, and is it still valid?";
+
+/** One card of the landing's image showcase: the sample, its recording and the message. */
+export interface ShowcaseCard {
+  sample: ImageSample;
+  recording: ImageLabelsRecording;
+  message: string;
+  /** What the masked card's alt text adds about this recording's covers. */
+  maskedNote?: string;
+}
+
+/** The landing's showcase cards, in `LANDING_IMAGE_SAMPLES` order: English first, the default. */
+export const SHOWCASE: readonly ShowcaseCard[] = LANDING_IMAGE_SAMPLES.map((sample) =>
+  sample.language === "en"
+    ? { sample, recording: IMAGE_LABELS_EN, message: IMAGE_LABELS_MESSAGE_EN }
+    : { sample, recording: IMAGE_LABELS, message: IMAGE_LABELS_MESSAGE, maskedNote: " The photo cover clips the expiry's first digit and also covers the signature." },
+);

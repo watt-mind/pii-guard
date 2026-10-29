@@ -1,50 +1,41 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Boundary } from "../components/Boundary";
 import { MaskedText } from "../components/MaskedText";
 import { Pane } from "../components/Pane";
 import { RestoredText } from "../components/RestoredText";
-import { Metric } from "../components/ui";
-import { IMAGE_LABELS, IMAGE_LABELS_MESSAGE } from "../content/imageLabels";
-import { DEFAULT_IMAGE_SAMPLE } from "../content/imageSamples";
+import { Metric, SegmentedControl } from "../components/ui";
+import { SHOWCASE, type ShowcaseCard } from "../content/imageLabels";
 import { metaFor } from "../lib/entities";
-import { legendRows, MASK_PADDING, percentBox, regionColor, tint } from "../lib/imageRegions";
+import { legendRows, MASK_PADDING, percentBox, regionColor, tint, zoomBox } from "../lib/imageRegions";
 import { alignLoose, placeholderRegex } from "../lib/placeholders";
 import { YourText } from "./Highlight";
 import { LabelledCovers } from "./LabelledCovers";
 import { restoredSegments } from "./landing";
 
 /*
- * The landing's image showcase (LAB-1466, labels render LAB-1484), loaded on demand. The
- * fictional specimen ID card and a message naming its holder, masked in one vault session by
- * the real API with the hosted preview's setup (src/content/imageLabelsRecording.json): each
- * printed value is covered by a box carrying its placeholder, the photo and face are covered
- * solid, and the masked transcript and summary go with the image. The model's answer comes
- * back with the real name. Kept regions are outlined in --region-kept, as on the console's
- * Images screen; signatures and stamps are kept, as on the hosted preview (ADR 0014).
+ * The landing's image showcase (LAB-1466, labels render LAB-1484, English specimen LAB-1509),
+ * loaded on demand. A fictional specimen ID card and a message naming its holder, masked in one
+ * vault session by the real API with the hosted preview's setup (src/content/imageLabels*.json):
+ * each printed value is covered by a box carrying its placeholder, the photo and face are covered
+ * solid, and the masked transcript and summary go with the image. The model's answer comes back
+ * with the real name. Kept regions are outlined in --region-kept, as on the console's Images
+ * screen; signatures and stamps are kept, as on the hosted preview (ADR 0014). The English card
+ * is the default; the Hungarian one is a click away.
  */
 
-const sample = DEFAULT_IMAGE_SAMPLE;
-const { image, message, answer, recorded } = IMAGE_LABELS;
-const regions = image.regions;
-const masked = regions.filter((r) => r.policy === "mask");
-const tokenized = masked.filter((r) => r.source === "ocr" && r.placeholder);
-const summary = image.summary as { document_type?: string; holder?: string; document_number?: string; expired?: boolean };
-
 /** The answer with each placeholder put back, from the message's own values (as /v1/unmask does). */
-function restore(text: string): string {
+function restore(text: string, masked: string, message: string): string {
   const values = new Map<string, string>();
-  for (const s of alignLoose(message.masked, IMAGE_LABELS_MESSAGE) ?? []) if (s.kind === "restored") values.set(s.placeholder, s.text);
+  for (const s of alignLoose(masked, message) ?? []) if (s.kind === "restored") values.set(s.placeholder, s.text);
   return text.replace(placeholderRegex(), (p) => values.get(p) ?? p);
 }
 
-const restored = restore(answer.masked);
-const day = new Date(`${recorded}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-
-function Figure({ alt, compact = false, children }: { alt: string; compact?: boolean; children?: ReactNode }) {
+function Figure({ card, alt, compact = false, children }: { card: ShowcaseCard; alt: string; compact?: boolean; children?: ReactNode }) {
+  const { image } = card.recording;
   return (
     <div className="flex justify-center rounded-lg bg-surface-2 p-2 ring-1 ring-line">
       <div className={["@container relative w-full max-w-[44rem]", compact ? "max-sm:max-w-[15rem]" : ""].join(" ")}>
-        <img src={sample.src} alt={alt} width={image.width} height={image.height} loading="lazy" decoding="async" className="block h-auto w-full rounded-sm" />
+        <img src={card.sample.src} alt={alt} width={image.width} height={image.height} loading="lazy" decoding="async" className="block h-auto w-full rounded-sm" />
         {children}
       </div>
     </div>
@@ -53,16 +44,16 @@ function Figure({ alt, compact = false, children }: { alt: string; compact?: boo
 
 /**
  * The text column, enlarged: as printed on your side, and with the covers the model reads on its
- * side, so the two panes line up and the placeholders on the card can be read.
+ * side, so the two panes line up and the placeholders on the card can be read. The crop starts
+ * right of a photo cover that ends before the text, and a photo cover reaching into the text
+ * column is drawn without its label, so no stray tail of it shows at the left (L2 carryover 2).
  */
-function Zoom({ masked: covered, className = "" }: { masked: boolean; className?: string }) {
-  const text = masked.filter((r) => r.source === "ocr" && r.cover_box);
-  if (!text.length) return null;
-  const pad = 14;
-  const x1 = Math.max(0, Math.min(...text.map((r) => r.cover_box![0])) - pad);
-  const y1 = Math.max(0, Math.min(...text.map((r) => r.cover_box![1])) - pad);
-  const x2 = Math.min(image.width, Math.max(...text.map((r) => r.cover_box![2])) + pad);
-  const y2 = Math.min(image.height, Math.max(...text.map((r) => r.cover_box![3])) + pad);
+
+function Zoom({ card, masked: covered, className = "" }: { card: ShowcaseCard; masked: boolean; className?: string }) {
+  const { image } = card.recording;
+  const crop = zoomBox(image.regions, image.width, image.height);
+  if (!crop) return null;
+  const [x1, y1, x2, y2] = crop;
   const w = x2 - x1;
   const h = y2 - y1;
   return (
@@ -70,8 +61,8 @@ function Zoom({ masked: covered, className = "" }: { masked: boolean; className?
       <figcaption><Caption>{covered ? "Enlarged: the details as the model reads them" : "Enlarged: the details as printed"}</Caption></figcaption>
       <div aria-hidden="true" className="relative mx-auto w-full max-w-[13rem] overflow-hidden rounded-md ring-1 ring-line" style={{ aspectRatio: `${w} / ${h}` }}>
         <div className="@container absolute" style={{ width: `${(image.width / w) * 100}%`, left: `${(-x1 / w) * 100}%`, top: `${(-y1 / h) * 100}%` }}>
-          <img src={sample.src} alt="" width={image.width} height={image.height} loading="lazy" decoding="async" className="block h-auto w-full" />
-          {covered && <LabelledCovers regions={regions} width={image.width} height={image.height} />}
+          <img src={card.sample.src} alt="" width={image.width} height={image.height} loading="lazy" decoding="async" className="block h-auto w-full" />
+          {covered && <LabelledCovers regions={image.regions} width={image.width} height={image.height} textLabelsOnly />}
         </div>
       </div>
     </figure>
@@ -82,23 +73,47 @@ function Caption({ children }: { children: ReactNode }) {
   return <p className="font-mono text-2xs text-muted">{children}</p>;
 }
 
+const SPECIMENS = SHOWCASE.map((card, i) => ({ value: String(i), label: card.sample.language === "en" ? "English ID card" : "Hungarian ID card" }));
+
 export default function ImageShowcase() {
+  const [picked, setPicked] = useState("0");
+  const card = SHOWCASE[Number(picked)]!;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p aria-hidden="true" className="text-sm font-medium text-ink">Specimen</p>
+        <SegmentedControl label="Specimen" options={SPECIMENS} value={picked} onChange={setPicked} />
+        <p className="text-xs text-muted">Fictional, AI-generated and overprinted SPECIMEN.</p>
+      </div>
+      <Showcase key={card.sample.id} card={card} />
+    </div>
+  );
+}
+
+function Showcase({ card }: { card: ShowcaseCard }) {
+  const { image, message, answer, recorded } = card.recording;
+  const regions = image.regions;
+  const masked = regions.filter((r) => r.policy === "mask");
+  const tokenized = masked.filter((r) => r.source === "ocr" && r.placeholder);
+  const summary = image.summary as { document_type?: string; holder?: string; document_number?: string; expired?: boolean };
+  const restored = restore(answer.masked, message.masked, card.message);
+  const day = new Date(`${recorded}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   const rows = legendRows(regions);
   const box = (r: (typeof regions)[number]) => percentBox(r.box, image.width, image.height, MASK_PADDING);
   const types = tokenized.map((r) => metaFor(r.entity_type).label.toLowerCase());
   return (
     <div className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the on-device face detector. Dashed: text found by OCR and the rules.">
+        <Pane headingLevel={3} id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the on-device face detector. Dashed: text found by OCR and the rules.">
           <div className="space-y-3">
-            <YourText text={IMAGE_LABELS_MESSAGE} masked={message.masked} />
-            <Figure alt={sample.alt} compact>
+            <YourText text={card.message} masked={message.masked} />
+            <Figure card={card} alt={card.sample.alt} compact>
               {regions.map((r, i) => (
                 <span key={i} aria-hidden="true" className="absolute rounded-sm" style={{ ...box(r), border: r.source === "ocr" ? `1px dashed ${regionColor(r)}` : `2px solid ${regionColor(r)}`, backgroundColor: r.policy === "mask" && r.source !== "ocr" ? tint(regionColor(r), 8) : "transparent" }} />
               ))}
             </Figure>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
-            <Zoom masked={false} className="max-sm:hidden" />
+            <Zoom card={card} masked={false} className="max-sm:hidden" />
             <div className="min-w-0 space-y-1.5">
             <Caption>Found on the card</Caption>
             <ul aria-label="Region legend" className="flex flex-wrap gap-1.5">
@@ -121,14 +136,14 @@ export default function ImageShowcase() {
             <Metric label="as placeholders" value={tokenized.length} className="min-w-12" />
           </dl>
         </Boundary>
-        <Pane id="image-sent" side="model" eyebrow="Placeholders only" title="What the model gets" className="lg:flex-1" footer={`Recorded ${day} by the real masker with the hosted preview's setup; the covers are drawn in your browser from the recorded boxes.`}>
+        <Pane headingLevel={3} id="image-sent" side="model" eyebrow="Placeholders only" title="What the model gets" className="lg:flex-1" footer={`Recorded ${day} by the real masker with the hosted preview's setup; the covers are drawn in your browser from the recorded boxes.`}>
           <div className="space-y-3">
             <MaskedText text={message.masked} />
-            <Figure alt={`The same card as the model gets it: the photo and face covered, labelled PHOTO with the holder's placeholder; the ${[...new Set(types)].join(", ")} each covered by a box printed with its placeholder. The expiry date, sex and nationality are not personal data and stay readable, though the photo cover clips the expiry's first digit and also covers the signature.`}>
+            <Figure card={card} alt={`The same card as the model gets it: the photo and face covered, labeled PHOTO with the holder's placeholder; the ${[...new Set(types)].join(", ")} each covered by a box printed with its placeholder. The expiry date, sex and nationality are not personal data and stay readable.${card.maskedNote ?? ""}`}>
               <LabelledCovers regions={regions} width={image.width} height={image.height} />
             </Figure>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
-            <Zoom masked />
+            <Zoom card={card} masked />
             <div className="min-w-0 space-y-1.5">
               <Caption>With the image: its document summary</Caption>
               <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
@@ -151,12 +166,12 @@ export default function ImageShowcase() {
         </Pane>
       </div>
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane id="image-answer" side="model" eyebrow="Still placeholders" title="The model’s answer about the card" className="lg:flex-1" footer="A stand-in model, reading only the masked summary.">
+        <Pane headingLevel={3} id="image-answer" side="model" eyebrow="Still placeholders" title="The model’s answer about the card" className="lg:flex-1" footer="A stand-in model, reading only the masked summary.">
           <MaskedText text={answer.masked} />
         </Pane>
         <Boundary direction="inbound" label="PII Guard boundary: placeholders are restored on the way back" />
-        <Pane id="image-restored" side="you" eyebrow="Real values put back" title="The answer, with the name back" className="lg:flex-1">
-          <RestoredText segments={restoredSegments({ answer: answer.masked, restored, masked: message.masked, original: IMAGE_LABELS_MESSAGE })} />
+        <Pane headingLevel={3} id="image-restored" side="you" eyebrow="Real values put back" title="The answer, with the name back" className="lg:flex-1">
+          <RestoredText segments={restoredSegments({ answer: answer.masked, restored, masked: message.masked, original: card.message })} />
         </Pane>
       </div>
     </div>

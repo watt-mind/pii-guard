@@ -140,6 +140,9 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   const route = allowedRoute(requestedRoute, caps);
   // Evaluation loads its data lazily on first open, then stays mounted (filters survive).
   const [evaluationOpened, setEvaluationOpened] = useState(() => route.section === "evaluation");
+  // The Images screen (and its sample PNGs, ~820 KB) mounts on first open, then stays mounted (LAB-1458).
+  const [imagesOpened, setImagesOpened] = useState(() => route.section === "playground" && route.tab === "images");
+  if (!imagesOpened && route.section === "playground" && route.tab === "images") setImagesOpened(true);
   const [textView, setTextView] = useState<"mask" | "roundtrip">("mask");
   const navigate = useCallback((next: Route, how: "push" | "replace" | "none" = "push") => {
     if (next.section === "evaluation") setEvaluationOpened(true);
@@ -254,6 +257,13 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   useEffect(() => {
     if (route.section === "overview") void refreshAccount?.();
   }, [route.section, refreshAccount]);
+
+  // Hosted: the traffic log answered 401, so ask /v1/account whether the session ended; if it
+  // did, the hosted shell swaps the console for the "Your session ended" panel (LAB-1519).
+  const signedOut = trafficHandle.status.state === "denied" && trafficHandle.status.reason === "signed_out";
+  useEffect(() => {
+    if (signedOut) void refreshAccount?.();
+  }, [signedOut, refreshAccount]);
 
   const chatClient = engine.engine === "api" ? apiChat : mockChat;
   // Nobody chose the demo engine and the API does not answer: the notice turns red.
@@ -400,7 +410,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               />
             </div>
             <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={tab !== "images"}>
-              {caps.images && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}
+              {caps.images && imagesOpened && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}
             </div>
           </section>
 

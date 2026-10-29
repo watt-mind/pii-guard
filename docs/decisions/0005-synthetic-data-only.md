@@ -18,7 +18,7 @@ runs, which is exactly the harm the project exists to prevent.
   synthetic ones.
 - Generated data that is committed lives under `eval/fixtures/`; working data is gitignored.
 
-### Fictional phone numbers and e-mail addresses
+### Fictional phone numbers and email addresses
 
 A made-up phone number can still ring a real person. Hand-written fixtures therefore use
 numbers that are set aside for fiction wherever a country has such a range, and a fixed,
@@ -26,7 +26,7 @@ visibly placeholder pattern where it has none (added 2026-10-27, LAB-1214):
 
 | Country | Rule | Examples |
 |---|---|---|
-| e-mail | the reserved `example.com`, `example.org`, `example.net` domains (RFC 2606) | `teszt.elek@example.com` |
+| email | the reserved `example.com`, `example.org`, `example.net` domains (RFC 2606) | `teszt.elek@example.com` |
 | US, CA | NANP `555-0100` to `555-0199` | `+1 202 555 0143` |
 | UK | Ofcom's drama ranges (`020 7946 0xxx`, `07700 900xxx`) | `+44 20 7946 0123` |
 | DE | the Bundesnetzagentur "Drama Numbers": fixed line `030 23125 xxx`, `040 66969 xxx`, `069 90009 xxx`, `0221 4710 xxx`, `089 99998 xxx`; mobile `0171 39200 xx`, `0176 040690 xx` | `+49 30 23125042`, `0171 3920042` |

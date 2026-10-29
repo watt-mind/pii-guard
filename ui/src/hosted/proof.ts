@@ -37,11 +37,11 @@ export function nextBest(metric: "leak" | "f1", set: number) {
 }
 
 const ours = COMPARISON[0]!;
-/** The hero's three numbers, each with the best of the other tools on the same set. */
+/** The hero's three numbers, each with the best of the other tools on the same set; `short` labels fit a phone's third (L2 carryover 8). */
 export const PROOF = [
-  { value: `${ours.leak[1]}\u00a0%`, label: "Values leaked, CEE-PII public set", hint: `Next best: ${nextBest("leak", 1)}` },
-  { value: `${ours.leak[0]}\u00a0%`, label: "Values leaked, 51 hand-written docs", hint: `Next best: ${nextBest("leak", 0)}` },
-  { value: `${ours.f1[0]}\u00a0%`, label: "Detection F1, same docs", hint: `Next best: ${nextBest("f1", 0)}` },
+  { value: `${ours.leak[1]}\u00a0%`, label: "Values leaked, CEE-PII public set", short: "Leaked, CEE-PII", hint: `Next best: ${nextBest("leak", 1)}` },
+  { value: `${ours.leak[0]}\u00a0%`, label: "Values leaked, 51 hand-written docs", short: "Leaked, 51 docs", hint: `Next best: ${nextBest("leak", 0)}` },
+  { value: `${ours.f1[0]}\u00a0%`, label: "Detection F1, same docs", short: "F1, same docs", hint: `Next best: ${nextBest("f1", 0)}` },
 ] as const;
 
 export const LATENCY = { value: "~34 ms", label: "Gateway overhead per request", hint: "p50 on CPU, rules + NER, one request at a time" } as const;

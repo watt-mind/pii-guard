@@ -63,7 +63,7 @@ from pii_guard.api.routes._common import (
     v1_router,
 )
 from pii_guard.detection_profile import require_local_ocr, require_segmenter_instance
-from pii_guard.policy import Policy
+from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import Vault
 from pii_guard.visual.masking import (
@@ -287,7 +287,32 @@ def _sam_client(request: Request) -> Segmenter:
                 sam = build_segmenter(state.settings)
                 state.sam_client = sam
     require_segmenter_instance(state.settings, sam)
-    return sam
+    policy = getattr(request.state, "project_policy", None)
+    if policy is None:
+        return sam
+    # A selected project policy picks local or SAM detection; a stricter server wins (LAB-1444).
+    from pii_guard.projects.visual import visual_detection
+    from pii_guard.visual.segmenters import policy_segmenter
+
+    return policy_segmenter(visual_detection(policy), sam, lambda: _policy_local(state, sam))
+
+
+def _policy_local(state: Any, server: Segmenter) -> Segmenter:
+    """The shared on-device segmenter (faces, ID photos, signatures) for ``local`` policies."""
+    from pii_guard.visual.segment import LocalSegmenter
+    from pii_guard.visual.segmenters import HybridSegmenter, LocalSignatureSegmenter
+
+    local = getattr(state, "policy_local_segmenter", None)
+    if local is None:
+        with _lock:
+            local = getattr(state, "policy_local_segmenter", None)
+            if local is None:
+                faces = server.local if isinstance(server, HybridSegmenter) else server
+                if not isinstance(faces, LocalSegmenter):
+                    faces = build_segmenter(state.settings, mode="local")
+                local = LocalSignatureSegmenter(faces)
+                state.policy_local_segmenter = local
+    return local
 
 
 def _ocr_engine(request: Request) -> OcrEngine | None:
@@ -550,19 +575,29 @@ async def mask_image_endpoint(
     if _hosted(request):
         from pii_guard.hosted.images import (
             hosted_image_limits,
-            hosted_image_policies,
+            hosted_visual_policies,
             require_image_capacity,
             require_local_visual_policies,
         )
 
-        # The project's text policies, the operator's visual ones (projects hold text only).
-        request.state.project_policies = hosted_image_policies(
-            get_policies(request), request.app.state.policies
+        # The owner's policy, text and visual; the operator's overrides win when stricter.
+        policy = getattr(request.state, "project_policy", None)
+        request.state.project_policies = hosted_visual_policies(
+            policy, get_policies(request), settings, request.app.state.policies
         )
         # Before the image is decoded: a policy only SAM could serve, or a busy replica.
-        require_local_visual_policies(request.state.project_policies)
+        require_local_visual_policies(request.state.project_policies, policy)
         require_image_capacity(workers)
         _, timeout = hosted_image_limits(settings)
+    elif getattr(request.state, "project_policy", None) is not None:
+        from pii_guard.projects.visual import effective_policies
+
+        request.state.project_policies = effective_policies(
+            request.state.project_policy,
+            get_policies(request),
+            getattr(request.app.state, "policies", None) or PolicySet.from_settings(settings),
+            settings.policy_overrides,
+        )
     data, options = await _image_from_request(request)
     if not data:
         raise InvalidImageError("image is empty")

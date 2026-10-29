@@ -273,6 +273,7 @@ function SourceBanner({
   replayDone: boolean;
   onReplay: () => void;
 }) {
+  const hosted = useHostedSession() !== null;
   const code = (s: string) => <code className="rounded bg-surface px-1 font-mono text-xs">{s}</code>;
   if (source === "fixture") {
     return (
@@ -354,7 +355,16 @@ function SourceBanner({
       <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm sm:p-4 text-ink">
         {status.reason === "signed_out" ? (
           <>
-            <strong className="font-medium text-danger">You're signed out.</strong> The API is up but answered 401. Sign in again; this page reconnects by itself.
+            {hosted ? (
+              // Hosted: the console only opens signed in, so a 401 means the session ended (LAB-1519).
+              <>
+                <strong className="font-medium text-danger">Your session ended.</strong> Sign in again; this page reconnects by itself.
+              </>
+            ) : (
+              <>
+                <strong className="font-medium text-danger">You're signed out.</strong> The API is up but answered 401. Sign in again; this page reconnects by itself.
+              </>
+            )}
           </>
         ) : (
           <>
@@ -439,7 +449,7 @@ function EmptyCalls({
 }
 
 const LABELLED_NOTE = LABELLED_SCENARIOS.length
-  ? `; ${LABELLED_SCENARIOS.length} labelled “${LABELLED_SCENARIOS[0]!.label}”: in rules-only mode its name is an expected miss`
+  ? `; ${LABELLED_SCENARIOS.length} labeled “${LABELLED_SCENARIOS[0]!.label}”: in rules-only mode its name is an expected miss`
   : "";
 
 export function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
@@ -503,7 +513,7 @@ function LabelTag({ match }: { match: LabelledMatch }) {
   const missed = match.missed.length > 0;
   return (
     <span
-      title={`Demo scenario labelled “${match.scenario.label}”${missed ? ": in rules-only mode its name is an expected miss" : ""}`}
+      title={`Demo scenario labeled “${match.scenario.label}”${missed ? ": in rules-only mode its name is an expected miss" : ""}`}
       className={[
         "rounded-sm px-1.5 py-0.5 text-2xs font-medium whitespace-nowrap ring-1 ring-inset",
         missed ? "bg-leak-soft text-leak ring-leak/40" : "text-muted ring-line-strong",
@@ -526,7 +536,7 @@ function LabelledNote({ match }: { match: LabelledMatch }) {
       <p className="mt-1 text-ink">
         {missed ? (
           <>
-            This call names a person in free text, with no pre-loaded known value and nothing a rule can recognise, so the name ({match.missed.join(", ")}) reached the
+            This call names a person in free text, with no pre-loaded known value and nothing a rule can recognize, so the name ({match.missed.join(", ")}) reached the
             mock model as written. Every other demo call masks its names, because they are pre-loaded as session known values. This one is kept on purpose, to show what
             the NER adds. With <NerHint />, it is masked too.
           </>
@@ -911,12 +921,12 @@ function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
       Only highlighted values were replaced; anything else reached the model as written.{" "}
       {free ? null : e.detectors.includes("known") ? (
         <>
-          This call ran {e.detectors.map((d) => detectorName(d)).join(", ")}: pre-loaded known values (names included) and structured values (e-mail, phone, IBAN, IDs) are
+          This call ran {e.detectors.map((d) => detectorName(d)).join(", ")}: pre-loaded known values (names included) and structured values (email, phone, IBAN, IDs) are
           masked; other names need <NerHint />.
         </>
       ) : (
         <>
-          This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (e-mail, phone, IBAN, IDs) but{" "}
+          This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (email, phone, IBAN, IDs) but{" "}
           <strong className="font-medium text-ink">not names</strong>: names need <NerHint />.
         </>
       )}

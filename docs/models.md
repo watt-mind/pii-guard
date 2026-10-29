@@ -67,7 +67,7 @@ would run, without downloading).
    [model card](../training/ner/model-card.md). A checkpoint is never loaded unpinned: another
    repo needs `repo@revision`. It downloads like the fallback below (1.1 GB, first run only,
    into `~/.cache/pii-guard/models/ner/watt-mind--pii-guard-ner-xlmr-base-95f612a9ad65/`).
-   The repo moved from `hdkiller/` to the `watt-mind` organisation (LAB-1402) with its
+   The repo moved from `hdkiller/` to the `watt-mind` organization (LAB-1402) with its
    history, so the revision is unchanged: a checked download under the old directory name,
    `hdkiller--pii-guard-ner-xlmr-base-95f612a9ad65/`, is reused (offline and under `cached`
    too), and `PII_GUARD_NER_PUBLISHED_MODEL` set to the old `hdkiller` id still names this
@@ -87,7 +87,7 @@ weights are then checked against their pinned SHA-256 and loaded from that direc
 runs are offline. No weights are committed to this repository. `PII_GUARD_NER_FALLBACK=off`
 (what `make demo MODE=rules` and `make smoke` set) keeps fast mode rules only.
 
-**Licence and attribution.** The model card at the pinned revision declares
+**License and attribution.** The model card at the pinned revision declares
 `license: apache-2.0`. The model is by [bards.ai](https://bards.ai): XLM-RoBERTa base
 (FacebookAI, MIT) fine-tuned for 36 PII classes in the 24 official EU languages, Hungarian,
 English and German among them. Its card names the training data:
@@ -113,7 +113,7 @@ classifier. All three run zero-shot here (rules + model, the LAB-1150 fixture li
 | ai4privacy F1, mean | **84.6**\* | 75.9 | 77.0 |
 | NER per ~400-char message, M1 Max CPU p50 / p95 | 54 / 101 ms† | 107 / 126 ms | 48 / 56 ms† |
 | Installs with | `ner` extra | `gliner` extra (conflicts with `ner`) | `ner` extra |
-| Licence | Apache-2.0 | Apache-2.0 | AFL-3.0 |
+| License | Apache-2.0 | Apache-2.0 | AFL-3.0 |
 
 \* Not an out-of-distribution check: its card lists OpenPII among its training data, and the
 ai4privacy fixtures are OpenPII validation rows. The hand-written smoke sets are the fair
@@ -136,7 +136,7 @@ extra, so `uvx`, `make demo` and the demo image need no second environment, unli
   ([eval/results/2026-10-28-new-encoders](../eval/results/2026-10-28-new-encoders/README.md));
 - `iiiorg/piiranha-v1-detect-personal-information`: CC BY-NC-ND 4.0, not open for this use.
 
-**Older models and licences.**
+**Older models and licenses.**
 
 - Previous zero-shot default (until LAB-1192):
   [`Davlan/xlm-roberta-base-ner-hrl`](https://huggingface.co/Davlan/xlm-roberta-base-ner-hrl)
@@ -187,7 +187,7 @@ measured.
 
 ### Distilled from Muse Glimmer
 
-A bigger, more varied corpus labelled by Muse Glimmer 30B (low reasoning) as the teacher, used
+A bigger, more varied corpus labeled by Muse Glimmer 30B (low reasoning) as the teacher, used
 to retrain the student. Everything is fictional and reproducible from the seed; data and
 weights stay out of git (`eval/generated/`, `models/` are ignored), and the hashes of every
 corpus, label and cache file are in `eval/results/ner/distilled/corpus.json` and each model's
@@ -264,7 +264,7 @@ LAB-1150. The full method, every candidate and the latency tables are in
   [entities.md](entities.md#ner-label-set).
 - **Data:**
   - distillation s11 (LAB-1128);
-  - s13, written from the lexicon packs and labelled by Muse Glimmer on Modal;
+  - s13, written from the lexicon packs and labeled by Muse Glimmer on Modal;
   - 5,000 rows per language from the Ai4Privacy OpenPII-1M **train** split
     (`training/ner/openpii.py`). The script asserts these are disjoint from the evaluated
     validation rows; only its manifest is committed;
@@ -320,7 +320,7 @@ smoke over-masking no worse than v2.
 
 **v2 stays, and is the one published.** The new negatives removed the "és Fia" `PERSON` and
 lone-street `ADDRESS` false positives (LAB-1220), and cut cee-pii over-masking from 39 to 29 %.
-But they also made the model drop real ids and e-mails that have no cue word. Full tables,
+But they also made the model drop real ids and emails that have no cue word. Full tables,
 held-out test sets and latency are in
 [eval/results/2026-10-27-ner-v21/](../eval/results/2026-10-27-ner-v21/README.md).
 
@@ -329,9 +329,9 @@ config, `training_meta.json` without local values, the model card as `README.md`
 It uses the local Hugging Face login, tags the upload commit, and prints the revision and
 SHA-256 that `ner_resolve.PUBLISHED` pins. Modal spend: $2.92 of free credits.
 
-### NER v3, v3.1 and v3.2: v2.0 stays
+### NER v3, v3.1, v3.2 and v3.3: v2.0 stays
 
-Three later rounds tried to replace v2.0. Each used a selection rule fixed in advance, and v2.0
+Four later rounds tried to replace v2.0. Each used a selection rule fixed in advance, and v2.0
 is still the published model.
 
 - **v3** (LAB-1393) and **v3.1** (LAB-1410) retrained on wider mixes. Each traded one
@@ -344,6 +344,21 @@ is still the published model.
     still fails the smoke gate on one inflected Hungarian name.
   - Mining found no real error family to generate data for, so nothing was trained
     ([v3.2 results](../eval/results/2026-10-29-ner-v32/README.md)).
+- **v3.3** (LAB-1512) fine-tuned that soup on a templated add-on (inflected Hungarian,
+  Polish and German names; payload and agent-text hard negatives; `training/ner/targeted_v33.py`).
+  It also tried dev-calibrated thresholds on v2.0 (`training/ner/thresholds_v33.py`).
+  - Every candidate failed a gate: smoke leak, smoke over-masking or inflection.
+  - The fine-tunes over-masked less agent text but leaked more, and lost MAPA
+    ([v3.3 results](../eval/results/2026-10-29-ner-v33/README.md)). v2.0 is frozen as the
+    published model.
+
+### NER v2.0 in every MAPA language
+
+v2.0 is gated on en, de and hu. It is also measured, zero-shot, in all 21 languages of MAPA
+EUR-Lex. Pooled, 8.5 % of person names leak, against 21.9 % and 29.5 % for two public
+EU-multilingual models. Weakest: Maltese, Latvian, Lithuanian, Irish. Per-language table and
+the add-a-language roadmap:
+[MAPA 21-language baseline](../eval/results/2026-10-29-lab-1516-mapa-24/README.md) (LAB-1516).
 
 ## LLM detector
 
@@ -411,7 +426,7 @@ export PII_GUARD_LLM_DETECTOR_REASONING_EFFORT=low          # required, see belo
   (Baseten's docs show `muse-spark-open`, which hackathon keys reject).
 - **Set `reasoning_effort: "low"`.** At the default effort the model spent all of a 2,048-token
   `max_tokens` budget on reasoning and returned empty `content` (the detector then fails
-  closed: `finish_reason=length`). `low` is honoured. `chat_template_kwargs.reasoning_strength`
+  closed: `finish_reason=length`). `low` is honored. `chat_template_kwargs.reasoning_strength`
   (the Glimmer knob) has no effect here. With the detector's prompt, `low` still reasons about
   400–500 tokens per short document.
 - The message carries `content` (the JSON answer) and a separate `reasoning_content`; the
@@ -475,7 +490,7 @@ zero-shot's 0.4 % (mostly names and ID numbers). Not a production default. Resul
 
 **Data** (`training/llm/build_sft.py`, manifest `training/llm/data-manifest.json`). One chat
 example per LAB-1128 distillation document (train split, seed 11): system and user are exactly
-what the `llm` detector sends (`build_messages`, the language pack's prompt, normalisation,
+what the `llm` detector sends (`build_messages`, the language pack's prompt, normalization,
 6,000/300 chunking, a fresh LAB-1107 delimiter boundary per example from a seeded generator);
 the assistant turn is only `{"entities": [{"type": ..., "text": ...}]}`. Targets are the labels
 the NER student learned from (planted gold plus the names Glimmer found); the 340 documents
@@ -483,7 +498,7 @@ with a teacher disagreement are left out, because an LLM target can't mask part 
 3,883 examples (hu 1,789, en 2,094; 553 hard negatives with an empty list), 19.8 MB,
 5.06 M tokens. The distillation dev split (741 documents) is the held-out test set, and the
 build fails if any of its documents or any document under `eval/fixtures/**` is in the file
-(by hash of the normalised text). The JSONL is not committed: it is 19.8 MB, mostly the same
+(by hash of the normalized text). The JSONL is not committed: it is 19.8 MB, mostly the same
 3.4 KB system prompt repeated, and the script rebuilds it byte for byte (same sha256) from the
 corpus.
 
@@ -576,7 +591,7 @@ upload in one step once downloads are allowed for the key.
 
 **Privacy rule for the hosted API.** Hosted Meta API models only ever see **fictional or
 masked** data: tests, fixtures and the corpus generator send synthetic text only. Real data is
-analysed only by open-weights models on endpoints you control (Muse Spark Open on your own
+analyzed only by open-weights models on endpoints you control (Muse Spark Open on your own
 hardware, or a dedicated partner deployment whose terms exclude training on your data). The
 recorded test fixtures in `tests/detect/fixtures/` are responses to fictional text.
 
@@ -638,7 +653,7 @@ the fictional set (24 images, committed) and the official specimen set (65 image
 locally, never committed), without OCR. Run records: `eval/results/runs/2026-10-27-segment-*`;
 chart and table: [benchmarks.md](benchmarks.md#segmenters-sam-31-api-vs-on-device).
 
-| Candidate | Set | Portrait recall (IoU ≥ 0.5) | Portrait leak | Signature recall | Signature leak | p50 / p95 per image | Weights | Licence |
+| Candidate | Set | Portrait recall (IoU ≥ 0.5) | Portrait leak | Signature recall | Signature leak | p50 / p95 per image | Weights | License |
 |---|---|---:|---:|---:|---:|---:|---:|---|
 | **SAM 3.1, Meta API** (baseline) | fictional | 100.0 % | 0.0 % | 100.0 % | 6.7 % | 5.1 s / 6.9 s | hosted | hosted API |
 | | specimens | 90.8 % | 47.7 % | 83.8 % | 51.3 % | 5.5 s / 8.6 s | | |
@@ -650,10 +665,10 @@ chart and table: [benchmarks.md](benchmarks.md#segmenters-sam-31-api-vs-on-devic
 | | specimens | 92.3 % | 16.9 % | — | — | 2.2 s / 3.3 s | | |
 | SAM 3 locally | — | not run | | | | | 3.4 GB | gated |
 
-- **Leak** is a labelled region less than 95 % covered by the boxes returned (the specimen
+- **Leak** is a labeled region less than 95 % covered by the boxes returned (the specimen
   labels are hand-drawn to about ±1-2 % of the image side; with a 100 % threshold every
   candidate "leaks" through label slack: SAM 83 % of specimen portraits, YuNet 12 %). Each
-  run's notes also give that strict figure and **precision** (boxes that hit a labelled region
+  run's notes also give that strict figure and **precision** (boxes that hit a labeled region
   of their kind): portraits 90 % SAM vs 61 % YuNet on the specimens. YuNet's ID-photo box is
   the face box grown by a fixed margin, so it over-masks around the photo; over-masking is the
   safe side.
@@ -673,7 +688,7 @@ chart and table: [benchmarks.md](benchmarks.md#segmenters-sam-31-api-vs-on-devic
 | Face/ID-photo leak ≤ SAM, recall within 2 pp | pass (0.0 / 10.8 % vs 0.0 / 47.7 %; recall +0 / +1.5 pp) | pass | pass |
 | Signature recall within 5 pp | **fail** (finds none) | **fail** (−32.4 pp on specimens) | **fail** (finds none) |
 | p50 ≤ 500 ms on CPU | pass | **fail** | **fail** |
-| ≤ 200 MB, permissive licence | pass | pass | pass |
+| ≤ 200 MB, permissive license | pass | pass | pass |
 
 Why the rest fell short:
 
@@ -691,7 +706,7 @@ Why the rest fell short:
 **Model pin.** YuNet `face_detection_yunet_2023mar.onnx` from the OpenCV model zoo
 (`https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx`),
 232,589 bytes, SHA-256 `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`,
-licence **MIT** (weights; OpenCV itself is Apache-2.0). The Docker build fetches it from that URL
+license **MIT** (weights; OpenCV itself is Apache-2.0). The Docker build fetches it from that URL
 and fails on a checksum mismatch; `LocalSegmenter` refuses a file whose SHA-256 differs.
 
 Use `LocalSegmenter` directly (it raises `DetectionError` if asked for `SIGNATURE`):

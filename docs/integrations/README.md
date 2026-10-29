@@ -148,7 +148,7 @@ Measured on the fictional mini-repo ([examples/coding-agents/](../../examples/co
 plus five source files and one doc from this repository, in fast mode
 ([run record](../../examples/coding-agents/runs/2026-10-27-coding-agent-overmask-fast.json)):
 
-- **Masked:** names, e-mail addresses, phone numbers, IBANs and other identifiers the language
+- **Masked:** names, email addresses, phone numbers, IBANs and other identifiers the language
   packs know, in prompts, file contents the agent reads, tool results and tool-call arguments.
 - **Not masked, on purpose:** code identifiers, file paths and URLs. 0 of 23 masked spans
   were code. The only false positives were the country codes `HU`, `GB` and `DE` in a markdown

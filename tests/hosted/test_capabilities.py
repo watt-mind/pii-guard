@@ -79,7 +79,8 @@ def _endpoint(client: TestClient, subject: str = "synthetic-one") -> str:
 HOSTED_CAPABILITIES = {
     "text": True,
     "chat": True,
-    "images": False,
+    # Signatures are masked on-device (LAB-1444), so the default policies are servable.
+    "images": True,
     "logs": True,
     "vault": True,
     "server_policy": False,

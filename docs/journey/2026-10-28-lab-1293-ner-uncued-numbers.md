@@ -21,7 +21,7 @@ the CSV field before it, and digits cut out of longer tokens.
 - **What was tried and dropped.** Two rules were dropped because they cost leaks and removed
   nothing on the tuning data. One dropped an uncued all-digit number that fails every card,
   giro and IBAN check; the other dropped values of three characters or fewer. After
-  normalisation, a phone number spelled out digit by digit (`4 4 2 0 …`) reads as one digit run,
+  normalization, a phone number spelled out digit by digit (`4 4 2 0 …`) reads as one digit run,
   and the first rule dropped it. On `ai4privacy`, amount and generic reference words
   ("Betrag", "reference", "product") turned out to stand before real account and ID numbers, so
   they are not negative cues either.
