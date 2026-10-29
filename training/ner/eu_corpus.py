@@ -1,4 +1,5 @@
-"""Fictional Muse-written documents for the multilingual NER phase 1 (LAB-1525): lv, lt, hr, sl.
+"""Fictional Muse-written documents for the multilingual NER phase 1 (LAB-1525): lv, lt, hr, sl;
+phase 1b (LAB-1534): fr, es, it, nl, ro, ga, mt.
 
 Fictional data only (ADR 0005). The v2.0 distillation corpus (``training/distill/corpus.py``)
 plans each document from ``(seed, language, index)``, has Muse write it around planted
@@ -29,6 +30,8 @@ names Muse added and excludes disagreements from the loss)::
     set -a; source .env; set +a      # META_API_KEY (Meta Model API, contributor tier)
     uv run --no-sync python training/ner/eu_corpus.py --languages lv,lt,hr,sl --n 1200 \\
         --seed 1525 --out eval/generated/distill-eu-s1525 --budget-usd 3 --workers 16
+    uv run --no-sync python training/ner/eu_corpus.py --languages fr,es,it,nl,ro,ga,mt \\
+        --n 1200 --seed 1525 --out eval/generated/distill-eu-1b-s1525 --budget-usd 4.8 --workers 32
 
 Writes ``<lang>-distill-{train,dev}.jsonl`` and ``stats.json`` (counts, discard reasons, token
 usage, cost; never values). Split: 90 % train, 10 % dev, by a seeded shuffle of the indices.

@@ -4,7 +4,9 @@ Rows are never committed. ``training/ner/eu-phase1-data-manifest.json`` records,
 language, the documents, gold spans, the SHA-256 of each git-ignored file under
 ``eval/generated/`` (so a rebuild can be checked byte for byte) and the licence. Every source
 is synthetic or fictional (ADR 0005), marked ``"synthetic": true``, so the Modal upload
-allowlist (``training/distill/modal_upload.py``, LAB-1527) may carry it::
+allowlist (``training/distill/modal_upload.py``, LAB-1527) may carry it. A source whose
+directory is absent on this machine keeps its recorded entry (phase 1b, LAB-1534, added
+sources without rebuilding phase 1's)::
 
     uv run --no-sync python training/ner/eu_phase1_manifest.py
 """
@@ -44,6 +46,19 @@ SOURCES: dict[str, dict[str, Any]] = {
         "what": "muse-eu after the Muse Glimmer teacher pass (training/distill/label.py)",
         "license": "Apache-2.0 (teacher: Muse Glimmer, open weights, Apache-2.0)",
     },
+    "muse-eu-1b": {
+        "dir": "eval/generated/distill-eu-1b-s1525",
+        "glob": "*-distill-*.jsonl",
+        "what": "phase 1b (LAB-1534): the muse-eu pipeline for fr, es, it, nl, ro, ga, mt "
+        "(eu_corpus.py)",
+        "license": "Apache-2.0 (pii-guard generator, as the v2.0 s11/s13 corpora)",
+    },
+    "muse-eu-1b-labelled": {
+        "dir": "eval/generated/distill-eu-1b-s1525/labelled",
+        "glob": "*-distill-*.jsonl",
+        "what": "muse-eu-1b after the Muse Glimmer teacher pass (training/distill/label.py)",
+        "license": "Apache-2.0 (teacher: Muse Glimmer, open weights, Apache-2.0)",
+    },
     "negatives-eu": {
         "dir": "eval/generated/negatives-eu",
         "glob": "*-negatives-train.jsonl",
@@ -79,14 +94,21 @@ def file_block(path: Path) -> dict[str, Any]:
 def main() -> int:
     out: dict[str, Any] = {
         "ticket": "LAB-1525",
+        "tickets": ["LAB-1525", "LAB-1534"],
         "synthetic": True,
         "rows_committed": False,
         "policy": "ADR 0005: synthetic or fictional only; no MAPA/TAB or other real text "
         "(LAB-1419); no GDPR special categories",
         "sources": {},
     }
+    previous = json.loads(OUT.read_text(encoding="utf-8"))["sources"] if OUT.exists() else {}
     for name, src in SOURCES.items():
         base = Path(src["dir"])
+        if not base.is_dir() and name in previous:
+            # Not rebuilt on this machine: keep the recorded counts and hashes.
+            out["sources"][name] = previous[name]
+            print(f"manifest: {name}: kept (no {base} here)", file=sys.stderr)
+            continue
         files = sorted(base.glob(src["glob"])) if base.is_dir() else []
         entry = {k: v for k, v in src.items() if k not in {"dir", "glob"}}
         entry["synthetic"] = True

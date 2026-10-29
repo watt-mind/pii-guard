@@ -1,5 +1,9 @@
 {
   "ticket": "LAB-1525",
+  "tickets": [
+    "LAB-1525",
+    "LAB-1534"
+  ],
   "synthetic": true,
   "rows_committed": false,
   "policy": "ADR 0005: synthetic or fictional only; no MAPA/TAB or other real text (LAB-1419); no GDPR special categories",
@@ -720,6 +724,440 @@
             "VEHICLE_PLATE": 163
           },
           "sha256": "d08f6c504dd04f3295fc4b7a0075d39edcbd1bd111f2e057219f20d235c8f222"
+        }
+      }
+    },
+    "muse-eu-1b": {
+      "what": "phase 1b (LAB-1534): the muse-eu pipeline for fr, es, it, nl, ro, ga, mt (eu_corpus.py)",
+      "license": "Apache-2.0 (pii-guard generator, as the v2.0 s11/s13 corpora)",
+      "synthetic": true,
+      "files": {
+        "es-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 173,
+            "BANK_ACCOUNT": 50,
+            "DATE_OF_BIRTH": 58,
+            "EMAIL": 41,
+            "ID_DOCUMENT": 58,
+            "ORGANIZATION": 79,
+            "PERSON": 592,
+            "PHONE": 56,
+            "VEHICLE_PLATE": 29
+          },
+          "sha256": "33e248b97ea1d416012e47e434767fb9ac2f20ae87990c0c24fcf18d4cb53ec4"
+        },
+        "es-distill-train.jsonl": {
+          "documents": 1076,
+          "gold_spans": {
+            "ADDRESS": 1459,
+            "BANK_ACCOUNT": 457,
+            "DATE_OF_BIRTH": 512,
+            "EMAIL": 421,
+            "ID_DOCUMENT": 432,
+            "ORGANIZATION": 790,
+            "PERSON": 5129,
+            "PHONE": 554,
+            "VEHICLE_PLATE": 206
+          },
+          "sha256": "82378909fa4cc721d4f2e27b874963a6e4dff81fc9e5c5da96be845debd338c1"
+        },
+        "fr-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 162,
+            "BANK_ACCOUNT": 49,
+            "DATE_OF_BIRTH": 56,
+            "EMAIL": 43,
+            "ID_DOCUMENT": 37,
+            "ORGANIZATION": 107,
+            "PERSON": 598,
+            "PHONE": 74,
+            "VEHICLE_PLATE": 12
+          },
+          "sha256": "652c96ba59b8b1029b217229c4481fb0aa44cae9d1a0fed706221937c1615c01"
+        },
+        "fr-distill-train.jsonl": {
+          "documents": 1079,
+          "gold_spans": {
+            "ADDRESS": 1497,
+            "BANK_ACCOUNT": 482,
+            "DATE_OF_BIRTH": 519,
+            "EMAIL": 397,
+            "ID_DOCUMENT": 400,
+            "ORGANIZATION": 918,
+            "PERSON": 5480,
+            "PHONE": 623,
+            "VEHICLE_PLATE": 142
+          },
+          "sha256": "8d7b6845a1cf3ead4b3aafd253f9163b8fdb998f0e41d65d2dbfaa102368b6de"
+        },
+        "ga-distill-dev.jsonl": {
+          "documents": 119,
+          "gold_spans": {
+            "ADDRESS": 161,
+            "BANK_ACCOUNT": 49,
+            "DATE_OF_BIRTH": 59,
+            "EMAIL": 42,
+            "ID_DOCUMENT": 40,
+            "ORGANIZATION": 100,
+            "PERSON": 615,
+            "PHONE": 66,
+            "VEHICLE_PLATE": 10
+          },
+          "sha256": "5640958123f8f0b2dbc48777af17e298042db324fc70c1da01d17952c837b365"
+        },
+        "ga-distill-train.jsonl": {
+          "documents": 1068,
+          "gold_spans": {
+            "ADDRESS": 1403,
+            "BANK_ACCOUNT": 441,
+            "DATE_OF_BIRTH": 502,
+            "EMAIL": 385,
+            "ID_DOCUMENT": 372,
+            "ORGANIZATION": 784,
+            "PERSON": 5605,
+            "PHONE": 528,
+            "VEHICLE_PLATE": 124
+          },
+          "sha256": "c8b801981bdd94c5598ecb0ba33e3ab727376e4b1bc388c895e6c111da048443"
+        },
+        "it-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 161,
+            "BANK_ACCOUNT": 37,
+            "DATE_OF_BIRTH": 48,
+            "EMAIL": 50,
+            "ID_DOCUMENT": 26,
+            "ORGANIZATION": 100,
+            "PERSON": 593,
+            "PHONE": 69,
+            "VEHICLE_PLATE": 9
+          },
+          "sha256": "0367ed7ac0c25fa2f8a7282af51b50b9fe9254c8d4d6fd687898672aad457aa5"
+        },
+        "it-distill-train.jsonl": {
+          "documents": 1080,
+          "gold_spans": {
+            "ADDRESS": 1471,
+            "BANK_ACCOUNT": 466,
+            "DATE_OF_BIRTH": 522,
+            "EMAIL": 402,
+            "ID_DOCUMENT": 403,
+            "ORGANIZATION": 843,
+            "PERSON": 5410,
+            "PHONE": 561,
+            "VEHICLE_PLATE": 172
+          },
+          "sha256": "9600b831e21ab4fb6143357abce4df991accebaef72a65a90507e3bd0f961f56"
+        },
+        "mt-distill-dev.jsonl": {
+          "documents": 119,
+          "gold_spans": {
+            "ADDRESS": 169,
+            "BANK_ACCOUNT": 54,
+            "DATE_OF_BIRTH": 59,
+            "EMAIL": 41,
+            "ID_DOCUMENT": 42,
+            "ORGANIZATION": 103,
+            "PERSON": 604,
+            "PHONE": 67,
+            "VEHICLE_PLATE": 14
+          },
+          "sha256": "99d35979de5e76f3f5e92dec19e7b8636a6564465e12ed7f7c3d2ebcf59c193d"
+        },
+        "mt-distill-train.jsonl": {
+          "documents": 1075,
+          "gold_spans": {
+            "ADDRESS": 1446,
+            "BANK_ACCOUNT": 454,
+            "DATE_OF_BIRTH": 524,
+            "EMAIL": 402,
+            "ID_DOCUMENT": 373,
+            "ORGANIZATION": 811,
+            "PERSON": 5856,
+            "PHONE": 570,
+            "VEHICLE_PLATE": 130
+          },
+          "sha256": "4314898461694d5a6f6ec409f06af91aead7195362d5104023539f0f82aa1781"
+        },
+        "nl-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 149,
+            "BANK_ACCOUNT": 43,
+            "DATE_OF_BIRTH": 52,
+            "EMAIL": 49,
+            "ID_DOCUMENT": 30,
+            "ORGANIZATION": 102,
+            "PERSON": 767,
+            "PHONE": 64,
+            "VEHICLE_PLATE": 14
+          },
+          "sha256": "bdba3c1145d6a8cb8c947dc5da48deccf27f653baef81508308f832e7724ebe3"
+        },
+        "nl-distill-train.jsonl": {
+          "documents": 1080,
+          "gold_spans": {
+            "ADDRESS": 1436,
+            "BANK_ACCOUNT": 464,
+            "DATE_OF_BIRTH": 489,
+            "EMAIL": 415,
+            "ID_DOCUMENT": 371,
+            "ORGANIZATION": 976,
+            "PERSON": 6812,
+            "PHONE": 594,
+            "VEHICLE_PLATE": 144
+          },
+          "sha256": "29f2aa7363934a501b08fa3a17986c727aba7acf781ab85fc0d4e9c904331186"
+        },
+        "ro-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 150,
+            "BANK_ACCOUNT": 53,
+            "DATE_OF_BIRTH": 59,
+            "EMAIL": 47,
+            "ID_DOCUMENT": 34,
+            "ORGANIZATION": 99,
+            "PERSON": 607,
+            "PHONE": 63,
+            "VEHICLE_PLATE": 9
+          },
+          "sha256": "c748730e577a64559adab27bb243afcfcd236b1b8fba8033ff6bcf4a2aa078c7"
+        },
+        "ro-distill-train.jsonl": {
+          "documents": 1080,
+          "gold_spans": {
+            "ADDRESS": 1412,
+            "BANK_ACCOUNT": 506,
+            "DATE_OF_BIRTH": 522,
+            "EMAIL": 394,
+            "ID_DOCUMENT": 403,
+            "ORGANIZATION": 781,
+            "PERSON": 5595,
+            "PHONE": 516,
+            "VEHICLE_PLATE": 135
+          },
+          "sha256": "13c2ffa232ced651196e2059e3528633500aadcba7a29f7f3d968a0bacd7e998"
+        }
+      }
+    },
+    "muse-eu-1b-labelled": {
+      "what": "muse-eu-1b after the Muse Glimmer teacher pass (training/distill/label.py)",
+      "license": "Apache-2.0 (teacher: Muse Glimmer, open weights, Apache-2.0)",
+      "synthetic": true,
+      "files": {
+        "es-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 173,
+            "BANK_ACCOUNT": 50,
+            "DATE_OF_BIRTH": 58,
+            "EMAIL": 41,
+            "ID_DOCUMENT": 58,
+            "ORGANIZATION": 79,
+            "PERSON": 593,
+            "PHONE": 56,
+            "VEHICLE_PLATE": 29
+          },
+          "sha256": "b9836df2b4ac9daa14569d854aa5a979a27c88ca3926f4a1b1ae44ab2ff56dca"
+        },
+        "es-distill-train.jsonl": {
+          "documents": 1076,
+          "gold_spans": {
+            "ADDRESS": 1459,
+            "BANK_ACCOUNT": 457,
+            "DATE_OF_BIRTH": 512,
+            "EMAIL": 421,
+            "ID_DOCUMENT": 432,
+            "ORGANIZATION": 790,
+            "PERSON": 5135,
+            "PHONE": 554,
+            "VEHICLE_PLATE": 206
+          },
+          "sha256": "df2e12d6646291bc3ca915b9ccdc7666f427d7e0d88878c159fe8b0038bbd14d"
+        },
+        "fr-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 162,
+            "BANK_ACCOUNT": 49,
+            "DATE_OF_BIRTH": 56,
+            "EMAIL": 43,
+            "ID_DOCUMENT": 37,
+            "ORGANIZATION": 107,
+            "PERSON": 598,
+            "PHONE": 74,
+            "VEHICLE_PLATE": 12
+          },
+          "sha256": "05d824207d9cf256eea06eb1d5432d12268cb12a740a81a7139d1cdf0edf93b0"
+        },
+        "fr-distill-train.jsonl": {
+          "documents": 1079,
+          "gold_spans": {
+            "ADDRESS": 1497,
+            "BANK_ACCOUNT": 482,
+            "DATE_OF_BIRTH": 519,
+            "EMAIL": 397,
+            "ID_DOCUMENT": 400,
+            "ORGANIZATION": 919,
+            "PERSON": 5480,
+            "PHONE": 623,
+            "VEHICLE_PLATE": 142
+          },
+          "sha256": "5498205ea0d15e365508ae84f048ff5f16962c3824f11e1e55d578c0c5f2a3be"
+        },
+        "ga-distill-dev.jsonl": {
+          "documents": 119,
+          "gold_spans": {
+            "ADDRESS": 161,
+            "BANK_ACCOUNT": 49,
+            "DATE_OF_BIRTH": 59,
+            "EMAIL": 42,
+            "ID_DOCUMENT": 40,
+            "ORGANIZATION": 102,
+            "PERSON": 663,
+            "PHONE": 66,
+            "VEHICLE_PLATE": 10
+          },
+          "sha256": "841ca547fbb7682948c129fd66c74ef0e9cef0ce709343b38b07cf641bf3964d"
+        },
+        "ga-distill-train.jsonl": {
+          "documents": 1068,
+          "gold_spans": {
+            "ADDRESS": 1403,
+            "BANK_ACCOUNT": 441,
+            "DATE_OF_BIRTH": 502,
+            "EMAIL": 385,
+            "ID_DOCUMENT": 372,
+            "ORGANIZATION": 789,
+            "PERSON": 5838,
+            "PHONE": 528,
+            "VEHICLE_PLATE": 124
+          },
+          "sha256": "01dc41ffa5e53f72fc055eda856e5627a30bbdaa67cfd4dc7daeb5c1b100a0d9"
+        },
+        "it-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 161,
+            "BANK_ACCOUNT": 37,
+            "DATE_OF_BIRTH": 48,
+            "EMAIL": 50,
+            "ID_DOCUMENT": 26,
+            "ORGANIZATION": 101,
+            "PERSON": 593,
+            "PHONE": 69,
+            "VEHICLE_PLATE": 9
+          },
+          "sha256": "f74a59e682ed8b846ec4ea2dbe966103fa8a9ea3a1f5ad124c17b733b3e657c1"
+        },
+        "it-distill-train.jsonl": {
+          "documents": 1080,
+          "gold_spans": {
+            "ADDRESS": 1471,
+            "BANK_ACCOUNT": 466,
+            "DATE_OF_BIRTH": 522,
+            "EMAIL": 402,
+            "ID_DOCUMENT": 403,
+            "ORGANIZATION": 845,
+            "PERSON": 5410,
+            "PHONE": 561,
+            "VEHICLE_PLATE": 172
+          },
+          "sha256": "55635d834fef9d213a0e64ce9f8928471f31583ac808099a23029d5b5a15fbd6"
+        },
+        "mt-distill-dev.jsonl": {
+          "documents": 119,
+          "gold_spans": {
+            "ADDRESS": 169,
+            "BANK_ACCOUNT": 54,
+            "DATE_OF_BIRTH": 59,
+            "EMAIL": 41,
+            "ID_DOCUMENT": 42,
+            "ORGANIZATION": 104,
+            "PERSON": 604,
+            "PHONE": 67,
+            "VEHICLE_PLATE": 14
+          },
+          "sha256": "cda377d74946e4ae3f7859367d0116218e288eff9b502c3777b65c47892a7375"
+        },
+        "mt-distill-train.jsonl": {
+          "documents": 1075,
+          "gold_spans": {
+            "ADDRESS": 1446,
+            "BANK_ACCOUNT": 454,
+            "DATE_OF_BIRTH": 524,
+            "EMAIL": 402,
+            "ID_DOCUMENT": 373,
+            "ORGANIZATION": 818,
+            "PERSON": 5856,
+            "PHONE": 570,
+            "VEHICLE_PLATE": 130
+          },
+          "sha256": "d67638370afcf7be93da456ab2b5862c79e45e310ae974d4dc7a2f6d0d54ba7b"
+        },
+        "nl-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 149,
+            "BANK_ACCOUNT": 43,
+            "DATE_OF_BIRTH": 52,
+            "EMAIL": 49,
+            "ID_DOCUMENT": 30,
+            "ORGANIZATION": 102,
+            "PERSON": 767,
+            "PHONE": 64,
+            "VEHICLE_PLATE": 14
+          },
+          "sha256": "9097fe26feb00dcc05a68dc340f9049801b1e2864d1ea13279316ba0188cf851"
+        },
+        "nl-distill-train.jsonl": {
+          "documents": 1080,
+          "gold_spans": {
+            "ADDRESS": 1436,
+            "BANK_ACCOUNT": 464,
+            "DATE_OF_BIRTH": 489,
+            "EMAIL": 415,
+            "ID_DOCUMENT": 371,
+            "ORGANIZATION": 978,
+            "PERSON": 6812,
+            "PHONE": 594,
+            "VEHICLE_PLATE": 144
+          },
+          "sha256": "a397edda3ae5e8e5f65513faca173bbb2ddafc8173aa3f2a644a3a0521e5c599"
+        },
+        "ro-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 150,
+            "BANK_ACCOUNT": 53,
+            "DATE_OF_BIRTH": 59,
+            "EMAIL": 47,
+            "ID_DOCUMENT": 34,
+            "ORGANIZATION": 99,
+            "PERSON": 616,
+            "PHONE": 63,
+            "VEHICLE_PLATE": 9
+          },
+          "sha256": "1efa56e137eb6be0c66fb71eccf2848d982a4d4947f8a244b2d10a040ba19df5"
+        },
+        "ro-distill-train.jsonl": {
+          "documents": 1080,
+          "gold_spans": {
+            "ADDRESS": 1412,
+            "BANK_ACCOUNT": 506,
+            "DATE_OF_BIRTH": 522,
+            "EMAIL": 394,
+            "ID_DOCUMENT": 403,
+            "ORGANIZATION": 782,
+            "PERSON": 5665,
+            "PHONE": 516,
+            "VEHICLE_PLATE": 135
+          },
+          "sha256": "bf1dacf2ef497ef1fca592809f943aa852a298eb0da16c63fef742e77be8c58f"
         }
       }
     },
