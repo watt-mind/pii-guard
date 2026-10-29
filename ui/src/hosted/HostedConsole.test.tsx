@@ -168,7 +168,7 @@ describe("hosted console for a signed-in owner", () => {
     expect(within(region).getByText("· v2")).toBeInTheDocument();
     expect(within(region).queryByText("Strict")).not.toBeInTheDocument();
     // The first table is the text entity types; the second is the image types (LAB-1444).
-    const [text] = within(region).getAllByRole("table");
+    const text = within(region).getAllByRole("table")[0]!;
     expect(within(within(text).getByRole("row", { name: /ORGANIZATION/ })).getByText("Kept in place")).toBeInTheDocument();
     expect(within(within(text).getByRole("row", { name: /EMAIL/ })).getByText("Blocks the request")).toBeInTheDocument();
     expect(within(region).getByRole("link", { name: "Edit policies in Projects" })).toHaveAttribute("href", "#projects");
