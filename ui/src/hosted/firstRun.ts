@@ -172,7 +172,7 @@ export function testRecovery(error: unknown): string {
     if (error.code === "sponsored_unavailable") return "Free runs are paused right now. Add your own Meta API key to this endpoint in Projects, then try again.";
     // The provider's own refusal keeps its status (a wrong key is the provider's 401).
     if (error.code.startsWith("upstream") || error.status === 502 || error.status === 504) return "The model provider refused or didn't answer. If you added your own key, check it is valid for the Meta Model API, then retry.";
-    if (error.status === 401 || error.status === 403) return "Your session is no longer authorised. Sign in again, then retry.";
+    if (error.status === 401 || error.status === 403) return "Your session is no longer authorized. Sign in again, then retry.";
     if (error.status === 429) return "The daily allowance is used up or requests are arriving too quickly. Check the reset time on Overview and retry later.";
     if (error.status === 503) return "The guard or the model provider is unavailable. Retry in a minute.";
     if (error.status === 422 || error.status === 400) return "The endpoint refused the request. Check its settings in Projects, then retry.";

@@ -115,7 +115,7 @@ export function TimingWaterfall({ event }: { event: TrafficEvent }) {
           {w.other > 0 ? ` + ${formatMsShort(w.other)} other` : ""}).
         </span>{" "}
         {w.rows.find((r) => r.key === "forward" && r.ms >= w.own / 2)
-          ? "Forward (most of PII Guard's time here) is serialising the masked body and opening the HTTP connection to the model. "
+          ? "Forward (most of PII Guard's time here) is serializing the masked body and opening the HTTP connection to the model. "
           : ""}
         {event.stream
           ? `Streamed: unmasking runs between upstream reads and is shown summed after it${w.ttft !== null ? `; first token to the client after ${formatMsShort(w.ttft)}` : ""}.`

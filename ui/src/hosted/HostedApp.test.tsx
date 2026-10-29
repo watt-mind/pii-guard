@@ -238,7 +238,7 @@ describe("positioning and copy (LAB-1466)", () => {
     expect(screen.getByRole("list", { name: "Proof" })).toHaveTextContent(/Tested with 4 real coding agents.*700\+ committed benchmark runs.*Published open NER model.*Apache-2\.0.*CI and tests/);
     // The Meta strip says what each model does, and Glimmer was the teacher, not a fine-tune.
     expect(screen.getByRole("list", { name: "Meta models and what each does" })).toHaveTextContent(/XLM-RoBERTa.*Muse Glimmer 30B.*served on Modal.*The teacher.*Muse Spark Open.*on Baseten.*SAM 3\.1.*Muse Spark 1\.3/);
-    expect(text).not.toMatch(/LoRA|being finalised|not a live run|Checking availability|written by hand/);
+    expect(text).not.toMatch(/LoRA|being finali[sz]ed|not a live run|Checking availability|written by hand/);
     expect(text).not.toMatch(/Claude Code/);
     expect(screen.getByText(/^Next best: PrivAiTe 12\.7\s%$/)).toBeInTheDocument();
   });
@@ -279,7 +279,7 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
     expect(screen.getByText(/^A technical measure, not legal advice/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "What we don’t claim ↗" })).toHaveAttribute("href", expect.stringMatching(/docs\/eu-regulation\.md#what-we-dont-claim$/));
     expect(screen.getByRole("list", { name: "Live in three steps" })).toHaveTextContent(/Change one base URL\..*Masking and restoring happen automatically: streaming, tool calls, images\..*See every request in Logs, with its outbound check result\./);
-    expect(document.body.textContent).not.toMatch(/GDPR[- ]compliant|special categor|anonymised data/i);
+    expect(document.body.textContent).not.toMatch(/GDPR[- ]compliant|special categor|anonymi[sz]ed data/i);
   });
   it("offers a section menu where the nav links don't fit, closed after a link is followed", async () => {
     const user = userEvent.setup();

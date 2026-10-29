@@ -29,7 +29,7 @@ export const STAGE_HINT: Record<OwnStage | "upstream" | "other", string> = {
   detect: "every detector on every text, then known values (wall time)",
   image: "the visual pipeline for inline images",
   mask: "replacing values with placeholders in the vault",
-  forward: "serialising the masked body and opening the HTTP connection to the model (PII Guard's side)",
+  forward: "serializing the masked body and opening the HTTP connection to the model (PII Guard's side)",
   unmask: "restoring the stream, summed over its chunks",
   response: "restoring a non-streamed answer and building the response",
   upstream: "waiting on the model: headers and body (not PII Guard's time)",

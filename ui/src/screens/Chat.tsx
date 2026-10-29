@@ -259,7 +259,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
           )}
           {client.kind === "api" && ner === false && (
             <p role="note" data-testid="rules-only-note" className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
-              <strong className="font-medium text-warn">Names are not detected.</strong> This server runs fast mode with the rules only, so e-mail addresses, phone numbers,
+              <strong className="font-medium text-warn">Names are not detected.</strong> This server runs fast mode with the rules only, so email addresses, phone numbers,
               IBANs and IDs are masked but free-text names reach the model as written. Names need <NerHint />.
             </p>
           )}

@@ -287,7 +287,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
                   <Metric label="unknown" value={unresolved.length} className="min-w-12" />
                   {view.kind === "streaming" && <Metric label="chunks" value={`${view.received.length}/${view.total}`} className="min-w-12" />}
                 </dl>
-                <span>Restored values are underlined and coloured by type. Hover one to see its placeholder.</span>
+                <span>Restored values are underlined and colored by type. Hover one to see its placeholder.</span>
               </div>
             ) : undefined
           }

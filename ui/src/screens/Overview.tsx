@@ -130,7 +130,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
             <ChartCard
               id="chart-stages"
               title="Where the time goes"
-              note="PII Guard's own stages, the most recent calls (as many as fit). Forward is serialising the masked body and opening the HTTP connection to the model. Pick a column to open that call in Logs."
+              note="PII Guard's own stages, the most recent calls (as many as fit). Forward is serializing the masked body and opening the HTTP connection to the model. Pick a column to open that call in Logs."
             >
               <StageChart events={t.events} onSelect={onOpenCall} />
             </ChartCard>
@@ -248,7 +248,7 @@ function EmptyOverview({ t, server, sendDemo, setup = false }: { t: TrafficHandl
           Watch a recorded demo
         </Button>
       </div>
-      <p className="mt-3 text-xs text-faint">The recorded demo replays fictional calls in your browser, so you can see what the counters show. It is labelled as recorded wherever it shows.</p>
+      <p className="mt-3 text-xs text-faint">The recorded demo replays fictional calls in your browser, so you can see what the counters show. It is labeled as recorded wherever it shows.</p>
     </section>
   );
 }
