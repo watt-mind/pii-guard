@@ -95,6 +95,7 @@ USAGE_KEYS = (
     "invalid_outputs",
     "refusals",
     "empty_challenged",
+    "truncated_completions",
 )
 
 #: What the prompt tells the model about each text entity type.
@@ -848,6 +849,12 @@ class LlmDetector:
             except _InvalidOutput as exc:
                 self._count(invalid_outputs=1)
                 last_error = str(exc)
+                if "truncated" in last_error:
+                    # The answer did not fit: give the retry headroom instead of repeating
+                    # the same request (fail closed either way; LAB-1173).
+                    payload = dict(payload)
+                    current = payload.get("max_tokens", self.max_tokens)
+                    payload["max_tokens"] = min((current or DEFAULT_MAX_TOKENS) * 2, 32768)
             except _Retryable as exc:
                 last_error = str(exc)
             logger.warning(
@@ -915,6 +922,7 @@ class LlmDetector:
             self._count(refusals=1)
             raise _InvalidOutput("model refused")
         if choice.get("finish_reason") == "length":
+            self._count(truncated_completions=1)
             raise _InvalidOutput("completion truncated (finish_reason=length)")
         content = message.get("content") if isinstance(message, dict) else None
         if isinstance(content, list):  # content parts
