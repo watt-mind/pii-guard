@@ -230,7 +230,8 @@ with CPU-only torch; [operations.md](docs/operations.md#docker)). More:
 ```
 
 The mapping between real values and placeholders **never leaves PII Guard**. Design and
-engineering choices: [docs/architecture.md](docs/architecture.md); threat model:
+engineering choices: [docs/architecture.md](docs/architecture.md); API guide and
+reference: [docs/api.md](docs/api.md), [guard.watt-mind.com/#api](https://guard.watt-mind.com/#api); threat model:
 [docs/privacy-model.md](docs/privacy-model.md); everything else: [docs/INDEX.md](docs/INDEX.md).
 
 > **Status: hackathon build** for the Meta Global AI Developer Hackathon (October 26 –

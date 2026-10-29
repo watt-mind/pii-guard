@@ -1,0 +1,91 @@
+import { lazy, Suspense, useEffect, useSyncExternalStore, type MouseEvent } from "react";
+import specUrl from "../../../docs/openapi.json?url";
+import { ButtonLink, Logo, ThemeToggle } from "../components/ui";
+import { useTheme } from "../hooks/useTheme";
+import { SOURCE } from "./session";
+
+// The renderer is heavy and only this page needs it: the landing never downloads it, and only
+// the hosted build has it (the local build, bundled into the wheel, links to the hosted page).
+const ScalarReference = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? lazy(() => import("./ScalarReference")) : null;
+const HOSTED_REFERENCE = "https://guard.watt-mind.com/#api";
+
+const GUIDE = `${SOURCE}/blob/develop/docs/api.md`;
+const CONTRACTS = `${SOURCE}/blob/develop/docs/contracts.md#rest-api-implemented`;
+
+// `html.dark` is set by useTheme (and by index.html before the first paint).
+const subscribeDark = (cb: () => void) => {
+  const observer = new MutationObserver(cb);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+};
+const isDark = () => document.documentElement.classList.contains("dark");
+
+/**
+ * The public, read-only API reference (LAB-1586): the committed docs/openapi.json, bundled with
+ * the page and rendered by Scalar with no "try it". It calls no API, so it is the same for every
+ * visitor, signed in or not. The server's own /docs and /openapi.json stay off in production.
+ */
+export function ApiReference({ consoleHref }: { consoleHref: string }) {
+  const [theme, setTheme] = useTheme();
+  const dark = useSyncExternalStore(subscribeDark, isDark, () => false);
+  useEffect(() => {
+    // Opened from a link further down another page: start at the top.
+    if (globalThis.location?.hash === "#api") globalThis.scrollTo?.(0, 0);
+  }, []);
+  function skip(e: MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    document.getElementById("main")?.focus();
+  }
+
+  return (
+    <div className="pii-guard-api min-h-dvh bg-canvas text-sm text-ink">
+      <a href="#main" onClick={skip} className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">
+        Skip to content
+      </a>
+      <header className="sticky top-0 z-30 bg-canvas">
+        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-12 lg:px-10">
+          <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink">
+            <Logo />
+            PII Guard
+          </a>
+          <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
+            <a className="hidden text-muted hover:text-ink sm:inline" href="#demo">Demo</a>
+            <a className="hidden text-muted hover:text-ink sm:inline" href="#evaluation">Evaluation</a>
+            <span aria-current="page" className="hidden text-ink underline decoration-guard decoration-2 underline-offset-[6px] sm:inline">API</span>
+            <ButtonLink href={consoleHref}>Console</ButtonLink>
+          </nav>
+        </div>
+        <div aria-hidden="true" className="header-hairline" />
+      </header>
+      <main id="main" tabIndex={-1} className="focus:outline-none">
+        <div className="mx-auto max-w-[1280px] px-4 pt-6 sm:px-6 sm:pt-8 lg:px-10">
+          <h1 className="text-xl font-medium tracking-tight sm:text-2xl">API reference</h1>
+          <p className="mt-2 max-w-[68ch] text-muted">
+            The OpenAI-compatible gateway and the masking routes. Point an OpenAI SDK at the guard&apos;s <code className="font-mono text-ink">/v1</code> base URL; the provider only sees placeholders.
+            This page is read-only and sends no requests.
+          </p>
+          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+            <a className="underline underline-offset-4 hover:text-ink" href={GUIDE}>Guide: quickstart, keys, sessions ↗</a>
+            <a className="underline underline-offset-4 hover:text-ink" href={CONTRACTS}>Full contract ↗</a>
+            <a className="underline underline-offset-4 hover:text-ink" href={specUrl} download="pii-guard-openapi.json">openapi.json</a>
+          </p>
+        </div>
+        {ScalarReference ? (
+          <Suspense fallback={<p role="status" className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">Loading the reference…</p>}>
+            <ScalarReference specUrl={specUrl} dark={dark} />
+          </Suspense>
+        ) : (
+          <p className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">
+            The rendered reference is on the hosted site: <a className="underline underline-offset-4 hover:text-ink" href={HOSTED_REFERENCE}>guard.watt-mind.com/#api ↗</a>
+          </p>
+        )}
+      </main>
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 lg:px-10">
+          <p className="text-xs text-muted">Generated from the code and checked in CI. Every example is fictional.</p>
+          <ThemeToggle theme={theme} onTheme={setTheme} />
+        </div>
+      </footer>
+    </div>
+  );
+}
