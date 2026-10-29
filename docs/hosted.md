@@ -202,6 +202,26 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `VITE_PII_GUARD_ROBOTS` (UI build arg) | Default `disallow`: `robots.txt` keeps crawlers out. Build with `--build-arg VITE_PII_GUARD_ROBOTS=allow` only for the public production image. Dev and prod currently share one image, so prod indexing needs its own build or a runtime switch first |
 | `VITE_PII_GUARD_DEMO_VIDEO_URL`, `VITE_PII_GUARD_DEMO_VIDEO_POSTER` (UI build args) | Unset by default: the landing's demo video slot stays hidden. Set the URL (and optionally a poster image) to show a poster with a play button above the demo |
 
+### Browser security headers
+
+The hosted app sets these on every response itself, once each (`src/pii_guard/security_headers.py`,
+LAB-1460); a header a route already set is not repeated. The dev router forwards and collapses
+headers (LAB-1467), so they do not belong there. `Strict-Transport-Security` comes from the Azure
+Container Apps ingress, so the app does not send a second one.
+
+| Header | Value |
+|---|---|
+| `Content-Security-Policy` | `default-src 'self'`; scripts and styles from the origin plus the SHA-256 of each inline `<script>`/`<style>` in the served `index.html` (computed at startup, so the build-dependent theme script stays allowed); `img-src 'self' data: blob:`; `font-src 'self' data:`; `connect-src 'self'`; `object-src 'none'`; `base-uri 'none'`; `form-action 'self'`; `frame-ancestors 'none'`. `/docs` and `/redoc` (Swagger UI and ReDoc load from a CDN) keep only `frame-ancestors`, `object-src` and `base-uri` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `same-origin`: not `no-referrer`, under which a browser may send `Origin: null` on a write and the same-origin check refuses it |
+| `Permissions-Policy` | camera, microphone, geolocation, payment, USB, serial, HID, Bluetooth, MIDI, display capture and topics off |
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+
+Anything the UI loads from another origin needs the policy widened first: for example a
+`VITE_PII_GUARD_DEMO_VIDEO_POSTER` on another host is blocked by `img-src`; ship it in `ui/public/`
+instead. `pii-guard up` (local) sends none of these unless `create_bundle_app(..., security_headers=True)`.
+
 ## Dedicated Azure deployment
 
 Use an explicit subscription and a **new dedicated** resource group beginning with
