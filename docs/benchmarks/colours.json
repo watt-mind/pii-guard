@@ -390,7 +390,7 @@
     "visual:presidio-image-tuned": "#DDCC77",
     "visual:sam-3.1+tesseract+rules": "#117733",
     "visual:sam-3.1+tesseract+rules+captions": "#44AA99",
-    "visual:sam-3.1+tesseract+rules+llm:muse-spark-open": "#0072B2",
+    "visual:sam-3.1+tesseract+rules+llm:muse-spark-open": "#AA4499",
     "visual:sam-3.1+tesseract+rules+llm:muse-spark-open+captions": "#CC6677"
   }
 }
