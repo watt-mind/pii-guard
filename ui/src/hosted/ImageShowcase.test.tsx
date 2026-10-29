@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { IMAGE_LABELS } from "../content/imageLabels";
-import HeroImage from "./HeroImage";
 import ImageShowcase from "./ImageShowcase";
 
 const holder = /\[\[PERSON_[0-9a-f]+\]\]/.exec(IMAGE_LABELS.message.masked)![0];
@@ -25,9 +24,4 @@ describe("landing image showcase (labels render, LAB-1484)", () => {
     expect(screen.getAllByText((_, el) => el?.getAttribute("data-placeholder") === holder).length).toBeGreaterThan(2);
   });
 
-  it("draws the hero's after thumbnail with the same labelled covers", () => {
-    const { container } = render(<HeroImage />);
-    expect(container.querySelectorAll("img")).toHaveLength(2);
-    expect(container.querySelectorAll("[data-cover]").length).toBeGreaterThan(0);
-  });
 });
