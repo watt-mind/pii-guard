@@ -183,14 +183,18 @@ def test_the_session_sweep_masks_a_value_the_transcript_let_through(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = Vault(bytes.fromhex(TENANT_KEY)).session()
-    monkeypatch.setattr(labels_module, "_transcript", lambda words, covered: FICTIONAL_TAJ)
+    monkeypatch.setattr(
+        labels_module, "_transcript", lambda words, covered, *args, **kwargs: FICTIONAL_TAJ
+    )
     outcome = masker().mask(id_card_png(), render="labels", matcher=VaultMatcher(session))
     assert outcome.transcript is not None and FICTIONAL_TAJ not in outcome.transcript
 
 
 def test_a_transcript_that_would_leak_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     session = Vault(bytes.fromhex(TENANT_KEY)).session()
-    monkeypatch.setattr(labels_module, "_transcript", lambda words, covered: FICTIONAL_TAJ)
+    monkeypatch.setattr(
+        labels_module, "_transcript", lambda words, covered, *args, **kwargs: FICTIONAL_TAJ
+    )
     # Without both sweeps too (a defect in every layer), the leak check still stops it.
     monkeypatch.setattr(VaultSession, "mask", lambda self, text, *args, **kwargs: text)
     monkeypatch.setattr(VaultMatcher, "sweep", lambda self, text, *args: text)
@@ -602,3 +606,43 @@ def test_draw_helper_is_fictional() -> None:
     image = Image.open(io.BytesIO(id_card_png()))
     ImageDraw.Draw(image)
     assert image.size == (640, 400)
+
+
+# --- expiry in the transcript (LAB-1196) --------------------------------------------------------
+
+
+def _expiry_ocr() -> OcrText:
+    """Two OCR lines: a caption line and the card's expiry date (a non-personal field)."""
+    from pii_guard.visual.captions import CaptionValue
+
+    caption = OcrWord("Expiry", Box(10, 10, 70, 26), (0,))
+    date = OcrWord("2020.01.01.", Box(80, 10, 170, 26), (0,))
+    field = CaptionValue(
+        caption="Expiry",
+        language="hu",
+        entity_type=None,
+        box=date.box,
+        caption_box=caption.box,
+        words=(date,),
+    )
+    return OcrText([caption, date], [], [], [field])
+
+
+def test_transcript_reduces_the_expiry_date_by_default() -> None:
+    from pii_guard.visual.labels import label_image
+
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    outcome = label_image(_expiry_ocr(), [], VaultMatcher(session, "hu"))
+    assert outcome.transcript == "Expiry [EXPIRY]"
+    assert "2020" not in outcome.transcript
+    assert outcome.summary["expired"] is True
+    assert outcome.summary["expiry"] is None
+
+
+def test_transcript_keeps_the_expiry_date_when_asked() -> None:
+    from pii_guard.visual.labels import label_image
+
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    outcome = label_image(_expiry_ocr(), [], VaultMatcher(session, "hu"), expiry="keep")
+    assert outcome.transcript == "Expiry 2020.01.01."
+    assert outcome.summary["expiry"] == "2020-01-01"

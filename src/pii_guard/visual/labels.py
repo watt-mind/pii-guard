@@ -346,10 +346,31 @@ def _kind_label(entity_type: EntityType, holder: _Holder | None) -> RegionLabel:
     return RegionLabel(f"{kind} · {placeholder}", placeholder, holder.label.match)
 
 
-def _transcript(words: Sequence[OcrWord], covered: Sequence[tuple[Box, RegionLabel]]) -> str:
+#: The transcript token for a non-personal expiry value under ``expiry="reduce"``.
+EXPIRY_MARKER = "[EXPIRY]"
+
+
+def _expiry_redactions(ocr: OcrText | None, expiry: ExpiryPolicy) -> list[tuple[Box, str]]:
+    """The expiry value boxes to redact in the transcript when ``expiry="reduce"``
+    (LAB-1196): ``reduce`` then means the same in the transcript as in the summary.
+    Empty under ``expiry="keep"``: the date stays verbatim."""
+    if ocr is None or expiry != "reduce":
+        return []
+    return [
+        (value.box, EXPIRY_MARKER) for value in ocr.fields if field_name(value.caption) == "expiry"
+    ]
+
+
+def _transcript(
+    words: Sequence[OcrWord],
+    covered: Sequence[tuple[Box, RegionLabel]],
+    redacted: Sequence[tuple[Box, str]] = (),
+) -> str:
     """The OCR text, lines kept, with every covered word replaced by its region's token
     (the placeholder, or ``[PHOTO · [[PERSON_x]]]`` for a labelled visual region / MRZ).
-    Consecutive words of one region collapse into one token."""
+    Consecutive words of one region collapse into one token. ``redacted`` additionally
+    replaces the words under its boxes with a fixed marker (the ``[EXPIRY]`` transcript
+    redaction); a covered word keeps its placeholder."""
     parts: list[str] = []
     previous_line: tuple[int, ...] | None = None
     previous_token: str | None = None
@@ -368,6 +389,11 @@ def _transcript(words: Sequence[OcrWord], covered: Sequence[tuple[Box, RegionLab
                 token = best.placeholder
             else:
                 token = f"[{best.label or 'MASKED'}]"
+        elif redacted:
+            for box, marker in redacted:
+                if _overlap(word.box, box) >= WORD_COVER * area:
+                    token, replaced = marker, True
+                    break
         if word.line != previous_line:
             if parts:
                 parts.append("\n")
@@ -530,7 +556,7 @@ def label_image(
         region_labels.append(label)
         covered_boxes.append((region.box, label))
 
-    transcript = _transcript(words, covered_boxes)
+    transcript = _transcript(words, covered_boxes, _expiry_redactions(ocr, expiry))
     transcript = matcher.sweep(transcript, masked_types)
     transcript = matcher.session.mask(transcript, [], language=matcher.language, remask=True)
     summary = build_summary(
