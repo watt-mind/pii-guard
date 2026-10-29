@@ -19,6 +19,8 @@ import { COMPARED, COMPARISON, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEAS
 import AgentReplay from "./AgentReplay";
 import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
+import { consoleSectionOf } from "./consoleLink";
+import { SignedOutConsole } from "./SignedOut";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
 // sign-in returns to the console (LAB-1430).
@@ -59,7 +61,13 @@ const link = "underline underline-offset-4 hover:text-ink";
 export function HostedApp({ call = request, console: renderConsole }: { call?: Requester; console?: (session: HostedSession) => ReactNode }) {
   const { account, error, refresh } = useAccount(call);
   const hash = useHash();
+  // Signed in earlier on this page, so an anonymous account now means the session ended.
+  const [wasSignedIn, setWasSignedIn] = useState(false);
+  if (account?.authenticated && !wasSignedIn) setWasSignedIn(true);
   if (renderConsole && account?.authenticated && !SITE_HASHES.has(hash)) return renderConsole({ account, error, refresh, call });
+  // A console deep link without a session: say what the screen is and how to get there (LAB-1519).
+  const section = renderConsole && account && !account.authenticated ? consoleSectionOf(hash) : null;
+  if (section && account) return <SignedOutConsole section={section} hash={hash} loginUrl={account.login_url || LOGIN} expired={wasSignedIn} />;
   // Back from sign-in: wait for the account rather than flash the public page.
   if (renderConsole && !account && !error && hash !== "" && !SITE_HASHES.has(hash) && hash !== "#account") return <p role="status" className="p-6 text-sm text-muted">Opening your console…</p>;
   return <HostedContent call={call} account={error ? null : account} accountError={error} refresh={refresh} console={Boolean(renderConsole)} />;
