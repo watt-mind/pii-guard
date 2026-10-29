@@ -9,7 +9,7 @@ function trigger() { return menu().querySelector("summary")!; }
 describe("public header navigation", () => {
   it("separates account access and preserves sign-in and signed-in destinations", () => {
     const { rerender } = render(<PublicHeader accountHref="/.auth/login/google?post_login_redirect_uri=%2F%23evaluation" />);
-    const account = screen.getByRole("link", { name: "Sign in" });
+    const account = screen.getByRole("link", { name: "Sign in to console" });
     expect(account).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23evaluation");
     expect(screen.getByRole("navigation")).not.toContainElement(account);
     rerender(<PublicHeader signedIn accountHref="#overview" />);
@@ -36,7 +36,7 @@ describe("public header navigation", () => {
     await user.click(screen.getByRole("link", { name: "PII Guard" }));
     expect(menu()).not.toHaveAttribute("open");
     await user.click(trigger());
-    screen.getByRole("link", { name: "Sign in" }).focus();
+    screen.getByRole("link", { name: "Sign in to console" }).focus();
     expect(menu()).not.toHaveAttribute("open");
     await user.click(trigger());
     fireEvent(window, new Event("resize"));

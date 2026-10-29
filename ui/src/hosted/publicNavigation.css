@@ -15,7 +15,7 @@
 .public-header-bar { max-width: 1280px; height: 64px; padding-inline: 16px; margin-inline: auto; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
 .public-brand { justify-self: start; border-radius: 4px; display: flex; align-items: center; gap: 8px; min-height: 44px; white-space: nowrap; font-size: 16px; font-weight: 500; }
 .public-nav { display: flex; align-items: center; justify-content: flex-end; }
-.public-primary, .public-desktop-label { display: none; }
+.public-primary, .public-desktop-label, .public-signin-suffix { display: none; }
 .public-nav a, .public-nav summary { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 4px; color: var(--muted); white-space: nowrap; }
 .public-nav summary { list-style: none; cursor: pointer; padding-inline: 8px; }
 .public-nav summary::-webkit-details-marker { display: none; }
@@ -25,7 +25,7 @@
 .public-nav-panel { position: absolute; top: 100%; inset-inline: 12px; padding: 8px; max-height: calc(100dvh - 80px); overflow-y: auto; overscroll-behavior: contain; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 8px 16px color-mix(in srgb, var(--ink) 10%, transparent); }
 .public-resource-label { padding: 12px 12px 4px; color: var(--faint); font-size: 12px; border-top: 1px solid var(--line); margin-top: 8px; }
 .public-account { border-left: 1px solid var(--line-strong); padding-left: 8px; }
-.public-account > a { min-height: 44px; padding-inline: 10px; white-space: nowrap; }
+.public-account > a { column-gap: 0; min-height: 44px; padding-inline: 10px; white-space: nowrap; }
 .public-header + main section[id] { scroll-margin-top: 82px; }
 .public-footer { --public-brand-mat: #ffffff; }
 .public-footer a { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; border-radius: 4px; white-space: nowrap; }
@@ -38,7 +38,7 @@
 @media (min-width: 1024px) {
   .public-header-bar { padding-inline: 40px; grid-template-columns: 1fr auto 1fr; gap: 24px; }
   .public-primary { display: flex; }
-  .public-desktop-label { display: inline; }
+  .public-desktop-label, .public-signin-suffix { display: inline; }
   .public-mobile-label, .public-nav .public-mobile-link, .public-resource-label { display: none; }
   .public-nav { justify-content: center; }
   .public-disclosure { position: relative; }

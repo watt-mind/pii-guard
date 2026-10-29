@@ -76,7 +76,7 @@ export function PublicHeader({ current, accountHref, signedIn = false }: { curre
           </div>
         </details>
       </nav>
-      <div className="public-account"><ButtonLink href={accountHref}>{signedIn ? "Open console" : "Sign in"}</ButtonLink></div>
+      <div className="public-account"><ButtonLink href={accountHref} aria-label={signedIn ? undefined : "Sign in to console"}>{signedIn ? "Open console" : <>Sign in<span className="public-signin-suffix"> to console</span></>}</ButtonLink></div>
     </div>
   </header>;
 }

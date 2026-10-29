@@ -36,7 +36,7 @@ describe("public hosted workflow", () => {
     await screen.findAllByText(/free runs/i);
     expect(screen.getByText(/Runs on Muse Spark 1.3 · no key needed/)).toHaveTextContent("3 of 3 free runs left today");
     expect(document.body.textContent).not.toMatch(/sponsor/i);
-    const links = [...screen.getAllByRole("link", { name: "Sign in with Google" }), ...screen.getAllByRole("link", { name: "Sign in" })];
+    const links = [...screen.getAllByRole("link", { name: "Sign in with Google" }), ...screen.getAllByRole("link", { name: "Sign in to console" })];
     expect(links.length).toBeGreaterThanOrEqual(2);
     for (const link of links) expect(link).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23overview");
   });
