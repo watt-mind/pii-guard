@@ -9,6 +9,12 @@
 - :func:`restore_completion` rewrites a ``chat.completion`` body in place: message texts,
   tool-call ``function.arguments`` and the legacy ``function_call.arguments`` (JSON-escaped),
   and custom tool ``custom.input`` (freeform text, restored as is; LAB-1354).
+- :class:`ToolInputSession` restores custom tool input. It and :class:`JsonEscapingSession`
+  also restore a **regex-escaped** placeholder (``\\[\\[EMAIL_x\\]\\]``, which a model
+  writes in a ``sed``/``perl``/``python`` pattern) to the value as a regex literal
+  (:func:`regex_literal`), so the command still matches the file (LAB-1481). In JSON arguments
+  the escape is JSON-encoded too (``\\\\[\\\\[``). Only tool-call fields get this; message
+  text keeps an escaped placeholder as written.
 
 Unknown placeholders are left as is and counted (``unresolved``). Every restored value is
 charged to one :class:`~pii_guard.vault.RestoreBudget` per response, so a response restores at
@@ -18,19 +24,24 @@ most ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of original values (LAB-
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+import re
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, RestoreBudget, UnmaskResult, VaultSession
 from pii_guard.vault.inflection import following_suffix
+from pii_guard.vault.placeholders import MAX_PLACEHOLDER_LENGTH
 
 __all__ = [
     "JsonEscapingSession",
     "RestoreReport",
+    "ToolInputSession",
+    "regex_literal",
     "restore_completion",
     "restore_text",
+    "restore_tool_input",
 ]
 
 #: String fields of an assistant message / delta that may carry placeholders.
@@ -126,6 +137,140 @@ def restore_text(
     return "".join(parts), spans, tuple(unresolved)
 
 
+# --- regex-escaped placeholders in tool input (LAB-1481) -----------------------------------
+
+#: Escaped with a backslash: literal in every regex flavour (BRE, ERE, PCRE, Python, JS).
+_BACKSLASHED = frozenset("\\.*[]^$/")
+#: Bracketed instead: ``\+``, ``\?``, ``\(``, ``\{``, ``\|`` are *operators* in GNU sed's BRE,
+#: and Perl interpolates ``@name`` in a pattern, while ``[+]`` and ``[@]`` are literals everywhere.
+_BRACKETED = frozenset("+?(){}|@")
+
+#: Placeholder body, as in :data:`~pii_guard.vault.PLACEHOLDER_RE`.
+_BODY = r"([A-Z][A-Z0-9_]*)_([0-9a-f]{4,})"
+#: A possible body still growing (loose, like the vault's prefix check): only for holding back.
+_BODY_PREFIX_RE = re.compile(r"[A-Z][A-Z0-9_a-f]*")
+
+
+def regex_literal(value: str) -> str:
+    """``value`` as a regex matching exactly it, in BRE, ERE, Perl, PCRE, Python and JS alike."""
+    return "".join(
+        "\\" + char if char in _BACKSLASHED else f"[{char}]" if char in _BRACKETED else char
+        for char in value
+    )
+
+
+class _EscapeForm:
+    """One escape depth: ``\\[\\[TYPE_id\\]\\]`` written with ``escape`` before each bracket.
+
+    The opening brackets must both be escaped; a closing one may be escaped or not (an
+    unescaped ``]`` is a literal in a regex too). An escape right after another backslash is
+    not one (``\\\\[`` is an escaped backslash and a bracket), so it is not matched.
+    """
+
+    def __init__(self, escape: str) -> None:
+        e = re.escape(escape)
+        self.escape = escape
+        self.pattern = re.compile(rf"(?<!\\){e}\[{e}\[{_BODY}(?:(?:{e})?\]){{2}}")
+        self.opening = f"{escape}[{escape}["
+        closes = (f"{escape}]", "]")
+        self.closings = tuple(a + b for a in closes for b in closes)
+        self.longest = MAX_PLACEHOLDER_LENGTH + 4 * len(escape)
+
+    def is_prefix(self, text: str) -> bool:
+        """True if ``text`` is an incomplete escaped placeholder that more input could complete."""
+        if len(text) >= self.longest:
+            return False
+        if len(text) <= len(self.opening):
+            return self.opening.startswith(text)
+        if not text.startswith(self.opening):
+            return False
+        body = _BODY_PREFIX_RE.match(text, len(self.opening))
+        if body is None:
+            return False
+        tail = text[body.end() :]
+        return any(len(tail) < len(c) and c.startswith(tail) for c in self.closings)
+
+    def hold_from(self, buffer: str) -> int:
+        """Index of a trailing possible escaped placeholder (``len(buffer)`` if there is none)."""
+        for index in range(max(0, len(buffer) - self.longest), len(buffer)):
+            if (
+                buffer[index] == "\\"
+                and (index == 0 or buffer[index - 1] != "\\")
+                and self.is_prefix(buffer[index:])
+            ):
+                return index
+        return len(buffer)
+
+
+#: In freeform tool input (a shell command): ``\\[\\[``.
+_RAW_ESCAPE = _EscapeForm("\\")
+#: In JSON arguments, the same escape JSON-encoded: ``\\\\[\\\\[`` (decodes to ``\\[\\[``).
+_JSON_ESCAPE = _EscapeForm("\\\\")
+
+
+def _restore_escaped(
+    session: VaultSession,
+    text: str,
+    budget: RestoreBudget,
+    form: _EscapeForm,
+    encode: Callable[[str], str],
+    rest: Callable[[str], UnmaskResult],
+) -> UnmaskResult:
+    """Escaped placeholders in ``text`` restored to ``encode(regex_literal(value))``; the text
+    between them goes through ``rest`` (the plain restore). Unknown ones stay as written."""
+    unresolved: dict[str, None] = {}
+    parts: list[str] = []
+    cursor = 0
+    for match in form.pattern.finditer(text):
+        plain = rest(text[cursor : match.start()])
+        parts.append(plain.text)
+        unresolved.update(dict.fromkeys(plain.unresolved))
+        cursor = match.end()
+        placeholder = f"[[{match.group(1)}_{match.group(2)}]]"
+        result = session.unmask_with_report(placeholder, budget=budget)
+        if result.unresolved:
+            unresolved[placeholder] = None
+            parts.append(match.group(0))
+        else:
+            parts.append(encode(regex_literal(result.text)))
+    plain = rest(text[cursor:])
+    parts.append(plain.text)
+    unresolved.update(dict.fromkeys(plain.unresolved))
+    return UnmaskResult("".join(parts), tuple(unresolved))
+
+
+def _json_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)[1:-1]
+
+
+class ToolInputSession:
+    """Restores freeform tool input (custom tool ``input``): plain placeholders as the session
+    does, and regex-escaped ones as regex literals. Duck-type compatible with
+    :class:`~pii_guard.vault.StreamUnmasker` (``hold_from`` holds back a split escape)."""
+
+    def __init__(self, session: VaultSession, budget: RestoreBudget | None = None) -> None:
+        self._session = session
+        self._budget = budget
+
+    def restore_budget(self) -> RestoreBudget:
+        return self._budget or self._session.restore_budget()
+
+    def unmask_with_report(self, text: str, *, budget: RestoreBudget | None = None) -> UnmaskResult:
+        budget = budget or self.restore_budget()
+        return _restore_escaped(
+            self._session,
+            text,
+            budget,
+            _RAW_ESCAPE,
+            lambda literal: literal,
+            lambda part: self._session.unmask_with_report(part, budget=budget),
+        )
+
+    @staticmethod
+    def hold_from(buffer: str) -> int:
+        return _RAW_ESCAPE.hold_from(buffer)
+
+
 class JsonEscapingSession:
     """Restores placeholders as JSON-string-escaped values (for tool-call ``arguments``)."""
 
@@ -138,6 +283,20 @@ class JsonEscapingSession:
 
     def unmask_with_report(self, text: str, *, budget: RestoreBudget | None = None) -> UnmaskResult:
         budget = budget or self.restore_budget()
+        return _restore_escaped(
+            self._session,
+            text,
+            budget,
+            _JSON_ESCAPE,
+            _json_string,
+            lambda part: self._plain(part, budget),
+        )
+
+    @staticmethod
+    def hold_from(buffer: str) -> int:
+        return _JSON_ESCAPE.hold_from(buffer)
+
+    def _plain(self, text: str, budget: RestoreBudget) -> UnmaskResult:
         unresolved: dict[str, None] = {}
         parts: list[str] = []
         cursor = 0
@@ -148,7 +307,7 @@ class JsonEscapingSession:
                 unresolved[item.placeholder] = None
                 parts.append(item.placeholder)
             else:
-                parts.append(json.dumps(item.value + item.suffix, ensure_ascii=False)[1:-1])
+                parts.append(_json_string(item.value + item.suffix))
         parts.append(text[cursor:])
         return UnmaskResult("".join(parts), tuple(unresolved))
 
@@ -170,6 +329,18 @@ def restore_arguments(
     budget: RestoreBudget | None = None,
 ) -> str:
     result = JsonEscapingSession(session, budget).unmask_with_report(arguments)
+    report.unresolved.update(dict.fromkeys(result.unresolved))
+    return result.text
+
+
+def restore_tool_input(
+    session: VaultSession,
+    text: str,
+    report: RestoreReport,
+    budget: RestoreBudget | None = None,
+) -> str:
+    """Freeform tool input (custom tool ``input``), with regex-escaped placeholders too."""
+    result = ToolInputSession(session, budget).unmask_with_report(text)
     report.unresolved.update(dict.fromkeys(result.unresolved))
     return result.text
 
@@ -214,10 +385,8 @@ def restore_completion(session: VaultSession, body: dict[str, Any]) -> RestoreRe
                 )
             custom = call.get("custom")
             if isinstance(custom, dict) and isinstance(custom.get("input"), str):
-                # Custom tool input is freeform text, not JSON: restored without escaping.
-                restored, _, unresolved = restore_text(session, custom["input"], budget)
-                custom["input"] = restored
-                report.unresolved.update(dict.fromkeys(unresolved))
+                # Custom tool input is freeform text, not JSON: restored without JSON escaping.
+                custom["input"] = restore_tool_input(session, custom["input"], report, budget)
         function_call = message.get("function_call")
         if isinstance(function_call, dict) and isinstance(function_call.get("arguments"), str):
             function_call["arguments"] = restore_arguments(

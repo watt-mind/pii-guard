@@ -8,7 +8,9 @@ is held back until it is complete. When a choice finishes (``finish_reason``) or
 ends, whatever is still held back is flushed into that chunk (or a final synthetic chunk).
 Concatenating the emitted deltas gives exactly ``session.unmask()`` of the upstream text.
 Arguments (JSON) get JSON-string-escaped values; custom tool input is freeform text and is
-restored as is (LAB-1354). One restore budget covers every field of the response (LAB-1350).
+restored as is (LAB-1354). In both, a regex-escaped placeholder is restored as a regex literal
+and held back while split (LAB-1481). One restore budget covers every field of the response
+(LAB-1350).
 
 Upstream ``error`` events are replaced by a generic error: they may quote the masked request.
 """
@@ -20,7 +22,7 @@ from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 from pii_guard.gateway.opaque_ids import upstream_ids
-from pii_guard.gateway.restore import MESSAGE_TEXT_FIELDS, JsonEscapingSession
+from pii_guard.gateway.restore import MESSAGE_TEXT_FIELDS, JsonEscapingSession, ToolInputSession
 from pii_guard.vault import StreamUnmasker, VaultSession
 
 __all__ = ["SseRestorer", "iter_sse_data", "sse_event"]
@@ -65,6 +67,7 @@ class SseRestorer:
         # One budget for the whole response: every choice, field and tool call (LAB-1350).
         self._budget = session.restore_budget()
         self._json_session = JsonEscapingSession(session, self._budget)
+        self._tool_session = ToolInputSession(session, self._budget)
         # (choice, field) or (choice, "tool", tool index) -> unmasker
         self._unmaskers: dict[tuple[Any, ...], StreamUnmasker] = {}
         self._retired_unresolved: dict[str, None] = {}
@@ -87,11 +90,13 @@ class SseRestorer:
         """Per choice, the upstream (masked) ``content`` seen so far -- for cache seeding."""
         return {index: "".join(parts) for index, parts in self._masked_content.items()}
 
-    def _unmasker(self, key: tuple[Any, ...], json_safe: bool = False) -> StreamUnmasker:
+    def _unmasker(self, key: tuple[Any, ...], kind: str = "text") -> StreamUnmasker:
         unmasker = self._unmaskers.get(key)
         if unmasker is None:
-            # StreamUnmasker only calls unmask_with_report(); the JSON adapter provides it.
-            session: Any = self._json_session if json_safe else self._session
+            # StreamUnmasker calls unmask_with_report() (and hold_from()); the adapters have them.
+            session: Any = {"json": self._json_session, "tool": self._tool_session}.get(
+                kind, self._session
+            )
             unmasker = StreamUnmasker(session, self._budget)
             self._unmaskers[key] = unmasker
         return unmasker
@@ -143,20 +148,20 @@ class SseRestorer:
             tool_index = call.get("index", position_in_delta)
             function = call.get("function")
             if isinstance(function, dict) and isinstance(function.get("arguments"), str):
-                function["arguments"] = self._unmasker(
-                    (index, "tool", tool_index), json_safe=True
-                ).feed(function["arguments"])
+                function["arguments"] = self._unmasker((index, "tool", tool_index), "json").feed(
+                    function["arguments"]
+                )
             custom = call.get("custom")
             if isinstance(custom, dict) and isinstance(custom.get("input"), str):
-                custom["input"] = self._unmasker((index, "custom", tool_index)).feed(
+                custom["input"] = self._unmasker((index, "custom", tool_index), "tool").feed(
                     custom["input"]
                 )
         # The legacy (pre-tools) single function call: ``delta.function_call.arguments``.
         function_call = delta.get("function_call")
         if isinstance(function_call, dict) and isinstance(function_call.get("arguments"), str):
-            function_call["arguments"] = self._unmasker(
-                (index, "function_call"), json_safe=True
-            ).feed(function_call["arguments"])
+            function_call["arguments"] = self._unmasker((index, "function_call"), "json").feed(
+                function_call["arguments"]
+            )
         if choice.get("finish_reason") and isinstance(index, int):
             self._flush_choice(index, delta)
 

@@ -1079,6 +1079,17 @@ kept in the forwarded text, so the first word of the line is detected on its own
 `arguments` get JSON-escaped values, as chat tool-call arguments do. `encrypted_content` is
 left as is. `X-PII-Guard-Unresolved` counts unknown placeholders.
 
+**Regex-escaped placeholders in tool input** (both APIs, whole and streamed; LAB-1481). A model with
+only a shell tool may write a placeholder escaped for a `sed`/`perl`/`python` pattern:
+`\[\[EMAIL_x\]\]` (or `\[\[EMAIL_x]]`). In custom tool `input` that form, and in `arguments` the
+same form JSON-encoded (`\\[\\[EMAIL_x\\]\\]`), is restored to the value as a regex literal, so the
+command still matches the file: `.*[]^$/\` get a backslash and `+?(){}|@` are bracketed (`[+]`),
+which is literal in BRE, ERE, Perl, PCRE, Python and JS alike (`\+` and `\(` are operators in GNU
+`sed`, and Perl interpolates `@name`). Nothing else changes: message text keeps an escaped
+placeholder as written; other escape depths (`\\[\\[` in freeform input, an escape after a
+backslash) are left; an unknown or other session's placeholder stays as written and is counted as
+unresolved; the restored value is charged to the response's restore budget.
+
 **Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
 stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
 `summary_index`: `response.output_text.delta`, `response.refusal.delta`,
