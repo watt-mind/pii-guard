@@ -34,13 +34,21 @@ identifier the upstream issued in this session (LAB-1469) and, in an identifier,
 name of a word-like type (LAB-1324). A tool name that is also a pre-loaded known value still
 blocks, as it fails closed at masking.
 
+**Beyond the walker's slots (LAB-1563).** Re-reading with the same walker cannot see a field
+the walker never collected, so :func:`check_outbound` also scans the serialized masked body
+(``json.dumps``) as one text, with the same session search, :func:`blocks` thresholds and
+exemptions (a kept tool-name value and an issued id — the JSON string enclosing the
+occurrence — do not block). Counts merge by taking the larger count per entity type, so a
+value both scans see is not counted twice.
+
 Cost: one fold per text (the session's memo serves the texts masking left unchanged) and one
-substring search per session value over all of them; a value is matched text by text only
-when it can occur at all.
+substring search per session value over all of them, plus one serialization and one search
+over it; a value is matched text by text only when it can occur at all.
 """
 
 from __future__ import annotations
 
+import json
 import time
 from collections import Counter
 from collections.abc import Callable, Mapping
@@ -172,15 +180,77 @@ def check_outbound(
     tool_names: frozenset[str] = frozenset(),
     issued: frozenset[str] = frozenset(),
 ) -> OutboundCheck:
-    """Re-read the masked ``body`` with ``collect`` and re-check every text in it.
+    """Re-read the masked ``body`` with ``collect`` and re-check every text in it, then scan
+    the serialized body independently of the walker's slots (LAB-1563).
 
     The walker only reads here: nothing is written back. A masked body it can no longer read
-    is refused like a hit (fail closed)."""
+    (or serialize) is refused like a hit (fail closed)."""
     started = time.perf_counter()
     try:
         slots = collect(body).slots
     except PiiGuardError:
         raise OutboundCheckFailedError({}, unreadable=True) from None
     check = check_slots(slots, session, language, tool_names=tool_names, issued=issued)
+    _check_serialized(body, session, language, check, tool_names=tool_names, issued=issued)
     check.ms = (time.perf_counter() - started) * 1000
     return check
+
+
+def _check_serialized(
+    body: Mapping[str, Any],
+    session: VaultSession,
+    language: str,
+    check: OutboundCheck,
+    *,
+    tool_names: frozenset[str],
+    issued: frozenset[str],
+) -> None:
+    """Search the serialized masked ``body`` for session values, wherever they sit.
+
+    This is the walker's blind-spot net: keys, structural values, raw numbers and any field
+    no slot covers. Exemptions mirror :func:`check_slots` without slot context: a declared
+    tool name of a word-like type (the tool-name identifiers masking keeps) and an upstream
+    issued id (the occurrence itself, or the JSON string enclosing it) do not block; a
+    pre-loaded known value always does. Merged into ``check`` by the larger count.
+    """
+    try:
+        serialized = json.dumps(body, ensure_ascii=False)
+    except (TypeError, ValueError):
+        raise OutboundCheckFailedError({}, unreadable=True) from None
+    if tool_names and session.known_values:
+        known = {normalize_value(v.value) for v in session.known_values.values()}
+        tool_names = tool_names - known
+    hits: Counter[str] = Counter()
+    short = 0
+    for occurrence in session.unmasked([serialized], language):
+        if not occurrence.known:
+            surface = serialized[occurrence.start : occurrence.end]
+            if occurrence.entity_type in EXEMPT_TYPES and (normalize_value(surface) in tool_names):
+                continue
+            if surface in issued or (
+                _enclosing_json_string(serialized, occurrence.start, occurrence.end) in issued
+            ):
+                continue
+        if blocks(occurrence):
+            hits[occurrence.entity_type.value] += 1
+        else:
+            short += 1
+    for entity_type, count in hits.items():
+        check.hits[entity_type] = max(check.hits[entity_type], count)
+    check.short = max(check.short, short)
+
+
+def _enclosing_json_string(serialized: str, start: int, end: int) -> str:
+    """The raw content of the JSON string enclosing ``serialized[start:end]`` (``""``: none
+    found nearby). Bounded: the quotes are searched within 1024 characters each way."""
+    opening = -1
+    for i in range(start - 1, max(start - 1025, -1), -1):
+        if serialized[i] == '"' and (i == 0 or serialized[i - 1] != "\\"):
+            opening = i
+            break
+    if opening < 0:
+        return ""
+    for j in range(end, min(end + 1024, len(serialized))):
+        if serialized[j] == '"' and serialized[j - 1] != "\\":
+            return serialized[opening + 1 : j]
+    return ""

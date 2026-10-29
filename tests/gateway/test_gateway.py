@@ -248,13 +248,14 @@ def test_second_turn_detects_only_the_new_message(stream: bool) -> None:
         )
         session = raw.headers["x-pii-guard-session"]
         assert raw.headers["x-pii-guard-cache-hits"] == "0"
-        assert raw.headers["x-pii-guard-cache-misses"] == "2"
+        # Two messages plus the identifier-checked ``model`` (LAB-1563).
+        assert raw.headers["x-pii-guard-cache-misses"] == "3"
         parsed = raw.parse()
         if stream:
             answer = "".join(c.choices[0].delta.content or "" for c in parsed if c.choices)
         else:
             answer = parsed.choices[0].message.content
-        assert llm.calls == 2
+        assert llm.calls == 3
 
         turn_two = [
             *turn_one,
@@ -266,9 +267,9 @@ def test_second_turn_detects_only_the_new_message(stream: bool) -> None:
         )
         raw2.parse()
     assert raw2.headers["x-pii-guard-session"] == session
-    assert raw2.headers["x-pii-guard-cache-hits"] == "3"  # system, user 1, the answer
+    assert raw2.headers["x-pii-guard-cache-hits"] == "4"  # system, user 1, the answer, model
     assert raw2.headers["x-pii-guard-cache-misses"] == "1"  # only the new message
-    assert llm.calls == 3
+    assert llm.calls == 4
     first, second = upstream.bodies[0], upstream.bodies[1]
     # Re-sent history masks identically (deterministic per session).
     assert second["messages"][:2] == first["messages"][:2]
@@ -313,7 +314,7 @@ def test_audit_mode_calls_the_llm_detector() -> None:
         openai_client(http, **{"X-PII-Guard-Mode": "audit"}).chat.completions.create(
             model="m", messages=conversation_turn_one()
         )
-    assert llm.calls == 2
+    assert llm.calls == 3  # two messages plus the identifier-checked ``model`` (LAB-1563)
 
 
 def test_default_mode_comes_from_the_config() -> None:

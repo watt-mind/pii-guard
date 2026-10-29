@@ -967,7 +967,9 @@ the entries the refused call added. A refused call never drops a session it did 
 Every gateway response that reached the upstream carries `X-PII-Guard-Outbound-Check: passed`;
 a request refused by the re-check gets `422 outbound_check_failed` with
 `X-PII-Guard-Outbound-Check: blocked` (policy and short-value rules:
-[architecture-gateway.md](architecture-gateway.md#outbound-re-check)).
+[architecture-gateway.md](architecture-gateway.md#outbound-re-check)). Besides re-reading the
+walker's texts, the re-check scans the serialized masked body as one text, so a field no
+walker slot covers can't carry a session value out either (LAB-1563).
 
 ## Gateway request fields (implemented)
 
@@ -1000,8 +1002,10 @@ Treatments:
 
 **Declared tool names.** A tool or namespace name the request declares (`tools[].name`,
 `tools[].function.name`, `functions[].name`, ...) is the client's vocabulary: a `PERSON`,
-`ORGANIZATION` or `ADDRESS` detection whose whole value is a declared name is dropped, in the
-texts and in identifiers ("Muse" read as a person, LAB-1299/LAB-1317/LAB-1324). No other type
+`ORGANIZATION` or `ADDRESS` detection whose whole value is a declared name is dropped **in
+identifiers only** ("Muse" read as a person, LAB-1299/LAB-1317/LAB-1324). The same value in
+message prose or any other masked text is masked as usual (LAB-1563: a declared name is
+client-controlled and must not suppress prose detections). No other type
 is exempt: a value found by format or checksum (a tax ID, an IBAN, ...) is masked wherever it
 appears, and a tool named after one is `400 unsupported_content` (LAB-1348). Values the operator
 pre-loaded (`known`) are never exempt.
@@ -1010,7 +1014,7 @@ pre-loaded (`known`) are never exempt.
 
 | Where | Key | Treatment |
 | --- | --- | --- |
-| body | `model` | pass (non-empty string, required) |
+| body | `model` | check (non-empty string, required; LAB-1563) |
 | body | `messages` | per message, below (non-empty array, required) |
 | body | `temperature`, `top_p`, `n`, `max_tokens`, `max_completion_tokens`, `presence_penalty`, `frequency_penalty`, `seed`, `logprobs`, `top_logprobs`, `stream`, `parallel_tool_calls`, `store`, and the extension knobs `top_k`, `min_p`, `repetition_penalty` | pass |
 | body | `reasoning_effort`, `service_tier`, `verbosity`, `modalities`, `stream_options`, `audio`, `tool_choice`, `function_call` | check (every string and key) |
@@ -1020,7 +1024,7 @@ pre-loaded (`known`) are never exempt.
 | body | `web_search_options` | `search_context_size` check; `user_location` mask JSON |
 | body | `logit_bias` | keys must be token ids, values numbers |
 | body | `metadata` | keys check; values mask JSON |
-| body | `tools`, `functions` | definitions: `name` and other keys check; `parameters`/`schema` walked as JSON Schema (free text masked, `properties` keys and `required` entries checked, `type`/`$ref`/`format`/... passed); every other string or array mask JSON (e.g. an MCP tool's `server_description`); entries must be objects |
+| body | `tools`, `functions` | definitions: `name` and other keys check; `parameters`/`schema` walked as JSON Schema (free text masked, `properties` keys and `required` entries checked, `type`/`$ref`/`format`/... **values** checked, LAB-1563); a custom tool's `format.grammar.definition` mask, its other `format` leaves check; every other string, array or direct numeric leaf mask JSON (e.g. an MCP tool's `server_description`); entries must be objects |
 | body | `response_format` | `type` check; `json_schema` as a definition |
 | message | `role` | one of `system`, `developer`, `user`, `assistant`, `tool`, `function` |
 | message | `content` | string mask; array of content parts, below |
@@ -1055,7 +1059,7 @@ with the treatments of the table above. Any other key, item type or part type is
 
 | Where | Key | Treatment |
 | --- | --- | --- |
-| body | `model` | pass (non-empty string, required) |
+| body | `model` | check (non-empty string, required; LAB-1563) |
 | body | `input` | a string (mask), or a non-empty array of items, below (required) |
 | body | `instructions` | mask |
 | body | `temperature`, `top_p`, `top_logprobs`, `max_output_tokens`, `max_tool_calls`, `parallel_tool_calls`, `store`, `stream`, `background` | pass |
@@ -1063,7 +1067,7 @@ with the treatments of the table above. Any other key, item type or part type is
 | body | `user`, `safety_identifier`, `prompt_cache_key` | mask |
 | body | `metadata`, `client_metadata` (Codex's per-turn ids) | keys check; values mask JSON |
 | body | `text` | `verbosity` check; `format` (`type`, `name`, `schema`, `description`, `strict`) as a definition |
-| body | `tools` | `function` and `custom` tools as definitions (as for chat); `namespace` tools: `name` check, `description` mask, `tools` (function/custom only) walked; hosted tools (`web_search`, `file_search`, `mcp`, ...) `400` |
+| body | `tools` | `function` and `custom` tools as definitions (as for chat, including a custom tool's `format.grammar.definition` mask); `namespace` tools: `name` check, `description` mask, `tools` (function/custom only) walked; hosted tools (`web_search`, `file_search`, `mcp`, ...) `400` |
 | body | `previous_response_id`, `conversation`, `prompt` | `400`: server-side state would hold another vault session's placeholders; send the whole `input` with `store: false` |
 | every item | `type`, `id`, `call_id`, `status`, `phase` | check |
 | `message` item (or `{role, content}` without `type`) | `role` | one of `system`, `developer`, `user`, `assistant` |
