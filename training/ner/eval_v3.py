@@ -62,11 +62,14 @@ LABELS = {
     "v32-s70": "pii-guard fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494)",
     "v32-d": "pii-guard fast, NER v3.2 candidate D: v2.0 warm start + error-mined data (LAB-1494)",
     "v32-e": "pii-guard fast, NER v3.2 candidate E: v2.0 recipe + error-mined data (LAB-1494)",
+    "v33-t1": "pii-guard fast, NER v3.3 candidate T1: S30 + targeted add-on, 1 epoch (LAB-1512)",
+    "v33-t2": "pii-guard fast, NER v3.3 candidate T2: S30 + targeted add-on, 2 epochs (LAB-1512)",
+    "v33-h": "pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512)",
 }
 #: Tickets whose v2.0 runs are selection-only re-scores (LAB-1494): their records get a system
 #: key and label of their own, so the report's latest-per-system pick keeps the published v2.0
 #: rows (timed on a quiet machine) instead of these, timed on a loaded one.
-RESCORE_TICKETS = ("LAB-1494",)
+RESCORE_TICKETS = ("LAB-1494", "LAB-1512")
 
 
 def system_extra(ticket: str, candidate: str) -> dict[str, Any]:
@@ -86,6 +89,7 @@ TICKETS = {
     "LAB-1393": "NER v3 candidates vs v2.0",
     "LAB-1410": "NER v3.1 candidates vs v2.0 (clean selection set: agent-traffic-dev)",
     "LAB-1494": "NER v3.2 candidates (soups, error-mined data) vs v2.0, v3.1 protocol",
+    "LAB-1512": "NER v3.3 candidates (S30 + targeted add-on; thresholds) vs v2.0, v3.1 protocol",
 }
 
 
@@ -124,6 +128,13 @@ def _detector(candidate: str, model: str | None) -> dict[str, Any]:
 def _score(args: argparse.Namespace) -> int:
     if args.model:
         os.environ["PII_GUARD_NER_MODEL"] = args.model
+    thresholds: dict[str, Any] = {}
+    if args.thresholds:  # LAB-1512 path 4: a dev-calibrated table (thresholds_v33.py)
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import thresholds_v33
+
+        thresholds = json.loads(args.thresholds.read_text(encoding="utf-8"))["thresholds"]
+        thresholds_v33.apply(thresholds)
     from pii_guard.eval.fixtures import load_fixtures
     from pii_guard.eval.record import build_records, host_info, write_records
     from pii_guard.eval.report import build_scorecard
@@ -135,6 +146,13 @@ def _score(args: argparse.Namespace) -> int:
         return 2
     analyzer.analyze("Warm-up text without personal data.", "en")
     detectors = [{"name": "rules"}, _detector(args.candidate, args.model)]
+    if thresholds:
+        from pii_guard.eval.stats import sha256_file
+
+        detectors[1]["settings"] = {
+            "thresholds_file": str(args.thresholds),
+            "thresholds_sha256": sha256_file(args.thresholds),
+        }
     summary: dict[str, Any] = {}
     for name in args.sets:
         paths = _paths(name)
@@ -158,9 +176,9 @@ def _score(args: argparse.Namespace) -> int:
                 "(seed 1393, near-copies removed by decontam.py): closer to distribution than "
                 "for v2.0."
             )
-        if name == "agent-traffic-dev" and args.ticket in ("LAB-1410", "LAB-1494"):
+        if name == "agent-traffic-dev" and args.ticket in ("LAB-1410", "LAB-1494", "LAB-1512"):
             notes.append(
-                "Selection set. No v3.1 or v3.2 mix holds any agent-traffic generator "
+                "Selection set. No v3.1, v3.2 or v3.3 mix holds any agent-traffic generator "
                 "document, so it is unseen by every candidate, as it was for v2.0."
             )
         records = build_records(
@@ -269,6 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument("--runs-dir", type=Path, default=Path("eval/results/runs"))
     score.add_argument("--scorecards", type=Path)
     score.add_argument("--summary", type=Path)
+    score.add_argument("--thresholds", type=Path, help="thresholds_v33.py JSON (candidate H)")
     lat = sub.add_parser("latency")
     lat.add_argument("--model", action="append", required=True, help="name=dir (empty: v2.0)")
     lat.add_argument("--n", type=int, default=150)

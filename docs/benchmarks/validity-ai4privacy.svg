@@ -22,468 +22,508 @@
 <text x="1353.8" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">75%</text>
 <line x1="1460" y1="210" x2="1460" y2="730" stroke="#E3E3E8" stroke-width="2"/>
 <text x="1460" y="760" font-size="20" fill="#4A4A52" text-anchor="middle">100%</text>
-<circle cx="66" cy="215.7" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="223.7" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
-<rect x="1035.3" y="218" width="267.2" height="-4.2" fill="#4A4A52"/>
-<text x="1310.6" y="209.8" font-size="19" fill="#1B1B1F">62.9</text>
-<rect x="1035.3" y="217.8" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="209.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="217.7" width="267.5" height="-4.2" fill="#CC6677"/>
-<text x="1310.8" y="209.5" font-size="19" fill="#1B1B1F">63.0</text>
-<rect x="1035.3" y="217.5" width="301.8" height="-4.2" fill="#332288"/>
-<text x="1345.2" y="209.3" font-size="19" fill="#1B1B1F">71.1</text>
-<circle cx="66" cy="227" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="235" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
-<rect x="1035.3" y="229.3" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="221.1" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="229.1" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="221" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="229" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="220.8" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="228.8" width="2.7" height="-4.2" fill="#332288"/>
-<text x="1046" y="220.6" font-size="19" fill="#1B1B1F">0.6</text>
-<circle cx="66" cy="238.3" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="246.3" font-size="21" fill="#1B1B1F" font-weight="600">bardsai/eu-pii-anonimization-multilang-v3 alone (comparison)</text>
-<rect x="1035.3" y="240.6" width="2.3" height="-4.2" fill="#4A4A52"/>
-<text x="1045.7" y="232.4" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="240.4" width="2.5" height="-4.2" fill="#117733"/>
-<text x="1045.9" y="232.3" font-size="19" fill="#1B1B1F">0.6</text>
-<rect x="1035.3" y="240.3" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="232.1" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="240.1" width="3.7" height="-4.2" fill="#332288"/>
-<text x="1047" y="231.9" font-size="19" fill="#1B1B1F">0.9</text>
-<circle cx="66" cy="249.6" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="257.6" font-size="21" fill="#1B1B1F" font-weight="600">tabularisai/eu-pii-safeguard alone (comparison, LAB-1386)</text>
-<rect x="1035.3" y="251.9" width="49.6" height="-4.2" fill="#4A4A52"/>
-<text x="1092.9" y="243.7" font-size="19" fill="#1B1B1F">11.7</text>
-<rect x="1035.3" y="251.7" width="25.6" height="-4.2" fill="#117733"/>
-<text x="1068.9" y="243.6" font-size="19" fill="#1B1B1F">6.0</text>
-<rect x="1035.3" y="251.6" width="54.9" height="-4.2" fill="#CC6677"/>
-<text x="1098.2" y="243.4" font-size="19" fill="#1B1B1F">12.9</text>
-<rect x="1035.3" y="251.4" width="49.6" height="-4.2" fill="#332288"/>
-<text x="1092.9" y="243.2" font-size="19" fill="#1B1B1F">11.7</text>
-<circle cx="66" cy="260.9" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="268.9" font-size="21" fill="#1B1B1F" font-weight="600">Horizon-Labs/pii-redactor-base alone (comparison)</text>
-<rect x="1035.3" y="263.2" width="2.7" height="-4.2" fill="#4A4A52"/>
-<text x="1046.1" y="255" font-size="19" fill="#1B1B1F">0.6</text>
-<rect x="1035.3" y="263" width="5.1" height="-4.2" fill="#117733"/>
-<text x="1048.4" y="254.9" font-size="19" fill="#1B1B1F">1.2</text>
-<rect x="1035.3" y="262.9" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="254.7" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="262.7" width="3" height="-4.2" fill="#332288"/>
-<text x="1046.4" y="254.5" font-size="19" fill="#1B1B1F">0.7</text>
-<circle cx="66" cy="272.2" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="280.2" font-size="21" fill="#1B1B1F" font-weight="600">Horizon-Labs/pii-redactor-small alone (comparison)</text>
-<rect x="1035.3" y="274.5" width="3.3" height="-4.2" fill="#4A4A52"/>
-<text x="1046.7" y="266.3" font-size="19" fill="#1B1B1F">0.8</text>
-<rect x="1035.3" y="274.3" width="2.5" height="-4.2" fill="#117733"/>
-<text x="1045.9" y="266.2" font-size="19" fill="#1B1B1F">0.6</text>
-<rect x="1035.3" y="274.2" width="2.8" height="-4.2" fill="#CC6677"/>
-<text x="1046.2" y="266" font-size="19" fill="#1B1B1F">0.7</text>
-<rect x="1035.3" y="274" width="3.7" height="-4.2" fill="#332288"/>
-<text x="1047" y="265.8" font-size="19" fill="#1B1B1F">0.9</text>
-<circle cx="66" cy="283.5" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="291.5" font-size="21" fill="#1B1B1F" font-weight="600">Wismut/nym-pii-multilingual alone (comparison)</text>
-<rect x="1035.3" y="285.8" width="43.4" height="-4.2" fill="#4A4A52"/>
-<text x="1086.7" y="277.7" font-size="19" fill="#1B1B1F">10.2</text>
-<rect x="1035.3" y="285.7" width="56.3" height="-4.2" fill="#117733"/>
-<text x="1099.6" y="277.5" font-size="19" fill="#1B1B1F">13.2</text>
-<rect x="1035.3" y="285.5" width="70.3" height="-4.2" fill="#CC6677"/>
-<text x="1113.6" y="277.3" font-size="19" fill="#1B1B1F">16.6</text>
-<rect x="1035.3" y="285.3" width="25.9" height="-4.2" fill="#332288"/>
-<text x="1069.3" y="277.1" font-size="19" fill="#1B1B1F">6.1</text>
-<circle cx="66" cy="294.8" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="302.8" font-size="21" fill="#1B1B1F" font-weight="600">NER v2.0 alone (no rules)</text>
-<rect x="1035.3" y="297.1" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="289" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="297" width="2.5" height="-4.2" fill="#117733"/>
-<text x="1045.9" y="288.8" font-size="19" fill="#1B1B1F">0.6</text>
-<rect x="1035.3" y="296.8" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="288.6" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="296.6" width="2.7" height="-4.2" fill="#332288"/>
-<text x="1046" y="288.4" font-size="19" fill="#1B1B1F">0.6</text>
-<circle cx="66" cy="306.1" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="314.1" font-size="21" fill="#1B1B1F" font-weight="600">rules + the public fallback bardsai/eu-pii-anonimization-multilang v1 (reference)</text>
-<rect x="1035.3" y="308.4" width="44.5" height="-4.2" fill="#4A4A52"/>
-<text x="1087.8" y="300.3" font-size="19" fill="#1B1B1F">10.5</text>
-<rect x="1035.3" y="308.3" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="300.1" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="308.1" width="88.6" height="-4.2" fill="#CC6677"/>
-<text x="1131.9" y="299.9" font-size="19" fill="#1B1B1F">20.9</text>
-<rect x="1035.3" y="307.9" width="24.6" height="-4.2" fill="#332288"/>
-<text x="1068" y="299.7" font-size="19" fill="#1B1B1F">5.8</text>
-<circle cx="66" cy="317.4" r="9" fill="#332288" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="325.4" font-size="21" fill="#1B1B1F" font-weight="600">rules + bardsai/eu-pii-anonimization-multilang-v3 in place of pii-guard NER (comparison)</text>
-<rect x="1035.3" y="319.7" width="2.1" height="-4.2" fill="#4A4A52"/>
-<text x="1045.5" y="311.6" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="319.6" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="311.4" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="319.4" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="311.2" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="319.2" width="3.7" height="-4.2" fill="#332288"/>
-<text x="1047" y="311" font-size="19" fill="#1B1B1F">0.9</text>
-<circle cx="66" cy="328.7" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="336.7" font-size="21" fill="#1B1B1F" font-weight="600">fast, public fallback NER (bardsai/eu-pii-anonimization-multilang)</text>
-<rect x="1035.3" y="331" width="44.3" height="-4.2" fill="#4A4A52"/>
-<text x="1087.6" y="322.9" font-size="19" fill="#1B1B1F">10.4</text>
-<rect x="1035.3" y="330.9" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="322.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="330.7" width="88" height="-4.2" fill="#CC6677"/>
-<text x="1131.4" y="322.5" font-size="19" fill="#1B1B1F">20.7</text>
-<rect x="1035.3" y="330.5" width="24.6" height="-4.2" fill="#332288"/>
-<text x="1068" y="322.3" font-size="19" fill="#1B1B1F">5.8</text>
-<circle cx="66" cy="340" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="348" font-size="21" fill="#1B1B1F" font-weight="600">rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386)</text>
-<rect x="1035.3" y="342.3" width="31.9" height="-4.2" fill="#4A4A52"/>
-<text x="1075.2" y="334.2" font-size="19" fill="#1B1B1F">7.5</text>
-<rect x="1035.3" y="342.2" width="2" height="-4.2" fill="#117733"/>
+<circle cx="66" cy="215.2" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="223.2" font-size="21" fill="#1B1B1F" font-weight="600">rules</text>
+<rect x="1035.3" y="218" width="267.2" height="-4.4" fill="#4A4A52"/>
+<text x="1310.6" y="209.6" font-size="19" fill="#1B1B1F">62.9</text>
+<rect x="1035.3" y="217.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="209.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="217.2" width="267.5" height="-4.4" fill="#CC6677"/>
+<text x="1310.8" y="208.8" font-size="19" fill="#1B1B1F">63.0</text>
+<rect x="1035.3" y="216.8" width="301.8" height="-4.4" fill="#332288"/>
+<text x="1345.2" y="208.4" font-size="19" fill="#1B1B1F">71.1</text>
+<circle cx="66" cy="225.6" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="233.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
+<rect x="1035.3" y="228.4" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="220" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="228" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="219.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="227.6" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="219.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="227.2" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="218.8" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="236" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="244" font-size="21" fill="#1B1B1F" font-weight="600">bardsai/eu-pii-anonimization-multilang-v3 alone (comparison)</text>
+<rect x="1035.3" y="238.8" width="2.3" height="-4.4" fill="#4A4A52"/>
+<text x="1045.7" y="230.4" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="238.4" width="2.5" height="-4.4" fill="#117733"/>
+<text x="1045.9" y="230" font-size="19" fill="#1B1B1F">0.6</text>
+<rect x="1035.3" y="238" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="229.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="237.6" width="3.7" height="-4.4" fill="#332288"/>
+<text x="1047" y="229.2" font-size="19" fill="#1B1B1F">0.9</text>
+<circle cx="66" cy="246.4" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="254.4" font-size="21" fill="#1B1B1F" font-weight="600">tabularisai/eu-pii-safeguard alone (comparison, LAB-1386)</text>
+<rect x="1035.3" y="249.2" width="49.6" height="-4.4" fill="#4A4A52"/>
+<text x="1092.9" y="240.8" font-size="19" fill="#1B1B1F">11.7</text>
+<rect x="1035.3" y="248.8" width="25.6" height="-4.4" fill="#117733"/>
+<text x="1068.9" y="240.4" font-size="19" fill="#1B1B1F">6.0</text>
+<rect x="1035.3" y="248.4" width="54.9" height="-4.4" fill="#CC6677"/>
+<text x="1098.2" y="240" font-size="19" fill="#1B1B1F">12.9</text>
+<rect x="1035.3" y="248" width="49.6" height="-4.4" fill="#332288"/>
+<text x="1092.9" y="239.6" font-size="19" fill="#1B1B1F">11.7</text>
+<circle cx="66" cy="256.8" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="264.8" font-size="21" fill="#1B1B1F" font-weight="600">Horizon-Labs/pii-redactor-base alone (comparison)</text>
+<rect x="1035.3" y="259.6" width="2.7" height="-4.4" fill="#4A4A52"/>
+<text x="1046.1" y="251.2" font-size="19" fill="#1B1B1F">0.6</text>
+<rect x="1035.3" y="259.2" width="5.1" height="-4.4" fill="#117733"/>
+<text x="1048.4" y="250.8" font-size="19" fill="#1B1B1F">1.2</text>
+<rect x="1035.3" y="258.8" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="250.4" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="258.4" width="3" height="-4.4" fill="#332288"/>
+<text x="1046.4" y="250" font-size="19" fill="#1B1B1F">0.7</text>
+<circle cx="66" cy="267.2" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="275.2" font-size="21" fill="#1B1B1F" font-weight="600">Horizon-Labs/pii-redactor-small alone (comparison)</text>
+<rect x="1035.3" y="270" width="3.3" height="-4.4" fill="#4A4A52"/>
+<text x="1046.7" y="261.6" font-size="19" fill="#1B1B1F">0.8</text>
+<rect x="1035.3" y="269.6" width="2.5" height="-4.4" fill="#117733"/>
+<text x="1045.9" y="261.2" font-size="19" fill="#1B1B1F">0.6</text>
+<rect x="1035.3" y="269.2" width="2.8" height="-4.4" fill="#CC6677"/>
+<text x="1046.2" y="260.8" font-size="19" fill="#1B1B1F">0.7</text>
+<rect x="1035.3" y="268.8" width="3.7" height="-4.4" fill="#332288"/>
+<text x="1047" y="260.4" font-size="19" fill="#1B1B1F">0.9</text>
+<circle cx="66" cy="277.6" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="285.6" font-size="21" fill="#1B1B1F" font-weight="600">Wismut/nym-pii-multilingual alone (comparison)</text>
+<rect x="1035.3" y="280.4" width="43.4" height="-4.4" fill="#4A4A52"/>
+<text x="1086.7" y="272" font-size="19" fill="#1B1B1F">10.2</text>
+<rect x="1035.3" y="280" width="56.3" height="-4.4" fill="#117733"/>
+<text x="1099.6" y="271.6" font-size="19" fill="#1B1B1F">13.2</text>
+<rect x="1035.3" y="279.6" width="70.3" height="-4.4" fill="#CC6677"/>
+<text x="1113.6" y="271.2" font-size="19" fill="#1B1B1F">16.6</text>
+<rect x="1035.3" y="279.2" width="25.9" height="-4.4" fill="#332288"/>
+<text x="1069.3" y="270.8" font-size="19" fill="#1B1B1F">6.1</text>
+<circle cx="66" cy="288" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="296" font-size="21" fill="#1B1B1F" font-weight="600">NER v2.0 alone (no rules)</text>
+<rect x="1035.3" y="290.8" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="282.4" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="290.4" width="2.5" height="-4.4" fill="#117733"/>
+<text x="1045.9" y="282" font-size="19" fill="#1B1B1F">0.6</text>
+<rect x="1035.3" y="290" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="281.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="289.6" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="281.2" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="298.4" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="306.4" font-size="21" fill="#1B1B1F" font-weight="600">rules + the public fallback bardsai/eu-pii-anonimization-multilang v1 (reference)</text>
+<rect x="1035.3" y="301.2" width="44.5" height="-4.4" fill="#4A4A52"/>
+<text x="1087.8" y="292.8" font-size="19" fill="#1B1B1F">10.5</text>
+<rect x="1035.3" y="300.8" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="292.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="300.4" width="88.6" height="-4.4" fill="#CC6677"/>
+<text x="1131.9" y="292" font-size="19" fill="#1B1B1F">20.9</text>
+<rect x="1035.3" y="300" width="24.6" height="-4.4" fill="#332288"/>
+<text x="1068" y="291.6" font-size="19" fill="#1B1B1F">5.8</text>
+<circle cx="66" cy="308.8" r="9" fill="#332288" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="316.8" font-size="21" fill="#1B1B1F" font-weight="600">rules + bardsai/eu-pii-anonimization-multilang-v3 in place of pii-guard NER (comparison)</text>
+<rect x="1035.3" y="311.6" width="2.1" height="-4.4" fill="#4A4A52"/>
+<text x="1045.5" y="303.2" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="311.2" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="302.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="310.8" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="302.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="310.4" width="3.7" height="-4.4" fill="#332288"/>
+<text x="1047" y="302" font-size="19" fill="#1B1B1F">0.9</text>
+<circle cx="66" cy="319.2" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="327.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, public fallback NER (bardsai/eu-pii-anonimization-multilang)</text>
+<rect x="1035.3" y="322" width="44.3" height="-4.4" fill="#4A4A52"/>
+<text x="1087.6" y="313.6" font-size="19" fill="#1B1B1F">10.4</text>
+<rect x="1035.3" y="321.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="313.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="321.2" width="88" height="-4.4" fill="#CC6677"/>
+<text x="1131.4" y="312.8" font-size="19" fill="#1B1B1F">20.7</text>
+<rect x="1035.3" y="320.8" width="24.6" height="-4.4" fill="#332288"/>
+<text x="1068" y="312.4" font-size="19" fill="#1B1B1F">5.8</text>
+<circle cx="66" cy="329.6" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="337.6" font-size="21" fill="#1B1B1F" font-weight="600">rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386)</text>
+<rect x="1035.3" y="332.4" width="31.9" height="-4.4" fill="#4A4A52"/>
+<text x="1075.2" y="324" font-size="19" fill="#1B1B1F">7.5</text>
+<rect x="1035.3" y="332" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="323.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="331.6" width="30.3" height="-4.4" fill="#CC6677"/>
+<text x="1073.6" y="323.2" font-size="19" fill="#1B1B1F">7.1</text>
+<rect x="1035.3" y="331.2" width="36.9" height="-4.4" fill="#332288"/>
+<text x="1080.3" y="322.8" font-size="19" fill="#1B1B1F">8.7</text>
+<circle cx="66" cy="340" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="348" font-size="21" fill="#1B1B1F" font-weight="600">rules + Horizon-Labs/pii-redactor-base in place of pii-guard NER (comparison)</text>
+<rect x="1035.3" y="342.8" width="2.3" height="-4.4" fill="#4A4A52"/>
+<text x="1045.7" y="334.4" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="342.4" width="2" height="-4.4" fill="#117733"/>
 <text x="1045.3" y="334" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="342" width="30.3" height="-4.2" fill="#CC6677"/>
-<text x="1073.6" y="333.8" font-size="19" fill="#1B1B1F">7.1</text>
-<rect x="1035.3" y="341.8" width="36.9" height="-4.2" fill="#332288"/>
-<text x="1080.3" y="333.7" font-size="19" fill="#1B1B1F">8.7</text>
-<circle cx="66" cy="351.3" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="359.3" font-size="21" fill="#1B1B1F" font-weight="600">rules + Horizon-Labs/pii-redactor-base in place of pii-guard NER (comparison)</text>
-<rect x="1035.3" y="353.7" width="2.3" height="-4.2" fill="#4A4A52"/>
-<text x="1045.7" y="345.5" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="353.5" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="345.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="353.3" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="345.1" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="353.1" width="3" height="-4.2" fill="#332288"/>
-<text x="1046.4" y="345" font-size="19" fill="#1B1B1F">0.7</text>
-<circle cx="66" cy="362.6" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="370.6" font-size="21" fill="#1B1B1F" font-weight="600">rules + Horizon-Labs/pii-redactor-small in place of pii-guard NER (comparison)</text>
-<rect x="1035.3" y="365" width="2.9" height="-4.2" fill="#4A4A52"/>
-<text x="1046.3" y="356.8" font-size="19" fill="#1B1B1F">0.7</text>
-<rect x="1035.3" y="364.8" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="356.6" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="364.6" width="2.3" height="-4.2" fill="#CC6677"/>
-<text x="1045.6" y="356.4" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="364.4" width="3.7" height="-4.2" fill="#332288"/>
-<text x="1047" y="356.3" font-size="19" fill="#1B1B1F">0.9</text>
-<circle cx="66" cy="373.9" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="381.9" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)</text>
-<rect x="1035.3" y="376.3" width="4.3" height="-4.2" fill="#4A4A52"/>
-<text x="1047.6" y="368.1" font-size="19" fill="#1B1B1F">1.0</text>
-<rect x="1035.3" y="376.1" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="367.9" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="375.9" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="367.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="375.7" width="7.3" height="-4.2" fill="#332288"/>
-<text x="1050.6" y="367.6" font-size="19" fill="#1B1B1F">1.7</text>
-<circle cx="66" cy="385.2" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="393.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)</text>
-<rect x="1035.3" y="387.6" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="379.4" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="387.4" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="379.2" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="387.2" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="379" font-size="19" fill="#1B1B1F">0.1</text>
-<rect x="1035.3" y="387" width="3" height="-4.2" fill="#332288"/>
-<text x="1046.4" y="378.9" font-size="19" fill="#1B1B1F">0.7</text>
-<circle cx="66" cy="396.5" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="404.5" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410)</text>
-<rect x="1035.3" y="398.9" width="4.5" height="-4.2" fill="#4A4A52"/>
-<text x="1047.8" y="390.7" font-size="19" fill="#1B1B1F">1.1</text>
-<rect x="1035.3" y="398.7" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="390.5" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="398.5" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="390.3" font-size="19" fill="#1B1B1F">0.3</text>
-<rect x="1035.3" y="398.3" width="7" height="-4.2" fill="#332288"/>
-<text x="1050.3" y="390.2" font-size="19" fill="#1B1B1F">1.7</text>
-<circle cx="66" cy="407.8" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="415.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)</text>
-<rect x="1035.3" y="410.2" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="402" font-size="19" fill="#1B1B1F">0.2</text>
-<rect x="1035.3" y="410" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="401.8" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="409.8" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="401.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="409.7" width="2" height="-4.2" fill="#332288"/>
-<text x="1045.3" y="401.5" font-size="19" fill="#1B1B1F">0.4</text>
-<circle cx="66" cy="419.1" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="427.1" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate C: B without Wismut (LAB-1410)</text>
-<rect x="1035.3" y="421.5" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="413.3" font-size="19" fill="#1B1B1F">0.3</text>
-<rect x="1035.3" y="421.3" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="413.1" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="421.1" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="413" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="421" width="2.3" height="-4.2" fill="#332288"/>
-<text x="1045.7" y="412.8" font-size="19" fill="#1B1B1F">0.5</text>
-<circle cx="66" cy="430.4" r="9" fill="#332288" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="438.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494)</text>
-<rect x="1035.3" y="432.8" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="424.6" font-size="19" fill="#1B1B1F">0.3</text>
-<rect x="1035.3" y="432.6" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="424.4" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="432.4" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="424.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="432.3" width="2" height="-4.2" fill="#332288"/>
-<text x="1045.3" y="424.1" font-size="19" fill="#1B1B1F">0.5</text>
-<circle cx="66" cy="441.7" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="449.7" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494)</text>
-<rect x="1035.3" y="444.1" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="435.9" font-size="19" fill="#1B1B1F">0.3</text>
-<rect x="1035.3" y="443.9" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="435.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="443.7" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="435.6" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="443.6" width="2" height="-4.2" fill="#332288"/>
-<text x="1045.3" y="435.4" font-size="19" fill="#1B1B1F">0.5</text>
-<circle cx="66" cy="453" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="461" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494)</text>
-<rect x="1035.3" y="455.4" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="447.2" font-size="19" fill="#1B1B1F">0.3</text>
-<rect x="1035.3" y="455.2" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="447" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="455" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="446.9" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="454.9" width="2" height="-4.2" fill="#332288"/>
-<text x="1045.3" y="446.7" font-size="19" fill="#1B1B1F">0.5</text>
-<circle cx="66" cy="464.3" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="472.3" font-size="21" fill="#1B1B1F" font-weight="600">rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison)</text>
-<rect x="1035.3" y="466.7" width="28.4" height="-4.2" fill="#4A4A52"/>
-<text x="1071.7" y="458.5" font-size="19" fill="#1B1B1F">6.7</text>
-<rect x="1035.3" y="466.5" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="458.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="466.3" width="54.9" height="-4.2" fill="#CC6677"/>
-<text x="1098.2" y="458.2" font-size="19" fill="#1B1B1F">12.9</text>
-<rect x="1035.3" y="466.2" width="16.6" height="-4.2" fill="#332288"/>
+<rect x="1035.3" y="342" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="333.6" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="341.6" width="3" height="-4.4" fill="#332288"/>
+<text x="1046.4" y="333.2" font-size="19" fill="#1B1B1F">0.7</text>
+<circle cx="66" cy="350.4" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="358.4" font-size="21" fill="#1B1B1F" font-weight="600">rules + Horizon-Labs/pii-redactor-small in place of pii-guard NER (comparison)</text>
+<rect x="1035.3" y="353.2" width="2.9" height="-4.4" fill="#4A4A52"/>
+<text x="1046.3" y="344.8" font-size="19" fill="#1B1B1F">0.7</text>
+<rect x="1035.3" y="352.8" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="344.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="352.4" width="2.3" height="-4.4" fill="#CC6677"/>
+<text x="1045.6" y="344" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="352" width="3.7" height="-4.4" fill="#332288"/>
+<text x="1047" y="343.6" font-size="19" fill="#1B1B1F">0.9</text>
+<circle cx="66" cy="360.8" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="368.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393)</text>
+<rect x="1035.3" y="363.6" width="4.3" height="-4.4" fill="#4A4A52"/>
+<text x="1047.6" y="355.2" font-size="19" fill="#1B1B1F">1.0</text>
+<rect x="1035.3" y="363.2" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="354.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="362.8" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="354.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="362.4" width="7.3" height="-4.4" fill="#332288"/>
+<text x="1050.6" y="354" font-size="19" fill="#1B1B1F">1.7</text>
+<circle cx="66" cy="371.2" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="379.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393)</text>
+<rect x="1035.3" y="374" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="365.6" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="373.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="365.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="373.2" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="364.8" font-size="19" fill="#1B1B1F">0.1</text>
+<rect x="1035.3" y="372.8" width="3" height="-4.4" fill="#332288"/>
+<text x="1046.4" y="364.4" font-size="19" fill="#1B1B1F">0.7</text>
+<circle cx="66" cy="381.6" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="389.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410)</text>
+<rect x="1035.3" y="384.4" width="4.5" height="-4.4" fill="#4A4A52"/>
+<text x="1047.8" y="376" font-size="19" fill="#1B1B1F">1.1</text>
+<rect x="1035.3" y="384" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="375.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="383.6" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="375.2" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="383.2" width="7" height="-4.4" fill="#332288"/>
+<text x="1050.3" y="374.8" font-size="19" fill="#1B1B1F">1.7</text>
+<circle cx="66" cy="392" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="400" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410)</text>
+<rect x="1035.3" y="394.8" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="386.4" font-size="19" fill="#1B1B1F">0.2</text>
+<rect x="1035.3" y="394.4" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="386" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="394" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="385.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="393.6" width="2" height="-4.4" fill="#332288"/>
+<text x="1045.3" y="385.2" font-size="19" fill="#1B1B1F">0.4</text>
+<circle cx="66" cy="402.4" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="410.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.1 candidate C: B without Wismut (LAB-1410)</text>
+<rect x="1035.3" y="405.2" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="396.8" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="404.8" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="396.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="404.4" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="396" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="404" width="2.3" height="-4.4" fill="#332288"/>
+<text x="1045.7" y="395.6" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="412.8" r="9" fill="#332288" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="420.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494)</text>
+<rect x="1035.3" y="415.6" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="407.2" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="415.2" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="406.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="414.8" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="406.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="414.4" width="2" height="-4.4" fill="#332288"/>
+<text x="1045.3" y="406" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="423.2" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="431.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494)</text>
+<rect x="1035.3" y="426" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="417.6" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="425.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="417.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="425.2" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="416.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="424.8" width="2" height="-4.4" fill="#332288"/>
+<text x="1045.3" y="416.4" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="433.6" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="441.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494)</text>
+<rect x="1035.3" y="436.4" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="428" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="436" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="427.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="435.6" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="427.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="435.2" width="2" height="-4.4" fill="#332288"/>
+<text x="1045.3" y="426.8" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="444" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="452" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.3 candidate T1: S30 + targeted add-on, 1 epoch (LAB-1512)</text>
+<rect x="1035.3" y="446.8" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="438.4" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="446.4" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="438" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="446" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="437.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="445.6" width="2" height="-4.4" fill="#332288"/>
+<text x="1045.3" y="437.2" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="454.4" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="462.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v3.3 candidate T2: S30 + targeted add-on, 2 epochs (LAB-1512)</text>
+<rect x="1035.3" y="457.2" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="448.8" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="456.8" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="448.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="456.4" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="448" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="456" width="2.3" height="-4.4" fill="#332288"/>
+<text x="1045.7" y="447.6" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="464.8" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="472.8" font-size="21" fill="#1B1B1F" font-weight="600">rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison)</text>
+<rect x="1035.3" y="467.6" width="28.4" height="-4.4" fill="#4A4A52"/>
+<text x="1071.7" y="459.2" font-size="19" fill="#1B1B1F">6.7</text>
+<rect x="1035.3" y="467.2" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="458.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="466.8" width="54.9" height="-4.4" fill="#CC6677"/>
+<text x="1098.2" y="458.4" font-size="19" fill="#1B1B1F">12.9</text>
+<rect x="1035.3" y="466.4" width="16.6" height="-4.4" fill="#332288"/>
 <text x="1060" y="458" font-size="19" fill="#1B1B1F">3.9</text>
-<circle cx="66" cy="475.7" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="483.7" font-size="21" fill="#1B1B1F" font-weight="600">fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl)</text>
-<rect x="1035.3" y="478" width="122" height="-4.2" fill="#4A4A52"/>
-<text x="1165.4" y="469.8" font-size="19" fill="#1B1B1F">28.7</text>
-<rect x="1035.3" y="477.8" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="469.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="477.7" width="269.2" height="-4.2" fill="#CC6677"/>
-<text x="1312.5" y="469.5" font-size="19" fill="#1B1B1F">63.4</text>
-<rect x="1035.3" y="477.5" width="52.2" height="-4.2" fill="#332288"/>
-<text x="1095.6" y="469.3" font-size="19" fill="#1B1B1F">12.3</text>
-<circle cx="66" cy="487" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="495" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base (xlm-roberta-base, LAB-1150)</text>
-<rect x="1035.3" y="489.3" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="481.1" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="489.1" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="481" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="489" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="480.8" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="488.8" width="2.7" height="-4.2" fill="#332288"/>
-<text x="1046" y="480.6" font-size="19" fill="#1B1B1F">0.6</text>
-<circle cx="66" cy="498.3" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="506.3" font-size="21" fill="#1B1B1F" font-weight="600">audit (rules + NER v2 + LLM)</text>
-<rect x="1035.3" y="500.6" width="4.2" height="-4.2" fill="#4A4A52"/>
-<text x="1047.5" y="492.4" font-size="19" fill="#1B1B1F">1.0</text>
-<rect x="1035.3" y="500.4" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="492.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="500.3" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="492.1" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="500.1" width="6.3" height="-4.2" fill="#332288"/>
-<text x="1049.7" y="491.9" font-size="19" fill="#1B1B1F">1.5</text>
-<circle cx="66" cy="509.6" r="9" fill="#332288" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="517.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150)</text>
-<rect x="1035.3" y="511.9" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="503.7" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="511.7" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="503.6" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="511.6" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="503.4" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="511.4" width="2.7" height="-4.2" fill="#332288"/>
-<text x="1046" y="503.2" font-size="19" fill="#1B1B1F">0.6</text>
-<circle cx="66" cy="520.9" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="528.9" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (selection-only re-score, LAB-1494)</text>
-<rect x="1035.3" y="523.2" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="515" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="523" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="514.9" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="522.9" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="514.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="522.7" width="2.7" height="-4.2" fill="#332288"/>
-<text x="1046" y="514.5" font-size="19" fill="#1B1B1F">0.6</text>
-<circle cx="66" cy="532.2" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="540.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base without Ai4Privacy rows (LAB-1150)</text>
-<rect x="1035.3" y="534.5" width="58.5" height="-4.2" fill="#4A4A52"/>
-<text x="1101.9" y="526.3" font-size="19" fill="#1B1B1F">13.8</text>
-<rect x="1035.3" y="534.3" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="526.2" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="534.2" width="86.3" height="-4.2" fill="#CC6677"/>
-<text x="1129.6" y="526" font-size="19" fill="#1B1B1F">20.3</text>
-<rect x="1035.3" y="534" width="49.9" height="-4.2" fill="#332288"/>
-<text x="1093.3" y="525.8" font-size="19" fill="#1B1B1F">11.8</text>
-<circle cx="66" cy="543.5" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="551.5" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150)</text>
-<rect x="1035.3" y="545.8" width="2.1" height="-4.2" fill="#4A4A52"/>
-<text x="1045.5" y="537.7" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="545.7" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="537.5" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="545.5" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="537.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="545.3" width="3.7" height="-4.2" fill="#332288"/>
-<text x="1047" y="537.1" font-size="19" fill="#1B1B1F">0.9</text>
-<circle cx="66" cy="554.8" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="562.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 1 of 5 (LAB-1306)</text>
-<rect x="1035.3" y="557.1" width="2.1" height="-4.2" fill="#4A4A52"/>
-<text x="1045.5" y="549" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="557" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="548.8" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="556.8" width="2.3" height="-4.2" fill="#CC6677"/>
-<text x="1045.6" y="548.6" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="556.6" width="2.3" height="-4.2" fill="#332288"/>
-<text x="1045.7" y="548.4" font-size="19" fill="#1B1B1F">0.5</text>
-<circle cx="66" cy="566.1" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="574.1" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 2 of 5 (LAB-1306)</text>
-<rect x="1035.3" y="568.4" width="2.1" height="-4.2" fill="#4A4A52"/>
-<text x="1045.5" y="560.3" font-size="19" fill="#1B1B1F">0.5</text>
-<rect x="1035.3" y="568.3" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="560.1" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="568.1" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="559.9" font-size="19" fill="#1B1B1F">0.1</text>
-<rect x="1035.3" y="567.9" width="3.3" height="-4.2" fill="#332288"/>
-<text x="1046.7" y="559.7" font-size="19" fill="#1B1B1F">0.8</text>
-<circle cx="66" cy="577.4" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="585.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 3 of 5 (LAB-1306)</text>
-<rect x="1035.3" y="579.7" width="3.3" height="-4.2" fill="#4A4A52"/>
-<text x="1046.7" y="571.6" font-size="19" fill="#1B1B1F">0.8</text>
-<rect x="1035.3" y="579.6" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="571.4" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="579.4" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="571.2" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="579.2" width="5.6" height="-4.2" fill="#332288"/>
-<text x="1049" y="571" font-size="19" fill="#1B1B1F">1.3</text>
-<circle cx="66" cy="588.7" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="596.7" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 4 of 5 (LAB-1306)</text>
-<rect x="1035.3" y="591" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="582.9" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="590.9" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="582.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="590.7" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="582.5" font-size="19" fill="#1B1B1F">0.1</text>
-<rect x="1035.3" y="590.5" width="2.7" height="-4.2" fill="#332288"/>
-<text x="1046" y="582.3" font-size="19" fill="#1B1B1F">0.6</text>
-<circle cx="66" cy="600" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="608" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 5 of 5 (LAB-1306)</text>
-<rect x="1035.3" y="602.3" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="594.2" font-size="19" fill="#1B1B1F">0.3</text>
-<rect x="1035.3" y="602.2" width="2" height="-4.2" fill="#117733"/>
+<circle cx="66" cy="475.2" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="483.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl)</text>
+<rect x="1035.3" y="478" width="122" height="-4.4" fill="#4A4A52"/>
+<text x="1165.4" y="469.6" font-size="19" fill="#1B1B1F">28.7</text>
+<rect x="1035.3" y="477.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="469.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="477.2" width="269.2" height="-4.4" fill="#CC6677"/>
+<text x="1312.5" y="468.8" font-size="19" fill="#1B1B1F">63.4</text>
+<rect x="1035.3" y="476.8" width="52.2" height="-4.4" fill="#332288"/>
+<text x="1095.6" y="468.4" font-size="19" fill="#1B1B1F">12.3</text>
+<circle cx="66" cy="485.6" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="493.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base (xlm-roberta-base, LAB-1150)</text>
+<rect x="1035.3" y="488.4" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="480" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="488" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="479.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="487.6" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="479.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="487.2" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="478.8" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="496" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="504" font-size="21" fill="#1B1B1F" font-weight="600">audit (rules + NER v2 + LLM)</text>
+<rect x="1035.3" y="498.8" width="4.2" height="-4.4" fill="#4A4A52"/>
+<text x="1047.5" y="490.4" font-size="19" fill="#1B1B1F">1.0</text>
+<rect x="1035.3" y="498.4" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="490" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="498" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="489.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="497.6" width="6.3" height="-4.4" fill="#332288"/>
+<text x="1049.7" y="489.2" font-size="19" fill="#1B1B1F">1.5</text>
+<circle cx="66" cy="506.4" r="9" fill="#332288" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="514.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base + hard negatives, union with GLiNER (LAB-1150)</text>
+<rect x="1035.3" y="509.2" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="500.8" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="508.8" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="500.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="508.4" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="500" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="508" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="499.6" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="516.8" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="524.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (selection-only re-score, LAB-1494)</text>
+<rect x="1035.3" y="519.6" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="511.2" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="519.2" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="510.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="518.8" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="510.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="518.4" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="510" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="527.2" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="535.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 (selection-only re-score, LAB-1512)</text>
+<rect x="1035.3" y="530" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="521.6" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="529.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="521.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="529.2" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="520.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="528.8" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="520.4" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="537.6" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="545.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512)</text>
+<rect x="1035.3" y="540.4" width="2.5" height="-4.4" fill="#4A4A52"/>
+<text x="1045.9" y="532" font-size="19" fill="#1B1B1F">0.6</text>
+<rect x="1035.3" y="540" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="531.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="539.6" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="531.2" font-size="19" fill="#1B1B1F">0.1</text>
+<rect x="1035.3" y="539.2" width="4" height="-4.4" fill="#332288"/>
+<text x="1047.3" y="530.8" font-size="19" fill="#1B1B1F">0.9</text>
+<circle cx="66" cy="548" r="9" fill="#999933" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="556" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base without Ai4Privacy rows (LAB-1150)</text>
+<rect x="1035.3" y="550.8" width="58.5" height="-4.4" fill="#4A4A52"/>
+<text x="1101.9" y="542.4" font-size="19" fill="#1B1B1F">13.8</text>
+<rect x="1035.3" y="550.4" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="542" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="550" width="86.3" height="-4.4" fill="#CC6677"/>
+<text x="1129.6" y="541.6" font-size="19" fill="#1B1B1F">20.3</text>
+<rect x="1035.3" y="549.6" width="49.9" height="-4.4" fill="#332288"/>
+<text x="1093.3" y="541.2" font-size="19" fill="#1B1B1F">11.8</text>
+<circle cx="66" cy="558.4" r="9" fill="#882255" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="566.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150)</text>
+<rect x="1035.3" y="561.2" width="2.1" height="-4.4" fill="#4A4A52"/>
+<text x="1045.5" y="552.8" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="560.8" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="552.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="560.4" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="552" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="560" width="3.7" height="-4.4" fill="#332288"/>
+<text x="1047" y="551.6" font-size="19" fill="#1B1B1F">0.9</text>
+<circle cx="66" cy="568.8" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="576.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 1 of 5 (LAB-1306)</text>
+<rect x="1035.3" y="571.6" width="2.1" height="-4.4" fill="#4A4A52"/>
+<text x="1045.5" y="563.2" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="571.2" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="562.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="570.8" width="2.3" height="-4.4" fill="#CC6677"/>
+<text x="1045.6" y="562.4" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="570.4" width="2.3" height="-4.4" fill="#332288"/>
+<text x="1045.7" y="562" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="579.2" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="587.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 2 of 5 (LAB-1306)</text>
+<rect x="1035.3" y="582" width="2.1" height="-4.4" fill="#4A4A52"/>
+<text x="1045.5" y="573.6" font-size="19" fill="#1B1B1F">0.5</text>
+<rect x="1035.3" y="581.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="573.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="581.2" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="572.8" font-size="19" fill="#1B1B1F">0.1</text>
+<rect x="1035.3" y="580.8" width="3.3" height="-4.4" fill="#332288"/>
+<text x="1046.7" y="572.4" font-size="19" fill="#1B1B1F">0.8</text>
+<circle cx="66" cy="589.6" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="597.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 3 of 5 (LAB-1306)</text>
+<rect x="1035.3" y="592.4" width="3.3" height="-4.4" fill="#4A4A52"/>
+<text x="1046.7" y="584" font-size="19" fill="#1B1B1F">0.8</text>
+<rect x="1035.3" y="592" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="583.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="591.6" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="583.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="591.2" width="5.6" height="-4.4" fill="#332288"/>
+<text x="1049" y="582.8" font-size="19" fill="#1B1B1F">1.3</text>
+<circle cx="66" cy="600" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="608" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 4 of 5 (LAB-1306)</text>
+<rect x="1035.3" y="602.8" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="594.4" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="602.4" width="2" height="-4.4" fill="#117733"/>
 <text x="1045.3" y="594" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="602" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="593.8" font-size="19" fill="#1B1B1F">0.1</text>
-<rect x="1035.3" y="601.8" width="2" height="-4.2" fill="#332288"/>
-<text x="1045.3" y="593.7" font-size="19" fill="#1B1B1F">0.5</text>
-<circle cx="66" cy="611.3" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="619.3" font-size="21" fill="#1B1B1F" font-weight="600">rules + ner (xlmr-large-distilled-glimmer)</text>
-<rect x="1035.3" y="613.7" width="117.4" height="-4.2" fill="#4A4A52"/>
-<text x="1160.7" y="605.5" font-size="19" fill="#1B1B1F">27.6</text>
-<rect x="1035.3" y="613.5" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="605.3" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="613.3" width="269.2" height="-4.2" fill="#CC6677"/>
-<text x="1312.5" y="605.1" font-size="19" fill="#1B1B1F">63.4</text>
-<rect x="1035.3" y="613.1" width="44.2" height="-4.2" fill="#332288"/>
-<text x="1087.6" y="605" font-size="19" fill="#1B1B1F">10.4</text>
-<circle cx="66" cy="622.6" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="630.6" font-size="21" fill="#1B1B1F" font-weight="600">audit (rules + NER + Muse Spark Open, Baseten) §</text>
-<rect x="1035.3" y="625" width="16.7" height="-4.2" fill="#4A4A52"/>
-<text x="1060.1" y="616.8" font-size="19" fill="#1B1B1F">3.9</text>
-<rect x="1035.3" y="624.8" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="616.6" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="624.6" width="27.4" height="-4.2" fill="#CC6677"/>
-<text x="1070.8" y="616.4" font-size="19" fill="#1B1B1F">6.5</text>
-<rect x="1035.3" y="624.4" width="12" height="-4.2" fill="#332288"/>
-<text x="1055.3" y="616.3" font-size="19" fill="#1B1B1F">2.8</text>
-<circle cx="66" cy="633.9" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="641.9" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 large (xlm-roberta-large, LAB-1150)</text>
-<rect x="1035.3" y="636.3" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="628.1" font-size="19" fill="#1B1B1F">0.3</text>
-<rect x="1035.3" y="636.1" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="627.9" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="635.9" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="627.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="635.7" width="2" height="-4.2" fill="#332288"/>
-<text x="1045.3" y="627.6" font-size="19" fill="#1B1B1F">0.5</text>
-<circle cx="66" cy="645.2" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="653.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 large + hard negatives (LAB-1150)</text>
-<rect x="1035.3" y="647.6" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="639.4" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="647.4" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="639.2" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="647.2" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="639" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="647" width="2.7" height="-4.2" fill="#332288"/>
-<text x="1046" y="638.9" font-size="19" fill="#1B1B1F">0.6</text>
-<circle cx="66" cy="656.5" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="664.5" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150)</text>
-<rect x="1035.3" y="658.9" width="53.3" height="-4.2" fill="#4A4A52"/>
-<text x="1096.6" y="650.7" font-size="19" fill="#1B1B1F">12.5</text>
-<rect x="1035.3" y="658.7" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="650.5" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="658.5" width="84" height="-4.2" fill="#CC6677"/>
-<text x="1127.3" y="650.3" font-size="19" fill="#1B1B1F">19.8</text>
-<rect x="1035.3" y="658.3" width="42.3" height="-4.2" fill="#332288"/>
-<text x="1085.6" y="650.2" font-size="19" fill="#1B1B1F">10.0</text>
-<circle cx="66" cy="667.8" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="675.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150)</text>
-<rect x="1035.3" y="670.2" width="2" height="-4.2" fill="#4A4A52"/>
-<text x="1045.3" y="662" font-size="19" fill="#1B1B1F">0.4</text>
-<rect x="1035.3" y="670" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="661.8" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="669.8" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="661.7" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="669.7" width="2.7" height="-4.2" fill="#332288"/>
-<text x="1046" y="661.5" font-size="19" fill="#1B1B1F">0.6</text>
-<circle cx="66" cy="679.1" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="687.1" font-size="21" fill="#1B1B1F" font-weight="600">fast, GLiNER multi fine-tuned (LAB-1150)</text>
-<rect x="1035.3" y="681.5" width="2.9" height="-4.2" fill="#4A4A52"/>
-<text x="1046.3" y="673.3" font-size="19" fill="#1B1B1F">0.7</text>
-<rect x="1035.3" y="681.3" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="673.1" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="681.1" width="2" height="-4.2" fill="#CC6677"/>
-<text x="1045.3" y="673" font-size="19" fill="#1B1B1F">0.3</text>
-<rect x="1035.3" y="681" width="4.3" height="-4.2" fill="#332288"/>
-<text x="1047.7" y="672.8" font-size="19" fill="#1B1B1F">1.0</text>
-<circle cx="66" cy="690.4" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
-<text x="84" y="698.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, GLiNER multi v2.1 zero-shot (LAB-1150)</text>
-<rect x="1035.3" y="692.8" width="95.4" height="-4.2" fill="#4A4A52"/>
-<text x="1138.8" y="684.6" font-size="19" fill="#1B1B1F">22.5</text>
-<rect x="1035.3" y="692.6" width="2" height="-4.2" fill="#117733"/>
-<text x="1045.3" y="684.4" font-size="19" fill="#1B1B1F">0.0</text>
-<rect x="1035.3" y="692.4" width="194.3" height="-4.2" fill="#CC6677"/>
-<text x="1237.7" y="684.3" font-size="19" fill="#1B1B1F">45.8</text>
-<rect x="1035.3" y="692.3" width="50.2" height="-4.2" fill="#332288"/>
-<text x="1093.6" y="684.1" font-size="19" fill="#1B1B1F">11.8</text>
-<rect x="58.4" y="694.1" width="15.3" height="15.3" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
-<text x="84" y="709.7" font-size="21" fill="#1B1B1F" font-weight="600">Presidio</text>
-<rect x="1035.3" y="704.1" width="125.7" height="-4.2" fill="#4A4A52"/>
-<text x="1169.1" y="695.9" font-size="19" fill="#1B1B1F">29.6</text>
-<rect x="1035.3" y="703.9" width="204.6" height="-4.2" fill="#117733"/>
-<text x="1248" y="695.7" font-size="19" fill="#1B1B1F">48.2</text>
-<rect x="1035.3" y="703.7" width="170.9" height="-4.2" fill="#CC6677"/>
-<text x="1214.2" y="695.6" font-size="19" fill="#1B1B1F">40.2</text>
-<rect x="1035.3" y="703.6" width="89.2" height="-4.2" fill="#332288"/>
-<text x="1132.5" y="695.4" font-size="19" fill="#1B1B1F">21.0</text>
-<polygon points="66,702.7 75.9,720.2 56.1,720.2" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
-<text x="84" y="721" font-size="21" fill="#1B1B1F" font-weight="600">LLM Guard</text>
-<rect x="1035.3" y="715.4" width="186" height="-4.2" fill="#4A4A52"/>
-<text x="1229.3" y="707.2" font-size="19" fill="#1B1B1F">43.8</text>
-<rect x="1035.3" y="715.2" width="110" height="-4.2" fill="#117733"/>
-<text x="1153.3" y="707" font-size="19" fill="#1B1B1F">25.9</text>
-<rect x="1035.3" y="715" width="300.6" height="-4.2" fill="#CC6677"/>
-<text x="1344" y="706.9" font-size="19" fill="#1B1B1F">70.8</text>
-<rect x="1035.3" y="714.9" width="129.1" height="-4.2" fill="#332288"/>
-<text x="1172.5" y="706.7" font-size="19" fill="#1B1B1F">30.4</text>
-<polygon points="66,713.1 77.2,724.3 66,735.6 54.8,724.3" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
-<text x="84" y="732.3" font-size="21" fill="#1B1B1F" font-weight="600">PrivAiTe</text>
-<rect x="1035.3" y="726.7" width="40.4" height="-4.2" fill="#4A4A52"/>
-<text x="1083.8" y="718.5" font-size="19" fill="#1B1B1F">9.5</text>
-<rect x="1035.3" y="726.5" width="17.9" height="-4.2" fill="#117733"/>
-<text x="1061.3" y="718.3" font-size="19" fill="#1B1B1F">4.2</text>
-<rect x="1035.3" y="726.3" width="12.6" height="-4.2" fill="#CC6677"/>
-<text x="1055.9" y="718.2" font-size="19" fill="#1B1B1F">3.0</text>
-<rect x="1035.3" y="726.2" width="59.6" height="-4.2" fill="#332288"/>
+<rect x="1035.3" y="602" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="593.6" font-size="19" fill="#1B1B1F">0.1</text>
+<rect x="1035.3" y="601.6" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="593.2" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="610.4" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="618.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2.1 base, epoch 5 of 5 (LAB-1306)</text>
+<rect x="1035.3" y="613.2" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="604.8" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="612.8" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="604.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="612.4" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="604" font-size="19" fill="#1B1B1F">0.1</text>
+<rect x="1035.3" y="612" width="2" height="-4.4" fill="#332288"/>
+<text x="1045.3" y="603.6" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="620.8" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="628.8" font-size="21" fill="#1B1B1F" font-weight="600">rules + ner (xlmr-large-distilled-glimmer)</text>
+<rect x="1035.3" y="623.6" width="117.4" height="-4.4" fill="#4A4A52"/>
+<text x="1160.7" y="615.2" font-size="19" fill="#1B1B1F">27.6</text>
+<rect x="1035.3" y="623.2" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="614.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="622.8" width="269.2" height="-4.4" fill="#CC6677"/>
+<text x="1312.5" y="614.4" font-size="19" fill="#1B1B1F">63.4</text>
+<rect x="1035.3" y="622.4" width="44.2" height="-4.4" fill="#332288"/>
+<text x="1087.6" y="614" font-size="19" fill="#1B1B1F">10.4</text>
+<circle cx="66" cy="631.2" r="9" fill="#CC79A7" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="639.2" font-size="21" fill="#1B1B1F" font-weight="600">audit (rules + NER + Muse Spark Open, Baseten) §</text>
+<rect x="1035.3" y="634" width="16.7" height="-4.4" fill="#4A4A52"/>
+<text x="1060.1" y="625.6" font-size="19" fill="#1B1B1F">3.9</text>
+<rect x="1035.3" y="633.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="625.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="633.2" width="27.4" height="-4.4" fill="#CC6677"/>
+<text x="1070.8" y="624.8" font-size="19" fill="#1B1B1F">6.5</text>
+<rect x="1035.3" y="632.8" width="12" height="-4.4" fill="#332288"/>
+<text x="1055.3" y="624.4" font-size="19" fill="#1B1B1F">2.8</text>
+<circle cx="66" cy="641.6" r="9" fill="#117733" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="649.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 large (xlm-roberta-large, LAB-1150)</text>
+<rect x="1035.3" y="644.4" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="636" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="644" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="635.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="643.6" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="635.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="643.2" width="2" height="-4.4" fill="#332288"/>
+<text x="1045.3" y="634.8" font-size="19" fill="#1B1B1F">0.5</text>
+<circle cx="66" cy="652" r="9" fill="#AA4499" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="660" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 large + hard negatives (LAB-1150)</text>
+<rect x="1035.3" y="654.8" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="646.4" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="654.4" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="646" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="654" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="645.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="653.6" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="645.2" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="662.4" r="9" fill="#E69F00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="670.4" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 large without Ai4Privacy rows (ablation, LAB-1150)</text>
+<rect x="1035.3" y="665.2" width="53.3" height="-4.4" fill="#4A4A52"/>
+<text x="1096.6" y="656.8" font-size="19" fill="#1B1B1F">12.5</text>
+<rect x="1035.3" y="664.8" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="656.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="664.4" width="84" height="-4.4" fill="#CC6677"/>
+<text x="1127.3" y="656" font-size="19" fill="#1B1B1F">19.8</text>
+<rect x="1035.3" y="664" width="42.3" height="-4.4" fill="#332288"/>
+<text x="1085.6" y="655.6" font-size="19" fill="#1B1B1F">10.0</text>
+<circle cx="66" cy="672.8" r="9" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="680.8" font-size="21" fill="#1B1B1F" font-weight="600">fast, NER v2 large, OpenPII cut to 1k rows/language (LAB-1150)</text>
+<rect x="1035.3" y="675.6" width="2" height="-4.4" fill="#4A4A52"/>
+<text x="1045.3" y="667.2" font-size="19" fill="#1B1B1F">0.4</text>
+<rect x="1035.3" y="675.2" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="666.8" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="674.8" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="666.4" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="674.4" width="2.7" height="-4.4" fill="#332288"/>
+<text x="1046" y="666" font-size="19" fill="#1B1B1F">0.6</text>
+<circle cx="66" cy="683.2" r="9" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="691.2" font-size="21" fill="#1B1B1F" font-weight="600">fast, GLiNER multi fine-tuned (LAB-1150)</text>
+<rect x="1035.3" y="686" width="2.9" height="-4.4" fill="#4A4A52"/>
+<text x="1046.3" y="677.6" font-size="19" fill="#1B1B1F">0.7</text>
+<rect x="1035.3" y="685.6" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="677.2" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="685.2" width="2" height="-4.4" fill="#CC6677"/>
+<text x="1045.3" y="676.8" font-size="19" fill="#1B1B1F">0.3</text>
+<rect x="1035.3" y="684.8" width="4.3" height="-4.4" fill="#332288"/>
+<text x="1047.7" y="676.4" font-size="19" fill="#1B1B1F">1.0</text>
+<circle cx="66" cy="693.6" r="9" fill="#D55E00" stroke="#FFFFFF" stroke-width="3"/>
+<text x="84" y="701.6" font-size="21" fill="#1B1B1F" font-weight="600">fast, GLiNER multi v2.1 zero-shot (LAB-1150)</text>
+<rect x="1035.3" y="696.4" width="95.4" height="-4.4" fill="#4A4A52"/>
+<text x="1138.8" y="688" font-size="19" fill="#1B1B1F">22.5</text>
+<rect x="1035.3" y="696" width="2" height="-4.4" fill="#117733"/>
+<text x="1045.3" y="687.6" font-size="19" fill="#1B1B1F">0.0</text>
+<rect x="1035.3" y="695.6" width="194.3" height="-4.4" fill="#CC6677"/>
+<text x="1237.7" y="687.2" font-size="19" fill="#1B1B1F">45.8</text>
+<rect x="1035.3" y="695.2" width="50.2" height="-4.4" fill="#332288"/>
+<text x="1093.6" y="686.8" font-size="19" fill="#1B1B1F">11.8</text>
+<rect x="58.4" y="696.4" width="15.3" height="15.3" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
+<text x="84" y="712" font-size="21" fill="#1B1B1F" font-weight="600">Presidio</text>
+<rect x="1035.3" y="706.8" width="125.7" height="-4.4" fill="#4A4A52"/>
+<text x="1169.1" y="698.4" font-size="19" fill="#1B1B1F">29.6</text>
+<rect x="1035.3" y="706.4" width="204.6" height="-4.4" fill="#117733"/>
+<text x="1248" y="698" font-size="19" fill="#1B1B1F">48.2</text>
+<rect x="1035.3" y="706" width="170.9" height="-4.4" fill="#CC6677"/>
+<text x="1214.2" y="697.6" font-size="19" fill="#1B1B1F">40.2</text>
+<rect x="1035.3" y="705.6" width="89.2" height="-4.4" fill="#332288"/>
+<text x="1132.5" y="697.2" font-size="19" fill="#1B1B1F">21.0</text>
+<polygon points="66,704.1 75.9,721.6 56.1,721.6" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
+<text x="84" y="722.4" font-size="21" fill="#1B1B1F" font-weight="600">LLM Guard</text>
+<rect x="1035.3" y="717.2" width="186" height="-4.4" fill="#4A4A52"/>
+<text x="1229.3" y="708.8" font-size="19" fill="#1B1B1F">43.8</text>
+<rect x="1035.3" y="716.8" width="110" height="-4.4" fill="#117733"/>
+<text x="1153.3" y="708.4" font-size="19" fill="#1B1B1F">25.9</text>
+<rect x="1035.3" y="716.4" width="300.6" height="-4.4" fill="#CC6677"/>
+<text x="1344" y="708" font-size="19" fill="#1B1B1F">70.8</text>
+<rect x="1035.3" y="716" width="129.1" height="-4.4" fill="#332288"/>
+<text x="1172.5" y="707.6" font-size="19" fill="#1B1B1F">30.4</text>
+<polygon points="66,713.6 77.2,724.8 66,736.1 54.8,724.8" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
+<text x="84" y="732.8" font-size="21" fill="#1B1B1F" font-weight="600">PrivAiTe</text>
+<rect x="1035.3" y="727.6" width="40.4" height="-4.4" fill="#4A4A52"/>
+<text x="1083.8" y="719.2" font-size="19" fill="#1B1B1F">9.5</text>
+<rect x="1035.3" y="727.2" width="17.9" height="-4.4" fill="#117733"/>
+<text x="1061.3" y="718.8" font-size="19" fill="#1B1B1F">4.2</text>
+<rect x="1035.3" y="726.8" width="12.6" height="-4.4" fill="#CC6677"/>
+<text x="1055.9" y="718.4" font-size="19" fill="#1B1B1F">3.0</text>
+<rect x="1035.3" y="726.4" width="59.6" height="-4.4" fill="#332288"/>
 <text x="1102.9" y="718" font-size="19" fill="#1B1B1F">14.0</text>
 <text x="56" y="780" font-size="20" fill="#4A4A52">Fixture set &#x27;ai4privacy&#x27; (mixed; de 200 docs + en 200 docs + hu 200 docs), de + en + hu pooled (micro-averaged).</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Valid = a validated rule of the type recognises the value (checksum, numbering plan, format). Invalid numbers stay in the headline.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">§ Breakdown from a re-run that differs from the headline: audit (rules + NER + Muse Spark Open, Baseten) re-run 3.8%.</text>
-<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-27 to 2026-10-29 · 12 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-27 to 2026-10-29 · 13 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>

@@ -112,8 +112,10 @@ def test_pooling_languages_is_exact(records: list[dict[str, Any]]) -> None:
             continue
         pooled = compact(pool(list(rec["metrics"]["languages"].values())))
         overall = compact(rec["metrics"]["overall"])
+        # Both sides are rounded to 4 decimals, so a rate on a rounding edge (0.00595) can
+        # differ by one unit in the last place; 1.5e-4 allows that and nothing more.
         for key in ("documents", "gold", "pred", "precision", "recall", "f1", "leak"):
-            assert pooled[key] == pytest.approx(overall[key], abs=1e-4), (rec["run_id"], key)
+            assert pooled[key] == pytest.approx(overall[key], abs=1.5e-4), (rec["run_id"], key)
         for name, t in overall["per_type"].items():
             assert pooled["per_type"][name]["recall"] == pytest.approx(t["recall"], abs=1e-4)
         checked += 1

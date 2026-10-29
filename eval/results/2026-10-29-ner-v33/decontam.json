@@ -1,0 +1,356 @@
+{
+  "method": {
+    "shingles": "word 5-grams of NFKC case-folded text",
+    "minhash": "128 hashes, LSH 32 bands x 4 rows",
+    "threshold": "exact Jaccard >= 0.8",
+    "exact": "SHA-256 of the whitespace-folded text"
+  },
+  "documents": 10430,
+  "dropped": 0,
+  "dropped_exact": 0,
+  "dropped_near": 0,
+  "by_eval_set": {},
+  "files": {
+    "eval/generated/v33-addon/de-v33-agent-dev.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/de-v33-agent-train.jsonl": {
+      "documents": 200,
+      "kept": 200,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/de-v33-names-dev.jsonl": {
+      "documents": 30,
+      "kept": 30,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/de-v33-names-train.jsonl": {
+      "documents": 300,
+      "kept": 300,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/de-v33-payload-dev.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/de-v33-payload-train.jsonl": {
+      "documents": 200,
+      "kept": 200,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/en-v33-agent-dev.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/en-v33-agent-train.jsonl": {
+      "documents": 200,
+      "kept": 200,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/en-v33-payload-dev.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/en-v33-payload-train.jsonl": {
+      "documents": 200,
+      "kept": 200,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/hu-v33-agent-dev.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/hu-v33-agent-train.jsonl": {
+      "documents": 200,
+      "kept": 200,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/hu-v33-names-dev.jsonl": {
+      "documents": 150,
+      "kept": 150,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/hu-v33-names-train.jsonl": {
+      "documents": 1500,
+      "kept": 1500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/hu-v33-payload-dev.jsonl": {
+      "documents": 20,
+      "kept": 20,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/hu-v33-payload-train.jsonl": {
+      "documents": 200,
+      "kept": 200,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/pl-v33-names-dev.jsonl": {
+      "documents": 30,
+      "kept": 30,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-addon/pl-v33-names-train.jsonl": {
+      "documents": 300,
+      "kept": 300,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/gretel/en-gretel-train.jsonl": {
+      "documents": 200,
+      "kept": 200,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/negatives/de-negatives-train.jsonl": {
+      "documents": 300,
+      "kept": 300,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/negatives/en-negatives-train.jsonl": {
+      "documents": 300,
+      "kept": 300,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/negatives/hu-negatives-train.jsonl": {
+      "documents": 300,
+      "kept": 300,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/nemotron/en-nemotron-train.jsonl": {
+      "documents": 200,
+      "kept": 200,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/cs-openpii-train.jsonl": {
+      "documents": 250,
+      "kept": 250,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/de-openpii-train.jsonl": {
+      "documents": 500,
+      "kept": 500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/en-openpii-train.jsonl": {
+      "documents": 500,
+      "kept": 500,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/hr-openpii-train.jsonl": {
+      "documents": 250,
+      "kept": 250,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/hu-openpii-train-10k.jsonl": {
+      "documents": 1000,
+      "kept": 1000,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/pl-openpii-train.jsonl": {
+      "documents": 250,
+      "kept": 250,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/ro-openpii-train.jsonl": {
+      "documents": 250,
+      "kept": 250,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/sk-openpii-train.jsonl": {
+      "documents": 250,
+      "kept": 250,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/openpii/sl-openpii-train.jsonl": {
+      "documents": 250,
+      "kept": 250,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/privy/en-privy-train-6k.jsonl": {
+      "documents": 300,
+      "kept": 300,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/s11/en-distill-train.jsonl": {
+      "documents": 600,
+      "kept": 600,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/s11/hu-distill-train.jsonl": {
+      "documents": 600,
+      "kept": 600,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/wismut/cs-wismut-train.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/wismut/de-wismut-train.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/wismut/en-wismut-train.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/wismut/pl-wismut-train.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/v33-replay/wismut/ro-wismut-train.jsonl": {
+      "documents": 100,
+      "kept": 100,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    }
+  },
+  "examples": [],
+  "eval_index": {
+    "documents_by_set": {
+      "agent-traffic": 990,
+      "agent-traffic-dev": 300,
+      "ai4privacy": 600,
+      "cee-pii": 451,
+      "fixtures/agent-text": 69,
+      "fixtures/brand-names": 30,
+      "fixtures/company-names": 44,
+      "fixtures/inflection": 12,
+      "fixtures/injection": 62,
+      "fixtures/known-values": 5,
+      "fixtures/secrets": 21,
+      "fixtures/smoke": 62,
+      "fixtures/synth-sample": 30,
+      "fixtures/uncued-numbers": 49,
+      "gretel-finance": 400,
+      "mapa-eur-lex": 42,
+      "nemotron-pii": 300,
+      "pl-pii-bench": 346
+    },
+    "hashes": 3710,
+    "missing": [
+      "data/datasets/fixtures/tab-echr/en-tab-echr.jsonl"
+    ]
+  },
+  "addon_max_jaccard": {
+    "agent-traffic-dev": {
+      "jaccard": 0.0,
+      "train_id": null,
+      "eval_id": null,
+      "train_documents": 3630,
+      "eval_documents": 300,
+      "method": "exact Jaccard of word 5-gram sets over every pair sharing a shingle"
+    },
+    "smoke": {
+      "jaccard": 0.0,
+      "train_id": null,
+      "eval_id": null,
+      "train_documents": 3630,
+      "eval_documents": 51,
+      "method": "exact Jaccard of word 5-gram sets over every pair sharing a shingle"
+    },
+    "inflection": {
+      "jaccard": 0.0,
+      "train_id": null,
+      "eval_id": null,
+      "train_documents": 3630,
+      "eval_documents": 12,
+      "method": "exact Jaccard of word 5-gram sets over every pair sharing a shingle"
+    },
+    "agent-text": {
+      "jaccard": 0.0169,
+      "train_id": "hu-v33-agent-train-00067",
+      "eval_id": "de-agent-text-n14",
+      "train_documents": 3630,
+      "eval_documents": 69,
+      "method": "exact Jaccard of word 5-gram sets over every pair sharing a shingle"
+    }
+  }
+}

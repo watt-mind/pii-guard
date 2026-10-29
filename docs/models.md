@@ -329,9 +329,9 @@ config, `training_meta.json` without local values, the model card as `README.md`
 It uses the local Hugging Face login, tags the upload commit, and prints the revision and
 SHA-256 that `ner_resolve.PUBLISHED` pins. Modal spend: $2.92 of free credits.
 
-### NER v3, v3.1 and v3.2: v2.0 stays
+### NER v3, v3.1, v3.2 and v3.3: v2.0 stays
 
-Three later rounds tried to replace v2.0. Each used a selection rule fixed in advance, and v2.0
+Four later rounds tried to replace v2.0. Each used a selection rule fixed in advance, and v2.0
 is still the published model.
 
 - **v3** (LAB-1393) and **v3.1** (LAB-1410) retrained on wider mixes. Each traded one
@@ -344,6 +344,13 @@ is still the published model.
     still fails the smoke gate on one inflected Hungarian name.
   - Mining found no real error family to generate data for, so nothing was trained
     ([v3.2 results](../eval/results/2026-10-29-ner-v32/README.md)).
+- **v3.3** (LAB-1512) fine-tuned that soup on a templated add-on (inflected Hungarian,
+  Polish and German names; payload and agent-text hard negatives; `training/ner/targeted_v33.py`).
+  It also tried dev-calibrated thresholds on v2.0 (`training/ner/thresholds_v33.py`).
+  - Every candidate failed a gate: smoke leak, smoke over-masking or inflection.
+  - The fine-tunes over-masked less agent text but leaked more, and lost MAPA
+    ([v3.3 results](../eval/results/2026-10-29-ner-v33/README.md)). v2.0 is frozen as the
+    published model.
 
 ### NER v2.0 in every MAPA language
 

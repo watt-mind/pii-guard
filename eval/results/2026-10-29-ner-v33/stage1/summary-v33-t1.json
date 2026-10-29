@@ -1,0 +1,20 @@
+{
+  "smoke": {
+    "documents": 51,
+    "leak": 0.00578,
+    "over_masking": 0.011111,
+    "f1": 0.943139
+  },
+  "inflection": {
+    "documents": 12,
+    "leak": 0.0,
+    "over_masking": 0.0,
+    "f1": 1.0
+  },
+  "agent-traffic-dev": {
+    "documents": 300,
+    "leak": 0.005145,
+    "over_masking": 0.014943,
+    "f1": 0.963152
+  }
+}
