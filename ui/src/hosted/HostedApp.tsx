@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { lazy, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import demoRecording from "../content/demoRecording.json";
 import { createHttpChat, pickDefaultModel, SYSTEM_PROMPT } from "../api/chat";
 import type { EntityType } from "../api/types";
@@ -22,6 +22,7 @@ import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 import { useCurrentSection } from "./useCurrentSection";
 import { consoleSectionOf } from "./consoleLink";
+import { DeferredSection } from "./DeferredSection";
 import { PublicEvaluation } from "./PublicEvaluation";
 import { SignedOutConsole } from "./SignedOut";
 
@@ -329,7 +330,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
-        <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
+        {/* Reserved from production measurements: stacked phone/tablet panes, paired desktop panes. */}
+        <DeferredSection anchor="images" className="min-h-[2200px] sm:min-h-[2600px] lg:min-h-[1100px]"><ImageShowcase /></DeferredSection>
         <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a model, with faces, ID photos and signatures found on the server itself. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
         <div aria-labelledby="images-proof-heading" role="group" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 border-y border-line py-5 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
           <div className="min-w-0">
@@ -344,7 +346,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on each test set below." lead="Committed runs of 27–28 Oct 2026 on fictional and public data. Leak: personal values that still reach the model; F1 also counts over-masking. The sets are small, so treat a gap of a point or two as noise; where PII Guard is weaker is under Limits." />
         <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-6 lg:grid-cols-2">
           <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
-            <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
+            <DeferredSection anchor="results" className="min-h-[340px]"><ResultsChart /></DeferredSection>
           </Card>
           <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labeled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better)." className="flex flex-col">
             <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">

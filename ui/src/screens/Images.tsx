@@ -239,7 +239,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
                   on ? "border-ink bg-surface" : "border-line hover:border-line-strong hover:bg-surface",
                 ].join(" ")}
               >
-                <img src={s.src} alt="" aria-hidden="true" className="size-12 shrink-0 rounded-md border border-line bg-surface-2 object-cover" />
+                <img src={s.thumbnail} width={48} height={48} alt="" aria-hidden="true" className="size-12 shrink-0 rounded-md border border-line bg-surface-2 object-cover" />
                 <span className="min-w-0">
                   <span className="block text-sm font-medium text-ink">{s.title}</span>
                   <span className="block text-xs text-muted">{s.subtitle}</span>
@@ -332,7 +332,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
             )
           }
         >
-          <Figure src={src} alt={alt}>
+          <Figure src={src} alt={alt} width={selection.kind === "sample" ? selection.sample.width : data?.width} height={selection.kind === "sample" ? selection.sample.height : data?.height}>
             {data &&
               showRegions &&
               data.regions.map((r, i, all) => (
@@ -388,11 +388,11 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
           ) : data && result ? (
             <div className="space-y-4">
               {result.engine === "api" && data.image ? (
-                <Figure src={`data:image/png;base64,${data.image}`} alt={`Masked image: ${plural(summary?.masked ?? 0, "region")} covered.`} testId="masked-image">
+                <Figure src={`data:image/png;base64,${data.image}`} alt={`Masked image: ${plural(summary?.masked ?? 0, "region")} covered.`} testId="masked-image" width={data.width} height={data.height}>
                   {active !== null && data.regions[active] && <Highlight region={data.regions[active]} width={data.width} height={data.height} />}
                 </Figure>
               ) : (
-                <Figure src={src} alt={`Masked image (drawn in the browser): ${plural(summary?.masked ?? 0, "region")} covered.`} testId="demo-masked-image">
+                <Figure src={src} alt={`Masked image (drawn in the browser): ${plural(summary?.masked ?? 0, "region")} covered.`} testId="demo-masked-image" width={data.width} height={data.height}>
                   {data.regions.map((r, i) =>
                     r.policy === "mask" ? (
                       <span key={i} aria-hidden="true" data-testid="demo-mask" className="absolute" style={{ ...percentBox(r.box, data.width, data.height, MASK_PADDING), backgroundColor: IMAGE_FILL }} />
@@ -438,11 +438,11 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
   );
 }
 
-function Figure({ src, alt, testId, children }: { src: string; alt: string; testId?: string; children?: ReactNode }) {
+function Figure({ src, alt, testId, children, width, height }: { src: string; alt: string; testId?: string; children?: ReactNode; width?: number; height?: number }) {
   return (
     <div className="flex justify-center rounded-lg bg-surface-2 p-2 ring-1 ring-line">
       <div className="relative w-full max-w-[44rem]" data-testid={testId}>
-        <img src={src} alt={alt} className="block h-auto w-full rounded-sm" />
+        <img src={src} alt={alt} width={width} height={height} className="block h-auto w-full rounded-sm" />
         {children}
       </div>
     </div>
