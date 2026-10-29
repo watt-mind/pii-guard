@@ -1,0 +1,120 @@
+{
+  "method": {
+    "shingles": "word 5-grams of NFKC case-folded text",
+    "minhash": "128 hashes, LSH 32 bands x 4 rows",
+    "threshold": "exact Jaccard >= 0.8",
+    "exact": "SHA-256 of the whitespace-folded text"
+  },
+  "documents": 4793,
+  "dropped": 0,
+  "dropped_exact": 0,
+  "dropped_near": 0,
+  "by_eval_set": {},
+  "files": {
+    "eval/generated/distill-eu-s1525/hr-distill-dev.jsonl": {
+      "documents": 120,
+      "kept": 120,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/distill-eu-s1525/hr-distill-train.jsonl": {
+      "documents": 1078,
+      "kept": 1078,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/distill-eu-s1525/lt-distill-dev.jsonl": {
+      "documents": 120,
+      "kept": 120,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/distill-eu-s1525/lt-distill-train.jsonl": {
+      "documents": 1077,
+      "kept": 1077,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/distill-eu-s1525/lv-distill-dev.jsonl": {
+      "documents": 120,
+      "kept": 120,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/distill-eu-s1525/lv-distill-train.jsonl": {
+      "documents": 1079,
+      "kept": 1079,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/distill-eu-s1525/sl-distill-dev.jsonl": {
+      "documents": 120,
+      "kept": 120,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    },
+    "eval/generated/distill-eu-s1525/sl-distill-train.jsonl": {
+      "documents": 1079,
+      "kept": 1079,
+      "dropped_exact": 0,
+      "dropped_near": 0,
+      "by_eval_set": {}
+    }
+  },
+  "examples": [],
+  "eval_index": {
+    "documents_by_set": {
+      "agent-traffic": 990,
+      "agent-traffic-dev": 300,
+      "ai4privacy": 600,
+      "cee-pii": 451,
+      "fixtures/agent-text": 69,
+      "fixtures/brand-names": 30,
+      "fixtures/company-names": 44,
+      "fixtures/court-smoke": 6,
+      "fixtures/inflection": 60,
+      "fixtures/injection": 62,
+      "fixtures/known-values": 5,
+      "fixtures/secrets": 21,
+      "fixtures/smoke": 117,
+      "fixtures/synth-sample": 30,
+      "fixtures/uncued-numbers": 49,
+      "gretel-finance": 400,
+      "nemotron-pii": 300,
+      "pl-pii-bench": 346
+    },
+    "hashes": 3819,
+    "missing": [
+      "data/datasets/fixtures/tab-echr/en-tab-echr.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/en-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/es-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/bg-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/cs-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/da-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/de-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/el-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/ga-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/et-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/fi-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/fr-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/hu-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/it-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/lt-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/lv-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/mt-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/nl-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/pt-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/ro-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/sk-mapa-eur-lex.jsonl",
+      "data/datasets/fixtures/mapa-eur-lex/sv-mapa-eur-lex.jsonl"
+    ]
+  },
+  "absent_inputs": []
+}
