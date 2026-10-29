@@ -15,7 +15,7 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
-import { COMPARISON, IMAGE_PROOF, MEASURED, OPEN_MODELS, PROOF, SETS } from "./proof";
+import { COMPARISON, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, SETS } from "./proof";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -284,13 +284,14 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="how" aria-labelledby="how-heading" className="scroll-mt-6 space-y-6">
         <SectionHead id="how-heading" title="Change one base URL. The model gets placeholders." lead="pii-guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
         <ol className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
-          <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted">Validated rules for identifiers, plus an open multilingual NER for names, addresses and dates, run inside pii-guard with no API call.</p></Card></li>
+          <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted"><span className="font-medium text-ink">No LLM in the masking path.</span> Validated rules for identifiers, plus our open multilingual NER, a small encoder model, for names, addresses and dates. Both run inside pii-guard, with no API call. An LLM detector is an opt-in audit mode, off by default.</p></Card></li>
           <li><Card as="div" title="2 · Swap" headingLevel={3} className="h-full"><p className="text-muted">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in pii-guard.</p></Card></li>
           <li><Card as="div" title="3 · Restore" headingLevel={3} className="h-full"><p className="text-muted">The answer comes back with the real values, chunk by chunk as it streams.</p></Card></li>
         </ol>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-          <Card title="One line in your client" headingLevel={3} subtitle="Works with the OpenAI SDK, Codex, Muse Code and pi.">
+          <Card title="One line in your client" headingLevel={3} subtitle="Tested with Codex, OpenCode, Muse Code, pi and the OpenAI SDK.">
             <pre tabIndex={0} aria-label="Python client example" className="overflow-x-auto rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-ui text-ink"><code>{"from openai import OpenAI\n\nclient = OpenAI(\n    base_url=\"https://<your-pii-guard>/v1\",\n    api_key=\"…\",\n)"}</code></pre>
+            <dl className="mt-4"><Metric label={LATENCY.label} value={LATENCY.value} hint={LATENCY.hint} /></dl>
             <p className="mt-3 text-xs text-muted"><a className={link} href={`${DOCS}/integrations/README.md`}>Integration guides ↗</a></p>
           </Card>
           <Card title="Made for agents" headingLevel={3}>
