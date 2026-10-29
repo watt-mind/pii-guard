@@ -181,19 +181,23 @@ def _code_alternatives(value: str, entity_type: EntityType) -> list[str]:
 def _word_alternatives(value: str, entity_type: EntityType, forms: LanguageForms) -> list[str]:
     value = value.strip()
     body = _words(value)
-    left = r"(?<!\w)" if _is_word(value[0]) else ""
+    # An underscore counts as a boundary, not a word character: a value glued to one
+    # (``[[PERSON_Teszt Elek]]``, ``user_Teszt Elek``) still survived there (LAB-1147).
+    left = r"(?<![^\W_])" if _is_word(value[0]) else ""
     if _is_word(value[-1]):
         suffix = forms.suffix_pattern(value, entity_type)
-        right = f"(?=(?:{suffix})?(?!\\w))" if suffix else r"(?!\w)"
+        right = f"(?=(?:{suffix})?(?![^\\W_]))" if suffix else r"(?![^\W_])"
     else:
         right = ""
     alternatives = [left + body + right]
-    alternatives.extend(left + v + r"(?!\w)" for v in forms.stem_variants(value, entity_type))
+    alternatives.extend(
+        left + v + r"(?![^\W_])" for v in forms.stem_variants(value, entity_type)
+    )
     return alternatives
 
 
 def _is_word(char: str) -> bool:
-    return char.isalnum() or char == "_"
+    return char.isalnum()
 
 
 @lru_cache(maxsize=4096)
