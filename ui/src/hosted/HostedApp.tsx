@@ -213,7 +213,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-20 lg:px-10">
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
-          <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible · Built on Meta’s XLM-RoBERTa, Muse Glimmer, Muse Spark and SAM&nbsp;3.1</p>
+          <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible<span className="sm:hidden"> ·</span> <span className="sm:block">Built on Meta’s <span className="whitespace-nowrap">XLM-RoBERTa</span>, Muse Glimmer, Muse Spark and SAM&nbsp;3.1</span></p>
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
           <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base"><span className="text-ink">Legal, HR and finance teams in the EU often can’t send case files to a hosted model, so their agents stay off the useful work.</span> PII Guard is a privacy gateway: personal data in text, tool calls and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
           <div className="max-w-2xl space-y-3">
@@ -237,7 +237,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <ul aria-label="What makes it different" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 sm:grid-cols-2 lg:grid-cols-5">
           <Differentiator href="#how" title="Agents, not just chat">Prompts, tool calls and streamed answers. Tested on the coding agents {HARNESS.agents.join(", ").replace(/, (?=[^,]*$)/, " and ")}: {HARNESS.requests} requests, {HARNESS.leaked} values leaked, {HARNESS.refused} turns refused.</Differentiator>
           <Differentiator href="#how" title="No LLM, no GPU to mask">Validated rules and our open NER on the CPU, adding {LATENCY.value} per request (p50). Nothing is sent out to find personal data.</Differentiator>
-          <Differentiator href="#how" title="EU languages, grammar-aware">Hungarian names change with every case; the ending stays outside the placeholder, so the model still writes correct sentences.</Differentiator>
+          <Differentiator href="#how" title="Inflected EU languages">Hungarian names change with every case; the ending stays outside the placeholder, so the model still writes correct sentences.</Differentiator>
           <Differentiator href="#images" title="One person, one placeholder">The same placeholder in the text and on a scanned ID: {VISUAL_PLACEHOLDERS.recall}&nbsp;% of image values matched, no false merges.</Differentiator>
           <Differentiator href="#results" title="Measured in the open">Public test sets, {COMPARED.tools} other tools and {COMPARED.openModels} other open NER models, {RUNS.label} committed runs. Our NER is published.</Differentiator>
         </ul>
@@ -393,20 +393,20 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
       <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="privacy-heading" eyebrow="Limits" title="What PII Guard doesn’t promise." />
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card title="Detection can miss" headingLevel={3}><p className="text-muted">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</p></Card>
-          <Card title="Context can identify" headingLevel={3}><p className="text-muted">Even with names removed, surrounding detail can point to a person.</p></Card>
-          <Card title="It pseudonymizes; it doesn’t anonymize" headingLevel={3}><p className="text-muted">The data is still personal data, and PII Guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</p></Card>
-          <Card title="Remote detectors join your trust boundary" headingLevel={3}><p className="text-muted">If you enable one, it sees originals. Don’t submit highly sensitive data, or content you aren’t authorized to process.</p></Card>
-          <Card title="Weaker on some text" headingLevel={3}>
-            <ul className="grid gap-2">
+        <ul aria-label="What PII Guard doesn’t promise" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-2 lg:grid-cols-3">
+          <LimitItem title="Detection can miss">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</LimitItem>
+          <LimitItem title="Context can identify">Even with names removed, surrounding detail can point to a person.</LimitItem>
+          <LimitItem title="It pseudonymizes; it doesn’t anonymize">The data is still personal data, and PII Guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</LimitItem>
+          <LimitItem title="Remote detectors join your trust boundary">If you enable one, it sees originals. Don’t submit highly sensitive data, or content you aren’t authorized to process.</LimitItem>
+          <LimitItem title="Weaker on some text">
+            <span className="grid gap-1.5">
               <Point title="Finance text.">{WEAKER.gretel}&nbsp;% leak on Gretel finance, level with Presidio ({WEAKER.gretelPresidio}&nbsp;%).</Point>
               <Point title="Over-masking.">Reference numbers without a cue word can be masked as IDs ({WEAKER.ceeOverMasking}&nbsp;% on CEE-PII).</Point>
               <Point title="Other EU languages.">Trained on Hungarian, German and English; on EU legal text in 21 languages it leaks {WEAKER.mapaLeak}&nbsp;%.</Point>
-            </ul>
-          </Card>
-          <Card title="Printed text on ID scans" headingLevel={3}><p className="text-muted">On {IMAGE_LIMITS.ids} official specimen IDs, {IMAGE_LIMITS.all}&nbsp;% of all labeled regions are covered (Presidio Image Redactor: {IMAGE_LIMITS.presidio}&nbsp;%). Printed text alone: {IMAGE_LIMITS.text}&nbsp;%. Faces and ID photos are the strong part; read the masked transcript before you rely on it.</p></Card>
-        </div>
+            </span>
+          </LimitItem>
+          <LimitItem title="Printed text on ID scans">On {IMAGE_LIMITS.ids} official specimen IDs, {IMAGE_LIMITS.all}&nbsp;% of all labeled regions are covered (Presidio Image Redactor: {IMAGE_LIMITS.presidio}&nbsp;%). Printed text alone: {IMAGE_LIMITS.text}&nbsp;%. Faces and ID photos are the strong part; read the masked transcript before you rely on it.</LimitItem>
+        </ul>
         <p className="text-xs text-muted"><a className={link} href={`${DOCS}/privacy-model.md`}>Read the privacy model ↗</a></p>
       </section>
 
@@ -540,9 +540,14 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   return <li className="min-w-0 bg-surface p-4 sm:p-5"><p className="flex items-baseline gap-2.5"><span aria-hidden="true" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-guard-soft font-mono text-xs text-guard">{n}</span><span className="font-medium text-ink"><span className="sr-only">Step {n}: </span>{title}</span></p><div className="mt-2 pl-8.5 text-muted">{children}</div></li>;
 }
 
-/** One list item with its lead in ink. */
+/** One point inside a limit: its lead in ink. */
 function Point({ title, children }: { title: string; children: ReactNode }) {
-  return <li className="text-muted"><span className="font-medium text-ink">{title}</span> {children}</li>;
+  return <span className="block text-muted"><span className="font-medium text-ink">{title}</span> {children}</span>;
+}
+
+/** One of the Limits: a hairline cell like the Meta and EU strips, so the six read as one list. */
+function LimitItem({ title, children }: { title: string; children: ReactNode }) {
+  return <li className="min-w-0 bg-surface p-4 sm:p-5"><h3 className="text-sm font-medium text-ink">{title}</h3><div className="mt-2 text-muted">{children}</div></li>;
 }
 
 /** One proof signal under the hero's call to action: a short claim that links to its evidence. */
