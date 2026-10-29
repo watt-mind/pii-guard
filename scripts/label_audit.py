@@ -30,6 +30,7 @@ from typing import Any
 
 from pii_guard.eval.datasets import corrections, get
 from pii_guard.eval.fixtures import load_fixtures
+from pii_guard.eval.record import text_metrics
 from pii_guard.eval.report import build_scorecard, git_commit
 from pii_guard.eval.scorer import DetectorAnalyzer, leak_report, run_documents
 from pii_guard.vault import normalize_value
@@ -68,7 +69,9 @@ def _analyzer(system: str) -> DetectorAnalyzer:
 
 
 def _summary(card: dict[str, Any]) -> dict[str, Any]:
-    o = card["overall"]
+    """The run-record view of a scorecard (``record.text_metrics``), trimmed to what changes."""
+    o = text_metrics(card["overall"])
+    languages = {lang: text_metrics(b) for lang, b in card["languages"].items()}
     per_type = {
         t: {"gold": b["gold"], "leaked": b["leak"]["leaked"], "values": b["leak"]["values"]}
         for t, b in sorted(o["per_type"].items())
@@ -83,7 +86,7 @@ def _summary(card: dict[str, Any]) -> dict[str, Any]:
         "per_type_leak": per_type,
         "languages": {
             lang: {"leak": b["leak"]["rate"], "values": b["leak"]["values"]}
-            for lang, b in sorted(card["languages"].items())
+            for lang, b in sorted(languages.items())
         },
     }
 

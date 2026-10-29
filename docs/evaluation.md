@@ -59,6 +59,18 @@ neither credited nor charged: it is left out of precision and over-masking and c
 regions existed falls back to a per-type rule (`scorer.LEGACY_UNSCORED_TYPES`:
 `DATE_OF_BIRTH` on Ai4Privacy).
 
+**Corrected labels.** A public set's gold can be plainly wrong: Gretel finance labels German set
+phrases (`Damen`, `Herren`, `Im Rahmen`), common nouns (`Saldo`) and template slots
+(`[Borrower Name]`) as names, and every system pays for them as leaks. We never edit the
+upstream set for that. A committed corrections file (`eval/datasets/<set>/corrections.json`)
+lists each class of error with its rationale and the exact span texts it covers, and
+`python -m pii_guard.eval.datasets fetch <set>-corrected` builds a **separate** set from it in
+which those spans are ignore regions (`corrected:<rule>`). The rules match the span's own text,
+never a system's output, and every system is scored on the same corrected files, so both the
+upstream number and the corrected one are reported side by side. Only `gretel-finance` has one
+(LAB-1497): 178 of its 1,710 gold spans; what, why and the before/after are in
+[datasets.md](datasets.md#corrected-labels).
+
 **Percentiles.** Every latency percentile the harnesses write (text and visual evals, segmenter
 eval, `pii-guard bench latency`) uses one definition, `pii_guard.eval.stats.percentile`:
 linear interpolation between the closest ranks, numpy's default, so p50 is the median and
