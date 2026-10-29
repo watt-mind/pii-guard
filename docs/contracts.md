@@ -991,7 +991,10 @@ Treatments:
   the placeholder **string** (`"[[NATIONAL_ID_HU_TAX]]"`), because a JSON number can't
   carry a placeholder; any other number is forwarded as the same number. A restored value
   comes back as a string: the answer's tool-call arguments hold the original digits as a JSON
-  string, not a number (LAB-1348).
+  string, not a number (LAB-1348). If distinct object keys mask to the same key (including
+  case or Unicode variants), the request fails closed with `400 invalid_request`, at any
+  nesting depth. No values are merged or silently dropped, and nothing is forwarded
+  (LAB-1568).
 - **check**: an identifier or enum-like setting that can't carry a placeholder. Detected
   personal data rejects the request (`400 unsupported_content`); otherwise it is forwarded
   unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.

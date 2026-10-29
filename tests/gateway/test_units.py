@@ -285,3 +285,24 @@ def test_gateway_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.keep_types == frozenset({EntityType.ORGANIZATION})
     assert config.llm_reasoning_effort == "minimal"
     assert GatewayConfig(keep_types="").keep_types == frozenset()
+
+
+@pytest.mark.parametrize("nested", [False, True], ids=["top-level", "nested"])
+@pytest.mark.parametrize("serialized", [False, True], ids=["object", "json-string"])
+def test_json_key_collision_does_not_replace_object(nested: bool, serialized: bool) -> None:
+    original = {"Teszt Elek": 1, "TESZT ELEK": 2}
+    args = {"outer": [{"inner": original}]} if nested else original
+    function = {"arguments": json.dumps(args) if serialized else args}
+    body = {"model": "m", "messages": [{"role": "assistant", "function_call": function}]}
+    collected = collect_texts(body)
+    for slot in collected.slots:
+        slot.write("[[PERSON_aaaa]]" if slot.text.casefold() == "teszt elek" else slot.text)
+    with pytest.raises(
+        InvalidChatRequestError, match="masking JSON object keys produced a collision"
+    ) as exc:
+        collected.finalize()
+    assert "Teszt" not in str(exc.value)
+    assert "TESZT" not in str(exc.value)
+    # Reject before clearing the colliding object or serializing a lossy replacement.
+    assert original == {"Teszt Elek": 1, "TESZT ELEK": 2}
+    assert function["arguments"] == (json.dumps(args) if serialized else args)

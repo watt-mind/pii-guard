@@ -775,8 +775,16 @@ def _collect_json(
             _collect_json(item, 1, out, kind)
 
         def rebuild(value: dict[str, Any] = value, items: list[list[Any]] = items) -> None:
+            # Distinct spellings can share a vault placeholder (case/Unicode folding).
+            # Fail closed before replacing the object: merging loses arguments, while
+            # inventing placeholders would break reversible vault mappings (LAB-1568).
+            rebuilt = dict(items)
+            if len(rebuilt) != len(items):
+                raise InvalidChatRequestError(
+                    "masking JSON object keys produced a collision; request not forwarded"
+                )
             value.clear()
-            value.update((k, v) for k, v in items)
+            value.update(rebuilt)
 
         # Inner dicts must be rebuilt before outer ones re-serialise: prepend.
         out.finalizers.insert(0, rebuild)
