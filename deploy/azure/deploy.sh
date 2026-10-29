@@ -133,7 +133,10 @@ if [[ "$mode" == bind-domain ]]; then
   : "${HOSTED_PUBLIC_ORIGIN:?Set canonical HTTPS origin}"
   hostname=${HOSTED_PUBLIC_ORIGIN#https://}
   [[ "$HOSTED_PUBLIC_ORIGIN" =~ ^https://[a-z0-9.-]+$ ]] || exit 2
-  az containerapp hostname add --name "$app" --resource-group "$AZURE_RESOURCE_GROUP" --hostname "$hostname" --output none
+  existing=$(az containerapp show --name "$app" --resource-group "$AZURE_RESOURCE_GROUP" --query "properties.configuration.ingress.customDomains[].name" --output tsv)
+  if ! printf '%s\n' "$existing" | grep -qxF "$hostname"; then
+    az containerapp hostname add --name "$app" --resource-group "$AZURE_RESOURCE_GROUP" --hostname "$hostname" --output none
+  fi
   az containerapp hostname bind --name "$app" --resource-group "$AZURE_RESOURCE_GROUP" --hostname "$hostname" --environment "${name_prefix}-env" --validation-method CNAME --output none
   exit 0
 fi

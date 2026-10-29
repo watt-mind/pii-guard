@@ -52,6 +52,11 @@ case "$*" in
     printf '{"internal":%s,"public":"%s"}\n' \
       "${TEST_INTERNAL:-true}" "${TEST_PUBLIC_NETWORK:-Disabled}";;
   "vm show "*) echo Succeeded;;
+  "containerapp show "*"customDomains[].name"*)
+    printf '%s\n' "${TEST_EXISTING_HOSTNAMES:-}"
+    ;;
+  "containerapp hostname add "*) exit 0;;
+  "containerapp hostname bind "*) exit 0;;
   "containerapp show "*"customDomains"*)
     case "${TEST_BINDINGS_ERROR:-}" in
       forbidden) echo 'ERROR: (AuthorizationFailed) synthetic refusal' >&2; exit 1;;
@@ -668,6 +673,18 @@ class DeploymentAdmissionTests(unittest.TestCase):
         self.assertIn("customDomains=", self.calls)
         self.assertIn("guard.example.com", self.calls)
         self.assertIn("monitor action-group show", self.calls)
+
+    def test_bind_domain_adds_then_binds(self) -> None:
+        result = self.run_deploy("bind-domain", TEST_EXISTING_HOSTNAMES="")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("containerapp hostname add", self.calls)
+        self.assertIn("containerapp hostname bind", self.calls)
+
+    def test_bind_domain_skips_add_when_hostname_exists(self) -> None:
+        result = self.run_deploy("bind-domain", TEST_EXISTING_HOSTNAMES="guard.example.com")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("containerapp hostname add", self.calls)
+        self.assertIn("containerapp hostname bind", self.calls)
 
 
 if __name__ == "__main__":
