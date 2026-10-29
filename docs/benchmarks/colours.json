@@ -137,6 +137,18 @@
       "color": "#D55E00",
       "shape": "circle"
     },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s30": {
+      "color": "#332288",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s50": {
+      "color": "#999933",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v32-s70": {
+      "color": "#882255",
+      "shape": "circle"
+    },
     "rules+ner:wismut-nym@decoder=word": {
       "color": "#117733",
       "shape": "circle"

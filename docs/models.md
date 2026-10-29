@@ -329,6 +329,22 @@ config, `training_meta.json` without local values, the model card as `README.md`
 It uses the local Hugging Face login, tags the upload commit, and prints the revision and
 SHA-256 that `ner_resolve.PUBLISHED` pins. Modal spend: $2.92 of free credits.
 
+### NER v3, v3.1 and v3.2: v2.0 stays
+
+Three later rounds tried to replace v2.0. Each used a selection rule fixed in advance, and v2.0
+is still the published model.
+
+- **v3** (LAB-1393) and **v3.1** (LAB-1410) retrained on wider mixes. Each traded one
+  domain's leaks for another's, and every candidate failed the smoke leak gate
+  ([v3.1 results](../eval/results/2026-10-28-ner-v31/README.md)).
+- **v3.2** (LAB-1494) averaged the weights of v2.0 and v3.1-B (soups, 30/50/70 % B;
+  `training/ner/soup.py`). It also mined v2.0's misses on development data
+  (`training/ner/mine_errors.py`).
+  - The 30 % soup leaks less than v2.0 on six of seven held-out sets, MAPA included. It
+    still fails the smoke gate on one inflected Hungarian name.
+  - Mining found no real error family to generate data for, so nothing was trained
+    ([v3.2 results](../eval/results/2026-10-29-ner-v32/README.md)).
+
 ## LLM detector
 
 `pii_guard.detect.llm.LlmDetector` (registry name `llm`) talks to any OpenAI-compatible Chat
