@@ -1,5 +1,9 @@
 # Real harnesses through the gateway: results (2026-10-28)
 
+> Re-run on 2026-10-29 with the placeholder note and the agent-text guards in: refusals 7 of 15
+> → 0 of 10 agent turns. See [harness-matrix-2026-10-29.md](harness-matrix-2026-10-29.md)
+> (LAB-1475). This page is kept as the record of the first run.
+
 LAB-1469. Each coding agent installed on a developer Mac ran non-interactively through a local
 `pii-guard up`, on a synthetic task with fictional personal data, against the Meta Model API.
 The scripted end-to-end tests ([`tests/integrations/`](../../tests/integrations/)) pin one

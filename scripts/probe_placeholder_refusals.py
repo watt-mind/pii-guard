@@ -9,7 +9,9 @@ Completions with tools) against an OpenAI-compatible upstream, under four condit
 - ``note``: the same, plus the gateway's placeholder note
   (:data:`pii_guard.gateway.placeholder_note.PLACEHOLDER_NOTE`) as the first system message;
 - ``neutral``: high-sensitivity types relabelled ``[[REF_<id>]]``, no note;
-- ``both``: neutral labels and the note.
+- ``both``: neutral labels and the note;
+- ``labels``: person placeholders replaced by ``Customer 1`` / ``Customer 2``, no note
+  (LAB-1475: is a person placeholder next to an identity number the trigger?).
 
 ``--via-gateway`` instead sends the same turns with fictional values (checksum-valid synthetic
 identifiers, generated here; the two customers are "Customer 1" and "Customer 2", so no name
@@ -47,6 +49,7 @@ import httpx
 from pii_guard.gateway.placeholder_note import PLACEHOLDER_NOTE
 
 CONDITIONS = ("baseline", "note", "neutral", "both")
+EXTRA_CONDITIONS = ("labels",)
 GATEWAY_CONDITIONS = ("gateway-off", "gateway-note")
 
 # The placeholders of the run's customers.md (ids are made up; nothing maps to a value).
@@ -66,6 +69,11 @@ _HIGH = re.compile(r"\[\[(?:NATIONAL_ID_[A-Z_]+|BANK_ACCOUNT|ID_DOCUMENT)_([0-9a
 
 def neutral(text: str) -> str:
     return _HIGH.sub(r"[[REF_\1]]", text)
+
+
+def person_labels(text: str) -> str:
+    """The two customers as ``Customer 1`` / ``Customer 2`` instead of person placeholders."""
+    return text.replace(TYPED["hu_name"], "Customer 1").replace(TYPED["de_name"], "Customer 2")
 
 
 AGENTS_MD = (
@@ -267,6 +275,8 @@ def build(condition: str, scenario: str) -> dict[str, Any]:
     text = json.dumps(body_messages, ensure_ascii=False)
     if condition in ("neutral", "both"):
         text = neutral(text)
+    if condition == "labels":
+        text = person_labels(text)
     return {"messages": json.loads(text), "tools": TOOLS}
 
 
@@ -400,6 +410,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-calls", type=int, default=80)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--via-gateway", action="store_true")
+    parser.add_argument("--ticket", default="LAB-1471", help="recorded in the JSON record")
     args = parser.parse_args(argv)
     if args.via_gateway and args.conditions == ",".join(CONDITIONS):
         args.conditions = ",".join(GATEWAY_CONDITIONS)
@@ -476,7 +487,7 @@ def main(argv: list[str] | None = None) -> int:
     args.out.write_text(
         json.dumps(
             {
-                "ticket": "LAB-1471",
+                "ticket": args.ticket,
                 "model": args.model,
                 "base_url": args.base_url,
                 "via_gateway": args.via_gateway,

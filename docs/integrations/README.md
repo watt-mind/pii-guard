@@ -16,7 +16,8 @@ answer (tool-call arguments included) comes back restored.
 
 The versions installed on a developer Mac (Codex 0.163.0, pi 1.3.0, OpenCode 1.18.26, Muse Code
 1.4.14, Claude Code 2.1.289) were also run by hand against the Meta Model API, with the
-published NER: [results matrix, 2026-10-28](harness-matrix-2026-10-28.md).
+published NER: [results matrix, 2026-10-28](harness-matrix-2026-10-28.md), re-run with the
+placeholder note on [2026-10-29](harness-matrix-2026-10-29.md).
 
 Each end-to-end test installs the pinned version into a throwaway directory, runs one task on
 the fictional mini-repo through the gateway against a scripted upstream (CI), and asserts that
