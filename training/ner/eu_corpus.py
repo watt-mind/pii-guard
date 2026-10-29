@@ -28,13 +28,21 @@ as ``O``).
 names Muse added and excludes disagreements from the loss)::
 
     set -a; source .env; set +a      # META_API_KEY (Meta Model API, contributor tier)
-    uv run --no-sync python training/ner/eu_corpus.py --languages lv,lt,hr,sl --n 1200 \\
-        --seed 1525 --out eval/generated/distill-eu-s1525 --budget-usd 3 --workers 16
-    uv run --no-sync python training/ner/eu_corpus.py --languages fr,es,it,nl,ro,ga,mt \\
-        --n 1200 --seed 1525 --out eval/generated/distill-eu-1b-s1525 --budget-usd 4.8 --workers 32
+    uv run --no-sync --with huggingface-hub python training/ner/eu_corpus.py \\
+        --languages lv,lt,hr,sl --n 1200 --seed 1525 --corpus phase1 --budget-usd 3 --workers 16
+    uv run --no-sync --with huggingface-hub python training/ner/eu_corpus.py \\
+        --languages fr,es,it,nl,ro,ga,mt --n 1200 --seed 1525 --corpus phase1b --budget-usd 4.8 \\
+        --workers 32
 
 Writes ``<lang>-distill-{train,dev}.jsonl`` and ``stats.json`` (counts, discard reasons, token
 usage, cost; never values). Split: 90 % train, 10 % dev, by a seeded shuffle of the indices.
+
+**Where it goes (LAB-1542).** Into the corpus folder ``--corpus`` under the data root
+(``PII_GUARD_DATA_DIR``, ``training/ner/data_sync.py``), outside the worktree: the documents in
+``<corpus>/distill-eu-s<seed>/``, the response cache in ``<corpus>/cache/``, and a
+``manifest.json`` marking it synthetic. At the end of a successful run the corpus is pushed to
+the private dataset (one commit; the revision is printed); ``--no-push`` skips that. An explicit
+``--out eval/generated/...`` / ``--cache ...`` still works as before and is not pushed.
 """
 
 # Seeded synthetic data: the standard PRNG is the point.
@@ -58,6 +66,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import data_sync
 from eu_identities import LANGS, Identities, Lang, Planted, name_forms
 
 from pii_guard.eval.fixtures import Document, GoldSpan, write_fixtures
@@ -535,8 +544,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--languages", default="lv,lt,hr,sl")
     parser.add_argument("--n", type=int, default=1200, help="planned documents per language")
     parser.add_argument("--seed", type=int, default=1525)
-    parser.add_argument("--out", type=Path, default=Path("eval/generated/distill-eu-s1525"))
-    parser.add_argument("--cache", type=Path, default=Path("eval/generated/cache"))
+    parser.add_argument(
+        "--corpus", default="phase1", help="corpus folder under the data root (PII_GUARD_DATA_DIR)"
+    )
+    parser.add_argument("--out", type=Path, help="default: <corpus>/distill-eu-s<seed>")
+    parser.add_argument("--cache", type=Path, help="default: <corpus>/cache")
+    parser.add_argument(
+        "--no-push", action="store_true", help="do not push the corpus to the HF dataset"
+    )
     parser.add_argument("--budget-usd", type=float, required=True)
     parser.add_argument("--workers", type=int, default=16)
     parser.add_argument(
@@ -545,6 +560,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--dry-run", action="store_true", help="print one plan's prompt, no calls")
     args = parser.parse_args(argv)
+    corpus = data_sync.data_root() / args.corpus
+    args.out = args.out or corpus / f"distill-eu-s{args.seed}"
+    args.cache = args.cache or corpus / "cache"
     languages = args.languages.split(",")
     if args.dry_run:
         plan = plan_document(LANGS[languages[0]], args.seed, 0)
@@ -593,6 +611,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     stats["cost_usd_uncached"] = round(budget.spent, 4)
     (args.out / "stats.json").write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
     print(f"eu-corpus: uncached cost ${budget.spent:.3f}", file=sys.stderr)
+    if data_sync.corpus_of(args.out) is not None:
+        data_sync.write_manifest(
+            data_sync.data_root() / str(data_sync.corpus_of(args.out)),
+            generated_by={
+                "script": "training/ner/eu_corpus.py", "model": args.model, "seed": args.seed,
+                "languages": languages, "out": args.out.name,
+            },
+            license="Apache-2.0 (pii-guard generator; fictional values only, ADR 0005)",
+        )  # fmt: skip
+    data_sync.push_after_run(args.out, enabled=not args.no_push, what="eu-corpus")
     return 0
 
 

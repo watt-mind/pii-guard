@@ -1096,6 +1096,19 @@ placeholder as written; other escape depths (`\\[\\[` in freeform input, an esca
 backslash) are left; an unknown or other session's placeholder stays as written and is counted as
 unresolved; the restored value is charged to the response's restore budget.
 
+**Shell quoting in command arguments** (both APIs, whole and streamed; LAB-1483). A restored value
+is byte-exact, except in one context the gateway reads for sure: the string value of a top-level
+`command` or `cmd` key in JSON `arguments` (or the script after `-c`/`-lc` in a `command` array),
+read by a small shell lexer. There a value restored inside a single-quoted string gets `'` written
+as `'\''`; inside the single-quoted script word of a `sed` command, in an `s` replacement, `\`, `&`,
+the delimiter and a newline also get a backslash (an escaped placeholder in an `s` pattern also gets a
+delimiter backslashed that the regex literal leaves as is). Then it is JSON-escaped as usual. So
+`echo '[[PERSON_x]]'` with `O'Brien Teszt` and `sed 's/x/[[ADDRESS_x]]/'` with `Fő utca 1/A` run
+as meant. **Limitation:** everywhere else the value stays byte-exact, so a `$`, backtick, `"` or `\`
+in a double-quoted string, an unquoted value, a heredoc, `$'...'`, a comment, a nested or argv-array
+command, another `sed` command or a bracket expression, and custom tool `input` (it may be a patch,
+not a command) are not escaped. Other keys, message text and file content are never touched.
+
 **Streaming** (`stream: true`). The `response.*` events keep their `event:` lines. Each delta
 stream has its own streaming unmasker, keyed by `output_index` plus `content_index` or
 `summary_index`: `response.output_text.delta`, `response.refusal.delta`,
@@ -1579,9 +1592,9 @@ single-owner routes keep their default namespace.
 |---|---|---|
 | `GET /v1/projects` | — | `{projects:[...],default_project_id}`; creates the default if needed |
 | `POST /v1/projects` | `{name}` | 201 project metadata; maximum 32 projects per owner |
-| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` |
+| `GET /v1/projects/{project_id}` | — | Owned project metadata, including `default_policy_version_id` (the default policy's latest version) |
 | `GET /v1/projects/{project_id}/policies` | — | `{policies:[...]}`; every immutable version |
-| `POST /v1/projects/{project_id}/policies` | `{name,entity_policies?,language?,mode?,detection_profile?}` | 201 first version in a new policy family |
+| `POST /v1/projects/{project_id}/policies` | `{name,entity_policies?,language?,mode?,detection_profile?,visual_detection?}` | 201 first version in a new policy family |
 | `PUT /v1/projects/{project_id}/policies/{policy_id}` | Same policy fields | 201 next immutable version; existing endpoints remain pinned |
 | `GET /v1/projects/{project_id}/policies/versions/{version_id}` | — | Exact policy-version snapshot |
 | `GET /v1/projects/{project_id}/endpoints` | — | `{endpoints:[...]}`; credentials are never returned |
@@ -1593,12 +1606,33 @@ single-owner routes keep their default namespace.
 | `POST /v1/projects/{project_id}/endpoints/{endpoint_id}/keys` | `{name}` | 201 key metadata plus raw `key`, returned once; maximum 32 active and 128 retained records per endpoint |
 | `DELETE /v1/projects/{project_id}/endpoints/{endpoint_id}/keys/{key_id}` | — | 204; revokes future admissions |
 
-Policy versions capture a complete text-entity action map, language and detection mode. Omitted
-entity actions use deployment defaults. Only text entities accept `mask`, `keep` or `block`;
-unknown entities and extra fields are rejected with sanitized validation messages. Hosted
-policies require `fast`; self-hosted policies must use the deployment's detection profile, and
-`local-only` refuses `audit`. A policy revision appends a version and never mutates a prior
-version or silently changes endpoint pins. A project can contain up to 256 policy versions.
+Policy versions capture a complete text- and visual-entity action map, language, detection mode
+and image detection. Omitted entity actions use deployment defaults. Text entities accept
+`mask`, `keep` or `block`; visual entities (`FACE`, `ID_PHOTO`, `SIGNATURE`, `STAMP`) accept
+`mask` or `keep` (LAB-1444). Unknown entities and extra fields are rejected with sanitized
+validation messages. Hosted policies require `fast`; self-hosted policies must use the
+deployment's detection profile, and `local-only` refuses `audit`. A policy revision appends a
+version and never mutates a prior version or silently changes endpoint pins. A project can
+contain up to 256 policy versions.
+
+`visual_detection` chooses who finds visual regions for a selected project policy's images:
+
+- `local` (default): on the CPU only. YuNet finds faces and ID photos, and the pinned YOLOS-tiny
+  signature detector (`mdefrance/yolos-tiny-signature-detection` at a fixed revision,
+  Apache-2.0, safetensors, every file SHA-256 checked; `python -m pii_guard.visual.segmenters
+  fetch`) finds signatures, on the whole image and 2x2 overlapping tiles. No SAM request is
+  made. Stamps cannot be found locally: a `local` policy that masks `STAMP` refuses images.
+  `analysis.sam.model` is `yunet-2023mar+yolos-tiny-signature` once signatures were asked for.
+- `sam`: the server's segmenter (`PII_GUARD_SEGMENTER`, `hybrid` by default: SAM 3.1 on the Meta
+  API for signatures and stamps, so the original image leaves the machine). A server set to
+  `local` or `off` is stricter and wins. `local-only` deployments and the hosted service accept
+  `local` only (`422 invalid_project_config`).
+
+Versions saved before LAB-1444 have no visual actions and no `visual_detection`: they read as
+`local` with the server's visual actions. For visual types, an explicit
+`PII_GUARD_POLICY_OVERRIDES` entry wins over the policy when it is stricter (`keep` < `mask` <
+`block`). Requests without a selected project use the server's policies and segmenter, as
+before.
 
 An endpoint pins one policy version and one provider/upstream/credential tuple, and optionally
 one model (LAB-1451). Providers

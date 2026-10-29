@@ -1,13 +1,23 @@
-import type { TextEntityType } from "../api/types";
+import type { TextEntityType, VisualEntityType } from "../api/types";
 import type { Policy } from "../lib/entities";
 
 export interface Project { id: string; name: string; default_policy_id: string }
 export interface ProjectList { projects: Project[]; default_project_id: string }
 export interface PolicyVersion {
   id: string; policy_id: string; policy_version_id: string; name: string; version: number;
-  entity_policies: Record<TextEntityType, Policy>; language: string; mode: string;
-  detection_profile: string;
+  /** Text types, and visual types (mask or keep) for versions saved since LAB-1444. */
+  entity_policies: Record<TextEntityType, Policy> & Partial<Record<VisualEntityType, Policy>>;
+  language: string; mode: string; detection_profile: string;
+  /** Image detection; absent on versions saved before LAB-1444 (read as `local`). */
+  visual_detection?: VisualDetection;
 }
+/** `local`: on-device faces, ID photos and signatures. `sam`: SAM 3.1 on the Meta API too. */
+export type VisualDetection = "local" | "sam";
+/** What the Detection choice says, in the editor and the read-only policy view. */
+export const VISUAL_DETECTION_LABEL: Record<VisualDetection, string> = {
+  local: "On-device (fast)",
+  sam: "SAM 3.1 (better signatures, ~2–4 s, sends the image to Meta)",
+};
 export interface Endpoint {
   id: string; name: string; project_id: string; policy_id: string;
   policy_version_id: string; policy_version: number; provider: string;

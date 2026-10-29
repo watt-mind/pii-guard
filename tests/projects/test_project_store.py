@@ -119,8 +119,10 @@ def test_owner_isolation_and_policy_versions_remain_pinned(store: ProjectStore) 
     assert next_policy["version"] == 2
     assert next_policy["policy_version_id"] != policy["policy_version_id"]
     assert store.get_policy("owner-a", project["id"], policy["policy_version_id"]) == policy
+    # The project default follows the family's latest version; endpoints stay pinned (LAB-1537).
     assert (
-        store.default_project("owner-a")["default_policy_version_id"] == policy["policy_version_id"]
+        store.default_project("owner-a")["default_policy_version_id"]
+        == next_policy["policy_version_id"]
     )
     assert before.policy["entity_policies"]["EMAIL"] == "mask"
     assert store.endpoint_snapshot("owner-a", project["id"], configured["id"]) == before

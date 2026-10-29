@@ -7,6 +7,7 @@
 | [architecture.md](architecture.md) | Components, data flow, APIs, the gateway and streaming re-identification |
 | [private-dev.md](private-dev.md) | Tailnet-only dev networking, proxy credentials, app-only releases and live activation gates |
 | [hosted.md](hosted.md) | Hosted deployment, trust boundary, actual retention, release gates and rollback |
+| [integrations.md](integrations.md) | Connect an application: URLs, keys, runnable cURL and SDK examples, images; client guides in [integrations/](integrations/README.md) |
 | [projects.md](projects.md) | Projects, immutable policy versions, endpoint configuration and persistence boundaries |
 | [privacy-model.md](privacy-model.md) | Threat model, what PII Guard guarantees and what it does not |
 | [eu-regulation.md](eu-regulation.md) | Why it matters in the EU: GDPR, transfers, sector rules and the AI Act, mapped to primary sources, and what we don't claim |
@@ -18,6 +19,7 @@
 | [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [journey.md](journey.md) | The project's story so far: dated milestones with before/after metrics, cost and the decisions made |
+| [demo-story.md](demo-story.md) | Repeatable judge walkthrough, hosted/self-hosted boundaries and recorded-image fallback |
 | [submission.md](submission.md) | Draft hackathon submission text, consistent with why-pii-guard.md |
 | [demo-script.md](demo-script.md) | Shot list and voice-over for the 3-minute submission video, with the source of every number said aloud |
 | [roadmap.md](roadmap.md) | The 9-day hackathon plan, day-1 checks, what comes after |

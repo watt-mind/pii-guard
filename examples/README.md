@@ -1,5 +1,11 @@
 # Examples
 
+## Connect an application
+
+The [integration guide](../docs/integrations.md) and [runnable clients](integrations/)
+cover cURL and the OpenAI Python SDK for self-hosted and hosted project endpoints,
+streaming, credential boundaries and the self-hosted image path.
+
 ## Images that keep their meaning: "which parties have an ID?"
 
 [`which_parties_have_an_id.py`](which_parties_have_an_id.py) sends one chat turn through the

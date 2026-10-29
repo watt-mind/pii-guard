@@ -29,8 +29,9 @@ from starlette.staticfiles import StaticFiles
 from starlette.types import Scope
 
 from pii_guard.api.app import create_app
-from pii_guard.config import Settings
+from pii_guard.config import Settings, get_settings
 from pii_guard.detect import ner_resolve
+from pii_guard.security_headers import SecurityHeadersMiddleware
 
 __all__ = [
     "UI_DIR",
@@ -207,13 +208,25 @@ padding:0 16px}}</style></head>
 
 
 def create_bundle_app(
-    status: Status, settings: Settings | None = None, *, ui_dir: Path = UI_DIR
+    status: Status,
+    settings: Settings | None = None,
+    *,
+    ui_dir: Path = UI_DIR,
+    security_headers: bool | None = None,
 ) -> FastAPI:
-    """:func:`~pii_guard.api.app.create_app` plus the UI (or a fallback page) at ``/``."""
+    """:func:`~pii_guard.api.app.create_app` plus the UI (or a fallback page) at ``/``.
+
+    ``security_headers`` (default: on in hosted mode) adds the browser security headers of
+    :mod:`pii_guard.security_headers` to every response, with the served page's inline
+    script and style hashes in its Content-Security-Policy (LAB-1460).
+    """
+    settings = settings or get_settings()
     app = create_app(settings)
     app.state.up_status = status
     if ui_available(ui_dir):
-        app.mount("/", _SpaFiles(directory=ui_dir), name="ui")
+        spa = _SpaFiles(directory=ui_dir)
+        app.mount("/", spa, name="ui")
+        page = spa._index.decode("utf-8")
     else:
         page = _no_ui_page(status)
 
@@ -221,6 +234,9 @@ def create_bundle_app(
         def no_ui() -> HTMLResponse:
             return HTMLResponse(page)
 
+    if settings.hosted if security_headers is None else security_headers:
+        # Outermost: the Host check's 400 and every error response carry them too.
+        app.add_middleware(SecurityHeadersMiddleware, page=page)
     return app
 
 

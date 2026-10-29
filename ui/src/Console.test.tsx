@@ -103,6 +103,16 @@ describe("console shell", () => {
     expect(location.hash).toBe(now);
   });
 
+  it("mounts the Images screen, and so its sample images, only once it is opened (LAB-1458)", async () => {
+    const { container } = render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: vi.fn(() => ({ close() {} })), fixtureIntervalMs: 60_000 }} loadStatus={statusOf()} />);
+    expect(container.querySelector('img[src^="/samples/"]')).toBeNull();
+    act(() => {
+      history.replaceState(null, "", "#playground/images");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    await waitFor(() => expect(container.querySelector('img[src^="/samples/"]')).not.toBeNull());
+  });
+
   it("switches sections on a hash change, also away from Images (LAB-1294)", async () => {
     history.replaceState(null, "", "#playground/images");
     render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: vi.fn(() => ({ close() {} })), fixtureIntervalMs: 60_000 }} loadStatus={statusOf()} />);
@@ -144,9 +154,17 @@ describe("console shell", () => {
     expect(menu).toHaveAttribute("aria-expanded", "false");
     await user.click(menu);
     expect(menu).toHaveAttribute("aria-expanded", "true");
+    const destination = screen.getByRole("main");
+    const scroll = vi.spyOn(destination, "scrollIntoView").mockImplementation(() => {
+      expect(menu).toHaveAttribute("aria-expanded", "false");
+      expect(location.hash).toBe("#connect");
+    });
     await user.click(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /^Connect/ }));
     expect(menu).toHaveAttribute("aria-expanded", "false");
     expect(location.hash).toBe("#connect");
+    expect(screen.getByRole("main")).toHaveFocus();
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "auto" });
+    scroll.mockRestore();
     await user.click(menu);
     await user.keyboard("{Escape}");
     expect(menu).toHaveAttribute("aria-expanded", "false");

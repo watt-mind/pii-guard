@@ -393,8 +393,12 @@ def summary_line(report: Report) -> str:
 
 
 def _paths_from(config: Path, include_dev: bool) -> list[Path]:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from data_sync import resolve  # data:<corpus>/<file> under PII_GUARD_DATA_DIR (LAB-1542)
+
     cfg = tomllib.loads(config.read_text(encoding="utf-8"))
-    return [Path(p) for p in [*cfg.get("train", []), *(cfg.get("dev", []) if include_dev else [])]]
+    paths = [*cfg.get("train", []), *(cfg.get("dev", []) if include_dev else [])]
+    return [resolve(p) for p in paths]
 
 
 def main(argv: Sequence[str] | None = None) -> int:

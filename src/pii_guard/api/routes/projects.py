@@ -17,8 +17,10 @@ from pii_guard.api.routes.models import provider_catalog
 from pii_guard.hosted.egress import validate_destination
 from pii_guard.projects.runtime import ProjectAccessError
 from pii_guard.projects.store import InvalidProjectConfigError, ProjectStore
-from pii_guard.types import TEXT_ENTITY_TYPES
+from pii_guard.types import TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES
 from pii_guard.upstreams import PRESETS
+
+VISUAL_TYPE_NAMES = frozenset(entity.value for entity in VISUAL_ENTITY_TYPES)
 
 router = v1_router()
 router.tags = ["projects"]
@@ -76,7 +78,14 @@ class PolicyRequest(NameRequest):
     """A new complete immutable policy version; omitted actions use deployment defaults."""
 
     entity_policies: dict[str, Literal["mask", "keep", "block"]] = Field(
-        default_factory=dict, description="Text entity actions: mask, keep or block."
+        default_factory=dict,
+        description="Entity actions: mask, keep or block for text types; mask or keep for "
+        "visual types (FACE, ID_PHOTO, SIGNATURE, STAMP).",
+    )
+    visual_detection: Literal["local", "sam"] = Field(
+        default="local",
+        description="Image detection: local (on-device faces, ID photos and signatures) or "
+        "sam (SAM 3.1 on the Meta API for signatures and stamps; sends the image to Meta).",
     )
     language: str = Field(
         default="hu", min_length=2, max_length=16, description="Detection language tag."
@@ -90,11 +99,14 @@ class PolicyRequest(NameRequest):
 
     @field_validator("entity_policies", mode="before")
     @classmethod
-    def text_policies_only(cls, value: object) -> object:
+    def known_policies_only(cls, value: object) -> object:
         if not isinstance(value, dict) or any(
-            key not in {entity.value for entity in TEXT_ENTITY_TYPES} for key in value
+            key not in {entity.value for entity in TEXT_ENTITY_TYPES | VISUAL_ENTITY_TYPES}
+            for key in value
         ):
-            raise ValueError("unknown text entity type")
+            raise ValueError("unknown entity type")
+        if any(value[key] == "block" for key in value if key in VISUAL_TYPE_NAMES):
+            raise ValueError("visual entity types are mask or keep")
         return value
 
 
@@ -152,7 +164,8 @@ def _context(request: Request) -> tuple[ProjectStore, str]:
 
 def _policy_data(body: PolicyRequest, request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
-    if settings.hosted and body.mode != "fast":
+    # Hosted images are on-device only until SAM has its own spend reservation (LAB-1444).
+    if settings.hosted and (body.mode != "fast" or body.visual_detection != "local"):
         raise InvalidProjectConfigError()
     return body.model_dump(exclude_none=True)
 

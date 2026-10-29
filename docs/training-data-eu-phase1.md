@@ -152,6 +152,50 @@ veto after selection.
   hash only; the Muse and template texts are generated, so an exact copy is the only way one
   could match.
 
+## Where the data lives
+
+The template sets (OpenPII rows, negatives, court-style templates) rebuild byte-identically from
+this repository. The LLM-written sets do not: a rerun gets new completions and costs credits and
+GPU hours. Since LAB-1542 they live **outside every worktree** and are backed up to a **private**
+Hugging Face dataset, so removing a worktree no longer loses them.
+
+- **Local data root.** `PII_GUARD_DATA_DIR`, default `~/Develop/.worktrees/pii-guard/data-eu`.
+  One folder per *corpus* (`phase1b/`, `v41/`, ...): the documents, the response cache
+  (`cache/`), teacher labels (`labelled/`, `teacher-cache.jsonl`) and a `manifest.json` that
+  says `"synthetic": true`. `eu_corpus.py --corpus <name>` and `modal_eu_label.py`
+  (`EU_CORPUS=<corpus>/<dir>`) write there; an explicit `--out eval/generated/...` (or a
+  repo-relative `EU_CORPUS`) still works as before and is not pushed.
+- **Backup.** [`watt-mind/pii-guard-ner-train`](https://huggingface.co/datasets/watt-mind/pii-guard-ner-train)
+  (private). Both generators push the corpus at the end of a successful run (one commit; the
+  revision is printed); `--no-push` skips it. A push is refused unless the manifest says
+  synthetic and every path passes the LAB-1527 real-text allowlist (`modal_upload.check_payload`):
+  MAPA, TAB, dataset downloads and mining pools never go.
+- **Training.** Config paths `data:<corpus>/<file>` are read from the data root (`train.py`,
+  `decontam.py`). On Modal, `modal_train.py --data <corpus>@<rev>` reads the corpus from the
+  volume `pii-guard-ner-runs` (`data/<corpus>@<rev>`) instead of uploading it.
+
+| Corpus | What | Revision |
+|---|---|---|
+| `phase1b` | Muse es/fr/it/nl/ro/ga/mt documents + response cache (LAB-1534), no teacher labels yet | `6fbb52b62d990e2c2a1008d2427d66f413dddebb` |
+| `v41` | Muse court-style documents bg..ga, pilot, response cache (LAB-1539, snapshot while the run continued) | `4b6c928f4abd8b9e7137d5d0cfbd519744f6bf9a` |
+| `v20-s11` | v2.0's s11 hu/en corpus, Glimmer labels, teacher and writer caches (LAB-1128) | `294adb3fc4d411825f5a416f4b6b93468e4836fe` |
+
+```sh
+set -a; source .env; set +a   # or: hf auth login (read access to watt-mind)
+# restore a corpus into the data root, pinned to a revision
+uv run --no-sync --with huggingface-hub python training/ner/data_sync.py pull phase1b \
+  --revision 6fbb52b62d990e2c2a1008d2427d66f413dddebb
+# what a push would upload (nothing is sent)
+uv run --no-sync python training/ner/data_sync.py check phase1b
+# back up a corpus by hand (prints the revision)
+uv run --no-sync --with huggingface-hub python training/ner/data_sync.py push phase1b
+# copy a revision to the Modal volume, then train from it without uploading
+uv run --no-sync --with huggingface-hub --with modal python training/ner/data_sync.py volume phase1b \
+  --revision 6fbb52b62d990e2c2a1008d2427d66f413dddebb
+modal run training/distill/modal_train.py --config <toml> \
+  --data phase1b@6fbb52b62d990e2c2a1008d2427d66f413dddebb
+```
+
 ## Rebuild
 
 ```sh
@@ -161,10 +205,15 @@ uv run --no-sync python training/ner/openpii_eu.py --source data/public/openpii-
 uv run --no-sync python training/ner/negatives_eu.py --stats eval/generated/negatives-eu-stats.json
 uv run --no-sync python training/ner/court_surnames_en.py
 set -a; source .env; set +a   # META_API_KEY; cached responses make a rerun free
-uv run --no-sync python training/ner/eu_corpus.py --languages lv,lt,hr,sl --n 1200 --budget-usd 4 --workers 32
-EU_CORPUS=eval/generated/distill-eu-s1525 uv run --no-sync --with modal modal run training/ner/modal_eu_label.py
-uv run --no-sync python training/ner/eu_corpus.py --languages fr,es,it,nl,ro,ga,mt --n 1200 --out eval/generated/distill-eu-1b-s1525 --budget-usd 4.8 --workers 8
-EU_CORPUS=eval/generated/distill-eu-1b-s1525 uv run --no-sync --with modal modal run training/ner/modal_eu_label.py
+# phase-1 paths under eval/generated, as the manifest records them; drop --out/--cache to use
+# the data root and push (see "Where the data lives")
+uv run --no-sync python training/ner/eu_corpus.py --languages lv,lt,hr,sl --n 1200 --budget-usd 4 --workers 32 \
+  --out eval/generated/distill-eu-s1525 --cache eval/generated/cache --no-push
+EU_CORPUS=eval/generated/distill-eu-s1525 uv run --no-sync --with modal modal run training/ner/modal_eu_label.py --no-push
+# phase 1b (LAB-1534), under the data root (corpus phase1b)
+uv run --no-sync python training/ner/eu_corpus.py --languages fr,es,it,nl,ro,ga,mt --n 1200 --budget-usd 4.8 --workers 8 \
+  --out ~/Develop/.worktrees/pii-guard/data-eu/phase1b/distill-eu-1b-s1525 --cache ~/Develop/.worktrees/pii-guard/data-eu/phase1b/cache --no-push
+EU_CORPUS=phase1b/distill-eu-1b-s1525 uv run --no-sync --with modal modal run training/ner/modal_eu_label.py
 uv run --no-sync python training/ner/eu_phase1_manifest.py
 uv run --no-sync python eval/fixtures/build_eu_gates.py
 ```
