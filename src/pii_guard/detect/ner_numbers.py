@@ -8,11 +8,12 @@ spans were these types: order and ticket numbers, SKUs, request and tool-call id
 numbers, an amount glued to the field before it, or a few digits cut out of a longer token.
 
 :func:`check_numbers` runs on the NER spans of :data:`NUMBER_TYPES` before they leave the
-detector. Every other type passes untouched. For each span:
+detector, plus a split-only pass over :data:`_SPLIT_TYPES` (``PHONE``). Every other type
+passes untouched. For each span:
 
 1. **Fields.** A span that runs over a field separator (``,`` ``;`` ``|`` ``=`` a quote or a
    tab, as in ``SO4760429,77445.68``) is cut into its fields, and each field is judged on its
-   own.
+   own. A ``PHONE`` span is only ever split: one without a separator passes untouched.
 2. **Machine ids: drop.** A lowercase hexadecimal id with letters and digits
    (``"id": "40aebd349d7fcb76"``, ``call_…``, ``req=…``), or any piece of one, whatever its key.
 3. **Positive cue: keep.** An identity, account, card, tax or phone word in the column header
@@ -60,6 +61,11 @@ NUMBER_TYPES: frozenset[EntityType] = frozenset(
         EntityType.NATIONAL_ID_HU_TAJ,
     }
 )
+
+#: Further NER types split at field separators (LAB-1380): a single-field span keeps its
+#: verdict-free pass; only a span running over a separator has its fields judged on their own
+#: (a phone number never holds a field separator: ``07700900316,703`` is two fields).
+_SPLIT_TYPES: frozenset[EntityType] = frozenset({EntityType.PHONE})
 
 # Field names and labels, folded (lower case, no accents). A trailing "*" takes any suffix.
 # Positive: the value is (or may be) an identity, account, card or tax number.
@@ -380,11 +386,14 @@ def check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
 def _check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
     out: list[Span] = []
     for span in spans:
-        if span.entity_type not in NUMBER_TYPES:
+        if span.entity_type not in NUMBER_TYPES | _SPLIT_TYPES:
             out.append(span)
             continue
         fields = _fields(text, span.start, span.end)
-        kept = [f for f in fields if number_verdict(text, f[0], f[1])]
+        if span.entity_type in NUMBER_TYPES or len(fields) > 1:
+            kept = [f for f in fields if number_verdict(text, f[0], f[1])]
+        else:
+            kept = fields  # one field: no separator ran through it, leave it alone
         if kept == [(span.start, span.end)]:
             out.append(span)
             continue

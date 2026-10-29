@@ -51,6 +51,7 @@ from copy import copy
 from dataclasses import dataclass
 
 from pii_guard.detect.normalize import NormalizedText, normalize_for_detection
+from pii_guard.detect.rules._base import VALIDATED_ID_DOCUMENT
 from pii_guard.detect.suffix_trim import trim_name_suffixes
 from pii_guard.registry import create_detector
 from pii_guard.types import DetectionError, Detector, EntityType, Span
@@ -103,7 +104,14 @@ class _Cand:
 
 
 def _is_authoritative(span: Span, authoritative: frozenset[str]) -> bool:
-    return span.detector in authoritative and span.entity_type in STRUCTURED_TYPES
+    if span.detector not in authoritative:
+        return False
+    # A checksum- or label-validated ID_DOCUMENT rule span counts as authoritative too: the
+    # checksum is the validation, so it wins an exact-range conflict with a higher-score NER
+    # number span (LAB-1380). Bare format-only ID hits carry no such subtype.
+    return span.entity_type in STRUCTURED_TYPES or (
+        span.entity_type is EntityType.ID_DOCUMENT and span.subtype == VALIDATED_ID_DOCUMENT
+    )
 
 
 class _Intervals:
