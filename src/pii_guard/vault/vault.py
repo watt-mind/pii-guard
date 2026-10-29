@@ -586,6 +586,14 @@ class VaultSession:
         entry_limit: int | None = None,
     ) -> None:
         self.session_id = session_id
+        #: The gateway client identity this session is bound to (LAB-1565, LAB-1580), set by
+        #: :func:`pii_guard.gateway.sessions.check_and_bind`; ``None``: not presented yet.
+        #: On the session itself, so the binding lives exactly as long as the session.
+        self.owner: str | None = None
+        #: Random per session object (LAB-1580): a dropped/expired/rotated id re-created as a
+        #: new session gets a new one, so per-session state keyed by it (the gateway's
+        #: detection cache) starts clean in every runtime that shares that state.
+        self.incarnation = secrets.token_hex(8)
         self._case_sensitive = case_sensitive_placeholders
         self._max_restored = max_restored_chars
         #: Explicit-session placeholder cap enforced at mask time (LAB-1565); ``None``:
@@ -712,6 +720,7 @@ class VaultSession:
             fork._known = self._known
             fork._journal = []
             fork._parent = self
+            fork.owner, fork.incarnation = self.owner, self.incarnation
             return fork
 
     def commit(self, fork: VaultSession) -> None:

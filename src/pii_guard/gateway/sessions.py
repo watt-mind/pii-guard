@@ -64,6 +64,8 @@ __all__ = [
     "SESSION_SOURCE_HEADER",
     "SessionPathMiddleware",
     "SessionSource",
+    "check_and_bind",
+    "check_owner",
     "client_identity",
     "path_session",
     "resolve_session",
@@ -163,57 +165,45 @@ def _conversations(vault: Vault) -> _Conversations:
         return found
 
 
-#: Explicit-session identity bindings remembered per vault (oldest forgotten first).
-MAX_BINDINGS = 16384
+_OWNER_LOCK = threading.Lock()
 
 
-class _Bindings:
-    """Session id -> (client identity, the session object it was recorded for) (LAB-1565).
+def _owner_refuses(owner: str | None, identity: str) -> bool:
+    """Whether a session recorded for ``owner`` must refuse ``identity`` (LAB-1565).
 
-    Keyed by session object identity via a weak reference: a dropped/expired/rotated id that
-    is re-created as a new :class:`VaultSession` starts unbound.
+    The credential-less ``anonymous`` identity is the one local principal (see the module
+    docstring): it matches an anonymous owner, and a credentialed identity may use an
+    anonymous-owned (or unowned) session. Any other mismatch is refused, including
+    ``anonymous`` presenting a credentialed owner: leaving ``Authorization`` out is the
+    caller's choice and must not bypass the binding.
     """
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._by_id: OrderedDict[str, tuple[str, weakref.ref[VaultSession]]] = OrderedDict()
-
-    def check_and_bind(self, session: VaultSession, identity: str) -> None:
-        """Record ``identity`` for ``session``; refuse a different credentialed identity.
-
-        The credential-less ``anonymous`` identity is the one local principal (see the
-        module docstring): it matches an anonymous binding, and a credentialed identity
-        presenting an anonymous-bound session takes the binding over. Any other mismatch
-        is refused, including ``anonymous`` presenting a credentialed binding: leaving
-        ``Authorization`` out is the caller's choice and must not bypass the binding.
-        """
-        with self._lock:
-            found = self._by_id.get(session.session_id)
-            if found is not None:
-                recorded, ref = found
-                if ref() is session:
-                    if recorded == identity:
-                        self._by_id.move_to_end(session.session_id)
-                        return
-                    if recorded != "anonymous":
-                        raise SessionNotFoundError("vault session not found or expired")
-                    # Fall through: a credentialed identity takes an anonymous binding over.
-            self._by_id[session.session_id] = (identity, weakref.ref(session))
-            self._by_id.move_to_end(session.session_id)
-            while len(self._by_id) > MAX_BINDINGS:
-                self._by_id.popitem(last=False)
+    return owner is not None and owner != "anonymous" and owner != identity
 
 
-_BINDINGS: weakref.WeakKeyDictionary[Vault, _Bindings] = weakref.WeakKeyDictionary()
-_BINDINGS_LOCK = threading.Lock()
+def check_and_bind(session: VaultSession, identity: str) -> None:
+    """Record ``identity`` as ``session``'s owner; refuse a different credentialed identity.
+
+    The owner lives on the :class:`VaultSession` itself (LAB-1580), so the binding lasts
+    exactly as long as the session: no index to evict, and a dropped/expired/rotated id
+    that is re-created as a new session object starts unowned. A credentialed identity
+    takes an anonymous owner over.
+    """
+    with _OWNER_LOCK:
+        if _owner_refuses(session.owner, identity):
+            raise SessionNotFoundError("vault session not found or expired")
+        if session.owner != identity:
+            session.owner = identity
 
 
-def _bindings(vault: Vault) -> _Bindings:
-    with _BINDINGS_LOCK:
-        found = _BINDINGS.get(vault)
-        if found is None:
-            found = _BINDINGS[vault] = _Bindings()
-        return found
+def check_owner(session: VaultSession, identity: str) -> None:
+    """Refuse ``identity`` like :func:`check_and_bind`, without recording it (``/v1/unmask``).
+
+    A session no gateway request presented yet has no owner and stays open to every caller,
+    as before (``/v1/mask`` sessions); reading never claims one.
+    """
+    with _OWNER_LOCK:
+        if _owner_refuses(session.owner, identity):
+            raise SessionNotFoundError("vault session not found or expired")
 
 
 def _cache_key_session_id(vault: Vault, identity: str, key: str) -> str:
@@ -246,21 +236,21 @@ def resolve_session(
         # the header; the mapping is gone, so a silent new session would be a different one.
         # LAB-1565: a different identity than the recorded creator gets the same 404.
         session = vault.session(raw.strip())
-        _bindings(vault).check_and_bind(session, identity)
+        check_and_bind(session, identity)
         return session, False, SessionSource.HEADER
     if path_session is not None:
         if not SESSION_RE.match(path_session):  # the middleware checked it already
             raise InvalidChatRequestError("the session in the URL path is malformed")
         session, created = vault.session_or_create(path_session)
-        _bindings(vault).check_and_bind(session, identity)
+        check_and_bind(session, identity)
         return session, created, SessionSource.PATH
     key = body.get("prompt_cache_key")
     if isinstance(key, str) and key:
         session, created = vault.session_or_create(_cache_key_session_id(vault, identity, key))
-        _bindings(vault).check_and_bind(session, identity)
+        check_and_bind(session, identity)
         return session, created, SessionSource.PROMPT_CACHE_KEY
     session, created = vault.session_or_create(vault.derive_session_id(f"default:{identity}"))
-    _bindings(vault).check_and_bind(session, identity)
+    check_and_bind(session, identity)
     return session, created, SessionSource.DEFAULT
 
 
