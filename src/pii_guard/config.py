@@ -141,6 +141,10 @@ class Settings(BaseSettings):
     # Upstream LLM the gateway forwards masked requests to (OpenAI-compatible).
     upstream_base_url: str | None = None
     upstream_api_key: SecretStr | None = None
+    # The configured upstream is the offline mock (LAB-1311): `make demo` sets this when it
+    # starts its mock upstream, so /v1/status and Connect report it as the mock instead of
+    # a real-looking URL. `pii-guard up --mock` marks it through app.state.up_status instead.
+    upstream_mock: bool = False
 
     # Key for deriving pseudonyms (HMAC), hex encoded (openssl rand -hex 32).
     tenant_key: SecretStr | None = None
