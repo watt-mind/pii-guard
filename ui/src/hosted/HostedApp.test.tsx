@@ -179,6 +179,22 @@ describe("hero CTA (LAB-1479)", () => {
     expect(screen.getByText("Your text · ready for a live run")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run your text" })).toBeEnabled();
   });
+  it("clears a shown custom result and reopens the editor from the signed-in hero", async () => {
+    const send = vi.fn(async () => ({ sessionId: "synthetic", answer: "Synthetic answer", maskedAnswer: "Synthetic answer", maskedMessages: [{ role: "user" as const, content: "Synthetic draft." }], masked: 0, mode: "fast" as const, ms: 1 }));
+    const chat = vi.spyOn(chatApi, "createHttpChat").mockReturnValue({ kind: "api", listModels: async () => ["test-model"], send });
+    const scroll = spyScroll();
+    try {
+      const call = requester(() => ({ ...account, authenticated: true }));
+      const user = userEvent.setup(); render(<HostedApp call={call} />);
+      await user.selectOptions(await screen.findByRole("combobox", { name: "Input" }), "custom");
+      await user.type(screen.getByRole("textbox", { name: "Your text" }), "Synthetic draft.");
+      await user.click(screen.getByRole("button", { name: "Run your text" }));
+      await screen.findByRole("button", { name: "Edit your text" });
+      await user.click(screen.getByRole("link", { name: "Run your own text" }));
+      expect(screen.queryByRole("button", { name: "Edit your text" })).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Your text" })).toBeInTheDocument();
+    } finally { chat.mockRestore(); scroll.mockRestore(); }
+  });
   it("lets a custom result be edited with the draft and focus preserved, or return to the recording", async () => {
     const draft = "Synthetic draft. ".repeat(25);
     const send = vi.fn(async () => ({ sessionId: "synthetic", answer: "Synthetic answer", maskedAnswer: "Synthetic answer", maskedMessages: [{ role: "user" as const, content: draft }], masked: 0, mode: "fast" as const, ms: 1 }));

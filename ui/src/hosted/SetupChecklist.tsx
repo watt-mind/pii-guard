@@ -21,7 +21,14 @@ export function SetupChecklist({ call, account, active, calls }: { call: Request
       live = false;
     };
   }, [call, account, active, revision]);
-  const feedback = loading ? <p role="status" className="mt-3 text-sm text-muted">Checking setup progress…</p> : failed ? (
+  // Don't flash the spinner text for a quick refresh when earlier progress is already showing.
+  const [lateLoading, setLateLoading] = useState(false);
+  useEffect(() => {
+    if (!loading) { setLateLoading(false); return; }
+    const t = setTimeout(() => setLateLoading(true), 300);
+    return () => clearTimeout(t);
+  }, [loading]);
+  const feedback = loading ? (!state || lateLoading ? <p role="status" className="mt-3 text-sm text-muted">Checking setup progress…</p> : null) : failed ? (
     <Notice tone="warn" live className="mt-3" action={<Button size="sm" onClick={() => { setLoading(true); setFailed(false); setRevision((n) => n + 1); }}>Retry setup</Button>}>
       Setup progress could not be refreshed. {state ? "Showing the last available progress." : "You can still continue in Connect or Projects."}
     </Notice>
