@@ -1,0 +1,51 @@
+{
+  "ticket": "LAB-1500",
+  "commit": "6d02b8d5335e72e82eb25631ddc82cdc4b3850a0",
+  "mode": "fast (rules + NER)",
+  "ner": "watt-mind/pii-guard-ner-xlmr-base",
+  "hardware": "macOS-26.5.2-arm64-arm-64bit, python 3.12.15",
+  "recorded_at": "2026-10-29T10:18:00+0100",
+  "set": "smoke",
+  "documents": 51,
+  "languages": {
+    "de": 10,
+    "en": 10,
+    "hu": 31
+  },
+  "per_document": {
+    "requests": 51,
+    "checked": 51,
+    "passed": 51,
+    "blocked": 0,
+    "false_block_rate": 0.0,
+    "blocked_types": {},
+    "short_occurrences": 0,
+    "refused_before_the_check": {},
+    "texts_per_request": {
+      "p50": 1
+    },
+    "check_ms": {
+      "p50": 0.116,
+      "p95": 0.426,
+      "max": 1.009
+    }
+  },
+  "shared_session": {
+    "requests": 51,
+    "checked": 51,
+    "passed": 51,
+    "blocked": 0,
+    "false_block_rate": 0.0,
+    "blocked_types": {},
+    "short_occurrences": 0,
+    "refused_before_the_check": {},
+    "texts_per_request": {
+      "p50": 1
+    },
+    "check_ms": {
+      "p50": 0.246,
+      "p95": 0.481,
+      "max": 0.731
+    }
+  }
+}

@@ -12,7 +12,7 @@ import anyio.to_thread
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pii_guard.api.errors import error_response
+from pii_guard.api.errors import error_headers, error_response
 from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT
 from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
@@ -453,7 +453,9 @@ class HostedMiddleware:
                 UPSTREAM_PAYLOAD_LIMIT.reset(limit_token)
         except PiiGuardError as exc:
             if not started:
-                response = error_response(exc.status_code, exc.code, exc.message)
+                response = error_response(
+                    exc.status_code, exc.code, exc.message, error_headers(exc)
+                )
                 if isinstance(exc, AbuseAdmissionError):
                     response.headers["Retry-After"] = str(exc.retry_after)
                 await response(scope, receive, tracked_send)

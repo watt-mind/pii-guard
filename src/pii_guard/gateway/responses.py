@@ -98,7 +98,7 @@ class _Stats(RequestStats):
         logger.info(
             "responses %s mode=%s stream=%s texts=%d cache_hits=%d cache_misses=%d seeded=%d "
             "spans=%s masked=%s detect_ms=%.0f upstream=%s upstream_ms=%.0f unresolved=%d "
-            "images=%d image_masked=%s image_ms=%.0f",
+            "images=%d image_masked=%s image_ms=%.0f outbound=%s outbound_hits=%s",
             outcome,
             self.mode.value,
             self.stream,
@@ -115,6 +115,8 @@ class _Stats(RequestStats):
             self.images,
             _counts(self.image_masked),
             self.image_ms,
+            self.outbound.result if self.outbound is not None else "-",
+            _counts(self.outbound.hits) if self.outbound is not None else "-",
         )
 
 
@@ -262,6 +264,8 @@ class ResponsesGateway:
                 )
                 collected.finalize()
             _count_masked(stats, before, session)
+            with timer.span("mask"):
+                gw._recheck(body, collect_response_texts, session, language, stats, names, issued)
         except BaseException:
             stats.log("blocked")
             gw._release_session(session, created, masked=False)

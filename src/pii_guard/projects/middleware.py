@@ -12,7 +12,7 @@ import anyio.to_thread
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pii_guard.api.errors import error_response
+from pii_guard.api.errors import error_headers, error_response
 from pii_guard.api.security import _addr_is_loopback
 from pii_guard.projects.runtime import ProjectAccessError, ProjectService
 from pii_guard.types import PiiGuardError
@@ -259,7 +259,9 @@ class ProjectMiddleware:
             await self.app({**scope, "state": state}, receive, scoped_send)
         except PiiGuardError as exc:
             if not started:
-                await error_response(exc.status_code, exc.code, exc.message)(scope, receive, send)
+                await error_response(exc.status_code, exc.code, exc.message, error_headers(exc))(
+                    scope, receive, send
+                )
         except TimeoutError:
             if started:
                 return

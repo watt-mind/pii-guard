@@ -65,6 +65,7 @@ __all__ = [
     "SessionNotFoundError",
     "UnmaskOutputTooLargeError",
     "UnmaskResult",
+    "Unmasked",
     "Vault",
     "VaultSession",
 ]
@@ -1347,6 +1348,83 @@ class VaultSession:
             self._check_alive()
             return [(e.placeholder, e.entity_type, e.count) for e in self._by_placeholder.values()]
 
+    def unmasked(self, texts: Sequence[str], language: str = "hu") -> list[Unmasked]:
+        """Every occurrence of a value this session holds that is still written out in ``texts``.
+
+        The outbound re-check (LAB-1500): ``texts`` are what is about to leave the guard, and
+        any value found here would leave it real. The values are the session's confirmed
+        entries (with their surfaces and aliases) and its pre-loaded known values. Each is
+        searched with the sweep's own patterns over the sweep's folded views (case,
+        whitespace, Unicode form, ``ß``/``ss``, inflection), so a value is found however
+        :meth:`mask` would have found it. The sweep's guards apply too: an NER-only value
+        where the text's structure rules it out (``sweep_vetoed``) and a case-sensitive value
+        in another casing are not occurrences. Neither is anything inside a placeholder
+        token. Overlapping occurrences count once, the longest value first.
+
+        Read-only: no entry, count, memo or generation changes. The result holds offsets,
+        types and flags, never a value.
+        """
+        with self._lock:
+            self._check_alive()
+            views = [self._folds.get(text) or fold_views(text) for text in texts]
+            # One string with every view: a value none of whose needles is in it can't occur
+            # in any text, so most entries are skipped after one substring search each.
+            joined = (FoldedText("", "\x00".join(v.text for vs in views for v in vs)),)
+            taken = [bytearray(len(text)) for text in texts]
+            for index, text in enumerate(texts):
+                for match in PLACEHOLDER_RE.finditer(text):
+                    taken[index][match.start() : match.end()] = b"\x01" * (
+                        match.end() - match.start()
+                    )
+            found: list[Unmasked] = []
+
+            def add(index: int, start: int, end: int, unmasked: Unmasked) -> None:
+                if end > start and not any(taken[index][start:end]):
+                    taken[index][start:end] = b"\x01" * (end - start)
+                    found.append(unmasked)
+
+            entries = sorted(self._by_key.values(), key=lambda e: (-len(e.normalized), e.order))
+            for entry in entries:
+                entry.pattern(language)  # compiles the pattern and its prefilter
+                needles = [entry.prefilter(language)]
+                needles += [n for _, _, n in entry.alias_pattern_list(language)]
+                if all(_absent(n, joined) for n in needles):
+                    continue
+                chars, digits = _value_shape(entry.normalized)
+                for index, text in enumerate(texts):
+                    _, own, aliases = self._found(entry, language, views[index], text)
+                    for start, end in itertools.chain(own, *(o for _, o in aliases)):
+                        if entry.model_only and sweep_vetoed(
+                            text, start, end, entry.entity_type, language
+                        ):
+                            continue
+                        add(
+                            index,
+                            start,
+                            end,
+                            Unmasked(
+                                index,
+                                start,
+                                end,
+                                entry.entity_type,
+                                chars,
+                                digits,
+                                model_only=entry.model_only,
+                            ),
+                        )
+            for item, pattern in self._known.patterns(language):
+                if pattern.search(joined[0].text) is None:
+                    continue
+                chars, digits = _value_shape(normalize_value(item.value))
+                for index, view in enumerate(views):
+                    for start, end in _occurrences(pattern, view):
+                        occurrence = Unmasked(
+                            index, start, end, item.entity_type, chars, digits, known=True
+                        )
+                        add(index, start, end, occurrence)
+            found.sort(key=lambda u: (u.index, u.start))
+            return found
+
     def confirmed_values(self, entity_types: Iterable[EntityType]) -> list[str]:
         """The confirmed values of ``entity_types``, as first written, plus pre-loaded ones.
 
@@ -1363,6 +1441,32 @@ class VaultSession:
                 dict.fromkeys(v.value for v in self._known.values() if v.entity_type in types)
             )
             return list(found)
+
+
+@dataclass(frozen=True, slots=True)
+class Unmasked:
+    """One occurrence of a session value still written out (:meth:`VaultSession.unmasked`).
+
+    ``index`` is the text it is in, ``start``/``end`` its offsets there. ``chars`` counts the
+    letters and digits of the value, ``digits_only`` says it has no letter; ``model_only``:
+    only a learned model (the NER) has found the value; ``known``: the operator pre-loaded it.
+    Never the value itself.
+    """
+
+    index: int
+    start: int
+    end: int
+    entity_type: EntityType
+    chars: int
+    digits_only: bool
+    model_only: bool = False
+    known: bool = False
+
+
+def _value_shape(normalized: str) -> tuple[int, bool]:
+    """Letters and digits in a value, and whether all of them are digits."""
+    alnum = [c for c in normalized if c.isalnum()]
+    return len(alnum), bool(alnum) and all(c.isdigit() for c in alnum)
 
 
 _WHITESPACE_RUN = re.compile(r"\s+")
