@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-labelledby="t d" font-family="Inter, &#x27;Helvetica Neue&#x27;, Helvetica, Arial, sans-serif">
+<title id="t">Leak rate over time</title>
+<desc id="d">Line chart of the full leak rate of pii-guard configurations across runs on the smoke fixtures.</desc>
+<rect width="1600" height="900" fill="#111318"/>
+<text x="56" y="70" font-size="40" fill="#F2F2F5" font-weight="700">Leak rate over time</text>
+<text x="56" y="112" font-size="24" fill="#B8B8C0">Full leak rate of each pii-guard configuration, run by run, oldest first (lower is safer)</text>
+<line x1="150" y1="670" x2="1180" y2="670" stroke="#33333A" stroke-width="2"/>
+<text x="134" y="677" font-size="20" fill="#B8B8C0" text-anchor="end">0%</text>
+<line x1="150" y1="586.7" x2="1180" y2="586.7" stroke="#33333A" stroke-width="2"/>
+<text x="134" y="593.7" font-size="20" fill="#B8B8C0" text-anchor="end">10%</text>
+<line x1="150" y1="503.3" x2="1180" y2="503.3" stroke="#33333A" stroke-width="2"/>
+<text x="134" y="510.3" font-size="20" fill="#B8B8C0" text-anchor="end">20%</text>
+<line x1="150" y1="420" x2="1180" y2="420" stroke="#33333A" stroke-width="2"/>
+<text x="134" y="427" font-size="20" fill="#B8B8C0" text-anchor="end">30%</text>
+<line x1="150" y1="336.7" x2="1180" y2="336.7" stroke="#33333A" stroke-width="2"/>
+<text x="134" y="343.7" font-size="20" fill="#B8B8C0" text-anchor="end">40%</text>
+<line x1="150" y1="253.3" x2="1180" y2="253.3" stroke="#33333A" stroke-width="2"/>
+<text x="134" y="260.3" font-size="20" fill="#B8B8C0" text-anchor="end">50%</text>
+<line x1="150" y1="170" x2="1180" y2="170" stroke="#33333A" stroke-width="2"/>
+<text x="134" y="177" font-size="20" fill="#B8B8C0" text-anchor="end">60%</text>
+<text x="169.1" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-26</text>
+<text x="169.1" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">0ba3c1a</text>
+<text x="359.8" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-27</text>
+<text x="359.8" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">9fad0fa</text>
+<text x="550.6" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-27</text>
+<text x="550.6" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">dd35916</text>
+<text x="741.3" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-27</text>
+<text x="741.3" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">477196a</text>
+<text x="932" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-28</text>
+<text x="932" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">72026a5</text>
+<text x="1122.8" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-29</text>
+<text x="1122.8" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">6d02b8d</text>
+<text x="1160.9" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-29</text>
+<text x="1160.9" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">37afe96</text>
+<line x1="150" y1="670" x2="1180" y2="670" stroke="#8A8A93" stroke-width="2"/>
+<path d="M358,323.2H396.1V323.2H434.3V323.2H472.4V323.2H510.6V323.2H548.7V323.2H586.9V323.2H625V670H663.1V670H701.3V670H739.4V670H777.6V670H815.7V670H853.9V670H892V670H930.2V670H968.3V670H1006.5V670H1044.6V670H1082.8V670H1120.9V670H1200.9" fill="none" stroke="#F2F2F5" stroke-width="3" stroke-dasharray="10 7"/>
+<path d="M169.1,243.5L207.2,243.5L283.5,243.5L398,323.2L436.1,323.2L474.3,323.2L512.4,323.2L550.6,323.2L588.7,323.2L626.9,323.2L703.1,323.2L1160.9,309.7" fill="none" stroke="#0072B2" stroke-width="4"/>
+<circle cx="169.1" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="207.2" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="283.5" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="398" cy="323.2" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<circle cx="436.1" cy="323.2" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<circle cx="474.3" cy="323.2" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<circle cx="512.4" cy="323.2" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<circle cx="550.6" cy="323.2" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<circle cx="588.7" cy="323.2" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<circle cx="626.9" cy="323.2" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<circle cx="703.1" cy="323.2" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<circle cx="1160.9" cy="309.7" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<path d="M665,670L741.3,670L779.4,670L817.6,670L855.7,670L893.9,670L932,670L970.2,670L1008.3,670L1046.5,670L1084.6,670L1122.8,670" fill="none" stroke="#009E73" stroke-width="4"/>
+<circle cx="665" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="741.3" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="779.4" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="817.6" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="855.7" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="893.9" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="932" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="970.2" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="1008.3" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="1046.5" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="1084.6" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<circle cx="1122.8" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<path d="M321.7,663.8L359.8,663.8" fill="none" stroke="#D55E00" stroke-width="4"/>
+<circle cx="321.7" cy="663.8" r="11" fill="#111318" stroke="#D55E00" stroke-width="4"/>
+<circle cx="359.8" cy="663.8" r="11" fill="#111318" stroke="#D55E00" stroke-width="4"/>
+<circle cx="245.4" cy="670" r="11" fill="#111318" stroke="#CC79A7" stroke-width="4"/>
+<circle cx="1230" cy="180" r="10" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<text x="1250" y="187" font-size="20" fill="#F2F2F5" font-weight="600">rules (default)</text>
+<text x="1250" y="213" font-size="19" fill="#B8B8C0">latest 43.2% leak, other documents</text>
+<circle cx="1230" cy="250" r="10" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<text x="1250" y="257" font-size="20" fill="#F2F2F5" font-weight="600">fast, NER v2.0 (published</text>
+<text x="1250" y="283" font-size="20" fill="#F2F2F5" font-weight="600">watt-mind/pii-guard-ner-xlmr-base,</text>
+<text x="1250" y="309" font-size="20" fill="#F2F2F5" font-weight="600">LAB-1306)</text>
+<text x="1250" y="335" font-size="19" fill="#B8B8C0">latest 0.0% leak</text>
+<circle cx="1230" cy="372" r="10" fill="#D55E00" stroke="#111318" stroke-width="3"/>
+<text x="1250" y="379" font-size="20" fill="#F2F2F5" font-weight="600">rules + Muse Spark Open</text>
+<text x="1250" y="405" font-size="20" fill="#F2F2F5" font-weight="600">(Baseten)</text>
+<text x="1250" y="431" font-size="19" fill="#B8B8C0">latest 0.7% leak, other documents</text>
+<circle cx="1230" cy="468" r="10" fill="#CC79A7" stroke="#111318" stroke-width="3"/>
+<text x="1250" y="475" font-size="20" fill="#F2F2F5" font-weight="600">rules + Muse Glimmer (low)</text>
+<text x="1250" y="501" font-size="19" fill="#B8B8C0">latest 0.0% leak, other documents</text>
+<line x1="1218" y1="538" x2="1242" y2="538" stroke="#F2F2F5" stroke-width="3" stroke-dasharray="8 5"/>
+<text x="1250" y="545" font-size="20" fill="#F2F2F5" font-weight="600">best of any configuration so far</text>
+<text x="56" y="780" font-size="20" fill="#B8B8C0">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs), de + en + hu pooled (micro-averaged); one configuration at one commit merged.</text>
+<text x="56" y="810" font-size="20" fill="#B8B8C0">Hollow: run on an earlier fixture file or on fewer languages (other documents), not comparable with filled points or the best line.</text>
+<text x="56" y="840" font-size="20" fill="#B8B8C0">The default pipeline (rules only) finds no names by design; names come from the NER and LLM stages.</text>
+<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-26 to 2026-10-29 · 27 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
+</svg>
