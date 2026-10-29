@@ -78,7 +78,14 @@ def test_refuses_a_corpus_not_marked_synthetic(
         "data/datasets/raw/dump.jsonl",
         "data/mining/pool.jsonl",
         "real/notes.jsonl",
-        *{Path(p).name for ds in REGISTRY.values() if not ds.synthetic for p in ds.fixture_paths()},
+        *sorted(
+            {
+                Path(p).name
+                for ds in REGISTRY.values()
+                if not ds.synthetic
+                for p in ds.fixture_paths()
+            }
+        ),
     ],
 )
 def test_refuses_real_text_paths_even_when_marked_synthetic(
