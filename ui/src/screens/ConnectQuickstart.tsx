@@ -336,7 +336,7 @@ function Unavailable({ missing, tool }: { missing: boolean; tool: ToolId }) {
   return (
     <div className="space-y-3 text-sm">
       <p className="text-ink">
-        {missing ? "This pii-guard server predates the quickstart." : "The pii-guard API isn't reachable from this page."} Start the gateway with a model, then reload:
+        {missing ? "This PII Guard server predates the quickstart." : "The PII Guard API isn't reachable from this page."} Start the gateway with a model, then reload:
       </p>
       <CodeBlock text={"export META_API_KEY=<your-key>\npii-guard up --upstream meta"} label="Copy the start command" />
       <p className="text-xs text-muted">

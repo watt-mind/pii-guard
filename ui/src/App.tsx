@@ -287,7 +287,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 : section === "evaluation"
                   ? "Benchmarks are bundled with this page, so they are the same with or without the API."
                   : section === "vault"
-                    ? "The vault lives in the pii-guard server; demo mode has none to inspect."
+                    ? "The vault lives in the PII Guard server; demo mode has none to inspect."
                     : section === "overview" || section === "logs"
                     ? "Overview and Logs replay calls recorded from the demo stack (masked level, no original values)."
                     : section === "connect" || section === "policy"
@@ -332,8 +332,8 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               title="Playground"
               lead={
                 caps.accounts
-                  ? "pii-guard finds personal data in what you send, swaps it for reversible placeholders before the model sees it, and puts the real values back into the answer."
-                  : "pii-guard finds personal data before a request leaves your network, swaps it for reversible placeholders, and puts the real values back into the answer."
+                  ? "PII Guard finds personal data in what you send, swaps it for reversible placeholders before the model sees it, and puts the real values back into the answer."
+                  : "PII Guard finds personal data before a request leaves your network, swaps it for reversible placeholders, and puts the real values back into the answer."
               }
             />
             <PlaygroundTabs tab={tab} onTab={openTab} caps={caps} />
@@ -457,12 +457,12 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
         <footer className="mx-auto max-w-[1280px] px-4 pb-10 text-xs text-faint sm:px-6">
           {caps.accounts ? (
             <>
-              All sample data is fictional. This page talks only to pii-guard, never to a model provider: pii-guard masks what you send and forwards it to the model your
+              All sample data is fictional. This page talks only to PII Guard, never to a model provider: PII Guard masks what you send and forwards it to the model your
               endpoint or connection names. The Playground round trip uses a simulated answer; the test request on Connect goes to your endpoint’s real model.
             </>
           ) : (
             <>
-              All sample data is fictional. This page talks only to pii-guard, never to a model provider: image segmentation and the Chat model run behind the pii-guard server.
+              All sample data is fictional. This page talks only to PII Guard, never to a model provider: image segmentation and the Chat model run behind the PII Guard server.
               The Chat model is real only when the server has an upstream; the round trip and demo mode use a simulated answer.
             </>
           )}

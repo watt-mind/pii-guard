@@ -53,7 +53,7 @@ describe("Chat model picker (LAB-1335)", () => {
     expect(picker).toHaveValue("muse-wonder-1.0");
     await user.selectOptions(picker, "muse-spark-1.2");
     expect(localStorage.getItem(`pii-guard:${MODEL_PREF}`)).toBe("muse-spark-1.2");
-    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]!.model).toBe("muse-spark-1.2");
   });
@@ -71,10 +71,10 @@ describe("Chat model picker (LAB-1335)", () => {
     expect(await screen.findByTestId("models-failed")).toBeInTheDocument();
     const input = screen.getByRole("textbox", { name: "Model" });
     expect(input).toHaveValue("");
-    expect(screen.getByRole("button", { name: /send through pii-guard/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /send through PII Guard/i })).toBeDisabled();
     const user = userEvent.setup();
     await user.type(input, "my-model");
-    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     await waitFor(() => expect(calls[0]?.model).toBe("my-model"));
   });
 
@@ -84,7 +84,7 @@ describe("Chat model picker (LAB-1335)", () => {
     render(<Chat client={createMockChat(mock, { delayMs: 0 })} live={false} draft={null} />);
     expect(screen.queryByRole("combobox", { name: "Model" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Model" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     expect(await screen.findByText(/Answers? received and restored/i, undefined, { timeout: 8000 })).toBeInTheDocument();
   });
 });
@@ -95,7 +95,7 @@ describe("Chat error copy per code (LAB-1335)", () => {
     const { client } = liveChat({ send: failWith(err) });
     render(<Chat client={client} live draft={null} />);
     await screen.findByRole("combobox", { name: "Model" });
-    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     return screen.findByRole("alert", undefined, { timeout: 5000 });
   }
 
@@ -103,7 +103,7 @@ describe("Chat error copy per code (LAB-1335)", () => {
     const alert = await sendWith(new ApiError(404, "upstream_error", "upstream returned HTTP 404"));
     expect(alert).toHaveTextContent("The upstream refused the masked request (HTTP 404).");
     expect(alert).toHaveTextContent("model not found on the upstream? Pick another model");
-    expect(alert).toHaveTextContent("Nothing unmasked left pii-guard.");
+    expect(alert).toHaveTextContent("Nothing unmasked left PII Guard.");
     expect(alert).not.toHaveTextContent("Nothing was sent to the model");
     expect(alert).not.toHaveTextContent("fails closed");
     expect(screen.getByText("The masked request was sent; the upstream refused it before answering.")).toBeInTheDocument();
@@ -131,7 +131,7 @@ describe("Chat empty reasoning answer (LAB-1335)", () => {
     const { client } = liveChat({ send });
     render(<Chat client={client} live draft={null} />);
     await screen.findByRole("combobox", { name: "Model" });
-    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     expect(await screen.findByTestId("empty-answer-hint", undefined, { timeout: 5000 })).toHaveTextContent("used its whole token budget reasoning");
     expect(screen.getByTestId("empty-answer-hint")).toHaveTextContent("raise max tokens");
   });
@@ -155,7 +155,7 @@ describe("Chat detection modes (LAB-1435)", () => {
     await screen.findByRole("combobox", { name: "Model" });
     expect(radios()).toEqual(["Fast"]);
     expect(screen.getByRole("radio", { name: "Fast" })).toBeChecked();
-    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]!.mode).toBe("fast");
   });
@@ -173,7 +173,7 @@ describe("Chat recovery and reset (LAB-1441)", () => {
     });
     render(<Chat client={client} live draft={null} />);
     await screen.findByRole("combobox", { name: "Model" });
-    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     const alert = await screen.findByRole("alert", undefined, { timeout: 5000 });
     fail = false;
     await user.click(within(alert).getByRole("button", { name: "Retry" }));
@@ -187,7 +187,7 @@ describe("Chat recovery and reset (LAB-1441)", () => {
     const { client } = liveChat();
     render(<Chat client={client} live draft={null} />);
     await screen.findByRole("combobox", { name: "Model" });
-    await user.click(screen.getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     await screen.findAllByRole("article", { name: "Chat turn" });
     const trigger = await screen.findByRole("button", { name: "New conversation" });
     await user.click(trigger);

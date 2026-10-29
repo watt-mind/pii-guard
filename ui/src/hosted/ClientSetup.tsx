@@ -75,7 +75,7 @@ export function ClientSetup({ call }: { call: Requester }) {
         <p className="mt-0.5 text-sm text-pretty text-muted">
           {state === "needs_key"
             ? "One step first: your endpoint needs a model key. Then copy your guard key, paste one block into your tool and send a test request."
-            : "Your client sends real data to your pii-guard endpoint. The model gets placeholders; the answer comes back with the real values. Three steps: copy your guard key, paste one block into your tool, send a test request."}
+            : "Your client sends real data to your PII Guard endpoint. The model gets placeholders; the answer comes back with the real values. Three steps: copy your guard key, paste one block into your tool, send a test request."}
         </p>
       </div>
       {loaded.state === "loading" ? (
@@ -226,7 +226,7 @@ function MetaKeyStep({ call, onAdded }: { call: Requester; onAdded: () => void }
           Add your Meta API key
         </h3>
         <p className="mt-0.5 text-sm text-pretty text-muted">
-          Free runs are paused right now, so your endpoint calls the Meta Model API with your own key. pii-guard sends it only to{" "}
+          Free runs are paused right now, so your endpoint calls the Meta Model API with your own key. PII Guard sends it only to{" "}
           {mono("api.meta.ai")}, with masked text, and never switches to another model or key.
         </p>
       </div>
@@ -287,7 +287,7 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
         </p>
         <CodeBlock text={`export ${ENDPOINT_KEY_ENV}=${key.key}`} label="Copy the export line with your guard key" />
         <p className="text-xs text-pretty text-muted">
-          The blocks below already contain it. pii-guard keeps only a hash, so after you leave or reload this page it can&apos;t be shown again: store it now (for example in a
+          The blocks below already contain it. PII Guard keeps only a hash, so after you leave or reload this page it can&apos;t be shown again: store it now (for example in a
           password manager). It works only for this endpoint; revoke it in Projects.
         </p>
         <div className="flex flex-wrap gap-2">
@@ -373,7 +373,7 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
               {chosen.id === "pi" && (
                 <>
                   {" "}
-                  The first line needs the pii-guard command (
+                  The first line needs the {mono("pii-guard")} command (
                   <a href={`${SOURCE}#quick-start`} target="_blank" rel="noreferrer" className="text-ink underline underline-offset-2">
                     install it ↗
                   </a>

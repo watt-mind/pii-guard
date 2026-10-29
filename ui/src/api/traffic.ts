@@ -251,9 +251,9 @@ export async function fetchTraffic(
   const message = contract && typeof contract.message === "string" ? contract.message : code;
   if (res.status === 429) throw new TrafficRateLimitedError(code ?? "rate_limited", message ?? "Too many requests", parseRetryAfter(res.headers.get("retry-after")));
   if (contract) throw new ApiError(res.status, code as string, message as string);
-  if (res.status === 401 || res.status === 403) throw new ApiError(res.status, res.status === 401 ? "unauthorized" : "forbidden", `pii-guard API answered ${res.status}`);
+  if (res.status === 401 || res.status === 403) throw new ApiError(res.status, res.status === 401 ? "unauthorized" : "forbidden", `PII Guard API answered ${res.status}`);
   if (res.status === 404 || res.status === 405) throw new ApiError(res.status, "not_found", "GET /v1/traffic is not available");
-  throw new UnreachableError(`pii-guard API answered ${res.status} without a contract error body`);
+  throw new UnreachableError(`PII Guard API answered ${res.status} without a contract error body`);
 }
 
 /** Load the backlog, then follow the live stream (or poll). Call `close()` to stop. */
@@ -306,7 +306,7 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
   const failure = (err: unknown): TrafficStatus => {
     if (err instanceof ApiError && err.code === "traffic_log_disabled") return { state: "disabled", reason: "off", message: err.message };
     if (err instanceof ApiError && err.code === "not_found")
-      return { state: "disabled", reason: "unsupported", message: "this pii-guard server has no traffic log (it predates /v1/traffic)" };
+      return { state: "disabled", reason: "unsupported", message: "this PII Guard server has no traffic log (it predates /v1/traffic)" };
     if (err instanceof TrafficRateLimitedError) return { state: "limited", message: err.message, retryAfterMs: err.retryAfterMs };
     if (err instanceof ApiError && (err.status === 401 || err.status === 403))
       return { state: "denied", reason: err.status === 401 ? "signed_out" : "forbidden", message: err.message };
@@ -334,7 +334,7 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
     let timer: ReturnType<typeof setTimeout> | undefined;
     const stop = new Promise<never>((_, reject) => {
       const onAbort = () =>
-        reject(controller.signal.aborted ? new DOMException("closed", "AbortError") : new UnreachableError(`pii-guard API did not answer within ${timeoutMs / 1000} s`));
+        reject(controller.signal.aborted ? new DOMException("closed", "AbortError") : new UnreachableError(`PII Guard API did not answer within ${timeoutMs / 1000} s`));
       request.signal.addEventListener("abort", onAbort);
       timer = setTimeout(abort, timeoutMs);
     });

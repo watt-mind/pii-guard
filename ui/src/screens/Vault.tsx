@@ -29,7 +29,7 @@ function errorOf(err: unknown): { code: string; message: string } {
   if (err instanceof ApiError) return { code: err.code, message: err.message };
   return {
     code: "unreachable",
-    message: err instanceof Error ? err.message : "pii-guard API is not reachable",
+    message: err instanceof Error ? err.message : "PII Guard API is not reachable",
   };
 }
 
@@ -201,11 +201,11 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
       {!usable ? (
         <Notice live>
           {!live ? (
-            <>The vault lives in the pii-guard server, so this needs the live API. Start it with {mono("pii-guard up")}; if the engine is set to Demo engine, switch it to Auto.</>
+            <>The vault lives in the PII Guard server, so this needs the live API. Start it with {mono("pii-guard up")}; if the engine is set to Demo engine, switch it to Auto.</>
           ) : status.state === "loading" ? (
             "Asking the server…"
           ) : server === null ? (
-            "This pii-guard server doesn't report its configuration (it predates /v1/status), so the vault inspector isn't available."
+            "This PII Guard server doesn't report its configuration (it predates /v1/status), so the vault inspector isn't available."
           ) : (
             <>
               The vault inspector is off on this server. Turn it on and restart the server ({mono("PII_GUARD_VAULT_INSPECT=masked")}, or {mono("full")} on localhost).

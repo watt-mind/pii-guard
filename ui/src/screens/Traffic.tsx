@@ -605,7 +605,7 @@ function CallRow({
         {labelled && <LabelTag match={labelled} />}
         <OutcomeBadge outcome={e.outcome} />
         </span>
-        <span className="shrink-0 font-medium whitespace-nowrap text-ink tabular-nums" title="pii-guard overhead">
+        <span className="shrink-0 font-medium whitespace-nowrap text-ink tabular-nums" title="PII Guard overhead">
           +{formatMsShort(e.timing.overhead_ms)}
         </span>
       </span>
@@ -953,7 +953,7 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
       </div>
       <div aria-hidden="true" className="flex items-center gap-2 font-mono text-2xs text-guard @2xl:flex-col @2xl:justify-center">
         <span className="h-px flex-1 bg-guard/40 @2xl:h-auto @2xl:w-px" />
-        <span className="whitespace-nowrap">pii-guard</span>
+        <span className="whitespace-nowrap">PII Guard</span>
         <span className="text-faint">
           <span className="@2xl:hidden">↓</span>
           <span className="hidden @2xl:inline">→</span>

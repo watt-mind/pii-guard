@@ -245,7 +245,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
   return (
     <div className="space-y-6">
       <p className="max-w-3xl text-sm text-pretty text-muted">
-        Your message goes through the pii-guard gateway, a drop-in for any OpenAI-compatible API. The model only ever sees placeholders: the message is masked on the way
+        Your message goes through the PII Guard gateway, a drop-in for any OpenAI-compatible API. The model only ever sees placeholders: the message is masked on the way
         out and the streamed answer is restored on the way back, with the same placeholder for the same person in every turn.
       </p>
 
@@ -266,7 +266,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
           {client.kind === "api" && mockUpstream && (
             <p role="note" className="rounded-lg border border-line bg-surface px-4 py-3 text-sm text-ink">
               <strong className="font-medium">Mock upstream.</strong> The server's model is the offline mock: it answers by echoing the masked text it received, whatever model
-              is named. Start pii-guard with <code className="font-mono text-xs">--upstream-url</code> for a real one.
+              is named. Start PII Guard with <code className="font-mono text-xs">--upstream-url</code> for a real one.
             </p>
           )}
 
@@ -650,7 +650,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, lan
             </Button>
           ) : (
             <Button variant="primary" onClick={onSend} disabled={text.trim() === "" || needsModel} title={needsModel ? "Choose a model first" : undefined}>
-              Send through pii-guard <span aria-hidden="true">→</span>
+              Send through PII Guard <span aria-hidden="true">→</span>
             </Button>
           )}
         </div>

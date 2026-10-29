@@ -19,7 +19,7 @@ const metrics = (leak: number, f1: number, p50: number): Metrics => ({
 });
 
 const SMOKE_POINTS: ScatterPoint[] = [
-  { key: "rules+ner:xlmr-base-v2-hn", info: system("rules+ner:xlmr-base-v2-hn", "pii-guard fast (rules + our open NER)", "pii-guard", "pii-guard", "#CC79A7", "circle", true), metrics: metrics(0.0, 0.943, 39) },
+  { key: "rules+ner:xlmr-base-v2-hn", info: system("rules+ner:xlmr-base-v2-hn", "PII Guard fast (rules + our open NER)", "PII Guard", "pii-guard", "#CC79A7", "circle", true), metrics: metrics(0.0, 0.943, 39) },
   { key: "privaite", info: system("privaite", "PrivAiTe", "PrivAiTe", "comparison", "#595959", "diamond"), metrics: metrics(0.127, 0.552, 170) },
   { key: "presidio", info: system("presidio", "Presidio", "Presidio", "comparison", "#595959", "square"), metrics: metrics(0.243, 0.649, 88) },
   { key: "llm-guard", info: system("llm-guard", "LLM Guard", "LLM Guard", "comparison", "#595959", "triangle"), metrics: metrics(0.451, 0.532, 110) },

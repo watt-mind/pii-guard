@@ -79,7 +79,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
           {/* The 24px mark is 8px wider than the 16px nav icons, so px-2 (not px-3) keeps it centred over them. */}
           <a href="#overview" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm px-2 text-ink">
             <Logo />
-            <span className="text-base font-medium">pii-guard</span>
+            <span className="text-base font-medium">PII Guard</span>
           </a>
           <span className="truncate text-sm text-muted lg:hidden">{current.label}</span>
           <span className="flex-1 lg:hidden" />

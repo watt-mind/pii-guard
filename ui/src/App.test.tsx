@@ -180,7 +180,7 @@ describe("Known values and Chat in demo mode", () => {
     render(<App api={offlineApi()} mock={mock} chat={{ mock: createMockChat(mock, { delayMs: 0 }) }} />);
     await user.click(screen.getByRole("tab", { name: /chat/i }));
     const panel = screen.getByRole("tabpanel", { name: /chat/i });
-    await user.click(within(panel).getByRole("button", { name: /send through pii-guard/i }));
+    await user.click(within(panel).getByRole("button", { name: /send through PII Guard/i }));
     const received = await within(panel).findByRole("region", { name: "What the model received" });
     await waitFor(() => expect(received).toHaveTextContent(/\[\[PERSON_[0-9a-f]{4,}\]\]/));
     const back = within(panel).getByRole("region", { name: "What you got back" });

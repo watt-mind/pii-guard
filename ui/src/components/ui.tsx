@@ -491,7 +491,7 @@ export function SecretReveal({
         Copy {label} now. It is shown only once.
       </p>
       <p className="mt-1 text-sm text-ink">
-        pii-guard keeps only a hash, so this value can't be shown again.{envName && <> Store it as <code className="font-mono text-xs">{envName}</code>.</>}
+        PII Guard keeps only a hash, so this value can't be shown again.{envName && <> Store it as <code className="font-mono text-xs">{envName}</code>.</>}
       </p>
       <code className="mt-3 block rounded-md border border-line bg-surface px-3 py-2 font-mono text-xs break-all text-ink select-all">{secret}</code>
       {copied === "failed" && <p className="mt-2 text-xs text-danger">Copy failed. Select the key and copy it manually.</p>}
@@ -653,7 +653,7 @@ export function BlockedNotice({ error, phase = "outbound", onRetry }: { error: R
     phase === "inbound"
       ? error.code === "not_found"
         ? "Mappings live only in the guard's memory and expire. Mask the document again to start a new session."
-        : "pii-guard shows nothing rather than a half-restored answer."
+        : "PII Guard shows nothing rather than a half-restored answer."
       : copy.body;
   const showMessage = import.meta.env.VITE_PII_GUARD_HOSTED !== "true" && error.message && error.message !== error.code;
   return (

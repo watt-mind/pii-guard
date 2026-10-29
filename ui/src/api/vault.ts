@@ -98,7 +98,7 @@ export function createVaultClient(options: { baseUrl?: string; fetch?: typeof fe
     if (err && typeof err.code === "string") throw new ApiError(res.status, err.code, typeof err.message === "string" ? err.message : err.code);
     // A server that predates the inspector answers FastAPI's plain 404.
     if (res.status === 404 || res.status === 405) throw new ApiError(res.status, "not_found", `${method} ${path} is not available`);
-    throw new UnreachableError(`pii-guard API answered ${res.status} without a contract error body`);
+    throw new UnreachableError(`PII Guard API answered ${res.status} without a contract error body`);
   }
 
   const at = (ref: string) => `/v1/vault/sessions/${encodeURIComponent(ref)}`;

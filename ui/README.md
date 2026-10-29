@@ -1,9 +1,9 @@
-# pii-guard demo UI
+# PII Guard demo UI
 
 A small web app that makes the guard visible: **what the model saw** next to **what you got
-back**. It talks only to the pii-guard REST API (`/healthz`, `/v1/analyze`, `/v1/mask`,
+back**. It talks only to the PII Guard REST API (`/healthz`, `/v1/analyze`, `/v1/mask`,
 `/v1/unmask`, `/v1/mask/image`, `/v1/traffic`, `/v1/status`, see [docs/contracts.md](../docs/contracts.md)). It never calls a
-model provider and holds no secrets (SAM 3.1 is called by the pii-guard server).
+model provider and holds no secrets (SAM 3.1 is called by the PII Guard server).
 
 ## Run it
 
@@ -59,7 +59,7 @@ links, new tabs and the back button work; the old tab links (`#mask`, `#chat`, `
 
 1. **Overview** (`#overview`). What the guard protected, counted from the gateway's traffic log
    (`GET /v1/traffic` plus the live stream): requests, values masked, requests blocked,
-   pii-guard's overhead (p50 and p95), the top entity types, latency per stage, and the live
+   PII Guard's overhead (p50 and p95), the top entity types, latency per stage, and the live
    latency charts. Next to them, read from `GET /v1/status`: where the gateway forwards (the
    offline mock model or a real upstream, with the last call's HTTP status) and which detectors
    each mode runs (a warning when only the rules run, so free-text names are not masked). With

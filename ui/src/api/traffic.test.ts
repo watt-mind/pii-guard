@@ -352,7 +352,7 @@ describe("connectTraffic resilience", () => {
     expect(signals[0]!.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1000); // timeoutMs reached
     expect(signals[0]!.aborted).toBe(true);
-    expect(statuses.at(-1)).toEqual({ state: "offline", message: "pii-guard API did not answer within 5 s" });
+    expect(statuses.at(-1)).toEqual({ state: "offline", message: "PII Guard API did not answer within 5 s" });
     await vi.advanceTimersByTimeAsync(1000); // the next poll, only after the previous one settled
     expect(f).toHaveBeenCalledTimes(3);
     conn.close();

@@ -164,7 +164,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
     <header className="bg-canvas">
       <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-12">
-        <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />pii-guard</a>
+        <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
         <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
           <a className="hidden text-muted hover:text-ink md:inline" href="#demo">Demo</a>
           <a className="hidden text-muted hover:text-ink md:inline" href="#images">Images</a>
@@ -199,7 +199,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-6 space-y-4">
-        <SectionHead id="demo-heading" focusable title="See exactly what the model sees." lead={`Your text, what pii-guard sends to ${modelOr("the model")}, its answer, and the answer with the real values put back.`} />
+        <SectionHead id="demo-heading" focusable title="See exactly what the model sees." lead={`Your text, what PII Guard sends to ${modelOr("the model")}, its answer, and the answer with the real values put back.`} />
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-end gap-3">
             <div className="basis-full sm:order-last sm:ml-auto sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
@@ -224,10 +224,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <Announcer message={announce} />
         <div data-flow className={["space-y-4 transition-opacity", running ? "opacity-55" : ""].join(" ")}>
           <div className="flex flex-col lg:flex-row lg:items-stretch">
-            <Pane id="demo-input" side="you" eyebrow="Stays with pii-guard" title="Your text" className="lg:flex-1" footer={result ? "A real guard and model produced this. Check the masked request: detection can miss values, and this is pseudonymisation, not anonymisation." : "Hand-written, fictional example: nothing was detected or sent. Live runs use fictional samples chosen by the server."}>
-              {shown ? <YourText text={shown.original} masked={shown.masked} entities={result?.entities} /> : <Field label="Your text" hint="pii-guard receives this text in full on Azure in Sweden Central. Use fictional data while you evaluate."><Textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field>}
+            <Pane id="demo-input" side="you" eyebrow="Stays with PII Guard" title="Your text" className="lg:flex-1" footer={result ? "A real guard and model produced this. Check the masked request: detection can miss values, and this is pseudonymisation, not anonymisation." : "Hand-written, fictional example: nothing was detected or sent. Live runs use fictional samples chosen by the server."}>
+              {shown ? <YourText text={shown.original} masked={shown.masked} entities={result?.entities} /> : <Field label="Your text" hint="PII Guard receives this text in full on Azure in Sweden Central. Use fictional data while you evaluate."><Textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field>}
             </Pane>
-            <Boundary direction="outbound" label="pii-guard boundary: only this crosses to the model">
+            <Boundary direction="outbound" label="PII Guard boundary: only this crosses to the model">
               {shown && <dl className="text-center"><Metric label="masked" value={masked} className="min-w-12" /></dl>}
             </Boundary>
             <Pane id="demo-sent" side="model" eyebrow="Placeholders only" title="Sent to the model" className="lg:flex-1" footer={legend.size > 0 ? <Legend counts={legend} /> : undefined}>
@@ -238,17 +238,17 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <Pane id="demo-answer" side="model" eyebrow="Still placeholders" title="Model answer" className="lg:flex-1">
               {shown ? <MaskedText text={shown.answer} /> : <p className="text-sm text-muted">The model’s answer appears here.</p>}
             </Pane>
-            <Boundary direction="inbound" label="pii-guard boundary: placeholders are restored on the way back" />
+            <Boundary direction="inbound" label="PII Guard boundary: placeholders are restored on the way back" />
             <Pane id="demo-restored" side="you" eyebrow="Real values put back" title="Restored answer" className="lg:flex-1">
               {shown ? <RestoredText segments={restoredSegments(shown)} /> : <p className="text-sm text-muted">The answer with the real values appears here.</p>}
             </Pane>
           </div>
-          <p className="text-xs text-muted">Blue marks a value and the placeholder that replaced it; green marks a value pii-guard put back.</p>
+          <p className="text-xs text-muted">Blue marks a value and the placeholder that replaced it; green marks a value PII Guard put back.</p>
         </div>
       </section>
 
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="images-heading" title="Images too: faces blocked, ID details tokenized." lead="A gateway that only reads text passes screenshots and scans on untouched. pii-guard reads the image itself: faces and ID photos are covered, and each printed name and number is covered by a box with its placeholder. The same person gets the same placeholder in your text and in the image, so the model can still answer, and the answer comes back to you with the real values." />
+        <SectionHead id="images-heading" title="Images too: faces blocked, ID details tokenized." lead="A gateway that only reads text passes screenshots and scans on untouched. PII Guard reads the image itself: faces and ID photos are covered, and each printed name and number is covered by a box with its placeholder. The same person gets the same placeholder in your text and in the image, so the model can still answer, and the answer comes back to you with the real values." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
         <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway, the masked image goes to the model in place of the original, followed by its masked transcript and summary. On 24 fictional documents, 98&nbsp;% of the values on an image got the same placeholder as in the text, with no false merges (<a className={link} href={`${DOCS}/benchmarks.md#visual-placeholders`}>benchmark</a>).</p>
         <p className="max-w-3xl text-xs text-muted">In the hosted preview, masking runs on the service and the masked image comes back to you; it isn’t sent to a model. It doesn’t look for signatures or stamps (on this card the photo cover happens to take the signature too); a self-hosted install masks them. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
@@ -278,13 +278,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labelled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better).">
               <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">
                 <table className="w-full min-w-[28rem] border-collapse text-sm">
-                  <caption className="sr-only">Leak rate and F1 in percent, by dataset, for pii-guard and three comparison tools</caption>
+                  <caption className="sr-only">Leak rate and F1 in percent, by dataset, for PII Guard and three comparison tools</caption>
                   <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
                   <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
                 </table>
               </div>
               <div className="space-y-5 sm:hidden">{SETS.map((set, i) => <ResultTable key={set} caption={set} columns={["Leak", "F1"]} rows={COMPARISON.map((row) => ({ name: row.system, ours: row.ours, values: [row.leak[i]!, row.f1[i]!] }))} />)}</div>
-              <p className="mt-3 text-xs text-muted">pii-guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits pii-guard was not trained on.</p>
+              <p className="mt-3 text-xs text-muted">PII Guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits PII Guard was not trained on.</p>
             </Card>
             <Card title="Our NER against other open PII models" headingLevel={3} subtitle="The same rules and the same 51 hand-written documents; only the NER model differs. Over-masking: text masked that wasn’t personal data.">
               <ResultTable hideCaption caption="Leak, F1 and over-masking in percent, by NER model, with the same rules" columns={["Leak", "F1", "Over-masking"]} rows={OPEN_MODELS.map((m) => ({ name: m.model, title: m.id, ours: "ours" in m, values: [m.leak, m.f1, m.over] }))} />
@@ -295,10 +295,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="how" aria-labelledby="how-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="how-heading" title="Change one base URL. The model gets placeholders." lead="pii-guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
+        <SectionHead id="how-heading" title="Change one base URL. The model gets placeholders." lead="PII Guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
         <ol className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
-          <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted"><span className="font-medium text-ink">No LLM in the masking path.</span> Validated rules for identifiers, plus our open multilingual NER, a small encoder model, for names, addresses and dates. Both run inside pii-guard, with no API call. An LLM detector is an opt-in audit mode, off by default.</p></Card></li>
-          <li><Card as="div" title="2 · Swap" headingLevel={3} className="h-full"><p className="text-muted">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in pii-guard.</p></Card></li>
+          <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted"><span className="font-medium text-ink">No LLM in the masking path.</span> Validated rules for identifiers, plus our open multilingual NER, a small encoder model, for names, addresses and dates. Both run inside PII Guard, with no API call. An LLM detector is an opt-in audit mode, off by default.</p></Card></li>
+          <li><Card as="div" title="2 · Swap" headingLevel={3} className="h-full"><p className="text-muted">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in PII Guard.</p></Card></li>
           <li><Card as="div" title="3 · Restore" headingLevel={3} className="h-full"><p className="text-muted">The answer comes back with the real values, chunk by chunk as it streams.</p></Card></li>
         </ol>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
@@ -320,7 +320,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="for" aria-labelledby="for-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="for-heading" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. pii-guard lets the agent use the model without handing over the person." />
+        <SectionHead id="for-heading" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. PII Guard lets the agent use the model without handing over the person." />
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
           <Card title="Legal" headingLevel={3}><p className="text-muted">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</p></Card>
           <Card title="HR" headingLevel={3}><p className="text-muted">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</p></Card>
@@ -332,7 +332,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <SectionHead id="meta-heading" title="Built on Meta models, each where it fits." lead="Anything that sees real personal data is an open-weight model you can run yourself. Hosted models only see fictional or masked text." />
         <Card>
           <KeyValues className="sm:grid-cols-[12rem_minmax(0,1fr)]" items={[
-            { key: "xlmr", label: <span className="font-medium text-ink">XLM-RoBERTa</span>, value: <>Open, MIT. Our fine-tuned NER runs inside pii-guard on every request. <a className={link} href={NER_MODEL}>On Hugging Face ↗</a></> },
+            { key: "xlmr", label: <span className="font-medium text-ink">XLM-RoBERTa</span>, value: <>Open, MIT. Our fine-tuned NER runs inside PII Guard on every request. <a className={link} href={NER_MODEL}>On Hugging Face ↗</a></> },
             { key: "glimmer", label: <span className="font-medium text-ink">Muse Glimmer 30B</span>, value: "Open weights. The teacher: it labelled 4,964 fictional documents to train the NER." },
             { key: "spark", label: <span className="font-medium text-ink">{modelOr("Muse Spark")}</span>, value: "Answers in this demo, seeing placeholders only." },
             { key: "sam", label: <span className="font-medium text-ink">SAM 3.1</span>, value: "Finds signatures so a self-hosted install can mask them too." },
@@ -369,7 +369,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <KeyValues items={[
             { label: "Where", value: "Microsoft Azure, Sweden Central (EU). Processed in memory. No content archive, and no backup of the mappings. Azure operators can access process memory." },
             { label: "As a guest", value: `You can’t type anything. A fixed, fictional sample is masked here, and only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` },
-            { label: "Signed in", value: `Google receives your sign-in (name, email, profile). pii-guard receives your text in full; only the masked text goes to ${modelOr("Meta’s model")} or to the provider you connect.` },
+            { label: "Signed in", value: `Google receives your sign-in (name, email, profile). PII Guard receives your text in full; only the masked text goes to ${modelOr("Meta’s model")} or to the provider you connect.` },
             { label: "Images", value: "Signed in only. Read and masked inside the service: faces and ID photos are covered, and signatures and stamps stay visible. Images are never stored or sent to a model." },
             { label: "How long", value: "Placeholder mappings expire after 1 hour without use. Your last 50 masked requests are kept in memory for your activity log. A restart clears both. Expiry makes them unavailable; it doesn’t prove the memory is erased." },
             { label: "What Meta receives", value: "Masked text only. Meta’s standard terms exclude training on it but allow retention as needed, and processing there isn’t guaranteed to stay in the EU." },
@@ -381,7 +381,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="account" aria-labelledby="account-heading" className="scroll-mt-6">
         <Card as="div" title="Try it now. Connect your app when you’re ready." titleId="account-heading" actions={account && (signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account.logout_url || LOGOUT}>Sign out</ButtonLink></> : <ButtonLink variant="primary" href={loginUrl}>Sign in with Google</ButtonLink>)}>
           <div className="space-y-4">
-            {!signedIn && <p className="max-w-3xl text-muted">{sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own pii-guard address." : "No sign-in needed for the live example. Sign in with Google to run your own text, create projects and point your app at your own pii-guard address."}</p>}
+            {!signedIn && <p className="max-w-3xl text-muted">{sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live example. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."}</p>}
             {signedIn && <p className="max-w-3xl text-muted">You’re signed in. Your projects, endpoints, model connections and activity are in the console.</p>}
             {accountError ? <Notice tone="danger" live action={<Button size="sm" onClick={() => void refresh()}>Reconnect to API</Button>}>{accountError}</Notice> : !account ? <p className="text-muted">Checking live availability…</p> : <>
               {(!sponsoredOff || signedIn) && <dl className="grid max-w-md grid-cols-2 gap-4">
@@ -398,11 +398,11 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="privacy-heading" title="What pii-guard doesn’t promise." />
+        <SectionHead id="privacy-heading" title="What PII Guard doesn’t promise." />
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2">
           <Card title="Detection can miss" headingLevel={3}><p className="text-muted">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</p></Card>
           <Card title="Context can identify" headingLevel={3}><p className="text-muted">Even with names removed, surrounding detail can point to a person.</p></Card>
-          <Card title="It pseudonymises; it doesn’t anonymise" headingLevel={3}><p className="text-muted">The data is still personal data, and pii-guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</p></Card>
+          <Card title="It pseudonymises; it doesn’t anonymise" headingLevel={3}><p className="text-muted">The data is still personal data, and PII Guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</p></Card>
           <Card title="Remote detectors join your trust boundary" headingLevel={3}><p className="text-muted">If you enable one, it sees originals. Don’t submit highly sensitive data, or content you aren’t authorised to process.</p></Card>
         </div>
         <p className="text-xs text-muted"><a className={link} href={`${DOCS}/privacy-model.md`}>Read the privacy model ↗</a></p>
@@ -411,7 +411,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     <footer className="border-t border-line">
       <div className="mx-auto grid max-w-[1280px] gap-4 px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <a href="#" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />pii-guard</a>
+          <a href="#" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
           <ThemeToggle theme={theme} onTheme={setTheme} />
         </div>
         <p className="text-muted">Open-source privacy gateway for AI agents. Every example on this page is fictional.</p>
@@ -462,9 +462,9 @@ function MiniFlow({ model, name }: { model: string | null; name: string }) {
     <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back. Below it, a fictional ID card before and after masking: the face is blocked and each ID detail is covered by a box printed with its placeholder.</figcaption>
     <div aria-hidden="true" className="space-y-2">
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You send</p><p className="doc mt-1">Name: <mark className={["rounded-md px-0.5 -mx-0.5 ring-1 ring-inset", masked.mark].join(" ")}>{name}</mark></p></div>
-      <p className="text-center font-mono text-2xs text-guard">↓ pii-guard masks</p>
+      <p className="text-center font-mono text-2xs text-guard">↓ PII Guard masks</p>
       <div className="rounded-xl border border-model/25 bg-model-soft/60 px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-model">{model ?? "The model"} sees</p><p className="doc mt-1">Name: <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" /></p></div>
-      <p className="text-center font-mono text-2xs text-guard">↓ pii-guard restores</p>
+      <p className="text-center font-mono text-2xs text-guard">↓ PII Guard restores</p>
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You get back</p><p className="doc mt-1">Dear <mark className="rounded-md bg-restored-soft px-0.5 -mx-0.5 text-ink ring-1 ring-restored/45 ring-inset">{name}</mark>, …</p></div>
       <p className="text-center font-mono text-2xs text-guard">↓ and in images</p>
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">Faces blocked · ID details tokenized</p><div className="mt-2"><Suspense fallback={<div className="aspect-[3/1] rounded-md bg-surface-2" />}><HeroImage /></Suspense></div></div>

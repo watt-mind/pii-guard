@@ -67,7 +67,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
     <div className="space-y-6">
       <PageHeader
         title="Overview"
-        lead="pii-guard masks personal data before a request reaches the model and puts it back in the answer. This page counts what it protected: every call through the gateway, from its traffic log. Values never appear here, only their types and counts."
+        lead="PII Guard masks personal data before a request reaches the model and puts it back in the answer. This page counts what it protected: every call through the gateway, from its traffic log. Values never appear here, only their types and counts."
       />
 
       {account}
@@ -82,14 +82,14 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
             <Counter label="Requests" value={s.calls} note={`${s.calls === 1 ? "call" : "calls"} through the gateway`} />
             <Counter label="Values masked" value={s.masked} note="replaced by placeholders before the model saw them" />
             <Counter label="Requests blocked" value={s.blocked} note="failed closed: nothing was sent" tone={s.blocked ? "blocked" : undefined} />
-            <Counter label="pii-guard overhead" value={formatMsShort(s.overhead.p50)} note={`p50 · p95 ${formatMsShort(s.overhead.p95)}`} />
+            <Counter label="PII Guard overhead" value={formatMsShort(s.overhead.p50)} note={`p50 · p95 ${formatMsShort(s.overhead.p95)}`} />
           </dl>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Panel title="Top entity types" note="Values masked, by type, across the calls counted above.">
               <TopTypes types={s.types} />
             </Panel>
-            <Panel title="Latency per stage" note="pii-guard's own stages; the model's time is not included. p50 and p95 over the calls that ran the stage.">
+            <Panel title="Latency per stage" note="PII Guard's own stages; the model's time is not included. p50 and p95 over the calls that ran the stage.">
               <StageTable stages={s.stages} />
             </Panel>
           </div>
@@ -120,7 +120,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
             <p className="mt-0.5 text-sm text-muted">From the timing block of each call: the overhead is the call's total time minus the time spent waiting on the model.</p>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
-            <ChartCard id="chart-overhead" title="Overhead per call" note="What pii-guard added to each call, with the rolling p50 and p95.">
+            <ChartCard id="chart-overhead" title="Overhead per call" note="What PII Guard added to each call, with the rolling p50 and p95.">
               <OverheadChart events={t.events} />
             </ChartCard>
             <ChartCard id="chart-mode" title="Overhead by mode" note={modeNote(t.events)}>
@@ -129,7 +129,7 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
             <ChartCard
               id="chart-stages"
               title="Where the time goes"
-              note="pii-guard's own stages, the most recent calls (as many as fit). Forward is serialising the masked body and opening the HTTP connection to the model. Pick a column to open that call in Logs."
+              note="PII Guard's own stages, the most recent calls (as many as fit). Forward is serialising the masked body and opening the HTTP connection to the model. Pick a column to open that call in Logs."
             >
               <StageChart events={t.events} onSelect={onOpenCall} />
             </ChartCard>
@@ -188,7 +188,7 @@ function EmptyOverview({ t, server, sendDemo, setup = false }: { t: TrafficHandl
       : status.state === "disabled"
         ? "The traffic log is off on this server, so there is nothing to count."
         : status.state === "offline"
-          ? "The pii-guard API isn't reachable."
+          ? "The PII Guard API isn't reachable."
           : status.state === "limited"
             ? "Too many requests just now, so the traffic log is paused."
             : status.state === "denied"
@@ -326,8 +326,8 @@ function Unknown({ status }: { status: ServerStatusState }) {
       {status.state === "loading"
         ? "Asking the server…"
         : status.state === "missing"
-          ? "This pii-guard server doesn't report its configuration (it predates /v1/status)."
-          : "Unknown: the pii-guard API isn't reachable, so the page can't ask it."}
+          ? "This PII Guard server doesn't report its configuration (it predates /v1/status)."
+          : "Unknown: the PII Guard API isn't reachable, so the page can't ask it."}
     </p>
   );
 }

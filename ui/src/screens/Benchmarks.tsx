@@ -73,7 +73,7 @@ export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader 
     <div className="space-y-6">
       <PageHeader
         title="Evaluation"
-        lead="How much personal data gets through, measured on every run. Each evaluation run of pii-guard, and of the open-source tools it is compared with, is recorded with its commit, models, fixtures and hardware. All test documents are fictional."
+        lead="How much personal data gets through, measured on every run. Each evaluation run of PII Guard, and of the open-source tools it is compared with, is recorded with its commit, models, fixtures and hardware. All test documents are fictional."
       />
       {data.state === "loading" && (
         <p role="status" className="text-sm text-muted">
@@ -173,7 +173,7 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
               if (!keys.length) return null;
               return (
                 <div key={family} className="flex flex-wrap items-center gap-1.5">
-                  <span className="w-full text-xs text-muted sm:w-28 sm:shrink-0">{family === "pii-guard" ? "pii-guard" : "Open-source tools"}</span>
+                  <span className="w-full text-xs text-muted sm:w-28 sm:shrink-0">{family === "pii-guard" ? "PII Guard" : "Open-source tools"}</span>
                   {keys.map((k) => {
                     const sys = index.systems[k];
                     const on = selected.includes(k);
@@ -216,7 +216,7 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
       </p>
       {info?.origin === "generated" && (
         <p role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
-          <strong className="font-medium text-warn">Generated set.</strong> These documents were written by a Muse model, the same family as pii-guard's LLM detector, which flatters
+          <strong className="font-medium text-warn">Generated set.</strong> These documents were written by a Muse model, the same family as PII Guard's LLM detector, which flatters
           Muse-based detection, and fine-tuned detectors may have been trained on similar generated text (see the run notes under the
           results). The hand-written set has neither bias.
         </p>
@@ -239,7 +239,7 @@ function Explorer({ summary, source }: { summary: BenchmarkIndex; source: Benchm
           <Section id="bench-lang" title="By language" note="The same fixture set in each language.">
             <LanguageBars snapshots={snapshots} systems={index.systems} languages={languages} />
           </Section>
-          <Section id="bench-progress" title="Leak rate over time" note="Each pii-guard configuration, run by run. Dashed: the best result of any configuration so far, so a drop can mean a new configuration rather than an improved one.">
+          <Section id="bench-progress" title="Leak rate over time" note="Each PII Guard configuration, run by run. Dashed: the best result of any configuration so far, so a drop can mean a new configuration rather than an improved one.">
             <ProgressChart history={history} systems={index.systems} lang={lang} />
             <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
               {[...new Set(history.map((h) => h.system))].map((k) => (
@@ -311,7 +311,7 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
   return (
     <div className="border-l-2 border-guard py-1 pl-4" data-testid="bench-headline">
       <p className="text-base text-pretty text-ink sm:text-lg">
-        On {scope}, pii-guard lets {pct(h.ours)} of personal values through, against {pct(h.theirs)} for the best open-source tool.
+        On {scope}, PII Guard lets {pct(h.ours)} of personal values through, against {pct(h.theirs)} for the best open-source tool.
         {demo && demoLeak !== null && demoLeak !== undefined && demo.system !== h.ours.system && (
           <>
             {" "}
@@ -320,7 +320,7 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
         )}
       </p>
       <p className="mt-1 text-xs text-muted">
-        Best pii-guard configuration: {h.ours.label}. Best tool: {h.theirs.label}. Leak = labelled personal values still readable after masking. Speed was
+        Best PII Guard configuration: {h.ours.label}. Best tool: {h.theirs.label}. Leak = labelled personal values still readable after masking. Speed was
         measured where each ran, so it isn't a like-for-like test: {[speed(h.ours), speed(h.theirs)].filter(Boolean).join("; ")}.
       </p>
     </div>
