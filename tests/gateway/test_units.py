@@ -285,3 +285,99 @@ def test_gateway_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.keep_types == frozenset({EntityType.ORGANIZATION})
     assert config.llm_reasoning_effort == "minimal"
     assert GatewayConfig(keep_types="").keep_types == frozenset()
+
+
+@pytest.mark.parametrize("index", ["0", 0.5, None, True, [], {}])
+@pytest.mark.parametrize("finish", [False, True])
+def test_sse_invalid_choice_index_uses_enumeration(index: object, finish: bool) -> None:
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    choice = {"index": index, "delta": {"content": "[["}}
+    restorer.process(json.dumps({"choices": [{}, choice]}))
+    if finish:
+        out = restorer.process(
+            json.dumps({"choices": [{}, {"index": index, "finish_reason": "stop"}]})
+        )
+        assert json.loads(out[0])["choices"][1]["delta"]["content"] == "[["
+        assert restorer.finish() == []
+    else:
+        assert json.loads(restorer.finish()[0])["choices"] == [
+            {"index": 1, "delta": {"content": "[["}, "finish_reason": None}
+        ]
+
+
+def test_sse_absent_choice_index_flushes_by_position() -> None:
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    restorer.process(json.dumps({"choices": [{}, {"delta": {"content": "[["}}]}))
+    assert json.loads(restorer.finish()[0])["choices"][0]["index"] == 1
+
+
+@pytest.mark.parametrize("finish", [False, True])
+def test_sse_content_parts_share_string_unmasker(finish: bool) -> None:
+    session, ph = make_session()
+    restorer = SseRestorer(session)
+    restorer.process(json.dumps(chunk({"content": ph["PERSON"][:5]})))
+    payload = chunk(
+        {"content": [{"type": "text", "text": ph["PERSON"][5:]}, {"type": "text", "text": " [["}]},
+        finish="stop" if finish else None,
+    )
+    out = json.loads(restorer.process(json.dumps(payload))[0])
+    parts = out["choices"][0]["delta"]["content"]
+    text = "".join(p["text"] for p in parts)
+    tails = restorer.finish()
+    if tails:
+        text += json.loads(tails[0])["choices"][0]["delta"]["content"]
+    assert text == "Teszt Elek [["
+    assert restorer.masked_content() == {0: ph["PERSON"] + " [["}
+
+
+@pytest.mark.parametrize("kind,field", [("function", "arguments"), ("custom", "input")])
+def test_sse_indexless_tool_tail_stays_in_original_call(kind: str, field: str) -> None:
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    delta = {"tool_calls": [{kind: {field: "first [["}}, {kind: {field: "second [["}}]}
+    out = json.loads(restorer.process(json.dumps(chunk(delta, finish="tool_calls")))[0])
+    assert out["choices"][0]["delta"] == delta
+
+
+def test_sse_multiline_non_json_round_trips() -> None:
+    from pii_guard.gateway.stream import sse_event
+
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    payload = "first\nsecond\n"
+    assert sse_event(restorer.process(payload)[0]) == b"data: first\ndata: second\ndata: \n\n"
+
+    async def collect():
+        async def lines():
+            for line in sse_event(payload).decode().splitlines():
+                yield line
+
+        return [data async for data in iter_sse_data(lines())]
+
+    assert asyncio.run(collect()) == [payload]
+
+
+def test_sse_flushes_before_upstream_error_and_ignores_after_done() -> None:
+    session, ph = make_session()
+    restorer = SseRestorer(session)
+    restorer.process(json.dumps(chunk({"content": ph["PERSON"]})))
+    tail, error, done = restorer.process(json.dumps({"error": {"message": "private detail"}}))
+    assert json.loads(tail)["choices"][0]["delta"]["content"] == "Teszt Elek"
+    assert json.loads(error)["error"]["code"] == "upstream_error"
+    assert "private detail" not in error
+    assert done == "[DONE]"
+    assert restorer.process(json.dumps(chunk({"content": "ignored [["}))) == []
+    assert restorer.process("[DONE]") == []
+    assert restorer.finish() == []
+
+
+def test_sse_ignores_all_payloads_after_done() -> None:
+    session, _ = make_session()
+    restorer = SseRestorer(session)
+    assert restorer.process("[DONE]") == ["[DONE]"]
+    for payload in ["not JSON", json.dumps(chunk({"content": "[["})), '{"error": "bad"}']:
+        assert restorer.process(payload) == []
+    assert restorer.masked_content() == {}
+    assert restorer.finish() == []
