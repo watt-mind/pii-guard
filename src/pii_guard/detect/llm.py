@@ -105,9 +105,16 @@ ENTITY_DESCRIPTIONS: dict[EntityType, str] = {
     EntityType.EMAIL: "an email address",
     EntityType.PHONE: "a phone or fax number",
     EntityType.DATE_OF_BIRTH: "a date that is someone's date of birth",
-    EntityType.NATIONAL_ID_HU_TAX: "Hungarian personal tax ID (adóazonosító jel), 10 digits",
+    EntityType.NATIONAL_ID_HU_TAX: (
+        "Hungarian personal tax ID (adóazonosító jel): exactly 10 digits starting "
+        "with 8; never the 11-digit personal number (személyi azonosító), "
+        "which is an ID_DOCUMENT"
+    ),
     EntityType.NATIONAL_ID_HU_TAJ: "Hungarian social security (TAJ) number, 9 digits",
-    EntityType.ID_DOCUMENT: "an ID card, passport or driving licence number",
+    EntityType.ID_DOCUMENT: (
+        "an ID card, passport or driving licence number, including the 11-digit "
+        "Hungarian personal number (személyi azonosító)"
+    ),
     EntityType.BANK_ACCOUNT: "a bank account number or IBAN",
     EntityType.COMPANY_ID_HU: "a company registration number (cégjegyzékszám) or company tax "
     "number (adószám)",
