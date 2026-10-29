@@ -21,6 +21,8 @@ concurrency:
 
 env:
   UV_LOCKED: "1"
+  # Keep in step with the uv image pinned in Dockerfile/Dockerfile.hosted.
+  UV_VERSION: "0.13.6"
   FORCE_COLOR: "1"
 
 jobs:
@@ -58,6 +60,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       - run: uv sync
       - name: Ruff lint
@@ -75,6 +78,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       - run: uv sync
       - name: mypy (no errors beyond scripts/ci/mypy-baseline.txt)
@@ -99,6 +103,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       # Exercise the real Azure SDK conditional-write boundary, not only mocks/skips.
       - run: uv sync --extra hosted-azure
@@ -124,6 +129,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       - run: uv sync --no-dev
       - name: Smoke (demo stack on the mock upstream, offline)
@@ -153,6 +159,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       - run: uv sync --no-dev
       - name: Quality regression gate (rules only, offline; eval/gates.json)
@@ -310,8 +317,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          # `uv audit` is a preview feature: pin the uv that it was introduced against.
-          version: "0.11.7"
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       # --frozen: audit uv.lock as committed, without resolving. Nothing is downloaded, which
       # matters for the baselines extra (never installed in CI; its HuSpaCy wheel is ~400 MB).
@@ -351,6 +357,7 @@ jobs:
       # `pii-guard eval report --print-index` (ui/vite.config.ts), so pii-guard is installed.
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       - name: Install pii-guard (builds the benchmark index)
         run: uv sync --no-dev
@@ -397,6 +404,7 @@ jobs:
           cache-dependency-path: ui/pnpm-lock.yaml
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       - name: Build the wheel with the web UI (size budget 5 MiB, UI present)
         run: make wheel
@@ -412,6 +420,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
       - name: Hosted deployment policy tests (offline; no cloud credentials)
         run: python3 -m unittest discover -s scripts/ci -p 'test_hosted_deploy.py'
       - name: actionlint (workflow lint; shellcheck on run blocks)
@@ -438,6 +448,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: ${{ env.UV_VERSION }}
           enable-cache: true
       - run: uv sync --no-dev
       - name: Real-looking PII on the lines this PR adds (pii-guard rules, dogfood)
