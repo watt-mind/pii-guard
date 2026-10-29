@@ -16,14 +16,14 @@ downstream boundary before saying that it worked.
 
 | Route | What can be shown | What must be said |
 |---|---|---|
-| Self-hosted console, mock upstream | Live text masking, gateway round trip and streaming; bundled image recording | The upstream echoes masked text; this proves the transport and restoration, not generation quality. A recorded image run is labelled as a recording. |
+| Self-hosted console, mock upstream | Live text masking, gateway round trip and streaming; bundled image recording | The upstream echoes masked text; this proves the transport and restoration, not generation quality. A recorded image run is labeled as a recording. |
 | Self-hosted console, prepared real provider | The same text flow with a generated answer; live images only after image preflight below | Name the configured downstream and detector boundary. A provider key, model access or current quota is never assumed. |
-| Hosted text experience | Curated anonymous text walkthrough, or signed-in editable text when enabled; configured project endpoints | The hosted service receives original text. It currently refuses image uploads/parts. Switch visibly to the self-hosted console or a recording for the image segment. |
+| Hosted experience | Curated anonymous text walkthrough, or signed-in editable text and image masking; configured project endpoints | The hosted service receives original text and, for signed-in Google owners, original images. Images are processed on the server only (Tesseract, YuNet and a pinned YOLOS-tiny signature detector); the masked image goes back to the owner, never to a model. Guests, API keys and `/e/<endpoint>` are refused, and gateway image parts and project endpoints stay off. Present images in Playground → Images when signed in, or the landing #images showcase. A live multimodal gateway round trip is self-hosted only, or shown as a recording. |
 
 The hosted service and self-hosting have different trust boundaries. Self-hosting puts the
 original text and local detection in the operator's environment; the hosted service processes
 original text on its server. Neither path establishes automatic GDPR compliance or
-anonymisation. Detection can miss values, and context can still identify someone. The
+anonymization. Detection can miss values, and context can still identify someone. The
 [privacy model](privacy-model.md) and [hosted processing table](hosted.md#what-each-mode-processes)
 are the reference for these statements.
 
@@ -45,7 +45,7 @@ uv run --no-sync python scripts/demo.py --mode rules --mock --traffic-log masked
 
 Open `http://localhost:5173`. The startup banner must say **mock upstream** and **rules
 only**. Select the live API engine in the console if it was previously set to Demo; confirm
-`http://127.0.0.1:8787/healthz` returns success. This baseline deliberately uses the e-mail
+`http://127.0.0.1:8787/healthz` returns success. This baseline deliberately uses the email
 rule and preloaded known values, so it needs no NER download and makes no claim about
 free-text name detection. The image segment uses the bundled recording.
 
@@ -68,54 +68,56 @@ data, and confirm the console no longer says mock. Keep its credentials off scre
 
 Use the existing [image setup](operations.md#segmenter-faces-on-the-device-signatures-on-sam-31):
 Tesseract plus the `ocr` extra and Hungarian/English language data; a configured visual
-segmenter; a tenant key for labelled rendering; and the text detectors required by the
+segmenter; a tenant key for labeled rendering; and the text detectors required by the
 chosen route. Provision models and authorized SAM access before rehearsing. Confirm
 `GET /v1/status` reports `images.available: true`, then actually run the bundled ID card;
 a configuration status alone does not prove inference will succeed.
 
-The default hybrid path uses local YuNet for faces/photos and sends the image
-as **normalized, unmasked pixels** to Meta SAM 3.1 for signatures (EXIF/metadata are stripped first). A missing local face detector can make hybrid use SAM for
-faces too. Describe this as a detector service boundary, separate from the downstream model
-that receives the masked image. Fully local segmentation cannot detect signatures/stamps;
-with the default signature-mask policy it refuses the image. Do not relax policies or turn
-OCR off just to obtain a successful demonstration.
+A project policy's `visual_detection` defaults to `local`: YuNet finds faces/photos and a
+pinned YOLOS-tiny detector finds signatures, all on-device. Stamps cannot be found locally,
+so a policy that masks stamps refuses the image. SAM 3.1 is opt-in
+(`visual_detection: sam`) or used on the no-project server path; it receives
+**normalized, unmasked pixels** (EXIF/metadata are stripped first). Describe that as a
+detector service boundary, separate from the downstream model that receives the masked
+image. Do not relax policies or turn OCR off just to obtain a successful demonstration.
 
 For a replay, no OCR, SAM access or image model is needed: use a bundled sample and the
 console's recorded-run fallback. Rehearse the fallback once and keep its recording label
 visible. Recordings only support their exact bundled samples, not arbitrary uploads.
 
-### If presenting hosted text
+### If presenting hosted
 
 Use only an operator-confirmed origin. No URL, sponsored budget, model access or deployment
 readiness is implied by this document. Before the audience arrives:
 
 1. Open the hosted landing page and complete the curated text flow. If sponsorship is
-   unavailable, use the local mock baseline above; do not improvise a sponsored route.
-2. For editable text, sign in and verify the app shows the owner state and intended
-   playground. An Azure “You have successfully signed in” page at `/.auth/login/done`
-   confirms an authentication step, not a working app session. If shown, use **Return to
-   website**, then verify the app session before continuing.
+   off, the landing demo shows “Recorded run · real model”: say out loud that it is a
+   recording. Do not improvise a sponsored route.
+2. For editable text and images, sign in (the landing header button is **Console**) and
+   verify the app shows the owner state and intended playground before continuing.
 3. Verify any chosen project endpoint and provider using synthetic text. Endpoint
    configuration persisting is separate from the temporary vault session: do not promise
    restoration after a restart or session expiry.
-4. Prepare a visibly separate self-hosted image segment or labelled recording. The hosted
-   initial release does not accept images. See [hosted.md](hosted.md) and
-   [projects.md](projects.md) for its actual scope.
+4. For images, signed-in owners can mask them in Playground → Images (or use the landing
+   #images showcase); run the bundled ID card once beforehand. A live multimodal gateway
+   round trip needs a visibly separate self-hosted segment or a labeled recording. See
+   [hosted.md](hosted.md) and [projects.md](projects.md) for its actual scope.
 
 ## The three-minute story
 
 The default route below is the local mock baseline, which works without provider/model
-access. For a hosted presentation, identify the self-hosted image recording at the opening, switch
-visibly to hosted text for beats 2–3, then return to the recording for beat 4.
+access. For a hosted presentation, signed in, run the image beats in the hosted Playground → Images;
+otherwise use the landing #images showcase or a recording, labeled as such. Switch visibly
+to hosted text for beats 2–3.
 
 | Time | Exact action and expected result | Say |
 |---|---|---|
 | 0:00–0:20 | Start on Playground → Images with the bundled **ID card** before/after result prepared in preflight. Keep its live/recorded label visible. Point to the covered portrait, signature and printed values; state that the specimen is fictional. | “Personal data is also in pictures. Here is a fictional ID before and after masking. This is [a live run / a bundled recording]. pii-guard covers detected regions before the image goes to the downstream assistant; I’ll show what remains useful.” |
 | 0:20–0:55 | Switch to Playground → Text. Replace the document with the Hungarian sentence below and choose Hungarian. Under **Known values**, add `Próba Zsuzsanna` as Person (`PERSON`). Click **Mask document**. Expect a PERSON placeholder for the name stem and an EMAIL placeholder; the Hungarian ending remains outside the person placeholder. Hover a placeholder to show the link. | “Here the application already knows its customer, so it preloads the name. This example uses rules and the vault, without an LLM detector. The same person gets a session placeholder, with the Hungarian ending kept outside it.” |
-| 0:55–1:30 | Click **Send it to the model** to continue to Chat in that session. Send the same sentence. Inspect **What the model received**, then the answer. Expect placeholders upstream and the fictional name/e-mail restored in `Echo: …`; Chat streams the response. | “This is a real request through the gateway to an offline echo upstream. The upstream gets placeholders; the client gets restored text while the answer streams. With a prepared provider, the same boundary wraps generation.” |
+| 0:55–1:30 | Click **Send it to the model** to continue to Chat in that session. Send the same sentence. Inspect **What the model received**, then the answer. Expect placeholders upstream and the fictional name/email restored in `Echo: …`; Chat streams the response. | “This is a real request through the gateway to an offline echo upstream. The upstream gets placeholders; the client gets restored text while the answer streams. With a prepared provider, the same boundary wraps generation.” |
 | 1:30–2:15 | Switch to Playground → Images. Click the bundled **ID card**. If the server refuses it, click **Replay the recorded run instead**. Keep the live/recorded label visible. Inspect the covered portrait/signature/text regions and displayed region provenance. | “The image path covers regions and can label them with session placeholders, plus a masked transcript and document summary. That lets an assistant connect an ID to a party without seeing the covered values. This is [a live run / the bundled recorded run]. SAM, when used, sees normalized unmasked pixels as a detector.” |
-| 2:15–2:40 | Open Evaluation and choose the relevant committed run/fixture set. Show the denominator and one weak dataset alongside the result. | “We measure leaks, over-masking and round trip on synthetic fixtures. A result belongs to its model and dataset; it does not prove that every new document is safe. The linked records make our limits inspectable.” |
-| 2:40–3:00 | Return to the input → masked → restored view. Leave the repository link visible. | “Reversible text placeholders preserve useful answers, and labelled image masking preserves document relationships. Self-host it inside your boundary, or review the hosted service's different boundary. It is an open-source hackathon build, with measured limitations.” |
+| 2:15–2:40 | Open Evaluation (on hosted, the public #evaluation page works signed out) and choose the relevant committed run/fixture set. Show the denominator and one weak dataset alongside the result. | “We measure leaks, over-masking and round trip on synthetic fixtures. A result belongs to its model and dataset; it does not prove that every new document is safe. The linked records make our limits inspectable.” |
+| 2:40–3:00 | Return to the input → masked → restored view. Leave the repository link visible. | “Reversible text placeholders preserve useful answers, and labeled image masking preserves document relationships. Self-host it inside your boundary, or review the hosted service's different boundary. It is an open-source hackathon build, with measured limitations.” |
 
 The exact synthetic sentence for beats 2–3:
 
@@ -133,7 +135,7 @@ round trip** only after separately rehearsing an inline-image Chat/Responses req
 inspecting the masked request at the upstream. Use the self-hosted legacy root `/v1` route
 without a nondefault project selection for inline images: configured project endpoints are
 text-only in both hosted and self-hosted mode. A standalone mask result is not that proof.
-Labelled image rendering does not reconstruct the original portrait, signature or pixels;
+Labeled image rendering does not reconstruct the original portrait, signature or pixels;
 text restoration uses the vault. The Images screen also does not prove that its session is
 the same as the Text screen's: cross-modal consistency requires the same explicit session.
 
@@ -165,7 +167,7 @@ the same as the Text screen's: cross-modal consistency requires the same explici
    `summary`. Claim a match only where those fields show it. An `uncertain` match gets a new
    placeholder rather than guessing. Show the covered PNG; do not promise pixel recovery.
 3. **The engineering tradeoff (about 30 seconds).** Show [models.md](models.md): XLM-R NER
-   distilled from Glimmer labels for the fast path, SAM 3.1 for visual segmentation, optional
+   distilled from Glimmer labels for the fast path, on-device YuNet/YOLOS-tiny by default with SAM 3.1 opt-in for visual segmentation, optional
    remote audit detection. The model actually used must match the status/run record. Close
    on [privacy-model.md](privacy-model.md): local detection, remote detection and downstream
    generation are separate boundaries.
@@ -177,7 +179,7 @@ the same as the Text screen's: cross-modal consistency requires the same explici
 | Provider unavailable, sponsored allowance disabled or model access absent | Restart the local baseline with `--mock`. Say “offline echo upstream”; show the upstream placeholders and restored echo. A mock never proves a generated answer's quality. |
 | NER not installed/ready | Use `--mode rules --mock` and preload the fictional known value. Say “rules plus a known value”; do not claim automatic free-text name detection. |
 | OCR, visual segmenter or SAM unavailable | Show the refusal, then choose the bundled sample's recorded-run fallback. Say “recorded regions for this exact specimen”; do not upload another image or imply inference just ran. |
-| Hosted login ends on the Azure success page | Use **Return to website**, verify owner state. If the app session is unavailable, switch to the pre-rehearsed local baseline; do not call the authentication success page the completed demo. |
+| Hosted sign-in does not reach an owner session | Verify owner state in the app. If the session is unavailable, switch to the pre-rehearsed local baseline or the landing's recorded run, and say it is a recording. |
 | Network or browser breaks entirely | Play a previously captured local recording with its checkout SHA, route, detector/model names and date in the opening slate. Keep the mock/recorded-image labels in frame. Say “recording”, then show the matching source/evidence files. |
 
 Capture the fallback video before the event: the six beats above, using only the bundled
