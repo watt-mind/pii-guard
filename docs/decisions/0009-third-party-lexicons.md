@@ -9,12 +9,12 @@ The synthetic corpus drew Hungarian people and addresses from short hand-picked 
 surnames, 20 towns, 25 streets), so a 50-document sample repeated the same 45 surnames and 19
 towns, and models trained or tuned on it saw a narrow slice of real names and places. The
 rules layer had a matching blind spot: it flagged only the four digits of a postcode before a
-capitalised word, so a masked address still leaked its street, and it couldn't tell a real
-Hungarian postcode/town pair from four digits that happen to sit before a capitalised word.
+capitalized word, so a masked address still leaked its street, and it couldn't tell a real
+Hungarian postcode/town pair from four digits that happen to sit before a capitalized word.
 
 Official public lists exist for all of this (the KSH gazetteer, Magyar Posta's postcode table,
 the interior ministry's name statistics, OpenStreetMap streets), but under different terms:
-some allow redistribution with attribution, some state no licence, some reserve all rights,
+some allow redistribution with attribution, some state no license, some reserve all rights,
 and OpenStreetMap's ODbL is share-alike for substantial extracts.
 
 ## Decision
@@ -26,11 +26,11 @@ extras), and `postcode_index(language)` answers "is this postcode one of this se
 A pack without a kind raises `LexiconUnavailable`; English has only `street_types` for now.
 
 **Committed only where the terms clearly allow it.** `data/lexicons/fetch.py` fetches every
-source politely into gitignored `data/lexicons/raw/` and normalises offline. Lists from
+source politely into gitignored `data/lexicons/raw/` and normalizes offline. Lists from
 CC BY 4.0 sources (KSH) and our own hand-curated lists are committed, with their source in
 each file's header and in [`data/lexicons/MANIFEST.md`](../../data/lexicons/MANIFEST.md)
 (URL, retrieval date, terms, SHA-256). Sources with all rights reserved (Magyar Posta) or no
-stated licence (ministry name statistics) are **fetch-only**: they are normalised to
+stated license (ministry name statistics) are **fetch-only**: they are normalized to
 `data/lexicons/raw/derived/` and used on a developer's machine through
 `PII_GUARD_LEXICON_DIR`, never committed. From OpenStreetMap we commit only a non-substantial
 extract (the 100 most common street names and the public-space type counts).
@@ -46,7 +46,7 @@ lists are 192 KB in total, so they stay plain UTF-8 TSV (diffable) instead of gz
   random, so no generated person is a real one. Every address gets one of its own
   settlement's postcodes. The prompt also asks for **hard negatives**, ordinary phrases that
   look like personal data but aren't (a surname that is a common word used as the word, a
-  town outside an address, "Eladó lakás"), which are never labelled.
+  town outside an address, "Eladó lakás"), which are never labeled.
   `GENERATOR_VERSION` is 2.
 - **Rules** (`detect/rules/hu.py`): a full Hungarian address recogniser,
   `[<postcode>] <settlement>[ <district>], <street> <type> <number>[ <floor/door>]`, whose

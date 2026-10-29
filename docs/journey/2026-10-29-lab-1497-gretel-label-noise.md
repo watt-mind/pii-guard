@@ -18,7 +18,7 @@ published. No model was trained or changed; the upstream set and its rows stay a
   [`datasets/corrections.py`](../../src/pii_guard/eval/datasets/corrections.py) builds
   `gretel-finance-corrected`, where those spans are ignore regions: no system is credited or
   charged for them. Placeholder names used as names (`Max Mustermann`) and address parts
-  labelled `PERSON` are kept as gold.
+  labeled `PERSON` are kept as gold.
 - **Same predictions, two label sets.** One v2.0 run scored against both
   ([audit](../../eval/results/2026-10-29-lab-1497-label-audit/README.md)):
   leak **19.07 % → 2.44 %** (German 29.1 → 2.3 %, English 5.1 → 2.6 %), names leaked 162/516
@@ -30,6 +30,6 @@ published. No model was trained or changed; the upstream set and its rows stay a
   now has the lowest leak of all 17; Presidio gains least because it masks almost everything.
 - **MAPA EUR-Lex needs no correction.** The role words LAB-1494 found were in the MAPA
   *validation* split. On the test set none of the gold names is a role word, and 41 of v2.0's
-  63 leaked values are the same string labelled a name in 6+ of the 21 language versions:
+  63 leaked values are the same string labeled a name in 6+ of the 21 language versions:
   real names. Its 8.5 % leak stays as published.
 - **Cost:** $0, local CPU.

@@ -5,7 +5,7 @@ ending after it (`Kerekes Ottótól`), but not with the possessive `-é`, the fa
 or the plural possessive `-éi` followed by a case ending of its own. Those forms are
 everyday Hungarian (`Kerekes Ottóéknál`, "at the Ottós'"), and they stayed in clear text. A
 fictional probe of 10 given names x 13 suffix chains x 5 surnames (`Kerekes Ottó írt nekünk.
-Tegnap Kerekes Ottóéknál voltunk.`, the bare name labelled) leaked the name in **650 of 650**
+Tegnap Kerekes Ottóéknál voltunk.`, the bare name labeled) leaked the name in **650 of 650**
 cases. **After:** **0 of 650**. All 650 use one placeholder for both occurrences and give back
 the text exactly on unmask.
 

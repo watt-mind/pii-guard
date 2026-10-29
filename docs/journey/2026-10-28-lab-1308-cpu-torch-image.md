@@ -9,7 +9,7 @@ CUDA build on Linux (`2.14.1+cu130`), and it pulls the CUDA libraries with it, o
   `[[tool.uv.index]]`, selected in `[tool.uv.sources]` with `sys_platform == 'linux'`). The
   lock holds `2.14.1+cpu` for Linux and the PyPI `2.14.1` for everything else, so macOS keeps
   MPS. The Dockerfile is unchanged: `uv sync --locked` picks the CPU wheel by itself.
-- **Same behaviour.** The demo container still masks a fictional name in `/v1/mask` with the
+- **Same behavior.** The demo container still masks a fictional name in `/v1/mask` with the
   NER active (and leaves it with `PII_GUARD_NER_FALLBACK=off`). `make audit` and
   `make licences` pass.
 

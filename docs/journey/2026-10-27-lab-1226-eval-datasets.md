@@ -3,7 +3,7 @@
 LAB-1226. Until now, every headline number came from our own fixtures plus one public sample
 (Ai4Privacy). Now a dataset registry ([datasets.md](../datasets.md)) adds four permissive public
 test sets and a seeded generator for agent traffic. Each set records its source, pinned
-revision, licence, label mapping and split. Every system runs on every set, and each rate
+revision, license, label mapping and split. Every system runs on every set, and each rate
 carries a bootstrap 95 % interval ([benchmarks.md](../benchmarks.md#results-per-dataset)).
 
 The four public sets:
@@ -14,7 +14,7 @@ The four public sets:
   never committed.
 
 The generator writes **agent traffic**: 330 test documents per language in hu/en/de, plus a
-dev split on another seed. The shapes are tool-call JSON, YAML, CSV, logs, code, e-mail
+dev split on another seed. The shapes are tool-call JSON, YAML, CSV, logs, code, email
 threads, chats and inflected names. 15 % of the checksums are invalid and 18 % of the values
 are perturbed. Hard negatives include public companies.
 
@@ -39,7 +39,7 @@ are perturbed. Hard negatives include public companies.
 - **Gretel's labels are incomplete.** Every system over-masks on it, and 19 % leak is the
   weakest result.
 - **Perturbed values leak more.** On agent traffic, fast leaks 13.7 % of perturbed values
-  (homoglyphs, zero-width spaces, spaced digits, leetspeak e-mail) against 2.4 % for PrivAiTe
+  (homoglyphs, zero-width spaces, spaced digits, leetspeak email) against 2.4 % for PrivAiTe
   (LAB-1297). It also leaks 8.5 % of invalid-checksum ids against 4.9 % of valid ones.
 - **Audit mode** (fast + Muse Spark 1.3 on the Meta Model API) ran on a 10-per-language
   sample of each synthetic set: 0 % leak on agent traffic, CEE and Nemotron, and 26.7 % on

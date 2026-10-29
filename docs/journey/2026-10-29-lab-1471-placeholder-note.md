@@ -3,7 +3,7 @@
 LAB-1471, found by LAB-1469. With every request masked and answered, `muse-spark-1.3` still
 ended 7 of 15 real agent turns in a refusal: it read `[[NATIONAL_ID_HU_TAJ_5a63fe]]` as a
 sensitive health-insurance identifier and would not copy it into a file, `cat` the file or
-repeat an e-mail. The gateway now puts one constant note in front of every request that carries
+repeat an email. The gateway now puts one constant note in front of every request that carries
 a placeholder: placeholders are opaque reference tokens, not real data, to be copied exactly as
 written, and restored after the answer
 ([results](../../eval/results/2026-10-29-lab-1471-placeholder-refusals/README.md)).

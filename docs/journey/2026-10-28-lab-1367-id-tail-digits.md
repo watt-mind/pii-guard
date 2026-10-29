@@ -16,7 +16,7 @@ eval counts this kind of leak.
      the comma (`1,234,567`, `27358,76`), in `detect/rules/_base.py`.
   2. **The NER span cut the token.** With no rule span, the model's span decided, and the
      model labels sub-word pieces of a number (`846` PHONE + `126` tax number of
-     `8461269321`). The LAB-1338 snap covered names, organisations and addresses only.
+     `8461269321`). The LAB-1338 snap covered names, organizations and addresses only.
      `detect/ner_words.snap_to_tokens` now extends phone, ID, account, tax and TAJ spans to
      the whole run of letters and digits, also across a `.`, `-` or `/` between digits
      (`812.754.113.91`), before the LAB-1293 number checks judge them. Pieces of different

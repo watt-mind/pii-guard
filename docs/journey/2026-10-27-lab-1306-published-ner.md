@@ -23,7 +23,7 @@ unseen `agent-traffic-dev` with smoke over-masking no worse than v2; on a tie, v
   4 spans to 0, the lone "… Street" went away, and cee-pii over-masking fell from 39.4 to
   29.0 %.
 - **They cost leak.** Without a cue word, the model also stopped marking real document ids and
-  e-mails: uncued `ID_DOCUMENT` leaks on agent-traffic-dev went from 5 to 11, and hu-smoke
+  emails: uncued `ID_DOCUMENT` leaks on agent-traffic-dev went from 5 to 11, and hu-smoke
   leaked a name. The held-out test sets, scored once after the choice, agree: agent-traffic
   2.6 → 3.4 %, gretel-finance 19.1 → 19.9 %.
 - **In-distribution vs held out.** v2's 0.4 % ai4privacy leak is in-distribution (it trained on

@@ -33,6 +33,6 @@ documents (not recorded).
 - **Consistency reads 93.5 %, not 100 %, and the vault is right.** The scorer groups gold
   values by case-folded text, so it counts the two case-differing tokens as one entity. It
   then charges the vault for giving them two placeholders, which LAB-1350 made the correct
-  behaviour. The old vault, which collapsed them, scores 100 %. This is a scorer follow-up
+  behavior. The old vault, which collapsed them, scores 100 %. This is a scorer follow-up
   (LAB-1382): SECRET should be grouped case-sensitively, the same as in the vault.
 - **Cost:** $0. No detector or vault change.

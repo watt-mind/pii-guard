@@ -23,11 +23,11 @@ real model and the published NER.
 | Upstream calls | 108 in total (budget 150): 97 agent requests, 11 `--check` canaries; all fictional data, and none of the 9 values in any of them |
 | Isolation | every client ran with a scratch `HOME` (and `XDG_*`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`, `--muse-dir`); cwd a scratch git repo; pi and OpenCode under a `sandbox-exec` profile that denies writes to the user's home, Codex and Muse in their own workspace sandboxes. No real config was read or written |
 
-The task: `customers.md` holds two fictional customers (a Hungarian name, e-mail, IBAN,
-adóazonosító jel and TAJ szám; a German name, e-mail, IBAN and Steuer-ID: 9 values, all masked
+The task: `customers.md` holds two fictional customers (a Hungarian name, email, IBAN,
+adóazonosító jel and TAJ szám; a German name, email, IBAN and Steuer-ID: 9 values, all masked
 in fast mode). Turn 1: "create `contacts.json` from it, `cat` it, reply with the German
-customer's e-mail". Turn 2, in the same conversation: "with your edit tool, insert
-`"verified": true` after the first e-mail". The project's `AGENTS.md` says placeholders are
+customer's email". Turn 2, in the same conversation: "with your edit tool, insert
+`"verified": true` after the first email". The project's `AGENTS.md` says placeholders are
 restored locally ([pi.md](pi.md#the-end-to-end-test)).
 
 ## Matrix

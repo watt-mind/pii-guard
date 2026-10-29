@@ -1,11 +1,11 @@
-# Fast mode reads spelled-out values and `[at]` e-mails: perturbed leak 13.7 → 0.3 % (2026-10-28)
+# Fast mode reads spelled-out values and `[at]` emails: perturbed leak 13.7 → 0.3 % (2026-10-28)
 
 LAB-1297, found during LAB-1226. **Fast mode leaked 118 of the 859 perturbed values (13.7 %)
 of the `agent-traffic` test split, against 2.4 % for PrivAiTe.** Broken down by perturbation
 kind, the folding of zero-width characters and lookalike letters already worked on every path
 (2 of 496 leaked, none of the 35 names split over a line). Three kinds caused nearly all of it,
 and the normaliser undid none of them: a value spelled out one character at a time
-(`D E 6 3 1 4 ...`: 67 of 126 leaked), an e-mail written with `[at]` and `[dot]` (36 of 75), and
+(`D E 6 3 1 4 ...`: 67 of 126 leaked), an email written with `[at]` and `[dot]` (36 of 75), and
 an identifier regrouped in threes with dots (`GB5.4PZ.JT7.994...`: 13 of 127). A model reading
 the request reads all three as the plain value.
 
@@ -26,7 +26,7 @@ the request reads all three as the plain value.
 | -- | -- | -- |
 | Perturbed values leaked | 118 / 859 (13.7 %) | 3 / 859 (0.3 %) |
 | — spaced digits | 67 / 126 | 1 / 126 |
-| — leetspeak e-mail | 36 / 75 | 0 / 75 |
+| — leetspeak email | 36 / 75 | 0 / 75 |
 | — dotted digits | 13 / 127 | 2 / 127 |
 | — zero-width, homoglyph, line break | 2 / 531 | 0 / 531 |
 | Invalid-checksum identifiers leaked | 8.5 % | 0.0 % |

@@ -30,7 +30,7 @@ records `2026-10-28-lab-1391-*`.
   (bardsai v3, Horizon); Wismut leaks nothing on hu-inflection despite never seeing Hungarian.
 - **Cost:** base-size models about 1.6× v2.0's CPU latency (p95 113–144 vs 66–82 ms per
   ~380-character message on the same loaded machine); Horizon small matches v2.0 at 141M.
-- **Licence:** Horizon's `LICENSE` and `NOTICE` agree with its card (Apache-2.0). bardsai v3 and
+- **License:** Horizon's `LICENSE` and `NOTICE` agree with its card (Apache-2.0). bardsai v3 and
   Wismut have no LICENSE file, only card metadata; no file contradicts a card.
 - **Decision:** no product change. Fast mode keeps NER v2.0 and the fallback stays v1. bardsai v3
   and Horizon base are the distillation-teacher candidates for English and German document text

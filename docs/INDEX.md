@@ -13,7 +13,7 @@
 | [entities.md](entities.md) | The entity taxonomy: what counts as personal data, per language |
 | [evaluation.md](evaluation.md) | Synthetic benchmark, metrics, baselines, how results are reported |
 | [languages.md](languages.md) | Adding a language: the language pack, the conformance suite, what "done" means |
-| [data-sources-eu24.md](data-sources-eu24.md) | Research: licence and coverage audit of NER/PII data and national identifiers for the 24 EU languages |
+| [data-sources-eu24.md](data-sources-eu24.md) | Research: license and coverage audit of NER/PII data and national identifiers for the 24 EU languages |
 | [contracts.md](contracts.md) | Public interfaces between modules: types, detectors, registry, API errors |
 | [models.md](models.md) | Which model does what, Meta models and hackathon partners |
 | [journey.md](journey.md) | The project's story so far: dated milestones with before/after metrics, cost and the decisions made |
