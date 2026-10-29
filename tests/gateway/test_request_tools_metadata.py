@@ -396,6 +396,81 @@ def test_chat_tool_names() -> None:
     assert tool_names({"functions": "not a list"}) == frozenset()
 
 
+@pytest.mark.parametrize("location", ["arguments-string", "arguments-object", "schema-example"])
+@pytest.mark.parametrize("nested", [False, True], ids=["top-level", "nested"])
+def test_colliding_masked_keys_fail_closed(
+    location: str, nested: bool, caplog: pytest.LogCaptureFixture
+) -> None:
+    first, second = PERSON, PERSON.upper()
+    caplog.set_level("DEBUG")
+    value = {first: 1, second: 2}
+    if nested:
+        value = {"outer": [{"inner": value}]}
+    fields: dict[str, Any]
+    if location == "schema-example":
+        fields = {"tools": [tool(parameters={"type": "object", "examples": [value]})]}
+    else:
+        arguments = json.dumps(value) if location == "arguments-string" else value
+        fields = {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "type": "function",
+                            "function": {
+                                "name": "send_letter",
+                                "arguments": arguments,
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+    upstream = MockUpstream()
+    app = make_app(upstream)
+    response = post(upstream, app, **fields)
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": {
+            "code": "invalid_request",
+            "message": "masking JSON object keys produced a collision; request not forwarded",
+        }
+    }
+    assert upstream.requests == []  # neither value may be silently dropped and forwarded
+    assert len(app.state.gateway.vault) == 0
+    for raw in (first, second):
+        assert raw not in response.text
+        assert raw not in json.dumps(response.json(), ensure_ascii=False)
+        assert raw not in caplog.text
+        assert all(raw not in header for header in response.headers.values())
+
+
+def test_noncolliding_masked_keys_keep_both_values() -> None:
+    upstream = MockUpstream(answer=lambda body: "ok")
+    args = {PERSON: 1, OTHER: {"items": [{PERSON: 2}]}}
+    response = post(
+        upstream,
+        messages=[
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {"function": {"name": "send_letter", "arguments": json.dumps(args)}}
+                ],
+            }
+        ],
+    )
+    assert response.status_code == 200
+    forwarded = json.loads(
+        upstream.bodies[0]["messages"][0]["tool_calls"][0]["function"]["arguments"]
+    )
+    assert len(forwarded) == 2
+    first, second = forwarded
+    assert PLACEHOLDER_RE.fullmatch(first)
+    assert PLACEHOLDER_RE.fullmatch(second)
+    assert forwarded == {first: 1, second: {"items": [{first: 2}]}}
+
+
 # --- schema structural values are checked, not skipped (LAB-1563) ---------------------------
 
 
