@@ -153,10 +153,10 @@ def merge(
     return Merged(spans, sorted(set(ignore)), counts)
 
 
-def labelled_document(doc: Document, merged: Merged) -> Document:
+def labelled_document(doc: Document, merged: Merged, model: str = TEACHER_MODEL) -> Document:
     meta = dict(doc.meta)
     meta["loss_ignore"] = [list(r) for r in merged.ignore]
-    meta["teacher"] = {"model": TEACHER_MODEL, "reasoning_strength": TEACHER_STRENGTH}
+    meta["teacher"] = {"model": model, "reasoning_strength": TEACHER_STRENGTH}
     return Document(doc.id, doc.language, doc.text, tuple(merged.spans), meta)
 
 
@@ -245,6 +245,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, help="label only the first N documents per file")
     parser.add_argument("--timeout", type=float, default=900.0)
     parser.add_argument("--cache-only", action="store_true", help="never call the teacher")
+    parser.add_argument(
+        "--model",
+        default=TEACHER_MODEL,
+        help="served model name (a Fireworks deployment: '<model>#<deployment>', LAB-1539)",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        help="also send reasoning_effort (Fireworks maps it onto Glimmer's template and "
+        "ignores chat_template_kwargs; use 'low' there)",
+    )
     args = parser.parse_args(argv)
 
     from pii_guard.detect.llm import LlmDetector
@@ -258,17 +268,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         p: load_fixtures([p])[: args.limit] if args.limit else load_fixtures([p]) for p in files
     }
     every = [d for docs in by_file.values() for d in docs]
+    usage: dict[str, int] = {}
     if args.cache_only:
         teacher = {d.id: cache.get(d) for d in every}
     else:
         detector = LlmDetector(
-            model=TEACHER_MODEL,
+            model=args.model,
             reasoning_strength=TEACHER_STRENGTH,
+            reasoning_effort=args.reasoning_effort,
             timeout=args.timeout,
             max_tokens=8192,
             max_retries=2,
         )
         teacher = run_teacher(every, detector, cache, args.workers)
+        usage = dict(detector.usage)
     rules = RuleDetector()
     totals: Counter[str] = Counter()
     for path, docs in by_file.items():
@@ -282,13 +295,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             merged = merge(doc, hits, rule_hits(doc, rules), negative=negative)
             totals.update(merged.counts)
             totals["documents"] += 1
-            labelled.append(labelled_document(doc, merged))
+            labelled.append(labelled_document(doc, merged, args.model))
         target = out / path.name
         write_fixtures(target, labelled)
         print(f"wrote {target} ({len(labelled)} documents)", file=sys.stderr)
     summary = {
-        "teacher": {"model": TEACHER_MODEL, "reasoning_strength": TEACHER_STRENGTH},
+        "teacher": {"model": args.model, "reasoning_strength": TEACHER_STRENGTH},
         "counts": dict(sorted(totals.items())),
+        "usage": usage,
     }
     (out / "label-stats.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary), file=sys.stderr)
