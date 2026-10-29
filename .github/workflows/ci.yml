@@ -110,11 +110,28 @@ jobs:
         run: |
           uv run --no-sync python -c "import azure.identity, azure.storage.blob"
           uv run --no-sync pytest tests/hosted/test_spend_adapter.py -k real_sdk --no-cov -q
+      # The integration e2e fixtures reuse an exact-version npm install already in these
+      # prefixes. Muse is deliberately not cached: its test must notice when the official
+      # installer starts serving a version other than MUSE_VERSION_CHECKED.
+      - name: Cache pinned integration CLI installs (pi, Codex, OpenCode)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ runner.temp }}/pii-guard-pi
+            ${{ runner.temp }}/pii-guard-codex
+            ${{ runner.temp }}/pii-guard-opencode
+          key: >-
+            integration-clis-${{ runner.os }}-${{ runner.arch }}-${{
+            hashFiles('src/pii_guard/integrations/snippets.py',
+            'src/pii_guard/integrations/e2e.py') }}
       - name: Test (parallel, coverage floor, derandomized Hypothesis)
         env:
           PYTEST_ADDOPTS: >-
             --durations=30 --junitxml=reports/junit.xml
             --cov-report=xml:reports/coverage.xml
+          PII_GUARD_PI_PREFIX: ${{ runner.temp }}/pii-guard-pi
+          PII_GUARD_CODEX_PREFIX: ${{ runner.temp }}/pii-guard-codex
+          PII_GUARD_OPENCODE_PREFIX: ${{ runner.temp }}/pii-guard-opencode
         run: |
           mkdir -p reports
           if [ "$FULL" = true ]; then
