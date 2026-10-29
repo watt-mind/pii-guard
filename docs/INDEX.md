@@ -7,6 +7,7 @@
 | [architecture.md](architecture.md) | Components, data flow, APIs, the gateway and streaming re-identification |
 | [private-dev.md](private-dev.md) | Tailnet-only dev networking, proxy credentials, app-only releases and live activation gates |
 | [hosted.md](hosted.md) | Hosted deployment, trust boundary, actual retention, release gates and rollback |
+| [integrations.md](integrations.md) | Connect an application: URLs, keys, runnable cURL and SDK examples, images; client guides in [integrations/](integrations/README.md) |
 | [projects.md](projects.md) | Projects, immutable policy versions, endpoint configuration and persistence boundaries |
 | [privacy-model.md](privacy-model.md) | Threat model, what PII Guard guarantees and what it does not |
 | [eu-regulation.md](eu-regulation.md) | Why it matters in the EU: GDPR, transfers, sector rules and the AI Act, mapped to primary sources, and what we don't claim |
