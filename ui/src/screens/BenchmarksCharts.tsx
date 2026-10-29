@@ -371,14 +371,18 @@ export function ProgressChart({
 // --- By language (HTML bars) ------------------------------------------------------------
 
 export function LanguageBars({
-  snapshots,
+  snapshots: all,
   systems,
   languages,
+  highlight,
 }: {
   snapshots: Snapshot[];
   systems: Record<string, SystemInfo>;
   languages: string[];
+  /** The production system: listed first, its bars in its own colour (LAB-1493). */
+  highlight?: string;
 }) {
+  const snapshots = highlight ? [...all.filter((s) => s.system === highlight), ...all.filter((s) => s.system !== highlight)] : all;
   const panels: { key: "f1" | "leak"; title: string }[] = [
     { key: "f1", title: "F1 (higher is better)" },
     { key: "leak", title: "Leak rate (lower is safer)" },
@@ -408,7 +412,7 @@ export function LanguageBars({
                           {v !== null && (
                             <div
                               className="h-full rounded-sm"
-                              style={{ width: v > 0 ? `${Math.max(v * 100, 0.8)}%` : "0%", background: BAR }}
+                              style={{ width: v > 0 ? `${Math.max(v * 100, 0.8)}%` : "0%", background: s.system === highlight ? colorOf(systems[s.system]) : BAR }}
                             />
                           )}
                         </div>
@@ -427,7 +431,8 @@ export function LanguageBars({
 }
 
 // One neutral bar: the row label names the language and the heading names the system, so a
-// hue here would only compete with the system's own marker colour.
+// hue here would only compete with the system's own marker colour. Only the production system
+// keeps its colour, so it stands out against the comparators.
 const BAR = "color-mix(in oklab, var(--ink) 62%, var(--surface))";
 
 // --- Recall per entity type (HTML heatmap) ----------------------------------------------

@@ -7,7 +7,6 @@ import {
   headline,
   type HeadlineSide,
   languageName,
-  modelId,
   originKind,
   type SystemGroup,
   coverageTag,
@@ -41,6 +40,7 @@ function stripTickets(text: string): string {
     .replace(/,\s*LAB-\d+(?=\))/g, "")
     .replace(/\s*\(LAB-\d+\)/g, "")
     .replace(/\bLAB-\d+:?\s*/g, "")
+    .replace(/\bpii-guard(?= (?:NER|rules|fast|audit|LLM|gateway)\b)/g, "PII Guard")
     .trim();
 }
 
@@ -92,7 +92,7 @@ export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader 
     <div className="space-y-6">
       <PageHeader
         title="Evaluation"
-        lead="How much personal data gets through. Every evaluation run of PII Guard, and of the open-source tools it is compared with, is recorded with its commit, models, fixtures and hardware. All test documents are fictional or come from public test sets."
+        lead="How much personal data gets through. Every evaluation run of PII Guard, and of the open-source tools it is compared with, is recorded with its commit (and whether the working tree had uncommitted changes), models, fixtures and hardware. All test documents are fictional or come from public test sets."
       >
         <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <a className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink" href={`${DOCS}/evaluation.md`}>
@@ -272,7 +272,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
         {lang === "all"
           ? languages.map((l) => `${info?.documents[l] ?? "?"} ${languageName(l)}`).join(" + ") + " documents"
           : `${documentCount(info, lang) ?? "?"} ${languageName(lang)} documents`}
-        . Small sets: a few points of difference is noise.
+        .{(documentCount(info, lang) ?? 0) < 200 ? " Small set: a few points of difference is noise." : ""}
       </p>
       {info?.origin === "generated" && (
         <p role="note" className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-ink">
@@ -297,7 +297,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
             })} />
           </Section>
           <Section id="bench-lang" title="By language" note="The same fixture set in each language.">
-            <LanguageBars snapshots={snapshots} systems={index.systems} languages={languages} />
+            <LanguageBars snapshots={snapshots} systems={index.systems} languages={languages} highlight={FAST_MODE_SYSTEM} />
           </Section>
           <Section id="bench-progress" title="Leak rate over time" note="Each PII Guard configuration, run by run. Dashed: the best result of any configuration so far, so a drop can mean a new configuration rather than an improved one.">
             <ProgressChart history={history} systems={index.systems} lang={lang} />
@@ -310,7 +310,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
               ))}
             </ul>
           </Section>
-          <Section id="bench-types" title="Recall per entity type" note="Share of labelled values of each type found (overlap), in %.">
+          <Section id="bench-types" title="Recall per entity type" note="Share of labelled values of each type found with the right type (overlap), in %. Leak doesn't look at types: a value masked under another type is protected, so it costs recall here but not leak.">
             <TypeHeatmap snapshots={snapshots} systems={index.systems} types={index.entity_types} lang={lang} />
           </Section>
         </>
@@ -378,7 +378,7 @@ function FastModeTag() {
   return (
     <span
       title="Rules + the published on-device NER v2.0: the gateway's fast mode, its production path. Without a NER checkpoint, fast mode runs the rules alone."
-      className="rounded-sm bg-guard-soft px-1 font-mono text-2xs text-guard-ink ring-1 ring-guard/40"
+      className="rounded-sm bg-guard-soft px-1 font-mono text-2xs whitespace-nowrap text-guard-ink ring-1 ring-guard/40"
     >
       fast mode
     </span>
@@ -433,9 +433,11 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
       </p>
       <p className="mt-1 max-w-4xl text-xs text-pretty text-muted">
         {h.fastMode ? "Fast mode is the production path: rules + the published on-device NER v2.0. " : "Fast mode wasn’t run on this set. "}
+        {set === index.headline_set && kind === "hand-written" && "This is our own hand-written regression set; pick a public test set above (cee-pii, nemotron-pii …) to check it on data we didn’t write. "}
+        F1 {formatPct(h.ours.f1)} against {formatPct(h.theirs.f1)}; over-masking (masked text that wasn’t personal data) {formatPct(h.ours.over_masking)} against {formatPct(h.theirs.over_masking)}.{" "}
         {h.otherModel && (
           <>
-            Best other open NER model with the same rules: {modelId(h.otherModel.label) ?? h.otherModel.label}, {formatPct(h.otherModel.leak)}.{" "}
+            Best other open NER model with the same rules (switch it on under More systems): {h.otherModel.label}, {formatPct(h.otherModel.leak)}.{" "}
           </>
         )}
         Leak = labelled personal values still readable after masking. Runs of {dateSpan(h.ours.dates)} (PII Guard) and {dateSpan(h.theirs.dates)} ({h.theirs.label}); speed was measured where each ran, so see the
@@ -585,11 +587,11 @@ function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index
                 <th
                   scope="row"
                   title={sys?.label ?? s.system}
-                  className={["sticky left-0 z-10 max-w-[9.5rem] py-2 pr-3 text-left font-medium text-ink sm:max-w-[17rem]", fast ? "bg-guard-soft pl-2 shadow-[inset_2px_0_0_var(--guard)]" : "bg-surface"].join(" ")}
+                  className={["sticky left-0 z-10 max-w-[9.5rem] overflow-hidden py-2 pr-3 text-left font-medium text-ink sm:max-w-[17rem]", fast ? "bg-guard-soft pl-2 shadow-[inset_2px_0_0_var(--guard)]" : "bg-surface"].join(" ")}
                 >
                   <span className="flex items-start gap-1.5">
                     <span className="mt-[3px] shrink-0"><MarkerIcon info={sys} /></span>
-                    <span className="min-w-0 break-words">
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
                       {sys?.short_label ?? s.system}
                       {fast && <> <FastModeTag /></>}
                       {lang === "all" && coverageTag(index, s) && (

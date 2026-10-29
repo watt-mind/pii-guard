@@ -323,6 +323,8 @@ export interface HeadlineSide {
   label: string;
   leak: number;
   p50: number | null;
+  f1: number | null;
+  over_masking: number | null;
   /** Run dates of the snapshot, oldest first. */
   dates: string[];
 }
@@ -343,11 +345,6 @@ export function isOtherModel(info: SystemInfo | undefined): boolean {
 /** The picker group a system belongs to: pii-guard's own, other open models, or the tools. */
 export type SystemGroup = "ours" | "other-model" | "tool";
 
-/** The other organisation's Hugging Face id in a label ("bardsai/eu-pii-anonimization-multilang"), if any. */
-export function modelId(label: string): string | null {
-  return (label.match(/\b[\w.-]+\/[\w.]*-[\w.-]+/g) ?? []).find((r) => !r.startsWith("watt-mind/")) ?? null;
-}
-
 export function groupOf(info: SystemInfo | undefined): SystemGroup {
   if (!info || info.family === "comparison") return "tool";
   return isOtherModel(info) ? "other-model" : "ours";
@@ -355,7 +352,7 @@ export function groupOf(info: SystemInfo | undefined): SystemGroup {
 
 function sideOf(index: BenchmarkIndex, s: Snapshot, m: Metrics): HeadlineSide {
   const sys = index.systems[s.system]!;
-  return { system: s.system, label: sys.short_label || sys.label, leak: m.leak!, p50: m.detect_p50_ms, dates: s.dates };
+  return { system: s.system, label: sys.short_label || sys.label, leak: m.leak!, p50: m.detect_p50_ms, f1: m.f1, over_masking: m.over_masking, dates: s.dates };
 }
 
 /** The lowest-leak snapshot of a set among `keep` (ties go to the faster one). */
@@ -447,6 +444,7 @@ export function readerNote(note: string): string {
     .replace(/machine shared with parallel agent runs/gi, "machine shared with other jobs")
     .replace(/\s*\(LAB-\d+\)/g, "")
     .replace(/^LAB-\d+:?\s+/, "")
+    .replace(/\bpii-guard(?= (?:NER|rules|fast|audit|LLM|gateway)\b)/g, "PII Guard")
     .trim();
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
