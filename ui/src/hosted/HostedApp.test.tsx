@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/http";
@@ -134,12 +134,25 @@ describe("hero CTA (LAB-1479)", () => {
     expect(scroll).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
     vi.unstubAllGlobals(); scroll.mockRestore();
   });
-  it("stays a plain anchor when runs are paused or the visitor is signed in", async () => {
+  it("opens the custom-text editor from the signed-in hero without sending a request", async () => {
+    const call = requester((path) => path === "/v1/account" ? { ...account, authenticated: true } : result);
+    const scroll = spyScroll();
+    try {
+      const user = userEvent.setup(); render(<HostedApp call={call} />);
+      await user.click(await screen.findByRole("link", { name: "Run your own text" }));
+      expect(screen.getByRole("combobox", { name: "Input" })).toHaveValue("custom");
+      expect(screen.getByRole("textbox", { name: "Your text" })).toBeInTheDocument();
+      expect(screen.getByText("Your text · ready for a live run")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "See exactly what the model sees." })).toHaveFocus();
+      expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
+    } finally { scroll.mockRestore(); }
+  });
+  it("stays a plain anchor when guest runs are paused or a signed-in visitor needs a key", async () => {
     const off: Account = { ...account, limits: { requests_per_day: 5, sponsored_enabled: false } };
-    for (const acct of [off, { ...account, authenticated: true }]) {
+    for (const acct of [off, { ...off, authenticated: true }]) {
       const call = requester((path) => path === "/v1/account" ? acct : path === "/v1/demo" ? result : []);
       const user = userEvent.setup(); const { unmount } = render(<HostedApp call={call} />);
-      const cta = await screen.findByRole("link", { name: acct === off ? "See the demo" : "Run your own text" });
+      const cta = await screen.findByRole("link", { name: "See the demo" });
       let prevented: boolean | null = null;
       const listener = (e: Event) => { prevented = e.defaultPrevented; e.preventDefault(); };
       document.addEventListener("click", listener);
@@ -299,6 +312,45 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
     await user.click(screen.getByText("Sections"));
     await user.click(screen.getByRole("heading", { level: 1 }));
     expect(menu).not.toHaveAttribute("open");
+  });
+});
+
+describe("landing recovery and keyboard navigation (LAB-1540)", () => {
+  it("retries beside the recorded demo, prevents duplicate retries and recovers live actions", async () => {
+    let finish!: (value: Account) => void;
+    const call = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockImplementationOnce(() => new Promise<Account>((resolve) => { finish = resolve; }));
+    const user = userEvent.setup(); render(<HostedApp call={call as Requester} />);
+    await user.click(await screen.findByRole("button", { name: "Retry live service" }));
+    for (const button of screen.getAllByRole("button", { name: "Retrying…" })) expect(button).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getAllByRole("button", { name: "Retrying…" })[0]!);
+    expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
+    finish(account);
+    expect(await screen.findByRole("button", { name: "Run the live demo" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry live service" })).not.toBeInTheDocument();
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+
+  it("can retry again after another outage without losing the recording", async () => {
+    const call = vi.fn().mockRejectedValue(new Error("offline"));
+    const user = userEvent.setup(); render(<HostedApp call={call as Requester} />);
+    await user.click(await screen.findByRole("button", { name: "Retry live service" }));
+    expect(await screen.findByRole("button", { name: "Retry live service" })).toBeEnabled();
+    expect(document.querySelector("#demo [data-flow] [data-restored]")).toHaveTextContent("Jane Placeholder");
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes when keyboard focus leaves and focuses the destination after following a section", async () => {
+    const user = userEvent.setup(); render(<HostedApp call={requester(() => account)} />);
+    const toggle = screen.getByText("Sections").closest("summary")!;
+    const menu = toggle.closest("details")!;
+    await user.click(toggle);
+    await user.tab({ shift: true });
+    expect(menu).not.toHaveAttribute("open");
+    await user.click(toggle);
+    await user.click(screen.getAllByRole("link", { name: "Why Europe" })[0]!);
+    expect(menu).not.toHaveAttribute("open");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "What EU rules ask, and what PII Guard does." })).toHaveFocus());
   });
 });
 

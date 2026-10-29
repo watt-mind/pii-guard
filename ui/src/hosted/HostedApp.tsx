@@ -104,6 +104,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const [error, setError] = useState("");
   const [quota, setQuota] = useState(false);
   const [announce, setAnnounce] = useState("");
+  const [reconnecting, setReconnecting] = useState(false);
   const [text, setText] = useState(RECORDED[language].original);
   const [editable, setEditable] = useState(false);
   const controller = useRef<AbortController | null>(null);
@@ -180,18 +181,24 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const counts = shown ? placeholderCounts(shown.masked) : [];
   const legend = new Map<EntityType, number>(counts.filter((c): c is [EntityType, string, number] => c[0] !== null).map(([type, , n]) => [type, n]));
   const masked = counts.reduce((sum, [, , n]) => sum + n, 0);
-  const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: "Live run didn’t finish · showing the recorded run" } : { tone: "neutral", text: "Recorded run · real model · fictional data" };
-  const heroCta = signedIn ? "Run your own text" : guestLive ? "Run the live demo" : "See the demo";
+  const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: shown ? "Live run didn’t finish · showing the recorded run" : "Live run didn’t finish · try again" } : { tone: "neutral", text: shown ? "Recorded run · real model · fictional data" : "Your text · ready for a live run" };
+  const heroCta = signedIn && !needsKey ? "Run your own text" : guestLive ? "Run the live demo" : "See the demo";
   // A guest with a live run gets it from the hero in one press (LAB-1479): the link still points
-  // at #demo, so without JS, signed in or paused it stays a plain anchor.
+  // at #demo for modified clicks and paused guests. Signed-in visitors open the text editor.
   const startsRun = guestLive && !running && !quota;
   function heroRun(e: MouseEvent<HTMLAnchorElement>) {
-    if (!startsRun || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if ((!startsRun && !(signedIn && !needsKey && !running)) || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     document.getElementById("demo")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     document.getElementById("demo-heading")?.focus({ preventScroll: true });
-    void run();
+    if (signedIn) { setEditable(true); reset(); }
+    else void run();
+  }
+
+  async function reconnect() {
+    setReconnecting(true);
+    try { await refresh(); } finally { setReconnecting(false); }
   }
 
   const current = useCurrentSection(SECTIONS);
@@ -199,9 +206,9 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   return <div className="min-h-dvh bg-canvas text-sm text-ink">
     <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
     <header className="sticky top-0 z-30 bg-canvas">
-      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-12 lg:px-10">
-        <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
-        <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
+      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:h-12 lg:px-10">
+        <a href="#" className="flex h-11 shrink-0 items-center gap-2.5 rounded-sm whitespace-nowrap text-base font-medium text-ink"><Logo />PII Guard</a>
+        <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-1 sm:gap-2 md:gap-5">
           {NAV.map((item) => <a key={item.href} aria-current={current === item.href.slice(1) ? "location" : undefined} className={["hidden text-muted hover:text-ink aria-[current]:text-ink aria-[current]:underline aria-[current]:decoration-guard aria-[current]:decoration-2 aria-[current]:underline-offset-[6px]", item.wide ? "lg:inline" : "md:inline"].join(" ")} href={item.href}>{item.label}</a>)}
           <a className="hidden text-muted hover:text-ink md:inline" href={SELF_HOST}>Self-host</a>
           <SectionMenu current={current} />
@@ -244,7 +251,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       </section>
 
       <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-20 space-y-4">
-        <SectionHead id="demo-heading" eyebrow="Demo" focusable title="See exactly what the model sees." lead={`One request, four steps: your text, what ${modelOr("the model")} sees, its answer, and that answer with the real values back.`} />
+        <SectionHead id="demo-heading" eyebrow="Demo" title="See exactly what the model sees." lead={`One request, four steps: your text, what ${modelOr("the model")} sees, its answer, and that answer with the real values back.`} />
         {DEMO_VIDEO_URL && <DemoVideo url={DEMO_VIDEO_URL} />}
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-center gap-3">
@@ -258,7 +265,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div className="mt-4 space-y-3 empty:hidden">
             {account && !signedIn && sponsoredOff && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={loginUrl}>Sign in to run your own text</ButtonLink>}>The recorded run below shows the same flow, answered by a real model.</Notice>}
             {needsKey && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={hasConsole ? "#connect" : "#account"}>Add a model key</ButtonLink>}>Add your own model key to run it, or follow the recorded run below.</Notice>}
-            {!account && accountError && <Notice title="The live service isn’t reachable">The recorded run below still shows the whole flow. <a className={link} href="#account">Check the connection ↓</a></Notice>}
+            {!account && accountError && <Notice title="The live service isn’t reachable" action={<Button busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Retry live service"}</Button>}>The recorded run below still shows the whole flow.</Notice>}
             {running && <div className="rounded-lg border border-line bg-surface-2 p-3 sm:p-4">
               <ol aria-label="Live run progress" className="flex flex-wrap gap-x-6 gap-y-2">{steps.map((label, i) => <li key={label} data-state={i < step ? "done" : i === step ? "active" : "todo"} className={["inline-flex items-center gap-2", i === step ? "font-medium text-ink" : "text-muted"].join(" ")}><span aria-hidden="true" className={["size-2 rounded-full border", i < step ? "border-guard-dot bg-guard-dot" : i === step ? "border-ink bg-ink motion-safe:animate-pulse" : "border-field"].join(" ")} />{label}{i === step && <span className="sr-only"> (in progress)</span>}</li>)}</ol>
               <p className="mt-2 text-xs text-muted">Usually a few seconds. The first run after a quiet spell can take up to a minute while the service wakes up.</p>
@@ -326,7 +333,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
-        <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a model,, with faces, ID photos and signatures found on the server itself. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a model, with faces, ID photos and signatures found on the server itself. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
         <div aria-labelledby="images-proof-heading" role="group" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 border-y border-line py-5 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
           <div className="min-w-0">
             <h3 id="images-proof-heading" className="text-sm font-medium text-ink">Measured on images</h3>
@@ -422,7 +429,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
                 { label: "Your originals", value: "Our service on Azure, Sweden Central (EU), in memory." },
                 { label: "What leaves", value: `Masked text, to ${modelOr("Meta’s model")} or the provider you connect.` },
               ]} />
-              {accountError ? <Notice tone="danger" live action={<Button size="sm" onClick={() => void refresh()}>Reconnect to API</Button>}>{accountError}</Notice> : !account ? <p className="text-muted">Checking live availability…</p> : <>
+              {accountError ? <Notice tone="danger" live action={<Button size="sm" busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Reconnect to API"}</Button>}>{accountError}</Notice> : !account ? <p className="text-muted">Checking live availability…</p> : <>
                 {(!sponsoredOff || signedIn) && <dl className="grid max-w-md grid-cols-2 gap-4 border-t border-line pt-4">
                   {typeof account.limits.requests_per_day === "number"
                     ? <Metric label={signedIn ? "Runs left today" : "Free runs left today"} value={Math.max(0, account.limits.requests_per_day - account.usage.requests_today)} suffix={`of ${account.limits.requests_per_day}`} />
@@ -472,10 +479,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
  * landing's 24→30/500 section title (one step above the console's page title, so a section never
  * reads at card-title weight) and a muted lead.
  */
-function SectionHead({ id, eyebrow, title, lead, focusable }: { id: string; eyebrow: string; title: string; lead?: string; focusable?: boolean }) {
+function SectionHead({ id, eyebrow, title, lead }: { id: string; eyebrow: string; title: string; lead?: string }) {
   return <div className="max-w-3xl">
     <p className="font-mono text-xs text-guard">{eyebrow}</p>
-    <h2 id={id} tabIndex={focusable ? -1 : undefined} className="mt-2 text-2xl font-medium text-balance text-ink focus:outline-none sm:text-3xl">{title}</h2>
+    <h2 id={id} tabIndex={-1} className="mt-2 text-2xl font-medium text-balance text-ink focus:outline-none sm:text-3xl">{title}</h2>
     {lead && <p className="mt-3 text-sm text-pretty text-muted sm:text-base">{lead}</p>}
   </div>;
 }
@@ -494,19 +501,26 @@ function SectionMenu({ current }: { current: string | null }) {
     const close = () => menu.removeAttribute("open");
     const onToggle = () => { openedAt = scrollY; };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && menu.open) { close(); menu.querySelector("summary")?.focus(); } };
+    const onFocus = (e: FocusEvent) => { if (menu.open && !menu.contains(e.target as Node)) close(); };
     const onPointer = (e: PointerEvent) => { if (menu.open && !menu.contains(e.target as Node)) close(); };
     const onScroll = () => { if (menu.open && Math.abs(scrollY - openedAt) > 48) close(); };
     menu.addEventListener("toggle", onToggle);
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("focusin", onFocus);
     addEventListener("scroll", onScroll, { passive: true });
-    return () => { menu.removeEventListener("toggle", onToggle); document.removeEventListener("keydown", onKey); document.removeEventListener("pointerdown", onPointer); removeEventListener("scroll", onScroll); };
+    return () => { menu.removeEventListener("toggle", onToggle); document.removeEventListener("keydown", onKey); document.removeEventListener("pointerdown", onPointer); document.removeEventListener("focusin", onFocus); removeEventListener("scroll", onScroll); };
   }, []);
   return <details ref={ref} className="group relative md:hidden">
-    <summary className="flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">Sections<svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m4 6 4 4 4-4" /></svg></summary>
-    <ul className="absolute right-0 z-40 mt-2 w-52 rounded-lg border border-line bg-surface p-1.5 shadow-lg">
-      {[...NAV.slice(0, 2), { href: "#europe", label: "Why Europe" }, ...NAV.slice(2), { href: "#account", label: "Get started" }].map((item) => <li key={item.href}><a href={item.href} aria-current={current === item.href.slice(1) ? "location" : undefined} onClick={() => ref.current?.removeAttribute("open")} className="flex min-h-10 items-center rounded-md px-3 text-ink hover:bg-surface-2 aria-[current]:font-medium aria-[current]:text-guard">{item.label}</a></li>)}
-      <li><a href={SELF_HOST} onClick={() => ref.current?.removeAttribute("open")} className="flex min-h-10 items-center rounded-md px-3 text-ink hover:bg-surface-2">Self-host ↗</a></li>
+    <summary className="flex h-11 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">Sections<svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m4 6 4 4 4-4" /></svg></summary>
+    <ul className="absolute right-0 z-40 mt-2 max-h-[calc(100dvh-5rem)] w-52 overflow-y-auto rounded-lg border border-line bg-surface p-1.5 shadow-lg">
+      {[...NAV.slice(0, 2), { href: "#europe", label: "Why Europe" }, ...NAV.slice(2), { href: "#account", label: "Get started" }].map((item) => <li key={item.href}><a href={item.href} aria-current={current === item.href.slice(1) ? "location" : undefined} onClick={(e) => {
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        ref.current?.removeAttribute("open");
+        // Let native hash navigation finish before moving keyboard focus.
+        requestAnimationFrame(() => document.querySelector<HTMLElement>(`${item.href} h2`)?.focus({ preventScroll: true }));
+      }} className="flex min-h-11 items-center rounded-md px-3 text-ink hover:bg-surface-2 aria-[current]:font-medium aria-[current]:text-guard">{item.label}</a></li>)}
+      <li><a href={SELF_HOST} onClick={() => ref.current?.removeAttribute("open")} className="flex min-h-11 items-center rounded-md px-3 text-ink hover:bg-surface-2">Self-host ↗</a></li>
     </ul>
   </details>;
 }
