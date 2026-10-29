@@ -107,3 +107,93 @@ def test_commit_to_an_expired_session_fails_closed(vault: Vault, clock: FakeCloc
     session.close()
     with pytest.raises(SessionNotFoundError):
         session.commit(fork)
+
+
+def test_late_commit_mismatch_preserves_all_parent_state(vault: Vault) -> None:
+    session = vault.session()
+    fork = session.fork()
+    fork.mask(NAME, [span_of(NAME, NAME, EntityType.PERSON)])
+    fork.mask(EMAIL, [])  # only this second journal entry will mismatch
+    session.mask(EMAIL, [span_of(EMAIL, EMAIL, EntityType.EMAIL)])
+    before = session.entities()
+    generation = session.generation
+    expiry = session._expires_at
+    scans = session.entries_scanned
+    with pytest.raises(MaskingError, match="session changed"):
+        session.commit(fork)
+    assert session._expires_at == expiry
+    assert session.entries_scanned == scans
+    assert session.entities() == before
+    assert session.entry_count == len(before)
+    assert session.generation == generation
+    assert session.mask(NAME, []) == NAME
+    assert session.entities() == before
+
+
+def test_leases_skip_lru_and_refuse_when_every_slot_is_pinned(clock: FakeClock) -> None:
+    vault = Vault(TEST_KEY, clock=clock, max_sessions=2)
+    pinned, _, _ = vault.acquire_session(lambda: (*vault.session_or_create("active"), None))
+    idle = vault.session()
+    clock.now += 1
+    replacement = vault.session()
+    assert idle.expired
+    assert not pinned.expired
+    vault.acquire_session(lambda: (replacement, False, None))
+    with pytest.raises(MaskingError) as error:
+        vault.session()
+    assert error.value.code == "vault_capacity_exhausted"
+    assert error.value.status_code == 503
+    assert len(vault) == 2
+    vault.release_session(pinned)
+    vault.session()
+    assert pinned.expired
+    vault.release_session(replacement)
+    assert not vault._leases
+
+
+@pytest.mark.parametrize("remove", ["ttl", "drop"])
+def test_lease_does_not_override_expiry_or_explicit_drop(remove: str, clock: FakeClock) -> None:
+    vault = Vault(TEST_KEY, clock=clock, ttl_seconds=2, max_sessions=1)
+    session, _, _ = vault.acquire_session(lambda: (*vault.session_or_create("active"), None))
+    if remove == "ttl":
+        clock.now += 3
+        assert vault.purge_expired() == 1
+    else:
+        vault.drop(session.session_id)
+    assert session.expired
+    assert len(vault) == 0
+    vault.release_session(session)
+    assert not vault._leases
+
+
+def test_lookup_and_pin_share_the_vault_lock() -> None:
+    import threading
+
+    vault = Vault(TEST_KEY, max_sessions=1)
+    attempted = threading.Event()
+    finished = threading.Event()
+    errors = []
+
+    def compete() -> None:
+        attempted.set()
+        try:
+            vault.session()
+        except MaskingError as error:
+            errors.append(error.code)
+        finally:
+            finished.set()
+
+    def resolve():
+        session = vault.session()
+        thread.start()
+        assert attempted.wait(5)
+        assert not finished.wait(0.05)  # cannot evict between lookup and pin
+        return session, True, None
+
+    thread = threading.Thread(target=compete)
+    session, _, _ = vault.acquire_session(resolve)
+    thread.join(5)
+    assert finished.is_set()
+    assert errors == ["vault_capacity_exhausted"]
+    assert not session.expired
+    vault.release_session(session)

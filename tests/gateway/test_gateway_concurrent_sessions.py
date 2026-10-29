@@ -22,7 +22,7 @@ from pii_guard.config import Settings
 from pii_guard.gateway import Gateway, GatewayConfig, Mode, build_mode_detectors
 from pii_guard.gateway.responses import ResponsesGateway
 from pii_guard.gateway.sessions import SESSION_HEADER
-from pii_guard.types import DetectionError, Span
+from pii_guard.types import DetectionError, MaskingError, Span
 from pii_guard.vault import PLACEHOLDER_RE, SessionNotFoundError, Vault
 
 REFUSE = "Refuse this one, Teszt Elek."
@@ -211,3 +211,109 @@ def test_placeholders_of_the_served_request_restore_after_the_refusal() -> None:
     placeholders = [p for p, _, _ in session.entities()]
     assert placeholders and all(PLACEHOLDER_RE.fullmatch(p) for p in placeholders)
     assert "Minta Mária" in session.unmask(" ".join(placeholders))
+
+
+@pytest.mark.parametrize("endpoint", ["chat", "responses"])
+@pytest.mark.parametrize("cancel", [False, True])
+def test_slow_upstream_keeps_session_pinned_until_completion_or_cancel(
+    endpoint: str, cancel: bool
+) -> None:
+    gw = _gateway(FakeLlm())
+    gw.vault = Vault(bytes.fromhex(TEST_TENANT_KEY), max_sessions=2)
+
+    async def main() -> None:
+        entered = asyncio.Event()
+        resume = asyncio.Event()
+
+        async def upstream(request: httpx.Request) -> httpx.Response:
+            entered.set()
+            await resume.wait()
+            return _upstream(request)
+
+        gw._transport = httpx.MockTransport(upstream)
+        body = _body(endpoint, SERVE, None)
+        call = (
+            gw.chat_completions(body, BEARER, path_session="active")
+            if endpoint == "chat"
+            else ResponsesGateway(gw).responses(body, BEARER, path_session="active")
+        )
+        task = asyncio.create_task(call)
+        try:
+            await asyncio.wait_for(entered.wait(), 5)
+            active = gw.vault.session("active")
+            for _ in range(5):
+                gw.vault.session()
+                assert not active.expired
+            assert gw.vault._leases[active] == 1
+            if cancel:
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            else:
+                resume.set()
+                response, _ = await task
+                assert response.status_code == 200
+            assert not gw.vault._leases
+            assert not gw._session_holds
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            await gw.aclose()
+
+    asyncio.run(main())
+
+
+@pytest.mark.parametrize("endpoint", ["chat", "responses"])
+@pytest.mark.parametrize("close_early", [False, True])
+def test_stream_keeps_pin_until_iterator_cleanup(endpoint: str, close_early: bool) -> None:
+    gw = _gateway(FakeLlm())
+    gw.vault = Vault(bytes.fromhex(TEST_TENANT_KEY), max_sessions=1)
+
+    class Events(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            if endpoint == "chat":
+                yield b'data: {"choices":[{"index":0,"delta":{"content":"Noted."}}]}\n\n'
+                yield b"data: [DONE]\n\n"
+            else:
+                yield (
+                    b"event: response.output_text.delta\n"
+                    b'data: {"type":"response.output_text.delta",'
+                    b'"output_index":0,"content_index":0,"delta":"Noted."}\n\n'
+                )
+                yield (
+                    b'event: response.completed\ndata: {"type":"response.completed",'
+                    b'"response":{"id":"resp_1","status":"completed","output":[]}}\n\n'
+                )
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=Events())
+
+    gw._transport = httpx.MockTransport(upstream)
+
+    async def main() -> None:
+        body = _body(endpoint, SERVE, None)
+        body["stream"] = True
+        try:
+            if endpoint == "chat":
+                response, _ = await gw.chat_completions(body, BEARER, path_session="active")
+            else:
+                response, _ = await ResponsesGateway(gw).responses(
+                    body, BEARER, path_session="active"
+                )
+            assert gw.vault._leases
+            with pytest.raises(MaskingError):
+                gw.vault.session()
+            iterator = response.body_iterator
+            await anext(iterator)
+            if close_early:
+                await iterator.aclose()
+            else:
+                async for _ in iterator:
+                    pass
+            assert not gw.vault._leases
+            assert not gw._session_holds
+            gw.vault.session()  # capacity is available again
+        finally:
+            await gw.aclose()
+
+    asyncio.run(main())
