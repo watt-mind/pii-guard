@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Benchmarks } from "./Benchmarks";
@@ -241,7 +241,7 @@ describe("Benchmarks screen, round E2 (LAB-1531)", () => {
     // Numbers come from the index: fast mode's pooled leak on a public set.
     const other = expected.find((k) => k !== INDEX.headline_set)!;
     const row = within(table).getAllByRole("row").find((r) => within(r).queryByRole("button", { name: new RegExp(other) }))!;
-    expect(row).toHaveTextContent(pct(snap(other, FAST_MODE_SYSTEM).all.leak));
+    await waitFor(() => expect(row).toHaveTextContent(pct(snap(other, FAST_MODE_SYSTEM).all.leak)));
     await user.click(within(row).getByRole("button", { name: new RegExp(other) }));
     expect(within(panel).getByRole("combobox", { name: "Fixture set" })).toHaveValue(other);
   });
