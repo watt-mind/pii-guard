@@ -45,6 +45,7 @@ import time
 import weakref
 from collections import Counter, OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
+from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -1002,7 +1003,20 @@ class Gateway:
             return _upstream_error(response.status_code, raw, out_headers), stats
 
         is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
-        if not stream or not is_sse:
+        if stream and not is_sse:
+            # The client requested SSE: never pass through or buffer a whole JSON answer.
+            # Closing must not replace the protocol error with transport exception text.
+            with suppress(httpx.HTTPError):
+                await response.aclose()
+            stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+            stats.log("upstream_did_not_stream")
+            raise UpstreamError(
+                "upstream did not return an event stream; retry without stream",
+                code="upstream_did_not_stream",
+            ) from None
+
+        if not stream:
             try:
                 raw = await _read_bounded(response, self.config.upstream_max_response_bytes)
             except httpx.HTTPError as exc:
