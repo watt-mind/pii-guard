@@ -192,8 +192,11 @@ class SamClient:
         self._settings = settings
         self.url = _resolve_url(base_url or settings.sam_url or DEFAULT_BASE_URL)
         if api_key is None:
+            # An explicitly emptied PII_GUARD_SAM_API_KEY disables SAM even when META_API_KEY
+            # (or the repo .env) has a key: the smoke stack is offline by contract (LAB-1255).
+            # Empty counts as unset everywhere else (Settings ignores empty values too).
             env_key = os.environ.get(API_KEY_ENV_VAR)
-            api_key = env_key if env_key else settings.meta_api_key
+            api_key = (env_key or None) if env_key is not None else settings.meta_api_key
         self._api_key = api_key.get_secret_value() if isinstance(api_key, SecretStr) else api_key
         self.model = model or os.environ.get(MODEL_ENV_VAR) or DEFAULT_MODEL
         self.prompts: dict[EntityType, tuple[str, ...]] = {

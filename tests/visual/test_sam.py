@@ -177,6 +177,21 @@ def test_settings_and_env_configuration(monkeypatch: pytest.MonkeyPatch) -> None
     assert rec.requests[0].headers["Authorization"] == "Bearer sam-specific"
 
 
+def test_empty_sam_key_disables_sam_despite_meta_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An explicitly emptied PII_GUARD_SAM_API_KEY keeps SAM unconfigured (LAB-1255): the
+    smoke stack is offline by contract even when META_API_KEY (or the repo .env) has a key."""
+    from pii_guard.config import Settings
+
+    monkeypatch.setenv("META_API_KEY", "from-meta-env")
+    monkeypatch.setenv("PII_GUARD_SAM_API_KEY", "")
+    client = SamClient(settings=Settings())
+    assert not client.configured
+    with pytest.raises(DetectionError, match="no API key"):
+        client.segment(id_card_png(), [EntityType.FACE])
+
+
 def test_full_url_is_kept() -> None:
     assert SamClient(base_url="http://x/v1/responses").url == "http://x/v1/responses"
 
