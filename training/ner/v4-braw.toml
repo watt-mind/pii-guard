@@ -1,0 +1,110 @@
+# NER v4 candidate B-raw (LAB-1535): v2.0 warm start, mix b (training/ner/v4_data.py), 2 epochs,
+# lr 2e-5, epoch chosen by dev F1. Candidate B is the soup 0.5 v2.0 + 0.5 B-raw (soup.py).
+# Candidates and gates were fixed in eval/results/2026-10-29-lab-1535-ner-v4/README.md before any run.
+# Fictional / synthetic data only (ADR 0005); no MAPA/TAB text (LAB-1419, LAB-1527 allowlist).
+#   uv run --no-sync python training/ner/v4_data.py build --json eval/results/2026-10-29-lab-1535-ner-v4/data.json
+#   modal run training/distill/modal_train.py --config training/ner/v4-braw.toml --gpu A10G
+base_model = "watt-mind/pii-guard-ner-xlmr-base"   # v2.0, Apache-2.0
+base_revision = "95f612a9ad65cc5ade5b9248bd152020541e7097"
+train = [
+  "eval/generated/v4-mix/b/openpii/lv-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/lt-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/hr-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/sl-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/fr-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/es-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/it-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/nl-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/ro-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/bg-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/cs-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/da-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/el-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/et-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/fi-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/pl-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/pt-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/sk-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/openpii/sv-openpii-train-5000.jsonl",
+  "eval/generated/v4-mix/b/negatives/lv-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/lt-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/hr-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/sl-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/fr-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/es-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/it-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/nl-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/ro-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/bg-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/cs-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/da-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/el-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/et-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/fi-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/pl-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/pt-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/sk-negatives-train-2000.jsonl",
+  "eval/generated/v4-mix/b/negatives/sv-negatives-train-2000.jsonl",
+  "eval/generated/distill-eu-s1525/lv-distill-train.jsonl",
+  "eval/generated/distill-eu-s1525/lv-distill-train.jsonl",
+  "eval/generated/distill-eu-s1525/lt-distill-train.jsonl",
+  "eval/generated/distill-eu-s1525/lt-distill-train.jsonl",
+  "eval/generated/distill-eu-s1525/hr-distill-train.jsonl",
+  "eval/generated/distill-eu-s1525/hr-distill-train.jsonl",
+  "eval/generated/distill-eu-s1525/sl-distill-train.jsonl",
+  "eval/generated/distill-eu-s1525/sl-distill-train.jsonl",
+  "eval/generated/court-en/en-court-train.jsonl",
+  "eval/generated/distill-s11/labelled/hu-distill-train.jsonl",
+  "eval/generated/distill-s11/labelled/en-distill-train.jsonl",
+  "eval/generated/openpii-train/hu-openpii-train.jsonl",
+  "eval/generated/openpii-train/en-openpii-train.jsonl",
+  "eval/generated/openpii-train/de-openpii-train.jsonl",
+  "eval/generated/negatives/hu-negatives-train.jsonl",
+  "eval/generated/negatives/en-negatives-train.jsonl",
+  "eval/generated/negatives/de-negatives-train.jsonl",
+]
+dev = [
+  "eval/generated/distill-s11/labelled/hu-distill-dev.jsonl",
+  "eval/generated/distill-s11/labelled/en-distill-dev.jsonl",
+  "eval/generated/openpii-train/hu-openpii-dev.jsonl",
+  "eval/generated/openpii-train/en-openpii-dev.jsonl",
+  "eval/generated/openpii-train/de-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/lv-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/lt-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/hr-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/sl-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/fr-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/es-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/it-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/nl-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/ro-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/bg-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/cs-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/da-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/el-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/et-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/fi-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/pl-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/pt-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/sk-openpii-dev.jsonl",
+  "eval/generated/openpii-eu/sv-openpii-dev.jsonl",
+  "eval/generated/distill-eu-s1525/lv-distill-dev.jsonl",
+  "eval/generated/distill-eu-s1525/lt-distill-dev.jsonl",
+  "eval/generated/distill-eu-s1525/hr-distill-dev.jsonl",
+  "eval/generated/distill-eu-s1525/sl-distill-dev.jsonl",
+  "eval/generated/court-en/en-court-dev.jsonl",
+]
+out = "models/ner/pii-guard-ner-xlmr-base-v4-braw"
+teacher = "none"
+epochs = 2
+batch_size = 16
+lr = 2e-5
+weight_decay = 0.01
+warmup = 0.1
+max_length = 512
+stride = 128
+seed = 13
+device = "cuda"
+precision = "bf16"
+other_types = "ignore"
+save_epochs = false

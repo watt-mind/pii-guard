@@ -1,0 +1,1890 @@
+{
+  "ticket": "LAB-1535",
+  "synthetic": true,
+  "mixes": {
+    "a": {
+      "sizes": {
+        "openpii": 2500,
+        "negatives": 1000
+      },
+      "train": [
+        "eval/generated/v4-mix/a/openpii/lv-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/lt-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/hr-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/sl-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/fr-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/es-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/it-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/nl-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/ro-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/bg-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/cs-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/da-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/el-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/et-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/fi-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/pl-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/pt-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/sk-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/openpii/sv-openpii-train-2500.jsonl",
+        "eval/generated/v4-mix/a/negatives/lv-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/lt-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/hr-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/sl-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/fr-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/es-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/it-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/nl-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/ro-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/bg-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/cs-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/da-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/el-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/et-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/fi-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/pl-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/pt-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/sk-negatives-train-1000.jsonl",
+        "eval/generated/v4-mix/a/negatives/sv-negatives-train-1000.jsonl",
+        "eval/generated/distill-eu-s1525/lv-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/lv-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/lt-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/lt-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/hr-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/hr-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/sl-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/sl-distill-train.jsonl",
+        "eval/generated/court-en/en-court-train.jsonl",
+        "eval/generated/distill-s11/labelled/hu-distill-train.jsonl",
+        "eval/generated/distill-s11/labelled/en-distill-train.jsonl",
+        "eval/generated/openpii-train/hu-openpii-train.jsonl",
+        "eval/generated/openpii-train/en-openpii-train.jsonl",
+        "eval/generated/openpii-train/de-openpii-train.jsonl",
+        "eval/generated/negatives/hu-negatives-train.jsonl",
+        "eval/generated/negatives/en-negatives-train.jsonl",
+        "eval/generated/negatives/de-negatives-train.jsonl"
+      ],
+      "dev": [
+        "eval/generated/distill-s11/labelled/hu-distill-dev.jsonl",
+        "eval/generated/distill-s11/labelled/en-distill-dev.jsonl",
+        "eval/generated/openpii-train/hu-openpii-dev.jsonl",
+        "eval/generated/openpii-train/en-openpii-dev.jsonl",
+        "eval/generated/openpii-train/de-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/lv-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/lt-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/hr-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/sl-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/fr-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/es-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/it-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/nl-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/ro-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/bg-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/cs-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/da-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/el-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/et-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/fi-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/pl-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/pt-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/sk-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/sv-openpii-dev.jsonl",
+        "eval/generated/distill-eu-s1525/lv-distill-dev.jsonl",
+        "eval/generated/distill-eu-s1525/lt-distill-dev.jsonl",
+        "eval/generated/distill-eu-s1525/hr-distill-dev.jsonl",
+        "eval/generated/distill-eu-s1525/sl-distill-dev.jsonl",
+        "eval/generated/court-en/en-court-dev.jsonl"
+      ],
+      "train_documents": 101851,
+      "dev_documents": 3669,
+      "files": {
+        "eval/generated/v4-mix/a/openpii/lv-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1904,
+            "BANK_ACCOUNT": 582,
+            "EMAIL": 1428,
+            "ID_DOCUMENT": 2424,
+            "PERSON": 2436,
+            "PHONE": 1057
+          },
+          "sha256": "b6e44194d95931f374dfde97ad86c6959245b5b2fd0cfd2c47d76785e25db815"
+        },
+        "eval/generated/v4-mix/a/openpii/lt-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1729,
+            "BANK_ACCOUNT": 640,
+            "EMAIL": 1324,
+            "ID_DOCUMENT": 2410,
+            "PERSON": 2451,
+            "PHONE": 1040
+          },
+          "sha256": "f45c8e1e1f0f29353790e08bf5f9bf818b994aa717dfe6e3a30cda443958a8b9"
+        },
+        "eval/generated/v4-mix/a/openpii/hr-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1506,
+            "BANK_ACCOUNT": 518,
+            "EMAIL": 1450,
+            "ID_DOCUMENT": 2272,
+            "PERSON": 2462,
+            "PHONE": 1055
+          },
+          "sha256": "6327ae751d8e14d08bc9ecc1ab933292fddbe5edb6c294c86d90badacf48231a"
+        },
+        "eval/generated/v4-mix/a/openpii/sl-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1355,
+            "BANK_ACCOUNT": 533,
+            "EMAIL": 1442,
+            "ID_DOCUMENT": 2355,
+            "PERSON": 2466,
+            "PHONE": 1054
+          },
+          "sha256": "bc26369abbd0e99995f997e504ee9dfb2648429026d5087729afa4e9f785f1bf"
+        },
+        "eval/generated/v4-mix/a/openpii/fr-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1670,
+            "BANK_ACCOUNT": 561,
+            "EMAIL": 1291,
+            "ID_DOCUMENT": 2341,
+            "PERSON": 2365,
+            "PHONE": 961
+          },
+          "sha256": "8e5d3ca8a00ec47aabe47f42f258e6340e2ddff0c58080efb14ba05c62023b22"
+        },
+        "eval/generated/v4-mix/a/openpii/es-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 2027,
+            "BANK_ACCOUNT": 493,
+            "EMAIL": 1323,
+            "ID_DOCUMENT": 2491,
+            "PERSON": 2334,
+            "PHONE": 987
+          },
+          "sha256": "be9d7500a60d648e5be098c6e0584df6b779fc3c3ad78bd3906a4d5b38cb2893"
+        },
+        "eval/generated/v4-mix/a/openpii/it-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1703,
+            "BANK_ACCOUNT": 560,
+            "EMAIL": 1269,
+            "ID_DOCUMENT": 2301,
+            "PERSON": 2459,
+            "PHONE": 964
+          },
+          "sha256": "28637e2aa21f8f4d74ab6ba9481edca48f49560e4af6c1f08c46dce5832b5550"
+        },
+        "eval/generated/v4-mix/a/openpii/nl-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1339,
+            "BANK_ACCOUNT": 609,
+            "EMAIL": 1387,
+            "ID_DOCUMENT": 2123,
+            "PERSON": 2464,
+            "PHONE": 1007
+          },
+          "sha256": "1528d8c3fa8151280183aa87575063266a19516619b374182008cf16d6f06282"
+        },
+        "eval/generated/v4-mix/a/openpii/ro-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 2186,
+            "BANK_ACCOUNT": 582,
+            "EMAIL": 1309,
+            "ID_DOCUMENT": 2297,
+            "PERSON": 2311,
+            "PHONE": 1011
+          },
+          "sha256": "89c36d5a836c277107d6bd823d5542ac9380daa5c71ac3edfeae1fbea92c4976"
+        },
+        "eval/generated/v4-mix/a/openpii/bg-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1928,
+            "BANK_ACCOUNT": 543,
+            "EMAIL": 1454,
+            "ID_DOCUMENT": 2378,
+            "PERSON": 2443,
+            "PHONE": 1079
+          },
+          "sha256": "234f6424ed0c659484f684850dd4a58b4dccfbf75c485f70efb973b63eb265e2"
+        },
+        "eval/generated/v4-mix/a/openpii/cs-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1697,
+            "BANK_ACCOUNT": 559,
+            "EMAIL": 1390,
+            "ID_DOCUMENT": 2411,
+            "PERSON": 2434,
+            "PHONE": 1031
+          },
+          "sha256": "5803473987814a068dbf717b14310c7a968cf3ff98bc6433237def4f45f6d7eb"
+        },
+        "eval/generated/v4-mix/a/openpii/da-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1386,
+            "BANK_ACCOUNT": 535,
+            "EMAIL": 1356,
+            "ID_DOCUMENT": 2145,
+            "PERSON": 2356,
+            "PHONE": 988
+          },
+          "sha256": "53f241aa0771f0bca3ce735aacc6b0fd9ac33f1e2f5169a673724f7091abecb6"
+        },
+        "eval/generated/v4-mix/a/openpii/el-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1584,
+            "BANK_ACCOUNT": 507,
+            "EMAIL": 1268,
+            "ID_DOCUMENT": 2376,
+            "PERSON": 2343,
+            "PHONE": 961
+          },
+          "sha256": "2f3356fb61d91c5e5c7a15372f6eaa4d17c6af7f98d5e85dd7b01fa324441697"
+        },
+        "eval/generated/v4-mix/a/openpii/et-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1466,
+            "BANK_ACCOUNT": 606,
+            "EMAIL": 1420,
+            "ID_DOCUMENT": 2479,
+            "PERSON": 2429,
+            "PHONE": 1092
+          },
+          "sha256": "5230114f0960cad4d0abd7cd30bf75f6089f657dbaf9dcc7a5532b6b6645e87f"
+        },
+        "eval/generated/v4-mix/a/openpii/fi-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1359,
+            "BANK_ACCOUNT": 567,
+            "EMAIL": 1367,
+            "ID_DOCUMENT": 2296,
+            "PERSON": 2513,
+            "PHONE": 980
+          },
+          "sha256": "56fbdc221a9295ebc4b1073e1f86b6703fee06e6cb4bf657549ea69c3caf49d3"
+        },
+        "eval/generated/v4-mix/a/openpii/pl-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1509,
+            "BANK_ACCOUNT": 550,
+            "EMAIL": 1367,
+            "ID_DOCUMENT": 2300,
+            "PERSON": 2363,
+            "PHONE": 1076
+          },
+          "sha256": "2943032575a49965a54e7ab8279beb3e8bd3d2853db584ab3e60bbed53c504c8"
+        },
+        "eval/generated/v4-mix/a/openpii/pt-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1833,
+            "BANK_ACCOUNT": 516,
+            "EMAIL": 1259,
+            "ID_DOCUMENT": 2419,
+            "PERSON": 2194,
+            "PHONE": 945
+          },
+          "sha256": "5027b586c3b1d05394ccf052732539df6b6ccc6cf5c2b995aa4dd57ace7e8631"
+        },
+        "eval/generated/v4-mix/a/openpii/sk-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1706,
+            "BANK_ACCOUNT": 528,
+            "EMAIL": 1452,
+            "ID_DOCUMENT": 2327,
+            "PERSON": 2413,
+            "PHONE": 1040
+          },
+          "sha256": "bfc7a627a69932848cfba29974084c403f2b252394c870bf34042350cb9da452"
+        },
+        "eval/generated/v4-mix/a/openpii/sv-openpii-train-2500.jsonl": {
+          "documents": 2500,
+          "gold_spans": {
+            "ADDRESS": 1349,
+            "BANK_ACCOUNT": 558,
+            "EMAIL": 1346,
+            "ID_DOCUMENT": 2251,
+            "PERSON": 2359,
+            "PHONE": 1022
+          },
+          "sha256": "3b30519bcac9f30cb2405a6073a267cfcb29dbf0657e08441b85ca51a6b54f71"
+        },
+        "eval/generated/v4-mix/a/negatives/lv-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "ef55bd04f2b3a2d5b98bd0bd18c59b2ad53d2efb54815e344e6cde2a173abec7"
+        },
+        "eval/generated/v4-mix/a/negatives/lt-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "bacbae1b57af093028c978959f3d78050078fc871c409d344588d33994797628"
+        },
+        "eval/generated/v4-mix/a/negatives/hr-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "1a5b17c860b04885bfc15ed3e74e4fcb12cb79edf11ff7c42a330d69e3fcc4c8"
+        },
+        "eval/generated/v4-mix/a/negatives/sl-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "bacdb2b93b86f43fdd8c51f7b64fa633911a64067c77daf6728c09c789bd3e57"
+        },
+        "eval/generated/v4-mix/a/negatives/fr-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "251f433a4166df270baec0612227ddc98b751e525f7645f08dc7c1e2d33ce0ad"
+        },
+        "eval/generated/v4-mix/a/negatives/es-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "e9f25e1f9f39c32dff9fffbb6248af9c052ce9791d91a922d0e59d43c4f4072c"
+        },
+        "eval/generated/v4-mix/a/negatives/it-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "67f4295e64ddf0d36975b8fce52bf423b71b51deec919fe7cd91e509001d1be4"
+        },
+        "eval/generated/v4-mix/a/negatives/nl-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "992305130f04b96110359618677f7ea42c9de27699705e3a7c4fe89ff1503687"
+        },
+        "eval/generated/v4-mix/a/negatives/ro-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "6e287e912a4e44f195f1a7f8229498bca3aee21e12c59983bb1be56cd20a601a"
+        },
+        "eval/generated/v4-mix/a/negatives/bg-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "06c7655b1a4b260cb5cc497d0391ad08ee0107d67a1c1cd81a2115f3fa922aa7"
+        },
+        "eval/generated/v4-mix/a/negatives/cs-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "48b5e472ef5e69b9e8af61e82dafd62cd2424dc1d86500d3da7b6bf285cb68da"
+        },
+        "eval/generated/v4-mix/a/negatives/da-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "45bba2c1e13a196084e8e673bc08c4b9b5b7caba6a3284105096d7e9f1aed77f"
+        },
+        "eval/generated/v4-mix/a/negatives/el-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "b601975bca689010e5b332767903cd19fc6974da7132a74eb2faa61d0d9f7994"
+        },
+        "eval/generated/v4-mix/a/negatives/et-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "9f2b69d21926f45ddb9938969cc12d3d708f9880069ab4b1c1e792af844a7454"
+        },
+        "eval/generated/v4-mix/a/negatives/fi-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "53cc5c675d24ec2127a9eb1c2b4f296251aeea8fca58b47288b9f6983fcca658"
+        },
+        "eval/generated/v4-mix/a/negatives/pl-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "e47eda3b7e35117bb66d2f1396c2a8eca076e75ed36dca89ec08b1d8838b8c9b"
+        },
+        "eval/generated/v4-mix/a/negatives/pt-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "e5e106e8eb88e78aa94c06f4feaae52b317eeaf888a03db314808fb3f0f7ef87"
+        },
+        "eval/generated/v4-mix/a/negatives/sk-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "6c675e8977e10ed34527063c73616e93f937f32f5f5a1dcb1b89e9ee8edbb84a"
+        },
+        "eval/generated/v4-mix/a/negatives/sv-negatives-train-1000.jsonl": {
+          "documents": 1000,
+          "gold_spans": {},
+          "sha256": "2813ea2cb16a512ac4355e1e474f1c41bf41babd22cd62a15f343726af5d7db0"
+        },
+        "eval/generated/distill-eu-s1525/lv-distill-train.jsonl": {
+          "documents": 1077,
+          "gold_spans": {
+            "ADDRESS": 1401,
+            "BANK_ACCOUNT": 460,
+            "DATE_OF_BIRTH": 486,
+            "EMAIL": 395,
+            "ID_DOCUMENT": 353,
+            "ORGANIZATION": 884,
+            "PERSON": 6385,
+            "PHONE": 561,
+            "VEHICLE_PLATE": 117
+          },
+          "sha256": "07b414c981376fae528598eb256ca849d1ed2f55ab201ee6802668741b3b92ae"
+        },
+        "eval/generated/distill-eu-s1525/lt-distill-train.jsonl": {
+          "documents": 1079,
+          "gold_spans": {
+            "ADDRESS": 1445,
+            "BANK_ACCOUNT": 473,
+            "DATE_OF_BIRTH": 516,
+            "EMAIL": 387,
+            "ID_DOCUMENT": 389,
+            "ORGANIZATION": 846,
+            "PERSON": 6517,
+            "PHONE": 555,
+            "VEHICLE_PLATE": 141
+          },
+          "sha256": "f93eb94a9201cc2d89a1c5dfcef03e1f6400e1ba4ed8f428954babe9d4120d14"
+        },
+        "eval/generated/distill-eu-s1525/hr-distill-train.jsonl": {
+          "documents": 1079,
+          "gold_spans": {
+            "ADDRESS": 1484,
+            "BANK_ACCOUNT": 514,
+            "DATE_OF_BIRTH": 545,
+            "EMAIL": 385,
+            "ID_DOCUMENT": 403,
+            "ORGANIZATION": 745,
+            "PERSON": 5882,
+            "PHONE": 551,
+            "VEHICLE_PLATE": 144
+          },
+          "sha256": "bb00be18c5b94b97e19c4f333e64176cdc6d1b3097426e80a14736a13ec43620"
+        },
+        "eval/generated/distill-eu-s1525/sl-distill-train.jsonl": {
+          "documents": 1079,
+          "gold_spans": {
+            "ADDRESS": 1467,
+            "BANK_ACCOUNT": 594,
+            "DATE_OF_BIRTH": 499,
+            "EMAIL": 390,
+            "ID_DOCUMENT": 407,
+            "ORGANIZATION": 791,
+            "PERSON": 5650,
+            "PHONE": 583,
+            "VEHICLE_PLATE": 170
+          },
+          "sha256": "521a432b32a267d9824b85f90c5219ea6af8b58e3c49c454179217e5398aeba3"
+        },
+        "eval/generated/court-en/en-court-train.jsonl": {
+          "documents": 1500,
+          "gold_spans": {
+            "PERSON": 13513
+          },
+          "sha256": "d19e33c17b1ac1f245bb920d3947d595893853305284b382f3fd9e5fb5c67b1e"
+        },
+        "eval/generated/distill-s11/labelled/hu-distill-train.jsonl": {
+          "documents": 2104,
+          "gold_spans": {
+            "ADDRESS": 2320,
+            "BANK_ACCOUNT": 656,
+            "COMPANY_ID_HU": 443,
+            "DATE_OF_BIRTH": 822,
+            "EMAIL": 1084,
+            "ID_DOCUMENT": 370,
+            "NATIONAL_ID_HU_TAJ": 446,
+            "NATIONAL_ID_HU_TAX": 459,
+            "ORGANIZATION": 991,
+            "PARCEL_NUMBER_HU": 272,
+            "PERSON": 7993,
+            "PHONE": 1750,
+            "VEHICLE_PLATE": 249
+          },
+          "sha256": "3784482de825b207e847449f46ac7a80856b07ddb588e48471eb11975d28187f"
+        },
+        "eval/generated/distill-s11/labelled/en-distill-train.jsonl": {
+          "documents": 2119,
+          "gold_spans": {
+            "ADDRESS": 2077,
+            "BANK_ACCOUNT": 559,
+            "DATE_OF_BIRTH": 604,
+            "EMAIL": 1517,
+            "ID_DOCUMENT": 264,
+            "ORGANIZATION": 786,
+            "PERSON": 7482,
+            "PHONE": 1734,
+            "VEHICLE_PLATE": 255
+          },
+          "sha256": "cc9af7113b5cd89b23ebb08347d7b3a2d68dca2fc182a1b9a39635252c4670dc"
+        },
+        "eval/generated/openpii-train/hu-openpii-train.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3064,
+            "BANK_ACCOUNT": 1237,
+            "EMAIL": 2237,
+            "ID_DOCUMENT": 2650,
+            "NATIONAL_ID_HU_TAJ": 966,
+            "NATIONAL_ID_HU_TAX": 1001,
+            "PERSON": 4072,
+            "PHONE": 1706
+          },
+          "sha256": "9869591e53aa04ee54880c72e9abaa2b1f0eec906ee07d9f834807f3d99eb5cd"
+        },
+        "eval/generated/openpii-train/en-openpii-train.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3441,
+            "BANK_ACCOUNT": 1201,
+            "EMAIL": 2802,
+            "ID_DOCUMENT": 4608,
+            "PERSON": 4998,
+            "PHONE": 2033
+          },
+          "sha256": "a99597cde5c0ac9e111ad8ee4ce8be9c419f98c19d697ca708701d2dc1faf16f"
+        },
+        "eval/generated/openpii-train/de-openpii-train.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 2738,
+            "BANK_ACCOUNT": 1132,
+            "EMAIL": 2498,
+            "ID_DOCUMENT": 4360,
+            "PERSON": 4401,
+            "PHONE": 1917
+          },
+          "sha256": "4ea22c0746e2c43c55569ba2b7e03d9cf738ea25e564c094fe321340b30d0c75"
+        },
+        "eval/generated/negatives/hu-negatives-train.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "3e8def88e29b7e0272ebceea3dbe6e76653b733c27a895b3244b05e136f1f387"
+        },
+        "eval/generated/negatives/en-negatives-train.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "f0835f0a41ceaa9d3acc83343eff0ad4d03c137e7305d3f3ff6cca985ee7db9a"
+        },
+        "eval/generated/negatives/de-negatives-train.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "033b6b93e7b11744674fa36bbc87d268a4bb433555ef8e2d003c19cd0f8654b2"
+        },
+        "eval/generated/distill-s11/labelled/hu-distill-dev.jsonl": {
+          "documents": 368,
+          "gold_spans": {
+            "ADDRESS": 444,
+            "BANK_ACCOUNT": 122,
+            "COMPANY_ID_HU": 91,
+            "DATE_OF_BIRTH": 161,
+            "EMAIL": 194,
+            "ID_DOCUMENT": 70,
+            "NATIONAL_ID_HU_TAJ": 88,
+            "NATIONAL_ID_HU_TAX": 73,
+            "ORGANIZATION": 181,
+            "PARCEL_NUMBER_HU": 51,
+            "PERSON": 1503,
+            "PHONE": 326,
+            "VEHICLE_PLATE": 47
+          },
+          "sha256": "f6dca4b60ca8dfa56d306dfb93ff169e696e350ad6c5e0d062f047c0d6662521"
+        },
+        "eval/generated/distill-s11/labelled/en-distill-dev.jsonl": {
+          "documents": 373,
+          "gold_spans": {
+            "ADDRESS": 361,
+            "BANK_ACCOUNT": 98,
+            "DATE_OF_BIRTH": 108,
+            "EMAIL": 283,
+            "ID_DOCUMENT": 47,
+            "ORGANIZATION": 135,
+            "PERSON": 1295,
+            "PHONE": 297,
+            "VEHICLE_PLATE": 53
+          },
+          "sha256": "b13f9983ca99ade625e05185c76f25611bec6ca33147072fd58dd1e50b25557a"
+        },
+        "eval/generated/openpii-train/hu-openpii-dev.jsonl": {
+          "documents": 150,
+          "gold_spans": {
+            "ADDRESS": 94,
+            "BANK_ACCOUNT": 35,
+            "EMAIL": 70,
+            "ID_DOCUMENT": 75,
+            "NATIONAL_ID_HU_TAJ": 28,
+            "NATIONAL_ID_HU_TAX": 30,
+            "PERSON": 103,
+            "PHONE": 55
+          },
+          "sha256": "2e49445d08f3a29b03248348fb5440265069c54d01d2deb17683a76956c053bb"
+        },
+        "eval/generated/openpii-train/en-openpii-dev.jsonl": {
+          "documents": 150,
+          "gold_spans": {
+            "ADDRESS": 101,
+            "BANK_ACCOUNT": 37,
+            "EMAIL": 78,
+            "ID_DOCUMENT": 140,
+            "PERSON": 154,
+            "PHONE": 64
+          },
+          "sha256": "7fe5a392f373d2e20b661ec07ffb6b98f13e8b4e4e0c628fb8ff181fbfaed688"
+        },
+        "eval/generated/openpii-train/de-openpii-dev.jsonl": {
+          "documents": 150,
+          "gold_spans": {
+            "ADDRESS": 99,
+            "BANK_ACCOUNT": 33,
+            "EMAIL": 84,
+            "ID_DOCUMENT": 130,
+            "PERSON": 139,
+            "PHONE": 63
+          },
+          "sha256": "40be12f56d49b1323254502c3e5806566266e92d3742db09d7a031dd097e8526"
+        },
+        "eval/generated/openpii-eu/lv-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 73,
+            "BANK_ACCOUNT": 26,
+            "EMAIL": 49,
+            "ID_DOCUMENT": 90,
+            "PERSON": 92,
+            "PHONE": 39
+          },
+          "sha256": "ee4c15cf1251faf0d1734af6f261e53d4032b6d61a014507df9932f03db25e8e"
+        },
+        "eval/generated/openpii-eu/lt-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 76,
+            "BANK_ACCOUNT": 26,
+            "EMAIL": 59,
+            "ID_DOCUMENT": 98,
+            "PERSON": 97,
+            "PHONE": 42
+          },
+          "sha256": "96d276c384bfdabf636e7bd95c80c5774f6b95b2c19022dc154fce2c24780f24"
+        },
+        "eval/generated/openpii-eu/hr-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 44,
+            "BANK_ACCOUNT": 33,
+            "EMAIL": 58,
+            "ID_DOCUMENT": 103,
+            "PERSON": 102,
+            "PHONE": 41
+          },
+          "sha256": "0a90af2c510d4ec604b66dcc6f5d97cfadaca69e2e8d1d4866a25fae409fd5a6"
+        },
+        "eval/generated/openpii-eu/sl-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 56,
+            "BANK_ACCOUNT": 12,
+            "EMAIL": 74,
+            "ID_DOCUMENT": 83,
+            "PERSON": 100,
+            "PHONE": 53
+          },
+          "sha256": "adf15aef3a18c59ae282610e01cb8c70aab2be7549b61ec13b205fa6dcb21d8d"
+        },
+        "eval/generated/openpii-eu/fr-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 60,
+            "BANK_ACCOUNT": 17,
+            "EMAIL": 52,
+            "ID_DOCUMENT": 114,
+            "PERSON": 103,
+            "PHONE": 42
+          },
+          "sha256": "495fa67c36678a5dd137fe7b381f286516b4eae227791cfd47072900a725fa77"
+        },
+        "eval/generated/openpii-eu/es-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 84,
+            "BANK_ACCOUNT": 20,
+            "EMAIL": 48,
+            "ID_DOCUMENT": 87,
+            "PERSON": 105,
+            "PHONE": 34
+          },
+          "sha256": "e4551ce995978ed5f1da963822ec2ba20069e87d1f6d17d2edc28badf1eeba98"
+        },
+        "eval/generated/openpii-eu/it-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 72,
+            "BANK_ACCOUNT": 21,
+            "EMAIL": 67,
+            "ID_DOCUMENT": 85,
+            "PERSON": 104,
+            "PHONE": 48
+          },
+          "sha256": "e3d9c76913ce5580179d0a5c82fdc377e626eafbdd5405b51ec26a58d72d5e65"
+        },
+        "eval/generated/openpii-eu/nl-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 55,
+            "BANK_ACCOUNT": 23,
+            "EMAIL": 64,
+            "ID_DOCUMENT": 76,
+            "PERSON": 93,
+            "PHONE": 46
+          },
+          "sha256": "75e9b1fcaa84a4626bf9e46d10b5e2dd487c67298a6cb9815d09fec289e168a5"
+        },
+        "eval/generated/openpii-eu/ro-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 95,
+            "BANK_ACCOUNT": 25,
+            "EMAIL": 55,
+            "ID_DOCUMENT": 82,
+            "PERSON": 89,
+            "PHONE": 43
+          },
+          "sha256": "879cd623e6528b53050daa03eaad06000b76fa9e12f5c798e6c3180d740d5821"
+        },
+        "eval/generated/openpii-eu/bg-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 78,
+            "BANK_ACCOUNT": 26,
+            "EMAIL": 48,
+            "ID_DOCUMENT": 81,
+            "PERSON": 86,
+            "PHONE": 44
+          },
+          "sha256": "5b9015275d611fd10bc51caf148b068fc32d9b2e29f6858a118bfc37fcbd690f"
+        },
+        "eval/generated/openpii-eu/cs-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 57,
+            "BANK_ACCOUNT": 28,
+            "EMAIL": 59,
+            "ID_DOCUMENT": 72,
+            "PERSON": 92,
+            "PHONE": 32
+          },
+          "sha256": "07de0f567eee759b2445fb17235b7623f6364b9c805e9a5f4e13780ecdb99d37"
+        },
+        "eval/generated/openpii-eu/da-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 51,
+            "BANK_ACCOUNT": 23,
+            "EMAIL": 53,
+            "ID_DOCUMENT": 88,
+            "PERSON": 92,
+            "PHONE": 37
+          },
+          "sha256": "cef0f7e4ef8da6f522df962901820930fd33d56ad69a9e3872bbdaf730a1db92"
+        },
+        "eval/generated/openpii-eu/el-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 66,
+            "BANK_ACCOUNT": 18,
+            "EMAIL": 52,
+            "ID_DOCUMENT": 78,
+            "PERSON": 95,
+            "PHONE": 40
+          },
+          "sha256": "f6f4bc648f8d65495de1e3190ee90a5b0b473e958b627616c5d79b965796b434"
+        },
+        "eval/generated/openpii-eu/et-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 47,
+            "BANK_ACCOUNT": 23,
+            "EMAIL": 54,
+            "ID_DOCUMENT": 97,
+            "PERSON": 103,
+            "PHONE": 44
+          },
+          "sha256": "572319835b45efba8e966301087cf09d836cab36be2f9c40b442e309934a5eba"
+        },
+        "eval/generated/openpii-eu/fi-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 45,
+            "BANK_ACCOUNT": 16,
+            "EMAIL": 53,
+            "ID_DOCUMENT": 76,
+            "PERSON": 113,
+            "PHONE": 44
+          },
+          "sha256": "2211a14840d06c9cdb7354a101f0abae22009989955938a7037f9244a6aaf924"
+        },
+        "eval/generated/openpii-eu/pl-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 59,
+            "BANK_ACCOUNT": 24,
+            "EMAIL": 52,
+            "ID_DOCUMENT": 90,
+            "PERSON": 94,
+            "PHONE": 41
+          },
+          "sha256": "cadd7714a65fe03ba86acc0501908728c0d53698fa761553dc052f34321af516"
+        },
+        "eval/generated/openpii-eu/pt-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 76,
+            "BANK_ACCOUNT": 29,
+            "EMAIL": 52,
+            "ID_DOCUMENT": 93,
+            "PERSON": 96,
+            "PHONE": 47
+          },
+          "sha256": "e068804156a984bc8f815cb65e69a2059b985ed6c80d9fb563e79d1a47d16797"
+        },
+        "eval/generated/openpii-eu/sk-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 61,
+            "BANK_ACCOUNT": 11,
+            "EMAIL": 59,
+            "ID_DOCUMENT": 76,
+            "PERSON": 99,
+            "PHONE": 46
+          },
+          "sha256": "bf956b8f3f5ef53e51af9fc54e036f5992ad09f6246f52b34d4fc531d1a09dfd"
+        },
+        "eval/generated/openpii-eu/sv-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 59,
+            "BANK_ACCOUNT": 23,
+            "EMAIL": 59,
+            "ID_DOCUMENT": 75,
+            "PERSON": 91,
+            "PHONE": 42
+          },
+          "sha256": "0f0654dba065c59270a5e6944ed28d2d9a2be16dc547a8a8c556567cf23279e6"
+        },
+        "eval/generated/distill-eu-s1525/lv-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 142,
+            "BANK_ACCOUNT": 54,
+            "DATE_OF_BIRTH": 47,
+            "EMAIL": 49,
+            "ID_DOCUMENT": 29,
+            "ORGANIZATION": 90,
+            "PERSON": 661,
+            "PHONE": 65,
+            "VEHICLE_PLATE": 9
+          },
+          "sha256": "0483a485895be117a588ef47278310a39ce8d28b57bdf410f59e11b63eddcdf9"
+        },
+        "eval/generated/distill-eu-s1525/lt-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 164,
+            "BANK_ACCOUNT": 56,
+            "DATE_OF_BIRTH": 57,
+            "EMAIL": 45,
+            "ID_DOCUMENT": 38,
+            "ORGANIZATION": 96,
+            "PERSON": 665,
+            "PHONE": 66,
+            "VEHICLE_PLATE": 11
+          },
+          "sha256": "b07078abd83c89aa9a36ab1df78ea6c90f87b261c9362bc6e777da6b119e15e2"
+        },
+        "eval/generated/distill-eu-s1525/hr-distill-dev.jsonl": {
+          "documents": 118,
+          "gold_spans": {
+            "ADDRESS": 165,
+            "BANK_ACCOUNT": 56,
+            "DATE_OF_BIRTH": 60,
+            "EMAIL": 44,
+            "ID_DOCUMENT": 37,
+            "ORGANIZATION": 79,
+            "PERSON": 665,
+            "PHONE": 60,
+            "VEHICLE_PLATE": 11
+          },
+          "sha256": "88c6699744f9821ae4029f0343176d31bca61b2a615b220c479218b5edb0adac"
+        },
+        "eval/generated/distill-eu-s1525/sl-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 165,
+            "BANK_ACCOUNT": 67,
+            "DATE_OF_BIRTH": 55,
+            "EMAIL": 40,
+            "ID_DOCUMENT": 50,
+            "ORGANIZATION": 88,
+            "PERSON": 673,
+            "PHONE": 71,
+            "VEHICLE_PLATE": 19
+          },
+          "sha256": "e12e7675070ea31982d6af68efd72908a36bc336a06a597c7567ba47fe1e9f7c"
+        },
+        "eval/generated/court-en/en-court-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "PERSON": 911
+          },
+          "sha256": "cd404d4813e9ba2f947d0a5411e62cd8fa27b316babb7b5104b654c4a7d99a41"
+        }
+      }
+    },
+    "b": {
+      "sizes": {
+        "openpii": 5000,
+        "negatives": 2000
+      },
+      "train": [
+        "eval/generated/v4-mix/b/openpii/lv-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/lt-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/hr-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/sl-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/fr-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/es-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/it-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/nl-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/ro-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/bg-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/cs-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/da-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/el-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/et-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/fi-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/pl-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/pt-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/sk-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/openpii/sv-openpii-train-5000.jsonl",
+        "eval/generated/v4-mix/b/negatives/lv-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/lt-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/hr-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/sl-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/fr-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/es-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/it-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/nl-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/ro-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/bg-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/cs-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/da-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/el-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/et-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/fi-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/pl-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/pt-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/sk-negatives-train-2000.jsonl",
+        "eval/generated/v4-mix/b/negatives/sv-negatives-train-2000.jsonl",
+        "eval/generated/distill-eu-s1525/lv-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/lv-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/lt-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/lt-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/hr-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/hr-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/sl-distill-train.jsonl",
+        "eval/generated/distill-eu-s1525/sl-distill-train.jsonl",
+        "eval/generated/court-en/en-court-train.jsonl",
+        "eval/generated/distill-s11/labelled/hu-distill-train.jsonl",
+        "eval/generated/distill-s11/labelled/en-distill-train.jsonl",
+        "eval/generated/openpii-train/hu-openpii-train.jsonl",
+        "eval/generated/openpii-train/en-openpii-train.jsonl",
+        "eval/generated/openpii-train/de-openpii-train.jsonl",
+        "eval/generated/negatives/hu-negatives-train.jsonl",
+        "eval/generated/negatives/en-negatives-train.jsonl",
+        "eval/generated/negatives/de-negatives-train.jsonl"
+      ],
+      "dev": [
+        "eval/generated/distill-s11/labelled/hu-distill-dev.jsonl",
+        "eval/generated/distill-s11/labelled/en-distill-dev.jsonl",
+        "eval/generated/openpii-train/hu-openpii-dev.jsonl",
+        "eval/generated/openpii-train/en-openpii-dev.jsonl",
+        "eval/generated/openpii-train/de-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/lv-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/lt-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/hr-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/sl-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/fr-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/es-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/it-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/nl-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/ro-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/bg-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/cs-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/da-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/el-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/et-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/fi-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/pl-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/pt-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/sk-openpii-dev.jsonl",
+        "eval/generated/openpii-eu/sv-openpii-dev.jsonl",
+        "eval/generated/distill-eu-s1525/lv-distill-dev.jsonl",
+        "eval/generated/distill-eu-s1525/lt-distill-dev.jsonl",
+        "eval/generated/distill-eu-s1525/hr-distill-dev.jsonl",
+        "eval/generated/distill-eu-s1525/sl-distill-dev.jsonl",
+        "eval/generated/court-en/en-court-dev.jsonl"
+      ],
+      "train_documents": 168351,
+      "dev_documents": 3669,
+      "files": {
+        "eval/generated/v4-mix/b/openpii/lv-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3711,
+            "BANK_ACCOUNT": 1149,
+            "EMAIL": 2812,
+            "ID_DOCUMENT": 4797,
+            "PERSON": 4774,
+            "PHONE": 2095
+          },
+          "sha256": "62b4b9ff77a25e00fa088c5404f959f7c92024d7a5ac31094c0b876fbbce625c"
+        },
+        "eval/generated/v4-mix/b/openpii/lt-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3424,
+            "BANK_ACCOUNT": 1276,
+            "EMAIL": 2666,
+            "ID_DOCUMENT": 4892,
+            "PERSON": 4898,
+            "PHONE": 2131
+          },
+          "sha256": "32e816be877f5b91cc928d9c8df2ab792fb857cbd069f857add63c408ccc291d"
+        },
+        "eval/generated/v4-mix/b/openpii/hr-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3054,
+            "BANK_ACCOUNT": 1096,
+            "EMAIL": 2815,
+            "ID_DOCUMENT": 4611,
+            "PERSON": 4954,
+            "PHONE": 2084
+          },
+          "sha256": "af04518ac069dfbeedc554354343b199abe0a295cc7e97c20d13e6ec725b34d2"
+        },
+        "eval/generated/v4-mix/b/openpii/sl-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 2771,
+            "BANK_ACCOUNT": 1073,
+            "EMAIL": 2878,
+            "ID_DOCUMENT": 4627,
+            "PERSON": 4896,
+            "PHONE": 2098
+          },
+          "sha256": "af8663601b04381895ef7f67c08ae929770c6b50f73726ae9f06747058494def"
+        },
+        "eval/generated/v4-mix/b/openpii/fr-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3282,
+            "BANK_ACCOUNT": 1110,
+            "EMAIL": 2558,
+            "ID_DOCUMENT": 4712,
+            "PERSON": 4754,
+            "PHONE": 1882
+          },
+          "sha256": "7c75d3df5e8f7d9a6e5383bc40c5fed21e72cc4e4369537923b3774e82705656"
+        },
+        "eval/generated/v4-mix/b/openpii/es-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 4030,
+            "BANK_ACCOUNT": 1021,
+            "EMAIL": 2601,
+            "ID_DOCUMENT": 4878,
+            "PERSON": 4609,
+            "PHONE": 1937
+          },
+          "sha256": "9392abb8aeb8ef3d0b78882431e244f0c2c844bccfff754cf57fe32e3b27e133"
+        },
+        "eval/generated/v4-mix/b/openpii/it-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3429,
+            "BANK_ACCOUNT": 1114,
+            "EMAIL": 2592,
+            "ID_DOCUMENT": 4776,
+            "PERSON": 4911,
+            "PHONE": 1992
+          },
+          "sha256": "54a0b8c2b200935cef840ca493a161677d25eede744eac9a76ebda49752d27df"
+        },
+        "eval/generated/v4-mix/b/openpii/nl-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 2659,
+            "BANK_ACCOUNT": 1146,
+            "EMAIL": 2754,
+            "ID_DOCUMENT": 4350,
+            "PERSON": 4866,
+            "PHONE": 2042
+          },
+          "sha256": "d923c942a8cdebe3a108b0b464fde59d8e04cace258bc81533f81e591718d0c4"
+        },
+        "eval/generated/v4-mix/b/openpii/ro-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 4371,
+            "BANK_ACCOUNT": 1175,
+            "EMAIL": 2633,
+            "ID_DOCUMENT": 4681,
+            "PERSON": 4576,
+            "PHONE": 2049
+          },
+          "sha256": "b91887f91c52eca165225230b47ccceab3fc0e1b3b663578770d20a30c908be8"
+        },
+        "eval/generated/v4-mix/b/openpii/bg-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3878,
+            "BANK_ACCOUNT": 1052,
+            "EMAIL": 2875,
+            "ID_DOCUMENT": 4586,
+            "PERSON": 4853,
+            "PHONE": 2192
+          },
+          "sha256": "a137a28ef0b59bbdc85ea89fbd9f77ff6f09357aaaf585f5c3751f4d2c457ec6"
+        },
+        "eval/generated/v4-mix/b/openpii/cs-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3379,
+            "BANK_ACCOUNT": 1111,
+            "EMAIL": 2776,
+            "ID_DOCUMENT": 4734,
+            "PERSON": 4715,
+            "PHONE": 2061
+          },
+          "sha256": "157ed345bc96915eb0b8ba95afb9fe13e0dce5f27fd3671f2b0f27d0eac77614"
+        },
+        "eval/generated/v4-mix/b/openpii/da-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 2758,
+            "BANK_ACCOUNT": 1100,
+            "EMAIL": 2753,
+            "ID_DOCUMENT": 4381,
+            "PERSON": 4782,
+            "PHONE": 2004
+          },
+          "sha256": "56247618eb7d385ae91599e4b34db8b1e60e05aa1fbb6190fa1259f8e41cbd6a"
+        },
+        "eval/generated/v4-mix/b/openpii/el-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3063,
+            "BANK_ACCOUNT": 1029,
+            "EMAIL": 2530,
+            "ID_DOCUMENT": 4686,
+            "PERSON": 4656,
+            "PHONE": 1921
+          },
+          "sha256": "ca3b66b57321c9d9481fd4e301c8b55cd5789c0f4b85cd24e5ff5c0f262df42e"
+        },
+        "eval/generated/v4-mix/b/openpii/et-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 2918,
+            "BANK_ACCOUNT": 1188,
+            "EMAIL": 2780,
+            "ID_DOCUMENT": 4888,
+            "PERSON": 4814,
+            "PHONE": 2145
+          },
+          "sha256": "e94adf8c3902574b1968c6c483074e9128b1300047ae55c30e9878e9f95f69a1"
+        },
+        "eval/generated/v4-mix/b/openpii/fi-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 2729,
+            "BANK_ACCOUNT": 1176,
+            "EMAIL": 2776,
+            "ID_DOCUMENT": 4629,
+            "PERSON": 5049,
+            "PHONE": 2050
+          },
+          "sha256": "bc3b14559f439e7adee4bf261bb1744704c00dbb4eaabf0616feed5bd5d2dee0"
+        },
+        "eval/generated/v4-mix/b/openpii/pl-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3040,
+            "BANK_ACCOUNT": 1124,
+            "EMAIL": 2768,
+            "ID_DOCUMENT": 4555,
+            "PERSON": 4703,
+            "PHONE": 2194
+          },
+          "sha256": "f9fd6b0fed40190acbf9b612361772e89dd8017b5b27d210bd1d5cc84a9a0f61"
+        },
+        "eval/generated/v4-mix/b/openpii/pt-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3685,
+            "BANK_ACCOUNT": 1036,
+            "EMAIL": 2499,
+            "ID_DOCUMENT": 4855,
+            "PERSON": 4426,
+            "PHONE": 1900
+          },
+          "sha256": "6b6e4b8178566997ad20ec0162589cb93d0ba799011b6fd659c4e84d3e945434"
+        },
+        "eval/generated/v4-mix/b/openpii/sk-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3455,
+            "BANK_ACCOUNT": 1099,
+            "EMAIL": 2880,
+            "ID_DOCUMENT": 4552,
+            "PERSON": 4834,
+            "PHONE": 2094
+          },
+          "sha256": "77574ed98788853087b5eb9df798acf9e864d459583d30aed9bfb71450585a61"
+        },
+        "eval/generated/v4-mix/b/openpii/sv-openpii-train-5000.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 2569,
+            "BANK_ACCOUNT": 1106,
+            "EMAIL": 2722,
+            "ID_DOCUMENT": 4502,
+            "PERSON": 4764,
+            "PHONE": 2021
+          },
+          "sha256": "edfbf46397ec780a66393d300151148054b40ff7142881c4157e285fbd46481a"
+        },
+        "eval/generated/v4-mix/b/negatives/lv-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "8889926fffea8739b6e7da3f507b8e61f912bf0de48dda3e891e48cc9abf051d"
+        },
+        "eval/generated/v4-mix/b/negatives/lt-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "27f438c0a00d92cba53aea2ee5266891e1c78505c982866020ef1907087c85f0"
+        },
+        "eval/generated/v4-mix/b/negatives/hr-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "f15a75ef790d601755dccfe959697972a123fb27bcf040b4e2841c3c93c94b88"
+        },
+        "eval/generated/v4-mix/b/negatives/sl-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "ae8c0f2d3213ef49ff06b80c6ab1f090489e059ce9a66bfbc876fa9682f74faf"
+        },
+        "eval/generated/v4-mix/b/negatives/fr-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "bb0cc181ed2145d0208c472c565e5aee4185bad2de92f5353a075609fac6d7dc"
+        },
+        "eval/generated/v4-mix/b/negatives/es-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "fbec89b6967a2d12d888dd35972a9fae29a66bd703844b61f850a43e102c9285"
+        },
+        "eval/generated/v4-mix/b/negatives/it-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "4572f674a410f4cee46bf9c7873e64219603febe53519ec9fcc6d85d166fbb5e"
+        },
+        "eval/generated/v4-mix/b/negatives/nl-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "156d712386f2088ec8c9b2d72d1d1127f3650ee3a7ea067489448482ebe626d4"
+        },
+        "eval/generated/v4-mix/b/negatives/ro-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "5d59a922857068f61a3b6ff3ab9d98266c22ca178baa7809394b2bf24bb34360"
+        },
+        "eval/generated/v4-mix/b/negatives/bg-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "4c9f4ce77b09873a17ca0c0d11fc10bbb3db09396c2778192b156530c108a14b"
+        },
+        "eval/generated/v4-mix/b/negatives/cs-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "48c931eae1e4f9eeaea15e9fc739665ac7d30d345e9bc67a4a70fc685bf2111d"
+        },
+        "eval/generated/v4-mix/b/negatives/da-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "2695b0c96197c25daeb01a844c61244d8f2b4ed93a81609fffb859be9899f645"
+        },
+        "eval/generated/v4-mix/b/negatives/el-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "87d5b3705b975145a8c2c5ca302dbccfa3928a05064ee6a933677b4231198b8a"
+        },
+        "eval/generated/v4-mix/b/negatives/et-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "b228d04c8658e9ccf86e0b41166d612dd9e486ae75ab6fa217f6e23c3c44e894"
+        },
+        "eval/generated/v4-mix/b/negatives/fi-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "6b5ff41c20850fdfba5a4cb5041257907a4120c96d46b83bbcb336230d62dd1b"
+        },
+        "eval/generated/v4-mix/b/negatives/pl-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "d096dd740185c0ce7238ddfb02a23de92c60282fe28ad0826ddbbdbb3ca1917d"
+        },
+        "eval/generated/v4-mix/b/negatives/pt-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "b1b68758226ed0e7f027591a2bf0db86cad6c6cf0754e56f2b4d626293c3ed95"
+        },
+        "eval/generated/v4-mix/b/negatives/sk-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "df20d23936f8515d0e540ccf709340db2abc8a47c12d37f314cfa6177c0aa2ef"
+        },
+        "eval/generated/v4-mix/b/negatives/sv-negatives-train-2000.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "47b4f335e039da53746b765f58a0eeb25a463638aae0a7627dcd2fc24f6531f4"
+        },
+        "eval/generated/distill-eu-s1525/lv-distill-train.jsonl": {
+          "documents": 1077,
+          "gold_spans": {
+            "ADDRESS": 1401,
+            "BANK_ACCOUNT": 460,
+            "DATE_OF_BIRTH": 486,
+            "EMAIL": 395,
+            "ID_DOCUMENT": 353,
+            "ORGANIZATION": 884,
+            "PERSON": 6385,
+            "PHONE": 561,
+            "VEHICLE_PLATE": 117
+          },
+          "sha256": "07b414c981376fae528598eb256ca849d1ed2f55ab201ee6802668741b3b92ae"
+        },
+        "eval/generated/distill-eu-s1525/lt-distill-train.jsonl": {
+          "documents": 1079,
+          "gold_spans": {
+            "ADDRESS": 1445,
+            "BANK_ACCOUNT": 473,
+            "DATE_OF_BIRTH": 516,
+            "EMAIL": 387,
+            "ID_DOCUMENT": 389,
+            "ORGANIZATION": 846,
+            "PERSON": 6517,
+            "PHONE": 555,
+            "VEHICLE_PLATE": 141
+          },
+          "sha256": "f93eb94a9201cc2d89a1c5dfcef03e1f6400e1ba4ed8f428954babe9d4120d14"
+        },
+        "eval/generated/distill-eu-s1525/hr-distill-train.jsonl": {
+          "documents": 1079,
+          "gold_spans": {
+            "ADDRESS": 1484,
+            "BANK_ACCOUNT": 514,
+            "DATE_OF_BIRTH": 545,
+            "EMAIL": 385,
+            "ID_DOCUMENT": 403,
+            "ORGANIZATION": 745,
+            "PERSON": 5882,
+            "PHONE": 551,
+            "VEHICLE_PLATE": 144
+          },
+          "sha256": "bb00be18c5b94b97e19c4f333e64176cdc6d1b3097426e80a14736a13ec43620"
+        },
+        "eval/generated/distill-eu-s1525/sl-distill-train.jsonl": {
+          "documents": 1079,
+          "gold_spans": {
+            "ADDRESS": 1467,
+            "BANK_ACCOUNT": 594,
+            "DATE_OF_BIRTH": 499,
+            "EMAIL": 390,
+            "ID_DOCUMENT": 407,
+            "ORGANIZATION": 791,
+            "PERSON": 5650,
+            "PHONE": 583,
+            "VEHICLE_PLATE": 170
+          },
+          "sha256": "521a432b32a267d9824b85f90c5219ea6af8b58e3c49c454179217e5398aeba3"
+        },
+        "eval/generated/court-en/en-court-train.jsonl": {
+          "documents": 1500,
+          "gold_spans": {
+            "PERSON": 13513
+          },
+          "sha256": "d19e33c17b1ac1f245bb920d3947d595893853305284b382f3fd9e5fb5c67b1e"
+        },
+        "eval/generated/distill-s11/labelled/hu-distill-train.jsonl": {
+          "documents": 2104,
+          "gold_spans": {
+            "ADDRESS": 2320,
+            "BANK_ACCOUNT": 656,
+            "COMPANY_ID_HU": 443,
+            "DATE_OF_BIRTH": 822,
+            "EMAIL": 1084,
+            "ID_DOCUMENT": 370,
+            "NATIONAL_ID_HU_TAJ": 446,
+            "NATIONAL_ID_HU_TAX": 459,
+            "ORGANIZATION": 991,
+            "PARCEL_NUMBER_HU": 272,
+            "PERSON": 7993,
+            "PHONE": 1750,
+            "VEHICLE_PLATE": 249
+          },
+          "sha256": "3784482de825b207e847449f46ac7a80856b07ddb588e48471eb11975d28187f"
+        },
+        "eval/generated/distill-s11/labelled/en-distill-train.jsonl": {
+          "documents": 2119,
+          "gold_spans": {
+            "ADDRESS": 2077,
+            "BANK_ACCOUNT": 559,
+            "DATE_OF_BIRTH": 604,
+            "EMAIL": 1517,
+            "ID_DOCUMENT": 264,
+            "ORGANIZATION": 786,
+            "PERSON": 7482,
+            "PHONE": 1734,
+            "VEHICLE_PLATE": 255
+          },
+          "sha256": "cc9af7113b5cd89b23ebb08347d7b3a2d68dca2fc182a1b9a39635252c4670dc"
+        },
+        "eval/generated/openpii-train/hu-openpii-train.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3064,
+            "BANK_ACCOUNT": 1237,
+            "EMAIL": 2237,
+            "ID_DOCUMENT": 2650,
+            "NATIONAL_ID_HU_TAJ": 966,
+            "NATIONAL_ID_HU_TAX": 1001,
+            "PERSON": 4072,
+            "PHONE": 1706
+          },
+          "sha256": "9869591e53aa04ee54880c72e9abaa2b1f0eec906ee07d9f834807f3d99eb5cd"
+        },
+        "eval/generated/openpii-train/en-openpii-train.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 3441,
+            "BANK_ACCOUNT": 1201,
+            "EMAIL": 2802,
+            "ID_DOCUMENT": 4608,
+            "PERSON": 4998,
+            "PHONE": 2033
+          },
+          "sha256": "a99597cde5c0ac9e111ad8ee4ce8be9c419f98c19d697ca708701d2dc1faf16f"
+        },
+        "eval/generated/openpii-train/de-openpii-train.jsonl": {
+          "documents": 5000,
+          "gold_spans": {
+            "ADDRESS": 2738,
+            "BANK_ACCOUNT": 1132,
+            "EMAIL": 2498,
+            "ID_DOCUMENT": 4360,
+            "PERSON": 4401,
+            "PHONE": 1917
+          },
+          "sha256": "4ea22c0746e2c43c55569ba2b7e03d9cf738ea25e564c094fe321340b30d0c75"
+        },
+        "eval/generated/negatives/hu-negatives-train.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "3e8def88e29b7e0272ebceea3dbe6e76653b733c27a895b3244b05e136f1f387"
+        },
+        "eval/generated/negatives/en-negatives-train.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "f0835f0a41ceaa9d3acc83343eff0ad4d03c137e7305d3f3ff6cca985ee7db9a"
+        },
+        "eval/generated/negatives/de-negatives-train.jsonl": {
+          "documents": 2000,
+          "gold_spans": {},
+          "sha256": "033b6b93e7b11744674fa36bbc87d268a4bb433555ef8e2d003c19cd0f8654b2"
+        },
+        "eval/generated/distill-s11/labelled/hu-distill-dev.jsonl": {
+          "documents": 368,
+          "gold_spans": {
+            "ADDRESS": 444,
+            "BANK_ACCOUNT": 122,
+            "COMPANY_ID_HU": 91,
+            "DATE_OF_BIRTH": 161,
+            "EMAIL": 194,
+            "ID_DOCUMENT": 70,
+            "NATIONAL_ID_HU_TAJ": 88,
+            "NATIONAL_ID_HU_TAX": 73,
+            "ORGANIZATION": 181,
+            "PARCEL_NUMBER_HU": 51,
+            "PERSON": 1503,
+            "PHONE": 326,
+            "VEHICLE_PLATE": 47
+          },
+          "sha256": "f6dca4b60ca8dfa56d306dfb93ff169e696e350ad6c5e0d062f047c0d6662521"
+        },
+        "eval/generated/distill-s11/labelled/en-distill-dev.jsonl": {
+          "documents": 373,
+          "gold_spans": {
+            "ADDRESS": 361,
+            "BANK_ACCOUNT": 98,
+            "DATE_OF_BIRTH": 108,
+            "EMAIL": 283,
+            "ID_DOCUMENT": 47,
+            "ORGANIZATION": 135,
+            "PERSON": 1295,
+            "PHONE": 297,
+            "VEHICLE_PLATE": 53
+          },
+          "sha256": "b13f9983ca99ade625e05185c76f25611bec6ca33147072fd58dd1e50b25557a"
+        },
+        "eval/generated/openpii-train/hu-openpii-dev.jsonl": {
+          "documents": 150,
+          "gold_spans": {
+            "ADDRESS": 94,
+            "BANK_ACCOUNT": 35,
+            "EMAIL": 70,
+            "ID_DOCUMENT": 75,
+            "NATIONAL_ID_HU_TAJ": 28,
+            "NATIONAL_ID_HU_TAX": 30,
+            "PERSON": 103,
+            "PHONE": 55
+          },
+          "sha256": "2e49445d08f3a29b03248348fb5440265069c54d01d2deb17683a76956c053bb"
+        },
+        "eval/generated/openpii-train/en-openpii-dev.jsonl": {
+          "documents": 150,
+          "gold_spans": {
+            "ADDRESS": 101,
+            "BANK_ACCOUNT": 37,
+            "EMAIL": 78,
+            "ID_DOCUMENT": 140,
+            "PERSON": 154,
+            "PHONE": 64
+          },
+          "sha256": "7fe5a392f373d2e20b661ec07ffb6b98f13e8b4e4e0c628fb8ff181fbfaed688"
+        },
+        "eval/generated/openpii-train/de-openpii-dev.jsonl": {
+          "documents": 150,
+          "gold_spans": {
+            "ADDRESS": 99,
+            "BANK_ACCOUNT": 33,
+            "EMAIL": 84,
+            "ID_DOCUMENT": 130,
+            "PERSON": 139,
+            "PHONE": 63
+          },
+          "sha256": "40be12f56d49b1323254502c3e5806566266e92d3742db09d7a031dd097e8526"
+        },
+        "eval/generated/openpii-eu/lv-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 73,
+            "BANK_ACCOUNT": 26,
+            "EMAIL": 49,
+            "ID_DOCUMENT": 90,
+            "PERSON": 92,
+            "PHONE": 39
+          },
+          "sha256": "ee4c15cf1251faf0d1734af6f261e53d4032b6d61a014507df9932f03db25e8e"
+        },
+        "eval/generated/openpii-eu/lt-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 76,
+            "BANK_ACCOUNT": 26,
+            "EMAIL": 59,
+            "ID_DOCUMENT": 98,
+            "PERSON": 97,
+            "PHONE": 42
+          },
+          "sha256": "96d276c384bfdabf636e7bd95c80c5774f6b95b2c19022dc154fce2c24780f24"
+        },
+        "eval/generated/openpii-eu/hr-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 44,
+            "BANK_ACCOUNT": 33,
+            "EMAIL": 58,
+            "ID_DOCUMENT": 103,
+            "PERSON": 102,
+            "PHONE": 41
+          },
+          "sha256": "0a90af2c510d4ec604b66dcc6f5d97cfadaca69e2e8d1d4866a25fae409fd5a6"
+        },
+        "eval/generated/openpii-eu/sl-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 56,
+            "BANK_ACCOUNT": 12,
+            "EMAIL": 74,
+            "ID_DOCUMENT": 83,
+            "PERSON": 100,
+            "PHONE": 53
+          },
+          "sha256": "adf15aef3a18c59ae282610e01cb8c70aab2be7549b61ec13b205fa6dcb21d8d"
+        },
+        "eval/generated/openpii-eu/fr-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 60,
+            "BANK_ACCOUNT": 17,
+            "EMAIL": 52,
+            "ID_DOCUMENT": 114,
+            "PERSON": 103,
+            "PHONE": 42
+          },
+          "sha256": "495fa67c36678a5dd137fe7b381f286516b4eae227791cfd47072900a725fa77"
+        },
+        "eval/generated/openpii-eu/es-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 84,
+            "BANK_ACCOUNT": 20,
+            "EMAIL": 48,
+            "ID_DOCUMENT": 87,
+            "PERSON": 105,
+            "PHONE": 34
+          },
+          "sha256": "e4551ce995978ed5f1da963822ec2ba20069e87d1f6d17d2edc28badf1eeba98"
+        },
+        "eval/generated/openpii-eu/it-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 72,
+            "BANK_ACCOUNT": 21,
+            "EMAIL": 67,
+            "ID_DOCUMENT": 85,
+            "PERSON": 104,
+            "PHONE": 48
+          },
+          "sha256": "e3d9c76913ce5580179d0a5c82fdc377e626eafbdd5405b51ec26a58d72d5e65"
+        },
+        "eval/generated/openpii-eu/nl-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 55,
+            "BANK_ACCOUNT": 23,
+            "EMAIL": 64,
+            "ID_DOCUMENT": 76,
+            "PERSON": 93,
+            "PHONE": 46
+          },
+          "sha256": "75e9b1fcaa84a4626bf9e46d10b5e2dd487c67298a6cb9815d09fec289e168a5"
+        },
+        "eval/generated/openpii-eu/ro-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 95,
+            "BANK_ACCOUNT": 25,
+            "EMAIL": 55,
+            "ID_DOCUMENT": 82,
+            "PERSON": 89,
+            "PHONE": 43
+          },
+          "sha256": "879cd623e6528b53050daa03eaad06000b76fa9e12f5c798e6c3180d740d5821"
+        },
+        "eval/generated/openpii-eu/bg-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 78,
+            "BANK_ACCOUNT": 26,
+            "EMAIL": 48,
+            "ID_DOCUMENT": 81,
+            "PERSON": 86,
+            "PHONE": 44
+          },
+          "sha256": "5b9015275d611fd10bc51caf148b068fc32d9b2e29f6858a118bfc37fcbd690f"
+        },
+        "eval/generated/openpii-eu/cs-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 57,
+            "BANK_ACCOUNT": 28,
+            "EMAIL": 59,
+            "ID_DOCUMENT": 72,
+            "PERSON": 92,
+            "PHONE": 32
+          },
+          "sha256": "07de0f567eee759b2445fb17235b7623f6364b9c805e9a5f4e13780ecdb99d37"
+        },
+        "eval/generated/openpii-eu/da-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 51,
+            "BANK_ACCOUNT": 23,
+            "EMAIL": 53,
+            "ID_DOCUMENT": 88,
+            "PERSON": 92,
+            "PHONE": 37
+          },
+          "sha256": "cef0f7e4ef8da6f522df962901820930fd33d56ad69a9e3872bbdaf730a1db92"
+        },
+        "eval/generated/openpii-eu/el-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 66,
+            "BANK_ACCOUNT": 18,
+            "EMAIL": 52,
+            "ID_DOCUMENT": 78,
+            "PERSON": 95,
+            "PHONE": 40
+          },
+          "sha256": "f6f4bc648f8d65495de1e3190ee90a5b0b473e958b627616c5d79b965796b434"
+        },
+        "eval/generated/openpii-eu/et-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 47,
+            "BANK_ACCOUNT": 23,
+            "EMAIL": 54,
+            "ID_DOCUMENT": 97,
+            "PERSON": 103,
+            "PHONE": 44
+          },
+          "sha256": "572319835b45efba8e966301087cf09d836cab36be2f9c40b442e309934a5eba"
+        },
+        "eval/generated/openpii-eu/fi-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 45,
+            "BANK_ACCOUNT": 16,
+            "EMAIL": 53,
+            "ID_DOCUMENT": 76,
+            "PERSON": 113,
+            "PHONE": 44
+          },
+          "sha256": "2211a14840d06c9cdb7354a101f0abae22009989955938a7037f9244a6aaf924"
+        },
+        "eval/generated/openpii-eu/pl-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 59,
+            "BANK_ACCOUNT": 24,
+            "EMAIL": 52,
+            "ID_DOCUMENT": 90,
+            "PERSON": 94,
+            "PHONE": 41
+          },
+          "sha256": "cadd7714a65fe03ba86acc0501908728c0d53698fa761553dc052f34321af516"
+        },
+        "eval/generated/openpii-eu/pt-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 76,
+            "BANK_ACCOUNT": 29,
+            "EMAIL": 52,
+            "ID_DOCUMENT": 93,
+            "PERSON": 96,
+            "PHONE": 47
+          },
+          "sha256": "e068804156a984bc8f815cb65e69a2059b985ed6c80d9fb563e79d1a47d16797"
+        },
+        "eval/generated/openpii-eu/sk-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 61,
+            "BANK_ACCOUNT": 11,
+            "EMAIL": 59,
+            "ID_DOCUMENT": 76,
+            "PERSON": 99,
+            "PHONE": 46
+          },
+          "sha256": "bf956b8f3f5ef53e51af9fc54e036f5992ad09f6246f52b34d4fc531d1a09dfd"
+        },
+        "eval/generated/openpii-eu/sv-openpii-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "ADDRESS": 59,
+            "BANK_ACCOUNT": 23,
+            "EMAIL": 59,
+            "ID_DOCUMENT": 75,
+            "PERSON": 91,
+            "PHONE": 42
+          },
+          "sha256": "0f0654dba065c59270a5e6944ed28d2d9a2be16dc547a8a8c556567cf23279e6"
+        },
+        "eval/generated/distill-eu-s1525/lv-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 142,
+            "BANK_ACCOUNT": 54,
+            "DATE_OF_BIRTH": 47,
+            "EMAIL": 49,
+            "ID_DOCUMENT": 29,
+            "ORGANIZATION": 90,
+            "PERSON": 661,
+            "PHONE": 65,
+            "VEHICLE_PLATE": 9
+          },
+          "sha256": "0483a485895be117a588ef47278310a39ce8d28b57bdf410f59e11b63eddcdf9"
+        },
+        "eval/generated/distill-eu-s1525/lt-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 164,
+            "BANK_ACCOUNT": 56,
+            "DATE_OF_BIRTH": 57,
+            "EMAIL": 45,
+            "ID_DOCUMENT": 38,
+            "ORGANIZATION": 96,
+            "PERSON": 665,
+            "PHONE": 66,
+            "VEHICLE_PLATE": 11
+          },
+          "sha256": "b07078abd83c89aa9a36ab1df78ea6c90f87b261c9362bc6e777da6b119e15e2"
+        },
+        "eval/generated/distill-eu-s1525/hr-distill-dev.jsonl": {
+          "documents": 118,
+          "gold_spans": {
+            "ADDRESS": 165,
+            "BANK_ACCOUNT": 56,
+            "DATE_OF_BIRTH": 60,
+            "EMAIL": 44,
+            "ID_DOCUMENT": 37,
+            "ORGANIZATION": 79,
+            "PERSON": 665,
+            "PHONE": 60,
+            "VEHICLE_PLATE": 11
+          },
+          "sha256": "88c6699744f9821ae4029f0343176d31bca61b2a615b220c479218b5edb0adac"
+        },
+        "eval/generated/distill-eu-s1525/sl-distill-dev.jsonl": {
+          "documents": 120,
+          "gold_spans": {
+            "ADDRESS": 165,
+            "BANK_ACCOUNT": 67,
+            "DATE_OF_BIRTH": 55,
+            "EMAIL": 40,
+            "ID_DOCUMENT": 50,
+            "ORGANIZATION": 88,
+            "PERSON": 673,
+            "PHONE": 71,
+            "VEHICLE_PLATE": 19
+          },
+          "sha256": "e12e7675070ea31982d6af68efd72908a36bc336a06a597c7567ba47fe1e9f7c"
+        },
+        "eval/generated/court-en/en-court-dev.jsonl": {
+          "documents": 100,
+          "gold_spans": {
+            "PERSON": 911
+          },
+          "sha256": "cd404d4813e9ba2f947d0a5411e62cd8fa27b316babb7b5104b654c4a7d99a41"
+        }
+      }
+    }
+  }
+}
