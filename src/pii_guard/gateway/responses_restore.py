@@ -56,10 +56,8 @@ __all__ = [
 DONE = "[DONE]"
 #: Provider-encrypted blobs: forwarded as is.
 _OPAQUE = frozenset({"encrypted_content"})
-#: JSON documents (tool-call arguments): restored with JSON-escaped values.
-_JSON_FIELDS = frozenset({"arguments"})
-#: Freeform tool input (custom tool calls): regex-escaped placeholders restored too.
-_TOOL_FIELDS = frozenset({"input"})
+#: Item type -> (exact field, restore adapter).
+_TOOL_ITEMS = {"function_call": ("arguments", "json"), "custom_tool_call": ("input", "tool")}
 
 #: delta event -> (stream name, index fields, session kind: text, json or tool). The ``.done``
 #: event of the same stream has the same prefix.
@@ -90,6 +88,9 @@ def _restore_value(
     budget: RestoreBudget,
     key: str = "",
     charged: set[str] | None = None,
+    context: str = "plain",
+    kind: str = "text",
+    event_type: str | None = None,
 ) -> Any:
     """Restore every string in ``value``. ``charged`` (streamed restore only): masked texts
     already restored once in this stream, which repeat in later whole events of the same
@@ -102,9 +103,9 @@ def _restore_value(
         effective = (
             RestoreBudget(_ALREADY_CHARGED) if charged is not None and value in charged else budget
         )
-        if key in _JSON_FIELDS:
+        if kind == "json":
             restored = restore_arguments(session, value, report, effective)
-        elif key in _TOOL_FIELDS:
+        elif kind == "tool":
             restored = restore_tool_input(session, value, report, effective)
         else:
             restored, _, unresolved = restore_text(session, value, effective)
@@ -113,12 +114,53 @@ def _restore_value(
             charged.add(value)
         return restored
     if isinstance(value, list):
-        return [_restore_value(session, item, report, budget, key, charged) for item in value]
+        return [
+            _restore_value(
+                session,
+                item,
+                report,
+                budget,
+                key,
+                charged,
+                context="item" if context == "items" else "plain",
+            )
+            for item in value
+        ]
     if isinstance(value, dict):
-        # Keys are the upstream's own field names; values are restored.
-        return {
-            k: _restore_value(session, v, report, budget, str(k), charged) for k, v in value.items()
-        }
+        # Only structural response/item/event positions confer tool semantics. A type or
+        # key inside metadata/schema data must not select an escaping adapter.
+        semantic_type = event_type if event_type is not None else value.get("type")
+        field, adapter = ("", "text")
+        if context == "item" and isinstance(semantic_type, str):
+            field, adapter = _TOOL_ITEMS.get(semantic_type, ("", "text"))
+        elif context == "event" and isinstance(semantic_type, str) and semantic_type in _DONES:
+            stream, _, stream_kind = _DELTAS[_DONES[semantic_type]]
+            if stream_kind in ("json", "tool"):
+                field, adapter = stream, stream_kind
+        restored_fields = {}
+        for k, v in value.items():
+            child_context = "plain"
+            if context == "response" and k in ("output", "input"):
+                child_context = "items"
+            elif context == "event":
+                if k == "response":
+                    child_context = "response"
+                elif k == "item" and semantic_type in (
+                    "response.output_item.added",
+                    "response.output_item.done",
+                ):
+                    child_context = "item"
+            restored_fields[k] = _restore_value(
+                session,
+                v,
+                report,
+                budget,
+                str(k),
+                charged,
+                context=child_context,
+                kind=adapter if k == field else "text",
+            )
+        return restored_fields
     return value
 
 
@@ -135,7 +177,9 @@ def restore_response(session: VaultSession, body: dict[str, Any]) -> RestoreRepo
         if text is not None:
             restored, spans, _ = restore_text(session, text)
             report.restored_spans[index] = (restored, spans)
-    restored_body = _restore_value(session, body, report, session.restore_budget())
+    restored_body = _restore_value(
+        session, body, report, session.restore_budget(), context="response"
+    )
     body.clear()
     body.update(restored_body)
     return report
@@ -299,7 +343,13 @@ class ResponsesSseRestorer:
                 out.append(self._emit(extra))
         self._charged_texts.update("".join(parts) for parts in self._stream_texts.values())
         restored = _restore_value(
-            self._session, parsed, self._report, self._budget, charged=self._charged_texts
+            self._session,
+            parsed,
+            self._report,
+            self._budget,
+            charged=self._charged_texts,
+            context="event",
+            event_type=event_type,
         )
         if event_type == "response.failed":
             response = restored.get("response")

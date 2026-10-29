@@ -279,6 +279,121 @@ def test_responses_streamed_custom_tool_call_input_is_restored_across_a_split() 
 # --- end to end through the gateway ------------------------------------------------------
 
 
+@pytest.mark.parametrize("transport", ["whole", "completed", "item_added", "item_done"])
+def test_responses_tool_escaping_is_limited_to_structural_fields(transport: str) -> None:
+    session = _session()
+    value = 'Teszt "Minta" \\ út'
+    ph = _placeholder(session, value, EntityType.PERSON)
+    plain = f'echo "{ph}"'
+    metadata = {
+        "arguments": plain,
+        "input": plain,
+        "nested": [
+            {"type": "function_call", "arguments": plain},
+            {"type": "custom_tool_call", "input": plain},
+        ],
+    }
+    expected_metadata = {
+        "arguments": f'echo "{value}"',
+        "input": f'echo "{value}"',
+        "nested": [
+            {"type": "function_call", "arguments": f'echo "{value}"'},
+            {"type": "custom_tool_call", "input": f'echo "{value}"'},
+        ],
+    }
+    items = [
+        {
+            "type": "function_call",
+            "arguments": json.dumps({"value": ph}),
+            "input": plain,
+            "metadata": metadata,
+        },
+        {
+            "type": "custom_tool_call",
+            "input": f'echo "{ph}"',
+            "arguments": plain,
+            "metadata": metadata,
+        },
+        {"type": "message", "arguments": plain, "input": plain, "metadata": metadata},
+    ]
+    if transport in ("whole", "completed"):
+        body = {
+            "output": items,
+            "input": items,
+            "metadata": metadata,
+            "tools": [{"type": "function_call", "arguments": plain, "input": plain}],
+        }
+        if transport == "whole":
+            restore_response(session, body)
+        else:
+            payload = {"type": "response.completed", "response": body}
+            out = ResponsesSseRestorer(session).process(payload["type"], json.dumps(payload))
+            body = json.loads(out[-1][1])["response"]
+        assert body["metadata"] == expected_metadata
+        assert body["tools"][0]["arguments"] == f'echo "{value}"'
+        assert body["tools"][0]["input"] == f'echo "{value}"'
+        assert body["input"] == body["output"]
+        restored_items = body["output"]
+    else:
+        restored_items = []
+        for item in items:
+            event_type = "response.output_item." + transport.removeprefix("item_")
+            payload = {"type": event_type, "item": item, "metadata": metadata}
+            out = ResponsesSseRestorer(session).process(event_type, json.dumps(payload))
+            restored = json.loads(out[-1][1])
+            assert restored["metadata"] == expected_metadata
+            restored_items.append(restored["item"])
+    assert json.loads(restored_items[0]["arguments"]) == {"value": value}
+    assert restored_items[0]["input"] == f'echo "{value}"'
+    assert restored_items[1]["input"] == 'echo "Teszt \\"Minta\\" \\\\ út"'
+    assert restored_items[1]["arguments"] == f'echo "{value}"'
+    assert restored_items[2]["arguments"] == f'echo "{value}"'
+    assert restored_items[2]["input"] == f'echo "{value}"'
+    assert all(item["metadata"] == expected_metadata for item in restored_items)
+
+
+@pytest.mark.parametrize("tool", ["function_call_arguments", "custom_tool_call_input"])
+@pytest.mark.parametrize("header_only", [False, True])
+def test_responses_tool_delta_done_and_completed_use_the_same_adapter(
+    tool: str, header_only: bool
+) -> None:
+    session = _session()
+    value = 'Teszt "Minta" \\ út'
+    ph = _placeholder(session, value, EntityType.PERSON)
+    is_json = tool == "function_call_arguments"
+    field = "arguments" if is_json else "input"
+    text = json.dumps({"value": ph}) if is_json else f'echo "{ph}"'
+    restorer = ResponsesSseRestorer(session)
+    out = []
+    for part in _split(text, ph):
+        event_type = f"response.{tool}.delta"
+        payload = {"output_index": 0, "delta": part}
+        if not header_only:
+            payload["type"] = event_type
+        out += restorer.process(event_type, json.dumps(payload))
+    event_type = f"response.{tool}.done"
+    payload = {
+        "output_index": 0,
+        field: text,
+        "metadata": {"arguments": ph, "input": f'echo "{ph}"'},
+    }
+    if not header_only:
+        payload["type"] = event_type
+    out += restorer.process(event_type, json.dumps(payload))
+    events = [json.loads(data) for _, data in out]
+    joined = "".join(e["delta"] for e in events if "delta" in e)
+    assert events[-1][field] == joined
+    assert events[-1]["metadata"] == {"arguments": value, "input": f'echo "{value}"'}
+    item = {"type": "function_call" if is_json else "custom_tool_call", field: text}
+    payload = {"type": "response.completed", "response": {"output": [item]}}
+    completed = restorer.process(payload["type"], json.dumps(payload))
+    assert json.loads(completed[-1][1])["response"]["output"][0][field] == joined
+    if is_json:
+        assert json.loads(joined) == {"value": value}
+    else:
+        assert joined == 'echo "Teszt \\"Minta\\" \\\\ út"'
+
+
 class _ToolUpstream(MockUpstream):
     """Answers with the placeholder it received, inside a tool call of the given format."""
 
