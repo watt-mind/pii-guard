@@ -15,7 +15,9 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
-import { COMPARISON, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, SETS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
+import { COMPARED, COMPARISON, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, RUNS, SETS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
+import AgentReplay from "./AgentReplay";
+import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -26,15 +28,18 @@ const NER_MODEL = "https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base";
 const DOCS = `${SOURCE}/blob/develop/docs`;
 const SELF_HOST = `${SOURCE}#try-it`;
 const MODEL_CARD = `${NER_MODEL}#model-card`;
+const CI = `${SOURCE}/actions/workflows/ci.yml`;
+const HARNESS_REPORT = `${DOCS}/integrations/harness-matrix-2026-10-29.md`;
+// The 3-minute demo video: the slot stays hidden until a URL is configured at build time.
+const DEMO_VIDEO_URL = import.meta.env.VITE_PII_GUARD_DEMO_VIDEO_URL || null;
 
 // Below the fold and heavier than the rest of the page: loaded on demand, so the first paint
 // stays small (Lighthouse, LAB-1466).
 const ImageShowcase = lazy(() => import("./ImageShowcase"));
 const ResultsChart = lazy(() => import("./ResultsChart"));
-const HeroImage = lazy(() => import("./HeroImage"));
 
-// TODO(owner): operator name, privacy notice URL and contact address. Until they are set the
-// footer says they are being finalised; never invent a legal entity here.
+// TODO(owner, LAB-1474): operator name, privacy notice URL and contact address. Until they are
+// set the footer points at the repository's issues; never invent a legal entity here.
 const OPERATOR: string | null = null;
 const PRIVACY_NOTICE_URL: string | null = null;
 const CONTACT_URL: string | null = null;
@@ -146,7 +151,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const counts = shown ? placeholderCounts(shown.masked) : [];
   const legend = new Map<EntityType, number>(counts.filter((c): c is [EntityType, string, number] => c[0] !== null).map(([type, , n]) => [type, n]));
   const masked = counts.reduce((sum, [, , n]) => sum + n, 0);
-  const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: "Live run didn’t finish · showing the worked example" } : { tone: "neutral", text: "Worked example · not a live run" };
+  const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: "Live run didn’t finish · showing the worked example" } : { tone: "neutral", text: "Worked example" };
   const heroCta = signedIn ? "Run your own text" : guestLive ? "Run the live demo" : "See how it works";
   // A guest with a live run gets it from the hero in one press (LAB-1479): the link still points
   // at #demo, so without JS, signed in or paused it stays a plain anchor.
@@ -168,6 +173,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
           <a className="hidden text-muted hover:text-ink md:inline" href="#demo">Demo</a>
           <a className="hidden text-muted hover:text-ink md:inline" href="#images">Images</a>
+          <a className="hidden text-muted hover:text-ink lg:inline" href="#meta">Meta models</a>
           <a className="hidden text-muted hover:text-ink md:inline" href="#results">Results</a>
           <a className="hidden text-muted hover:text-ink md:inline" href="#how">How it works</a>
           <a className="hidden text-muted hover:text-ink lg:inline" href="#data">Your data</a>
@@ -180,32 +186,46 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-24 lg:px-10">
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
-          <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible · Built on Meta models</p>
+          <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible · Built on Meta’s XLM-RoBERTa, Muse Glimmer, Muse Spark and SAM&nbsp;3.1</p>
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
-          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">A privacy gateway for AI agents. Personal data in text and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
+          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base"><span className="text-ink">Legal, HR and finance teams in the EU can’t send case files to a hosted model, so their agents stay off the useful work.</span> PII Guard is a privacy gateway: personal data in text, tool calls and images becomes placeholders before the request leaves, and the real values come back in the answer.</p>
           <div className="max-w-2xl space-y-3">
             <dl aria-label="Measured results" className="grid grid-cols-3 gap-3 sm:gap-6">{PROOF.map((p) => <Metric key={p.label} size="hero" label={p.label} value={p.value} hint={p.hint} />)}</dl>
-            <p className="text-xs text-muted">{MEASURED} · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a> · <a className={[link, "whitespace-nowrap"].join(" ")} href={NER_MODEL}>Our NER on Hugging Face ↗</a></p>
+            <p className="text-xs text-muted">{MEASURED} · compared with the open-source tools Presidio, PrivAiTe and LLM Guard · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
           </div>
           <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
-          <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 border-t border-line pt-5 sm:grid-cols-3">
-            <Differentiator href="#images" title="Images too">Faces are blocked and printed ID details become placeholders before an image is sent.</Differentiator>
-            <Differentiator href="#how" title="No LLM in the masking path">Rules and an open NER fine-tuned from Meta’s XLM-RoBERTa, run on the gateway.</Differentiator>
-            <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
+          <ul aria-label="Proof" className="flex max-w-2xl flex-wrap gap-x-4 gap-y-0.5 border-t border-line pt-4 text-xs text-muted">
+            <ProofItem href={HARNESS_REPORT}>Tested with {HARNESS.agents.length} real coding agents</ProofItem>
+            <ProofItem href={`${DOCS}/benchmarks.md#run-log`}>{RUNS.label} committed benchmark runs</ProofItem>
+            <ProofItem href={NER_MODEL}>Published open NER model</ProofItem>
+            <ProofItem href={`${SOURCE}/blob/develop/LICENSE`}>Apache-2.0</ProofItem>
+            <ProofItem href={CI}>CI and tests</ProofItem>
           </ul>
         </div>
-        <MiniFlow model={model} name={language === "hu" ? "Minta Réka" : "Robin Example"} />
+        <AgentReplay />
+      </section>
+
+      <section id="why" aria-labelledby="why-heading" className="scroll-mt-20 space-y-6">
+        <SectionHead id="why-heading" eyebrow="Why PII Guard" title="Made for agents, measured in the open." />
+        <ul aria-label="What makes it different" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 sm:grid-cols-2 lg:grid-cols-5">
+          <Differentiator href="#how" title="Agents, not just chat">Prompts, tool calls and streamed answers. Tested on the coding agents {HARNESS.agents.join(", ").replace(/, (?=[^,]*$)/, " and ")}: {HARNESS.requests} requests, {HARNESS.leaked} values leaked, {HARNESS.refused} turns refused.</Differentiator>
+          <Differentiator href="#how" title="No LLM, no GPU to mask">Validated rules and our open NER on the CPU, adding {LATENCY.value} per request (p50). Nothing is sent out to find personal data.</Differentiator>
+          <Differentiator href="#how" title="EU languages, grammar-aware">Hungarian names change with every case; the ending stays outside the placeholder, so the model still writes correct sentences.</Differentiator>
+          <Differentiator href="#images" title="One person, one placeholder">The same placeholder in the text and on a scanned ID: {VISUAL_PLACEHOLDERS.recall}&nbsp;% of image values matched, no false merges.</Differentiator>
+          <Differentiator href="#results" title="Measured in the open">Public test sets, {COMPARED.tools} other tools and {COMPARED.openModels} other open NER models, {RUNS.label} committed runs. Our NER is published.</Differentiator>
+        </ul>
       </section>
 
       <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-20 space-y-4">
         <SectionHead id="demo-heading" eyebrow="Demo" focusable title="See exactly what the model sees." lead={`One request, four steps: your text, what ${modelOr("the model")} sees, its answer, and that answer with the real values back.`} />
+        {DEMO_VIDEO_URL && <DemoVideo url={DEMO_VIDEO_URL} />}
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-end gap-3">
             <div className="basis-full sm:order-last sm:ml-auto sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
             <div className="grid gap-1.5"><p aria-hidden="true" className="text-sm font-medium text-ink">Sample language</p><SegmentedControl label="Sample language" options={LANGUAGES.map((l) => ({ ...l, disabled: running }))} value={language} onChange={(v) => reset(v as Language)} /></div>
             {signedIn && !needsKey && <Field label="Input" className="min-w-36 max-w-56 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">Worked example</option><option value="custom">Your text</option></Select></Field>}
             {canRun && !quota && <Button variant="primary" busy={running} disabled={!running && editable && !text.trim()} onClick={() => void run()}>{running ? "Running…" : failed ? "Try again" : editable ? "Run your text" : "Run live example"}</Button>}
-            {!account && <Button variant="primary" disabled>{accountError ? "Run live example" : "Checking availability…"}</Button>}
+            {!account && accountError && <Button variant="primary" disabled>Run live example</Button>}
             {result && !running && <Button onClick={() => reset()}>Back to the worked example</Button>}
             {canRun && !running && !quota && <p className="w-full text-xs text-muted sm:w-auto sm:self-center">{ownConnection ? <>Runs through your {providerLabel(ownConnection.provider)} connection.{hasConsole && <> <a className={link} href="#connect">Change it in Connect</a></>}</> : <>Runs on {modelOr("Meta’s model")} · no key needed{account && runsLeft(account) && <> · <span className="tabular-nums">{runsLeft(account)}</span></>}</>}</p>}
           </div>
@@ -223,7 +243,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <Announcer message={announce} />
         <div data-flow className={["space-y-4 transition-opacity", running ? "opacity-55" : ""].join(" ")}>
           <div className="flex flex-col lg:flex-row lg:items-stretch">
-            <Pane id="demo-input" side="you" eyebrow="Stays with PII Guard" title="Your text" className="lg:flex-1" footer={result ? "A real guard and model produced this. Check the masked request: detection can miss values, and this is pseudonymisation, not anonymisation." : "Written by hand to show the flow; no request was sent. Run live example for a real run on a fictional sample."}>
+            <Pane id="demo-input" side="you" eyebrow="Stays with PII Guard" title="Your text" className="lg:flex-1" footer={result ? "A real guard and model produced this. Check the masked request: detection can miss values, and this is pseudonymisation, not anonymisation." : "Hand-written to show the flow. Run live example sends this fictional sample through the real gateway and model."}>
               {shown ? <YourText text={shown.original} masked={shown.masked} entities={result?.entities} /> : <Field label="Your text" hint="PII Guard receives this text in full on Azure in Sweden Central. Use fictional data while you evaluate."><Textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field>}
             </Pane>
             <Boundary direction="outbound" label="PII Guard boundary: only this crosses to the model">
@@ -246,49 +266,59 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
 
-      <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
-        <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
-        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway the masked image replaces the original, with its masked transcript and summary; on {VISUAL_PLACEHOLDERS.docs} fictional documents {VISUAL_PLACEHOLDERS.recall}&nbsp;% of the values on an image got the same placeholder as in the text, with no false merges (<a className={link} href={`${DOCS}/benchmarks.md#visual-placeholders`}>benchmark</a>). In the hosted preview the masked image comes back to you and isn’t sent to a model; it doesn’t look for signatures or stamps (here the photo cover takes the signature too), which a self-hosted install masks. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
-        <Card title="Measured on 65 official specimen ID documents from 24 countries" headingLevel={3} subtitle="Self-hosted run with SAM 3.1, Tesseract OCR and the rules, 27 Oct 2026. A region counts as covered when the mask overlaps it at IoU ≥ 0.5.">
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
-          <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/benchmarks.md#image-masking`}>Image benchmark details ↗</a></p>
+      <section id="for" aria-labelledby="for-heading" className="scroll-mt-20 space-y-6">
+        <SectionHead id="for-heading" eyebrow="Who it’s for" title="Built for agents that work on people’s files." lead="Regulated teams keep their agents away from the useful input, because it is personal data: a case file, an HR folder, a client’s letter. PII Guard lets the agent use the model without handing over the person." />
+        <Card as="div">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-3 md:gap-0 md:divide-x md:divide-line">
+            <Audience title="Legal" task="Summarise the case file and draft the reply to opposing counsel.">Parties, addresses and case-file IDs are masked; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client, and the draft comes back with the name.</Audience>
+            <Audience title="HR" task="Answer this employee’s leave request from their folder.">Names, ID numbers, addresses and dates of birth are masked on the way out, in tool results as well as in the prompt.</Audience>
+            <Audience title="Finance and back office" task="Match these invoices to the account letters and flag the gaps.">IBANs and tax IDs are caught by validated rules with checksums; names and companies by the NER.</Audience>
+          </ul>
         </Card>
       </section>
 
+      <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
+        <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
+        <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
+        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card, masked with the hosted preview’s setup. Through the gateway, the masked image and its masked transcript are what the model receives. In this hosted preview images are masked and returned to you, never sent to a model, and signatures stay visible; masking them takes a self-hosted install with SAM 3.1. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <Card title="Measured on images" headingLevel={3} subtitle={`Same placeholder: ${VISUAL_PLACEHOLDERS.docs} fictional documents. Portraits and signatures: ${IMAGE_LIMITS.ids} official specimen ID documents from ${IMAGE_LIMITS.countries} countries, self-hosted, a region counted when the mask overlaps it at IoU ≥ 0.5. Runs of 27 Oct 2026.`}>
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
+          <p className="mt-4 text-xs text-muted">Printed text on real ID scans is still the weak spot; it’s listed under <a className={link} href="#privacy">limits</a>. <a className={link} href={`${DOCS}/benchmarks.md#image-masking`}>Image benchmark details ↗</a></p>
+        </Card>
+      </section>
+
+      <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-20 space-y-6">
+        <SectionHead id="meta-heading" eyebrow="Built on Meta models" title="Open weights wherever real data goes. Hosted models see placeholders." lead="Anything that sees real personal data is an open-weight model you can run yourself." />
+        <ul aria-label="Meta models and what each does" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
+          <MetaModel name="XLM-RoBERTa" where="Inside PII Guard, CPU" role={<>The base of our NER, fine-tuned for personal data. Runs on every request. <a className={link} href={NER_MODEL}>Published ↗</a></>} />
+          <MetaModel name="Muse Glimmer 30B" where="Open weights, served on Modal" role="The teacher: it labelled 4,964 fictional documents, and our NER was distilled from its labels." />
+          <MetaModel name="Muse Spark Open" where="Open weights, on Baseten" role="The opt-in audit detector, and the red team that tries to re-identify masked text." />
+          <MetaModel name="SAM 3.1" where="Self-hosted installs" role="Finds signatures on scans, so they’re masked along with faces and ID photos." />
+          <MetaModel name={modelOr("Muse Spark")} where="Meta Model API" role="Answers in this demo. It only ever sees placeholders." />
+        </ul>
+      </section>
+
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on all three test sets below." lead="Fictional and public test data, from committed run records of 27–28 Oct 2026. The sets are small, so a few points is noise; where it’s weaker is listed beside the chart." />
-        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
-            <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better; each tool’s time was measured where it ran.">
-              <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
-            </Card>
-          <Card title="Where it’s weaker" headingLevel={3}>
-            <ul className="grid gap-3">
-              <Point title="Finance text.">{WEAKER.gretel} % leak on Gretel finance, level with Presidio ({WEAKER.gretelPresidio} %).</Point>
-              <Point title="Over-masking.">It can mask too much: reference numbers without a cue word can be masked as IDs ({WEAKER.ceeOverMasking} % over-masking on CEE-PII).</Point>
-              <Point title="Other EU languages.">Trained on Hungarian, German and English. On EU legal text in 21 languages it leaks {WEAKER.mapaLeak} % (MAPA EUR-Lex, 42 docs).</Point>
-            </ul>
-            <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{signedIn && hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
+        <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on all three test sets below." lead="Fictional and public test data, from committed run records of 27–28 Oct 2026. Leak counts personal values that still reach the model; F1 also counts over-masking. The sets are small, so a few points is noise; where it’s weaker is listed under limits." />
+        <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-6 lg:grid-cols-2">
+          <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
+            <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
           </Card>
-          </div>
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
-            <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labelled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better).">
-              <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">
-                <table className="w-full min-w-[28rem] border-collapse text-sm">
-                  <caption className="sr-only">Leak rate and F1 in percent, by dataset, for PII Guard and three comparison tools</caption>
-                  <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
-                  <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
-                </table>
-              </div>
-              <div className="space-y-5 sm:hidden">{SETS.map((set, i) => <ResultTable key={set} caption={set} columns={["Leak", "F1"]} rows={COMPARISON.map((row) => ({ name: row.system, ours: row.ours, values: [row.leak[i]!, row.f1[i]!] }))} />)}</div>
-              <p className="mt-3 text-xs text-muted">PII Guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits PII Guard was not trained on.</p>
-            </Card>
-            <Card title="Our NER against other open PII models" headingLevel={3} subtitle="The same rules and the same 51 hand-written documents; only the NER model differs. Over-masking: text masked that wasn’t personal data.">
-              <ResultTable hideCaption caption="Leak, F1 and over-masking in percent, by NER model, with the same rules" columns={["Leak", "F1", "Over-masking"]} rows={OPEN_MODELS.map((m) => ({ name: m.model, title: m.id, ours: "ours" in m, values: [m.leak, m.f1, m.over] }))} />
-              <p className="mt-3 text-xs text-muted">Runs of 28 Oct 2026. The closest, {OPEN_MODELS[1].model}, leaks {OPEN_MODELS[1].leak} % but masks about nine times as much text that isn’t personal data.</p>
-            </Card>
-          </div>
+          <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labelled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better)." className="flex flex-col">
+            <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">
+              <table className="w-full min-w-[28rem] border-collapse text-sm">
+                <caption className="sr-only">Leak rate and F1 in percent, by dataset, for PII Guard and three comparison tools</caption>
+                <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
+                <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
+              </table>
+            </div>
+            <div className="space-y-5 sm:hidden">{SETS.map((set, i) => <ResultTable key={set} caption={set} columns={["Leak", "F1"]} rows={COMPARISON.map((row) => ({ name: row.system, ours: row.ours, values: [row.leak[i]!, row.f1[i]!] }))} />)}</div>
+            <p className="mt-3 text-xs text-muted">PII Guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits PII Guard was not trained on.</p>
+            <div className="mt-auto border-t border-line pt-4">
+              <p className="text-muted"><span className="font-medium text-ink">Against {COMPARED.openModels} other open PII models</span>, with the same rules around each: ours leaks {OPEN_MODELS[0].leak}&nbsp;%. The closest, {OPEN_MODELS[1].model}, leaks {OPEN_MODELS[1].leak}&nbsp;% and masks about nine times as much text that isn’t personal data ({OPEN_MODELS[1].over}&nbsp;% against {OPEN_MODELS[0].over}&nbsp;%).</p>
+              <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{signedIn && hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
+            </div>
+          </Card>
         </div>
       </section>
 
@@ -314,30 +344,6 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <dl className="mt-5 border-t border-line pt-4"><Metric label={LATENCY.label} value={LATENCY.value} hint={LATENCY.hint} /></dl>
           </Card>
         </div>
-      </section>
-
-      <section id="for" aria-labelledby="for-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="for-heading" eyebrow="Who it’s for" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. PII Guard lets the agent use the model without handing over the person." />
-        <Card as="div">
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-3 md:gap-0 md:divide-x md:divide-line">
-            <Audience title="Legal">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</Audience>
-            <Audience title="HR">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</Audience>
-            <Audience title="Finance and back office">Work through invoices and account correspondence. Bank accounts and tax IDs are caught by validated rules.</Audience>
-          </ul>
-        </Card>
-      </section>
-
-      <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="meta-heading" eyebrow="Models" title="Built on Meta models, each where it fits." lead="Anything that sees real personal data is an open-weight model you can run yourself. Hosted models only see fictional or masked text." />
-        <Card>
-          <KeyValues className="sm:grid-cols-[12rem_minmax(0,1fr)]" items={[
-            { key: "xlmr", label: <span className="font-medium text-ink">XLM-RoBERTa</span>, value: <>Open, MIT. Our fine-tuned NER runs inside PII Guard on every request. <a className={link} href={NER_MODEL}>On Hugging Face ↗</a></> },
-            { key: "glimmer", label: <span className="font-medium text-ink">Muse Glimmer 30B</span>, value: "Open weights. The teacher: it labelled 4,964 fictional documents to train the NER." },
-            { key: "spark", label: <span className="font-medium text-ink">{modelOr("Muse Spark")}</span>, value: "Answers in this demo, seeing placeholders only." },
-            { key: "sam", label: <span className="font-medium text-ink">SAM 3.1</span>, value: "Finds signatures so a self-hosted install can mask them too." },
-            { key: "open", label: <span className="font-medium text-ink">Muse Spark Open</span>, value: "The optional audit mode and the red team." },
-          ]} />
-        </Card>
       </section>
 
       <section id="run" aria-labelledby="run-heading" className="scroll-mt-20 space-y-6">
@@ -383,11 +389,19 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
       <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="privacy-heading" eyebrow="Limits" title="What PII Guard doesn’t promise." />
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Card title="Detection can miss" headingLevel={3}><p className="text-muted">A missed value goes to the model. That’s why we publish leak rates and show you the masked request.</p></Card>
           <Card title="Context can identify" headingLevel={3}><p className="text-muted">Even with names removed, surrounding detail can point to a person.</p></Card>
           <Card title="It pseudonymises; it doesn’t anonymise" headingLevel={3}><p className="text-muted">The data is still personal data, and PII Guard reduces exposure. Using it doesn’t by itself make a deployment compliant with any law.</p></Card>
           <Card title="Remote detectors join your trust boundary" headingLevel={3}><p className="text-muted">If you enable one, it sees originals. Don’t submit highly sensitive data, or content you aren’t authorised to process.</p></Card>
+          <Card title="Weaker on some text" headingLevel={3}>
+            <ul className="grid gap-2">
+              <Point title="Finance text.">{WEAKER.gretel}&nbsp;% leak on Gretel finance, level with Presidio ({WEAKER.gretelPresidio}&nbsp;%).</Point>
+              <Point title="Over-masking.">Reference numbers without a cue word can be masked as IDs ({WEAKER.ceeOverMasking}&nbsp;% on CEE-PII).</Point>
+              <Point title="Other EU languages.">Trained on Hungarian, German and English; on EU legal text in 21 languages it leaks {WEAKER.mapaLeak}&nbsp;%.</Point>
+            </ul>
+          </Card>
+          <Card title="Printed text on ID scans" headingLevel={3}><p className="text-muted">On {IMAGE_LIMITS.ids} official specimen IDs, {IMAGE_LIMITS.all}&nbsp;% of all labelled regions are covered (Presidio Image Redactor: {IMAGE_LIMITS.presidio}&nbsp;%). Printed text alone: {IMAGE_LIMITS.text}&nbsp;%. Faces and ID photos are the strong part; read the masked transcript before you rely on it.</p></Card>
         </div>
         <p className="text-xs text-muted"><a className={link} href={`${DOCS}/privacy-model.md`}>Read the privacy model ↗</a></p>
       </section>
@@ -427,10 +441,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <a className="text-ink hover:underline" href="#data">Your data</a>
           <a className="text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks</a>
           {PRIVACY_NOTICE_URL && <a className="text-ink hover:underline" href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
-          {CONTACT_URL && <a className="text-ink hover:underline" href={CONTACT_URL}>Contact</a>}
+          <a className="text-ink hover:underline" href={CONTACT_URL ?? `${SOURCE}/issues`}>{CONTACT_URL ? "Contact" : "Questions and issues"}</a>
         </nav>
         <p className="text-xs text-muted">Apache-2.0 · Built for the Meta Global AI Developer Hackathon 2026</p>
-        <p className="text-xs text-muted">{OPERATOR ? `Operated by ${OPERATOR}.` : "Operator details, privacy notice and contact are being finalised."}</p>
+        {OPERATOR && <p className="text-xs text-muted">Operated by {OPERATOR}.</p>}
       </div>
     </footer>
   </div>;
@@ -449,7 +463,7 @@ function SectionHead({ id, eyebrow, title, lead, focusable }: { id: string; eyeb
   </div>;
 }
 
-/** One of the hero's three differences: a short lead that links to the section that shows it. */
+/** One of the five differences: a short lead that links to the section that shows it. */
 function Differentiator({ href, title, children }: { href: string; title: string; children: ReactNode }) {
   return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink underline-offset-4 hover:underline">{title}{"\u00a0"}<span aria-hidden="true" className="text-muted">↓</span></a><span className="mt-0.5 block">{children}</span></li>;
 }
@@ -464,8 +478,8 @@ function ResultTable({ caption, hideCaption = false, columns, rows }: { caption:
 }
 
 /** One audience in the "Who it's for" card: columns split by hairlines from md up. */
-function Audience({ title, children }: { title: string; children: ReactNode }) {
-  return <li className="min-w-0 md:px-5 md:first:pl-0 md:last:pr-0"><h3 className="text-sm font-medium text-ink">{title}</h3><p className="mt-1 text-muted">{children}</p></li>;
+function Audience({ title, task, children }: { title: string; task: string; children: ReactNode }) {
+  return <li className="min-w-0 md:px-5 md:first:pl-0 md:last:pr-0"><h3 className="text-sm font-medium text-ink">{title}</h3><p className="mt-2 border-l-2 border-line pl-2.5 font-mono text-2xs text-ink sm:text-xs">“{task}”</p><p className="mt-2 text-muted">{children}</p></li>;
 }
 
 /** One list item with its lead in ink. */
@@ -473,19 +487,12 @@ function Point({ title, children }: { title: string; children: ReactNode }) {
   return <li className="text-muted"><span className="font-medium text-ink">{title}</span> {children}</li>;
 }
 
-/** The hero's picture of the product: one value, there and back. Fictional. Desktop only: phones go straight to the demo. */
-function MiniFlow({ model, name }: { model: string | null; name: string }) {
-  const masked = metaFor("PERSON");
-  return <figure className="hidden min-w-0 space-y-2 lg:block" aria-labelledby="mini-flow-caption">
-    <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back. Below it, a fictional ID card before and after masking: the face is blocked and each ID detail is covered by a box printed with its placeholder.</figcaption>
-    <div aria-hidden="true" className="space-y-2">
-      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You send</p><p className="doc mt-1">Name: <mark className={["rounded-md px-0.5 -mx-0.5 ring-1 ring-inset", masked.mark].join(" ")}>{name}</mark></p></div>
-      <p className="text-center font-mono text-2xs text-guard">↓ PII Guard masks</p>
-      <div className="rounded-xl border border-model/25 bg-model-soft/60 px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-model">{model ?? "The model"} sees</p><p className="doc mt-1">Name: <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" /></p></div>
-      <p className="text-center font-mono text-2xs text-guard">↓ PII Guard restores</p>
-      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You get back</p><p className="doc mt-1">Dear <mark className="rounded-md bg-restored-soft px-0.5 -mx-0.5 text-ink ring-1 ring-restored/45 ring-inset">{name}</mark>, …</p></div>
-      <p className="text-center font-mono text-2xs text-guard">↓ and in images</p>
-      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">Faces blocked · ID details tokenized</p><div className="mt-2"><Suspense fallback={<div className="aspect-[3/1] rounded-md bg-surface-2" />}><HeroImage /></Suspense></div></div>
-    </div>
-  </figure>;
+/** One proof signal under the hero's call to action: a short claim that links to its evidence. */
+function ProofItem({ href, children }: { href: string; children: ReactNode }) {
+  return <li><a className="inline-flex min-h-6 items-center gap-1.5 rounded-sm underline-offset-4 hover:text-ink hover:underline" href={href}><span aria-hidden="true" className="size-1.5 rounded-full bg-guard-dot" />{children}</a></li>;
+}
+
+/** One model in the Meta strip: what it does and where it runs. */
+function MetaModel({ name, where, role }: { name: string; where: string; role: ReactNode }) {
+  return <li className="min-w-0 bg-surface p-4"><h3 className="text-sm font-medium text-ink">{name}</h3><p className="mt-0.5 font-mono text-2xs text-guard">{where}</p><p className="mt-2 text-muted">{role}</p></li>;
 }

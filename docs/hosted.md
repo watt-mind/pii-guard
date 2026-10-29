@@ -200,6 +200,7 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
 | `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |
 | `VITE_PII_GUARD_ROBOTS` (UI build arg) | Default `disallow`: `robots.txt` keeps crawlers out. Build with `--build-arg VITE_PII_GUARD_ROBOTS=allow` only for the public production image. Dev and prod currently share one image, so prod indexing needs its own build or a runtime switch first |
+| `VITE_PII_GUARD_DEMO_VIDEO_URL`, `VITE_PII_GUARD_DEMO_VIDEO_POSTER` (UI build args) | Unset by default: the landing's demo video slot stays hidden. Set the URL (and optionally a poster image) to show a poster with a play button above the demo |
 
 ## Dedicated Azure deployment
 

@@ -57,12 +57,23 @@ export const OPEN_MODELS = [
   { model: "bardsai multilang v3", id: "bardsai/eu-pii-anonimization-multilang-v3", leak: "9.8", f1: "89.7", over: "1.3" },
 ] as const;
 
-/** Image masking on official specimen IDs: regions found (IoU ≥ 0.5), self-hosted with SAM 3.1. */
+/** Same placeholder in text and image: `visual-placeholders`, fuzzy matching, run of 2026-10-27 (recall; precision 100.0 %). */
+export const VISUAL_PLACEHOLDERS = { docs: 24, recall: "98.0" } as const;
+
+/**
+ * Image masking on official specimen IDs (`specimens`, run
+ * `2026-10-27-image-baselines-specimens-pii-guard-rules`, regions found at IoU ≥ 0.5, self-hosted
+ * with SAM 3.1), led by the same-placeholder figure (`VISUAL_PLACEHOLDERS`). The weaker figures
+ * from the same run are in `IMAGE_LIMITS`, shown under the page's limits.
+ */
 export const IMAGE_PROOF = [
+  { value: `${VISUAL_PLACEHOLDERS.recall}\u00a0%`, label: "Same placeholder as in the text", hint: `Values on ${VISUAL_PLACEHOLDERS.docs} fictional documents, no false merges` },
   { value: "90.8\u00a0%", label: "Portraits covered", hint: "Presidio Image Redactor can’t mask portraits" },
   { value: "83.8\u00a0%", label: "Signatures covered", hint: "Self-hosted with SAM 3.1; kept visible in the hosted preview" },
-  { value: "37.9\u00a0%", label: "All labelled regions", hint: "Presidio Image Redactor 13.3\u00a0%. Printed text is the weak spot: 15.0\u00a0%" },
 ] as const;
+
+/** The same image run's weak spots: all labelled regions, and printed text alone. */
+export const IMAGE_LIMITS = { all: "37.9", presidio: "13.3", text: "15.0", ids: 65, countries: 24 } as const;
 
 /**
  * Where it's weaker, from the same report: Gretel finance (PII Guard fast vs Presidio, 27–28 Oct),
@@ -70,5 +81,15 @@ export const IMAGE_PROOF = [
  */
 export const WEAKER = { gretel: "19.0", gretelPresidio: "18.8", ceeOverMasking: "26.4", mapaLeak: "8.5" } as const;
 
-/** Same placeholder in text and image: `visual-placeholders`, fuzzy matching, run of 2026-10-27 (recall; precision 100.0 %). */
-export const VISUAL_PLACEHOLDERS = { docs: 24, recall: "98.0" } as const;
+/**
+ * Real coding agents through the gateway: docs/integrations/harness-matrix-2026-10-29.md
+ * (LAB-1475). 115 agent requests through the gateway, none of the 9 fictional values in any
+ * body the upstream received, and 0 of 10 agent turns refused (7 of 15 the day before).
+ */
+export const HARNESS = { agents: ["Codex", "OpenCode", "Muse Code", "pi"], requests: 115, leaked: 0, refused: "0 of 10", date: "29 Oct 2026" } as const;
+
+/** Committed run records in eval/results/runs/ (733 on 29 Oct 2026): shown as a floor, so a new run never makes it wrong. */
+export const RUNS = { floor: 700, label: "700+" } as const;
+
+/** Our NER, the other open PII models it was compared with and the comparison tools, from `OPEN_MODELS` and `COMPARISON`. */
+export const COMPARED = { tools: COMPARISON.length - 1, openModels: OPEN_MODELS.length - 1 } as const;
