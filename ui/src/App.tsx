@@ -255,6 +255,13 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
     if (route.section === "overview") void refreshAccount?.();
   }, [route.section, refreshAccount]);
 
+  // Hosted: the traffic log answered 401, so ask /v1/account whether the session ended; if it
+  // did, the hosted shell swaps the console for the "Your session ended" panel (LAB-1519).
+  const signedOut = trafficHandle.status.state === "denied" && trafficHandle.status.reason === "signed_out";
+  useEffect(() => {
+    if (signedOut) void refreshAccount?.();
+  }, [signedOut, refreshAccount]);
+
   const chatClient = engine.engine === "api" ? apiChat : mockChat;
   // Nobody chose the demo engine and the API does not answer: the notice turns red.
   const apiDown = engine.engine === "mock" && engine.state.preference !== "mock" && engine.state.status.state === "offline";
