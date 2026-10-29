@@ -120,8 +120,9 @@ teacher adopts them, so they are labeled rather than taught as `O`.
 The training files are `eval/generated/distill-eu-s1525/labelled/<lang>-distill-{train,dev}.jsonl`;
 the teacher cache is kept next to them, so a rerun of `label.py --cache-only` is local and free.
 Phase 1b's are under `eval/generated/distill-eu-1b-s1525/labelled/`. Rows are not committed;
-an off-machine copy of the whole phase-1b output (documents, labels, teacher cache and the Muse
-response cache) is at `~/Develop/.worktrees/pii-guard/data-eu/phase1b/`.
+the whole phase-1b output (documents, labels, teacher cache and the Muse response cache) is the
+corpus `phase1b` in the data root, backed up at revision
+`5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28` (see "Where the data lives").
 
 ## Gate sets
 
@@ -176,7 +177,7 @@ Hugging Face dataset, so removing a worktree no longer loses them.
 
 | Corpus | What | Revision |
 |---|---|---|
-| `phase1b` | Muse es/fr/it/nl/ro/ga/mt documents + response cache (LAB-1534), no teacher labels yet | `6fbb52b62d990e2c2a1008d2427d66f413dddebb` |
+| `phase1b` | Muse fr/es/it/nl/ro/ga/mt documents (8,376), response cache, **Glimmer-labelled** (`labelled/`, `teacher-cache.jsonl`) (LAB-1534) | `5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28` |
 | `v41` | Muse court-style documents bg..ga, pilot, response cache (LAB-1539, snapshot while the run continued) | `4b6c928f4abd8b9e7137d5d0cfbd519744f6bf9a` |
 | `v20-s11` | v2.0's s11 hu/en corpus, Glimmer labels, teacher and writer caches (LAB-1128) | `294adb3fc4d411825f5a416f4b6b93468e4836fe` |
 
@@ -184,16 +185,16 @@ Hugging Face dataset, so removing a worktree no longer loses them.
 set -a; source .env; set +a   # or: hf auth login (read access to watt-mind)
 # restore a corpus into the data root, pinned to a revision
 uv run --no-sync --with huggingface-hub python training/ner/data_sync.py pull phase1b \
-  --revision 6fbb52b62d990e2c2a1008d2427d66f413dddebb
+  --revision 5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28
 # what a push would upload (nothing is sent)
 uv run --no-sync python training/ner/data_sync.py check phase1b
 # back up a corpus by hand (prints the revision)
 uv run --no-sync --with huggingface-hub python training/ner/data_sync.py push phase1b
 # copy a revision to the Modal volume, then train from it without uploading
 uv run --no-sync --with huggingface-hub --with modal python training/ner/data_sync.py volume phase1b \
-  --revision 6fbb52b62d990e2c2a1008d2427d66f413dddebb
+  --revision 5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28
 modal run training/distill/modal_train.py --config <toml> \
-  --data phase1b@6fbb52b62d990e2c2a1008d2427d66f413dddebb
+  --data phase1b@5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28
 ```
 
 ## Rebuild
