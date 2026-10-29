@@ -62,6 +62,27 @@ about the words of a language, and drops a hit only when that shape rules person
    - in a path, a name-like hit in the package segment right after ``node_modules/`` (or in its
      ``@scope`` segment and the package after it) goes: those are npm package names.
 
+7. **Bare numbers as addresses (LAB-1477).** An ``ADDRESS`` hit with digits and no letter
+   (``4096`` in ``up to 4096 keyed digests``, a port, ``"ticket": 4471``, the digits of a SKU)
+   goes when nothing address-like stands next to it. It is kept when:
+
+   - a word written as a name touches it (only spaces, ``,`` ``.`` ``-`` ``/`` or a line break
+     between, and no sentence end before a word after it): a settlement or a street
+     (``1051 Budapest``, ``Budapest, 1051``, ``Musterstraße 12``, ``H-6720 Szeged``);
+   - one of the two words before it, or the word after it, on its line is an address word
+     (:data:`_ADDRESS_WORDS`: a street type, ``zip``, ``PLZ``, ``irányítószám``, ``lakcím``):
+     ``Minta utca 12. 3/5.``, ``"zip": 1051``;
+   - another ``ADDRESS`` hit touches it (the model split one address in two).
+
+   A port word right before it (``port``, ``--port``, ``Ports``) drops it whatever follows. A
+   four-digit number has the shape of a Hungarian postcode, so the shape alone never decides.
+
+8. **Eponyms (LAB-1477).** A one-word ``PERSON`` hit that is followed by the noun of a method
+   (:data:`_METHOD_WORDS`: ``Luhn test``, ``Luhn check``, ``Dijkstra's algorithm``,
+   ``Luhn-algoritmus``, ``Luhn-Prüfsumme``, ``Bloom filter``) goes: it names an algorithm, not a
+   person. A name a language pack's lexicon knows (``Kovács``) and a hit that is part of a
+   longer name (``Hans Luhn test``) are kept, like the software-name shortcuts.
+
 Fail closed: anything else passes untouched. The rules, the LLM detector and the values a
 client pre-loaded (known values) are not checked here: they are validated or explicit.
 
@@ -183,6 +204,47 @@ _LIST_GAP_RE = re.compile(
 _PRODUCT_ACRONYMS = frozenset({"API", "SDK", "CLI", "MCP", "IDE"})
 _WORD_AFTER_RE = re.compile(r"^[ \t\u00a0]+([A-Za-z]{2,5})(?![\w])")
 _WORD_RE = re.compile(r"[^\W\d_](?:[^\W\d_]|['\u2019.-](?=[^\W\d_]))*")
+
+# --- LAB-1477: bare numbers as ADDRESS, eponyms as PERSON ---------------------------------
+# Words that make a number next to them part of an address, folded (lower case, no accents).
+# A trailing "*" takes any suffix. Street types, address and postcode labels of the built-in
+# languages; a pack adds its own with the next release.
+_ADDRESS_WORDS: tuple[str, ...] = (
+    # labels
+    "address*", "addr", "adresse*", "anschrift*", "wohnort*", "adres*", "cim", "cime*",
+    "cimem", "cimre", "cimen", "lakcim*", "szekhely*", "telephely*", "postacim*",
+    "zip*", "postcode*", "postal*", "plz", "postleitzahl*", "irsz", "iranyitoszam*",
+    "pocztowy*", "kod",
+    # street types and parts of an address
+    "street*", "st", "road*", "rd", "avenue*", "ave", "lane*", "ln", "grove", "crescent",
+    "terrace", "flat", "apt", "apartment*", "suite", "utca*", "u", "ut", "utja", "ter",
+    "tere", "koz", "sor", "korut*", "krt", "fasor*", "sugarut*", "em", "emelet*", "ajto*",
+    "fszt", "hazszam*", "strasse*", "str", "weg", "allee", "platz", "gasse", "hausnummer*",
+    "wohnung*", "ul", "ulica*", "al", "aleja*", "os", "osiedle*",
+)  # fmt: skip
+_ADDRESS_SUFFIXES = ("strasse", "weg", "allee", "platz", "gasse")
+# A port word right before a number: it is a port, not a postcode.
+_PORT_WORD_RE = re.compile(
+    r"^(?:ports?|port(?:on|ot|ra|ja|szam\w*|nummer\w*|e|en|s)|listen|listens|listening)$"
+)
+# What may stand between a number and a word that makes it an address: spaces, a comma, a
+# full stop, a hyphen (``H-1051``), a slash or a line break; at most three characters.
+_ADDRESS_GAP_RE = re.compile(r"^[ \t\u00a0,.\-\u2013/\r\n]{1,3}$")
+_LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
+# A full stop and a space after the number end its sentence: the next word is not its city.
+_SENTENCE_END_RE = re.compile(r"\.\s")
+# The noun of a method after an eponym, folded. English forms are listed whole (``tested``
+# is a verb); Hungarian and German forms take suffixes (``algoritmussal``, ``Prüfsummen``).
+_METHOD_WORDS: tuple[str, ...] = (
+    "test", "tests", "check", "checks", "checksum", "checksums", "algorithm", "algorithms",
+    "formula", "formulas", "method", "methods", "filter", "filters", "transform",
+    "transforms", "distance", "coding", "encoding", "digit", "validation", "scheme",
+    "algoritmus*", "ellenorz*", "teszt*", "proba*", "keplet*", "modszer*", "szuro*",
+    "eljaras*", "transzformaci*", "tavolsag*", "algorithmus*", "algorithmen", "prufung*",
+    "prufsumme*", "prufziffer*", "verfahren*", "formel*", "methode*", "transformation*",
+    "abstand*",
+)  # fmt: skip
+_EPONYM_AFTER_RE = re.compile(r"^(?:['\u2019]s)?[ \t\u00a0-]+([^\W\d_]+)")
 
 
 def enabled() -> bool:
@@ -445,6 +507,76 @@ def _npm_package_segment(text: str, ts: int, ss: int) -> bool:
     return _NODE_MODULES_RE.search(text[ts:ss]) is not None
 
 
+def _fold(word: str) -> str:
+    from pii_guard.languages.cues import fold
+
+    return fold(word).replace("ß", "ss").rstrip(".")
+
+
+def _listed(word: str, listed: tuple[str, ...]) -> bool:
+    folded = _fold(word)
+    return any(folded.startswith(w[:-1]) if w.endswith("*") else folded == w for w in listed)
+
+
+def _address_word(word: str) -> bool:
+    return _listed(word, _ADDRESS_WORDS) or _fold(word).endswith(_ADDRESS_SUFFIXES)
+
+
+def _bare_number_address(text: str, start: int, end: int, addresses: Sequence[Span] = ()) -> bool:
+    """A letterless ``ADDRESS`` hit with nothing address-like next to it (module rule 7)."""
+    value = text[start:end]
+    if not any(ch.isdigit() for ch in value) or any(ch.isalpha() for ch in value):
+        return False
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    line_end = len(text) if line_end < 0 else line_end
+    before = list(_LETTER_WORD_RE.finditer(text, max(line_start, start - 30), start))
+    after = list(_LETTER_WORD_RE.finditer(text, end, min(line_end, end + 30)))
+    if before and _PORT_WORD_RE.match(_fold(before[-1].group()).lstrip("-")):
+        return True
+    for other in addresses:
+        if (other.start, other.end) == (start, end):
+            continue
+        if other.start < end and start < other.end:
+            return False  # overlapping: one address
+        gap = text[other.end : start] if other.end <= start else text[end : other.start]
+        if not gap or _ADDRESS_GAP_RE.match(gap):
+            return False  # touching: the model split one address in two
+    if any(_address_word(m.group()) for m in [*before[-2:], *after[:1]]):
+        return False
+    # A word written as a name touching the number (a line break may stand between).
+    near = list(_LETTER_WORD_RE.finditer(text, max(0, start - 40), start))
+    if (
+        near
+        and _ADDRESS_GAP_RE.match(text[near[-1].end() : start])
+        and _name_shaped(near[-1].group())
+    ):
+        return False
+    nxt = _LETTER_WORD_RE.search(text, end, min(len(text), end + 40))
+    return not (
+        nxt is not None
+        and _ADDRESS_GAP_RE.match(text[end : nxt.start()])
+        and not _SENTENCE_END_RE.search(text[end : nxt.start()])
+        and _name_shaped(nxt.group())
+    )
+
+
+def _eponym(text: str, start: int, end: int, persons: Sequence[Span]) -> bool:
+    """A one-word ``PERSON`` hit followed by a method's noun (module rule 8)."""
+    from pii_guard.detect.ner_orgs import _part_of_name, _person_names
+
+    value = text[start:end]
+    if not _SINGLE_IDENT_RE.match(value) or not _name_shaped(value):
+        return False
+    match = _EPONYM_AFTER_RE.match(text[end : end + 40])
+    if match is None or not _listed(match.group(1), _METHOD_WORDS):
+        return False
+    if value.casefold() in _person_names():
+        return False
+    probe = Span(start, end, EntityType.PERSON, value, 1.0, "ner")
+    return not _part_of_name(text, probe, [p for p in persons if (p.start, p.end) != (start, end)])
+
+
 def _vetoed(
     text: str,
     start: int,
@@ -452,8 +584,11 @@ def _vetoed(
     entity_type: EntityType,
     language: str,
     persons: Sequence[Span] = (),
+    addresses: Sequence[Span] = (),
 ) -> bool:
     if entity_type is EntityType.EMAIL and not _email_ok(text, start, end):
+        return True
+    if entity_type is EntityType.ADDRESS and _bare_number_address(text, start, end, addresses):
         return True
     if _fence_info(text, start, end):
         return True
@@ -490,8 +625,8 @@ def _vetoed(
             and _in_inline_code(text, start, end)
         ):
             return True
-    return entity_type is EntityType.PERSON and _software_context(
-        text, start, end, language, persons
+    return entity_type is EntityType.PERSON and (
+        _software_context(text, start, end, language, persons) or _eponym(text, start, end, persons)
     )
 
 
@@ -504,7 +639,12 @@ def guard_spans(text: str, spans: Iterable[Span], language: str = "hu") -> list[
     if not found or not enabled():
         return found
     persons = [s for s in found if s.entity_type is EntityType.PERSON]
-    return [s for s in found if not _vetoed(text, s.start, s.end, s.entity_type, language, persons)]
+    addresses = [s for s in found if s.entity_type is EntityType.ADDRESS]
+    return [
+        s
+        for s in found
+        if not _vetoed(text, s.start, s.end, s.entity_type, language, persons, addresses)
+    ]
 
 
 def sweep_vetoed(text: str, start: int, end: int, entity_type: EntityType, language: str) -> bool:
