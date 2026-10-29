@@ -86,7 +86,7 @@ export default function ImageShowcase() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane id="image-original" side="you" eyebrow="Stays with pii-guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the on-device face detector. Dashed: text found by OCR and the rules.">
+        <Pane id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the on-device face detector. Dashed: text found by OCR and the rules.">
           <div className="space-y-3">
             <YourText text={IMAGE_LABELS_MESSAGE} masked={message.masked} />
             <Figure alt={sample.alt}>
@@ -106,7 +106,7 @@ export default function ImageShowcase() {
             </ul>
           </div>
         </Pane>
-        <Boundary direction="outbound" label="pii-guard boundary: only placeholders cross it">
+        <Boundary direction="outbound" label="PII Guard boundary: only placeholders cross it">
           <dl className="space-y-1 text-center">
             <Metric label="regions covered" value={masked.length} className="min-w-12" />
             <Metric label="as placeholders" value={tokenized.length} className="min-w-12" />
@@ -145,7 +145,7 @@ export default function ImageShowcase() {
         <Pane id="image-answer" side="model" eyebrow="Still placeholders" title="The model’s answer about the card" className="lg:flex-1" footer="A stand-in model, reading only the masked summary.">
           <MaskedText text={answer.masked} />
         </Pane>
-        <Boundary direction="inbound" label="pii-guard boundary: placeholders are restored on the way back" />
+        <Boundary direction="inbound" label="PII Guard boundary: placeholders are restored on the way back" />
         <Pane id="image-restored" side="you" eyebrow="Real values put back" title="The answer, with the name back" className="lg:flex-1">
           <RestoredText segments={restoredSegments({ answer: answer.masked, restored, masked: message.masked, original: IMAGE_LABELS_MESSAGE })} />
         </Pane>
