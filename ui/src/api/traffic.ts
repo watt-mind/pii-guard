@@ -77,6 +77,8 @@ export interface TrafficEvent {
   request: { masked?: unknown; original?: unknown } | null;
   /** `masked`: the upstream's answer; `unmasked`: what the client got (level `full` only). */
   response: { masked?: unknown; unmasked?: unknown; chunks?: number } | null;
+  /** Hosted: the endpoint the call went through (LAB-1492); `null` for a call on the project itself. */
+  endpoint?: { id: string; name: string } | null;
 }
 
 export interface TrafficPage {
@@ -133,6 +135,10 @@ export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
     },
     request: isRecord(raw.request) ? raw.request : null,
     response: isRecord(raw.response) ? raw.response : null,
+    endpoint:
+      isRecord(raw.endpoint) && typeof raw.endpoint.id === "string"
+        ? { id: raw.endpoint.id, name: typeof raw.endpoint.name === "string" && raw.endpoint.name ? raw.endpoint.name : raw.endpoint.id }
+        : null,
   };
 }
 

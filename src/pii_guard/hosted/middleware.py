@@ -408,6 +408,16 @@ class HostedMiddleware:
                     namespace = str(project_id) + ":" + selected_endpoint.id
                 runtime = self.service.acquire(principal, namespace=namespace)
                 state["hosted_runtime"] = runtime
+                if selected_endpoint is not None:
+                    # Each stored event names the endpoint it went through, so the project's
+                    # merged Logs can tell them apart (the name as of this request).
+                    runtime.observability.traffic.labels = {
+                        "endpoint": {"id": selected_endpoint.id, "name": selected_endpoint.name}
+                    }
+                elif canonical in {"/v1/traffic", "/v1/traffic/stream"}:
+                    # No endpoint selected: the project's own runtime plus its endpoints'
+                    # (LAB-1492). Vault and session routes stay on one runtime.
+                    state["hosted_traffic"] = self.service.project_traffic(runtime, project_id)
             filtered = [
                 (k, v)
                 for k, v in scope.get("headers", [])

@@ -5,6 +5,7 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { parseTrafficEvent, type TrafficConnectOptions, type TrafficEvent, type TrafficStatus } from "../api/traffic";
 import { Traffic } from "./Traffic";
+import { setSelectedEndpoint, setSelectedProject } from "../projects/selection";
 
 const recorded = (full.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
 const [huChat, huStream, deTools, refused] = recorded as [TrafficEvent, TrafficEvent, TrafficEvent, TrafficEvent];
@@ -327,7 +328,7 @@ describe("Live traffic", () => {
     const sendDemo = vi.fn();
     render(<Traffic connect={f.connect} pageHost="localhost" sendDemo={sendDemo} demoTraffic={false} />);
     f.push([], { state: "live", via: "sse", level: "masked", size: 200 });
-    expect(await screen.findByText("Connect a client to one of your endpoints (Connect), or mask a text in the Playground.")).toBeInTheDocument();
+    expect(await screen.findByText(/Calls through any of this project's endpoints show here, each tagged with its endpoint\./)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Send demo traffic" })).toBeNull();
     expect(screen.queryByText(/make demo-traffic/)).toBeNull();
     expect(sendDemo).not.toHaveBeenCalled();
@@ -378,5 +379,47 @@ describe("Upstream refusals in the drawer (LAB-1335)", () => {
     f.push([refused]);
     expect(await screen.findByText(/Refused\. Nothing was sent to the model\./)).toBeInTheDocument();
     expect(screen.queryByText(/The upstream refused/)).toBeNull();
+  });
+});
+
+describe("Endpoint traffic in project Logs (LAB-1492)", () => {
+  const viaEndpoint = (e: TrafficEvent, id: string, name: string): TrafficEvent => ({ ...asMasked(e), id: `${e.id}_${id}`, endpoint: { id, name } });
+
+  beforeEach(() => {
+    setSelectedProject(null);
+    setSelectedEndpoint(null);
+  });
+
+  it("tags each call with its endpoint when no endpoint is selected", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} />);
+    f.push([viaEndpoint(huChat, "ep_a", "Synthetic CLI"), asMasked(deTools)]);
+    const list = await screen.findByTestId("call-list");
+    expect(within(list).getByTitle("Endpoint: Synthetic CLI")).toBeInTheDocument();
+    expect(within(list).getAllByTitle(/^Endpoint:/)).toHaveLength(1);
+  });
+
+  it("names the endpoint in the detail and sends its vault session to that endpoint's view", async () => {
+    const f = fakeConnect();
+    const onOpenSession = vi.fn();
+    render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} onOpenSession={onOpenSession} />);
+    f.push([{ ...viaEndpoint(huChat, "ep_a", "Synthetic CLI"), session_ref: "s_0123456789abcdef" }]);
+    const detail = await screen.findByRole("region", { name: /Call at/ });
+    expect(within(detail).getByText("Endpoint")).toBeInTheDocument();
+    await userEvent.click(within(detail).getByRole("button", { name: "Switch to endpoint Synthetic CLI to open its session" }));
+    expect(onOpenSession).not.toHaveBeenCalled();
+    const { getSelectedEndpoint } = await import("../projects/selection");
+    expect(getSelectedEndpoint()).toBe("ep_a");
+  });
+
+  it("drops the tag and says the view is filtered while an endpoint is selected", async () => {
+    setSelectedEndpoint("ep_a");
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} />);
+    f.push([], { state: "live", via: "poll", level: "masked", size: 50 });
+    expect(await screen.findByText(/Only calls through the endpoint picked in the header show here\./)).toBeInTheDocument();
+    f.push([viaEndpoint(huChat, "ep_a", "Synthetic CLI")]);
+    const list = await screen.findByTestId("call-list");
+    expect(within(list).queryByTitle(/^Endpoint:/)).toBeNull();
   });
 });

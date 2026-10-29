@@ -474,3 +474,15 @@ describe("startFixtureFeed", () => {
     expect(none).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("parseTrafficEvent endpoint (LAB-1492)", () => {
+  const base = { id: "r_1", seq: 1, timing: {} };
+  it("keeps a hosted event's endpoint tag", () => {
+    expect(parseTrafficEvent({ ...base, endpoint: { id: "ep_a", name: "Synthetic CLI" } })?.endpoint).toEqual({ id: "ep_a", name: "Synthetic CLI" });
+  });
+  it("falls back to the id without a name, and to null without a tag", () => {
+    expect(parseTrafficEvent({ ...base, endpoint: { id: "ep_a" } })?.endpoint).toEqual({ id: "ep_a", name: "ep_a" });
+    expect(parseTrafficEvent(base)?.endpoint).toBeNull();
+    expect(parseTrafficEvent({ ...base, endpoint: "ep_a" })?.endpoint).toBeNull();
+  });
+});

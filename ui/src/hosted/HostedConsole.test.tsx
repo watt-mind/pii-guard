@@ -209,7 +209,7 @@ describe("hosted console for a signed-in owner", () => {
     history.replaceState(null, "", "#logs");
     act(() => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
     const logs = screen.getByRole("region", { name: "Logs" });
-    expect(await within(logs).findByText(/Connect a client to one of your endpoints/)).toBeInTheDocument();
+    expect(await within(logs).findByText(/Calls through any of this project.s endpoints show here/)).toBeInTheDocument();
     expect(within(logs).queryByRole("button", { name: "Send demo traffic" })).not.toBeInTheDocument();
   });
 

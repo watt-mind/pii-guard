@@ -26,7 +26,8 @@ from pii_guard.hosted.egress import SecureTransport
 from pii_guard.hosted.identity import ApiKeyStore, GuestIdentity, Principal
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits, SponsoredUnavailableError
 from pii_guard.hosted.spend import azure_spend
-from pii_guard.observability import Observability, ObservabilitySettings, TrafficLevel
+from pii_guard.observability import Observability, ObservabilitySettings, TrafficLevel, TrafficLog
+from pii_guard.observability.traffic import TrafficFeed, TrafficFeedView
 from pii_guard.types import Analyzer, PiiGuardError, Span
 from pii_guard.vault import Vault
 from pii_guard.workers import BoundedWorkers
@@ -115,6 +116,8 @@ class Runtime:
     #: The ``_runtimes`` key; a guest runtime is dropped as soon as it is idle.
     identity: str = ""
     guest: bool = False
+    #: The principal that owns this runtime; its traffic log belongs to that owner's feed.
+    owner: str = ""
 
 
 class BoundedAnalyzer:
@@ -203,6 +206,9 @@ class HostedService:
         self._spend_refresh_lock = threading.Lock()
         self._runtimes: dict[str, Runtime] = {}
         self._session_budgets: dict[str, SessionBudget] = {}
+        # One traffic sequence per owner (LAB-1492): a project's Logs merge its endpoint
+        # runtimes by ``seq`` without ever touching another owner's feed.
+        self._feeds: dict[str, TrafficFeed] = {}
         self._lock = threading.Lock()
         self.rest_slots = threading.BoundedSemaphore(4)
         self._ingress = 0
@@ -266,6 +272,11 @@ class HostedService:
                     SessionDirectory(self.settings.hosted_max_sessions),
                     identity=identity,
                     guest=guest,
+                    owner=principal.id,
+                )
+                feed = self._feeds.setdefault(principal.id, TrafficFeed())
+                runtime.observability.traffic = TrafficLog(
+                    TrafficLevel.MASKED, 50, feed=feed, source=identity
                 )
                 self._runtimes[identity] = runtime
             runtime.active += 1
@@ -281,6 +292,7 @@ class HostedService:
                 runtime.vault.close()
                 if self._runtimes.get(runtime.identity) is runtime:
                     del self._runtimes[runtime.identity]
+                    self._detach_traffic_locked(runtime)
 
     def purge_expired(self) -> None:
         with self._lock:
@@ -290,6 +302,7 @@ class HostedService:
                     runtime.vault.close()
                     self.connections.clear_owner(owner)
                     del self._runtimes[owner]
+                    self._detach_traffic_locked(runtime)
             for owner, budget in list(self._session_budgets.items()):
                 if not budget.vaults:
                     del self._session_budgets[owner]
@@ -297,6 +310,27 @@ class HostedService:
         self.connections.purge_expired()
         self.abuse.purge_expired()
         self.check_kill_switch()
+
+    def _detach_traffic_locked(self, runtime: Runtime) -> None:
+        feed = self._feeds.get(runtime.owner)
+        if feed is None:
+            return
+        feed.detach(runtime.identity)
+        if not feed.sources():
+            del self._feeds[runtime.owner]
+
+    def project_traffic(self, runtime: Runtime, project_id: str | None) -> TrafficFeedView:
+        """Project Logs with no endpoint selected (LAB-1492): ``runtime`` (the project's own)
+        and every endpoint runtime of ``project_id``, read from the owner's feed only."""
+        with self._lock:
+            feed = self._feeds[runtime.owner]
+        base = runtime.identity
+        prefix = f"{runtime.owner}:{project_id}:" if project_id else None
+
+        def include(source: str) -> bool:
+            return source == base or (prefix is not None and source.startswith(prefix))
+
+        return TrafficFeedView(feed, include, runtime.observability.traffic.level)
 
     def provider_settings(self, request: Request) -> Settings:
         connection = getattr(request.state, "hosted_connection", None)
@@ -442,6 +476,7 @@ class HostedService:
             for runtime in self._runtimes.values():
                 runtime.vault.close()
             self._runtimes.clear()
+            self._feeds.clear()
         self.keys.clear()
         self.connections.clear()
         for workers in self._workers.values():

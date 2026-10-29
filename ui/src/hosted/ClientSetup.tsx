@@ -503,7 +503,7 @@ function TestStep({ endpointId }: { endpointId: string }) {
               </details>
             )}
             <p className="text-xs text-muted">
-              Detection can miss values: check the masked request. Every call also shows up in <a className="text-ink underline underline-offset-4" href="#logs">Logs</a>.
+              Detection can miss values: check the masked request. Every call also shows up in <a className="text-ink underline underline-offset-4" href="#logs">Logs</a>, tagged with this endpoint.
             </p>
           </div>
         )}
