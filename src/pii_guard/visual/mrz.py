@@ -219,6 +219,9 @@ class MrzData:
     surname: str
     given: str
     valid: bool
+    #: The document-number check digit as read (``""`` when unreadable). Lets the caller
+    #: retry OCR confusions in the number until the digit passes (LAB-1197).
+    number_check: str = ""
 
     @property
     def name(self) -> str:
@@ -307,4 +310,5 @@ def parse_mrz(lines: Sequence[str]) -> MrzData | None:
         surname,
         given,
         valid,
+        number_check if len(number_check) == 1 and number_check.isdigit() else "",
     )

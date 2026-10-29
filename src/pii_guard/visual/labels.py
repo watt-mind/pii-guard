@@ -38,8 +38,8 @@ from typing import Any
 from pii_guard.policy import Policy
 from pii_guard.types import EntityType, MaskingError, Span
 from pii_guard.vault import PLACEHOLDER_RE, VaultSession, normalize_value
-from pii_guard.visual.fuzzy import Candidate, Match, match_value, name_tokens
-from pii_guard.visual.mrz import MrzData, parse_mrz
+from pii_guard.visual.fuzzy import CONFUSION_GROUPS, Candidate, Match, match_value, name_tokens
+from pii_guard.visual.mrz import MrzData, check_digit, parse_mrz
 from pii_guard.visual.ocr import OcrText, OcrWord, TextFinding
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.summary import (
@@ -321,6 +321,35 @@ def _holder_text(fields: dict[str, list[TextFinding]], mrz: MrzData | None) -> s
     return None
 
 
+#: OCR confusions tried for an MRZ document number beyond :data:`CONFUSION_GROUPS`:
+#: Tesseract reads ``J`` for ``I`` on OCR-B. Not a global confusion: one letter read for
+#: another is another document (LAB-1211); the check digit gates the substitution here.
+_MRZ_EXTRA_CONFUSIONS = ("IJ", "ij")
+
+
+def mrz_number_fixes(mrz: MrzData) -> list[str]:
+    """The document number with one OCR-confusion substitution that makes its check digit
+    pass (LAB-1197): Tesseract reads ``O`` for ``0``, ``I`` for ``1`` (and ``J`` for ``I``
+    on OCR-B) and the like; the digit says which read is right. ``[]`` when the check
+    digit itself is unreadable or nothing passes."""
+    check = mrz.number_check
+    if len(check) != 1 or not check.isdigit() or not mrz.document_number:
+        return []
+    out: list[str] = []
+    for index, char in enumerate(mrz.document_number):
+        for group in (*CONFUSION_GROUPS, *_MRZ_EXTRA_CONFUSIONS):
+            if char.casefold() not in group:
+                continue
+            for alt in group:
+                if not alt.isalnum() or alt == char.casefold():
+                    continue
+                fixed = alt.upper() if alt.isalpha() else alt
+                variant = mrz.document_number[:index] + fixed + mrz.document_number[index + 1 :]
+                if check_digit(variant) == check and variant not in out:
+                    out.append(variant)
+    return out
+
+
 def _overlap(a: Box, b: Box) -> int:
     ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
     iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
@@ -515,6 +544,10 @@ def label_image(
                 mrz_data.document_number, EntityType.ID_DOCUMENT
             ).placeholder
         else:
+            # A misread zone's number is only matched, never stored. First as read, then
+            # the check-digit-gated OCR-confusion fixes (LAB-1197). A fix reconstructs the
+            # printed number with the digit's certainty, so it must match exactly: a fuzzy
+            # reuse could merge a near-namesake the digit ruled out.
             found = matcher.match(mrz_data.document_number, EntityType.ID_DOCUMENT)
             if (
                 found.accepted
@@ -522,6 +555,16 @@ def label_image(
                 and not found.candidate.placeholder.startswith("known:")
             ):
                 mrz_document = found.candidate.placeholder
+            else:
+                for fix in mrz_number_fixes(mrz_data):
+                    fixed = matcher.match(fix, EntityType.ID_DOCUMENT)
+                    if (
+                        fixed.status == "exact"
+                        and fixed.candidate is not None
+                        and not fixed.candidate.placeholder.startswith("known:")
+                    ):
+                        mrz_document = fixed.candidate.placeholder
+                        break
     for finding in findings:
         if id(finding) in holder_findings and holder is not None:
             labelled.append((finding, holder.label))

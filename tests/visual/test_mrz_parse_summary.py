@@ -126,3 +126,52 @@ def test_uncertain_fields_are_listed() -> None:
         holder=SummaryField("holder", "[[PERSON_a]]", "uncertain"),
     )
     assert summary["fields_uncertain"] == ["holder", "date_of_birth"]
+
+
+TENANT_KEY = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"
+
+
+def test_garbled_document_number_is_fixed_by_its_check_digit() -> None:
+    # LAB-1197: Tesseract reads J for I in the de-id_card-back zone; the digit says which
+    # read is right. The garbled number alone only matches uncertainly (LAB-1211 keeps
+    # letter-apart numbers apart), the digit-gated fix recovers the printed number.
+    from pii_guard.vault import Vault
+    from pii_guard.visual.labels import VaultMatcher, mrz_number_fixes
+    from pii_guard.visual.mrz import MrzData
+
+    garbled = MrzData(
+        "TD1",
+        "I",
+        "UTO",
+        "XIXK86KV4",
+        "UTO",
+        "900722",
+        "310630",
+        "MUSTERMANN",
+        "ERIKA",
+        False,
+        "8",
+    )
+    assert mrz_number_fixes(garbled) == ["XJXK86KV4"]
+
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    matcher = VaultMatcher(session, "de")
+    true_placeholder = matcher.assign("XJXK86KV4", EntityType.ID_DOCUMENT).placeholder
+    near = matcher.assign("XJXK86KU4", EntityType.ID_DOCUMENT).placeholder
+    assert near != true_placeholder
+    # As read the garbled number is uncertain (a real letter changed), never a merge.
+    assert matcher.match("XIXK86KV4", EntityType.ID_DOCUMENT).status == "uncertain"
+    # The digit-gated fix matches the printed number exactly, not the near-namesake.
+    fixed = matcher.match("XJXK86KV4", EntityType.ID_DOCUMENT)
+    assert fixed.status == "exact" and fixed.candidate is not None
+    assert fixed.candidate.placeholder == true_placeholder
+
+
+def test_number_check_defaults_to_empty() -> None:
+    from pii_guard.visual.mrz import MrzData
+
+    data = MrzData(
+        "TD3", "P", "UTO", "KK7406302", "UTO", "850416", "310630", "PELDA", "GABOR", True
+    )
+    assert data.number_check == ""
+    assert "KK7406302" not in repr(data)
